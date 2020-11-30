@@ -49,15 +49,6 @@ tasks:
             set_cmake_var compiler_vars CMAKE_C_COMPILER PATH ${c_compiler}
             set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
         fi
-
-        if [ -n "${build_libuv|}" ]; then
-            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
-                ./evergreen/build_libuv.sh \
-                    -p libuv_prefix \
-                    -b v1.40.0 \
-                    -e "${extra_flags}" \
-                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
-        fi
        
         if [ -n "${build_zlib|}" ]; then
             CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
@@ -71,6 +62,10 @@ tasks:
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+
+        if [[ -n "${fetch_missing_dependencies|}" ]]; then
+            set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
+        fi
 
         cat cmake_vars/*.txt | tee cmake_vars.txt
         
@@ -164,7 +159,7 @@ buildvariants:
   expansions:
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    build_libuv: On
+    fetch_missing_dependencies: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -178,7 +173,7 @@ buildvariants:
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    build_libuv: On
+    fetch_missing_dependencies: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -218,7 +213,7 @@ buildvariants:
     test_flags: "-C Debug"
     package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
-    build_libuv: On
+    fetch_missing_dependencies: On
     build_zlib: On
   tasks:
   - name: compile_test_and_package
