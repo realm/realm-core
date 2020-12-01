@@ -12,7 +12,7 @@ set -o pipefail
 case $(uname -s) in
     Darwin)
         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
-        STITCH_ASSISTED_AGG_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-mongo-libs/stitch_mongo_libs_osx_patch_752d3ad5fa6c559e22ba1215acbe80b5c9567753_5fa1b8110305b929df995244_20_11_03_20_05_38/assisted_agg"
+        STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/assisted_agg"
         GO_URL="https://golang.org/dl/go1.14.10.darwin-amd64.tar.gz"
         MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/osx/mongodb-macos-x86_64-enterprise-4.4.1.tgz"
         YQ_DOWNLOAD_URL="https://github.com/mikefarah/yq/releases/download/3.4.1/yq_darwin_amd64"
@@ -39,14 +39,14 @@ case $(uname -s) in
         case $DISTRO_NAME in
             ubuntu)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-4.4.1.tgz"
-		STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_patch_592af1595b8bd8d19d8ad23292fc997691a0ee2a_5fb4567b57e85a2da5f4a69b_20_11_17_23_02_39/libmongo-ubuntu2004-x86_64.so"
+		STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/libmongo-ubuntu2004-x86_64.so"
                 STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-v4.4/stitch-support/ubuntu2004/03d22bb5884e280934d36702136d99a9363fb720/stitch-support-4.4.2-rc0-3-g03d22bb.tgz"
             ;;
             rhel)
                 case $DISTRO_VERSION_MAJOR in
                     7)
                         MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-rhel70-4.4.1.tgz"
-                        STITCH_ASSISTED_AGG_LIB_URL="https://s3.amazonaws.com//stitch-artifacts/stitch-mongo-libs/stitch_mongo_libs_linux_64_patch_752d3ad5fa6c559e22ba1215acbe80b5c9567753_5fa1b8110305b929df995244_20_11_03_20_05_38/libmongo.so"
+                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/libmongo.so"
                         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-rhel-70-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
                     ;;
                     *)

@@ -68,9 +68,6 @@ tasks:
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
-        if [[ -n "${fetch_missing_dependencies|}" ]]; then
-            set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
-        fi
 
         if [[ -n "${fetch_missing_dependencies|}" ]]; then
             set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
