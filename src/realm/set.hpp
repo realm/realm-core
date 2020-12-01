@@ -259,6 +259,13 @@ public:
     template <class It1, class It2>
     void assign_symmetric_difference(It1, It2);
 
+    bool is_subset_of(const LnkSet& rhs) const;
+    bool is_superset_of(const LnkSet& rhs) const;
+    bool intersects(const LnkSet& rhs) const;
+
+    template <class It1, class It2>
+    bool intersects(It1, It2) const;
+
     // Overriding members of CollectionBase:
     using CollectionBase::get_key;
     CollectionBasePtr clone_collection() const
