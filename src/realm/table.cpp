@@ -2284,6 +2284,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 {
     check_column(col_key);
 
+    if (!col_key.is_nullable() && value_is_null(value)) {
+        return {}; // this is a precaution/optimization
+    }
     // You cannot call GetIndexData on ObjKey
     if constexpr (!std::is_same_v<T, ObjKey>) {
         if (StringIndex* index = get_search_index(col_key)) {

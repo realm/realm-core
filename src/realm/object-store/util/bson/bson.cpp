@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/base64.hpp>
 #include <external/json/json.hpp>
 #include <sstream>
 #include <stack>
@@ -118,6 +119,9 @@ Bson& Bson::operator=(Bson&& v) noexcept
         case Type::Array:
             new (&array_val) std::unique_ptr<BsonArray>{std::move(v.array_val)};
             break;
+        case Type::Uuid:
+            uuid_val = v.uuid_val;
+            break;
     }
 
     return *this;
@@ -181,6 +185,9 @@ Bson& Bson::operator=(const Bson& v)
             new (&array_val) std::unique_ptr<BsonArray>(new BsonArray(*v.array_val));
             break;
         }
+        case Type::Uuid:
+            uuid_val = v.uuid_val;
+            break;
     }
 
     return *this;
@@ -237,6 +244,8 @@ bool Bson::operator==(const Bson& other) const
             return *document_val == *other.document_val;
         case Type::Array:
             return *array_val == *other.array_val;
+        case Type::Uuid:
+            return uuid_val == other.uuid_val;
     }
 
     return false;
@@ -341,6 +350,12 @@ template <>
 bool holds_alternative<MongoTimestamp>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Timestamp;
+}
+
+template <>
+bool holds_alternative<UUID>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Uuid;
 }
 
 struct PrecisionGuard {
@@ -482,6 +497,11 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
                 out << b;
             }
             out << "]";
+            break;
+        }
+        case Bson::Type::Uuid: {
+            const UUID& u = static_cast<UUID>(b);
+            out << "{\"$uuid\":\"" << u.to_string() << "\"}";
             break;
         }
     }
@@ -630,7 +650,18 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          }
          if (!base64 || !subType)
              throw BsonError("invalid extended json $binary");
-         return Bson(std::move(*base64)); // TODO don't throw away the subType.
+         if (subType == 0x04) { // UUID
+             auto stringData = StringData(reinterpret_cast<const char*>(base64->data()), base64->size());
+             util::Optional<std::vector<char>> uuidChrs = util::base64_decode_to_vector(stringData);
+             if (!uuidChrs)
+                 throw BsonError("Invalid base64 in $binary");
+             UUID::UUIDBytes bytes{};
+             std::copy_n(uuidChrs->data(), bytes.size(), bytes.begin());
+             return Bson(UUID(bytes));
+         }
+         else {
+             return Bson(std::move(*base64)); // TODO don't throw away the subType.
+         }
      }},
     {"$date",
      +[](const Json& json) {
@@ -702,6 +733,11 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
              throw BsonError("invalid extended json $timestamp");
          return Bson(MongoTimestamp(*t, *i));
      }},
+    {"$uuid",
+     +[](const Json& json) {
+         std::string uuid = json.get<std::string>();
+         return Bson(UUID(uuid));
+     }},
 };
 
 constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& lhs,
@@ -727,6 +763,16 @@ Bson dom_obj_to_bson(const Json& json)
                                        std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
             if (it != std::end(bson_fancy_parsers) && it->first == key) {
                 return it->second(value);
+            }
+        }
+    }
+    else if (json.size() == 2) {
+        const auto& [key, value] = json.items().begin();
+        if (key[0] == '$') {
+            auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
+                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
+            if (it != std::end(bson_fancy_parsers) && it->first == key) {
+                return it->second(json);
             }
         }
     }

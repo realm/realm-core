@@ -4,8 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix an assertion failure when querying for null on a non-nullable string primary key property. ([#4060](https://github.com/realm/realm-core/issues/4060), since v10.0.0-alpha.2)
  
 ### Breaking changes
 * None.
@@ -13,7 +12,8 @@
 -----------
 
 ### Internals
-* None.
+* Fix publishing the Cocoa xcframework release package to s3.
+* Remove debug libraries from the Cocoa release packages.
 
 ----------------------------------------------
 
