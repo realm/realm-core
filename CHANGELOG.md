@@ -8,7 +8,7 @@
 * None.
  
 ### Breaking changes
-* Add support for Google openId
+* None.
 
 -----------
 
