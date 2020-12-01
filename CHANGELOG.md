@@ -5,7 +5,8 @@
 
 ### Fixed
 * Fix an assertion failure when querying for null on a non-nullable string primary key property. ([#4060](https://github.com/realm/realm-core/issues/4060), since v10.0.0-alpha.2)
- 
+* Fix a use of a dangling reference when refreshing a user's custom data that could lead to a crash (since v10.0.0).
+
 ### Breaking changes
 * None.
 
