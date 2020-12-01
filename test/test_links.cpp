@@ -491,6 +491,7 @@ TEST(Links_LinkList_Construction)
     list0.add(target_keys[0]); // Ensure usability
     list0.clear();             // Make it empty again
 
+    links1.size();        // call update_if_needed()
     LnkLst list1(links1); // Constructed from not empty list
     CHECK_EQUAL(3, list1.size());
     list1.clear();
