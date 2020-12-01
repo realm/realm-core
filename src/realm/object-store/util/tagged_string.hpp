@@ -50,10 +50,10 @@ struct TaggedString {
     {
     }
 
-    constexpr TaggedString(TaggedString const& v) noexcept = default;
-    constexpr TaggedString& operator=(TaggedString const& v) noexcept = default;
-    constexpr TaggedString(TaggedString&& v) noexcept = default;
-    constexpr TaggedString& operator=(TaggedString&& v) noexcept = default;
+    constexpr TaggedString(TaggedString const& v) = default;
+    constexpr TaggedString& operator=(TaggedString const& v) = default;
+    constexpr TaggedString(TaggedString&& v) = default;
+    constexpr TaggedString& operator=(TaggedString&& v) = default;
 
     constexpr operator const char*() const noexcept
     {
