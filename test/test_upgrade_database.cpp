@@ -1420,5 +1420,16 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+/*
+TEST(Upgrade_bug)
+{
+    auto hist = make_in_realm_history("/home/jed/default.realm");
 
+    SharedGroup db(*hist);
+    {
+        ReadTransaction rt(db);
+        rt.get_group().verify();
+    }
+}
+*/
 #endif // TEST_GROUP
