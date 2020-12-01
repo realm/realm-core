@@ -1,19 +1,34 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Introduce preliminary support for the Set data type.
 
 ### Fixed
+* Sync client: Upgrade to protocol version 2, which fixes a bug that would
+  prevent eventual consistency during conflict resolution. Affected clients
+  would experience data divergence and potentially consistency errors as a
+  result. ([#4004](https://github.com/realm/realm-core/pull/4004))
 * Fix an assertion failure when querying for null on a non-nullable string primary key property. ([#4060](https://github.com/realm/realm-core/issues/4060), since v10.0.0-alpha.2)
+* Fixed an internal race condition
+  ([#4098](https://github.com/realm/realm-core/pull/4098),
+  [#4032](https://github.com/realm/realm-core/issues/4032)).
+* Fixed a use-after-free bug that would result in occasional unpredictable
+  crashes when calling `List::snapshot()`
+  ([#4114](https://github.com/realm/realm-core/issues/4114)).
  
 ### Breaking changes
-* None.
+* Sync client: The sync client now requires a server that speaks protocol
+  version 2 (Cloud version `20201202` or newer).
 
 -----------
 
 ### Internals
 * Fix publishing the Cocoa xcframework release package to s3.
 * Remove debug libraries from the Cocoa release packages.
+* Changed the `DataType` and `ColumnType` enums to be enum-like structs for
+  better type safety.
+* Added state applier tool for cloud-team fuzzing
+  ([#4037](https://github.com/realm/realm-core/pull/4037)).
 
 ----------------------------------------------
 
