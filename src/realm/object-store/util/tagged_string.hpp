@@ -57,10 +57,6 @@ struct TaggedString {
     {
         return m_value.data();
     }
-    constexpr TaggedString operator!() const noexcept
-    {
-        return TaggedString{!m_value};
-    }
 
     friend constexpr bool operator==(TaggedString l, TaggedString r) noexcept
     {
