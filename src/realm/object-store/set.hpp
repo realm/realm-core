@@ -59,6 +59,10 @@ public:
 
     template <class T, class Context>
     size_t find(Context&, const T&) const;
+
+    // Find the index in the Set of the first row matching the query
+    size_t find(Query&& query) const;
+
     template <class T, class Context>
     std::pair<size_t, bool> insert(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
@@ -199,5 +203,12 @@ void Set::assign(Context& ctx, T&& values, CreatePolicy policy)
 
 } // namespace object_store
 } // namespace realm
+
+namespace std {
+template <>
+struct hash<realm::object_store::Set> {
+    size_t operator()(realm::object_store::Set const&) const;
+};
+} // namespace std
 
 #endif // REALM_OS_SET_HPP

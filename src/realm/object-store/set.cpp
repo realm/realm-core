@@ -72,6 +72,16 @@ size_t Set::find(const T& value) const
     return as<T>().find(value);
 }
 
+size_t Set::find(Query&& q) const
+{
+    verify_attached();
+    if (m_type == PropertyType::Object) {
+        ObjKey key = get_query().and_query(std::move(q)).find();
+        return key ? as<Obj>().find_first(key) : not_found;
+    }
+    throw std::runtime_error("not implemented");
+}
+
 template <typename T>
 T Set::get(size_t row_ndx) const
 {
@@ -283,5 +293,26 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
     // FIXME: Handle Mixed / ObjLink
     return as<ObjKey>().insert(obj.get_key());
 }
-
 } // namespace realm::object_store
+
+namespace {
+size_t hash_combine()
+{
+    return 0;
+}
+template <typename T, typename... Rest>
+size_t hash_combine(const T& v, Rest... rest)
+{
+    size_t h = hash_combine(rest...);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    return h;
+}
+} // namespace
+
+namespace std {
+size_t hash<realm::object_store::Set>::operator()(realm::object_store::Set const& set) const
+{
+    auto& impl = *set.m_set_base;
+    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+}
+} // namespace std
