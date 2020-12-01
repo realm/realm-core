@@ -52,6 +52,8 @@ struct TaggedString {
 
     constexpr TaggedString(TaggedString const& v) noexcept = default;
     constexpr TaggedString& operator=(TaggedString const& v) noexcept = default;
+    constexpr TaggedString(TaggedString&& v) noexcept = default;
+    constexpr TaggedString& operator=(TaggedString&& v) noexcept = default;
 
     constexpr operator const char*() const noexcept
     {

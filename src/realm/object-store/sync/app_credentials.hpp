@@ -96,10 +96,10 @@ struct AppCredentials {
     static AppCredentials apple(const AppCredentialsToken id_token);
 
     // Construct and return credentials from a google account token.
-    static AppCredentials google(const AuthCode id_token);
+    static AppCredentials google(AuthCode&& id_token);
 
     // Construct and return credentials from a google account token.
-    static AppCredentials google(const IdToken id_token);
+    static AppCredentials google(IdToken&& id_token);
 
     // Construct and return credentials from a jwt token.
     static AppCredentials custom(const AppCredentialsToken token);
