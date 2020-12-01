@@ -840,15 +840,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // We must extend the file to a page boundary (unless already there)
         // The file must be extended to match in size prior to being mmapped,
         // as extending it after mmap has undefined behavior.
-
-        // The mapping of the first part of the file *must* be contiguous, because
-        // we do not know if the file was created by a version of the code, that took
-        // the section boundaries into account. If it wasn't we cannot map it in sections
-        // without risking datastructures that cross a mapping boundary.
-
-        // FIXME: This should be replaced by special handling for the older file formats,
-        // where we map contiguously but split the mapping into same sized maps afterwards.
-        // This will allow os to avoid a lot of mapping manipulations during file open.
         if (cfg.read_only) {
 
             // If the file is opened read-only, we cannot extend it. This is not a problem,

@@ -41,6 +41,7 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/set.hpp>
+#include <realm/backup_restore.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -977,6 +978,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
+        // - restore of a backup, if desired
+        // - backup of the realm file in preparation of file format upgrade
         // - DB beginning/ending a session
         // - Waiting for and signalling database changes
         {
@@ -1024,6 +1027,11 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                     auto reader_end_guard = make_scope_exit(handler);
                     Array top{alloc};
                     top.init_from_ref(top_ref);
+
+
+                    // FIXME: This will not work for future file format versions (first checked later) ?
+
+
                     Group::validate_top_array(top, alloc);
                 }
             }
@@ -1049,6 +1057,21 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // required if greater than file format version of attached file).
             using gf = _impl::GroupFriend;
             current_file_format_version = alloc.get_committed_file_format_version();
+            target_file_format_version =
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+
+            if (realm::must_restore_from_backup(path, current_file_format_version)) {
+                // we need to unmap before any file ops that'll change the realm file:
+                // (only strictly needed for Windows)
+                alloc.note_reader_end(this);
+                alloc.detach();
+                alloc_detach_guard.release();
+                realm::restore_from_backup(path);
+                // finally, retry with the restored file instead of the original one:
+                continue;
+            }
+
+            realm::backup_realm_if_needed(path, current_file_format_version, target_file_format_version);
 
             bool file_format_ok = false;
             // In shared mode (Realm file opened via a DB instance) this
@@ -1073,9 +1096,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             if (REALM_UNLIKELY(!file_format_ok)) {
                 throw UnsupportedFileFormatVersion(current_file_format_version);
             }
-
-            target_file_format_version =
-                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
