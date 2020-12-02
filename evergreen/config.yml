@@ -268,7 +268,7 @@ task_groups:
  
 buildvariants:
 - name: ubuntu2004
-  display_name: "Ubuntu 20.04"
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -285,7 +285,7 @@ buildvariants:
     - ubuntu2004-large
 
 - name: ubuntu2004-asan
-  display_name: "Ubuntu 20.04 (Clang 11 ASAN)"
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 ASAN)"
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -302,7 +302,7 @@ buildvariants:
     - ubuntu2004-large
 
 - name: ubuntu2004-tsan
-  display_name: "Ubuntu 20.04 (Clang 11 TSAN)"
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 TSAN)"
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
@@ -319,7 +319,7 @@ buildvariants:
     - ubuntu2004-large
 
 - name: rhel70
-  display_name: "RHEL 7"
+  display_name: "RHEL 7 x86_64"
   run_on: rhel70-small
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
@@ -346,7 +346,7 @@ buildvariants:
     - ubuntu2004-arm64-large
 
 - name: macos-1014
-  display_name: "MacOS 10.14"
+  display_name: "MacOS 10.14 x86_64"
   run_on: macos-1014-test
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
@@ -359,7 +359,7 @@ buildvariants:
     - macos-1014
 
 - name: windows-64-vs2019
-  display_name: "Windows x86_64 VS 2019"
+  display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-64-vs2019-test 
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
