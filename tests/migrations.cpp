@@ -205,10 +205,12 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
 
             Schema schema1 = {};
-            Schema schema2 = add_table(schema1, {"object", IsEmbedded{true}, {
+            Schema schema2 = add_table(schema1, {"object1", {{"link", PropertyType::Object|PropertyType::Nullable, "embedded1"}}});
+            schema2 = add_table(schema2, {"embedded1", IsEmbedded{true}, {
                 {"value", PropertyType::Int}
             }});
-            Schema schema3 = add_table(schema2, {"object2", IsEmbedded{true}, {
+            Schema schema3 = add_table(schema2, {"object2", {{"link", PropertyType::Object|PropertyType::Array, "embedded2"}}});
+            schema3 = add_table(schema3, {"embedded2", IsEmbedded{true}, {
                 {"value", PropertyType::Int}
             }});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
@@ -419,7 +421,7 @@ TEST_CASE("migration: Automatic") {
                     {"col1", PropertyType::Int},
                 }},
             };
-            auto schema2 = add_table(add_property(schema1, "object", {"col2", PropertyType::Int}),
+            auto schema2 = add_table(add_property(schema1, "object", {"link", PropertyType::Object|PropertyType::Nullable, "object2"}),
                                      {"object2", IsEmbedded{true}, {{"value", PropertyType::Int}}});
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
@@ -429,18 +431,19 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
 
             Schema schema = {
+                {"top", {{"link", PropertyType::Object|PropertyType::Nullable, "object"}}},
                 {"object", IsEmbedded{true}, {
                     {"value", PropertyType::Int},
                 }},
             };
             REQUIRE_MIGRATION_NEEDED(*realm, schema, set_embedded(schema, "object", false));
-
         }
 
         SECTION("change table from top-level to embedded") {
             auto realm = Realm::get_shared_realm(config);
 
             Schema schema = {
+                {"top", {{"link", PropertyType::Object|PropertyType::Nullable, "object"}}},
                 {"object", {
                     {"value", PropertyType::Int},
                 }},
@@ -738,12 +741,14 @@ TEST_CASE("migration: Automatic") {
             }}));
         }
         SECTION("add embedded table") {
-            VERIFY_SCHEMA_IN_MIGRATION(add_table(schema, {"new table", IsEmbedded{true}, {
+            VERIFY_SCHEMA_IN_MIGRATION(add_table(add_property(schema, "object", {"link", PropertyType::Object|PropertyType::Nullable, "new table"}),
+                                                 {"new table", IsEmbedded{true}, {
                 {"value", PropertyType::Int},
             }}));
         }
         SECTION("change table type") {
-            VERIFY_SCHEMA_IN_MIGRATION(set_embedded(schema, "no pk object", true));
+            VERIFY_SCHEMA_IN_MIGRATION(set_embedded(add_property(schema, "object", {"link", PropertyType::Object|PropertyType::Nullable, "no pk object"}),
+                                                    "no pk object", true));
         }
         SECTION("add property to table") {
             VERIFY_SCHEMA_IN_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}));
@@ -1586,6 +1591,9 @@ TEST_CASE("migration: Immutable") {
 
         SECTION("differing embeddedness") {
             auto realm = realm_with_schema({
+                {"top", {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "object"}
+                }},
                 {"object", {
                     {"value", PropertyType::Int},
                 }},
@@ -1714,6 +1722,9 @@ TEST_CASE("migration: ReadOnly") {
 
         SECTION("differing embeddedness") {
             Schema schema = {
+                {"top", {
+                    {"link", PropertyType::Object|PropertyType::Nullable, "object"}
+                }},
                 {"object", {
                     {"value", PropertyType::Int},
                 }},

@@ -132,7 +132,57 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
         }
     }
 }
+
+void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
+{
+    std::unordered_set<std::string> orphans;
+    std::unordered_set<std::string> visitable;
+    for (auto const& object : schema) {
+        if (!object.is_embedded) {
+            for (auto const& prop : object.persisted_properties) {
+                if (prop.type == PropertyType::Object) {
+                    auto it = schema.find(prop.object_type);
+                    REALM_ASSERT(it != schema.end());
+                    if (it->is_embedded) {
+                        visitable.insert(it->name);
+                    }
+                }
+            }
+        }
+        else {
+            orphans.insert(object.name);
+        }
+    }
+    for (auto it = orphans.begin(); it != orphans.end();) {
+        if (visitable.find(*it) != visitable.end()) {
+            it = orphans.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+    // at this point any remaining orphans can only be reached by another embedded object
+    bool changes_to_process = true;
+    while (orphans.size() > 0 && changes_to_process) {
+        changes_to_process = false;
+        for (auto& name : visitable) {
+            auto it = schema.find(name);
+            REALM_ASSERT(it != schema.end());
+            for (auto const& prop : it->persisted_properties) {
+                if (prop.type == PropertyType::Object && orphans.find(prop.object_type) != orphans.end()) {
+                    visitable.insert(prop.object_type);
+                    orphans.erase(prop.object_type);
+                    changes_to_process = true;
+                }
+            }
+        }
+    }
+
+    for (auto name : orphans) {
+        exceptions.push_back(util::format("Embedded object '%1' is unreachable by any link path from top level objects.", name));
+    }
 }
+} // end anonymous namespace
 
 void Schema::validate(bool for_sync) const
 {
@@ -160,6 +210,7 @@ void Schema::validate(bool for_sync) const
         // only attempt to check for loops if the rest of the schema is valid
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
+        check_for_embedded_object_orphans(*this, exceptions);
     }
 
     if (exceptions.size()) {
