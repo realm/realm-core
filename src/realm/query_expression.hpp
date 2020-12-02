@@ -2120,53 +2120,6 @@ class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
-template <>
-class Columns<Dictionary> : public ObjPropertyExpr<Mixed> {
-public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : ObjPropertyExpr<Mixed>(column, table, std::move(links), type)
-    {
-        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
-    }
-
-    Columns& key(const Mixed& key_value);
-    Columns& property(const std::string& prop)
-    {
-        REALM_ASSERT(!m_key.is_null());
-        m_prop_list.push_back(prop);
-        return *this;
-    }
-    void set_cluster(const Cluster* cluster) override;
-    void evaluate(size_t index, ValueBase& destination) override;
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns<Dictionary>>(*this);
-    }
-
-    Columns(Columns const& other)
-        : ObjPropertyExpr<Mixed>(other)
-        , m_key(other.m_key)
-        , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
-        , m_key_type(other.m_key_type)
-    {
-    }
-
-private:
-    Mixed m_key;
-    std::vector<std::string> m_prop_list;
-    ObjKey m_objkey;
-    DataType m_key_type;
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
-};
-
 // Columns<Mixed> == String
 inline Query operator==(Columns<Mixed>&& left, const char* right)
 {
@@ -2812,11 +2765,11 @@ public:
     mutable ColKey m_column_key;
     LinkMap m_link_map;
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    ArrayList* m_leaf_ptr = nullptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
     ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
@@ -2879,7 +2832,7 @@ public:
         evaluate<T>(index, destination);
     }
 
-    std::string description(util::serializer::SerialisationState& state) const final
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return ColumnListBase::description(state);
     }
@@ -2898,22 +2851,22 @@ public:
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     std::unique_ptr<Subexpr> max_of() override
@@ -3039,6 +2992,76 @@ public:
         return make_subexpr<Columns<LnkSet>>(*this);
     }
 };
+
+template <>
+class Columns<Dictionary> : public ColumnsCollection<Mixed> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnsCollection<Mixed>(column, table, std::move(links), type)
+    {
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+    }
+
+    DataType get_key_type() const
+    {
+        return m_key_type;
+    }
+
+    Columns& key(const Mixed& key_value);
+    Columns& property(const std::string& prop)
+    {
+        REALM_ASSERT(!m_key.is_null());
+        m_prop_list.push_back(prop);
+        return *this;
+    }
+
+    SizeOperator<int64_t> size() override;
+    std::unique_ptr<Subexpr> get_element_length() override
+    {
+        // Not supported for Dictionary
+        return {};
+    }
+    std::unique_ptr<Subexpr> max_of() override;
+    std::unique_ptr<Subexpr> min_of() override;
+    std::unique_ptr<Subexpr> sum_of() override;
+    std::unique_ptr<Subexpr> avg_of() override;
+
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        std::string key_str;
+        if (!m_key.is_null()) {
+            key_str = std::string(".") + std::string(m_key.get_string());
+        }
+        return ColumnListBase::description(state) + key_str;
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Dictionary>>(*this);
+    }
+
+    Columns(Columns const& other)
+        : ColumnsCollection<Mixed>(other)
+        , m_prop_list(other.m_prop_list)
+        , m_objkey(other.m_objkey)
+        , m_key_type(other.m_key_type)
+    {
+        if (!other.m_key.is_null()) {
+            key(other.m_key);
+        }
+    }
+
+protected:
+    Mixed m_key;
+    std::string m_buffer;
+    std::vector<std::string> m_prop_list;
+    ObjKey m_objkey;
+    DataType m_key_type;
+};
+
 
 template <typename T>
 class ColumnListSize : public ColumnsCollection<T> {
@@ -3172,15 +3195,13 @@ class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     using R = typename Operation::ResultType;
 
-    ListColumnAggregate(ColKey column_key, ColumnsCollection<T> column)
-        : m_column_key(column_key)
-        , m_list(std::move(column))
+    ListColumnAggregate(ColumnsCollection<T> column)
+        : m_list(std::move(column))
     {
     }
 
     ListColumnAggregate(const ListColumnAggregate& other)
-        : m_column_key(other.m_column_key)
-        , m_list(other.m_list)
+        : m_list(other.m_list)
     {
     }
 
@@ -3255,7 +3276,6 @@ private:
             }
         }
     }
-    ColKey m_column_key;
     ColumnsCollection<T> m_list;
 };
 

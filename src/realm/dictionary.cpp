@@ -40,6 +40,149 @@ DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_ty
 
 DictionaryClusterTree::~DictionaryClusterTree() {}
 
+Mixed DictionaryClusterTree::min(size_t* return_ndx) const
+{
+    Mixed m;
+    size_t ndx = realm::npos;
+    ArrayMixed leaf(m_alloc);
+    size_t start_ndx = 0;
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            if (m.is_null() || val < m) {
+                m = val;
+                ndx = i + start_ndx;
+            }
+        }
+        start_ndx += e;
+        // Continue
+        return false;
+    });
+
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return m;
+}
+
+Mixed DictionaryClusterTree::max(size_t* return_ndx) const
+{
+    Mixed m;
+    size_t ndx = realm::npos;
+    ArrayMixed leaf(m_alloc);
+    size_t start_ndx = 0;
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            if (m.is_null() || val > m) {
+                m = val;
+                ndx = i + start_ndx;
+            }
+        }
+        start_ndx += e;
+        // Continue
+        return false;
+    });
+
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return m;
+}
+
+Mixed DictionaryClusterTree::sum(size_t* return_cnt) const
+{
+    Mixed s;
+    size_t cnt = 0;
+    ArrayMixed leaf(m_alloc);
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            cnt++;
+
+            if (s.is_null()) {
+                auto type = val.get_type();
+                if (type != type_Int && type != type_Float && type != type_Double && type != type_Decimal) {
+                    throw std::runtime_error(util::format("Sum not defined for %1s", get_data_type_name(type)));
+                }
+                s = val;
+            }
+            else {
+                if (s.get_type() != val.get_type()) {
+                    throw std::runtime_error(util::format("Cannot add %1 and %2", get_data_type_name(s.get_type()),
+                                                          get_data_type_name(val.get_type())));
+                }
+                switch (s.get_type()) {
+                    case type_Int:
+                        s = Mixed(s.get_int() + val.get_int());
+                        break;
+                    case type_Float:
+                        s = Mixed(s.get_float() + val.get_float());
+                        break;
+                    case type_Double:
+                        s = Mixed(s.get_double() + val.get_double());
+                        break;
+                    case type_Decimal:
+                        s = Mixed(s.get<Decimal128>() + val.get<Decimal128>());
+                        break;
+                    default:
+                        REALM_UNREACHABLE();
+                        break;
+                }
+            }
+        }
+        // Continue
+        return false;
+    });
+
+    if (return_cnt)
+        *return_cnt = cnt;
+
+    return s;
+}
+
+Mixed DictionaryClusterTree::avg(size_t* return_cnt) const
+{
+    size_t cnt = 0;
+    auto s = sum(&cnt);
+    if (return_cnt)
+        *return_cnt = cnt;
+    if (cnt && !s.is_null()) {
+        switch (s.get_type()) {
+            case type_Int:
+                return Mixed(double(s.get_int()) / cnt);
+            case type_Float:
+                return Mixed(double(s.get_float()) / cnt);
+            case type_Double:
+                return Mixed(s.get_double() / cnt);
+            case type_Decimal:
+                return Mixed(s.get<Decimal128>() / cnt);
+            default:
+                throw std::runtime_error("Average not supported");
+                break;
+        }
+    }
+    return {};
+}
+
 /******************************** Dictionary *********************************/
 
 Dictionary::Dictionary(const Obj& obj, ColKey col_key)
@@ -126,111 +269,41 @@ size_t Dictionary::find_any(Mixed value) const
 
 Mixed Dictionary::min(size_t* return_ndx) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
-    size_t i = realm::npos;
-
-    for (auto&& elem : *this) {
-        i++;
-        if (elem.second.is_null())
-            continue;
-
-        if (m.is_null() || elem.second < m) {
-            m = elem.second;
-            ndx = i;
-        }
+    if (m_clusters) {
+        return m_clusters->min(return_ndx);
     }
-
     if (return_ndx)
-        *return_ndx = ndx;
-
-    return m;
+        *return_ndx = realm::npos;
+    return {};
 }
 
 Mixed Dictionary::max(size_t* return_ndx) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
-    size_t i = realm::npos;
-
-    for (auto&& elem : *this) {
-        i++;
-        if (elem.second.is_null())
-            continue;
-
-        if (m.is_null() || elem.second > m) {
-            m = elem.second;
-            ndx = i;
-        }
+    if (m_clusters) {
+        return m_clusters->max(return_ndx);
     }
-
     if (return_ndx)
-        *return_ndx = ndx;
-
-    return m;
+        *return_ndx = realm::npos;
+    return {};
 }
 
 Mixed Dictionary::sum(size_t* return_cnt) const
 {
-    Mixed s;
-    size_t cnt = 0;
-    for (auto&& elem : *this) {
-        if (elem.second.is_null())
-            continue;
-
-        cnt++;
-
-        if (s.is_null()) {
-            s = elem.second;
-        }
-        else {
-            if (s.get_type() != elem.second.get_type()) {
-                throw std::runtime_error("Sum not supported");
-            }
-            switch (s.get_type()) {
-                case type_Int:
-                    s = Mixed(s.get_int() + elem.second.get_int());
-                    break;
-                case type_Float:
-                    s = Mixed(s.get_float() + elem.second.get_float());
-                    break;
-                case type_Double:
-                    s = Mixed(s.get_double() + elem.second.get_double());
-                    break;
-                case type_Decimal:
-                    s = Mixed(s.get<Decimal128>() + elem.second.get<Decimal128>());
-                    break;
-                default:
-                    throw std::runtime_error("Average not supported");
-                    break;
-            }
-        }
+    if (m_clusters) {
+        return m_clusters->sum(return_cnt);
     }
-
     if (return_cnt)
-        *return_cnt = cnt;
-
-    return s;
+        *return_cnt = 0;
+    return {};
 }
 
 Mixed Dictionary::avg(size_t* return_cnt) const
 {
-    auto s = sum(return_cnt);
-    if (*return_cnt && !s.is_null()) {
-        switch (s.get_type()) {
-            case type_Int:
-                return Mixed(double(s.get_int()) / *return_cnt);
-            case type_Float:
-                return Mixed(double(s.get_float()) / *return_cnt);
-            case type_Double:
-                return Mixed(s.get_double() / *return_cnt);
-            case type_Decimal:
-                return Mixed(s.get<Decimal128>() / *return_cnt);
-            default:
-                throw std::runtime_error("Average not supported");
-                break;
-        }
+    if (m_clusters) {
+        return m_clusters->avg(return_cnt);
     }
+    if (return_cnt)
+        *return_cnt = 0;
     return {};
 }
 

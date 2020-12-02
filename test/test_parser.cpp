@@ -4163,5 +4163,82 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == int", 72);
 }
 
+TEST(Parser_Dictionary)
+{
+    Group g;
+    auto foo = g.add_table("foo");
+    auto origin = g.add_table("origin");
+    auto col_dict = foo->add_column_dictionary(type_Mixed, "dict");
+    auto col_link = origin->add_column(*foo, "link");
+    auto col_links = origin->add_column_list(*foo, "links");
+    size_t expected = 0;
+
+    for (int64_t i = 0; i < 100; i++) {
+        auto obj = foo->create_object();
+        Dictionary dict = obj.get_dictionary(col_dict);
+        bool incr = false;
+        if ((i % 4) == 0) {
+            dict.insert("Value", i);
+            if (i > 50)
+                incr = true;
+        }
+        else if ((i % 10) == 0) {
+            dict.insert("Value", 100);
+            incr = true;
+        }
+        if (i % 3) {
+            dict.insert("Value", 3);
+            incr = false;
+        }
+        if ((i % 5) == 0) {
+            dict.insert("Foo", 5);
+        }
+        dict.insert("Bar", i);
+        if (incr) {
+            expected++;
+        }
+    }
+
+    auto it = foo->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+
+        obj.set(col_link, it->get_key());
+
+        auto ll = obj.get_linklist(col_links);
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    verify_query(test_context, foo, "dict > 50", 50);
+    verify_query(test_context, foo, "dict.Value > 50", expected);
+
+    verify_query(test_context, origin, "link.dict.Value > 50", 3);
+    verify_query(test_context, origin, "links.dict.Value > 50", 5);
+    verify_query(test_context, origin, "links.dict > 50", 6);
+    verify_query(test_context, origin, "links.dict.Value == NULL", 10);
+
+    verify_query(test_context, foo, "dict.@size == 3", 17);
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 2);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 16);
+
+    verify_query(test_context, origin, "links.dict.@max == 100", 2);
+    verify_query(test_context, origin, "link.dict.@max == 100", 2);
+    auto dict = foo->begin()->get_dictionary(col_dict);
+
+    dict.insert("Value", 4.5);
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
+    CHECK_EQUAL(message, "Cannot add int and double");
+
+    dict.insert("Bar", Timestamp(1234, 5678));
+    // g.to_json(std::cout);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
+    CHECK_EQUAL(message, "Sum not defined for timestamps");
+}
 
 #endif // TEST_PARSER

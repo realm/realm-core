@@ -75,6 +75,10 @@ public:
     {
         return create_root_from_parent(m_owner, m_ndx_in_cluster);
     }
+    Mixed min(size_t* return_ndx = nullptr) const;
+    Mixed max(size_t* return_ndx = nullptr) const;
+    Mixed sum(size_t* return_cnt = nullptr) const;
+    Mixed avg(size_t* return_cnt = nullptr) const;
 
 private:
     ArrayParent* m_owner;
