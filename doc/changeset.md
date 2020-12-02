@@ -247,16 +247,16 @@ struct ArrayErase {
 }
 ~~~
 
-### ArrayClear (`0xb`)
+### Clear (`0xb`)
 
-**NOTE:** Contrary to other array instructions, `ArrayClear` does not end with an index. It clears the array itself, and not a value at a particular index.
+**NOTE:** Contrary to other container instructions, `Clear` does not end with an index or key. It clears the container itself, and not a value at a particular index.
 
 ~~~
-struct ArrayClear {
+struct Clear {
     table: InternString,
     object: PrimaryKey,
     field: InternString,
     path: Path,
-    prior_size: UInt32,
+    prior_size: UInt32, // ignored
 }
 ~~~

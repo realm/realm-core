@@ -489,7 +489,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
         auto objkey = table->find_primary_key(123);
         auto obj = table->get_object(objkey);
         auto subobj = obj.get_linked_object(table->get_column_key("embedded"));
-        CHECK_EQUAL(subobj.get<int64_t>("int"), 3);
+        CHECK_EQUAL(subobj.get<int64_t>("int"), 2);
     });
 }
 
@@ -568,6 +568,6 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
         auto obj = table->get_object(objkey);
         auto subobj = obj.get_linked_object(table->get_column_key("embedded"));
         auto subsubobj = subobj.get_linked_object(embedded->get_column_key("embedded"));
-        CHECK_EQUAL(subsubobj.get<int64_t>("int"), 3);
+        CHECK_EQUAL(subsubobj.get<int64_t>("int"), 2);
     });
 }

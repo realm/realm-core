@@ -206,9 +206,10 @@ void ChangesetEncoder::operator()(const Instruction::ArrayErase& instr)
     append_path_instr(Instruction::Type::ArrayErase, instr, instr.prior_size);
 }
 
-void ChangesetEncoder::operator()(const Instruction::ArrayClear& instr)
+void ChangesetEncoder::operator()(const Instruction::Clear& instr)
 {
-    append_path_instr(Instruction::Type::ArrayClear, instr, instr.prior_size);
+    uint32_t prior_size = 0; // Ignored
+    append_path_instr(Instruction::Type::Clear, instr, prior_size);
 }
 
 void ChangesetEncoder::operator()(const Instruction::SetInsert& instr)
@@ -219,11 +220,6 @@ void ChangesetEncoder::operator()(const Instruction::SetInsert& instr)
 void ChangesetEncoder::operator()(const Instruction::SetErase& instr)
 {
     append_path_instr(Instruction::Type::SetErase, instr, instr.value);
-}
-
-void ChangesetEncoder::operator()(const Instruction::SetClear& instr)
-{
-    append_path_instr(Instruction::Type::SetClear, instr);
 }
 
 InternString ChangesetEncoder::intern_string(StringData str)
