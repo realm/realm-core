@@ -1363,7 +1363,9 @@ TEST(Group_CascadeNotify_SimpleWeak)
     t->create_objects(100, t_keys);
 
     bool called = false;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) { called = true; });
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) {
+        called = true;
+    });
     t->remove_object(t_keys[5]);
     t_keys.erase(t_keys.begin() + 5);
     CHECK(called);
@@ -1664,13 +1666,11 @@ TEST(Group_ToDot)
     DescriptorRef subdesc;
     table->add_column(type_Int, "int");
     table->add_column(type_Bool, "bool");
-    table->add_column(type_OldDateTime, "date");
     table->add_column(type_String, "string");
     table->add_column(type_String, "string_long");
     table->add_column(type_String, "string_enum"); // becomes StringEnumColumn
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed, "mixed");
-    table->add_column(type_Table, "tables", &subdesc);
     subdesc->add_column(type_Int, "sub_first");
     subdesc->add_column(type_String, "sub_second");
     subdesc.reset();

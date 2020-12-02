@@ -307,6 +307,8 @@ public:
 
     std::unique_ptr<LnkSet> clone_linkset() const
     {
+        // FIXME: The copy constructor requires this.
+        update_if_needed();
         return std::make_unique<LnkSet>(*this);
     }
 
@@ -440,11 +442,7 @@ struct SetElementLessThan<Mixed> {
                 return a.get<UUID>() < b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() < b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];
@@ -496,11 +494,7 @@ struct SetElementEquals<Mixed> {
                 return a.get<UUID>() == b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() == b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];
@@ -533,6 +527,10 @@ template <class T>
 inline Set<T>::Set(const Set& other)
     : Base(static_cast<const Base&>(other))
 {
+    // FIXME: If the other side needed an update, we could be using a stale ref
+    // below.
+    REALM_ASSERT(!other.update_if_needed());
+
     if (other.m_tree) {
         Allocator& alloc = other.m_tree->get_alloc();
         m_tree = std::make_unique<BPlusTree<T>>(alloc);

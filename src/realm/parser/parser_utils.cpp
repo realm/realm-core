@@ -103,16 +103,12 @@ const char* data_type_to_str(DataType type)
             return "String";
         case type_Binary:
             return "Binary";
-        case type_OldDateTime:
-            return "DateTime";
         case type_Timestamp:
             return "Timestamp";
         case type_Decimal:
             return "Decimal";
         case type_ObjectId:
             return "ObjectId";
-        case type_OldTable:
-            return "Table";
         case type_Mixed:
             return "Mixed";
         case type_Link:
@@ -167,7 +163,8 @@ const char* comparison_type_to_str(parser::Expression::ComparisonType type)
     return "";
 }
 
-KeyPath key_path_from_string(const std::string &s) {
+KeyPath key_path_from_string(const std::string& s)
+{
     std::stringstream ss(s);
     std::string item;
     KeyPath key_path;
@@ -207,5 +204,5 @@ StringData get_printable_table_name(const Table& table)
     return get_printable_table_name(name);
 }
 
-} // namespace utils
+} // namespace util
 } // namespace realm

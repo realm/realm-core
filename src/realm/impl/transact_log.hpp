@@ -1048,7 +1048,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_DictionaryInsert: {
             int type = read_int<int>(); // Throws
-            REALM_ASSERT(type == type_String);
+            REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
             if (!handler.dictionary_insert(key)) // Throws
                 parser_error();
@@ -1056,7 +1056,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_DictionaryErase: {
             int type = read_int<int>(); // Throws
-            REALM_ASSERT(type == type_String);
+            REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
             if (!handler.dictionary_erase(key)) // Throws
                 parser_error();

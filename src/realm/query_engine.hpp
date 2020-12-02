@@ -447,7 +447,7 @@ public:
     using TConditionValue = typename LeafType::value_type;
     // static const bool nullable = ColType::nullable;
 
-    template <class TConditionFunction, Action TAction, DataType TDataType, bool Nullable>
+    template <class TConditionFunction, Action TAction, DataType::Type TDataType, bool Nullable>
     bool find_callback_specialization(size_t start_in_leaf, size_t end_in_leaf)
     {
         using AggregateLeafType = typename GetLeafType<TDataType, Nullable>::type;
@@ -611,7 +611,7 @@ protected:
         return nullptr;
     }
 
-    template <Action TAction, DataType TDataType, class TConditionFunction>
+    template <Action TAction, DataType::Type TDataType, class TConditionFunction>
     static TFind_callback_specialized get_specialized_callback_3(bool is_nullable)
     {
         if (is_nullable) {

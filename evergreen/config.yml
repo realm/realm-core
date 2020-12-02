@@ -49,15 +49,6 @@ tasks:
             set_cmake_var compiler_vars CMAKE_C_COMPILER PATH ${c_compiler}
             set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
         fi
-
-        if [ -n "${build_libuv|}" ]; then
-            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
-                ./evergreen/build_libuv.sh \
-                    -p libuv_prefix \
-                    -b v1.40.0 \
-                    -e "${extra_flags}" \
-                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
-        fi
        
         if [ -n "${build_zlib|}" ]; then
             CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
@@ -68,9 +59,19 @@ tasks:
                     -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
         fi
 
+        if [ -n "${run_tests_against_baas|}" ]; then
+            set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
+            set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
+            set_cmake_var baas_vars REALM_STITCH_CONFIG PATH $(pwd)/test/object-store/mongodb/stitch.json
+        fi
+
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+
+        if [[ -n "${fetch_missing_dependencies|}" ]]; then
+            set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
+        fi
 
         cat cmake_vars/*.txt | tee cmake_vars.txt
         
@@ -113,7 +114,7 @@ tasks:
       local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
       content_type: '${content_type|application/x-gzip}'
 
-- name: test
+- name: core-tests
   depends_on:
   - "compile"
   commands:
@@ -122,10 +123,75 @@ tasks:
       working_dir: realm-core
       script: |-
         set -o errexit
-        ctest=$(pwd)/${cmake_bindir}/ctest
+        CTEST=$(pwd)/${cmake_bindir}/ctest
 
         cd build
-        $ctest -V ${test_flags|}
+        $CTEST -V -R StorageTests ${test_flags|}
+
+- name: sync-tests
+  depends_on:
+  - "compile"
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        CTEST=$(pwd)/${cmake_bindir}/ctest
+
+        cd build
+        $CTEST -V -R SyncTests ${test_flags|}
+
+- name: object-store-tests
+  depends_on:
+  - "compile"
+  commands:
+  # If we need to start a local copy of baas, do it in the background here in a separate script.
+  # Evergreen should take care of the lifetime of the processes we start here automatically.
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      background: true
+      script: |-
+        set -o errexit
+        set -o pipefail
+
+        export CURL=${curl|curl}
+
+        if [[ -n "${run_tests_against_baas|}" ]]; then
+            ./evergreen/install_baas.sh ./baas-work-dir ./test/object-store/mongodb
+        fi
+
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o pipefail
+
+        export CURL=${curl|curl}
+
+        if [[ -n "${run_tests_against_baas|}" ]]; then
+            # wait for baas to start in the background script started above.
+            ./evergreen/wait_for_baas.sh ./baas-work-dir/stitch_server.pid
+
+            WAIT_FOR_BAAS_READY_COUNTER=0
+            until [[ -f ./baas-work-dir/baas_ready ]]; do
+                WAIT_FOR_BAAS_READY_COUNTER=$(($WAIT_FOR_BAAS_READY_COUNTER + 1))
+                if [[ "$WAIT_FOR_BAAS_READY_COUNTER" = 12 ]]; then
+                    echo "Timed out waiting for baas to finish starting and import the test app"
+                    exit 1
+                fi
+                sleep 5
+            done
+        fi
+
+        CTEST=$(pwd)/${cmake_bindir}/ctest
+
+        cd build
+        $CTEST -V -R ObjectStoreTests ${test_flags|}
 
 - name: lint
   commands:
@@ -153,10 +219,11 @@ task_groups:
   - func: "fetch cmake binaries"
   tasks:
   - compile
-  - test
+  - core-tests
+  - sync-tests
+  - object-store-tests
   - package
  
-# NOTE: When adding a new variant, update the "upload-all" task.
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04"
@@ -164,7 +231,8 @@ buildvariants:
   expansions:
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    build_libuv: On
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -178,7 +246,9 @@ buildvariants:
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    build_libuv: On
+    fetch_missing_dependencies: On
+    curl: "/opt/mongodbtoolchain/v3/bin/curl"
+    run_tests_against_baas: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -202,6 +272,7 @@ buildvariants:
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Darwin-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -218,7 +289,7 @@ buildvariants:
     test_flags: "-C Debug"
     package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
-    build_libuv: On
+    fetch_missing_dependencies: On
     build_zlib: On
   tasks:
   - name: compile_test_and_package
