@@ -97,6 +97,14 @@ public:
     util::Optional<Mixed> average(ColKey column = {}) const;
     Mixed sum(ColKey column = {}) const;
 
+    bool is_subset_of(const Set& rhs) const;
+    bool is_superset_of(const Set& rhs) const;
+    bool intersects(const Set& rhs) const;
+
+    void assign_intersection(const Set& rhs);
+    void assign_union(const Set& rhs);
+    void assign_difference(const Set& rhs);
+
     bool operator==(const Set& rhs) const noexcept;
 
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;

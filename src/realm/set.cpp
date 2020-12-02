@@ -212,7 +212,7 @@ void Set<Mixed>::do_erase(size_t ndx)
         m_tree->erase(ndx);
     }
 }
-
+    
 void LnkSet::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links
@@ -220,12 +220,27 @@ void LnkSet::remove_target_row(size_t link_ndx)
     ObjKey k = get(link_ndx);
     get_target_table()->remove_object(k);
 }
-
+    
 void LnkSet::remove_all_target_rows()
 {
     if (is_attached()) {
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
     }
+}
+
+bool LnkSet::is_subset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_subset_of(rhs.m_set);
+}
+
+bool LnkSet::is_superset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_superset_of(rhs.m_set);
+}
+
+bool LnkSet::intersects(const LnkSet& rhs) const
+{
+    return this->m_set.intersects(rhs.m_set);
 }
 
 } // namespace realm

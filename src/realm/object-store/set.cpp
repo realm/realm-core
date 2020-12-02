@@ -158,9 +158,9 @@ util::Optional<Mixed> Set::average(ColKey col) const
 
 bool Set::operator==(const Set& rgt) const noexcept
 {
-    return m_set_base->get_table() == rgt.m_set_base->get_table() &&
-           m_set_base->get_key() == rgt.m_set_base->get_key() &&
-           m_set_base->get_col_key() == rgt.m_set_base->get_col_key();
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>() == rgt.as<std::decay_t<decltype(*t)>>();
+    });
 }
 
 Results Set::snapshot() const
@@ -293,6 +293,49 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
     // FIXME: Handle Mixed / ObjLink
     return as<ObjKey>().insert(obj.get_key());
 }
+
+bool Set::is_subset_of(const Set &rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+bool Set::is_superset_of(const Set &rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+bool Set::intersects(const Set &rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_intersection(const Set &rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_union(const Set &rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_difference(const Set& rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
 } // namespace realm::object_store
 
 namespace {
