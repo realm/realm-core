@@ -133,7 +133,7 @@ jobWrapper {
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
+            buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
@@ -165,7 +165,9 @@ jobWrapper {
             ]
 
             parallelExecutors = [
+                buildMacOsDebug     : doBuildMacOs(buildOptions + [buildType : "MinSizeDebug"]),
                 buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
+                buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
@@ -184,9 +186,12 @@ jobWrapper {
             appleSdks = ['iphoneos', 'iphonesimulator',
                          'appletvos', 'appletvsimulator',
                          'watchos', 'watchsimulator']
+            appleBuildTypes = ['MinSizeDebug', 'Release']
 
-            for (buildType in appleBuildTypes) {
-                parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, 'Release')
+            for (sdk in appleSdks) {
+                for (buildType in appleBuildTypes) {
+                    parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+                }
             }
 
             linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
@@ -221,9 +226,10 @@ jobWrapper {
                             unstash name: cocoaStash
                         }
                         sh 'tools/build-cocoa.sh -x'
-                        archiveArtifacts('realm-*.tar.*')
-                        stash includes: 'realm-*.tar.xz', name: "cocoa-xz"
-                        stash includes: 'realm-*.tar.gz', name: "cocoa-gz"
+                        archiveArtifacts('realm-*-cocoa*.tar.gz')
+                        archiveArtifacts('realm-*-cocoa*.tar.xz')
+                        stash includes: 'realm-*-cocoa*.tar.xz', name: "cocoa-xz"
+                        stash includes: 'realm-*-cocoa*.tar.gz', name: "cocoa-gz"
                         publishingStashes << "cocoa-xz"
                         publishingStashes << "cocoa-gz"
                     }

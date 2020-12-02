@@ -191,9 +191,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
         if (json != expected) {
             std::cout << json << std::endl;
             std::cout << expected << std::endl;
-            std::string file_name = get_test_resource_path();
-            std::string path = file_name + "bad_" + expected_file + ".json";
-            std::string pathOld = "bad_" + file_name;
+            std::string path = "bad_" + file_name;
             File out(path, File::mode_Write);
             out.write(json);
             std::cerr << "\n error result in '" << std::string(path) << "'\n";

@@ -103,14 +103,6 @@ TEST_CASE("canonical_extjson_fragments", "[bson]") {
         boolean = static_cast<bool>(b);
         CHECK(!boolean);
     }
-
-    SECTION("UUID") {
-        auto a = bson::parse("{ \"$uuid\" : \"c8edabc3-f738-4ca3-b68d-ab92a91478a3\"}");
-        auto b = bson::parse("{ \"$binary\" : {\"base64\" : \"yO2rw/c4TKO2jauSqRR4ow==\", \"subType\" : \"04\"}}");
-        auto uuid = UUID("c8edabc3-f738-4ca3-b68d-ab92a91478a3");
-        CHECK((a == uuid));
-        CHECK((b == uuid));
-    }
 }
 
 TEST_CASE("canonical_extjson_corpus", "[bson]") {
@@ -161,13 +153,6 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                           std::string bin = "//8=";
                           CHECK(val == std::vector<char>(bin.begin(), bin.end()));
                       }});
-        }
-
-        SECTION("subtype 0x04 (UUID)") {
-            run_corpus<UUID>("u", {"{\"u\" : { \"$uuid\" : \"01234567-89ab-cdef-edcb-a98765432101\"}}", [](auto val) {
-                                       auto uuid = UUID("01234567-89ab-cdef-edcb-a98765432101");
-                                       CHECK((val == uuid));
-                                   }});
         }
     }
 
@@ -508,8 +493,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             "{\"$regularExpression\": {\"pattern\": \"pattern\", \"options\": \"\"}}, \"DatetimeEpoch\": {\"$date\": "
             "{\"$numberLong\": \"0\"}}, \"DatetimePositive\": {\"$date\": {\"$numberLong\": \"2147483647\"}}, "
             "\"DatetimeNegative\": {\"$date\": {\"$numberLong\": \"-2147483648\"}}, \"True\": true, \"False\": "
-            "false, \"Minkey\": {\"$minKey\": 1}, \"Maxkey\": {\"$maxKey\": 1}, \"Null\": null, \"UUID\": "
-            "{\"$uuid\": \"00000000-0000-0000-0000-000000000000\"}}");
+            "false, \"Minkey\": {\"$minKey\": 1}, \"Maxkey\": {\"$maxKey\": 1}, \"Null\": null}");
 
         std::string binary = "o0w498Or7cijeBSpkquNtg==";
         std::string binary_user_defined = "AQIDBAU=";
@@ -533,8 +517,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             {"False", false},
             {"Minkey", min_key},
             {"Maxkey", max_key},
-            {"Null", util::none},
-            {"UUID", UUID("00000000-0000-0000-0000-000000000000")}};
+            {"Null", util::none}};
 
         CHECK((static_cast<BsonDocument>(bson::parse(canonical_extjson)) == document));
         std::stringstream s;

@@ -103,6 +103,8 @@ if(ANDROID)
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 
+add_compile_options($<$<CONFIG:MinSizeDebug>:-g>)
+
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")

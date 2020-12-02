@@ -9,7 +9,7 @@ function usage {
     echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>] [-f <cmake_flags>]"
     echo ""
     echo "Arguments:"
-    echo "   build_type=<Release|Debug>"
+    echo "   build_type=<Release|Debug|MinSizeDebug>"
     echo "   target_os=<android|ios|watchos|tvos>"
     echo "   android_abi=<armeabi-v7a|x86|x86_64|arm64-v8a>"
     exit 1;

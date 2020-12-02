@@ -13,19 +13,17 @@ function usage {
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
     echo "   -x : build as an xcframework"
-    echo "   -d : include debug libraries"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmxdc:f:" opt; do
+while getopts ":bmxc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
         x) BUILD_XCFRAMEWORK=1;;
-        d) BUILD_DEBUG=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
@@ -35,7 +33,7 @@ done
 
 shift $((OPTIND-1))
 
-[[ -n $BUILD_DEBUG ]] && BUILD_TYPES=( Release Debug ) || BUILD_TYPES=( Release )
+readonly BUILD_TYPES=( Release MinSizeDebug )
 [[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator ) || PLATFORMS=( macosx )
 
 readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
@@ -192,7 +190,7 @@ function add_to_xcframework() {
     local os="$3"
     local platform="$4"
     local build_type="$5"
-    local suffix
+    local suffix 
     [[ "$build_type" = "Release" ]] && suffix="" || suffix="-dbg"
 
     local variant=""
@@ -291,13 +289,16 @@ if [[ -n $COPY ]]; then
     cp -R core "${DESTINATION}"
 else
     rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
-    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "*.xcframework" core
+    # .tar.gz package is used by realm-js, which uses the parser
+    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "realm-monorepo*.xcframework" core
+    # .tar.xz package is used by cocoa, which doesn't use the parser
+    tar -cJvf "realm-monorepo-cocoa-${VERSION}.tar.xz" --exclude "realm-monorepo*.xcframework" core
 
-    if [[ -n $BUILD_XCFRAMEWORK ]]; then
+    if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
         rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
         tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
         rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
         # until realmjs requires an xcframework, only package as .xz
-        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo*.xcframework
+        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo.xcframework core/realm-monorepo-dbg.xcframework
     fi
 fi
