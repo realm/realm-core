@@ -552,6 +552,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
         case 11:
         case 20:
+        case 21:
             file_format_ok = true;
             break;
     }

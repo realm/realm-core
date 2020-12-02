@@ -4290,21 +4290,30 @@ TEST(Shared_BumpFileFormat)
 
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    {
+        DBRef db = DB::create(*hist);
 
-    auto tr = db->start_write();
-    auto t = tr->add_table("Foo");
-    t->add_column(type_Int, "ints");
-    tr->commit();
+        auto tr = db->start_write();
+        auto t = tr->add_table("Foo");
+        t->add_column(type_Int, "ints");
+        tr->commit();
 
-    CHECK_EQUAL(db->get_file_format_version(), 20);
+        CHECK_EQUAL(db->get_file_format_version(), 20);
 
-    tr = db->start_write();
-    t = tr->get_table("Foo");
-    t->add_column_set(type_Int, "intset");
-    tr->commit();
+        tr = db->start_write();
+        t = tr->get_table("Foo");
+        t->add_column_set(type_Int, "intset");
+        tr->commit();
 
-    CHECK_EQUAL(db->get_file_format_version(), 21);
+        CHECK_EQUAL(db->get_file_format_version(), 21);
+    }
+    {
+        DBRef db = DB::create(*hist);
+
+        CHECK_EQUAL(db->get_file_format_version(), 21);
+        auto tr = db->start_read();
+        tr->verify();
+    }
 }
 
 #endif // TEST_SHARED

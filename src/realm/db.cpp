@@ -1066,6 +1066,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 case 10:
                 case 11:
                 case 20:
+                case 21:
                     file_format_ok = true;
                     break;
             }
@@ -1219,7 +1220,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << int(info->file_format_version) << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
@@ -2249,7 +2250,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
                 // mode the file on disk may very likely be in an invalid state.
                 break;
         }
-        this->m_file_format_version = transaction.get_file_format_version();
+        m_file_format_version = transaction.get_file_format_version();
         size_t new_file_size = out.get_file_size();
         // We must reset the allocators free space tracking before communicating the new
         // version through the ring buffer. If not, a reader may start updating the allocators

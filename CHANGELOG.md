@@ -8,7 +8,7 @@
 * None.
  
 ### Breaking changes
-* None.
+* File format version is bumped to 21 if the new data types are used.
 
 -----------
 
