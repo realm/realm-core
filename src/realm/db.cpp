@@ -2249,6 +2249,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
                 // mode the file on disk may very likely be in an invalid state.
                 break;
         }
+        this->m_file_format_version = transaction.get_file_format_version();
         size_t new_file_size = out.get_file_size();
         // We must reset the allocators free space tracking before communicating the new
         // version through the ring buffer. If not, a reader may start updating the allocators

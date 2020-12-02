@@ -927,6 +927,12 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     // locate insertion point: ordinary columns must come before backlink columns
     size_t spec_ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
 
+    if (col_key.is_dictionary() || col_key.is_set() || col_key.get_type() == col_type_Mixed ||
+        col_key.get_type() == col_type_UUID) {
+        if (auto g = get_parent_group()) {
+            g->set_file_format_version(21);
+        }
+    }
     if (!col_key) {
         col_key = generate_col_key(type, {});
     }

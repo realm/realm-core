@@ -4283,4 +4283,28 @@ TEST(Shared_ManyColumns)
     foo->create_object().set("Prop0", 500);
 }
 
+TEST(Shared_BumpFileFormat)
+{
+    // We had a bug where cluster array has to expand, but the new ref
+    // was not updated in the parent.
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+    auto t = tr->add_table("Foo");
+    t->add_column(type_Int, "ints");
+    tr->commit();
+
+    CHECK_EQUAL(db->get_file_format_version(), 20);
+
+    tr = db->start_write();
+    t = tr->get_table("Foo");
+    t->add_column_set(type_Int, "intset");
+    tr->commit();
+
+    CHECK_EQUAL(db->get_file_format_version(), 21);
+}
+
 #endif // TEST_SHARED
