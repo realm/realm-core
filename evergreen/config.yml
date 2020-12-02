@@ -363,7 +363,7 @@ buildvariants:
   run_on: windows-64-vs2019-test 
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
-    cmake_bindir: "./cmake-3.18.2-win64-x64/bin"
+    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     test_flags: "-C Debug"
