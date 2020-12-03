@@ -177,7 +177,7 @@ jobWrapper {
 
             for (abi in androidAbis) {
                 for (buildType in androidBuildTypes) {
-                    parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
+                    parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
                 }
             }
 
@@ -185,8 +185,8 @@ jobWrapper {
                          'appletvos', 'appletvsimulator',
                          'watchos', 'watchsimulator']
 
-            for (buildType in appleBuildTypes) {
-                parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, 'Release')
+            for (sdk in appleSdks) {
+                parallelExecutors[sdk] = doBuildAppleDevice(sdk, 'Release')
             }
 
             linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
