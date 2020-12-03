@@ -43,9 +43,7 @@ TEST_CASE("set") {
     ColKey col_int_set = table->get_column_key("int_set");
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
-//    ColKey other_col_int_set = table->get_column_key("int_set");
     ColKey other_col_link_set = table->get_column_key("link_set");
-//    ColKey other_col_link_obj_id = table2->get_column_key("id");
 
     auto write = [&](auto&& f) {
         r->begin_transaction();
