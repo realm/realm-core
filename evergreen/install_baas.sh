@@ -72,7 +72,7 @@ CURL=${CURL:=curl}
 
 BASE_PATH=$(cd $(dirname "$0"); pwd)
 
-REALPATH=$BASE_PATH/realpath.sh
+REALPATH=$BASE_PATH/abspath.sh
 
 if [[ -z $1 || -z $2 ]]; then
     echo "Must specify working directory and stitch app"
