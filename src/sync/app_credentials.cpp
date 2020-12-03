@@ -116,13 +116,24 @@ AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
                           });
 }
 
-AppCredentials AppCredentials::google(AppCredentialsToken auth_token)
+AppCredentials AppCredentials::google(AuthCode&& auth_token)
 {
     return AppCredentials(AuthProvider::GOOGLE,
-                          [=] {
+                          [auth_token = std::move(auth_token)] {
                               return nlohmann::json({
                                   {kAppProviderKey, IdentityProviderGoogle},
                                   {"authCode", auth_token}
+                              }).dump();
+                          });
+}
+
+AppCredentials AppCredentials::google(IdToken&& id_token)
+{
+    return AppCredentials(AuthProvider::GOOGLE,
+                          [id_token = std::move(id_token)] {
+                              return nlohmann::json({
+                                  {kAppProviderKey, IdentityProviderGoogle},
+                                  {"id_token", id_token}
                               }).dump();
                           });
 }

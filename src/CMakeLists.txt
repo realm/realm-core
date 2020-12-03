@@ -70,6 +70,7 @@ set(HEADERS
     util/event_loop_dispatcher.hpp
     util/scheduler.hpp
     util/tagged_bool.hpp
+    util/tagged_string.hpp
     util/uuid.hpp)
 
 if(APPLE)

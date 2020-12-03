@@ -3346,11 +3346,18 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.serialize_as_json() == "{\"provider\":\"anon-user\"}");
     }
 
-    SECTION("auth providers google") {
-        auto credentials = realm::app::AppCredentials::google("a_token");
+    SECTION("auth providers google authCode") {
+        auto credentials = realm::app::AppCredentials::google(AuthCode("a_token"));
         CHECK(credentials.provider() == AuthProvider::GOOGLE);
         CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
         CHECK(credentials.serialize_as_json() == "{\"authCode\":\"a_token\",\"provider\":\"oauth2-google\"}");
+    }
+
+    SECTION("auth providers google idToken") {
+        auto credentials = realm::app::AppCredentials::google(IdToken("a_token"));
+        CHECK(credentials.provider() == AuthProvider::GOOGLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
+        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-google\"}");
     }
 
     SECTION("auth providers apple") {
