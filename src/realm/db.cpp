@@ -1019,32 +1019,28 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
-                if (top_ref) {
-                    alloc.note_reader_start(this);
-                    auto handler = [this, &alloc]() noexcept {
-                        alloc.note_reader_end(this);
-                    };
-                    auto reader_end_guard = make_scope_exit(handler);
-                    Array top{alloc};
-                    top.init_from_ref(top_ref);
-
-
-                    // FIXME: This will not work for future file format versions (first checked later) ?
-
-
-                    Group::validate_top_array(top, alloc);
-                }
             }
             catch (const SlabAlloc::Retry&) {
+                // On a SlabAlloc::Retry file mappings are already unmapped, no need to do more
                 continue;
             }
-            catch (InvalidDatabase& e) {
-                if (e.get_path().empty()) {
-                    e.set_path(path);
-                }
-                throw;
+
+            // Determine target file format version for session (upgrade
+            // required if greater than file format version of attached file).
+            current_file_format_version = alloc.get_committed_file_format_version();
+            target_file_format_version =
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+
+            if (realm::must_restore_from_backup(path, current_file_format_version)) {
+                // we need to unmap before any file ops that'll change the realm file:
+                // (only strictly needed for Windows)
+                alloc.detach();
+                realm::restore_from_backup(path);
+                // finally, retry with the restored file instead of the original one:
+                continue;
             }
-            // If we fail in any way, we must detach the allocator.
+
+            // From here on, if we fail in any way, we must detach the allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
@@ -1053,26 +1049,29 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             };
             auto reader_end_guard = make_scope_exit(handler);
 
-            // Determine target file format version for session (upgrade
-            // required if greater than file format version of attached file).
-            using gf = _impl::GroupFriend;
-            current_file_format_version = alloc.get_committed_file_format_version();
-            target_file_format_version =
-                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
-
-            if (realm::must_restore_from_backup(path, current_file_format_version)) {
-                // we need to unmap before any file ops that'll change the realm file:
-                // (only strictly needed for Windows)
-                alloc.note_reader_end(this);
-                alloc.detach();
-                alloc_detach_guard.release();
-                realm::restore_from_backup(path);
-                // finally, retry with the restored file instead of the original one:
-                continue;
+            // Check validity of top array (to give more meaningfull errors early)
+            if (top_ref) {
+                try {
+                    alloc.note_reader_start(this);
+                    auto handler = [this, &alloc]() noexcept {
+                        alloc.note_reader_end(this);
+                    };
+                    auto reader_end_guard = make_scope_exit(handler);
+                    Array top{alloc};
+                    top.init_from_ref(top_ref);
+                    Group::validate_top_array(top, alloc);
+                }
+                catch (InvalidDatabase& e) {
+                    if (e.get_path().empty()) {
+                        e.set_path(path);
+                    }
+                    throw;
+                }
             }
-
-            realm::backup_realm_if_needed(path, current_file_format_version, target_file_format_version);
-
+            if (options.backup_at_file_format_change) {
+                realm::backup_realm_if_needed(path, current_file_format_version, target_file_format_version);
+            }
+            using gf = _impl::GroupFriend;
             bool file_format_ok = false;
             // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format

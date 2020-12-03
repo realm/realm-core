@@ -83,12 +83,15 @@ void backup_realm_if_needed(std::string path, int current_file_format_version, i
     if (current_file_format_version >= target_file_format_version)
         return;
     std::string prefix = get_prefix_from_path(path);
-    if (backup_exists(prefix, target_file_format_version))
-        return;
     std::string backup_nm = backup_name(prefix, current_file_format_version);
+    if (util::File::exists(backup_nm)) {
+    std::cout << "Backup file already exists: " << backup_nm << std::endl;
+        return;
+    }
     std::cout << "Creating backup " << backup_nm << std::endl;
     std::string part_name = backup_nm + ".part";
     // FIXME: Consider if it's better to do a writeToFile a la compact?
+    // FIXME: Handle running out of file space
     util::File::copy(path, part_name);
     util::File::move(part_name, backup_nm);
 }
