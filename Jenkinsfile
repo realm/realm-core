@@ -265,13 +265,10 @@ def doCheckInDocker(Map options = [:]) {
         REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
     if (options.enableSync) {
-        echo 'FIXME: Skipping stitch tests because of a breaking change in the sync client'
-        /*
         cmakeOptions << [
             REALM_ENABLE_AUTH_TESTS: 'ON',
             REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
         ]
-        */
     }
     if (longRunningTests) {
         cmakeOptions << [
