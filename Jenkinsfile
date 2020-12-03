@@ -212,41 +212,38 @@ jobWrapper {
 
             parallel parallelExecutors
         }
-        stage('Aggregate') {
-            parallel (
-                cocoa: {
-                    node('osx') {
-                        getArchive()
-                        for (cocoaStash in cocoaStashes) {
-                            unstash name: cocoaStash
+        stage('Aggregate Cocoa xcframeworks') {
+            node('osx') {
+                getArchive()
+                for (cocoaStash in cocoaStashes) {
+                    unstash name: cocoaStash
+                }
+                sh 'tools/build-cocoa.sh -x'
+                archiveArtifacts('realm-*.tar.*')
+                stash includes: 'realm-*.tar.xz', name: "cocoa-xz"
+                stash includes: 'realm-*.tar.gz', name: "cocoa-gz"
+                publishingStashes << "cocoa-xz"
+                publishingStashes << "cocoa-gz"
+            }
+        }
+        stage('Public to S3') {
+            node('docker') {
+                deleteDir()
+                dir('temp') {
+                    withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
+                        for (publishingStash in publishingStashes) {
+                            unstash name: publishingStash
+                            def path = publishingStash.replaceAll('___', '/')
+                            def files = findFiles(glob: '**')
+                            for (file in files) {
+                                rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
+                                rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+                            }
+                            deleteDir()
                         }
-                        sh 'tools/build-cocoa.sh -x'
-                        archiveArtifacts('realm-*.tar.*')
-                        stash includes: 'realm-*.tar.xz', name: "cocoa-xz"
-                        stash includes: 'realm-*.tar.gz', name: "cocoa-gz"
-                        publishingStashes << "cocoa-xz"
-                        publishingStashes << "cocoa-gz"
-                    }
-                },
-                android: {
-                    node('docker') {
-                        getArchive()
-                        for (androidStash in androidStashes) {
-                            unstash name: androidStash
-                        }
-                        sh 'tools/build-android.sh'
-                        archiveArtifacts('realm-core-android*.tar.gz')
-                        def stashName = 'android'
-                        stash includes: 'realm-core-android*.tar.gz', name: stashName
-                        publishingStashes << stashName
                     }
                 }
-            )
-        }
-        stage('publish-packages') {
-            parallel(
-                others: doPublishLocalArtifacts()
-            )
+            }
         }
     }
 }
@@ -988,28 +985,6 @@ def readGitTag() {
         return null
     }
     return sh(returnStdout: true, script: command).trim()
-}
-
-def doPublishLocalArtifacts() {
-    return {
-        node('docker') {
-            deleteDir()
-            dir('temp') {
-                withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
-                    for (publishingStash in publishingStashes) {
-                        unstash name: publishingStash
-                        def path = publishingStash.replaceAll('___', '/')
-                        def files = findFiles(glob: '**')
-                        for (file in files) {
-                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                        }
-                        deleteDir()
-                    }
-                }
-            }
-        }
-    }
 }
 
 def setBuildName(newBuildName) {
