@@ -47,7 +47,6 @@
 // "%code requires" blocks.
 
   # include <string>
-  # include "realm/query_expression.hpp"
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -1288,7 +1287,7 @@ switch (yykind)
     };
 
     /// Build a parser object.
-    parser (ParserDriver& drv_yyarg);
+    parser (ParserDriver& drv_yyarg, void* scanner_yyarg);
     virtual ~parser ();
 
 #if 201103L <= YY_CPLUSPLUS
@@ -2448,6 +2447,7 @@ switch (yykind)
 
     // User arguments.
     ParserDriver& drv;
+    void* scanner;
 
   };
 

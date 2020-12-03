@@ -2,13 +2,13 @@
 #define DRIVER_HH
 #include <string>
 #include <map>
-#include "realm/parser/generated/query_bison.hpp"
-#include "realm/parser/query_parser.hpp"
-#include "realm/parser/keypath_mapping.hpp"
 
-// Give Flex the prototype of yylex we want ...
-#define YY_DECL yy::parser::symbol_type yylex(realm::query_parser::ParserDriver&)
-// ... and declare it for the parser's sake.
+#include "realm/query_expression.hpp"
+#include "realm/parser/keypath_mapping.hpp"
+#include "realm/parser/query_parser.hpp"
+
+#define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
+#include "realm/parser/generated/query_bison.hpp"
 YY_DECL;
 
 #undef FALSE
@@ -24,15 +24,10 @@ public:
     virtual ~ParserNode();
 };
 
-class OrNode : public ParserNode {
+class AtomPredNode : public ParserNode {
 public:
-    std::vector<AndNode*> and_preds;
-
-    OrNode(AndNode* node)
-    {
-        and_preds.emplace_back(node);
-    }
-    Query visit(ParserDriver*);
+    ~AtomPredNode() override;
+    virtual Query visit(ParserDriver*) = 0;
 };
 
 class AndNode : public ParserNode {
@@ -46,10 +41,15 @@ public:
     Query visit(ParserDriver*);
 };
 
-class AtomPredNode : public ParserNode {
+class OrNode : public ParserNode {
 public:
-    ~AtomPredNode() override;
-    virtual Query visit(ParserDriver*) = 0;
+    std::vector<AndNode*> and_preds;
+
+    OrNode(AndNode* node)
+    {
+        and_preds.emplace_back(node);
+    }
+    Query visit(ParserDriver*);
 };
 
 class NotNode : public AtomPredNode {
@@ -87,6 +87,56 @@ public:
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
     static constexpr int IN = 10;
+};
+
+class ConstantNode : public ParserNode {
+public:
+    enum Type {
+        NUMBER,
+        INFINITY_VAL,
+        NAN_VAL,
+        FLOAT,
+        STRING,
+        BASE64,
+        TIMESTAMP,
+        UUID_T,
+        OID,
+        LINK,
+        NULL_VAL,
+        TRUE,
+        FALSE,
+        ARG
+    };
+
+    Type type;
+    std::string text;
+
+    ConstantNode(Type t, const std::string& str)
+        : type(t)
+        , text(str)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+};
+
+class PropertyNode : public ParserNode {
+public:
+    virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
+};
+
+class ValueNode : public ParserNode {
+public:
+    ConstantNode* constant = nullptr;
+    PropertyNode* prop = nullptr;
+
+    ValueNode(ConstantNode* node)
+        : constant(node)
+    {
+    }
+    ValueNode(PropertyNode* node)
+        : prop(node)
+    {
+    }
 };
 
 class EqualityNode : public CompareNode {
@@ -144,51 +194,6 @@ public:
     Query visit(ParserDriver*);
 };
 
-class ValueNode : public ParserNode {
-public:
-    ConstantNode* constant = nullptr;
-    PropertyNode* prop = nullptr;
-
-    ValueNode(ConstantNode* node)
-        : constant(node)
-    {
-    }
-    ValueNode(PropertyNode* node)
-        : prop(node)
-    {
-    }
-};
-
-class ConstantNode : public ParserNode {
-public:
-    enum Type {
-        NUMBER,
-        INFINITY_VAL,
-        NAN_VAL,
-        FLOAT,
-        STRING,
-        BASE64,
-        TIMESTAMP,
-        UUID_T,
-        OID,
-        LINK,
-        NULL_VAL,
-        TRUE,
-        FALSE,
-        ARG
-    };
-
-    Type type;
-    std::string text;
-
-    ConstantNode(Type t, const std::string& str)
-        : type(t)
-        , text(str)
-    {
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
-};
-
 class PostOpNode : public ParserNode {
 public:
     std::string op_name;
@@ -213,9 +218,15 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
 };
 
-class PropertyNode : public ParserNode {
+class PathNode : public ParserNode {
 public:
-    virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
+    std::vector<std::string> path_elems;
+
+    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
+    void add_element(const std::string& str)
+    {
+        path_elems.push_back(str);
+    }
 };
 
 class ListAggrNode : public PropertyNode {
@@ -293,17 +304,6 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
 };
 
-class PathNode : public ParserNode {
-public:
-    std::vector<std::string> path_elems;
-
-    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
-    void add_element(const std::string& str)
-    {
-        path_elems.push_back(str);
-    }
-};
-
 class DescriptorNode : public ParserNode {
 public:
     enum Type { SORT, DISTINCT, LIMIT };
@@ -376,17 +376,12 @@ public:
     };
 
     ParserDriver()
-        : m_args(s_default_args)
-        , m_mapping(s_default_mapping)
+        : ParserDriver(TableRef(), s_default_args, s_default_mapping)
     {
     }
 
-    ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping)
-        : m_base_table(t)
-        , m_args(args)
-        , m_mapping(mapping)
-    {
-    }
+    ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping);
+    ~ParserDriver();
 
     OrNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
@@ -394,13 +389,13 @@ public:
     Arguments& m_args;
     query_parser::KeyPathMapping m_mapping;
     ParserNodeStore m_parse_nodes;
+    void* m_yyscanner;
 
     // Run the parser on file F.  Return 0 on success.
     int parse(const std::string& str);
 
     // Handling the scanner.
-    void scan_begin(bool trace_scanning);
-    void scan_end();
+    void scan_begin(void*, bool trace_scanning);
 
     void error(const std::string& err)
     {
@@ -419,7 +414,7 @@ public:
 
 private:
     // The string being parsed.
-    std::string parse_string;
+    util::StringBuffer parse_buffer;
     std::string error_string;
     void* scan_buffer = nullptr;
     bool parse_error = false;
