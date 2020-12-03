@@ -148,8 +148,10 @@ jobWrapper {
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
                 checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
-                checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
-                coverage                      : doBuildCoverage(),
+                // FIXME: https://github.com/realm/realm-core/issues/4159
+                //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
+                // FIXME: https://github.com/realm/realm-core/issues/4162
+                //coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
