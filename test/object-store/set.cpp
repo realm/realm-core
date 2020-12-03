@@ -25,11 +25,13 @@ TEST_CASE("set") {
     auto r = Realm::get_shared_realm(config);
 
     r->update_schema({
-        {"table", {{"int_set", PropertyType::Set | PropertyType::Int}, {
-            "link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
+        {"table",
+         {{"int_set", PropertyType::Set | PropertyType::Int},
+          {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
         {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
-        {"other_table", {{"int_set", PropertyType::Set | PropertyType::Int},
-            {"link_set", PropertyType::Set | PropertyType::Object, "other_table2"}}},
+        {"other_table",
+         {{"int_set", PropertyType::Set | PropertyType::Int},
+          {"link_set", PropertyType::Set | PropertyType::Object, "other_table2"}}},
         {"other_table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
     });
 
@@ -39,7 +41,8 @@ TEST_CASE("set") {
     auto table = r->read_group().get_table("class_table");
     auto table2 = r->read_group().get_table("class_table2");
     auto other_table = r->read_group().get_table("class_table");
-    auto other_table2 = r->read_group().get_table("class_table2");;
+    auto other_table2 = r->read_group().get_table("class_table2");
+
     ColKey col_int_set = table->get_column_key("int_set");
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
@@ -270,7 +273,6 @@ TEST_CASE("set") {
             REQUIRE(set.find(std::move(table2->where().equal(col_link_obj_id, 123))) == 0);
             REQUIRE(set.find(std::move(table2->where().equal(col_link_obj_id, 456))) == 1);
             REQUIRE(set.find(std::move(table2->where().equal(col_link_obj_id, 789))) == 2);
-
         }
     }
 
@@ -289,7 +291,7 @@ TEST_CASE("set") {
         });
 
         write([&]() {
-            for (auto &obj : targets) {
+            for (auto& obj : targets) {
                 CHECK(set.insert(obj).second);
             }
             CHECK(set2.insert(targets[0]).second);
@@ -330,10 +332,10 @@ TEST_CASE("set") {
         });
 
         write([&]() {
-            for (auto &obj : targets) {
+            for (auto& obj : targets) {
                 CHECK(set.insert(obj).second);
             }
-            for (auto &obj : other_targets) {
+            for (auto& obj : other_targets) {
                 CHECK(set2.insert(obj).second);
             }
             CHECK(set2.insert(targets[0]).second);
@@ -383,10 +385,10 @@ TEST_CASE("set") {
         });
 
         write([&]() {
-            for (auto &obj : targets) {
+            for (auto& obj : targets) {
                 CHECK(set.insert(obj).second);
             }
-            for (auto &obj : other_targets) {
+            for (auto& obj : other_targets) {
                 CHECK(set2.insert(obj).second);
             }
             CHECK(set2.insert(targets[0]).second);
@@ -401,7 +403,7 @@ TEST_CASE("set") {
 
         SECTION("set2 intersects set") {
             // (123, 456, 789, (321, 654, 987), 111, 222, 333)
-            write([&]{
+            write([&] {
                 set2.assign_intersection(set);
             });
             CHECK(set2.size() == 3);
@@ -430,10 +432,10 @@ TEST_CASE("set") {
         });
 
         write([&]() {
-            for (auto &obj : targets) {
+            for (auto& obj : targets) {
                 CHECK(set.insert(obj).second);
             }
-            for (auto &obj : other_targets) {
+            for (auto& obj : other_targets) {
                 CHECK(set2.insert(obj).second);
             }
             CHECK(set2.insert(targets[0]).second);
@@ -448,7 +450,7 @@ TEST_CASE("set") {
 
         SECTION("set2 intersects set") {
             // (123, 456, 789, (321, 654, 987), 111, 222, 333)
-            write([&]{
+            write([&] {
                 set2.assign_union(set);
             });
             CHECK(set2.size() == 9);
@@ -477,10 +479,10 @@ TEST_CASE("set") {
         });
 
         write([&]() {
-            for (auto &obj : targets) {
+            for (auto& obj : targets) {
                 CHECK(set.insert(obj).second);
             }
-            for (auto &obj : other_targets) {
+            for (auto& obj : other_targets) {
                 CHECK(set2.insert(obj).second);
             }
             CHECK(set2.insert(targets[0]).second);
@@ -495,7 +497,7 @@ TEST_CASE("set") {
 
         SECTION("set2 intersects set") {
             // (123, 456, 789, (321, 654, 987), 111, 222, 333)
-            write([&]{
+            write([&] {
                 set2.assign_difference(set);
             });
             CHECK(set2.size() == 3);
