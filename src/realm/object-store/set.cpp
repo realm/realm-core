@@ -158,9 +158,9 @@ util::Optional<Mixed> Set::average(ColKey col) const
 
 bool Set::operator==(const Set& rgt) const noexcept
 {
-    return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>() == rgt.as<std::decay_t<decltype(*t)>>();
-    });
+    return m_set_base->get_table() == rgt.m_set_base->get_table() &&
+           m_set_base->get_key() == rgt.m_set_base->get_key() &&
+           m_set_base->get_col_key() == rgt.m_set_base->get_col_key();
 }
 
 Results Set::snapshot() const
