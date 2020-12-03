@@ -166,94 +166,6 @@ T minimum(T a, T b)
     return a < b ? a : b;
 }
 
-#if REALM_OLDQUERY_FALLBACK
-// Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
-namespace _impl {
-
-template <class T, class U>
-inline T only_numeric(U in)
-{
-    return static_cast<T>(util::unwrap(in));
-}
-
-template <class T>
-inline Decimal128 only_numeric(const Decimal128& d)
-{
-    return d;
-}
-
-template <class T>
-inline int only_numeric(const StringData&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline int only_numeric(const BinaryData&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-
-template <class T>
-inline int only_numeric(const realm::null&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline std::enable_if_t<std::is_same_v<T, Timestamp>, int> only_numeric(const ObjectId&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline std::enable_if_t<std::is_same_v<T, ObjectId>, int> only_numeric(const Timestamp&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-template <class T>
-inline StringData only_string_op_types(T in)
-{
-    REALM_ASSERT(false);
-    static_cast<void>(in);
-    return StringData();
-}
-
-inline BinaryData only_string_op_types(BinaryData in)
-{
-    return in;
-}
-
-template <>
-inline StringData only_string_op_types<StringData>(StringData in)
-{
-    return in;
-}
-
-template <class T, class U>
-inline T no_timestamp(U in)
-{
-    return static_cast<T>(util::unwrap(in));
-}
-
-template <class T>
-inline int no_timestamp(const Timestamp&)
-{
-    REALM_ASSERT(false);
-    return 0;
-}
-
-} // namespace _impl
-
-#endif // REALM_OLDQUERY_FALLBACK
-
 template <class T>
 struct Plus {
     T operator()(T v1, T v2) const
@@ -815,68 +727,63 @@ Query create(L left, const Subexpr2<R>& right)
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-    if constexpr (REALM_OLDQUERY_FALLBACK) {
-        if constexpr ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                      (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
-                      (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
-                      (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
-                      (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                      (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
-                      (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
-                      (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>) || std::is_same_v<R, Mixed>) {
-            const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-            // TODO: recognize size operator expressions
-            // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    constexpr const bool supported_by_old_query_engine =
+        (std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) || std::is_same_v<R, Mixed> ||
+        (std::is_same_v<L, R> &&
+         realm::is_any_v<L, double, float, Timestamp, StringData, BinaryData, ObjectId, UUID>);
 
-            if (column && !column->links_exist()) {
-                ConstTableRef t = column->get_base_table();
-                Query q = Query(t);
+    if constexpr (REALM_OLDQUERY_FALLBACK && supported_by_old_query_engine) {
+        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+        // TODO: recognize size operator expressions
+        // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-                if (std::is_same_v<Cond, Less>)
-                    q.greater(column->column_key(), _impl::only_numeric<R>(left));
-                else if (std::is_same_v<Cond, Greater>)
-                    q.less(column->column_key(), _impl::only_numeric<R>(left));
-                else if (std::is_same_v<Cond, Equal>)
-                    q.equal(column->column_key(), left);
-                else if (std::is_same_v<Cond, NotEqual>)
-                    q.not_equal(column->column_key(), left);
-                else if (std::is_same_v<Cond, LessEqual>)
-                    q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-                else if (std::is_same_v<Cond, GreaterEqual>)
-                    q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-                else if (std::is_same_v<Cond, EqualIns>)
-                    q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-                else if (std::is_same_v<Cond, NotEqualIns>)
-                    q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-                else if (std::is_same_v<Cond, BeginsWith>)
-                    q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-                else if (std::is_same_v<Cond, BeginsWithIns>)
-                    q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-                else if (std::is_same_v<Cond, EndsWith>)
-                    q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-                else if (std::is_same_v<Cond, EndsWithIns>)
-                    q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-                else if (std::is_same_v<Cond, Contains>)
-                    q.contains(column->column_key(), _impl::only_string_op_types(left));
-                else if (std::is_same_v<Cond, ContainsIns>)
-                    q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-                else if (std::is_same_v<Cond, Like>)
-                    q.like(column->column_key(), _impl::only_string_op_types(left));
-                else if (std::is_same_v<Cond, LikeIns>)
-                    q.like(column->column_key(), _impl::only_string_op_types(left), false);
-                else {
-                    // query_engine.hpp does not support this Cond. Please either add support for it in
-                    // query_engine.hpp or fallback to using use 'return new Compare<>' instead.
-                    REALM_ASSERT(false);
-                }
-                // Return query_engine.hpp node
-                return q;
+        if (column && !column->links_exist()) {
+            ConstTableRef t = column->get_base_table();
+            Query q(t);
+
+            if constexpr (std::is_same_v<Cond, Less>)
+                q.greater(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, Greater>)
+                q.less(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, Equal>)
+                q.equal(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, NotEqual>)
+                q.not_equal(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, LessEqual>)
+                q.greater_equal(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, GreaterEqual>)
+                q.less_equal(column->column_key(), static_cast<R>(left));
+            else if constexpr (std::is_same_v<Cond, EqualIns>)
+                q.equal(column->column_key(), left, false);
+            else if constexpr (std::is_same_v<Cond, NotEqualIns>)
+                q.not_equal(column->column_key(), left, false);
+            else if constexpr (std::is_same_v<Cond, BeginsWith>)
+                q.begins_with(column->column_key(), left);
+            else if constexpr (std::is_same_v<Cond, BeginsWithIns>)
+                q.begins_with(column->column_key(), left, false);
+            else if constexpr (std::is_same_v<Cond, EndsWith>)
+                q.ends_with(column->column_key(), left);
+            else if constexpr (std::is_same_v<Cond, EndsWithIns>)
+                q.ends_with(column->column_key(), left, false);
+            else if constexpr (std::is_same_v<Cond, Contains>)
+                q.contains(column->column_key(), left);
+            else if constexpr (std::is_same_v<Cond, ContainsIns>)
+                q.contains(column->column_key(), left, false);
+            else if constexpr (std::is_same_v<Cond, Like>)
+                q.like(column->column_key(), left);
+            else if constexpr (std::is_same_v<Cond, LikeIns>)
+                q.like(column->column_key(), left, false);
+            else {
+                // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp
+                // or fallback to using use 'return new Compare<>' instead.
+                REALM_ASSERT(false);
             }
+            return q;
         }
     }
 
     // Return query_expression.hpp node
-    using ValueType = typename std::conditional<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>::type;
+    using ValueType = typename std::conditional_t<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>;
     return make_expression<Compare<Cond>>(make_subexpr<ValueType>(left), right.clone());
 }
 
@@ -987,17 +894,17 @@ public:
                     t->get_name(), t_right->get_name()));
             }
             if (!left_col->links_exist() && !right_col->links_exist()) {
-                if (std::is_same_v<Cond, Less>)
+                if constexpr (std::is_same_v<Cond, Less>)
                     return Query(t).less(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
+                if constexpr (std::is_same_v<Cond, Greater>)
                     return Query(t).greater(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
+                if constexpr (std::is_same_v<Cond, Equal>)
                     return Query(t).equal(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
+                if constexpr (std::is_same_v<Cond, NotEqual>)
                     return Query(t).not_equal(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
+                if constexpr (std::is_same_v<Cond, LessEqual>)
                     return Query(t).less_equal(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
+                if constexpr (std::is_same_v<Cond, GreaterEqual>)
                     return Query(t).greater_equal(left_col->column_key(), right_col->column_key());
             }
         }
