@@ -236,6 +236,18 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto app = sync_manager.app();
         bool processed = false;
 
+        int subscribe_processed = 0;
+        auto token = app->subscribe([&subscribe_processed](auto& app) {
+            if (!subscribe_processed) {
+                subscribe_processed++;
+                REQUIRE(static_cast<bool>(app.current_user()));
+            }
+            else {
+                subscribe_processed++;
+                REQUIRE(!static_cast<bool>(app.current_user()));
+            }
+        });
+
         app->log_in_with_credentials(AppCredentials::anonymous(),
                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             if (error) {
@@ -255,6 +267,9 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             processed = true;
         });
         CHECK(processed);
+        CHECK(subscribe_processed == 2);
+
+        app->unsubscribe(token);
     }
 }
 
@@ -2446,6 +2461,75 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
+TEST_CASE("subscribable unit tests", "[sync][app]") {
+    struct Foo : public Subscribable<Foo> {
+        void event()
+        {
+            emit_change_to_subscribers(*this);
+        }
+    };
+
+    auto foo = Foo();
+
+    SECTION("subscriber receives events") {
+        auto event_count = 0;
+        auto token = foo.subscribe([&event_count](auto&) {
+            event_count++;
+        });
+
+        foo.event();
+        foo.event();
+        foo.event();
+
+        CHECK(event_count == 3);
+    }
+
+    SECTION("subscriber can unsubscribe") {
+        auto event_count = 0;
+        auto token = foo.subscribe([&event_count](auto&) {
+            event_count++;
+        });
+
+        foo.event();
+        CHECK(event_count == 1);
+
+        foo.unsubscribe(token);
+        foo.event();
+        CHECK(event_count == 1);
+    }
+
+    SECTION("subscriber is unsubscribed on dtor") {
+        auto event_count = 0;
+        {
+            auto token = foo.subscribe([&event_count](auto&) {
+                event_count++;
+            });
+
+            foo.event();
+            CHECK(event_count == 1);
+        }
+        foo.event();
+        CHECK(event_count == 1);
+    }
+
+    SECTION("multiple subscribers receive events") {
+        auto event_count = 0;
+        {
+            auto token1 = foo.subscribe([&event_count](auto&) {
+                event_count++;
+            });
+            auto token2 = foo.subscribe([&event_count](auto&) {
+                event_count++;
+            });
+
+            foo.event();
+            CHECK(event_count == 2);
+        }
+        foo.event();
+        CHECK(event_count == 2);
+    }
+}
+
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
@@ -2687,9 +2771,15 @@ TEST_CASE("app: user_semantics", "[app]") {
 
     CHECK(!app->current_user());
 
+    int event_processed = 0;
+    auto token = app->subscribe([&event_processed](auto&) {
+        event_processed++;
+    });
+
     SECTION("current user is populated") {
         const auto user1 = login_user_anonymous();
         CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(event_processed == 1);
     }
 
     SECTION("current user is updated on login") {
@@ -2698,6 +2788,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         const auto user2 = login_user_email_pass();
         CHECK(app->current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
+        CHECK(event_processed == 2);
     }
 
     SECTION("current user is updated to last used user on logout") {
@@ -2715,12 +2806,20 @@ TEST_CASE("app: user_semantics", "[app]") {
         const auto user3 = login_user_anonymous();
         CHECK(user3->identity() == user1->identity());
 
+        auto user_events_processed = 0;
+        auto _ = user3->subscribe([&user_events_processed](auto&) {
+            user_events_processed++;
+        });
+
         app->log_out([&](auto){});
+        CHECK(user_events_processed == 1);
 
         CHECK(app->current_user()->identity() == user2->identity());
 
         CHECK(app->all_users().size() == 1);
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
+
+        CHECK(user_events_processed == 4);
     }
 
     SECTION("anon users are removed on logout") {
@@ -2736,6 +2835,8 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         app->log_out([&](auto){});
         CHECK(app->all_users().size() == 0);
+
+        CHECK(event_processed == 3);
     }
 
     SECTION("logout user") {
@@ -2764,6 +2865,27 @@ TEST_CASE("app: user_semantics", "[app]") {
             CHECK(!error);
         });
         CHECK(user2->state() == SyncUser::State::Removed);
+
+        CHECK(event_processed == 4);
+    }
+
+    SECTION("unsubscribed observers no longer process events") {
+        app->unsubscribe(token);
+
+        const auto user1 = login_user_anonymous();
+        CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
+
+        const auto user2 = login_user_anonymous();
+        CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app->all_users().size() == 1);
+        CHECK(app->current_user()->identity() == user2->identity());
+        CHECK(user1->identity() == user2->identity());
+
+        app->log_out([&](auto) {});
+        CHECK(app->all_users().size() == 0);
+
+        CHECK(event_processed == 0);
     }
 }
 
