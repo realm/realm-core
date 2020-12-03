@@ -765,13 +765,38 @@ inline void Set<T>::clear()
 template <class T>
 inline Mixed Set<T>::min(size_t* return_ndx) const
 {
-    return MinHelper<T>::eval(*m_tree, return_ndx);
+    if (size() != 0) {
+        if (return_ndx) {
+            *return_ndx = 0;
+        }
+        return *begin();
+    }
+    else {
+        if (return_ndx) {
+            *return_ndx = not_found;
+        }
+        return Mixed{};
+    }
 }
 
 template <class T>
 inline Mixed Set<T>::max(size_t* return_ndx) const
 {
-    return MaxHelper<T>::eval(*m_tree, return_ndx);
+    auto sz = size();
+    if (sz != 0) {
+        if (return_ndx) {
+            *return_ndx = sz - 1;
+        }
+        auto e = end();
+        --e;
+        return *e;
+    }
+    else {
+        if (return_ndx) {
+            *return_ndx = not_found;
+        }
+        return Mixed{};
+    }
 }
 
 template <class T>
