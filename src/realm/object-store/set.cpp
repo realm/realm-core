@@ -294,35 +294,35 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
     return as<ObjKey>().insert(obj.get_key());
 }
 
-bool Set::is_subset_of(const Set &rhs) const
+bool Set::is_subset_of(const Set& rhs) const
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
-bool Set::is_superset_of(const Set &rhs) const
+bool Set::is_superset_of(const Set& rhs) const
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
-bool Set::intersects(const Set &rhs) const
+bool Set::intersects(const Set& rhs) const
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
-void Set::assign_intersection(const Set &rhs)
+void Set::assign_intersection(const Set& rhs)
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
-void Set::assign_union(const Set &rhs)
+void Set::assign_union(const Set& rhs)
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.as<std::decay_t<decltype(*t)>>());
