@@ -226,7 +226,7 @@ jobWrapper {
                 publishingStashes << "cocoa-gz"
             }
         }
-        stage('Public to S3') {
+        stage('Publish to S3') {
             node('docker') {
                 deleteDir()
                 dir('temp') {
