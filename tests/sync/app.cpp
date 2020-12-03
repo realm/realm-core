@@ -2819,7 +2819,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app->all_users().size() == 1);
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
 
-        CHECK(user_events_processed == 4);
+        CHECK(event_processed == 4);
     }
 
     SECTION("anon users are removed on logout") {
