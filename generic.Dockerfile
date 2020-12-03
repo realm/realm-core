@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 
 # Install EPEL & devtoolset
 # On CentOS6, there is a bug with OverlayFS and Docker. It is needed to touch
