@@ -9,7 +9,6 @@
 
 %code requires {
   # include <string>
-  # include "realm/query_expression.hpp"
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
@@ -31,7 +30,8 @@
 }
 
 // The parsing context.
-%param { ParserDriver& drv }
+%parse-param { ParserDriver& drv }
+%param { void* scanner }
 
 // %locations
 

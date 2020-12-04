@@ -1,11 +1,14 @@
 #include "realm/parser/driver.hpp"
-#include "realm/parser/generated/query_bison.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 #include "realm/sort_descriptor.hpp"
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
 #include "realm/util/base64.hpp"
+
+#define YY_NO_UNISTD_H 1
+#define YY_NO_INPUT 1
+#include "realm/parser/generated/query_flex.hpp"
 
 using namespace realm;
 using namespace std::string_literals;
@@ -1042,6 +1045,20 @@ void verify_conditions(Subexpr* left, Subexpr* right)
     }
 }
 
+ParserDriver::ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping)
+    : m_base_table(t)
+    , m_args(args)
+    , m_mapping(mapping)
+{
+    yylex_init(&m_yyscanner);
+}
+
+ParserDriver::~ParserDriver()
+{
+    yylex_destroy(m_yyscanner);
+}
+
+
 std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(const std::vector<ValueNode*>& values)
 {
     std::unique_ptr<Subexpr> left;
@@ -1130,12 +1147,12 @@ void ParserDriver::translate(LinkChain& link_chain, std::string& identifier)
 int ParserDriver::parse(const std::string& str)
 {
     // std::cout << str << std::endl;
-    parse_string = str;
-    scan_begin(trace_scanning);
-    yy::parser parse(*this);
+    parse_buffer.append(str);
+    parse_buffer.append("\0\0", 2); // Flex requires 2 terminating zeroes
+    scan_begin(m_yyscanner, trace_scanning);
+    yy::parser parse(*this, m_yyscanner);
     parse.set_debug_level(trace_parsing);
     int res = parse();
-    scan_end();
     if (parse_error) {
         std::string msg = "Invalid predicate: '" + str + "': " + error_string;
         throw std::runtime_error(msg);

@@ -169,27 +169,47 @@ typedef unsigned int flex_uint32_t;
 
 
 /* %if-reentrant */
+
+/* An opaque pointer. */
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
+typedef void* yyscan_t;
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* For convenience, these vars (plus the bison vars far below)
+   are macros in the reentrant scanner. */
+#define yyin yyg->yyin_r
+#define yyout yyg->yyout_r
+#define yyextra yyg->yyextra_r
+#define yyleng yyg->yyleng_r
+#define yytext yyg->yytext_r
+#define yylineno (YY_CURRENT_BUFFER_LVALUE->yy_bs_lineno)
+#define yycolumn (YY_CURRENT_BUFFER_LVALUE->yy_bs_column)
+#define yy_flex_debug yyg->yy_flex_debug_r
+
+
+
 /* %endif */
 
 
 
 /* %if-not-reentrant */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* %endif */
 
 
@@ -226,12 +246,10 @@ typedef size_t yy_size_t;
 #endif
 
 /* %if-not-reentrant */
-extern int yyleng;
 /* %endif */
 
 /* %if-c-only */
 /* %if-not-reentrant */
-extern FILE *yyin, *yyout;
 /* %endif */
 /* %endif */
 
@@ -309,45 +327,39 @@ struct yy_buffer_state
 
 /* %endif */
 
-void yyrestart ( FILE *input_file  );
-void yy_switch_to_buffer ( YY_BUFFER_STATE new_buffer  );
-YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size  );
-void yy_delete_buffer ( YY_BUFFER_STATE b  );
-void yy_flush_buffer ( YY_BUFFER_STATE b  );
-void yypush_buffer_state ( YY_BUFFER_STATE new_buffer  );
-void yypop_buffer_state ( void );
+void yyrestart ( FILE *input_file , yyscan_t yyscanner );
+void yy_switch_to_buffer ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size , yyscan_t yyscanner );
+void yy_delete_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
+void yy_flush_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
+void yypush_buffer_state ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+void yypop_buffer_state ( yyscan_t yyscanner );
 
 
 
-YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size  );
-YY_BUFFER_STATE yy_scan_string ( const char *yy_str  );
-YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len  );
+YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_string ( const char *yy_str , yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len , yyscan_t yyscanner );
 
 /* %endif */
 
-void *yyalloc ( yy_size_t  );
-void *yyrealloc ( void *, yy_size_t  );
-void yyfree ( void *  );
+void *yyalloc ( yy_size_t , yyscan_t yyscanner );
+void *yyrealloc ( void *, yy_size_t , yyscan_t yyscanner );
+void yyfree ( void * , yyscan_t yyscanner );
 
 
 
 /* %% [1.0] yytext/yyin/yyout/yy_state_type/yylineno etc. def's & init go here */
 /* Begin user sect3 */
 
-#define yywrap() (/*CONSTCOND*/1)
+#define yywrap(yyscanner) (/*CONSTCOND*/1)
 #define YY_SKIP_YYWRAP
 
 #define FLEX_DEBUG
 
 
 
-extern int yylineno;
-
-extern char *yytext;
-#ifdef yytext_ptr
-#undef yytext_ptr
-#endif
-#define yytext_ptr yytext
+#define yytext_ptr yytext_r
 
 
 
@@ -387,69 +399,90 @@ extern char *yytext;
 
 /* %if-c-only Reentrant structure and macros (non-C++). */
 /* %if-reentrant */
+
+
+
+
 /* %if-c-only */
 
 /* %endif */
+
 /* %if-reentrant */
+
+
+
+int yylex_init (yyscan_t* scanner);
+
+int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
+
 /* %endif */
+
 /* %endif End reentrant structures and macros. */
 
 /* Accessor methods to globals.
    These are made visible to non-reentrant scanners for convenience. */
 
 
-int yylex_destroy ( void );
+int yylex_destroy ( yyscan_t yyscanner );
 
 
 
-int yyget_debug ( void );
+int yyget_debug ( yyscan_t yyscanner );
 
 
 
-void yyset_debug ( int debug_flag  );
+void yyset_debug ( int debug_flag , yyscan_t yyscanner );
 
 
 
-YY_EXTRA_TYPE yyget_extra ( void );
+YY_EXTRA_TYPE yyget_extra ( yyscan_t yyscanner );
 
 
 
-void yyset_extra ( YY_EXTRA_TYPE user_defined  );
+void yyset_extra ( YY_EXTRA_TYPE user_defined , yyscan_t yyscanner );
 
 
 
-FILE *yyget_in ( void );
+FILE *yyget_in ( yyscan_t yyscanner );
 
 
 
-void yyset_in  ( FILE * _in_str  );
+void yyset_in  ( FILE * _in_str , yyscan_t yyscanner );
 
 
 
-FILE *yyget_out ( void );
+FILE *yyget_out ( yyscan_t yyscanner );
 
 
 
-void yyset_out  ( FILE * _out_str  );
+void yyset_out  ( FILE * _out_str , yyscan_t yyscanner );
 
 
 
-			int yyget_leng ( void );
+			int yyget_leng ( yyscan_t yyscanner );
 
 
 
-char *yyget_text ( void );
+char *yyget_text ( yyscan_t yyscanner );
 
 
 
-int yyget_lineno ( void );
+int yyget_lineno ( yyscan_t yyscanner );
 
 
 
-void yyset_lineno ( int _line_number  );
+void yyset_lineno ( int _line_number , yyscan_t yyscanner );
 
 
 
+
+int yyget_column  ( yyscan_t yyscanner );
+
+
+
+
+
+void yyset_column ( int _column_no , yyscan_t yyscanner );
 
 
 
@@ -462,9 +495,9 @@ void yyset_lineno ( int _line_number  );
 
 #ifndef YY_SKIP_YYWRAP
 #ifdef __cplusplus
-extern "C" int yywrap ( void );
+extern "C" int yywrap ( yyscan_t yyscanner );
 #else
-extern int yywrap ( void );
+extern int yywrap ( yyscan_t yyscanner );
 #endif
 #endif
 
@@ -473,11 +506,11 @@ extern int yywrap ( void );
 /* %endif */
 
 #ifndef yytext_ptr
-static void yy_flex_strncpy ( char *, const char *, int );
+static void yy_flex_strncpy ( char *, const char *, int , yyscan_t yyscanner);
 #endif
 
 #ifdef YY_NEED_STRLEN
-static int yy_flex_strlen ( const char * );
+static int yy_flex_strlen ( const char * , yyscan_t yyscanner);
 #endif
 
 #ifndef YY_NO_INPUT
@@ -540,9 +573,9 @@ static int yy_flex_strlen ( const char * );
 
 
 
-extern int yylex (void);
+extern int yylex (yyscan_t yyscanner);
 
-#define YY_DECL int yylex (void)
+#define YY_DECL int yylex (yyscan_t yyscanner)
 /* %endif */
 /* %if-c++-only C++ definition */
 /* %endif */

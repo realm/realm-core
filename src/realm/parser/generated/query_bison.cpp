@@ -128,14 +128,15 @@ using namespace realm::query_parser;
 namespace yy {
 
   /// Build a parser object.
-  parser::parser (ParserDriver& drv_yyarg)
+  parser::parser (ParserDriver& drv_yyarg, void* scanner_yyarg)
 #if YYDEBUG
     : yydebug_ (false),
       yycdebug_ (&std::cerr),
 #else
     :
 #endif
-      drv (drv_yyarg)
+      drv (drv_yyarg),
+      scanner (scanner_yyarg)
   {}
 
   parser::~parser ()
@@ -1136,7 +1137,7 @@ namespace yy {
         try
 #endif // YY_EXCEPTIONS
           {
-            symbol_type yylookahead (yylex (drv));
+            symbol_type yylookahead (yylex (scanner));
             yyla.move (yylookahead);
           }
 #if YY_EXCEPTIONS

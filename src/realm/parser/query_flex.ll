@@ -8,10 +8,9 @@
 # include <cstring> // strerror
 # include <string>
 # include "realm/parser/driver.hpp"
-# include "realm/parser/generated/query_bison.hpp"
 %}
 
-%option nounistd never-interactive noyywrap nounput noinput batch debug noyylineno
+%option nounistd never-interactive noyywrap nounput noinput batch debug noyylineno reentrant
 
 hex     [0-9a-fA-F]
 unicode "\\u"{hex}{4}
@@ -91,16 +90,9 @@ blank   [ \t\r]
 <<EOF>>    return yy::parser::make_END ();
 %%
 
-void realm::query_parser::ParserDriver::scan_begin (bool trace_scanning)
+void realm::query_parser::ParserDriver::scan_begin (yyscan_t yyscanner, bool trace_scanning)
 {
+    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
     yy_flex_debug = trace_scanning;
-    YY_BUFFER_STATE bp;
-    bp = yy_scan_bytes(parse_string.c_str(), int(parse_string.size()));
-    yy_switch_to_buffer(bp);
-    scan_buffer = (void *)bp;
-}
-
-void realm::query_parser::ParserDriver::scan_end ()
-{
-   yy_delete_buffer((YY_BUFFER_STATE)scan_buffer);
+    yy_scan_buffer(parse_buffer.data(), int(parse_buffer.size()), yyscanner);
 }

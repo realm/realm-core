@@ -4241,4 +4241,48 @@ TEST(Parser_Dictionary)
     CHECK_EQUAL(message, "Sum not defined for timestamps");
 }
 
+namespace {
+
+void worker(test_util::unit_test::TestContext& test_context, TransactionRef frozen)
+{
+    auto table = frozen->get_table("Foo");
+    for (auto obj : *table) {
+        auto val = obj.get_key().value;
+        std::string query_str = "value == " + util::to_string(val);
+        auto cnt = table->query(query_str).count();
+        CHECK_EQUAL(cnt, 1);
+    }
+}
+
+} // namespace
+
+TEST(Parser_Threads)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef db = DB::create(*hist);
+    TransactionRef frozen;
+
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_int = table->add_column(type_Int, "value");
+
+        for (int i = 0; i < 1000; i++) {
+            auto obj = table->create_object();
+            obj.set(col_int, obj.get_key().value);
+        }
+        wt->commit_and_continue_as_read();
+        frozen = wt->freeze();
+    }
+    const int num_threads = 2;
+    std::vector<std::thread> workers;
+    for (int j = 0; j < num_threads; ++j)
+        workers.emplace_back([&] {
+            worker(test_context, frozen);
+        });
+    for (auto& w : workers)
+        w.join();
+}
+
 #endif // TEST_PARSER
