@@ -1956,8 +1956,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             opts.return_new_document = true;
             dog_collection.find_one_and_replace(
                 bson::BsonDocument{{valid_pk_name, fido_pk}},
-                bson::BsonDocument{//{valid_pk_name, fido_pk},
-                                   {"breed", std::string("not a dog - actually a cat")},
+                bson::BsonDocument{{"breed", std::string("not a dog - actually a cat")},
                                    {"name", std::string("fido")},
                                    {"realm_id", std::string("foo")}},
                 opts, [&](Optional<bson::BsonDocument> maybe_doc, auto maybe_error) {
