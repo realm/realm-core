@@ -1077,19 +1077,12 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // version of the core library is able to open Realms using file format
             // versions listed below. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
-            switch (current_file_format_version) {
-                case 0:
-                    file_format_ok = (top_ref == 0);
-                    break;
-                case 6:
-                case 7:
-                case 8:
-                case 9:
-                case 10:
-                case 11:
-                case 20:
+            if (current_file_format_version == 0) {
+                file_format_ok = (top_ref == 0);
+            } else {
+                if (is_accepted_file_format(current_file_format_version)) {
                     file_format_ok = true;
-                    break;
+                }
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {

@@ -29,8 +29,24 @@ namespace realm {
 */
 
 // Note: accepted versions should have new versions added at front
-std::vector<int> accepted_versions{ 20, 11, 10, 9, 8, 7, 6, 0 };
-std::vector<int> deletion_list{};
+const std::vector<int> accepted_versions_{ 20, 11, 10, 9, 8, 7, 6, 0 };
+const std::vector<int> not_accepted_versions_{};
+
+std::vector<int> accepted_versions{ accepted_versions_ };
+std::vector<int> not_accepted_versions{ not_accepted_versions_ };
+
+void fake_versions(const std::vector<int>& accepted, const std::vector<int>& not_accepted)
+{
+    accepted_versions = accepted;
+    not_accepted_versions = not_accepted;
+}
+
+void unfake_versions()
+{
+    accepted_versions = accepted_versions_;
+    not_accepted_versions = not_accepted_versions_;
+}
+
 
 std::string get_prefix_from_path(std::string path) 
 {
@@ -65,12 +81,27 @@ bool must_restore_from_backup(std::string path, int current_file_format_version)
     return false;
 }
 
+bool is_accepted_file_format(int version)
+{
+    for (auto i: accepted_versions) {
+        if (i == version) return true;
+    }
+    return false;
+}
+
 void restore_from_backup(std::string path)
 {
     std::string prefix = get_prefix_from_path(path);
     for (auto i: accepted_versions) {
         if (backup_exists(prefix, i)) {
-            util::File::move(backup_name(prefix, i), path);
+            auto backup_nm = backup_name(prefix, i);
+            std::cout << "Restoring from backup " << backup_nm << std::endl;
+            util::File::move(backup_nm, path);
+        }
+    }
+    for (auto i: not_accepted_versions) {
+        if (backup_exists(prefix, i)) {
+            util::File::remove(backup_name(prefix, i));
         }
     }
 }
