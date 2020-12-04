@@ -1879,7 +1879,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     };
 
     SECTION("document replacements get notified as updates") {
-        auto sync_manager = std::make_unique<TestSyncManager>(TestSyncManager::Config(app_config), SyncServer::Config{});
+        auto sync_manager =
+            std::make_unique<TestSyncManager>(TestSyncManager::Config(app_config), SyncServer::Config{});
 
         auto app = get_app_and_login(sync_manager->app());
         auto config = setup_and_get_config(app);
@@ -1893,7 +1894,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             dogs.clear();
             r->commit_transaction();
         }
-    
+
         REQUIRE(get_dogs(r, session).size() == 0);
         r->begin_transaction();
         CppContext c;
@@ -1907,23 +1908,22 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->commit_transaction();
 
         REQUIRE(get_dogs(r, session).size() == 1);
-        
+
         auto mongo_client = app->current_user()->mongo_client("BackingDB");
         auto dog_collection = mongo_client.db("test_data").collection("Dog");
 
         auto found_fido = false;
         while (!found_fido) {
             auto callback_called = false;
-            dog_collection.find_one(
-                    bson::BsonDocument{{valid_pk_name, fido_pk}},
-                    [&](Optional<bson::BsonDocument> maybe_dog, auto maybe_err) {
-                callback_called = true;
-                REQUIRE(!maybe_err);
-                if (!maybe_dog) {
-                    return;
-                }
-                found_fido = maybe_dog->at(valid_pk_name) == bson::Bson(fido_pk);
-            });
+            dog_collection.find_one(bson::BsonDocument{{valid_pk_name, fido_pk}},
+                                    [&](Optional<bson::BsonDocument> maybe_dog, auto maybe_err) {
+                                        callback_called = true;
+                                        REQUIRE(!maybe_err);
+                                        if (!maybe_dog) {
+                                            return;
+                                        }
+                                        found_fido = maybe_dog->at(valid_pk_name) == bson::Bson(fido_pk);
+                                    });
 
             util::EventLoop::main().run_until([&] {
                 return callback_called;
@@ -1955,21 +1955,17 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             app::MongoCollection::FindOneAndModifyOptions opts;
             opts.return_new_document = true;
             dog_collection.find_one_and_replace(
-                    bson::BsonDocument{{valid_pk_name, fido_pk}},
-                    bson::BsonDocument{
-                        //{valid_pk_name, fido_pk},
-                        {"breed", std::string("not a dog - actually a cat")},
-                        {"name", std::string("fido")},
-                        {"realm_id", std::string("foo")}
-                    },
-                    opts,
-                    [&](Optional<bson::BsonDocument> maybe_doc, auto maybe_error) {
-
-                        REQUIRE(!maybe_error);
-                        REQUIRE(maybe_doc);
-                        REQUIRE(maybe_doc->at("breed") == bson::Bson("not a dog - actually a cat"));
-                        replace_done = true;
-                    });
+                bson::BsonDocument{{valid_pk_name, fido_pk}},
+                bson::BsonDocument{//{valid_pk_name, fido_pk},
+                                   {"breed", std::string("not a dog - actually a cat")},
+                                   {"name", std::string("fido")},
+                                   {"realm_id", std::string("foo")}},
+                opts, [&](Optional<bson::BsonDocument> maybe_doc, auto maybe_error) {
+                    REQUIRE(!maybe_error);
+                    REQUIRE(maybe_doc);
+                    REQUIRE(maybe_doc->at("breed") == bson::Bson("not a dog - actually a cat"));
+                    replace_done = true;
+                });
             util::EventLoop::main().run_until([&] {
                 return replace_done && fido_updated;
             });
