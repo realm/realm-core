@@ -1878,6 +1878,108 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         return realm::Results(r, r->read_group().get_table("class_Dog"));
     };
 
+    SECTION("document replacements get notified as updates") {
+        auto sync_manager = std::make_unique<TestSyncManager>(TestSyncManager::Config(app_config), SyncServer::Config{});
+
+        auto app = get_app_and_login(sync_manager->app());
+        auto config = setup_and_get_config(app);
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+        // clear state from previous runs
+        {
+            Results dogs = get_dogs(r, session);
+            r->begin_transaction();
+            dogs.clear();
+            r->commit_transaction();
+        }
+    
+        REQUIRE(get_dogs(r, session).size() == 0);
+        r->begin_transaction();
+        CppContext c;
+        auto fido_pk = ObjectId::gen();
+        Object::create(c, r, "Dog",
+                       util::Any(realm::AnyDict{{valid_pk_name, util::Any(fido_pk)},
+                                                {"breed", std::string("bulldog")},
+                                                {"name", std::string("fido")},
+                                                {"realm_id", std::string("foo")}}),
+                       CreatePolicy::ForceCreate);
+        r->commit_transaction();
+
+        REQUIRE(get_dogs(r, session).size() == 1);
+        
+        auto mongo_client = app->current_user()->mongo_client("BackingDB");
+        auto dog_collection = mongo_client.db("test_data").collection("Dog");
+
+        auto found_fido = false;
+        while (!found_fido) {
+            auto callback_called = false;
+            dog_collection.find_one(
+                    bson::BsonDocument{{valid_pk_name, fido_pk}},
+                    [&](Optional<bson::BsonDocument> maybe_dog, auto maybe_err) {
+                callback_called = true;
+                REQUIRE(!maybe_err);
+                if (!maybe_dog) {
+                    return;
+                }
+                found_fido = maybe_dog->at(valid_pk_name) == bson::Bson(fido_pk);
+            });
+
+            util::EventLoop::main().run_until([&] {
+                return callback_called;
+            });
+        }
+
+        Results dogs = get_dogs(r, session);
+        auto fido_deleted = false;
+        auto fido_created = false;
+        auto fido_updated = false;
+
+        auto callback_token = dogs.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            if (c.empty()) {
+                return;
+            }
+            if (!c.deletions.empty()) {
+                fido_deleted = true;
+            }
+            if (!c.insertions.empty()) {
+                fido_created = true;
+            }
+            if (!c.modifications.empty()) {
+                fido_updated = true;
+            }
+        });
+
+        {
+            auto replace_done = false;
+            app::MongoCollection::FindOneAndModifyOptions opts;
+            opts.return_new_document = true;
+            dog_collection.find_one_and_replace(
+                    bson::BsonDocument{{valid_pk_name, fido_pk}},
+                    bson::BsonDocument{
+                        //{valid_pk_name, fido_pk},
+                        {"breed", std::string("not a dog - actually a cat")},
+                        {"name", std::string("fido")},
+                        {"realm_id", std::string("foo")}
+                    },
+                    opts,
+                    [&](Optional<bson::BsonDocument> maybe_doc, auto maybe_error) {
+
+                        REQUIRE(!maybe_error);
+                        REQUIRE(maybe_doc);
+                        REQUIRE(maybe_doc->at("breed") == bson::Bson("not a dog - actually a cat"));
+                        replace_done = true;
+                    });
+            util::EventLoop::main().run_until([&] {
+                return replace_done && fido_updated;
+            });
+        }
+
+        REQUIRE(dogs.get(0).get<String>("breed") == "not a dog - actually a cat");
+        REQUIRE_FALSE(fido_created);
+        REQUIRE_FALSE(fido_deleted);
+    }
+
     // MARK: Add Objects -
     SECTION("Add Objects") {
         TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});

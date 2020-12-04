@@ -27,10 +27,12 @@ void ObjectChangeSet::insertions_add(ObjectKeyType obj)
 
 void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
 {
-    // don't report modifications on new objects
-    if (m_insertions.find(obj) == m_insertions.end()) {
-        m_modifications[obj].insert(col);
+    // don't report modifications on new objects. treat objects that have been deleted and recreated
+    // within the same transaction as a replace.
+    if (m_insertions.find(obj) != m_insertions.end() && m_deletions.find(obj) == m_deletions.end()) {
+        return;
     }
+    m_modifications[obj].insert(col);
 }
 
 void ObjectChangeSet::deletions_add(ObjectKeyType obj)
