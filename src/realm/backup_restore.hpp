@@ -21,14 +21,17 @@
 namespace realm {
 
 bool is_accepted_file_format(int current_file_format_version);
-bool must_restore_from_backup(std::string path, int current_file_format_version);
+bool must_restore_from_backup(std::string path,
+                              int current_file_format_version);
 void restore_from_backup(std::string path);
-void backup_realm_if_needed(std::string path, int current_file_format_version, int target_file_format_version);
+void backup_realm_if_needed(std::string path, int current_file_format_version,
+                            int target_file_format_version);
 std::string get_prefix_from_path(std::string path);
 
 // functions to mock version lists for testing purposes
 
-void fake_versions(const std::vector<int>& accepted, const std::vector<int>& not_accepted);
+void fake_versions(const std::vector<int> &accepted,
+                   const std::vector<int> &not_accepted);
 void unfake_versions();
 
 } // namespace realm

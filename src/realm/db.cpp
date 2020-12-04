@@ -27,21 +27,21 @@
 #include <type_traits>
 #include <random>
 
+#include <realm/backup_restore.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/replication.hpp>
+#include <realm/set.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/errno.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file_mapper.hpp>
-#include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/set.hpp>
-#include <realm/backup_restore.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -1021,26 +1021,33 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 top_ref = alloc.attach_file(path, cfg); // Throws
             }
             catch (const SlabAlloc::Retry&) {
-                // On a SlabAlloc::Retry file mappings are already unmapped, no need to do more
-                continue;
+              // On a SlabAlloc::Retry file mappings are already unmapped, no
+              // need to do more
+              continue;
             }
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
-            current_file_format_version = alloc.get_committed_file_format_version();
+            current_file_format_version =
+                alloc.get_committed_file_format_version();
             target_file_format_version =
-                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+                Group::get_target_file_format_version_for_session(
+                    current_file_format_version, openers_hist_type);
 
-            if (realm::must_restore_from_backup(path, current_file_format_version)) {
-                // we need to unmap before any file ops that'll change the realm file:
-                // (only strictly needed for Windows)
-                alloc.detach();
-                realm::restore_from_backup(path);
-                // finally, retry with the restored file instead of the original one:
-                continue;
+            if (realm::must_restore_from_backup(path,
+                                                current_file_format_version)) {
+              // we need to unmap before any file ops that'll change the realm
+              // file:
+              // (only strictly needed for Windows)
+              alloc.detach();
+              realm::restore_from_backup(path);
+              // finally, retry with the restored file instead of the original
+              // one:
+              continue;
             }
 
-            // From here on, if we fail in any way, we must detach the allocator.
+            // From here on, if we fail in any way, we must detach the
+            // allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
@@ -1049,27 +1056,28 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             };
             auto reader_end_guard = make_scope_exit(handler);
 
-            // Check validity of top array (to give more meaningfull errors early)
+            // Check validity of top array (to give more meaningfull errors
+            // early)
             if (top_ref) {
-                try {
-                    alloc.note_reader_start(this);
-                    auto handler = [this, &alloc]() noexcept {
-                        alloc.note_reader_end(this);
-                    };
-                    auto reader_end_guard = make_scope_exit(handler);
-                    Array top{alloc};
-                    top.init_from_ref(top_ref);
-                    Group::validate_top_array(top, alloc);
+              try {
+                alloc.note_reader_start(this);
+                auto handler = [ this, &alloc ]() noexcept {
+                  alloc.note_reader_end(this);
+                };
+                auto reader_end_guard = make_scope_exit(handler);
+                Array top{alloc};
+                top.init_from_ref(top_ref);
+                Group::validate_top_array(top, alloc);
+              } catch (InvalidDatabase &e) {
+                if (e.get_path().empty()) {
+                  e.set_path(path);
                 }
-                catch (InvalidDatabase& e) {
-                    if (e.get_path().empty()) {
-                        e.set_path(path);
-                    }
-                    throw;
-                }
+                throw;
+              }
             }
             if (options.backup_at_file_format_change) {
-                realm::backup_realm_if_needed(path, current_file_format_version, target_file_format_version);
+              realm::backup_realm_if_needed(path, current_file_format_version,
+                                            target_file_format_version);
             }
             using gf = _impl::GroupFriend;
             bool file_format_ok = false;
@@ -1078,11 +1086,11 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // versions listed below. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
             if (current_file_format_version == 0) {
-                file_format_ok = (top_ref == 0);
+              file_format_ok = (top_ref == 0);
             } else {
-                if (is_accepted_file_format(current_file_format_version)) {
-                    file_format_ok = true;
-                }
+              if (is_accepted_file_format(current_file_format_version)) {
+                file_format_ok = true;
+              }
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {
