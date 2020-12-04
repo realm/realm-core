@@ -1707,7 +1707,7 @@ TEST(Upgrade_FixColumnKeys)
     DB::create(*hist)->start_read()->verify();
 }
 
-NONCONCURRENT_TEST(Upgrade_BackupAtoBtoA)
+NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::get_prefix_from_path(path);
@@ -1761,8 +1761,58 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoA)
         auto db = DB::create(*hist);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
-        auto col = table->get_column_key("names");
         CHECK(table->size() == 1);
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // Cleanup file and disable mockup versioning
+    File::remove(prefix + "v200.backup.realm");
+    _impl::GroupFriend::fake_target_file_format(std::optional<int>());
+    realm::unfake_versions();
+}
+
+NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string prefix = realm::get_prefix_from_path(path);
+
+    // Build a realm file with format 200
+    _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
+    realm::fake_versions({200},{});
+    {
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto table = tr->add_table("MyTable");
+        table->add_column(type_String, "names");
+        tr->commit();
+    }
+
+    // upgrade to format 201
+    _impl::GroupFriend::fake_target_file_format(std::optional<int>{201});
+    realm::fake_versions({201, 200},{});
+    {
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        table->create_object().set(col, "hr hansen");
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // downgrade/restore backup of format 200, but don't actually run the downgrade, then
+    // move forward to version 202, bypassing the outlawed 201 - with implied downgrade first
+    _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
+    realm::fake_versions({202, 200},{201});
+    {
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        CHECK(table->size() == 0);
         tr->commit();
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
