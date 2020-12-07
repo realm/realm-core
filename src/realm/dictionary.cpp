@@ -94,6 +94,7 @@ bool Dictionary::is_null(size_t ndx) const
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
+    update_if_needed();
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
@@ -104,22 +105,25 @@ Mixed Dictionary::get_any(size_t ndx) const
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
-    ArrayMixed leaf(m_obj.get_alloc());
-    size_t start_ndx = 0;
+    if (is_attached()) {
+        update_if_needed();
+        ArrayMixed leaf(m_obj.get_alloc());
+        size_t start_ndx = 0;
 
-    m_clusters->traverse([&](const Cluster* cluster) {
-        size_t e = cluster->node_size();
-        cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-        for (size_t i = 0; i < e; i++) {
-            if (leaf.get(i) == value) {
-                ret = start_ndx + i;
-                return true;
+        m_clusters->traverse([&](const Cluster* cluster) {
+            size_t e = cluster->node_size();
+            cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+            for (size_t i = 0; i < e; i++) {
+                if (leaf.get(i) == value) {
+                    ret = start_ndx + i;
+                    return true;
+                }
             }
-        }
-        start_ndx += e;
-        // Continue
-        return false;
-    });
+            start_ndx += e;
+            // Continue
+            return false;
+        });
+    }
 
     return ret;
 }
@@ -346,21 +350,25 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
+    bool old_entry = false;
+    ClusterNode::State state;
+    try {
+        // We assume that we will most likely insert new values, so we try this first
+        state = m_clusters->insert(k, key, value);
+    }
+    catch (const KeyAlreadyUsed&) {
+        state = m_clusters->get(k);
+        old_entry = true;
+    }
+
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_insert(*this, key, value);
+        repl->dictionary_insert(*this, state.index, key, value);
     }
 
     bump_content_version();
-    try {
-        ClusterNode::State state = m_clusters->insert(k, key, value);
 
-        if (new_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, ObjLink(), new_link, cascade_state);
-        }
-        return {Iterator(this, state.index), true};
-    }
-    catch (const KeyAlreadyUsed&) {
+    ObjLink old_link;
+    if (old_entry) {
         auto state = m_clusters->get(k);
         Array fallback(m_obj.get_alloc());
         Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
@@ -369,19 +377,18 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.init_from_parent();
 
         Mixed old_value = values.get(state.index);
-        ObjLink old_link;
         if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
             old_link = old_value.get<ObjLink>();
         }
-
-        if (new_link != old_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
-        }
-
         values.set(state.index, value);
-        return {Iterator(this, state.index), false};
     }
+
+    if (new_link != old_link) {
+        CascadeState cascade_state;
+        m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+    }
+
+    return {Iterator(this, state.index), !old_entry};
 }
 
 const Mixed Dictionary::operator[](Mixed key)
@@ -423,11 +430,13 @@ void Dictionary::erase(Mixed key)
     if (m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-        CascadeState state;
+        auto state = m_clusters->get(k);
+
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, key);
+            repl->dictionary_erase(*this, state.index, key);
         }
-        m_clusters->erase(k, state);
+        CascadeState dummy;
+        m_clusters->erase(k, dummy);
         bump_content_version();
     }
 }
@@ -456,8 +465,10 @@ void Dictionary::clear()
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
         if (Replication* repl = this->m_obj.get_replication()) {
+            size_t n = 0;
             for (auto&& elem : *this) {
-                repl->dictionary_erase(*this, elem.first);
+                repl->dictionary_erase(*this, n, elem.first);
+                n++;
             }
         }
         // Just destroy the whole cluster

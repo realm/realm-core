@@ -20,8 +20,6 @@
 #define REALM_OS_LIST_HPP
 
 #include <realm/object-store/collection.hpp>
-#include <realm/object-store/collection_notifications.hpp>
-#include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/object.hpp>
 
 #include <realm/decimal128.hpp>
@@ -39,10 +37,6 @@ class SortDescriptor;
 class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
-
-namespace _impl {
-class ListNotifier;
-}
 
 class List : public object_store::Collection {
 public:
@@ -107,8 +101,6 @@ public:
 
     bool operator==(List const& rgt) const noexcept;
 
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
-
     template <typename Context>
     auto get(Context&, size_t row_ndx) const;
     template <typename T, typename Context>
@@ -138,7 +130,6 @@ public:
     };
 
 private:
-    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<LstBase> m_list_base;
     bool m_is_embedded = false;
 

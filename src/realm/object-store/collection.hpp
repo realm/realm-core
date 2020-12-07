@@ -22,11 +22,17 @@
 #include <realm/collection.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
+#include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/impl/collection_notifier.hpp>
 
 namespace realm {
 class Realm;
 class Results;
 class ObjectSchema;
+
+namespace _impl {
+class ListNotifier;
+}
 
 namespace object_store {
 class Collection {
@@ -79,11 +85,15 @@ public:
     // Return a Results representing a live view of this Collection.
     Results as_results() const;
 
+    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+
 protected:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
     std::shared_ptr<CollectionBase> m_coll_base;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
+    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
+
 
     Collection() noexcept;
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);

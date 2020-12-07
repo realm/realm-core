@@ -22,6 +22,7 @@
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
