@@ -427,7 +427,7 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
     if (auto app = m_sync_manager->app().lock()) {
-        app->refresh_custom_data(shared_from_this(), [&](auto error) {
+        app->refresh_custom_data(shared_from_this(), [completion_block, this](auto error) {
             emit_change_to_subscribers(*this);
             completion_block(error);
         });
