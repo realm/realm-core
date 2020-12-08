@@ -119,7 +119,7 @@ def doAndroidDockerBuild() {
                 cmake -B build -DREALM_PLATFORM=Android -DANDROID_NDK=\${ANDROID_NDK} -GNinja -DCMAKE_MAKE_PROGRAM=ninja
                 cmake --build build
                 adb connect emulator
-                timeout 10m adb wait-for-device
+                timeout 30m adb wait-for-device
                 adb push build/tests/tests /data/local/tmp
                 adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
                 ! grep __ADB_FAIL__ adb.log
