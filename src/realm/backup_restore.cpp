@@ -28,14 +28,17 @@ namespace realm {
  * as new versions are released or if rollback is ever done.
  */
 
+
 // Note: accepted versions should have new versions added at front
-const std::vector<int> accepted_versions_{20, 11, 10, 9, 8, 7, 6, 0};
-const std::vector<int> not_accepted_versions_{};
+const version_list_t accepted_versions_{20, 11, 10, 9, 8, 7, 6, 0};
 
-std::vector<int> accepted_versions{accepted_versions_};
-std::vector<int> not_accepted_versions{not_accepted_versions_};
+// the pair is <version, age-in-seconds>
+const version_time_list_t not_accepted_versions_{};
 
-void fake_versions(const std::vector<int>& accepted, const std::vector<int>& not_accepted)
+version_list_t accepted_versions{accepted_versions_};
+version_time_list_t not_accepted_versions{not_accepted_versions_};
+
+void fake_versions(const version_list_t& accepted, const version_time_list_t& not_accepted)
 {
     accepted_versions = accepted;
     not_accepted_versions = not_accepted;
@@ -103,8 +106,8 @@ void restore_from_backup(std::string path)
         }
     }
     for (auto i : not_accepted_versions) {
-        if (backup_exists(prefix, i)) {
-            util::File::remove(backup_name(prefix, i));
+        if (backup_exists(prefix, i.first)) {
+            util::File::remove(backup_name(prefix, i.first));
         }
     }
 }

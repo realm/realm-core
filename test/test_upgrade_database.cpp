@@ -1739,7 +1739,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // downgrade/restore backup of format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
-    realm::fake_versions({200}, {201});
+    realm::fake_versions({200}, {{201, 0}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1754,7 +1754,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // move forward to version 202, bypassing the outlawed 201
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
-    realm::fake_versions({202, 200}, {201});
+    realm::fake_versions({202, 200}, {{201, 0}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1807,7 +1807,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // move forward to version 202, bypassing the outlawed 201 - with implied
     // downgrade first
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
-    realm::fake_versions({202, 200}, {201});
+    realm::fake_versions({202, 200}, {{201, 0}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);

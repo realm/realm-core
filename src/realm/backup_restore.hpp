@@ -28,7 +28,10 @@ std::string get_prefix_from_path(std::string path);
 
 // functions to mock version lists for testing purposes
 
-void fake_versions(const std::vector<int>& accepted, const std::vector<int>& not_accepted);
+using version_list_t = std::vector<int>;
+using version_time_list_t = std::vector<std::pair<int, int>>;
+
+void fake_versions(const version_list_t& accepted, const version_time_list_t& not_accepted);
 void unfake_versions();
 
 } // namespace realm

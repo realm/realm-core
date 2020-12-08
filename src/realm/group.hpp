@@ -24,6 +24,7 @@
 #include <vector>
 #include <map>
 #include <stdexcept>
+#include <optional>
 
 #include <realm/util/features.h>
 #include <realm/exceptions.hpp>
