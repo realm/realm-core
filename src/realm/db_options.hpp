@@ -35,27 +35,32 @@ struct DBOptions {
         Unsafe // If you use this, you loose ACID property
     };
 
-    explicit DBOptions(Durability level = Durability::Full,
-                       const char *key = nullptr, bool allow_upgrade = true,
-                       std::function<void(int, int)> file_upgrade_callback =
-                           std::function<void(int, int)>(),
-                       std::string temp_directory = sys_tmp_dir,
-                       bool track_metrics = false,
-                       size_t metrics_history_size = 10000,
-                       bool backup_at_file_format_change = true)
-        : durability(level), encryption_key(key),
-          allow_file_format_upgrade(allow_upgrade),
-          upgrade_callback(file_upgrade_callback), temp_dir(temp_directory),
-          enable_metrics(track_metrics),
-          metrics_buffer_size(metrics_history_size),
-          backup_at_file_format_change(backup_at_file_format_change) {}
+    explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr, bool allow_upgrade = true,
+                       std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
+                       std::string temp_directory = sys_tmp_dir, bool track_metrics = false,
+                       size_t metrics_history_size = 10000, bool backup_at_file_format_change = true)
+        : durability(level)
+        , encryption_key(key)
+        , allow_file_format_upgrade(allow_upgrade)
+        , upgrade_callback(file_upgrade_callback)
+        , temp_dir(temp_directory)
+        , enable_metrics(track_metrics)
+        , metrics_buffer_size(metrics_history_size)
+        , backup_at_file_format_change(backup_at_file_format_change)
+    {
+    }
 
-    explicit DBOptions(const char *key)
-        : durability(Durability::Full), encryption_key(key),
-          allow_file_format_upgrade(true),
-          upgrade_callback(std::function<void(int, int)>()),
-          temp_dir(sys_tmp_dir), enable_metrics(false),
-          metrics_buffer_size(10000), backup_at_file_format_change(true) {}
+    explicit DBOptions(const char* key)
+        : durability(Durability::Full)
+        , encryption_key(key)
+        , allow_file_format_upgrade(true)
+        , upgrade_callback(std::function<void(int, int)>())
+        , temp_dir(sys_tmp_dir)
+        , enable_metrics(false)
+        , metrics_buffer_size(10000)
+        , backup_at_file_format_change(true)
+    {
+    }
 
     /// The persistence level of the Realm file. See Durability.
     Durability durability;

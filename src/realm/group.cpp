@@ -302,33 +302,32 @@ int Group::get_committed_file_format_version() const noexcept
 
 std::optional<int> fake_target_file_format;
 
-void _impl::GroupFriend::fake_target_file_format(
-    const std::optional<int> &format) noexcept {
-  ::fake_target_file_format = format;
+void _impl::GroupFriend::fake_target_file_format(const std::optional<int>& format) noexcept
+{
+    ::fake_target_file_format = format;
 }
 
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-  if (fake_target_file_format) {
-    return *fake_target_file_format;
-  }
-  // Note: This function is responsible for choosing the target file format
-  // for a sessions. If it selects a file format that is different from
-  // `current_file_format_version`, it will trigger a file format upgrade
-  // process.
+    if (fake_target_file_format) {
+        return *fake_target_file_format;
+    }
+    // Note: This function is responsible for choosing the target file format
+    // for a sessions. If it selects a file format that is different from
+    // `current_file_format_version`, it will trigger a file format upgrade
+    // process.
 
-  // Note: `current_file_format_version` may be zero at this time, which means
-  // that the file format it is not yet decided (only possible for empty
-  // Realms where top-ref is zero).
+    // Note: `current_file_format_version` may be zero at this time, which means
+    // that the file format it is not yet decided (only possible for empty
+    // Realms where top-ref is zero).
 
-  // Please see Group::get_file_format_version() for information about the
-  // individual file format versions.
+    // Please see Group::get_file_format_version() for information about the
+    // individual file format versions.
 
-  if (requested_history_type == Replication::hist_None &&
-      current_file_format_version == 11) {
-    // We are able to open file format 11 in RO mode
-    return 11;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 11) {
+        // We are able to open file format 11 in RO mode
+        return 11;
     }
 
     return 20;
@@ -385,10 +384,9 @@ uint64_t Group::get_sync_file_id() const noexcept
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
-    if (fake_target_file_format &&
-        *fake_target_file_format == target_file_format_version) {
-      // Testing, mockup scenario, not a real upgrade. Just pretend we're done!
-      return;
+    if (fake_target_file_format && *fake_target_file_format == target_file_format_version) {
+        // Testing, mockup scenario, not a real upgrade. Just pretend we're done!
+        return;
     }
 
     // Be sure to revisit the following upgrade logic when a new file format
