@@ -131,6 +131,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     config.schema = Schema{{"object",
                             {{"value", PropertyType::Int},
                              {"int_array", PropertyType::Array | PropertyType::Int},
+                             {"int_dict", PropertyType::Dictionary | PropertyType::Int},
                              {"object_array", PropertyType::Array | PropertyType::Object, "linked to object"}}},
                            {"linked to object", {{"value", PropertyType::Int}}}
 
@@ -141,7 +142,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     auto linked_table = realm->read_group().get_table("class_linked to object");
     auto value_col = table->get_column_key("value");
     auto object_link_col = table->get_column_key("object_array");
-    auto int_link_col = table->get_column_key("int_array");
+    auto int_list_col = table->get_column_key("int_array");
+    auto int_dict_col = table->get_column_key("int_dict");
     auto linked_object_value_col = linked_table->get_column_key("value");
 
     realm->begin_transaction();
@@ -149,12 +151,15 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Obj obj = table->create_object();
         obj.set(value_col, (i + 2));
         std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
-        auto int_list = List(realm, obj, int_link_col);
+        auto int_list = List(realm, obj, int_list_col);
+        object_store::Dictionary int_dict(realm, obj, int_dict_col);
         for (int j = 0; j < 5; ++j) {
             auto child_obj = linked_table->create_object();
             child_obj.set(linked_object_value_col, j + 10);
             object_link_view->add(child_obj.get_key());
             int_list.add(static_cast<Int>(j + 42));
+            std::string key = "Key" + util::to_string(j);
+            int_dict.insert(key, i);
         }
     }
     realm->commit_transaction();
@@ -203,7 +208,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("Result constructor - Primitive list") {
-        const List list = List(frozen_realm, table->get_object(0), int_link_col);
+        const List list = List(frozen_realm, table->get_object(0), int_list_col);
         auto list_results = list.as_results();
 
         Results frozen_res = list_results.freeze(frozen_realm);
@@ -218,6 +223,18 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(sorted_frozen_res.is_frozen());
             REQUIRE(sorted_frozen_res.size() == 5);
             REQUIRE(sorted_frozen_res.get<Int>(0) == 46);
+        });
+    }
+
+    SECTION("Result constructor - Dictionary") {
+        const object_store::Dictionary dict(frozen_realm, table->get_object(0), int_dict_col);
+        auto dict_results = dict.as_results();
+
+        Results frozen_res = dict_results.freeze(frozen_realm);
+        JoiningThread thread1([&] {
+            REQUIRE(frozen_res.is_frozen());
+            REQUIRE(frozen_res.size() == 5);
+            REQUIRE(frozen_res.get<Int>(0) == 0);
         });
     }
 

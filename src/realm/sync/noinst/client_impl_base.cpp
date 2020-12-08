@@ -932,14 +932,22 @@ void Connection::initiate_websocket_handshake()
     std::string sec_websocket_protocol;
     {
         std::ostringstream out;
+        out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         out.imbue(std::locale::classic());
+        const char* protocol_prefix = sync::get_websocket_protocol_prefix();
         int min = get_oldest_supported_protocol_version();
         int max = sync::get_current_protocol_version();
         REALM_ASSERT(min <= max);
-        auto protocol_prefix = sync::get_websocket_protocol_prefix(); // "io.realm.sync-2."
-        out << protocol_prefix << min;                                // Throws
-        if (min != max)
-            out << "-" << max; // Throws
+        // List protocol version in descending order to ensure that the server
+        // selects the highest possible version.
+        int version = max;
+        for (;;) {
+            out << protocol_prefix << version; // Throws
+            if (version == min)
+                break;
+            out << ", "; // Throws
+            --version;
+        }
         sec_websocket_protocol = std::move(out).str();
     }
 

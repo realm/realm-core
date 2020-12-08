@@ -157,8 +157,6 @@ int Obj::cmp(const Obj& other, ColKey col_key) const
             return cmp<ObjKey>(other, col_ndx);
         case type_TypedLink:
             return cmp<ObjLink>(other, col_ndx);
-        case type_OldDateTime:
-        case type_OldTable:
         case type_LinkList:
             REALM_ASSERT(false);
             break;
@@ -839,9 +837,7 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
             break;
         case type_Link:
         case type_LinkList:
-        case type_OldDateTime:
         case type_Mixed:
-        case type_OldTable:
             break;
     }
 }
@@ -902,9 +898,9 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             out << "\"}";
             break;
         case type_UUID:
-            out << "{\"$binary\": \"";
+            out << "{\"$uuid\": \"";
             out << val.get<UUID>();
-            out << "\", \"subType\": \"04\"}}";
+            out << "\"}";
             break;
         case type_TypedLink: {
             out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
@@ -912,9 +908,7 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
         }
         case type_Link:
         case type_LinkList:
-        case type_OldDateTime:
         case type_Mixed:
-        case type_OldTable:
             break;
     }
 }

@@ -25,12 +25,14 @@ Dictionary::Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey c
     : Collection(std::move(r), parent_obj, col)
     , m_dict(dynamic_cast<realm::Dictionary*>(m_coll_base.get()))
 {
+    REALM_ASSERT(m_dict);
 }
 
 Dictionary::Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict)
     : Collection(std::move(r), dict)
     , m_dict(dynamic_cast<realm::Dictionary*>(m_coll_base.get()))
 {
+    REALM_ASSERT(m_dict);
 }
 
 Dictionary::~Dictionary() {}

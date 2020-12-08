@@ -111,7 +111,6 @@ const char* get_encryption_key()
 #else
     return nullptr;
 #endif
-
 }
 
 int64_t get_int64(State& s)
@@ -143,7 +142,8 @@ std::string create_string(size_t length)
     return std::string{buf, length};
 }
 
-std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
+std::pair<int64_t, int32_t> get_timestamp_values(State& s)
+{
     int64_t seconds = get_int64(s);
     int32_t nanoseconds = get_int32(s) % 1000000000;
     // Make sure the values form a sensible Timestamp
@@ -171,7 +171,7 @@ std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log
 namespace {
 int table_index = 0;
 int column_index = 0;
-}
+} // namespace
 
 std::string create_column_name(DataType t)
 {
@@ -219,9 +219,6 @@ std::string create_column_name(DataType t)
         case type_Mixed:
             str = "any_";
             break;
-        case type_OldDateTime:
-        case type_OldTable:
-            break;
     }
     return str + util::to_string(column_index++);
 }
@@ -245,7 +242,7 @@ namespace {
 // You can use this variable to make a conditional breakpoint if you know that
 // a problem occurs after a certain amount of iterations.
 int iteration;
-}
+} // namespace
 
 void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
@@ -320,8 +317,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             else if (instr == REMOVE_TABLE && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (log) {
-                    *log << "try { wt->remove_table(" << table_key << "); }"
-                                                                      " catch (const CrossTableLinkTarget&) { }\n";
+                    *log << "try { wt->remove_table(" << table_key
+                         << "); }"
+                            " catch (const CrossTableLinkTarget&) { }\n";
                 }
                 try {
                     wt->remove_table(table_key);
@@ -521,7 +519,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                                 obj.set<Int>(col, value);
                             }
-
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
@@ -753,14 +750,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s {FILE | --} [--log] [--name NAME] [--prefix PATH]\n"
-                    "Where FILE is a instruction file that will be replayed.\n"
-                    "Pass -- without argument to read filenames from stdin\n"
-                    "Pass --log to have code printed to stdout producing the same instructions.\n"
-                    "Pass --name NAME with distinct values when running on multiple threads,\n"
-                    "                 to make sure the test don't use the same Realm file\n"
-                    "Pass --prefix PATH to supply a path that should be prepended to all filenames\n"
-                    "                 read from stdin.\n",
+    fprintf(stderr,
+            "Usage: %s {FILE | --} [--log] [--name NAME] [--prefix PATH]\n"
+            "Where FILE is a instruction file that will be replayed.\n"
+            "Pass -- without argument to read filenames from stdin\n"
+            "Pass --log to have code printed to stdout producing the same instructions.\n"
+            "Pass --name NAME with distinct values when running on multiple threads,\n"
+            "                 to make sure the test don't use the same Realm file\n"
+            "Pass --prefix PATH to supply a path that should be prepended to all filenames\n"
+            "                 read from stdin.\n",
             argv[0]);
     exit(1);
 }
@@ -837,7 +835,7 @@ int run_fuzzy(int argc, const char* argv[])
     return 0;
 }
 #else
-int run_fuzzy(int, const char* [])
+int run_fuzzy(int, const char*[])
 {
     return 0;
 }

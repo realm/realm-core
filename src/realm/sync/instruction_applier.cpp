@@ -699,7 +699,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
     resolve_path(instr, "ArrayErase", callback);
 }
 
-void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
+void InstructionApplier::operator()(const Instruction::Clear& instr)
 {
     auto callback = util::overload{
         [&](LstBase& list) {
@@ -708,12 +708,15 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
         [](Dictionary& dict) {
             dict.clear();
         },
+        [](SetBase& set) {
+            set.clear();
+        },
         [&](auto&&...) {
-            bad_transaction_log("Invalid path for ArrayClear");
+            bad_transaction_log("Invalid path for Clear");
         },
     };
 
-    resolve_path(instr, "ArrayClear", callback);
+    resolve_path(instr, "Clear", callback);
 }
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
@@ -858,20 +861,6 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
     };
 
     resolve_path(instr, "SetErase", callback);
-}
-
-void InstructionApplier::operator()(const Instruction::SetClear& instr)
-{
-    auto callback = util::overload{
-        [&](SetBase& set) {
-            set.clear();
-        },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for SetClear");
-        },
-    };
-
-    resolve_path(instr, "SetClear", callback);
 }
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)

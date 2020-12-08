@@ -144,6 +144,7 @@ set(REALM_INSTALL_HEADERS
     db_options.hpp
     decimal128.hpp
     dictionary.hpp
+    dictionary_cluster_tree.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     global_key.hpp
@@ -281,7 +282,6 @@ target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 
 target_compile_definitions(Storage PUBLIC
   $<$<CONFIG:Debug>:REALM_DEBUG=1>
-  $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
 if(NOT MSVC)
