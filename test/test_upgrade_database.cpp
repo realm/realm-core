@@ -29,8 +29,6 @@
 #include <sys/types.h>
 #endif
 
-#include "test.hpp"
-#include "test_table_helper.hpp"
 #include <realm.hpp>
 #include <realm/backup_restore.hpp>
 #include <realm/history.hpp>
@@ -38,6 +36,8 @@
 #include <realm/util/file.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/version.hpp>
+#include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;

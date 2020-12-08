@@ -26,7 +26,7 @@ namespace realm {
 /*
  * IMPORTANT: The following two arrays must be kept updated
  * as new versions are released or if rollback is ever done.
-*/
+ */
 
 // Note: accepted versions should have new versions added at front
 const std::vector<int> accepted_versions_{20, 11, 10, 9, 8, 7, 6, 0};

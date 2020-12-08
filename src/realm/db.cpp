@@ -1084,7 +1084,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             // information about the individual file format versions.
             if (current_file_format_version == 0) {
                 file_format_ok = (top_ref == 0);
-            } else {
+            }
+            else {
                 if (is_accepted_file_format(current_file_format_version)) {
                     file_format_ok = true;
                 }
