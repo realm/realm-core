@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 10.3.1 Release notes
 
 ### Enhancements
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
@@ -13,7 +12,7 @@
 -----------
 
 ### Internals
-* None.
+* Add missing header from packages (`realm/dictionary_cluster_tree.hpp`).
 
 ----------------------------------------------
 
