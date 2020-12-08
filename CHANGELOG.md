@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([HELP-20152](https://jira.mongodb.org/browse/HELP-20152), since v10.0.0)
  
 ### Breaking changes
 * None.
