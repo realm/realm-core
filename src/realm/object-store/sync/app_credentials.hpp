@@ -19,6 +19,8 @@
 #ifndef REALM_APP_CREDENTIALS_HPP
 #define REALM_APP_CREDENTIALS_HPP
 
+#include <realm/object-store/util/tagged_string.hpp>
+
 #include <functional>
 #include <string>
 
@@ -33,6 +35,9 @@ namespace app {
 
 typedef std::string IdentityProvider;
 typedef std::string AppCredentialsToken;
+
+using AuthCode = util::TaggedString<class AuthCodeTag>;
+using IdToken = util::TaggedString<class IdTokenTag>;
 
 // The username/password identity provider. User accounts are handled by the Realm Object Server directly without the
 // involvement of a third-party identity provider.
@@ -91,7 +96,10 @@ struct AppCredentials {
     static AppCredentials apple(const AppCredentialsToken id_token);
 
     // Construct and return credentials from a google account token.
-    static AppCredentials google(const AppCredentialsToken id_token);
+    static AppCredentials google(AuthCode&& id_token);
+
+    // Construct and return credentials from a google account token.
+    static AppCredentials google(IdToken&& id_token);
 
     // Construct and return credentials from a jwt token.
     static AppCredentials custom(const AppCredentialsToken token);

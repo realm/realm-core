@@ -155,6 +155,8 @@ TEST_CASE("set") {
             CHECK(set.insert(-1).second);
         });
 
+        auto x = set.min();
+
         REQUIRE(set.is_valid());
         CHECK(set.sum(col_int_set) == 578);
         CHECK(set.min(col_int_set) == -1);

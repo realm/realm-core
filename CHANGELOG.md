@@ -17,6 +17,31 @@
 
 ----------------------------------------------
 
+# 10.3.0 Release notes
+
+### Enhancements
+* Add support for Google openId
+
+### Fixed
+* Fix an assertion failure when querying for null on a non-nullable string primary key property. ([#4060](https://github.com/realm/realm-core/issues/4060), since v10.0.0-alpha.2)
+* Fix a use of a dangling reference when refreshing a user's custom data that could lead to a crash (since v10.0.0).
+* Sync client: Upgrade to protocol version 2, which fixes a bug that would
+  prevent eventual consistency during conflict resolution. Affected clients
+  would experience data divergence and potentially consistency errors as a
+  result. ([#4004](https://github.com/realm/realm-core/pull/4004))
+
+### Breaking changes
+* Sync client: The sync client now requires a server that speaks protocol
+  version 2 (Cloud version `20201202` or newer).
+
+-----------
+
+### Internals
+* Fix publishing the Cocoa xcframework release package to s3.
+* Remove debug libraries from the Cocoa release packages.
+
+----------------------------------------------
+
 # 10.2.0 Release notes
 
 ### Enhancements
