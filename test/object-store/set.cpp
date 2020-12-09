@@ -155,13 +155,11 @@ TEST_CASE("set") {
             CHECK(set.insert(-1).second);
         });
 
-        auto x = set.min();
-
         REQUIRE(set.is_valid());
-        CHECK(set.sum(col_int_set) == 578);
-        CHECK(set.min(col_int_set) == -1);
-        CHECK(set.max(col_int_set) == 456);
-        CHECK(set.average(col_int_set) == 144.5);
+        CHECK(set.sum() == 578);
+        CHECK(set.min() == -1);
+        CHECK(set.max() == 456);
+        CHECK(set.average() == 144.5);
     }
 
     SECTION("add_notification_block()") {
