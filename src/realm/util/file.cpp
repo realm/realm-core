@@ -1610,6 +1610,20 @@ void File::MapBase::sync()
     File::sync_map(m_fd, m_addr, m_size);
 }
 
+std::time_t File::last_write_time(const std::string& path)
+{
+#ifdef _WIN32
+    REALM_ASSERT(false); // unimplemented
+#else  // POSIX version
+
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) == 0) {
+        return statbuf.st_mtime;
+    }
+    throw std::system_error(errno, std::system_category(), "fstat() failed");
+#endif
+}
+
 
 
 #ifndef _WIN32

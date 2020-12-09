@@ -27,6 +27,7 @@
 #include <string>
 #include <streambuf>
 #include <iostream>
+#include <ctime>
 
 #ifndef _WIN32
 #include <dirent.h> // POSIX.1-2001
@@ -441,6 +442,9 @@ public:
     /// calling process has no access to, will necessarily be reported
     /// as not existing.
     static bool exists(const std::string& path);
+
+    /// Get the time of last modification made to the file
+    static time_t last_write_time(const std::string& path);
 
     /// Check whether the specified path exists and refers to a directory. If
     /// the referenced file system object resides in an inaccessible directory,

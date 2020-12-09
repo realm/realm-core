@@ -1710,6 +1710,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
@@ -1766,7 +1768,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
     CHECK(File::exists(prefix + "v200.backup.realm"));
 
     // Cleanup file and disable mockup versioning
-    File::remove(prefix + "v200.backup.realm");
+    File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format(std::optional<int>());
     realm::unfake_versions();
 }
@@ -1775,6 +1777,9 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
+    File::try_remove(prefix + "v201.backup.realm");
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
@@ -1802,12 +1807,22 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
 
-    // downgrade/restore backup of format 200, but don't actually run the
-    // downgrade, then
-    // move forward to version 202, bypassing the outlawed 201 - with implied
-    // downgrade first
+    // upgrade further to 202, based on 201, to create a v201 backup
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
-    realm::fake_versions({202, 200}, {{201, 0}});
+    realm::fake_versions({202, 201, 200}, {});
+    {
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist);
+        auto tr = db->start_write();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+
+    // downgrade/restore backup of format 200, but don't actually run the
+    // downgrade as a separate stage, but directly move forward to version 203,
+    // bypassing the outlawed 201 and 202.
+    _impl::GroupFriend::fake_target_file_format(std::optional<int>{203});
+    realm::fake_versions({203, 200}, {{201, 10}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1816,10 +1831,23 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         CHECK(table->size() == 0);
         tr->commit();
     }
+
     CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+    // Ask for v201 to have a max age of one sec.
+    // When opened more than a sec later,
+    // the v201 backup will be too old and automagically removed
+    realm::fake_versions({203, 200}, {{201, 1}});
+    sleep(2);
+    {
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist);
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(!File::exists(prefix + "v201.backup.realm"));
 
     // Cleanup file and disable mockup versioning
-    File::remove(prefix + "v200.backup.realm");
+    File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format(std::optional<int>());
     realm::unfake_versions();
 }

@@ -20,6 +20,8 @@
 #include <realm/util/file.hpp>
 
 #include <vector>
+#include <filesystem>
+#include <chrono>
 
 namespace realm {
 
@@ -33,21 +35,31 @@ namespace realm {
 const version_list_t accepted_versions_{20, 11, 10, 9, 8, 7, 6, 0};
 
 // the pair is <version, age-in-seconds>
-const version_time_list_t not_accepted_versions_{};
+// we keep backup files in 3 months: 3*30*24*60*60 secs
+constexpr int three_months = 3*30*24*60*60;
+const version_time_list_t delete_versions_{
+    {20, three_months},
+    {11, three_months},
+    {10, three_months},
+    {9, three_months},
+    {8, three_months},
+    {7, three_months},
+    {6, three_months}
+};
 
 version_list_t accepted_versions{accepted_versions_};
-version_time_list_t not_accepted_versions{not_accepted_versions_};
+version_time_list_t delete_versions{delete_versions_};
 
 void fake_versions(const version_list_t& accepted, const version_time_list_t& not_accepted)
 {
     accepted_versions = accepted;
-    not_accepted_versions = not_accepted;
+    delete_versions = not_accepted;
 }
 
 void unfake_versions()
 {
     accepted_versions = accepted_versions_;
-    not_accepted_versions = not_accepted_versions_;
+    delete_versions = delete_versions_;
 }
 
 std::string get_prefix_from_path(std::string path)
@@ -101,13 +113,31 @@ void restore_from_backup(std::string path)
     for (auto i : accepted_versions) {
         if (backup_exists(prefix, i)) {
             auto backup_nm = backup_name(prefix, i);
-            std::cout << "Restoring from backup " << backup_nm << std::endl;
+            std::cout << "Restoring from:    " << backup_nm << std::endl;
             util::File::move(backup_nm, path);
         }
     }
-    for (auto i : not_accepted_versions) {
-        if (backup_exists(prefix, i.first)) {
-            util::File::remove(backup_name(prefix, i.first));
+}
+
+void cleanup_backups(std::string path)
+{
+    std::string prefix = get_prefix_from_path(path);
+    auto now = time(nullptr);
+    for (auto i : delete_versions) {
+        try {
+            if (backup_exists(prefix, i.first)) {
+                std::string fn = backup_name(prefix, i.first);
+                // Assuming time_t is in seconds (should be on posix, but...)
+                auto last_modified = util::File::last_write_time(fn);
+                double diff = difftime(now, last_modified);
+                if (diff > i.second) {
+                    std::cout << "Removing backup:   " << fn << "  - age: " << diff << std::endl;
+                    util::File::remove(fn);
+                }
+            }
+        }
+        catch (...) // ignore any problems, just leave the files
+        {
         }
     }
 }
@@ -125,7 +155,7 @@ void backup_realm_if_needed(std::string path, int current_file_format_version, i
         std::cout << "Backup file already exists: " << backup_nm << std::endl;
         return;
     }
-    std::cout << "Creating backup " << backup_nm << std::endl;
+    std::cout << "Creating backup:   " << backup_nm << std::endl;
     std::string part_name = backup_nm + ".part";
     // FIXME: Consider if it's better to do a writeToFile a la compact?
     // FIXME: Handle running out of file space

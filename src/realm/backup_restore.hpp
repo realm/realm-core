@@ -23,6 +23,7 @@ namespace realm {
 bool is_accepted_file_format(int current_file_format_version);
 bool must_restore_from_backup(std::string path, int current_file_format_version);
 void restore_from_backup(std::string path);
+void cleanup_backups(std::string path);
 void backup_realm_if_needed(std::string path, int current_file_format_version, int target_file_format_version);
 std::string get_prefix_from_path(std::string path);
 
@@ -31,7 +32,7 @@ std::string get_prefix_from_path(std::string path);
 using version_list_t = std::vector<int>;
 using version_time_list_t = std::vector<std::pair<int, int>>;
 
-void fake_versions(const version_list_t& accepted, const version_time_list_t& not_accepted);
+void fake_versions(const version_list_t& accepted, const version_time_list_t& to_be_deleted);
 void unfake_versions();
 
 } // namespace realm

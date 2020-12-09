@@ -1042,6 +1042,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // one:
                 continue;
             }
+            realm::cleanup_backups(path);
 
             // From here on, if we fail in any way, we must detach the
             // allocator.
