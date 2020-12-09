@@ -453,4 +453,38 @@ TEST(Unresolved_CondensedIndices)
     CHECK_EQUAL(list2.size(), 1);
 }
 
+TEST(Unresolved_Recursive)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("RecursiveNode", type_ObjectId, "_id");
+    // Create two link columns. This will create two backlink columns in the target table
+    // When a tombstone is resurrected, and a backlink in the first backlink column is
+    // removed and the tombstone is thereby deleted, we should not attempt to find backlinks
+    // in the second backlink column.
+    auto col_next = table->add_column_link(type_Link, "NextNode", *table);
+    auto col_children = table->add_column_link(type_LinkList, "children", *table);
+
+    auto key = table->get_objkey_from_primary_key(ObjectId("5fc929bac4a3964b6d603f4e"));
+    key = table->create_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4d")).set(col_next, key).get_key();
+
+    table->create_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4c")).set(col_next, key);
+
+    // This will delete the tombstone for "5fc929bac4a3964b6d603f4e"
+    table->create_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4e"));
+
+    // The following will ensure that objects will be turned into tombstones when invalidated
+    auto obj = table->create_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4b"));
+    auto ll = obj.get_linklist(col_children);
+    ll.add(table->get_objkey_from_primary_key(ObjectId("5fc929bac4a3964b6d603f4c")));
+    ll.add(table->get_objkey_from_primary_key(ObjectId("5fc929bac4a3964b6d603f4d")));
+    ll.add(table->get_objkey_from_primary_key(ObjectId("5fc929bac4a3964b6d603f4e")));
+
+    g.verify();
+    CHECK_EQUAL(table->nb_unresolved(), 0);
+    table->get_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4c")).invalidate();
+    table->get_object_with_primary_key(ObjectId("5fc929bac4a3964b6d603f4d")).invalidate();
+    CHECK_EQUAL(table->nb_unresolved(), 2);
+    g.verify();
+}
+
 #endif
