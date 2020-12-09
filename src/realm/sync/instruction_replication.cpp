@@ -603,9 +603,9 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
+void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_insert(dict, key, value);
+    TrivialReplication::dictionary_insert(dict, ndx, key, value);
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
@@ -629,9 +629,9 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     }
 }
 
-void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
-    TrivialReplication::dictionary_erase(dict, key);
+    TrivialReplication::dictionary_erase(dict, ndx, key);
 
     if (select_collection(dict)) {
         Instruction::Update instr;

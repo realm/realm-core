@@ -60,11 +60,11 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overload{
-        [&](InternString str) -> PrimaryKey {
+    const auto& get = overload{
+        [this](InternString str) -> PrimaryKey {
             return get_string(str);
         },
-        [&](auto&& otherwise) -> PrimaryKey {
+        [](auto otherwise) -> PrimaryKey {
             return otherwise;
         },
     };
