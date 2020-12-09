@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
 
 ----------------------------------------------
 
