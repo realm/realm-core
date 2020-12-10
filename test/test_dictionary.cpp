@@ -212,6 +212,25 @@ TEST(Dictionary_TypedLinks)
     }
 }
 
+TEST(Dictionary_Clear)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict_typed = persons->add_column_dictionary(type_TypedLink, "typed");
+    auto col_dict_implicit = persons->add_column_dictionary(*dogs, "implicit");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+
+    adam.get_dictionary(col_dict_typed).insert("Dog1", pluto);
+    adam.get_dictionary(col_dict_implicit).insert("DOg2", lady.get_key());
+
+    persons->clear();
+    g.verify();
+}
+
 TEST(Dictionary_Transaction)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -291,6 +291,8 @@ private:
     template <class T>
     void do_erase(size_t ndx, ColKey col);
     void remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjKey>& keys, CascadeState& state) const;
+    void remove_backlinks(ObjKey origin_key, ColKey col, const std::vector<ObjLink>& links,
+                          CascadeState& state) const;
     void do_erase_key(size_t ndx, ColKey col, CascadeState& state);
     void do_insert_key(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
     void do_insert_link(size_t ndx, ColKey col, Mixed init_val, ObjKey origin_key);
