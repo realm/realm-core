@@ -476,13 +476,7 @@ auto value_or_object(const std::shared_ptr<Realm>& realm, PropertyType val_type,
 
         case type_Link:
             // Note: from_capi(realm_value_t) never produces an untyped link.
-            [[fallthrough]];
-        case type_OldTable:
-            [[fallthrough]];
         case type_Mixed:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
         case type_LinkList:
             REALM_TERMINATE("Invalid value type.");
     }

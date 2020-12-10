@@ -242,14 +242,7 @@ static inline realm_value_t to_capi(Mixed value)
             }
 
             case type_LinkList:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldTable:
-                [[fallthrough]];
-            case type_OldDateTime:
-                [[fallthrough]];
-            default:
                 REALM_TERMINATE("Invalid Mixed value type");
         }
     }
