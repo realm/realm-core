@@ -1444,8 +1444,13 @@ void Obj::assign_pk_and_backlinks(const ConstObj& other)
         Mixed val = other.get_any(col_pk);
         this->set(col_pk, val);
     }
+    auto nb_tombstones = m_table->m_tombstones->size();
 
-    auto copy_links = [this, &other](ColKey col) {
+    auto copy_links = [this, &other, nb_tombstones](ColKey col) {
+        if (nb_tombstones != m_table->m_tombstones->size()) {
+            // Object has been deleted - we are done
+            return true;
+        }
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
         auto backlinks = other.get_all_backlinks(col);
