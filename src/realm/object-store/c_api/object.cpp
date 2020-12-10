@@ -116,15 +116,8 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
 RLM_API bool realm_object_delete(realm_object_t* obj)
 {
     return wrap_err([&]() {
-        auto o = obj->obj();
-
-        if (!obj->is_valid()) {
-            auto table = o.get_table();
-            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
-            throw InvalidatedObjectException{schema.name};
-        }
-
-        o.remove();
+        obj->verify_attached();
+        obj->obj().remove();
         return true;
     });
 }
@@ -196,15 +189,7 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
                               realm_value_t* out_values)
 {
     return wrap_err([&]() {
-        auto o = obj->obj();
-
-        // FIXME: For a recently deleted object, this check can be expensive. It
-        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
-        if (!obj->is_valid()) {
-            auto table = o.get_table()->get_key();
-            auto& schema = schema_for_table(obj->get_realm(), to_capi(table));
-            throw InvalidatedObjectException{schema.name};
-        }
+        obj->verify_attached();
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = from_capi(properties[i]);
@@ -214,6 +199,7 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
                 throw std::logic_error("Accessing collection property as value.");
             }
 
+            auto o = obj->obj();
             auto val = o.get_any(col_key);
             out_values[i] = to_capi(val);
         }
@@ -231,15 +217,8 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
                               const realm_value_t* values, bool is_default)
 {
     return wrap_err([&]() {
+        obj->verify_attached();
         auto o = obj->obj();
-
-        // FIXME: For a recently deleted object, this check can be expensive. It
-        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
-        if (!obj->is_valid()) {
-            auto table = o.get_table()->get_key();
-            auto& schema = schema_for_table(obj->get_realm(), to_capi(table));
-            throw InvalidatedObjectException{schema.name};
-        }
 
         // Perform validation up front to avoid partial updates. This is
         // unlikely to incur performance overhead because the object itself is
@@ -284,16 +263,10 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key)
 {
     return wrap_err([&]() {
+        object->verify_attached();
+
         auto obj = object->obj();
         auto table = obj.get_table();
-
-        // FIXME: For a recently deleted object, this check can be expensive. It
-        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
-        if (!object->is_valid()) {
-            auto table_key = table->get_key();
-            auto& schema = schema_for_table(object->get_realm(), to_capi(table_key));
-            throw InvalidatedObjectException{schema.name};
-        }
 
         auto col_key = from_capi(key);
         table->report_invalid_key(col_key);
