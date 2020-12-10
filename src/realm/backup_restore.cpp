@@ -20,7 +20,6 @@
 #include <realm/util/file.hpp>
 
 #include <vector>
-#include <filesystem>
 #include <chrono>
 
 namespace realm {
