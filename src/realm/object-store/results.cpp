@@ -259,7 +259,7 @@ util::Optional<T> Results::try_get(size_t ndx)
         if (ndx < m_collection->size()) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any(ndx);
-            T val{};
+            T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
             }
