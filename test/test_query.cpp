@@ -665,9 +665,8 @@ TEST(Query_NextGenSyntaxMonkey)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 +
-                            random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-                                                        (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows = 1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
+                                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         auto col_int0 = table.add_column(type_Int, "first");
         auto col_int1 = table.add_column(type_Int, "second");
@@ -3615,10 +3614,10 @@ TEST(Query_FindAllRangeOr)
     TableView tv1 = q1.find_all(1, 8);
     CHECK_EQUAL(4, tv1.size());
 
-    TableView  tv2 = q1.find_all(2, 8);
+    TableView tv2 = q1.find_all(2, 8);
     CHECK_EQUAL(3, tv2.size());
 
-    TableView  tv3 = q1.find_all(1, 7);
+    TableView tv3 = q1.find_all(1, 7);
     CHECK_EQUAL(3, tv3.size());
 }
 
@@ -4049,21 +4048,21 @@ TEST(Query_EmptyDescriptors)
 
     std::vector<size_t> results = {4, 3, 2, 3}; // original order
 
-    {   // Sorting with an empty sort descriptor is a no-op
+    { // Sorting with an empty sort descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Distinct with an empty descriptor is a no-op
+    { // Distinct with an empty descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort, empty distinct is still a no-op
+    { // Empty sort, empty distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.distinct(DistinctDescriptor());
@@ -4071,7 +4070,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Arbitrary compounded empty sort and distinct is still a no-op
+    { // Arbitrary compounded empty sort and distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor());
@@ -4084,7 +4083,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty distinct compounded on a valid distinct is a no-op
+    { // Empty distinct compounded on a valid distinct is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4094,7 +4093,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort compounded on a valid sort is a no-op
+    { // Empty sort compounded on a valid sort is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor({{t1_int_col}}));
@@ -4541,7 +4540,7 @@ TEST(Query_DistinctAndSort)
     // 5 | 2        "A"      4           | 2       |
 
     using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, key
-    {   // distinct with no sort keeps original order
+    {                                                          // distinct with no sort keeps original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.distinct(t1_int_col);
@@ -4551,7 +4550,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view retains sorted order
+    { // distinct on a sorted view retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4562,7 +4561,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted descending retains sorted order
+    { // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {false /* descending */, false /* descending */}));
@@ -4573,7 +4572,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view (different from table order) retains sorted order
+    { // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[0]}};
         tv.sort(t1_int_col, false /* descending */);
@@ -4584,7 +4583,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links on an unsorted view retains original order
+    { // distinct across links on an unsorted view retains original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.distinct(DistinctDescriptor({{t1_link_col, t2_int_col}}));
@@ -4594,7 +4593,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted across links retains sorted order
+    { // distinct on a view sorted across links retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4605,7 +4604,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links and sort across links
+    { // distinct across links and sort across links
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4658,7 +4657,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     // 3 | 300        "A"      |
     // 4 | 400        "A"      |
 
-    {   // sort descending then distinct
+    { // sort descending then distinct
         TableView tv = t1->where().find_all();
         ResultList results = {{"A", k4}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4696,7 +4695,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // distinct then sort descending
+    { // distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}}));
@@ -4710,7 +4709,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // sort descending then multicolumn distinct
+    { // sort descending then multicolumn distinct
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4724,7 +4723,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // multicolumn distinct then sort descending
+    { // multicolumn distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4740,7 +4739,8 @@ TEST(Query_SortDistinctOrderThroughHandover)
     }
 }
 
-TEST(Query_CompoundDescriptors) {
+TEST(Query_CompoundDescriptors)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
@@ -4780,7 +4780,7 @@ TEST(Query_CompoundDescriptors) {
     // 4 | 2        "A"     |
     // 5 | 2        "A"     |
 
-    {   // sorting twice should the same as a single sort with both criteria
+    { // sorting twice should the same as a single sort with both criteria
         // but reversed: sort(a).sort(b) == sort(b, a)
         ResultList results = {{2, k3}, {1, k2}, {2, k4}, {2, k5}, {1, k0}, {1, k1}};
         TableView tv = t1->where().find_all();
@@ -4806,7 +4806,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // two distincts are not the same as a single distinct with both criteria
+    { // two distincts are not the same as a single distinct with both criteria
         ResultList results = {{1, k0}, {2, k3}};
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4832,7 +4832,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // check results of sort-distinct-sort-distinct
+    { // check results of sort-distinct-sort-distinct
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {true, true}));
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -5823,7 +5823,9 @@ TEST(Query_StringNodeEqualBaseBug)
     CHECK_EQUAL(tv.size(), 0);
 }
 
-TEST(Query_OptimalNode)
+// This test is disabled because it relies on timing, which is unpredictable
+// (especially in debug builds), causing spurious failures on CI.
+TEST_IF(Query_OptimalNode, false)
 {
     const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
     Group g;
