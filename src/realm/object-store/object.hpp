@@ -165,6 +165,8 @@ public:
     static Object get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm, StringData object_type,
                                       ValueType primary_value);
 
+    void verify_attached() const;
+
 private:
     friend class Results;
 
@@ -184,7 +186,6 @@ private:
     static ObjKey get_for_primary_key_in_migration(ContextType& ctx, Table const& table, const Property& primary_prop,
                                                    ValueType&& primary_value);
 
-    void verify_attached() const;
     Property const& property_for_name(StringData prop_name) const;
     void validate_property_for_setter(Property const&) const;
 };
