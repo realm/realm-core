@@ -36,16 +36,10 @@ const version_list_t accepted_versions_{20, 11, 10, 9, 8, 7, 6, 0};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months: 3*30*24*60*60 secs
-constexpr int three_months = 3*30*24*60*60;
-const version_time_list_t delete_versions_{
-    {20, three_months},
-    {11, three_months},
-    {10, three_months},
-    {9, three_months},
-    {8, three_months},
-    {7, three_months},
-    {6, three_months}
-};
+constexpr int three_months = 3 * 30 * 24 * 60 * 60;
+const version_time_list_t delete_versions_{{20, three_months}, {11, three_months}, {10, three_months},
+                                           {9, three_months},  {8, three_months},  {7, three_months},
+                                           {6, three_months}};
 
 version_list_t accepted_versions{accepted_versions_};
 version_time_list_t delete_versions{delete_versions_};
@@ -164,7 +158,7 @@ void backup_realm_if_needed(std::string path, int current_file_format_version, i
         util::File::copy(path, part_name);
         util::File::move(part_name, backup_nm);
     }
-    catch(...) {
+    catch (...) {
         util::File::try_remove(part_name);
         util::File::try_remove(backup_nm);
     }

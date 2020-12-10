@@ -1614,7 +1614,7 @@ std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
     REALM_ASSERT(false); // unimplemented
-#else  // POSIX version
+#else                    // POSIX version
 
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
@@ -1623,7 +1623,6 @@ std::time_t File::last_write_time(const std::string& path)
     throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
 }
-
 
 
 #ifndef _WIN32
