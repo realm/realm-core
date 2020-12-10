@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <fcntl.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -34,7 +35,6 @@
 #include <direct.h>
 #else
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
@@ -1613,8 +1613,19 @@ void File::MapBase::sync()
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
-    REALM_ASSERT(false); // unimplemented
-#else                    // POSIX version
+    int fd, result;
+    struct _stat buf;
+    fd = _open(path.c_str(), _O_RDONLY);
+    if (fd == -1) {
+        throw std::system_error(errno, std::system_category(), "_sopen_s() failed");
+    }
+    result = _fstat(fd, &buf);
+    if (result != 0) {
+        _close(fd);
+        throw std::system_error(errno, std::system_category(), "_fstat() failed");
+    }
+    return buf.st_mtime;
+#else // POSIX version
 
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
