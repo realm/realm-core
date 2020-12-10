@@ -1838,7 +1838,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // When opened more than a sec later,
     // the v201 backup will be too old and automagically removed
     realm::fake_versions({203, 200}, {{201, 1}});
-    sleep(2);
+    millisleep(2000);
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
