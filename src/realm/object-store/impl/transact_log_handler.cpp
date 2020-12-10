@@ -263,10 +263,6 @@ public:
     {
         return true;
     }
-    bool clear_table(size_t = 0) noexcept
-    {
-        return true;
-    }
     bool list_set(size_t)
     {
         return true;
@@ -488,18 +484,6 @@ public:
     {
         if (m_active_table)
             m_active_table->modifications_add(key.value, col.value);
-        return true;
-    }
-
-    bool clear_table(size_t old_size)
-    {
-        auto cur_table = current_table();
-        if (m_active_table)
-            m_active_table->clear(old_size);
-        auto it = remove_if(begin(m_info.lists), end(m_info.lists), [&](auto const& lv) {
-            return lv.table_key == cur_table;
-        });
-        m_info.lists.erase(it, end(m_info.lists));
         return true;
     }
 

@@ -132,10 +132,10 @@ void ResultsNotifier::calculate_changes()
             next_rows.push_back(m_run_tv.get_key(i).value);
 
         auto table_key = m_query->get_table()->get_key();
-        if (m_info->tables.count(table_key.value)) {
-            auto& changes = m_info->tables[table_key.value];
+        if (auto it = m_info->tables.find(table_key.value); it != m_info->tables.end()) {
+            auto& changes = it->second;
             for (auto& key_val : m_previous_rows) {
-                if (changes.get_deletions().count(key_val)) {
+                if (changes.deletions_contains(key_val)) {
                     key_val = -1;
                 }
             }

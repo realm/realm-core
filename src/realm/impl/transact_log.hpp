@@ -1307,15 +1307,6 @@ public:
         return true;
     }
 
-    bool clear_table(size_t old_size)
-    {
-        while (old_size--) {
-            m_encoder.create_object(null_key);
-            append_instruction();
-        }
-        return true;
-    }
-
     bool set_link_type(ColKey key)
     {
         m_encoder.set_link_type(key);

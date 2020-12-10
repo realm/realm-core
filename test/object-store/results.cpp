@@ -3596,17 +3596,35 @@ TEST_CASE("notifications: objects with PK recreated") {
     REQUIRE(calls2 == 1);
     REQUIRE(calls3 == 1);
 
-    r->begin_transaction();
-    r->read_group().get_table("class_no_pk")->remove_object(k1);
-    r->read_group().get_table("class_int_pk")->remove_object(k2);
-    r->read_group().get_table("class_string_pk")->remove_object(k3);
-    create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
-    create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
-    create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
-    r->commit_transaction();
+    SECTION("objects removed") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->remove_object(k1);
+        r->read_group().get_table("class_int_pk")->remove_object(k2);
+        r->read_group().get_table("class_string_pk")->remove_object(k3);
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
 
-    advance_and_notify(*r);
-    REQUIRE(calls1 == 2);
-    REQUIRE(calls2 == 2);
-    REQUIRE(calls3 == 2);
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
+    }
+
+    SECTION("table cleared") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->clear();
+        r->read_group().get_table("class_int_pk")->clear();
+        r->read_group().get_table("class_string_pk")->clear();
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
+    }
 }
