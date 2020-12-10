@@ -14,6 +14,8 @@
 
 ### Internals
 * Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
+* The xcframework build was missing the arm64 slice for apple simulators.
+* The non-xcframework Apple build once again includes fat libraries for the parser rather than separate device/simulator ones.
 
 ----------------------------------------------
 
