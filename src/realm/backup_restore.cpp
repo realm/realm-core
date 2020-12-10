@@ -50,10 +50,10 @@ const version_time_list_t delete_versions_{
 version_list_t accepted_versions{accepted_versions_};
 version_time_list_t delete_versions{delete_versions_};
 
-void fake_versions(const version_list_t& accepted, const version_time_list_t& not_accepted)
+void fake_versions(const version_list_t& accepted, const version_time_list_t& to_delete)
 {
     accepted_versions = accepted;
-    delete_versions = not_accepted;
+    delete_versions = to_delete;
 }
 
 void unfake_versions()
@@ -158,9 +158,16 @@ void backup_realm_if_needed(std::string path, int current_file_format_version, i
     std::cout << "Creating backup:   " << backup_nm << std::endl;
     std::string part_name = backup_nm + ".part";
     // FIXME: Consider if it's better to do a writeToFile a la compact?
-    // FIXME: Handle running out of file space
-    util::File::copy(path, part_name);
-    util::File::move(part_name, backup_nm);
+    // Silence any errors during the backup process, but should one occur
+    // remove any backup files, since they cannot be trusted.
+    try {
+        util::File::copy(path, part_name);
+        util::File::move(part_name, backup_nm);
+    }
+    catch(...) {
+        util::File::try_remove(part_name);
+        util::File::try_remove(backup_nm);
+    }
 }
 
 } // namespace realm

@@ -1,7 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* We now make a backup of the realm file prior to any file format upgrade. The backup is retained for 3 months.
+  Backups from before a file format upgrade allows for better analysis of any upgrade failure.
+  ([#4166](https://github.com/realm/realm-core/pull/4166))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
