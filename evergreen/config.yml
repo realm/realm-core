@@ -84,6 +84,10 @@ tasks:
             set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         fi
 
+        if [ -n "${use_system_openssl|}" ]; then
+            set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
+        fi
+
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
 
@@ -340,6 +344,8 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
+    use_system_openssl: On
+    fetch_missing_dependencies: On
   tasks:
   - name: compile_test_and_package
     distros:
