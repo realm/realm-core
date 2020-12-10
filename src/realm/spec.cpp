@@ -23,9 +23,7 @@
 #include <realm/group.hpp>
 using namespace realm;
 
-Spec::~Spec() noexcept
-{
-}
+Spec::~Spec() noexcept {}
 
 void Spec::detach() noexcept
 {
@@ -84,7 +82,7 @@ void Spec::update_internals() noexcept
     m_num_public_columns = 0;
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
-        if (m_types.get(i) == col_type_BackLink) {
+        if (ColumnType(int(m_types.get(i))) == col_type_BackLink) {
             // Now we have no more public columns
             return;
         }
@@ -199,37 +197,9 @@ bool Spec::convert_column_attributes()
                 changes = true;
             }
         }
-        ColumnType type = ColumnType(m_types.get(column_ndx));
+        ColumnType type = ColumnType(int(m_types.get(column_ndx)));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
-        switch (int(type)) {
-            case col_type_OldTable: {
-                Array subspecs(m_top.get_alloc());
-                subspecs.set_parent(&m_top, 3);
-                subspecs.init_from_parent();
-
-                Spec sub_spec(get_alloc());
-                size_t subspec_ndx = get_subspec_ndx(column_ndx);
-                ref_type ref = to_ref(subspecs.get(subspec_ndx)); // Throws
-                sub_spec.init(ref);
-                m_types.set(column_ndx, sub_spec.get_column_type(0));
-                m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
-                sub_spec.destroy();
-
-                subspecs.erase(subspec_ndx);
-                changes = true;
-                break;
-            }
-            case /*col_type_OldStringEnum */ 3: {
-                m_types.set(column_ndx, col_type_String);
-                // We need to padd zeroes into the m_enumkeys so that the index in
-                // m_enumkeys matches the column index.
-                for (size_t i = enumkey_ndx; i < column_ndx; i++) {
-                    m_enumkeys.insert(i, 0);
-                }
-                enumkey_ndx = column_ndx + 1;
-                changes = true;
-                break;
-            }
+        switch (type) {
             case col_type_Link:
                 if (!attr.test(col_attr_Nullable)) {
                     attr.set(col_attr_Nullable);
@@ -245,6 +215,32 @@ bool Spec::convert_column_attributes()
                 }
                 break;
             default:
+                if (type == col_type_OldTable) {
+                    Array subspecs(m_top.get_alloc());
+                    subspecs.set_parent(&m_top, 3);
+                    subspecs.init_from_parent();
+
+                    Spec sub_spec(get_alloc());
+                    size_t subspec_ndx = get_subspec_ndx(column_ndx);
+                    ref_type ref = to_ref(subspecs.get(subspec_ndx)); // Throws
+                    sub_spec.init(ref);
+                    m_types.set(column_ndx, int(sub_spec.get_column_type(0)));
+                    m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
+                    sub_spec.destroy();
+
+                    subspecs.erase(subspec_ndx);
+                    changes = true;
+                }
+                else if (type == col_type_OldStringEnum) {
+                    m_types.set(column_ndx, int(col_type_String));
+                    // We need to padd zeroes into the m_enumkeys so that the index in
+                    // m_enumkeys matches the column index.
+                    for (size_t i = enumkey_ndx; i < column_ndx; i++) {
+                        m_enumkeys.insert(i, 0);
+                    }
+                    enumkey_ndx = column_ndx + 1;
+                    changes = true;
+                }
                 break;
         }
     }
@@ -307,7 +303,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         m_num_public_columns++;
     }
 
-    m_types.insert(column_ndx, type);     // Throws
+    m_types.insert(column_ndx, int(type)); // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
     m_keys.insert(column_ndx, col_key.value);
@@ -323,7 +319,7 @@ void Spec::erase_column(size_t column_ndx)
 {
     REALM_ASSERT(column_ndx < m_types.size());
 
-    if (ColumnType(m_types.get(column_ndx)) != col_type_BackLink) {
+    if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
         if (is_string_enum_type(column_ndx)) {
             // Enum columns do also have a separate key list
             ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
@@ -351,8 +347,8 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Delete the entries common for all columns
-    m_types.erase(column_ndx);     // Throws
-    m_attr.erase(column_ndx);      // Throws
+    m_types.erase(column_ndx); // Throws
+    m_attr.erase(column_ndx);  // Throws
     m_keys.erase(column_ndx);
 
     update_internals();
@@ -369,11 +365,12 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
     REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Link ||
                  get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink ||
+                 // col_type_OldTable is used when migrating from file format 9 to 10.
                  get_column_type(column_ndx) == col_type_OldTable);
 
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
-        ColumnType type = ColumnType(m_types.get(i));
+        ColumnType type = ColumnType(int(m_types.get(i)));
         if (type == col_type_Link || type == col_type_LinkList) {
             subspec_ndx += 1; // index of dest column
         }
@@ -498,7 +495,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
     // check each column's type
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
-        ColumnType col_type = ColumnType(m_types.get(col_ndx));
+        ColumnType col_type = ColumnType(int(m_types.get(col_ndx)));
         switch (col_type) {
             case col_type_Link:
             case col_type_TypedLink:
@@ -517,9 +514,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Bool:
             case col_type_Binary:
             case col_type_String:
-            case col_type_OldTable:
             case col_type_Mixed:
-            case col_type_OldDateTime:
             case col_type_Timestamp:
             case col_type_Float:
             case col_type_Double:
@@ -540,7 +535,9 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 ColKey Spec::get_key(size_t column_ndx) const
 {
-    return ColKey(m_keys.get(column_ndx));
+    auto key = ColKey(m_keys.get(column_ndx));
+    REALM_ASSERT(key.get_type().is_valid());
+    return key;
 }
 
 void Spec::verify() const

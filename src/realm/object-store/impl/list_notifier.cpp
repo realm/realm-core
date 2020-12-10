@@ -26,7 +26,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list, PropertyType type)
+ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type)
     : CollectionNotifier(std::move(realm))
     , m_type(type)
     , m_table(list.get_table()->get_key())
@@ -49,7 +49,7 @@ void ListNotifier::do_attach_to(Transaction& sg)
 {
     try {
         auto obj = sg.get_table(m_table)->get_object(m_obj);
-        m_list = obj.get_listbase_ptr(m_col);
+        m_list = obj.get_collection_ptr(m_col);
     }
     catch (const KeyNotFound&) {
     }

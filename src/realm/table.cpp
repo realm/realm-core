@@ -305,10 +305,6 @@ const char* get_data_type_name(DataType type) noexcept
             return "link";
         case type_LinkList:
             return "linklist";
-        case type_OldTable:
-            return "oldTable";
-        case type_OldDateTime:
-            return "oldDateTime";
         case type_TypedLink:
             return "typedLink";
     }
@@ -2288,6 +2284,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 {
     check_column(col_key);
 
+    if (!col_key.is_nullable() && value_is_null(value)) {
+        return {}; // this is a precaution/optimization
+    }
     // You cannot call GetIndexData on ObjKey
     if constexpr (!std::is_same_v<T, ObjKey>) {
         if (StringIndex* index = get_search_index(col_key)) {
@@ -3442,8 +3441,8 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
-    noexcept
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
+                                                  StringData origin_col_name) const noexcept
 {
     BacklinkOrigin ret;
     auto f = [&](ColKey backlink_col_key) {
@@ -3770,9 +3769,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_TypedLink:
             case type_LinkList:
                 // Can't have lists of these types
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
@@ -3830,9 +3827,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 // Always nullable, so can't convert
             case type_LinkList:
                 // Never nullable, so can't convert
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;

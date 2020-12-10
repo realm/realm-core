@@ -449,10 +449,6 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
             break;
         }
         case type_Link:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
             REALM_TERMINATE("Unsupported column type.");
     }
 
@@ -574,13 +570,8 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
         case type_TypedLink:
             // FIXME: Implement
             break;
-        case type_LinkList:
-            [[fallthrough]];
         case type_Link:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
+        case type_LinkList:
             REALM_TERMINATE("Unsupported column type.");
     }
 
@@ -813,8 +804,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 
                 continue;
             }
-            case type_OldDateTime:
-            case type_OldTable:
             case type_LinkList:
                 break;
         }
