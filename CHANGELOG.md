@@ -13,7 +13,27 @@
 -----------
 
 ### Internals
+* Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
+* The xcframework build was missing the arm64 slice for apple simulators.
+* The non-xcframework Apple build once again includes fat libraries for the parser rather than separate device/simulator ones.
+
+----------------------------------------------
+
+# 10.3.1 Release notes
+
+### Enhancements
 * None.
+
+### Fixed
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Add missing header from packages (`realm/dictionary_cluster_tree.hpp`).
 
 ----------------------------------------------
 
@@ -74,6 +94,13 @@
 ### Enhancements
 * Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
 
+----------------------------------------------
+
+# 10.1.4 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+ 
 ----------------------------------------------
 
 # 10.1.3 Release notes
