@@ -96,6 +96,13 @@
 
 ----------------------------------------------
 
+# 10.1.4 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+ 
+----------------------------------------------
+
 # 10.1.3 Release notes
 
 ### Enhancements
