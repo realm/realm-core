@@ -13,8 +13,8 @@ static inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
     }
     catch (...) {
         set_last_exception(std::current_exception());
-        return decltype(std::declval<F>()()){};
-    }
+        return {};
+    };
 }
 
 template <class T>
