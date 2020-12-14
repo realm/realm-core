@@ -457,6 +457,8 @@ Query ParserDriver::simple_query(int op, ColKey col_key, T val)
     return m_base_table->where();
 }
 
+std::string check_escapes(const char* str);
+
 } // namespace query_parser
 } // namespace realm
 #endif // ! DRIVER_HH
