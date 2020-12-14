@@ -6,6 +6,8 @@
 
 #include <cstring>
 
+extern "C" int realm_c_api_tests(const char* file);
+
 template <class T>
 T checked(T x)
 {
@@ -84,6 +86,17 @@ static void check_err(realm_errno_e e)
     realm_error_t err;
     CHECK(realm_get_last_error(&err));
     CHECK(err.error == e);
+}
+
+TEST_CASE("C API (C)") {
+    const char* file_name = "c_api_test_c.realm";
+
+    // FIXME: Use a better test file guard.
+    if (realm::util::File::exists(file_name)) {
+        CHECK(realm::util::File::try_remove(file_name));
+    }
+
+    CHECK(realm_c_api_tests(file_name) == 0);
 }
 
 TEST_CASE("C API") {

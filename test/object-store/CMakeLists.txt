@@ -25,6 +25,7 @@ set(SOURCES
     transaction_log_parsing.cpp
     uuid.cpp
     c_api.cpp
+    c_api.c
 
     util/event_loop.cpp
     util/test_file.cpp
