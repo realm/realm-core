@@ -35,11 +35,7 @@ set_target_properties(Realm2JSON PROPERTIES
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(Realm2JSON Storage)
-if (NOT WINDOWS_STORE)
-    list(APPEND ExecTargetsToInstall Realm2JSON)
-else()
-    set_target_properties(Realm2JSON PROPERTIES EXCLUDE_FROM_ALL True)
-endif()
+list(APPEND ExecTargetsToInstall Realm2JSON)
 
 add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
 set_target_properties(RealmDump PROPERTIES
