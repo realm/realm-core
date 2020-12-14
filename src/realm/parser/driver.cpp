@@ -1166,6 +1166,31 @@ void parse(const std::string& str)
     driver.parse(str);
 }
 
+std::string check_escapes(const char* str)
+{
+    std::string ret;
+    const char* p = strchr(str, '\\');
+    while (p) {
+        ret += std::string(str, p);
+        p++;
+        if (*p == ' ') {
+            ret += ' ';
+        }
+        else if (*p == 't') {
+            ret += '\t';
+        }
+        else if (*p == 'r') {
+            ret += '\r';
+        }
+        else if (*p == 'n') {
+            ret += '\n';
+        }
+        str = p + 1;
+        p = strchr(str, '\\');
+    }
+    return ret + std::string(str);
+}
+
 } // namespace query_parser
 
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const

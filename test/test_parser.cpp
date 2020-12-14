@@ -100,7 +100,7 @@ static std::vector<std::string> valid_queries = {
     "10. = -.034",
     "10.0 = 5.034",
     "true = false",
-    "truelove = false",
+    "true\\ love = false",
     "true = falsey",
     "nullified = null",
     "nullified = nil",
@@ -250,6 +250,10 @@ static std::vector<std::string> invalid_queries = {
     "\"' = ''",
     "\" = ''",
     "' = ''",
+
+    // invalid property names
+    "stone#age = 5",
+    "true\\flove = false",
 
     // expressions
     "03a = 1",
@@ -459,7 +463,7 @@ TEST(Parser_basic_serialisation)
     auto int_col_key = t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
     t->add_column(type_Double, "fees", true);
-    t->add_column(type_Float, "float_fees", true);
+    t->add_column(type_Float, "float fees", true);
     t->add_column(type_Bool, "licensed", true);
     auto link_col = t->add_column(*t, "buddy");
     auto time_col = t->add_column(type_Timestamp, "time", true);
@@ -518,19 +522,19 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees != Nan", 5);
     verify_query(test_context, t, "fees == -naN", 0);
     verify_query(test_context, t, "fees != -nAn", 5);
-    verify_query(test_context, t, "float_fees > 2.0E0", 4);
-    verify_query(test_context, t, "float_fees > 200e-2", 4);
-    verify_query(test_context, t, "float_fees > 0.002E3", 4);
-    verify_query(test_context, t, "float_fees < INF", 5);
-    verify_query(test_context, t, "float_fees < +InF", 5);
-    verify_query(test_context, t, "float_fees > -inf", 5);
-    verify_query(test_context, t, "float_fees < InFiNiTy", 5);
-    verify_query(test_context, t, "float_fees < +iNfInItY", 5);
-    verify_query(test_context, t, "float_fees > -infinity", 5);
-    verify_query(test_context, t, "float_fees == NAN", 0);
-    verify_query(test_context, t, "float_fees != nan", 5);
-    verify_query(test_context, t, "float_fees == -NaN", 0);
-    verify_query(test_context, t, "float_fees != -NAn", 5);
+    verify_query(test_context, t, "float\\ fees > 2.0E0", 4);
+    verify_query(test_context, t, "float\\ fees > 200e-2", 4);
+    verify_query(test_context, t, "float\\ fees > 0.002E3", 4);
+    verify_query(test_context, t, "float\\ fees < INF", 5);
+    verify_query(test_context, t, "float\\ fees < +InF", 5);
+    verify_query(test_context, t, "float\\ fees > -inf", 5);
+    verify_query(test_context, t, "float\\ fees < InFiNiTy", 5);
+    verify_query(test_context, t, "float\\ fees < +iNfInItY", 5);
+    verify_query(test_context, t, "float\\ fees > -infinity", 5);
+    verify_query(test_context, t, "float\\ fees == NAN", 0);
+    verify_query(test_context, t, "float\\ fees != nan", 5);
+    verify_query(test_context, t, "float\\ fees == -NaN", 0);
+    verify_query(test_context, t, "float\\ fees != -NAn", 5);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
     verify_query(test_context, t, "licensed == true", 3);
     verify_query(test_context, t, "licensed == false", 2);
@@ -897,7 +901,7 @@ TEST(Parser_NullableBinaries)
     TableRef items = g.add_table("item");
     TableRef people = g.add_table("person");
     ColKey binary_col = items->add_column(type_Binary, "data");
-    ColKey nullable_binary_col = items->add_column(type_Binary, "nullable_data", true);
+    ColKey nullable_binary_col = items->add_column(type_Binary, "nullable\tdata", true);
     std::vector<ObjKey> item_keys;
     items->create_objects(5, item_keys);
     BinaryData bd0("knife", 5);
@@ -920,51 +924,51 @@ TEST(Parser_NullableBinaries)
     // direct checks
     verify_query(test_context, items, "data == NULL", 0);
     verify_query(test_context, items, "data != NULL", 5);
-    verify_query(test_context, items, "nullable_data == NULL", 2);
-    verify_query(test_context, items, "nullable_data != NULL", 3);
+    verify_query(test_context, items, "nullable\\tdata == NULL", 2);
+    verify_query(test_context, items, "nullable\\tdata != NULL", 3);
     verify_query(test_context, items, "data == NIL", 0);
     verify_query(test_context, items, "data != NIL", 5);
-    verify_query(test_context, items, "nullable_data == NIL", 2);
-    verify_query(test_context, items, "nullable_data != NIL", 3);
+    verify_query(test_context, items, "nullable\\tdata == NIL", 2);
+    verify_query(test_context, items, "nullable\\tdata != NIL", 3);
 
-    verify_query(test_context, items, "nullable_data CONTAINS 'f'", 2);
-    verify_query(test_context, items, "nullable_data BEGINSWITH 'f'", 1);
-    verify_query(test_context, items, "nullable_data ENDSWITH 'e'", 2);
-    verify_query(test_context, items, "nullable_data LIKE 'f*'", 1);
-    verify_query(test_context, items, "nullable_data CONTAINS[c] 'F'", 2);
-    verify_query(test_context, items, "nullable_data BEGINSWITH[c] 'F'", 1);
-    verify_query(test_context, items, "nullable_data ENDSWITH[c] 'E'", 2);
-    verify_query(test_context, items, "nullable_data LIKE[c] 'F*'", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS 'f'", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH 'f'", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH 'e'", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE 'f*'", 1);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] 'F'", 2);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] 'F'", 1);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] 'E'", 2);
+    verify_query(test_context, items, "nullable\\tdata LIKE[c] 'F*'", 1);
 
-    verify_query(test_context, items, "nullable_data CONTAINS NULL", 5);
-    verify_query(test_context, items, "nullable_data BEGINSWITH NULL", 5);
-    verify_query(test_context, items, "nullable_data ENDSWITH NULL", 5);
-    verify_query(test_context, items, "nullable_data LIKE NULL", 2);
-    verify_query(test_context, items, "nullable_data CONTAINS[c] NULL", 3);
-    verify_query(test_context, items, "nullable_data BEGINSWITH[c] NULL", 5);
-    verify_query(test_context, items, "nullable_data ENDSWITH[c] NULL", 5);
-    verify_query(test_context, items, "nullable_data LIKE[c] NULL", 2);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS NULL", 5);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH NULL", 5);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH NULL", 5);
+    verify_query(test_context, items, "nullable\\tdata LIKE NULL", 2);
+    verify_query(test_context, items, "nullable\\tdata CONTAINS[c] NULL", 3);
+    verify_query(test_context, items, "nullable\\tdata BEGINSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable\\tdata ENDSWITH[c] NULL", 5);
+    verify_query(test_context, items, "nullable\\tdata LIKE[c] NULL", 2);
 
-    verify_query(test_context, items, "NULL CONTAINS nullable_data", 0);
-    verify_query(test_context, items, "NULL BEGINSWITH nullable_data", 0);
-    verify_query(test_context, items, "NULL ENDSWITH nullable_data", 0);
-    verify_query(test_context, items, "NULL LIKE nullable_data", 2);
-    verify_query(test_context, items, "NULL CONTAINS[c] nullable_data", 0);
-    verify_query(test_context, items, "NULL BEGINSWITH[c] nullable_data", 0);
-    verify_query(test_context, items, "NULL ENDSWITH[c] nullable_data", 0);
-    verify_query(test_context, items, "NULL LIKE[c] nullable_data", 2);
+    verify_query(test_context, items, "NULL CONTAINS nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL BEGINSWITH nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL ENDSWITH nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL LIKE nullable\\tdata", 2);
+    verify_query(test_context, items, "NULL CONTAINS[c] nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL BEGINSWITH[c] nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL ENDSWITH[c] nullable\\tdata", 0);
+    verify_query(test_context, items, "NULL LIKE[c] nullable\\tdata", 2);
 
     // check across links
     verify_query(test_context, people, "fav_item.data == NULL", 0);
     verify_query(test_context, people, "fav_item.data != NULL", 5);
-    verify_query(test_context, people, "fav_item.nullable_data == NULL", 2);
-    verify_query(test_context, people, "fav_item.nullable_data != NULL", 3);
+    verify_query(test_context, people, "fav_item.nullable\\tdata == NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable\\tdata != NULL", 3);
     verify_query(test_context, people, "NULL == fav_item.data", 0);
 
     verify_query(test_context, people, "fav_item.data ==[c] NULL", 0);
     verify_query(test_context, people, "fav_item.data !=[c] NULL", 5);
-    verify_query(test_context, people, "fav_item.nullable_data ==[c] NULL", 2);
-    verify_query(test_context, people, "fav_item.nullable_data !=[c] NULL", 3);
+    verify_query(test_context, people, "fav_item.nullable\\tdata ==[c] NULL", 2);
+    verify_query(test_context, people, "fav_item.nullable\\tdata !=[c] NULL", 3);
     verify_query(test_context, people, "NULL ==[c] fav_item.data", 0);
 
     verify_query(test_context, people, "fav_item.data CONTAINS 'f'", 2);
@@ -977,9 +981,9 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.data LIKE[c] 'F*'", 1);
 
     // two column
-    verify_query(test_context, people, "fav_item.data == fav_item.nullable_data", 3);
+    verify_query(test_context, people, "fav_item.data == fav_item.nullable\\tdata", 3);
     verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
-    verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
+    verify_query(test_context, people, "fav_item.nullable\\tdata == fav_item.nullable\\tdata", 5);
 
     verify_query(test_context, items,
                  "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'",
@@ -2689,7 +2693,7 @@ TEST(Parser_Backlinks)
     ColKey name_col = t->add_column(type_String, "name");
     ColKey account_col = t->add_column(type_Double, "account_balance");
     ColKey items_col = t->add_column_list(*items, "items");
-    ColKey fav_col = t->add_column(*items, "fav_item");
+    ColKey fav_col = t->add_column(*items, "fav item");
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -2724,7 +2728,7 @@ TEST(Parser_Backlinks)
     Query q = items->backlink(*t, fav_col).column<Double>(account_col) > 20;
     CHECK_EQUAL(q.count(), 1);
     std::string desc = q.get_description();
-    CHECK(desc.find("@links.class_Person.fav_item.account_balance") != std::string::npos);
+    CHECK(desc.find("@links.class_Person.fav\\ item.account_balance") != std::string::npos);
 
     q = items->backlink(*t, items_col).column<Double>(account_col) > 20;
     CHECK_EQUAL(q.count(), 2);
@@ -2732,7 +2736,7 @@ TEST(Parser_Backlinks)
     CHECK(desc.find("@links.class_Person.items.account_balance") != std::string::npos);
 
     // favourite items bought by people who have > 20 in their account
-    verify_query(test_context, items, "@links.class_Person.fav_item.account_balance > 20", 1); // backlinks via link
+    verify_query(test_context, items, "@links.class_Person.fav\\ item.account_balance > 20", 1); // backlinks via link
     // items bought by people who have > 20 in their account
     verify_query(test_context, items, "@links.class_Person.items.account_balance > 20", 2); // backlinks via list
     // items bought by people who have 'J' as the first letter of their name
@@ -2755,14 +2759,14 @@ TEST(Parser_Backlinks)
 
     // backlinks over link
     // people having a favourite item which is also the favourite item of another person
-    verify_query(test_context, t, "fav_item.@links.class_Person.fav_item.@count > 1", 0);
+    verify_query(test_context, t, "fav\\ item.@links.class_Person.fav\\ item.@count > 1", 0);
     // people having a favourite item which is purchased more than once (by anyone)
-    verify_query(test_context, t, "fav_item.@links.class_Person.items.@count > 1 ", 2);
+    verify_query(test_context, t, "fav\\ item.@links.class_Person.items.@count > 1 ", 2);
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
     CHECK_EQUAL(message, "Cannot compare linklist with NULL");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav\\ item == NULL", 1),
                                 message);
     CHECK_EQUAL(message, "Cannot compare linklist with NULL");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
