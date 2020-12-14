@@ -90,8 +90,8 @@ public:
     void set_erase(const CollectionBase& list, size_t list_ndx, Mixed value) override;
     void set_clear(const CollectionBase& list) override;
 
-    void dictionary_insert(const CollectionBase&, Mixed key, Mixed val) override;
-    void dictionary_erase(const CollectionBase&, Mixed key) override;
+    void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) override;
+    void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) override;
 
     void remove_object(const Table*, ObjKey) override;
 

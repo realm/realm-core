@@ -5,6 +5,26 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Calling Table::clear() will in many cases not work for the data types introduced in v10.2.0. ([#4198](https://github.com/realm/realm-core/issues/4198), since v10.2.0)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
+* The xcframework build was missing the arm64 slice for apple simulators.
+* The non-xcframework Apple build once again includes fat libraries for the parser rather than separate device/simulator ones.
+
+----------------------------------------------
+
+# 10.3.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
 * None.
  
 ### Breaking changes
@@ -13,7 +33,32 @@
 -----------
 
 ### Internals
-* None.
+* Add missing header from packages (`realm/dictionary_cluster_tree.hpp`).
+
+----------------------------------------------
+
+# 10.3.0 Release notes
+
+### Enhancements
+* Add support for Google openId
+
+### Fixed
+* Fix an assertion failure when querying for null on a non-nullable string primary key property. ([#4060](https://github.com/realm/realm-core/issues/4060), since v10.0.0-alpha.2)
+* Fix a use of a dangling reference when refreshing a user's custom data that could lead to a crash (since v10.0.0).
+* Sync client: Upgrade to protocol version 2, which fixes a bug that would
+  prevent eventual consistency during conflict resolution. Affected clients
+  would experience data divergence and potentially consistency errors as a
+  result. ([#4004](https://github.com/realm/realm-core/pull/4004))
+
+### Breaking changes
+* Sync client: The sync client now requires a server that speaks protocol
+  version 2 (Cloud version `20201202` or newer).
+
+-----------
+
+### Internals
+* Fix publishing the Cocoa xcframework release package to s3.
+* Remove debug libraries from the Cocoa release packages.
 
 ----------------------------------------------
 
@@ -49,6 +94,13 @@
 ### Enhancements
 * Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
 
+----------------------------------------------
+
+# 10.1.4 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+ 
 ----------------------------------------------
 
 # 10.1.3 Release notes

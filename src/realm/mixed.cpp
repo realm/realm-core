@@ -420,8 +420,6 @@ size_t Mixed::hash() const
             hash = murmur2_or_cityhash(unsigned_data, 12);
             break;
         }
-        case type_OldDateTime:
-        case type_OldTable:
         case type_Mixed:
         case type_Link:
         case type_LinkList:
@@ -478,8 +476,6 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_UUID:
                 out << m.get<UUID>();
                 break;
-            case type_OldDateTime:
-            case type_OldTable:
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);

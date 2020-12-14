@@ -242,32 +242,32 @@ private:
 
 inline Mixed::Mixed(int64_t v) noexcept
 {
-    m_type = type_Int + 1;
+    m_type = int(type_Int) + 1;
     int_val = v;
 }
 
 inline Mixed::Mixed(bool v) noexcept
 {
-    m_type = type_Bool + 1;
+    m_type = int(type_Bool) + 1;
     bool_val = v;
 }
 
 inline Mixed::Mixed(float v) noexcept
 {
-    m_type = type_Float + 1;
+    m_type = int(type_Float) + 1;
     float_val = v;
 }
 
 inline Mixed::Mixed(double v) noexcept
 {
-    m_type = type_Double + 1;
+    m_type = int(type_Double) + 1;
     double_val = v;
 }
 
 inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
 {
     if (v) {
-        m_type = type_Int + 1;
+        m_type = int(type_Int) + 1;
         int_val = *v;
     }
     else {
@@ -278,7 +278,7 @@ inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
 inline Mixed::Mixed(util::Optional<bool> v) noexcept
 {
     if (v) {
-        m_type = type_Bool + 1;
+        m_type = int(type_Bool) + 1;
         bool_val = *v;
     }
     else {
@@ -289,7 +289,7 @@ inline Mixed::Mixed(util::Optional<bool> v) noexcept
 inline Mixed::Mixed(util::Optional<float> v) noexcept
 {
     if (v) {
-        m_type = type_Float + 1;
+        m_type = int(type_Float) + 1;
         float_val = *v;
     }
     else {
@@ -300,7 +300,7 @@ inline Mixed::Mixed(util::Optional<float> v) noexcept
 inline Mixed::Mixed(util::Optional<double> v) noexcept
 {
     if (v) {
-        m_type = type_Double + 1;
+        m_type = int(type_Double) + 1;
         double_val = *v;
     }
     else {
@@ -311,7 +311,7 @@ inline Mixed::Mixed(util::Optional<double> v) noexcept
 inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
 {
     if (v) {
-        m_type = type_ObjectId + 1;
+        m_type = int(type_ObjectId) + 1;
         id_val = *v;
     }
     else {
@@ -322,7 +322,7 @@ inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
 inline Mixed::Mixed(util::Optional<UUID> v) noexcept
 {
     if (v) {
-        m_type = type_UUID + 1;
+        m_type = int(type_UUID) + 1;
         uuid_val = *v;
     }
     else {
@@ -333,7 +333,7 @@ inline Mixed::Mixed(util::Optional<UUID> v) noexcept
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_String + 1;
+        m_type = int(type_String) + 1;
         string_val = v;
     }
     else {
@@ -344,7 +344,7 @@ inline Mixed::Mixed(StringData v) noexcept
 inline Mixed::Mixed(BinaryData v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_Binary + 1;
+        m_type = int(type_Binary) + 1;
         binary_val = v;
     }
     else {
@@ -355,7 +355,7 @@ inline Mixed::Mixed(BinaryData v) noexcept
 inline Mixed::Mixed(Timestamp v) noexcept
 {
     if (!v.is_null()) {
-        m_type = type_Timestamp + 1;
+        m_type = int(type_Timestamp) + 1;
         date_val = v;
     }
     else {
@@ -366,7 +366,7 @@ inline Mixed::Mixed(Timestamp v) noexcept
 inline Mixed::Mixed(Decimal128 v)
 {
     if (!v.is_null()) {
-        m_type = type_Decimal + 1;
+        m_type = int(type_Decimal) + 1;
         decimal_val = v;
     }
     else {
@@ -376,20 +376,20 @@ inline Mixed::Mixed(Decimal128 v)
 
 inline Mixed::Mixed(ObjectId v) noexcept
 {
-    m_type = type_ObjectId + 1;
+    m_type = int(type_ObjectId) + 1;
     id_val = v;
 }
 
 inline Mixed::Mixed(UUID v) noexcept
 {
-    m_type = type_UUID + 1;
+    m_type = int(type_UUID) + 1;
     uuid_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     if (v) {
-        m_type = type_Link + 1;
+        m_type = int(type_Link) + 1;
         int_val = v.value;
     }
     else {
@@ -400,7 +400,7 @@ inline Mixed::Mixed(ObjKey v) noexcept
 inline Mixed::Mixed(ObjLink v) noexcept
 {
     if (v) {
-        m_type = type_TypedLink + 1;
+        m_type = int(type_TypedLink) + 1;
         link_val = v;
     }
     else {

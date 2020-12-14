@@ -3385,6 +3385,57 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 }
 
+TEST_CASE("results: nullable list of primitives") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema =
+        Schema{{"ListTypes",
+                {
+                    {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                    {"nullable decimal list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+                    {"non nullable decimal list", PropertyType::Array | PropertyType::Decimal},
+                    {"nullable objectid list", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
+                    {"non nullable objectid list", PropertyType::Array | PropertyType::ObjectId},
+                }}};
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_ListTypes");
+    auto nullable_decimal_col = table->get_column_key("nullable decimal list");
+    auto non_nullable_decimal_col = table->get_column_key("non nullable decimal list");
+    auto nullable_oid_col = table->get_column_key("nullable objectid list");
+    auto non_nullable_oid_col = table->get_column_key("non nullable objectid list");
+    realm->begin_transaction();
+    auto obj = table->create_object_with_primary_key(1);
+    List nullable_decimal_list(realm, obj, nullable_decimal_col);
+    List non_nullable_decimal_list(realm, obj, non_nullable_decimal_col);
+    nullable_decimal_list.add(Decimal128{realm::null()});
+    non_nullable_decimal_list.add(Decimal128{});
+    List nullable_oid_list(realm, obj, nullable_oid_col);
+    List non_nullable_oid_list(realm, obj, non_nullable_oid_col);
+    nullable_oid_list.add(util::Optional<ObjectId>{});
+    non_nullable_oid_list.add(ObjectId()); // all zeros
+    realm->commit_transaction();
+    TestContext ctx(realm);
+
+    SECTION("check property values on internal null type") {
+        Results r_nullable = nullable_decimal_list.as_results();
+        Results r_non_nullable = non_nullable_decimal_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<Decimal128>(0) == Decimal128(realm::null()));
+        CHECK(r_non_nullable.get<Decimal128>(0) == Decimal128(0));
+    }
+
+    SECTION("check property values on optional type") {
+        Results r_nullable = nullable_oid_list.as_results();
+        Results r_non_nullable = non_nullable_oid_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<util::Optional<ObjectId>>(0) == util::Optional<ObjectId>());
+        CHECK(r_non_nullable.get<ObjectId>(0) == ObjectId());
+    }
+}
+
 TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     // config.cache = false;

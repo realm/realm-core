@@ -235,6 +235,10 @@ TEST(Set_Links)
     CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by LnkSet
     CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
+
+    // g.to_json(std::cout);
+    foos->clear();
+    g.verify();
 }
 
 TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>, Prop<ObjectId>,

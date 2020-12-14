@@ -242,10 +242,10 @@ TEST(ChangesetEncoding_ArrayErase)
     CHECK(**changeset.begin() == instr);
 }
 
-TEST(ChangesetEncoding_ArrayClear)
+TEST(ChangesetEncoding_Clear)
 {
     Changeset changeset;
-    ArrayClear instr;
+    Clear instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{mpark::monostate{}};
     instr.field = changeset.intern_string("foo");
@@ -253,7 +253,6 @@ TEST(ChangesetEncoding_ArrayClear)
     instr.path.push_back(234);
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
-    instr.prior_size = 123;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);

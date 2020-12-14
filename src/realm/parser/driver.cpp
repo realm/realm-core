@@ -279,7 +279,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type >= 0 && right_type >= 0 && !Mixed::data_types_are_comparable(left_type, right_type)) {
+    if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
         throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
                                                  get_data_type_name(left_type), get_data_type_name(right_type)));
     }
@@ -395,7 +395,7 @@ Query RelationalNode::visit(ParserDriver* drv)
             opstr[op]));
     }
 
-    if (left_type < 0 || right_type < 0 || !Mixed::data_types_are_comparable(left_type, right_type)) {
+    if (!left_type.is_valid() || !right_type.is_valid() || !Mixed::data_types_are_comparable(left_type, right_type)) {
         throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
                                               get_data_type_name(left_type), get_data_type_name(right_type)));
     }

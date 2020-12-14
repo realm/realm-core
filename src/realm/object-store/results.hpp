@@ -22,6 +22,8 @@
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
@@ -187,14 +189,13 @@ public:
     }
 
     enum class Mode {
-        Empty,     // Backed by nothing (for missing tables)
-        Table,     // Backed directly by a Table
-        List,      // Backed by a list-of-primitives that is not a link list.
-        Set,       // Backed by a set-of-primitives that is not a link set.
-        Query,     // Backed by a query that has not yet been turned into a TableView
-        LinkList,  // Backed directly by a LinkList
-        LinkSet,   // Backed directly by a LnkSet
-        TableView, // Backed by a TableView created from a Query
+        Empty,      // Backed by nothing (for missing tables)
+        Table,      // Backed directly by a Table
+        Collection, // Backed by a list-of-primitives, set-of-primitives or dictionary
+        Query,      // Backed by a query that has not yet been turned into a TableView
+        LinkList,   // Backed directly by a LinkList
+        LinkSet,    // Backed directly by a LnkSet
+        TableView,  // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
     // Ideally this would not be public but it's needed for some KVO stuff
@@ -334,9 +335,6 @@ private:
 
     template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
-
-    template <typename T>
-    auto& list_as() const;
 
     void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
     void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);

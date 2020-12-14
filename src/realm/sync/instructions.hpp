@@ -35,10 +35,9 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)                                                                                                    \
+    X(Clear)                                                                                                         \
     X(SetInsert)                                                                                                     \
-    X(SetErase)                                                                                                      \
-    X(SetClear)
+    X(SetErase)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -601,13 +600,12 @@ struct ArrayErase : PathInstruction {
     }
 };
 
-struct ArrayClear : PathInstruction {
+struct Clear : PathInstruction {
     using PathInstruction::PathInstruction;
-    uint32_t prior_size;
 
-    bool operator==(const ArrayClear& rhs) const noexcept
+    bool operator==(const Clear& rhs) const noexcept
     {
-        return PathInstruction::operator==(rhs) && prior_size == rhs.prior_size;
+        return PathInstruction::operator==(rhs);
     }
 };
 
@@ -628,15 +626,6 @@ struct SetErase : PathInstruction {
     bool operator==(const SetErase& rhs) const noexcept
     {
         return PathInstruction::operator==(rhs) && value == rhs.value;
-    }
-};
-
-struct SetClear : PathInstruction {
-    using PathInstruction::PathInstruction;
-
-    bool operator==(const SetClear& rhs) const noexcept
-    {
-        return PathInstruction::operator==(rhs);
     }
 };
 
@@ -670,10 +659,9 @@ struct Instruction {
         ArrayInsert = 8,
         ArrayMove = 9,
         ArrayErase = 10,
-        ArrayClear = 11,
+        Clear = 11,
         SetInsert = 12,
         SetErase = 13,
-        SetClear = 14,
     };
 
     template <Type t>

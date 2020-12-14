@@ -157,8 +157,6 @@ int Obj::cmp(const Obj& other, ColKey col_key) const
             return cmp<ObjKey>(other, col_ndx);
         case type_TypedLink:
             return cmp<ObjLink>(other, col_ndx);
-        case type_OldDateTime:
-        case type_OldTable:
         case type_LinkList:
             REALM_ASSERT(false);
             break;
@@ -839,9 +837,7 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
             break;
         case type_Link:
         case type_LinkList:
-        case type_OldDateTime:
         case type_Mixed:
-        case type_OldTable:
             break;
     }
 }
@@ -902,9 +898,9 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             out << "\"}";
             break;
         case type_UUID:
-            out << "{\"$binary\": \"";
+            out << "{\"$uuid\": \"";
             out << val.get<UUID>();
-            out << "\", \"subType\": \"04\"}}";
+            out << "\"}";
             break;
         case type_TypedLink: {
             out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
@@ -912,9 +908,7 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
         }
         case type_Link:
         case type_LinkList:
-        case type_OldDateTime:
         case type_Mixed:
-        case type_OldTable:
             break;
     }
 }
@@ -981,19 +975,22 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         out << "\"" << name << "\":";
         prefixComma = true;
 
-        if (ck.get_attrs().test(col_attr_List)) {
-            if (type == col_type_LinkList) {
+        if (ck.is_list() || ck.is_set()) {
+            if (type == col_type_LinkList)
+                type = col_type_Link;
+            if (type == col_type_Link) {
                 TableRef target_table = get_target_table(ck);
                 auto primary_key_coll = target_table->get_primary_key_column();
-                auto ll = get_linklist(ck);
-                auto sz = ll.size();
+                auto ll = get_collection_ptr(ck);
+                auto sz = ll->size();
 
                 if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
                     out << "[";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
                     }
                     out << "]";
                 }
@@ -1003,7 +1000,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
                     }
                     out << "]}}";
                 }
@@ -1014,7 +1012,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out << ll.get(i).value;
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out << link.value;
                     }
                     out << "]}";
                 }
@@ -1031,7 +1030,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                             out << ",";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        ll.get_object(i).to_json(out, new_depth, renames, followed, output_mode);
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
                     }
                     out << "]";
 
@@ -1041,7 +1041,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
             }
             else {
-                auto list = get_listbase_ptr(ck);
+                auto list = this->get_collection_ptr(ck);
                 auto sz = list->size();
 
                 out << "[";
@@ -1972,8 +1972,13 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
         Mixed val = other.get_any(col_pk);
         this->set_any(col_pk, val);
     }
+    auto nb_tombstones = m_table->m_tombstones->size();
 
-    auto copy_links = [this, &other](ColKey col) {
+    auto copy_links = [this, &other, nb_tombstones](ColKey col) {
+        if (nb_tombstones != m_table->m_tombstones->size()) {
+            // Object has been deleted - we are done
+            return true;
+        }
         auto t = m_table->get_opposite_table(col);
         auto c = m_table->get_opposite_column(col);
         auto backlinks = other.get_all_backlinks(col);

@@ -60,11 +60,11 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overload{
-        [&](InternString str) -> PrimaryKey {
+    const auto& get = overload{
+        [this](InternString str) -> PrimaryKey {
             return get_string(str);
         },
-        [&](auto&& otherwise) -> PrimaryKey {
+        [](auto otherwise) -> PrimaryKey {
             return otherwise;
         },
     };
@@ -153,6 +153,29 @@ std::ostream& Changeset::print_path(std::ostream& os, const Instruction::Path& p
             },
         };
         mpark::visit(print, element);
+    }
+    return os;
+}
+
+std::ostream& Changeset::print_path(std::ostream& os, InternString table, const Instruction::PrimaryKey& pk,
+                                    util::Optional<InternString> field, const Instruction::Path* path) const
+{
+    os << get_string(table) << "[" << format_pk(get_key(pk)) << "]";
+    if (field) {
+        os << "." << get_string(*field);
+    }
+    if (path) {
+        for (auto& element : *path) {
+            if (auto subfield = mpark::get_if<InternString>(&element)) {
+                os << "." << get_string(*subfield);
+            }
+            else if (auto index = mpark::get_if<uint32_t>(&element)) {
+                os << "[" << *index << "]";
+            }
+            else {
+                REALM_TERMINATE("Invalid path");
+            }
+        }
     }
     return os;
 }
@@ -315,7 +338,7 @@ void Changeset::Reflector::operator()(const Instruction::EraseTable& p) const
 
 void Changeset::Reflector::operator()(const Instruction::Update& p) const
 {
-    m_tracer.name("Set");
+    m_tracer.name("Update");
     path_instr(p);
     m_tracer.field("value", p.value);
     if (p.is_array_update()) {
@@ -368,11 +391,10 @@ void Changeset::Reflector::operator()(const Instruction::ArrayErase& p) const
     m_tracer.field("prior_size", p.prior_size);
 }
 
-void Changeset::Reflector::operator()(const Instruction::ArrayClear& p) const
+void Changeset::Reflector::operator()(const Instruction::Clear& p) const
 {
-    m_tracer.name("ArrayClear");
+    m_tracer.name("Clear");
     path_instr(p);
-    m_tracer.field("prior_size", p.prior_size);
 }
 
 void Changeset::Reflector::operator()(const Instruction::SetInsert& p) const
@@ -389,16 +411,10 @@ void Changeset::Reflector::operator()(const Instruction::SetErase& p) const
     m_tracer.field("value", p.value);
 }
 
-void Changeset::Reflector::operator()(const Instruction::SetClear& p) const
-{
-    m_tracer.name("SetClear");
-    path_instr(p);
-}
-
 void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
 {
     m_tracer.name("AddColumn");
-    table_instr(p);
+    m_tracer.field("table", p.table);
     m_tracer.field("field", p.field);
     if (p.type != Instruction::Payload::Type::Null) {
         m_tracer.field("type", p.type);
@@ -419,26 +435,23 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
 void Changeset::Reflector::operator()(const Instruction::EraseColumn& p) const
 {
     m_tracer.name("EraseColumn");
-    table_instr(p);
+    m_tracer.field("table", p.table);
     m_tracer.field("field", p.field);
 }
 
 void Changeset::Reflector::table_instr(const Instruction::TableInstruction& p) const
 {
-    m_tracer.field("table", p.table);
+    m_tracer.field("path", p.table);
 }
 
 void Changeset::Reflector::object_instr(const Instruction::ObjectInstruction& p) const
 {
-    table_instr(p);
-    m_tracer.field("object", p.object);
+    m_tracer.path("path", p.table, p.object, util::none, nullptr);
 }
 
 void Changeset::Reflector::path_instr(const Instruction::PathInstruction& p) const
 {
-    object_instr(p);
-    m_tracer.field("field", p.field);
-    m_tracer.field("path", p.path);
+    m_tracer.path("path", p.table, p.object, p.field, &p.path);
 }
 
 void Changeset::Reflector::visit_all() const
@@ -466,6 +479,14 @@ void Changeset::Printer::print_field(StringData name, std::string value)
     }
     m_first = false;
     m_out << name << "=" << value;
+}
+
+void Changeset::Printer::path(StringData name, InternString table, const Instruction::PrimaryKey& pk,
+                              util::Optional<InternString> field, const Instruction::Path* path)
+{
+    std::stringstream ss;
+    m_changeset->print_path(ss, table, pk, field, path);
+    print_field(name, ss.str());
 }
 
 void Changeset::Printer::field(StringData n, InternString value)

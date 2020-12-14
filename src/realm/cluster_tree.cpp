@@ -866,6 +866,9 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
 
 bool ClusterTree::is_valid(ObjKey k) const
 {
+    if (m_size == 0)
+        return false;
+
     ClusterNode::State state;
     return m_root->try_get(k, state);
 }

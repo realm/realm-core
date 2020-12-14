@@ -87,10 +87,6 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         }
         case type_Mixed:
             [[fallthrough]];
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
         case type_LinkList: {
             REALM_TERMINATE("Invalid payload type");
             break;
@@ -184,11 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::UUID;
         case type_Mixed:
             return Type::Null;
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            unsupported_instruction();
     }
+    unsupported_instruction();
     return Type::Int; // Make compiler happy
 }
 
@@ -482,6 +475,10 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         return;
     }
 
+    if (col == table->get_primary_key_column()) {
+        return;
+    }
+
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
         if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
@@ -493,6 +490,21 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
     }
 
     if (select_table(*table)) {
+        // Omit of Update(NULL, default=true) for embedded object / dictionary
+        // columns if the value is already NULL. This is a workaround for the
+        // fact that erase always wins for nested structures, but we don't want
+        // default values to win over later embedded object creation.
+        if (variant == _impl::instr_SetDefault && value.is_null()) {
+            if (col.get_type() == col_type_Link && table->get_object(key).is_null(col)) {
+                return;
+            }
+            if (col.is_dictionary() && table->get_object(key).is_null(col)) {
+                // Dictionary columns cannot currently be NULL, but this is
+                // likely to change.
+                return;
+            }
+        }
+
         Instruction::Update instr;
         populate_path_instr(instr, *table, key, col);
         instr.value = as_payload(*table, col, value);
@@ -548,12 +560,10 @@ void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 
 void SyncReplication::list_clear(const CollectionBase& view)
 {
-    size_t prior_size = view.size();
     TrivialReplication::list_clear(view);
     if (select_collection(view)) {
-        Instruction::ArrayClear instr;
+        Instruction::Clear instr;
         populate_path_instr(instr, view);
-        instr.prior_size = uint32_t(prior_size);
         emit(instr);
     }
 }
@@ -587,15 +597,15 @@ void SyncReplication::set_clear(const CollectionBase& set)
     TrivialReplication::set_clear(set);
 
     if (select_collection(set)) {
-        Instruction::SetClear instr;
+        Instruction::Clear instr;
         populate_path_instr(instr, set);
         emit(instr);
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
+void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_insert(dict, key, value);
+    TrivialReplication::dictionary_insert(dict, ndx, key, value);
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
@@ -619,9 +629,9 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     }
 }
 
-void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
-    TrivialReplication::dictionary_erase(dict, key);
+    TrivialReplication::dictionary_erase(dict, ndx, key);
 
     if (select_collection(dict)) {
         Instruction::Update instr;
