@@ -64,6 +64,11 @@ public:
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
 
+    std::pair<size_t, bool> insert_any(Mixed value);
+    Mixed get_any(size_t ndx) const;
+    std::pair<size_t, bool> remove_any(Mixed value);
+    size_t find_any(Mixed value) const;
+
     void remove_all();
 
     // Replace the values in this set with the values from an enumerable object
