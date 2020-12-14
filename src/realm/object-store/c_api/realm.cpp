@@ -28,6 +28,16 @@ RLM_API realm_t* _realm_from_native_ptr(const void* pshared_ptr, size_t n)
     return new shared_realm{*ptr};
 }
 
+RLM_API bool realm_is_closed(realm_t* realm)
+{
+    return (*realm)->is_closed();
+}
+
+RLM_API bool realm_is_writable(const realm_t* realm)
+{
+    return (*realm)->is_in_transaction();
+}
+
 RLM_API bool realm_close(realm_t* realm)
 {
     return wrap_err([&]() {
