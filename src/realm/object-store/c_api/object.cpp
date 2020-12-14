@@ -157,6 +157,11 @@ RLM_API realm_obj_key_t realm_object_get_key(const realm_object_t* obj)
     return to_capi(obj->obj().get_key());
 }
 
+RLM_API realm_table_key_t realm_object_get_table(const realm_object_t* obj)
+{
+    return to_capi(obj->obj().get_table()->get_key());
+}
+
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 {
     auto obj = object->obj();
