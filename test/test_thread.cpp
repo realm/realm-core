@@ -888,55 +888,6 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
 }
 
 
-// FIXME: Disabled because of sporadic failures on Android, which makes CI results non-deterministic
-// Reenabled again but marked as non-concurrent
-
-// test that notify will wake up only a single thread, even if there
-// are many waiters:
-NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
-{
-    int wait_counter = 0;
-    InterprocessMutex mutex;
-    InterprocessMutex::SharedPart mutex_part;
-    InterprocessCondVar changed;
-    InterprocessCondVar::SharedPart condvar_part;
-    InterprocessCondVar::init_shared_part(condvar_part);
-    bowl_of_stones_semaphore feedback(0);
-    SHARED_GROUP_TEST_PATH(path);
-    DBOptions default_options;
-    mutex.set_shared_part(mutex_part, path, "Thread_CondvarNotifyWakeup_Mutex");
-    changed.set_shared_part(condvar_part, path, "Thread_CondvarNotifyWakeup_CondVar", default_options.temp_dir);
-    const int num_waiters = 10;
-    Thread waiters[num_waiters];
-    for (int i = 0; i < num_waiters; ++i) {
-        waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
-    }
-    feedback.get_stone(num_waiters);
-    {
-        std::lock_guard<InterprocessMutex> l(mutex);
-        CHECK_EQUAL(wait_counter, num_waiters);
-        changed.notify();
-    }
-    feedback.get_stone(1);
-    {
-        std::lock_guard<InterprocessMutex> l(mutex);
-        CHECK_EQUAL(wait_counter, num_waiters - 1);
-        changed.notify();
-    }
-    feedback.get_stone(1);
-    {
-        std::lock_guard<InterprocessMutex> l(mutex);
-        CHECK_EQUAL(wait_counter, num_waiters - 2);
-        changed.notify_all();
-    }
-    for (int i = 0; i < num_waiters; ++i) {
-        waiters[i].join();
-    }
-    changed.release_shared_part();
-    mutex.release_shared_part();
-}
-
-
 // Test that the unlock+wait operation of wait() takes part atomically, i.e. that there is no time
 // gap between them where another thread could invoke signal() which could go undetected by the wait.
 // This test takes more than 3 days with valgrind.
@@ -994,8 +945,8 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                 }
             });
 
-            // This thread calls notify() exactly one time after the other thread has invoked wait() and has
-            // released the mutex. If wait() misses the notify() then there is a bug, which will reveal itself 
+            // This thread calls notify_all() exactly one time after the other thread has invoked wait() and has
+            // released the mutex. If wait() misses the notify_all() then there is a bug, which will reveal itself
             // by both threads hanging infinitely.
             std::thread t2([&]() {
                 for (int i = 0; i < iter; i++) {
@@ -1003,7 +954,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     }
                     signal = false;
                     mutex.lock();
-                    condvar.notify();
+                    condvar.notify_all();
                     mutex.unlock();
                 }
             });
