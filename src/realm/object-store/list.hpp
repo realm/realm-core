@@ -76,8 +76,8 @@ public:
 
     void insert_any(size_t list_ndx, Mixed value);
     void set_any(size_t list_ndx, Mixed value);
-    Mixed get_any(size_t list_ndx) const;
-    size_t find_any(Mixed value) const;
+    Mixed get_any(size_t list_ndx) const final;
+    size_t find_any(Mixed value) const final;
 
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;

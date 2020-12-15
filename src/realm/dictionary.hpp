@@ -32,7 +32,7 @@ class DictionaryClusterTree;
 class Dictionary final : public CollectionBaseImpl<CollectionBase> {
 public:
     using Base = CollectionBaseImpl<CollectionBase>;
-    using Iterator = CollectionIterator<Dictionary>;
+    class Iterator;
 
     Dictionary() {}
     ~Dictionary();
@@ -83,6 +83,7 @@ public:
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
 
+    bool contains(Mixed key);
     Iterator find(Mixed key);
 
     void erase(Mixed key);
@@ -124,8 +125,8 @@ private:
     friend struct CollectionIterator<Dictionary>;
 };
 
-template <>
-struct CollectionIterator<Dictionary> : public ClusterTree::Iterator {
+class Dictionary::Iterator : public ClusterTree::Iterator {
+public:
     typedef std::forward_iterator_tag iterator_category;
     typedef std::pair<const Mixed, Mixed> value_type;
     typedef ptrdiff_t difference_type;
@@ -134,13 +135,28 @@ struct CollectionIterator<Dictionary> : public ClusterTree::Iterator {
 
     value_type operator*() const;
 
+    Iterator& operator++()
+    {
+        return static_cast<Iterator&>(ClusterTree::Iterator::operator++());
+    }
+    Iterator& operator+=(ptrdiff_t adj)
+    {
+        return static_cast<Iterator&>(ClusterTree::Iterator::operator+=(adj));
+    }
+    Iterator operator+(ptrdiff_t n) const
+    {
+        Iterator ret(*this);
+        ret += n;
+        return ret;
+    }
+
 private:
     friend class Dictionary;
     using ClusterTree::Iterator::get_position;
 
     DataType m_key_type;
 
-    CollectionIterator(const Dictionary* dict, size_t pos);
+    Iterator(const Dictionary* dict, size_t pos);
 };
 
 inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const Obj& obj)

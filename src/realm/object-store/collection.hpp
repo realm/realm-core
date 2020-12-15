@@ -66,6 +66,9 @@ public:
 
     virtual ~Collection();
 
+    virtual Mixed get_any(size_t list_ndx) const = 0;
+    virtual size_t find_any(Mixed value) const = 0;
+
     // Get the ObjectSchema of the values in this List
     // Only valid if get_type() returns PropertyType::Object
     const ObjectSchema& get_object_schema() const;

@@ -409,6 +409,19 @@ const Mixed Dictionary::operator[](Mixed key)
     return ret;
 }
 
+bool Dictionary::contains(Mixed key)
+{
+    update_if_needed();
+    if (m_clusters) {
+        auto hash = key.hash();
+        ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+        auto state = m_clusters->try_get(k);
+        if (state.index != realm::npos)
+            return true;
+    }
+    return false;
+}
+
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
     if (m_clusters) {
@@ -526,7 +539,7 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
 
 /************************* Dictionary::Iterator *************************/
 
-CollectionIterator<Dictionary>::CollectionIterator(const Dictionary* dict, size_t pos)
+Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {

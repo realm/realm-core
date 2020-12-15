@@ -31,7 +31,7 @@ public:
     using Iterator = realm::Dictionary::Iterator;
     Dictionary() noexcept;
     Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
-    Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& list);
+    Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict);
     ~Dictionary() override;
 
     bool operator==(const Dictionary& rgt) const noexcept
@@ -55,6 +55,34 @@ public:
         m_dict->clear();
     }
 
+    Mixed get_any(StringData key)
+    {
+        return m_dict->get(key);
+    }
+    Mixed get_any(size_t ndx) const final
+    {
+        return m_dict->get_any(ndx);
+    }
+    bool try_get_any(StringData key, Mixed* result)
+    {
+        auto opt_val = m_dict->try_get(key);
+        if (opt_val) {
+            if (result) {
+                *result = *opt_val;
+            }
+            return true;
+        }
+        return false;
+    }
+    size_t find_any(Mixed value) const final
+    {
+        return m_dict->find_any(value);
+    }
+    bool contains(StringData key)
+    {
+        return m_dict->contains(key);
+    }
+
     template <typename T, typename Context>
     void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <typename Context>
@@ -63,6 +91,9 @@ public:
     // Replace the values in this dictionary with the values from an map type object
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+
+    Results snapshot() const;
+    Dictionary freeze(const std::shared_ptr<Realm>& realm) const;
 
     Iterator begin()
     {
