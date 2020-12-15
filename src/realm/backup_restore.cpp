@@ -73,7 +73,7 @@ void BackupHandler::unfake_versions()
 std::string BackupHandler::get_prefix_from_path(std::string path)
 {
     // prefix is everything but the suffix here, so start from the back
-    for (int i = path.size() - 1; i; --i) {
+    for (auto i = path.size() - 1; i; --i) {
         if (path[i] == '.')
             return path.substr(0, i + 1);
     }
