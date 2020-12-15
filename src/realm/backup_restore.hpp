@@ -38,6 +38,7 @@ public:
     static void fake_versions(const version_list_t& accepted, const version_time_list_t& to_be_deleted);
     static void unfake_versions();
     static std::string get_prefix_from_path(std::string path);
+
 private:
     std::string m_path;
     std::string m_prefix;
