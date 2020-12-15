@@ -143,6 +143,8 @@ int realm_c_api_tests(const char* file)
 
     realm_t* realm = realm_open(config);
     CHECK_ERROR();
+    realm_release(config);
+    realm_release(schema);
 
     assert(!realm_is_frozen(realm));
     assert(!realm_is_closed(realm));
