@@ -1031,18 +1031,18 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             current_file_format_version = alloc.get_committed_file_format_version();
             target_file_format_version =
                 Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
-
-            if (realm::must_restore_from_backup(path, current_file_format_version)) {
+            BackupHandler backup(path);
+            if (backup.must_restore_from_backup(current_file_format_version)) {
                 // we need to unmap before any file ops that'll change the realm
                 // file:
                 // (only strictly needed for Windows)
                 alloc.detach();
-                realm::restore_from_backup(path);
+                backup.restore_from_backup();
                 // finally, retry with the restored file instead of the original
                 // one:
                 continue;
             }
-            realm::cleanup_backups(path);
+            backup.cleanup_backups();
 
             // From here on, if we fail in any way, we must detach the
             // allocator.
@@ -1075,7 +1075,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 }
             }
             if (options.backup_at_file_format_change) {
-                realm::backup_realm_if_needed(path, current_file_format_version, target_file_format_version);
+                backup.backup_realm_if_needed(current_file_format_version, target_file_format_version);
             }
             using gf = _impl::GroupFriend;
             bool file_format_ok = false;
@@ -1087,7 +1087,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 file_format_ok = (top_ref == 0);
             }
             else {
-                if (is_accepted_file_format(current_file_format_version)) {
+                if (backup.is_accepted_file_format(current_file_format_version)) {
                     file_format_ok = true;
                 }
             }

@@ -20,19 +20,27 @@
 #include <vector>
 namespace realm {
 
-bool is_accepted_file_format(int current_file_format_version);
-bool must_restore_from_backup(std::string path, int current_file_format_version);
-void restore_from_backup(std::string path);
-void cleanup_backups(std::string path);
-void backup_realm_if_needed(std::string path, int current_file_format_version, int target_file_format_version);
-std::string get_prefix_from_path(std::string path);
+class BackupHandler {
+public:
+    BackupHandler(const std::string& path);
+    bool is_accepted_file_format(int current_file_format_version);
+    bool must_restore_from_backup(int current_file_format_version);
+    void restore_from_backup();
+    void cleanup_backups();
+    void backup_realm_if_needed(int current_file_format_version, int target_file_format_version);
+    std::string get_prefix();
 
-// functions to mock version lists for testing purposes
+    // functions to mock version lists for testing purposes
 
-using version_list_t = std::vector<int>;
-using version_time_list_t = std::vector<std::pair<int, int>>;
+    using version_list_t = std::vector<int>;
+    using version_time_list_t = std::vector<std::pair<int, int>>;
 
-void fake_versions(const version_list_t& accepted, const version_time_list_t& to_be_deleted);
-void unfake_versions();
+    static void fake_versions(const version_list_t& accepted, const version_time_list_t& to_be_deleted);
+    static void unfake_versions();
+    static std::string get_prefix_from_path(std::string path);
+private:
+    std::string m_path;
+    std::string m_prefix;
+};
 
 } // namespace realm

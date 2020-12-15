@@ -1709,13 +1709,13 @@ TEST(Upgrade_FixColumnKeys)
 NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::string prefix = realm::get_prefix_from_path(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
     // clear out any leftovers from potential earlier crash of unittest
     File::try_remove(prefix + "v200.backup.realm");
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
-    realm::fake_versions({200}, {});
+    realm::BackupHandler::fake_versions({200}, {});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1727,7 +1727,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // upgrade to format 201
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{201});
-    realm::fake_versions({201, 200}, {});
+    realm::BackupHandler::fake_versions({201, 200}, {});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1741,7 +1741,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // downgrade/restore backup of format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
-    realm::fake_versions({200}, {{201, 0}});
+    realm::BackupHandler::fake_versions({200}, {{201, 0}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1756,7 +1756,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // move forward to version 202, bypassing the outlawed 201
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
-    realm::fake_versions({202, 200}, {{201, 0}});
+    realm::BackupHandler::fake_versions({202, 200}, {{201, 0}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1770,20 +1770,20 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
     // Cleanup file and disable mockup versioning
     File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format(std::optional<int>());
-    realm::unfake_versions();
+    realm::BackupHandler::unfake_versions();
 }
 
 NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::string prefix = realm::get_prefix_from_path(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
     // clear out any leftovers from potential earlier crash of unittest
     File::try_remove(prefix + "v200.backup.realm");
     File::try_remove(prefix + "v201.backup.realm");
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{200});
-    realm::fake_versions({200}, {});
+    realm::BackupHandler::fake_versions({200}, {});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1795,7 +1795,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // upgrade to format 201
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{201});
-    realm::fake_versions({201, 200}, {});
+    realm::BackupHandler::fake_versions({201, 200}, {});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1809,7 +1809,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // upgrade further to 202, based on 201, to create a v201 backup
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{202});
-    realm::fake_versions({202, 201, 200}, {});
+    realm::BackupHandler::fake_versions({202, 201, 200}, {});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1822,7 +1822,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // downgrade as a separate stage, but directly move forward to version 203,
     // bypassing the outlawed 201 and 202.
     _impl::GroupFriend::fake_target_file_format(std::optional<int>{203});
-    realm::fake_versions({203, 200}, {{201, 10}});
+    realm::BackupHandler::fake_versions({203, 200}, {{201, 10}});
     {
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist);
@@ -1837,7 +1837,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // Ask for v201 to have a max age of one sec.
     // When opened more than a sec later,
     // the v201 backup will be too old and automagically removed
-    realm::fake_versions({203, 200}, {{201, 1}});
+    realm::BackupHandler::fake_versions({203, 200}, {{201, 1}});
     millisleep(2000);
     {
         auto hist = make_in_realm_history(path);
@@ -1849,7 +1849,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // Cleanup file and disable mockup versioning
     File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format(std::optional<int>());
-    realm::unfake_versions();
+    realm::BackupHandler::unfake_versions();
 }
 
 /*
