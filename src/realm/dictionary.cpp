@@ -102,6 +102,16 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
+std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx)
+{
+    update_if_needed();
+    if (ndx >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+    ObjKey k;
+    return do_get_pair(m_clusters->get(ndx, k));
+}
+
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
@@ -516,7 +526,7 @@ bool Dictionary::init_from_parent() const
     return valid;
 }
 
-Mixed Dictionary::do_get(ClusterNode::State&& s) const
+Mixed Dictionary::do_get(const ClusterNode::State& s) const
 {
     ArrayMixed values(m_obj.get_alloc());
     ref_type ref = to_ref(Array::get(s.mem.get_addr(), 2));
@@ -537,6 +547,32 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
     return val;
 }
 
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+{
+    Mixed key;
+    switch (m_key_type) {
+        case type_String: {
+            ArrayString keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        case type_Int: {
+            ArrayInteger keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        default:
+            throw std::runtime_error("Not implemented");
+            break;
+    }
+    Mixed val = do_get(std::move(s));
+
+    return std::make_pair(key, val);
+}
 /************************* Dictionary::Iterator *************************/
 
 Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
@@ -568,7 +604,6 @@ auto Dictionary::Iterator::operator*() const -> value_type
             throw std::runtime_error("Not implemented");
             break;
     }
-
     ArrayMixed values(m_tree.get_alloc());
     ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
     values.init_from_ref(ref);

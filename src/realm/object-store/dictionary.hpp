@@ -61,19 +61,20 @@ public:
     }
     Mixed get_any(size_t ndx) const final
     {
+        verify_valid_row(ndx);
         return m_dict->get_any(ndx);
     }
-    bool try_get_any(StringData key, Mixed* result)
+    util::Optional<Mixed> try_get_any(StringData key)
     {
-        auto opt_val = m_dict->try_get(key);
-        if (opt_val) {
-            if (result) {
-                *result = *opt_val;
-            }
-            return true;
-        }
-        return false;
+        return m_dict->try_get(key);
     }
+    std::pair<StringData, Mixed> get_pair(size_t ndx)
+    {
+        verify_valid_row(ndx);
+        auto pair = m_dict->get_pair(ndx);
+        return {pair.first.get_string(), pair.second};
+    }
+
     size_t find_any(Mixed value) const final
     {
         return m_dict->find_any(value);

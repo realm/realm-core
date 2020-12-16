@@ -394,8 +394,8 @@ std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
             if (m_list_indices) {
                 ndx = (*m_list_indices)[ndx];
             }
-            auto it = dict->begin() + ndx;
-            return {(*it).first.get_string(), (*it).second};
+            auto val = dict->get_pair(ndx);
+            return {val.first.get_string(), val.second};
         }
     }
     return {"", {}};
