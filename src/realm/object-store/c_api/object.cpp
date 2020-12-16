@@ -302,35 +302,6 @@ RLM_API bool realm_list_get_property(const realm_list_t* list, realm_property_in
     REALM_TERMINATE("Not implemented yet.");
 }
 
-/// Convert a Mixed that potentially contains an ObjKey from a link list to a
-/// Mixed containing an ObjLink.
-static inline Mixed link_to_typed_link(Mixed value, const List& list)
-{
-    if (!value.is_null() && value.get_type() == type_Link) {
-        auto col_key = list.get_parent_column_key();
-        REALM_ASSERT(col_key.get_type() == col_type_LinkList ||
-                     (col_key.get_type() == col_type_Link && col_key.is_list()));
-        REALM_ASSERT(list.get_type() == (PropertyType::Object | PropertyType::Array));
-
-        // Get the target table key.
-        auto& shared_realm = *list.get_realm();
-        auto source_table = shared_realm.read_group().get_table(list.get_parent_table_key());
-        auto target_table = source_table->get_link_target(col_key);
-        value = ObjLink{target_table->get_key(), value.get<ObjKey>()};
-    }
-    return value;
-}
-
-/// Convert a Mixed that potentially contains an ObjLink to a Mixed containing an ObjKey.
-static inline Mixed typed_link_to_link(Mixed value)
-{
-    if (!value.is_null() && value.get_type() == type_TypedLink) {
-        auto link = value.get<ObjLink>();
-        value = link.get_obj_key();
-    }
-    return value;
-}
-
 RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
