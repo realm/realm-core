@@ -173,12 +173,12 @@ tasks:
       script: |-
         set -o errexit
 
-        mkdir bench_results
-        cd bench_results
+        mkdir ${task_name|benchmark}_results
+        cd ${task_name|benchmark}_results
         ../build/test/benchmark-common-tasks/realm-benchmark-common-tasks
   - command: perf.send
     params:
-      file: ./realm-core/bench_results/results.latest.json
+      file: ./realm-core/${task_name|benchmark}_results/results.latest.json
 
 - name: benchmark-crud
   commands:
@@ -189,12 +189,12 @@ tasks:
       script: |-
         set -o errexit
 
-        mkdir bench_results
-        cd bench_results
+        mkdir ${task_name|benchmark}_results
+        cd ${task_name|benchmark}_results
         ../build/test/benchmark-crud/realm-benchmark-crud
   - command: perf.send
     params:
-      file: ./realm-core/bench_results/results.latest.json
+      file: ./realm-core/${task_name|benchmark}_results/results.latest.json
 
 - name: sync-tests
   commands:
