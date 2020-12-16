@@ -170,7 +170,8 @@ let package = Package(
             exclude: [
                 "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
-                "realm/object-store/impl/windows"
+                "realm/object-store/impl/windows",
+                "realm/object-store/c_api",
             ],
             sources: ["realm/object-store"],
             publicHeadersPath: "realm/object-store",
@@ -185,7 +186,9 @@ let package = Package(
             path: "test/object-store",
             exclude: [
                 "benchmarks",
-                "notifications-fuzzer"
+                "notifications-fuzzer",
+                "c_api.cpp",
+                "c_api.c",
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
