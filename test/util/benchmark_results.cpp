@@ -27,6 +27,8 @@
 #include <cmath>
 #include <cfloat> // DBL_MIN, DBL_MAX
 
+#include <external/json/json.hpp>
+
 #ifndef _WIN32
 #   include <unistd.h> // link, unlink
 #else
@@ -61,52 +63,15 @@ std::string format_elapsed_time(double seconds)
     return out.str();
 }
 
-std::string format_change_percent(double baseline, double seconds)
+std::string format_change(double baseline, double input)
 {
     std::ostringstream out;
-    double percent = (seconds - baseline) / baseline * 100;
+    double percent = (input - baseline) / baseline * 100;
     out.precision(2);
     out.setf(std::ios_base::showpos);
     out << std::fixed;
-    out << percent << "%";
+    out << '(' << percent << "%" << ')';
     return out.str();
-}
-
-std::string format_drop_factor(double baseline, double seconds)
-{
-    std::ostringstream out;
-    double factor = baseline / seconds;
-    out.precision(3);
-    out << factor << ":1";
-    return out.str();
-}
-
-std::string format_rise_factor(double baseline, double seconds)
-{
-    std::ostringstream out;
-    double factor = seconds / baseline;
-    out.precision(3);
-    out << "1:" << factor;
-    return out.str();
-}
-
-std::string format_change(double baseline, double input, BenchmarkResults::ChangeType change_type)
-{
-    std::string str;
-    switch (change_type) {
-        case BenchmarkResults::change_Percent:
-            str = format_change_percent(baseline, input);
-            break;
-        case BenchmarkResults::change_DropFactor:
-            str = format_drop_factor(baseline, input);
-            break;
-        case BenchmarkResults::change_RiseFactor:
-            str = format_rise_factor(baseline, input);
-            break;
-    }
-    std::ostringstream os;
-    os << '(' << str << ')';
-    return os.str();
 }
 
 std::string pad_right(std::string str, int width, char padding = ' ')
@@ -134,10 +99,10 @@ double BenchmarkResults::Result::avg() const
     return total / rep;
 }
 
-void BenchmarkResults::submit_single(const char* ident, const char* lead_text, double seconds, ChangeType change_type)
+void BenchmarkResults::submit_single(const char* ident, const char* lead_text, std::string measurement_type, double seconds)
 {
     submit(ident, seconds);
-    finish(ident, lead_text, change_type);
+    finish(ident, lead_text, std::move(measurement_type));
 }
 
 void BenchmarkResults::submit(const char* ident, double seconds)
@@ -205,7 +170,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
     return r;
 }
 
-void BenchmarkResults::finish(const std::string& ident, const std::string& lead_text, ChangeType change_type)
+void BenchmarkResults::finish(const std::string& ident, const std::string& lead_text, std::string measurement_type)
 {
     /*
         OUTPUT FOR RESULTS WITHOUT BASELINE:
@@ -227,11 +192,13 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
     std::string lead_text_2 = lead_text + ":";
     out << std::setw(m_max_lead_text_width + 1 + 3) << lead_text_2;
 
-    Measurements::const_iterator it = m_measurements.find(ident);
+    Measurements::iterator it = m_measurements.find(ident);
     if (it == m_measurements.end()) {
         out << "(no measurements)" << std::endl;
         return;
     }
+
+    it->second.type = std::move(measurement_type);
 
     Result r = it->second.finish();
 
@@ -250,10 +217,10 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
             out << "  ";
         }
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min) << " "
-            << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
+            << pad_right(format_change(br.min, r.min), 15) << "     ";
 
         out << "max " << std::setw(time_width) << format_elapsed_time(r.max) << " "
-            << pad_right(format_change(br.max, r.max, change_type), 15) << "   ";
+            << pad_right(format_change(br.max, r.max), 15) << "   ";
 
         if ((r.median - br.median) > r.stddev * 2) {
             out << "* ";
@@ -263,7 +230,7 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         }
 
         out << "med " << std::setw(time_width) << format_elapsed_time(r.median) << " "
-            << pad_right(format_change(br.median, r.median, change_type), 15) << "   ";
+            << pad_right(format_change(br.median, r.median), 15) << "   ";
 
         if ((avg - baseline_avg) > r.stddev * 2) {
             out << "* ";
@@ -272,10 +239,10 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
             out << "  ";
         }
         out << "avg " << std::setw(time_width) << format_elapsed_time(avg) << " "
-            << pad_right(format_change(baseline_avg, avg, change_type), 15) << "     ";
+            << pad_right(format_change(baseline_avg, avg), 15) << "     ";
 
         out << "stddev" << std::setw(time_width) << format_elapsed_time(r.stddev) << " "
-            << pad_right(format_change(br.stddev, r.stddev, change_type), 15);
+            << pad_right(format_change(br.stddev, r.stddev), 15);
     }
     else {
         out << "min " << std::setw(time_width) << format_elapsed_time(r.min) << "     ";
@@ -379,6 +346,52 @@ void BenchmarkResults::save_results()
             csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.avg() << ',' << r.stddev << ',' << r.rep
                     << ',' << r.total << '\n';
         }
+    }
+
+    {
+        using nlohmann::json;
+
+        auto test_results = json::array();
+        for (const auto& measurement: m_measurements) {
+            auto result = measurement.second.finish();
+            auto make_result_obj = [&](const char* rollup, auto value) -> json {
+                if (rollup) { 
+                    return json{
+                        { "name", util::format("%1_%2", measurement.second.type, rollup) },
+                        { "value", value }
+                    };
+                } else {
+                    return json{{"name", measurement.second.type}, {"value", value}};
+                }
+            };
+            auto metric_objs = json::array();
+            if (result.rep == 1) {
+                metric_objs.push_back(make_result_obj(nullptr, result.min));
+            } else {
+                metric_objs.push_back(make_result_obj("min", result.min));
+                metric_objs.push_back(make_result_obj("max", result.max));
+                metric_objs.push_back(make_result_obj("median", result.median));
+                metric_objs.push_back(make_result_obj("avg", result.avg()));
+                metric_objs.push_back(make_result_obj("stddev", result.stddev));
+            }
+
+            test_results.push_back(json{
+                { "info", json{
+                    {"test_name", measurement.first },
+                    {"parent", m_suite_name},
+                    {"args", json{ {"count", result.rep }}}
+                }},
+                { "metrics", std::move(metric_objs) }
+            });
+        }
+
+        auto full_results_obj = json::array({ json{
+            { "info", json{{"test_name", m_suite_name}} },
+            { "sub_tests", std::move(test_results) }
+        }});
+
+        std::ofstream json_file_stream(util::format("%1.latest.json", m_results_file_stem));
+        json_file_stream << full_results_obj << std::endl;
     }
 
     std::string baseline_file = m_results_file_stem;

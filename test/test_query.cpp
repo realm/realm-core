@@ -2521,8 +2521,10 @@ TEST(Query_Huge)
     for (int N = 0; N < 100; N++) {
 #elif TEST_DURATION == 2
     for (int N = 0; N < 1000; N++) {
-#elif TEST_DURATION == 3
+#elif TEST_DURATION >= 3
     for (int N = 0; N < 10000; N++) {
+#else
+#error("TEST_DURATION must be 0 >= TEST_DURATION <= 3")
 #endif
 
         // Makes you reproduce a bug in a certain run, without having
