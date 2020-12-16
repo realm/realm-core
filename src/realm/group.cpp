@@ -943,7 +943,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
         }
         if (g_table_recycler_2.size() + g_table_recycler_1.size() > g_table_recycling_delay) {
             table = g_table_recycler_2.back();
-            //table->fully_detach();
+            // table->fully_detach();
             g_table_recycler_2.pop_back();
         }
     }
