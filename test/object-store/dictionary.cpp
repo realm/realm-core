@@ -98,6 +98,18 @@ TEST_CASE("dictionary") {
         }
     }
 
+    SECTION("iteration") {
+        for (size_t i = 0; i < values.size(); ++i) {
+            auto ndx = dict.find_any(values[i]);
+            Dictionary::Iterator it = dict.begin() + ndx;
+            REQUIRE((*it).first.get_string() == keys[i]);
+            REQUIRE((*it).second.get_string() == values[i]);
+            auto element = results.get_dictionary_element(ndx);
+            REQUIRE(element.first == keys[i]);
+            REQUIRE(element.second.get_string() == values[i]);
+        }
+    }
+
     SECTION("notifications") {
         r->commit_transaction();
 

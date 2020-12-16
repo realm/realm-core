@@ -65,9 +65,9 @@ public:
     std::pair<size_t, bool> remove(Context&, const T&);
 
     std::pair<size_t, bool> insert_any(Mixed value);
-    Mixed get_any(size_t ndx) const;
+    Mixed get_any(size_t ndx) const final;
     std::pair<size_t, bool> remove_any(Mixed value);
-    size_t find_any(Mixed value) const;
+    size_t find_any(Mixed value) const final;
 
     void remove_all();
 
