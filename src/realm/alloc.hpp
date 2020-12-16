@@ -340,6 +340,13 @@ public:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
+    void kill()
+    {
+        m_alloc = nullptr;
+        m_baseline.store(0, std::memory_order_relaxed);
+        m_ref_translation_ptr.store(nullptr);
+    }
+
     void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);

@@ -1066,6 +1066,7 @@ void Table::detach(LifeCycleCookie cookie) noexcept
 {
     m_cookie = cookie;
     m_alloc.bump_instance_version();
+    m_alloc.kill();
 }
 
 void Table::fully_detach() noexcept
