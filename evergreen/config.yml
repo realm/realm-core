@@ -86,10 +86,6 @@ functions:
               set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
           fi
 
-          if [[ -n "${enable_long_running_tests|}" ]]; then
-              set_cmake_var realm_vars REALM_TEST_DURATION STRING "${enable_long_running_tests}"
-          fi
-
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
 
