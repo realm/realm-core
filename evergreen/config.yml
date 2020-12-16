@@ -338,6 +338,9 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - ubuntu2004-large
+  - name: benchmarks
+    distros:
+    - ubuntu2004-large
 
 - name: ubuntu2004-asan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 ASAN)"
@@ -401,6 +404,9 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - ubuntu2004-arm64-large
+  - name: benchmarks
+    distros:
+    - ubuntu2004-arm64-large
 
 - name: macos-1014
   display_name: "MacOS 10.14 x86_64"
@@ -412,6 +418,9 @@ buildvariants:
     run_tests_against_baas: On
   tasks:
   - name: compile_test_and_package
+    distros:
+    - macos-1014
+  - name: benchmarks
     distros:
     - macos-1014
 
