@@ -3607,6 +3607,12 @@ TEST_CASE("notifications: objects with PK recreated") {
         r->commit_transaction();
 
         advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
         REQUIRE(calls1 == 2);
         REQUIRE(calls2 == 2);
         REQUIRE(calls3 == 2);
@@ -3623,6 +3629,12 @@ TEST_CASE("notifications: objects with PK recreated") {
         r->commit_transaction();
 
         advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
         REQUIRE(calls1 == 2);
         REQUIRE(calls2 == 2);
         REQUIRE(calls3 == 2);
