@@ -516,6 +516,7 @@ void WatchStream::feed_line(std::string_view line)
         feed_sse({m_data_buffer, m_event_type});
         m_data_buffer.clear();
         m_event_type.clear();
+        return;
     }
 
     if (line[0] == ':')

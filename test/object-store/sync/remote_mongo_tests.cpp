@@ -299,6 +299,16 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
+    SECTION("with null string_view") {
+        ws.feed_line(R"(event: message)");
+        REQ_ND;
+        ws.feed_line(R"(data: {"a": 1})");
+        REQ_ND;
+        ws.feed_line(std::string_view());
+        REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
+        CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
+        CHECK(ws.state() == WatchStream::NEED_DATA);
+    }
     SECTION("no space") {
         ws.feed_line(R"(event:message)");
         REQ_ND;
