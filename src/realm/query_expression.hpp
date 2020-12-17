@@ -2908,7 +2908,7 @@ public:
 
     std::unique_ptr<Subexpr> get_element_length() override
     {
-        if constexpr (realm::is_any_v<T, StringData, BinaryData>) {
+        if constexpr (realm::is_any_v<T, StringData, BinaryData, Mixed>) {
             return element_lengths().clone();
         }
         else {
@@ -3135,7 +3135,20 @@ public:
                 const size_t list_size = list.size();
                 sizes.reserve(sizes.size() + list_size);
                 for (size_t j = 0; j < list_size; j++) {
-                    sizes.push_back(list.get(j).size());
+                    if constexpr (std::is_same_v<T, Mixed>) {
+                        Mixed v = list.get(j);
+                        if (!v.is_null()) {
+                            if (v.get_type() == type_String) {
+                                sizes.push_back(v.get_string().size());
+                            }
+                            else if (v.get_type() == type_Binary) {
+                                sizes.push_back(v.get_binary().size());
+                            }
+                        }
+                    }
+                    else {
+                        sizes.push_back(list.get(j).size());
+                    }
                 }
             }
         }

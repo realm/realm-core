@@ -58,6 +58,20 @@ const char* expression_cmp_type_to_str(ExpressionComparisonType type)
     return "";
 }
 
+static std::map<int, std::string> opstr = {
+    {CompareNode::EQUAL, "="},
+    {CompareNode::NOT_EQUAL, "!="},
+    {CompareNode::GREATER, ">"},
+    {CompareNode::LESS, "<"},
+    {CompareNode::GREATER_EQUAL, ">="},
+    {CompareNode::LESS_EQUAL, "<="},
+    {CompareNode::BEGINSWITH, "beginswith"},
+    {CompareNode::ENDSWITH, "endswith"},
+    {CompareNode::CONTAINS, "contains"},
+    {CompareNode::LIKE, "like"},
+    {CompareNode::IN, "in"},
+};
+
 bool is_length_suffix(const std::string& s)
 {
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
@@ -272,6 +286,15 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
+void verify_only_string_types(DataType type, const std::string& op_string)
+{
+    if (type != type_String && type != type_Binary && type != type_Mixed) {
+        throw std::runtime_error(util::format(
+            "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
+            op_string, get_data_type_name(type)));
+    }
+}
+
 Query EqualityNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
@@ -359,6 +382,7 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
     else {
+        verify_only_string_types(right_type, opstr[op]);
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
@@ -370,17 +394,6 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
     return {};
 }
-
-static std::map<int, std::string> opstr = {
-    {CompareNode::GREATER, ">"},
-    {CompareNode::LESS, "<"},
-    {CompareNode::GREATER_EQUAL, ">="},
-    {CompareNode::LESS_EQUAL, "<="},
-    {CompareNode::BEGINSWITH, "beginswith"},
-    {CompareNode::ENDSWITH, "endswith"},
-    {CompareNode::CONTAINS, "contains"},
-    {CompareNode::LIKE, "like"},
-};
 
 Query RelationalNode::visit(ParserDriver* drv)
 {
@@ -451,11 +464,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
     auto right_type = right->get_type();
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
-    if (right_type != type_String && right_type != type_Binary) {
-        throw std::runtime_error(util::format(
-            "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
-            opstr[op], get_data_type_name(right_type)));
-    }
+    verify_only_string_types(right_type, opstr[op]);
 
     if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
         auto col_key = prop->column_key();
@@ -1232,6 +1241,37 @@ Subexpr* LinkChain::column(const std::string& col)
 
     if (col_key.is_dictionary()) {
         return create_subexpr<Dictionary>(col_key);
+    }
+    else if (col_key.is_set()) {
+        switch (col_key.get_type()) {
+            case col_type_Int:
+                return create_subexpr<Set<Int>>(col_key);
+            case col_type_Bool:
+                return create_subexpr<Set<Bool>>(col_key);
+            case col_type_String:
+                return create_subexpr<Set<String>>(col_key);
+            case col_type_Binary:
+                return create_subexpr<Set<Binary>>(col_key);
+            case col_type_Float:
+                return create_subexpr<Set<Float>>(col_key);
+            case col_type_Double:
+                return create_subexpr<Set<Double>>(col_key);
+            case col_type_Timestamp:
+                return create_subexpr<Set<Timestamp>>(col_key);
+            case col_type_Decimal:
+                return create_subexpr<Set<Decimal>>(col_key);
+            case col_type_UUID:
+                return create_subexpr<Set<UUID>>(col_key);
+            case col_type_ObjectId:
+                return create_subexpr<Set<ObjectId>>(col_key);
+            case col_type_Mixed:
+                return create_subexpr<Set<Mixed>>(col_key);
+            case col_type_LinkList:
+                add(col_key);
+                return create_subexpr<Link>(col_key);
+            default:
+                break;
+        }
     }
     else if (col_key.is_list()) {
         switch (col_key.get_type()) {

@@ -4245,6 +4245,147 @@ TEST(Parser_Dictionary)
     CHECK_EQUAL(message, "Sum not defined for timestamps");
 }
 
+TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,
+           Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
+           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>,
+           Nullable<UUID>)
+{
+    using type = typename TEST_TYPE::type;
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    TestValueGenerator gen;
+    Group g;
+    auto table = g.add_table("foo");
+    auto col_set = table->add_column_set(TEST_TYPE::data_type, "set", TEST_TYPE::is_nullable);
+    auto col_prop = table->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
+    std::vector<ObjKey> keys;
+
+    table->create_objects(5, keys);
+
+    auto set_values = [](Set<type> set, const std::vector<type>& value_list) {
+        for (auto val : value_list)
+            set.insert(val);
+    };
+    constexpr int64_t same_value = 3;
+    auto item_3 = gen.convert_for_test<underlying_type>(same_value);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->get_object(keys[i]).set(col_prop, item_3);
+    }
+
+    set_values(table->get_object(keys[0]).get_set<type>(col_set), gen.values_from_int<type>({0, 1}));
+    set_values(table->get_object(keys[1]).get_set<type>(col_set), gen.values_from_int<type>({2, same_value, 4, 5}));
+    set_values(table->get_object(keys[2]).get_set<type>(col_set), gen.values_from_int<type>({6, 7, 100, 8, 9}));
+    set_values(table->get_object(keys[3]).get_set<type>(col_set), gen.values_from_int<type>({same_value}));
+    // the fifth set is empty
+
+    verify_query(test_context, table, "set.@count == 0", 1);
+    verify_query(test_context, table, "set.@size >= 1", 4);
+    verify_query(test_context, table, "set.@size == 4", 1);
+
+    util::Any args[] = {item_3};
+    size_t num_args = 1;
+    verify_query_sub(test_context, table, "set == $0", args, num_args, 2);      // 1, 3
+    verify_query_sub(test_context, table, "$0 IN set", args, num_args, 2);      // 1, 3
+    verify_query_sub(test_context, table, "ALL set == $0", args, num_args, 2);  // 3, 4
+    verify_query_sub(test_context, table, "NONE set == $0", args, num_args, 3); // 0, 2, 4
+
+    // single property vs set
+    verify_query(test_context, table, "set == value", 2);      // 1, 3
+    verify_query(test_context, table, "ANY set == value", 2);  // 1, 3
+    verify_query(test_context, table, "ALL set == value", 2);  // 3, 4
+    verify_query(test_context, table, "NONE set == value", 3); // 0, 2, 4
+
+    if constexpr (realm::is_any_v<underlying_type, Int, Double, Float, Decimal128>) {
+        verify_query(test_context, table, "set == 3", 2);          // 1, 3
+        verify_query(test_context, table, "set.@max == 100", 1);   // 2
+        verify_query(test_context, table, "set.@min == 0", 1);     // 0
+        verify_query(test_context, table, "set.@avg == 3", 1);     // 3
+        verify_query(test_context, table, "set.@avg >= 3", 3);     // 1, 2, 3
+        verify_query(test_context, table, "set.@sum == 1", 1);     // 0
+        verify_query(test_context, table, "set.@sum == 0", 1);     // 4
+        verify_query(test_context, table, "set.@sum > 100", 1);    // 2
+        verify_query(test_context, table, "set.@max == value", 1); // 3
+        verify_query(test_context, table, "set.@min == value", 1); // 3
+        verify_query(test_context, table, "set.@avg == value", 1); // 3
+        verify_query(test_context, table, "set.@sum == value", 1); // 3
+    }
+    else {
+        CHECK_THROW_ANY(verify_query(test_context, table, "set.@min > 100", 1));
+        CHECK_THROW_ANY(verify_query(test_context, table, "set.@max > 100", 1));
+        CHECK_THROW_ANY(verify_query(test_context, table, "set.@sum > 100", 1));
+        CHECK_THROW_ANY(verify_query(test_context, table, "set.@avg > 100", 1));
+    }
+    if constexpr (realm::is_any_v<underlying_type, StringData, BinaryData>) {
+        verify_query_sub(test_context, table, "set ==[c] $0", args, num_args, 2);           // 1, 3
+        verify_query_sub(test_context, table, "set LIKE $0", args, num_args, 2);            // 1, 3
+        verify_query_sub(test_context, table, "set BEGINSWITH $0", args, num_args, 2);      // 1, 3
+        verify_query_sub(test_context, table, "set ENDSWITH $0", args, num_args, 2);        // 1, 3
+        verify_query_sub(test_context, table, "set CONTAINS $0", args, num_args, 2);        // 1, 3
+        verify_query_sub(test_context, table, "ALL set LIKE $0", args, num_args, 2);        // 3, 4
+        verify_query_sub(test_context, table, "ALL set BEGINSWITH $0", args, num_args, 2);  // 3, 4
+        verify_query_sub(test_context, table, "ALL set ENDSWITH $0", args, num_args, 2);    // 3, 4
+        verify_query_sub(test_context, table, "ALL set CONTAINS $0", args, num_args, 2);    // 3, 4
+        verify_query_sub(test_context, table, "NONE set LIKE $0", args, num_args, 3);       // 0, 2, 4
+        verify_query_sub(test_context, table, "NONE set BEGINSWITH $0", args, num_args, 3); // 0, 2, 4
+        verify_query_sub(test_context, table, "NONE set ENDSWITH $0", args, num_args, 3);   // 0, 2, 4
+        verify_query_sub(test_context, table, "NONE set CONTAINS $0", args, num_args, 3);   // 0, 2, 4
+        verify_query(test_context, table, "set.length == 10", 1);                           // 2 == "String 100"
+        verify_query(test_context, table, "set.length == 0", 0);
+        verify_query(test_context, table, "set.length > 0", 4); // 0, 1, 2, 3
+    }
+    else {
+        CHECK_THROW_ANY(verify_query_sub(test_context, table, "set ==[c] $0", args, num_args, 0));
+        CHECK_THROW_ANY(verify_query_sub(test_context, table, "set LIKE $0", args, num_args, 2));
+        CHECK_THROW_ANY(verify_query_sub(test_context, table, "set BEGINSWITH $0", args, num_args, 2));
+        CHECK_THROW_ANY(verify_query_sub(test_context, table, "set ENDSWITH $0", args, num_args, 2));
+        CHECK_THROW_ANY(verify_query_sub(test_context, table, "set CONTAINS $0", args, num_args, 2));
+    }
+}
+
+TEST(Parser_SetMixed)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    bool is_nullable = true;
+    auto col_set = table->add_column_set(type_Mixed, "set", is_nullable);
+    auto col_prop = table->add_column(type_Mixed, "value", is_nullable);
+    std::vector<ObjKey> keys;
+    table->create_objects(4, keys);
+    auto set_values = [](Set<Mixed> set, const std::vector<Mixed>& value_list) {
+        for (auto val : value_list)
+            set.insert(val);
+    };
+    const Mixed same_value(300);
+    for (size_t i = 0; i < table->size(); ++i) {
+        table->get_object(keys[i]).set(col_prop, same_value);
+    }
+
+    BinaryData data("foo", 3);
+    set_values(table->get_object(keys[0]).get_set<Mixed>(col_set), {{3}, {"hello"}, same_value});
+    set_values(table->get_object(keys[1]).get_set<Mixed>(col_set),
+               {{3.5f}, {"world"}, {data}, {ObjectId::gen()}, {UUID()}, {}});
+    set_values(table->get_object(keys[2]).get_set<Mixed>(col_set), {same_value});
+    // the fourth set is empty
+
+    verify_query(test_context, table, "set.@count == 0", 1);
+    verify_query(test_context, table, "set.@size >= 1", 3);
+    verify_query(test_context, table, "set.@size == 6", 1);
+    verify_query(test_context, table, "3.5 IN set", 1);
+    verify_query(test_context, table, "'WorLD' IN[c] set", 1);
+    verify_query(test_context, table, "set == value", 2);
+    verify_query(test_context, table, "set < value", 2);
+    verify_query(test_context, table, "ALL set < value", 1); // 3
+    verify_query(test_context, table, "ALL set < value && set.@size > 0", 0);
+    verify_query(test_context, table, "ALL set == value", 2);  // 2, 3
+    verify_query(test_context, table, "NONE set == value", 2); // 1, 3
+    verify_query(test_context, table, "set == NULL", 1);
+    verify_query(test_context, table, "set beginswith[c] 'HE'", 1);
+    verify_query(test_context, table, "set endswith[c] 'D'", 1);
+    verify_query(test_context, table, "set LIKE[c] '*O*'", 2);
+    verify_query(test_context, table, "set CONTAINS 'r'", 1);
+    verify_query(test_context, table, "set.length == 5", 2);
+    verify_query(test_context, table, "set.length == 3", 1);
+}
+
 namespace {
 
 void worker(test_util::unit_test::TestContext& test_context, TransactionRef frozen)
