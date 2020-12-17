@@ -111,6 +111,48 @@ functions:
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
               --target ${target_to_build|}
 
+  "run benchmark":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+
+          if [[ -z "${path_to_benchmark}" ]]; then
+              echo "No path to benchmark specified."
+              exit 1
+          fi
+
+          BENCHMARK=$(./evergreen/abspath.sh ${path_to_benchmark})
+          echo "Going to run benchmark $BENCHMARK"
+
+          [[ -d benchmark_results ]] && rm -rf benchmark_results
+          mkdir benchmark_results
+          cd benchmark_results
+
+          $BENCHMARK
+    - command: perf.send
+      params:
+        file: './realm-core/benchmark_results/results.latest.json'
+
+  "run tests":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+          CTEST=$(pwd)/${cmake_bindir}/ctest
+
+          if [[ -n "${test_filter}" ]]; then
+              TEST_FLAGS="-R ${test_filter}"
+          fi
+          TETS_FLAGS="$TEST_FLAGS ${test_flags|}"
+
+          cd build
+          $CTEST -V $TEST_FLAGS
+
 tasks:
 - name: compile
   commands:
@@ -150,60 +192,30 @@ tasks:
 - name: core-tests
   commands:
   - func: "compile"
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      script: |-
-        set -o errexit
-        CTEST=$(pwd)/${cmake_bindir}/ctest
-
-        cd build
-        $CTEST -V -R StorageTests ${test_flags|}
+  - func: "run tests"
+    vars:
+      test_filter: StorageTests
 
 - name: benchmark-common-tasks
+  tags: [ "benchmark" ]
   commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-
-        mkdir ${task_name|benchmark}_results
-        cd ${task_name|benchmark}_results
-        ../build/test/benchmark-common-tasks/realm-benchmark-common-tasks
-  - command: perf.send
-    params:
-      file: ./realm-core/${task_name|benchmark}_results/results.latest.json
+  - func: "run benchmark"
+    vars:
+      path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
 
 - name: benchmark-crud
+  tags: [ "benchmark" ]
   commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-
-        mkdir ${task_name|benchmark}_results
-        cd ${task_name|benchmark}_results
-        ../build/test/benchmark-crud/realm-benchmark-crud
-  - command: perf.send
-    params:
-      file: ./realm-core/${task_name|benchmark}_results/results.latest.json
+  - func: "run benchmark"
+    vars:
+      path_to_benchmark: ./build/test/benchmark-crud/realm-benchmark-crud
 
 - name: sync-tests
   commands:
   - func: "compile"
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      script: |-
-        set -o errexit
-        CTEST=$(pwd)/${cmake_bindir}/ctest
-
-        cd build
-        $CTEST -V -R SyncTests ${test_flags|}
+  - func: "run tests"
+    vars:
+      test_filter: SyncTests
 
 - name: object-store-tests
   commands:
@@ -249,11 +261,9 @@ tasks:
                 sleep 5
             done
         fi
-
-        CTEST=$(pwd)/${cmake_bindir}/ctest
-
-        cd build
-        $CTEST -V -R ObjectStoreTests ${test_flags|}
+  - func: "run tests"
+    vars:
+      test_filter: ObjectStoreTests
 
 - name: lint
   commands:
@@ -274,7 +284,7 @@ tasks:
         if [[ "$out" == *"no modified files to format"* ]]; then
             exit 0
         fi
-        if [[ "$out" == *"clang-format did not modify any files"* ]];
+        if [[ "$out" == *"clang-format did not modify any files"* ]]; then
             exit 0
         fi
 
@@ -318,8 +328,7 @@ task_groups:
       cmake_build_type: "Release"
       target_to_build: "benchmarks"
   tasks:
-  - benchmark-common-tasks
-  - benchmark-crud
+  - .benchmark
 
 buildvariants:
 - name: ubuntu2004
@@ -426,7 +435,7 @@ buildvariants:
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
-  run_on: windows-64-vs2019-test 
+  run_on: windows-64-vs2019-test
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
     cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
