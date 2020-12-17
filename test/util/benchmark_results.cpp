@@ -99,7 +99,8 @@ double BenchmarkResults::Result::avg() const
     return total / rep;
 }
 
-void BenchmarkResults::submit_single(const char* ident, const char* lead_text, std::string measurement_type, double seconds)
+void BenchmarkResults::submit_single(const char* ident, const char* lead_text, std::string measurement_type,
+                                     double seconds)
 {
     submit(ident, seconds);
     finish(ident, lead_text, std::move(measurement_type));
@@ -352,22 +353,21 @@ void BenchmarkResults::save_results()
         using nlohmann::json;
 
         auto test_results = json::array();
-        for (const auto& measurement: m_measurements) {
+        for (const auto& measurement : m_measurements) {
             auto result = measurement.second.finish();
             auto make_result_obj = [&](const char* rollup, auto value) -> json {
-                if (rollup) { 
-                    return json{
-                        { "name", util::format("%1_%2", measurement.second.type, rollup) },
-                        { "value", value }
-                    };
-                } else {
+                if (rollup) {
+                    return json{{"name", util::format("%1_%2", measurement.second.type, rollup)}, {"value", value}};
+                }
+                else {
                     return json{{"name", measurement.second.type}, {"value", value}};
                 }
             };
             auto metric_objs = json::array();
             if (result.rep == 1) {
                 metric_objs.push_back(make_result_obj(nullptr, result.min));
-            } else {
+            }
+            else {
                 metric_objs.push_back(make_result_obj("min", result.min));
                 metric_objs.push_back(make_result_obj("max", result.max));
                 metric_objs.push_back(make_result_obj("median", result.median));
@@ -375,20 +375,14 @@ void BenchmarkResults::save_results()
                 metric_objs.push_back(make_result_obj("stddev", result.stddev));
             }
 
-            test_results.push_back(json{
-                { "info", json{
-                    {"test_name", measurement.first },
-                    {"parent", m_suite_name},
-                    {"args", json{ {"count", result.rep }}}
-                }},
-                { "metrics", std::move(metric_objs) }
-            });
+            test_results.push_back(json{{"info", json{{"test_name", measurement.first},
+                                                      {"parent", m_suite_name},
+                                                      {"args", json{{"count", result.rep}}}}},
+                                        {"metrics", std::move(metric_objs)}});
         }
 
-        auto full_results_obj = json::array({ json{
-            { "info", json{{"test_name", m_suite_name}} },
-            { "sub_tests", std::move(test_results) }
-        }});
+        auto full_results_obj =
+            json::array({json{{"info", json{{"test_name", m_suite_name}}}, {"sub_tests", std::move(test_results)}}});
 
         std::ofstream json_file_stream(util::format("%1.latest.json", m_results_file_stem));
         json_file_stream << full_results_obj << std::endl;

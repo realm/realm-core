@@ -75,7 +75,8 @@ private:
 
 // Implementation:
 
-inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, std::string suite_name, const char* results_file_stem)
+inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, std::string suite_name,
+                                          const char* results_file_stem)
     : m_max_lead_text_width(max_lead_text_width)
     , m_results_file_stem(results_file_stem)
     , m_suite_name(std::move(suite_name))
