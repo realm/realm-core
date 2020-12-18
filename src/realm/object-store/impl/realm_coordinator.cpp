@@ -757,23 +757,15 @@ void RealmCoordinator::wait_for_change_release()
     m_db->wait_for_change_release();
 }
 
-void RealmCoordinator::pin_version(VersionID versionid)
-{
-    if (m_async_error)
-        return;
-    if (!m_advancer_sg || versionid < m_advancer_sg->get_version_of_current_transaction())
-        m_advancer_sg = m_db->start_read(versionid);
-}
-
 // Thread-safety analsys doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier) NO_THREAD_SAFETY_ANALYSIS
 {
-    auto version = notifier->version();
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
-        self.pin_version(version);
+        if (!self.m_async_error)
+            notifier->attach_to(notifier->get_realm()->duplicate());
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -803,9 +795,7 @@ void RealmCoordinator::clean_up_dead_notifiers()
         m_notifier_sg = nullptr;
         m_notifier_skip_version = {0, 0};
     }
-    if (swap_remove(m_new_notifiers) && m_new_notifiers.empty()) {
-        m_advancer_sg = nullptr;
-    }
+    swap_remove(m_new_notifiers);
 }
 
 void RealmCoordinator::on_change()
@@ -947,57 +937,6 @@ void RealmCoordinator::run_async_notifiers()
     }
 
     VersionID version;
-
-    // Advance all of the new notifiers to the most recent version, if any
-    auto new_notifiers = std::move(m_new_notifiers);
-    IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, new_notifiers);
-    auto advancer_sg = std::move(m_advancer_sg);
-
-    if (!new_notifiers.empty()) {
-        REALM_ASSERT(advancer_sg);
-        REALM_ASSERT_3(advancer_sg->get_version_of_current_transaction().version, <=,
-                       new_notifiers.front()->version().version);
-
-        // The advancer SG can be at an older version than the oldest new notifier
-        // if a notifier was added and then removed before it ever got the chance
-        // to run, as we don't move the pin forward when removing dead notifiers
-        transaction::advance(*advancer_sg, nullptr, new_notifiers.front()->version());
-
-        // Advance each of the new notifiers to the latest version, attaching them
-        // to the SG at their handover version. This requires a unique
-        // TransactionChangeInfo for each source version, so that things don't
-        // see changes from before the version they were handed over from.
-        // Each Info has all of the changes between that source version and the
-        // next source version, and they'll be merged together later after
-        // releasing the lock
-        for (auto& notifier : new_notifiers) {
-            new_notifier_change_info.advance_incremental(notifier->version());
-            notifier->attach_to(advancer_sg);
-            notifier->add_required_change_info(new_notifier_change_info.current());
-        }
-        new_notifier_change_info.advance_to_final(VersionID{});
-
-        // We want to advance the non-new notifiers to the same version as the
-        // new notifiers to avoid having to merge changes from any new
-        // transaction that happen immediately after this into the new notifier
-        // changes
-        version = advancer_sg->get_version_of_current_transaction();
-    }
-    else {
-        // If we have no new notifiers we want to just advance to the latest
-        // version, but we have to pick a "latest" version while holding the
-        // notifier lock to avoid advancing over a transaction which should be
-        // skipped
-        // FIXME: this is comically slow
-        version = m_db->start_read()->get_version_of_current_transaction();
-        if (version == m_notifier_sg->get_version_of_current_transaction()) {
-            // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!m_notifier_skip_version.version);
-            m_notifier_cv.notify_all();
-            return;
-        }
-    }
-
     auto skip_version = m_notifier_skip_version;
     m_notifier_skip_version = {0, 0};
 
@@ -1015,8 +954,60 @@ void RealmCoordinator::run_async_notifiers()
         // be here even if the notifiers don't need to rerun.
         notifiers = m_notifiers;
     }
+
+    auto new_notifiers = std::move(m_new_notifiers);
+    m_new_notifiers.clear();
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
+
     lock.unlock();
+
+    // Advance all of the new notifiers to the most recent version, if any
+    TransactionRef new_notifier_transaction;
+    util::Optional<IncrementalChangeInfo> new_notifier_change_info;
+    if (!new_notifiers.empty()) {
+        // Starting from the oldest notifier, incrementally advance the notifiers
+        // to the latest version, attaching each new notifier as we reach its
+        // source version. Suppose three new notifiers have been created:
+        //  - Notifier A has a source version of 2
+        //  - Notifier B has a source version of 7
+        //  - Notifier C has a source version of 5
+        // Notifier A wants the changes from versions 2-latest, B wants 7-latest,
+        // and C wants 5-latest. We achieve this by starting at version 2 and
+        // attaching A, then advancing to version 5 (letting A gather changes
+        // from 2-5). We then attach C and advance to 7, then attach B and advance
+        // to the latest.
+        std::sort(new_notifiers.begin(), new_notifiers.end(), [](auto& a, auto& b) {
+            return a->version() < b->version();
+        });
+        new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
+
+        new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
+        for (auto& notifier : new_notifiers) {
+            new_notifier_change_info->advance_incremental(notifier->version());
+            notifier->attach_to(new_notifier_transaction);
+            notifier->add_required_change_info(new_notifier_change_info->current());
+        }
+        new_notifier_change_info->advance_to_final(VersionID{});
+
+        // We want to advance the non-new notifiers to the same version as the
+        // new notifiers to avoid having to merge changes from any new
+        // transaction that happen immediately after this into the new notifier
+        // changes
+        version = new_notifier_transaction->get_version_of_current_transaction();
+    }
+    else {
+        // If we have no new notifiers we want to just advance to the latest
+        // version, but we have to pick a "latest" version while holding the
+        // notifier lock to avoid advancing over a transaction which should be
+        // skipped
+        version = m_db->get_version_id_of_latest_snapshot();
+        if (version == m_notifier_sg->get_version_of_current_transaction()) {
+            // We were spuriously woken up and there isn't actually anything to do
+            REALM_ASSERT(!m_notifier_skip_version.version);
+            m_notifier_cv.notify_all();
+            return;
+        }
+    }
 
     if (skip_version.version) {
         REALM_ASSERT(!notifiers.empty());
