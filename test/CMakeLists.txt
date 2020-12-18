@@ -6,6 +6,8 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
 endif()
 
+add_custom_target(benchmarks)
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks

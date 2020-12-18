@@ -33,83 +33,134 @@ functions:
           set -o errexit
           git submodule update --init --recursive
 
+  "compile":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+          set -o verbose
+
+          if [ -d cmake_vars ]; then
+              rm cmake_vars/*.txt
+          fi
+          export CMAKE_VARS_DIR=$(./evergreen/abspath.sh cmake_vars)
+          source evergreen/cmake_vars_utils.sh
+          export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
+
+          if [ -n "${c_compiler}" ]; then
+              [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
+              set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
+              set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
+          fi
+
+          if [ -n "${build_zlib|}" ]; then
+              CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
+                  ./evergreen/build_zlib.sh \
+                      -p zlib_prefix \
+                      -b v1.2.11 \
+                      -e "${extra_flags}" \
+                      -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+          fi
+
+          if [ -n "${run_tests_against_baas|}" ]; then
+              set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
+              set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
+              set_cmake_var baas_vars REALM_STITCH_CONFIG PATH $(pwd)/test/object-store/mongodb/stitch.json
+          fi
+
+          if [ -n "${enable_asan|}" ]; then
+              set_cmake_var realm_vars REALM_ASAN BOOL On
+          fi
+
+          if [ -n "${enable_tsan|}" ]; then
+              set_cmake_var realm_vars REALM_TSAN BOOL On
+          fi
+
+          if [ -z "${disable_sync|}" ]; then
+              set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
+          fi
+
+          if [ -n "${use_system_openssl|}" ]; then
+              set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
+          fi
+
+          set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
+          set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+
+          if [[ -n "${fetch_missing_dependencies|}" ]]; then
+              set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
+          fi
+
+          if [[ -n "${cmake_build_type|}" ]]; then
+              set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
+          fi
+
+          echo "Running cmake with these vars:"
+          cat cmake_vars/*.txt | tee cmake_vars.txt
+          echo
+
+          $CMAKE \
+            -B build \
+            -C cmake_vars.txt ${extra_flags} \
+            -G "${cmake_generator|Unix Makefiles}"
+
+          ${cmake_bindir}/cmake \
+              --build build \
+              -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
+              --target ${target_to_build|}
+
+  "run benchmark":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+
+          if [[ -z "${path_to_benchmark}" ]]; then
+              echo "No path to benchmark specified."
+              exit 1
+          fi
+
+          BENCHMARK=$(./evergreen/abspath.sh ${path_to_benchmark})
+          echo "Going to run benchmark $BENCHMARK"
+
+          [[ -d benchmark_results ]] && rm -rf benchmark_results
+          mkdir benchmark_results
+          cd benchmark_results
+
+          $BENCHMARK
+    - command: perf.send
+      params:
+        file: './realm-core/benchmark_results/results.latest.json'
+
+  "run tests":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        shell: bash
+        script: |-
+          set -o errexit
+          CTEST=$(pwd)/${cmake_bindir}/ctest
+
+          if [[ -n "${test_filter}" ]]; then
+              TEST_FLAGS="-R ${test_filter}"
+          fi
+          TETS_FLAGS="$TEST_FLAGS ${test_flags|}"
+
+          cd build
+          $CTEST -V $TEST_FLAGS
+
 tasks:
 - name: compile
   commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o verbose
+  - func: "compile"
 
-        if [ -d cmake_vars ]; then
-            rm cmake_vars/*.txt
-        fi
-        export CMAKE_VARS_DIR=$(./evergreen/abspath.sh cmake_vars)
-        source evergreen/cmake_vars_utils.sh
-        export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
-        
-        if [ -n "${c_compiler}" ]; then
-            [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
-            set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
-            set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH $(./evergreen/abspath.sh ${cxx_compiler})
-        fi
-       
-        if [ -n "${build_zlib|}" ]; then
-            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
-                ./evergreen/build_zlib.sh \
-                    -p zlib_prefix \
-                    -b v1.2.11 \
-                    -e "${extra_flags}" \
-                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
-        fi
-
-        if [ -n "${run_tests_against_baas|}" ]; then
-            set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
-            set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
-            set_cmake_var baas_vars REALM_STITCH_CONFIG PATH $(pwd)/test/object-store/mongodb/stitch.json
-        fi
-
-        if [ -n "${enable_asan|}" ]; then
-            set_cmake_var realm_vars REALM_ASAN BOOL On
-        fi
-
-        if [ -n "${enable_tsan|}" ]; then
-            set_cmake_var realm_vars REALM_TSAN BOOL On
-        fi
-
-        if [ -z "${disable_sync|}" ]; then
-            set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
-        fi
-
-        if [ -n "${use_system_openssl|}" ]; then
-            set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
-        fi
-
-        set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
-        set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
-
-        if [[ -n "${fetch_missing_dependencies|}" ]]; then
-            set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
-        fi
-
-        echo "Running cmake with these vars:"
-        cat cmake_vars/*.txt | tee cmake_vars.txt
-        echo
-        
-        mkdir build
-        $CMAKE \
-          -B build \
-          -C cmake_vars.txt ${extra_flags} \
-          -G "${cmake_generator|Unix Makefiles}"
-
-        ${cmake_bindir}/cmake --build build -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
 - name: package
-  depends_on:
-  - "compile"
   commands:
+  - func: "compile"
   - command: shell.exec
     params:
       working_dir: realm-core
@@ -139,37 +190,36 @@ tasks:
       content_type: '${content_type|application/x-gzip}'
 
 - name: core-tests
-  depends_on:
-  - "compile"
   commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      script: |-
-        set -o errexit
-        CTEST=$(pwd)/${cmake_bindir}/ctest
+  - func: "compile"
+  - func: "run tests"
+    vars:
+      test_filter: StorageTests
 
-        cd build
-        $CTEST -V -R StorageTests ${test_flags|}
+- name: benchmark-common-tasks
+  tags: [ "benchmark" ]
+  commands:
+  - func: "run benchmark"
+    vars:
+      path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
+
+- name: benchmark-crud
+  tags: [ "benchmark" ]
+  commands:
+  - func: "run benchmark"
+    vars:
+      path_to_benchmark: ./build/test/benchmark-crud/realm-benchmark-crud
 
 - name: sync-tests
-  depends_on:
-  - "compile"
   commands:
-  - command: shell.exec
-    params:
-      working_dir: realm-core
-      script: |-
-        set -o errexit
-        CTEST=$(pwd)/${cmake_bindir}/ctest
-
-        cd build
-        $CTEST -V -R SyncTests ${test_flags|}
+  - func: "compile"
+  - func: "run tests"
+    vars:
+      test_filter: SyncTests
 
 - name: object-store-tests
-  depends_on:
-  - "compile"
   commands:
+  - func: "compile"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec
@@ -211,11 +261,9 @@ tasks:
                 sleep 5
             done
         fi
-
-        CTEST=$(pwd)/${cmake_bindir}/ctest
-
-        cd build
-        $CTEST -V -R ObjectStoreTests ${test_flags|}
+  - func: "run tests"
+    vars:
+      test_filter: ObjectStoreTests
 
 - name: lint
   commands:
@@ -236,7 +284,7 @@ tasks:
         if [[ "$out" == *"no modified files to format"* ]]; then
             exit 0
         fi
-        if [[ "$out" == *"clang-format did not modify any files"* ]];
+        if [[ "$out" == *"clang-format did not modify any files"* ]]; then
             exit 0
         fi
 
@@ -269,7 +317,19 @@ task_groups:
   - core-tests
   - sync-tests
   - object-store-tests
- 
+
+- name: benchmarks
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      cmake_build_type: "Release"
+      target_to_build: "benchmarks"
+  tasks:
+  - .benchmark
+
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -285,6 +345,9 @@ buildvariants:
   tasks:
   - name: lint
   - name: compile_test_and_package
+    distros:
+    - ubuntu2004-large
+  - name: benchmarks
     distros:
     - ubuntu2004-large
 
@@ -350,6 +413,9 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - ubuntu2004-arm64-large
+  - name: benchmarks
+    distros:
+    - ubuntu2004-arm64-large
 
 - name: macos-1014
   display_name: "MacOS 10.14 x86_64"
@@ -363,10 +429,13 @@ buildvariants:
   - name: compile_test_and_package
     distros:
     - macos-1014
+  - name: benchmarks
+    distros:
+    - macos-1014
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
-  run_on: windows-64-vs2019-test 
+  run_on: windows-64-vs2019-test
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
     cmake_bindir: "./cmake-3.19.1-win64-x64/bin"

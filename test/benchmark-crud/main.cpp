@@ -148,7 +148,7 @@ int main()
     int_fast64_t dummy = 0;
 
     int max_lead_text_size = 26;
-    BenchmarkResults results(max_lead_text_size);
+    BenchmarkResults results(max_lead_text_size, "benchmark-crud");
 
     Timer timer_total(Timer::type_UserTime);
     Timer timer(Timer::type_UserTime);
@@ -161,7 +161,7 @@ int main()
             insert(tables_1[i], rising_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
 
         id = "read_sequential_compact";
         desc = "Sequential read (compact)";
@@ -170,7 +170,7 @@ int main()
             dummy += read(tables_1[i], rising_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
 
         id = "read_random_compact";
         desc = "Random read (compact)";
@@ -179,7 +179,7 @@ int main()
             dummy += read(tables_1[i], random_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
 
         id = "write_sequential_compact";
         desc = "Sequential write (compact)";
@@ -188,7 +188,7 @@ int main()
             write(tables_1[i], rising_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
 
         id = "write_random_compact";
         desc = "Random write (compact)";
@@ -197,7 +197,7 @@ int main()
             write(tables_1[i], random_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
 
         id = "erase_end_compact";
         desc = "Erase from end (compact)";
@@ -206,7 +206,7 @@ int main()
             erase(tables_1[i], falling_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
     }
 
     // Start again using a random order (generalized).
@@ -218,45 +218,45 @@ int main()
             insert(tables_2[i], random_insert_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
         id = "read_sequential_general";
         desc = "Sequential read (general)";
         for (int i = 0; i != num_tables; ++i) {
             dummy += read(tables_2[0], rising_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
         id = "read_random_general";
         desc = "Random read (general)";
         for (int i = 0; i != num_tables; ++i) {
             dummy += read(tables_2[0], random_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
         id = "write_sequential_general";
         desc = "Sequential write (general)";
         for (int i = 0; i != num_tables; ++i) {
             write(tables_2[i], rising_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
         id = "write_random_general";
         desc = "Random write (general)";
         for (int i = 0; i != num_tables; ++i) {
             write(tables_2[i], random_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
         id = "erase_random_general";
         desc = "Random erase (general)";
         for (int i = 0; i != num_tables; ++i) {
             erase(tables_2[i], random_erase_order);
             results.submit(id, timer);
         }
-        results.finish(id, desc);
+        results.finish(id, desc, "runtime_secs");
     }
 
-    results.submit_single("crud_total_time", "Total time", timer_total);
+    results.submit_single("crud_total_time", "Total time", "runtime_secs", timer_total);
 
     std::cout << "dummy = " << dummy << " (to avoid over-optimization)\n";
 }
