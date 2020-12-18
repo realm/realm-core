@@ -13,6 +13,18 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 10.3.2 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+
+-----------
+
+### Internals
 * Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
 * The xcframework build was missing the arm64 slice for apple simulators.
 * The non-xcframework Apple build once again includes fat libraries for the parser rather than separate device/simulator ones.
