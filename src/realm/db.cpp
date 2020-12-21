@@ -1060,8 +1060,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 try {
                     alloc.note_reader_start(this);
                     auto reader_end_guard = make_scope_exit([&]() noexcept {
-                            alloc.note_reader_end(this);
-                        });
+                        alloc.note_reader_end(this);
+                    });
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);

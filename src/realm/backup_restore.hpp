@@ -45,7 +45,6 @@ private:
 
     static version_list_t s_accepted_versions;
     static version_time_list_t s_delete_versions;
-
 };
 
 } // namespace realm
