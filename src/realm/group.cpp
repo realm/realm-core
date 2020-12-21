@@ -302,7 +302,7 @@ int Group::get_committed_file_format_version() const noexcept
 
 std::optional<int> fake_target_file_format;
 
-void _impl::GroupFriend::fake_target_file_format(const std::optional<int>& format) noexcept
+void _impl::GroupFriend::fake_target_file_format(const std::optional<int> format) noexcept
 {
     ::fake_target_file_format = format;
 }

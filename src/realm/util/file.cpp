@@ -1613,26 +1613,15 @@ void File::MapBase::sync()
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
-    int fd, result;
-    struct _stat buf;
-    fd = _open(path.c_str(), _O_RDONLY);
-    if (fd == -1) {
-        throw std::system_error(errno, std::system_category(), "_sopen_s() failed");
-    }
-    result = _fstat(fd, &buf);
-    if (result != 0) {
-        _close(fd);
-        throw std::system_error(errno, std::system_category(), "_fstat() failed");
-    }
-    return buf.st_mtime;
-#else // POSIX version
-
+    struct _stat statubuf;
+    auto stat = _stat;
+#else
     struct stat statbuf;
-    if (::stat(path.c_str(), &statbuf) == 0) {
-        return statbuf.st_mtime;
-    }
-    throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
+    if (::stat(path.c_str(), &statbuf) != 0) {
+        throw std::system_error(errno, std::system_category(), "stat() failed");
+    }
+    return statbuf.st_mtime;
 }
 
 

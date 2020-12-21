@@ -102,7 +102,7 @@ struct DBOptions {
     /// is exceeded without being consumed, only the most recent entries will be stored.
     size_t metrics_buffer_size;
 
-    /// Disable automatic backup at file format upgrade
+    /// Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change;
 
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.

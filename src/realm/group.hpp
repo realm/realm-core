@@ -1254,7 +1254,7 @@ public:
         return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
     }
 
-    static void fake_target_file_format(const std::optional<int>& format) noexcept;
+    static void fake_target_file_format(const std::optional<int> format) noexcept;
 };
 
 

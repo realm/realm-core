@@ -1054,15 +1054,14 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             };
             auto reader_end_guard = make_scope_exit(handler);
 
-            // Check validity of top array (to give more meaningfull errors
+            // Check validity of top array (to give more meaningful errors
             // early)
             if (top_ref) {
                 try {
                     alloc.note_reader_start(this);
-                    auto handler = [this, &alloc]() noexcept {
-                        alloc.note_reader_end(this);
-                    };
-                    auto reader_end_guard = make_scope_exit(handler);
+                    auto reader_end_guard = make_scope_exit([&]() noexcept {
+                            alloc.note_reader_end(this);
+                        });
                     Array top{alloc};
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
@@ -1078,7 +1077,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 backup.backup_realm_if_needed(current_file_format_version, target_file_format_version);
             }
             using gf = _impl::GroupFriend;
-            bool file_format_ok = false;
+            bool file_format_ok;
             // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format
             // versions listed below. Please see Group::get_file_format_version() for
@@ -1087,9 +1086,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 file_format_ok = (top_ref == 0);
             }
             else {
-                if (backup.is_accepted_file_format(current_file_format_version)) {
-                    file_format_ok = true;
-                }
+                file_format_ok = backup.is_accepted_file_format(current_file_format_version);
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {
