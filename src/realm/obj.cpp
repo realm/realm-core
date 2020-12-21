@@ -975,19 +975,22 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         out << "\"" << name << "\":";
         prefixComma = true;
 
-        if (ck.get_attrs().test(col_attr_List)) {
-            if (type == col_type_LinkList) {
+        if (ck.is_list() || ck.is_set()) {
+            if (type == col_type_LinkList)
+                type = col_type_Link;
+            if (type == col_type_Link) {
                 TableRef target_table = get_target_table(ck);
                 auto primary_key_coll = target_table->get_primary_key_column();
-                auto ll = get_linklist(ck);
-                auto sz = ll.size();
+                auto ll = get_collection_ptr(ck);
+                auto sz = ll->size();
 
                 if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
                     out << "[";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
                     }
                     out << "]";
                 }
@@ -997,7 +1000,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
                     }
                     out << "]}}";
                 }
@@ -1008,7 +1012,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
-                        out << ll.get(i).value;
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        out << link.value;
                     }
                     out << "]}";
                 }
@@ -1025,7 +1030,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                             out << ",";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        ll.get_object(i).to_json(out, new_depth, renames, followed, output_mode);
+                        auto link = ll->get_any(i).get<ObjKey>();
+                        target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
                     }
                     out << "]";
 
@@ -1035,7 +1041,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
             }
             else {
-                auto list = get_listbase_ptr(ck);
+                auto list = this->get_collection_ptr(ck);
                 auto sz = list->size();
 
                 out << "[";
