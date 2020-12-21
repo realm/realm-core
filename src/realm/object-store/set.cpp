@@ -247,6 +247,29 @@ std::pair<size_t, bool> Set::remove<int>(const int& value)
     return remove(int64_t(value));
 }
 
+std::pair<size_t, bool> Set::insert_any(Mixed value)
+{
+    verify_in_transaction();
+    return m_set_base->insert_any(value);
+}
+
+Mixed Set::get_any(size_t ndx) const
+{
+    verify_valid_row(ndx);
+    return m_set_base->get_any(ndx);
+}
+
+std::pair<size_t, bool> Set::remove_any(Mixed value)
+{
+    verify_in_transaction();
+    return m_set_base->erase_any(value);
+}
+
+size_t Set::find_any(Mixed value) const
+{
+    return m_set_base->find_any(value);
+}
+
 void Set::remove_all()
 {
     verify_in_transaction();

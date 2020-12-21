@@ -3385,6 +3385,57 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 }
 
+TEST_CASE("results: nullable list of primitives") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema =
+        Schema{{"ListTypes",
+                {
+                    {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                    {"nullable decimal list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+                    {"non nullable decimal list", PropertyType::Array | PropertyType::Decimal},
+                    {"nullable objectid list", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
+                    {"non nullable objectid list", PropertyType::Array | PropertyType::ObjectId},
+                }}};
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_ListTypes");
+    auto nullable_decimal_col = table->get_column_key("nullable decimal list");
+    auto non_nullable_decimal_col = table->get_column_key("non nullable decimal list");
+    auto nullable_oid_col = table->get_column_key("nullable objectid list");
+    auto non_nullable_oid_col = table->get_column_key("non nullable objectid list");
+    realm->begin_transaction();
+    auto obj = table->create_object_with_primary_key(1);
+    List nullable_decimal_list(realm, obj, nullable_decimal_col);
+    List non_nullable_decimal_list(realm, obj, non_nullable_decimal_col);
+    nullable_decimal_list.add(Decimal128{realm::null()});
+    non_nullable_decimal_list.add(Decimal128{});
+    List nullable_oid_list(realm, obj, nullable_oid_col);
+    List non_nullable_oid_list(realm, obj, non_nullable_oid_col);
+    nullable_oid_list.add(util::Optional<ObjectId>{});
+    non_nullable_oid_list.add(ObjectId()); // all zeros
+    realm->commit_transaction();
+    TestContext ctx(realm);
+
+    SECTION("check property values on internal null type") {
+        Results r_nullable = nullable_decimal_list.as_results();
+        Results r_non_nullable = non_nullable_decimal_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<Decimal128>(0) == Decimal128(realm::null()));
+        CHECK(r_non_nullable.get<Decimal128>(0) == Decimal128(0));
+    }
+
+    SECTION("check property values on optional type") {
+        Results r_nullable = nullable_oid_list.as_results();
+        Results r_non_nullable = non_nullable_oid_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<util::Optional<ObjectId>>(0) == util::Optional<ObjectId>());
+        CHECK(r_non_nullable.get<ObjectId>(0) == ObjectId());
+    }
+}
+
 TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     // config.cache = false;
@@ -3550,5 +3601,120 @@ TEST_CASE("results: query helpers", "[include]") {
         IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
         CHECK(includes.is_valid());
         CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
+    }
+}
+
+TEST_CASE("notifications: objects with PK recreated") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"no_pk",
+         {
+             {"id", PropertyType::Int},
+             {"value", PropertyType::Int},
+         }},
+        {"int_pk",
+         {
+             {"id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+        {"string_pk",
+         {
+             {"id", PropertyType::String, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+    });
+
+    auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
+        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++calls;
+            changes = std::move(c);
+        });
+    };
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table1 = r->read_group().get_table("class_no_pk");
+    auto table2 = r->read_group().get_table("class_int_pk");
+    auto table3 = r->read_group().get_table("class_string_pk");
+
+    TestContext d(r);
+    auto create = [&](StringData type, util::Any&& value) {
+        return Object::create(d, r, *r->schema().find(type), value);
+    };
+
+    r->begin_transaction();
+    auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).obj().get_key();
+    r->commit_transaction();
+
+    Results results1(r, table1->where());
+    int calls1 = 0;
+    CollectionChangeSet changes1;
+    auto token1 = add_callback(results1, calls1, changes1);
+
+    Results results2(r, table2->where());
+    int calls2 = 0;
+    CollectionChangeSet changes2;
+    auto token2 = add_callback(results2, calls2, changes2);
+
+    Results results3(r, table3->where());
+    int calls3 = 0;
+    CollectionChangeSet changes3;
+    auto token3 = add_callback(results3, calls3, changes3);
+
+    advance_and_notify(*r);
+    REQUIRE(calls1 == 1);
+    REQUIRE(calls2 == 1);
+    REQUIRE(calls3 == 1);
+
+    SECTION("objects removed") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->remove_object(k1);
+        r->read_group().get_table("class_int_pk")->remove_object(k2);
+        r->read_group().get_table("class_string_pk")->remove_object(k3);
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
+
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
+    }
+
+    SECTION("table cleared") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->clear();
+        r->read_group().get_table("class_int_pk")->clear();
+        r->read_group().get_table("class_string_pk")->clear();
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
+
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
     }
 }

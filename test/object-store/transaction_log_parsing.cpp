@@ -1699,6 +1699,32 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
     }
 
+    SECTION("changes from an invalidated object") {
+        r->begin_transaction();
+        size_t obj_ndx_to_invalidate = 6;
+        for (int i = 0; i < 3; ++i) {
+            objects[i].get_linklist(cols[3]).add(objects[i].get_key());
+            objects[i].get_linklist(cols[3]).add(objects[obj_ndx_to_invalidate].get_key());
+            objects[i].get_linklist(cols[3]).add(objects[i + 1 + (i == 2)].get_key());
+        }
+        // Object invalidation can only happen if another sync client has deleted the object
+        // we simulate this by calling it directly here. The consequence is that links to this
+        // object are changed to the invalidated key, but not removed. This tests that the abstraction
+        // that core has built to hide invalidated links inside LnkLst is not leaking at this level.
+        objects[6].invalidate();
+        REQUIRE(objects[0].get_linklist(cols[3]).size() == 2); // LnkLst actually has 3 entries but hides one
+        r->commit_transaction();
+
+        auto info = track_changes([&] {
+            objects[4].set(cols[0], 10);
+        });
+        // if the change checker iterates over an invalid link, it'll hit an assertion
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+    }
+
     SECTION("cycles over links do not loop forever") {
         r->begin_transaction();
         objects[0].set(cols[1], objects[0].get_key());

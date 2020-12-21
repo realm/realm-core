@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/dictionary.hpp>
+#include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
 
 namespace realm::object_store {
@@ -41,6 +42,19 @@ Obj Dictionary::get_object(StringData key) const
 {
     auto k = m_dict->get(key).get<ObjKey>();
     return m_dict->get_target_table()->get_object(k);
+}
+
+Results Dictionary::snapshot() const
+{
+    return as_results().snapshot();
+}
+
+Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
+{
+    auto frozen_collection = frozen_realm->import_copy_of(*m_dict);
+    REALM_ASSERT(dynamic_cast<realm::Dictionary*>(frozen_collection.get()));
+    realm::Dictionary* frozen_dict = static_cast<realm::Dictionary*>(frozen_collection.get());
+    return Dictionary(frozen_realm, *frozen_dict);
 }
 
 } // namespace realm::object_store
