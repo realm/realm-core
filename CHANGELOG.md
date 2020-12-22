@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* `App::call_function` now catches invalid json parse exceptions during a client timeout.
  
 ### Breaking changes
 * None.
