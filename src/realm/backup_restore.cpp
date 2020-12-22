@@ -38,7 +38,7 @@ constexpr auto accepted_versions_ = {20, 11, 10, 9, 8, 7, 6, 0};
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
 constexpr int three_months = 3 * 31 * 24 * 60 * 60;
-constexpr std::initializer_list<std::pair<int, int>> delete_versions_{
+version_time_list_t delete_versions_{
     {20, three_months}, {11, three_months}, {10, three_months}, {9, three_months},
     {8, three_months},  {7, three_months},  {6, three_months}};
 

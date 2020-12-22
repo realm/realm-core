@@ -32,8 +32,8 @@ public:
 
     // functions to mock version lists for testing purposes
 
-    using version_list_t = std::initializer_list<int>;
-    using version_time_list_t = std::initializer_list<std::pair<int, int>>;
+    using version_list_t = std::vector<int>;
+    using version_time_list_t = std::vector<std::pair<int, int>>;
 
     static void fake_versions(const version_list_t& accepted, const version_time_list_t& to_be_deleted);
     static void unfake_versions();
@@ -43,8 +43,8 @@ private:
     std::string m_path;
     std::string m_prefix;
 
-    static std::vector<int> s_accepted_versions;
-    static std::vector<std::pair<int, int>> s_delete_versions;
+    static version_list_t s_accepted_versions;
+    static version_time_list_t s_delete_versions;
 };
 
 } // namespace realm
