@@ -38,9 +38,8 @@ constexpr auto accepted_versions_ = {20, 11, 10, 9, 8, 7, 6, 0};
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
 constexpr int three_months = 3 * 31 * 24 * 60 * 60;
-version_time_list_t delete_versions_{
-    {20, three_months}, {11, three_months}, {10, three_months}, {9, three_months},
-    {8, three_months},  {7, three_months},  {6, three_months}};
+version_time_list_t delete_versions_{{20, three_months}, {11, three_months}, {10, three_months}, {9, three_months},
+                                     {8, three_months},  {7, three_months},  {6, three_months}};
 
 std::vector<int> BackupHandler::s_accepted_versions(accepted_versions_);
 std::vector<std::pair<int, int>> BackupHandler::s_delete_versions(delete_versions_);
