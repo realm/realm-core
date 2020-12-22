@@ -33,7 +33,7 @@ using version_list_t = BackupHandler::version_list_t;
 using version_time_list_t = BackupHandler::version_time_list_t;
 
 // Note: accepted versions should have new versions added at front
-constexpr auto accepted_versions_ = {20, 11, 10, 9, 8, 7, 6, 0};
+version_list_t accepted_versions_ = {20, 11, 10, 9, 8, 7, 6, 0};
 
 // the pair is <version, age-in-seconds>
 // we keep backup files in 3 months.
