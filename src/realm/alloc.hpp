@@ -166,7 +166,8 @@ protected:
     // The ref translation splits the full ref-space (both below and above baseline)
     // into equal chunks.
     struct RefTranslation {
-        char* mapping_addr = nullptr;
+        char* mapping_addr;
+        uint64_t cookie;
         std::atomic<size_t> lowest_possible_xover_offset = 0;
 
         // member 'xover_mapping_addr' is used for memory synchronization of the fields
@@ -181,9 +182,17 @@ protected:
 #endif
         explicit RefTranslation(char* addr)
             : mapping_addr(addr)
+            , cookie(0x1234567890)
         {
         }
-        RefTranslation() = default;
+        RefTranslation()
+            : RefTranslation(nullptr)
+        {
+        }
+        ~RefTranslation()
+        {
+            cookie = 0xdeadbeefdeadbeef;
+        }
         RefTranslation& operator=(const RefTranslation& from)
         {
             if (&from != this) {
@@ -551,21 +560,25 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
-    size_t offset = ref - get_section_base(idx);
-    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
-    if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
-        // the lowest possible xover offset may grow concurrently, but that will not affect this code path
-        char* addr = txl.mapping_addr + offset;
+    if (REALM_LIKELY(txl.cookie == 0x1234567890)) {
+        size_t offset = ref - get_section_base(idx);
+        size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
+        if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
+            // the lowest possible xover offset may grow concurrently, but that will not affect this code path
+            char* addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
-                                             NodeHeader::get_byte_size_from_header);
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
+                                                 NodeHeader::get_byte_size_from_header);
 #endif
-        return addr;
+            return addr;
+        }
+        else {
+            // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
+            return translate_less_critical(ref_translation_ptr, ref);
+        }
     }
-    else {
-        // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
-        return translate_less_critical(ref_translation_ptr, ref);
-    }
+    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890);
+    return nullptr;
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept
