@@ -42,8 +42,8 @@ constexpr std::initializer_list<std::pair<int, int>> delete_versions_{
     {20, three_months}, {11, three_months}, {10, three_months}, {9, three_months},
     {8, three_months},  {7, three_months},  {6, three_months}};
 
-version_list_t BackupHandler::s_accepted_versions(accepted_versions_);
-version_time_list_t BackupHandler::s_delete_versions(delete_versions_);
+std::vector<int> BackupHandler::s_accepted_versions(accepted_versions_);
+std::vector<std::pair<int, int>> BackupHandler::s_delete_versions(delete_versions_);
 
 
 // helper functions

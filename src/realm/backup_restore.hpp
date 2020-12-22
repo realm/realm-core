@@ -43,8 +43,8 @@ private:
     std::string m_path;
     std::string m_prefix;
 
-    static version_list_t s_accepted_versions;
-    static version_time_list_t s_delete_versions;
+    static std::vector<int> s_accepted_versions;
+    static std::vector<std::pair<int, int>> s_delete_versions;
 };
 
 } // namespace realm
