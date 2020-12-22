@@ -1613,7 +1613,7 @@ void File::MapBase::sync()
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
-    struct _stat statubuf;
+    struct _stat statbuf;
     auto stat = _stat;
 #else
     struct stat statbuf;
