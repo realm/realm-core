@@ -14,9 +14,6 @@ endmacro()
 macro(set_common_xcode_attributes)
     set(REALM_ENABLE_ASSERTIONS ON CACHE BOOL "Enable release assertions")
 
-    list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
-    list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
-
     unset(CMAKE_XCODE_ATTRIBUTE_INSTALL_PATH)
     set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
 endmacro()
