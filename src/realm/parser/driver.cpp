@@ -5,6 +5,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
 #include "realm/util/base64.hpp"
+#include <realm/utilities.hpp>
 
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
@@ -77,20 +78,6 @@ bool is_length_suffix(const std::string& s)
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
            (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
            (s[5] == 'h' || s[5] == 'H');
-}
-
-// Converts ascii c-locale uppercase characters to lower case,
-// leaves other char values unchanged.
-inline char toLowerAscii(char c)
-{
-    if (isascii(c) && isupper(c)) {
-#if REALM_ANDROID
-        return tolower(c); // _tolower is not supported on all ABI levels
-#else
-        return _tolower(c);
-#endif
-    }
-    return c;
 }
 
 template <typename T>
@@ -286,12 +273,24 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-void verify_only_string_types(DataType type, const std::string& op_string)
+const char* get_subexpr_type_name(SubexprType t)
 {
-    if (type != type_String && type != type_Binary && type != type_Mixed) {
+    auto type = t.get_expression_type();
+    if (type == SubexprType::QueryTypeExtension::raw_data_type) {
+        return get_data_type_name(t.get_data_type());
+    }
+    else if (type == SubexprType::QueryTypeExtension::type_of_query) {
+        return "@type";
+    }
+    return "unknown";
+}
+
+void verify_only_string_types(SubexprType type, const std::string& op_string)
+{
+    if (!type.is_valid() || (type != type_String && type != type_Binary && type != type_Mixed)) {
         throw std::runtime_error(util::format(
             "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
-            op_string, get_data_type_name(type)));
+            op_string, get_subexpr_type_name(type)));
     }
 }
 
@@ -299,12 +298,14 @@ Query EqualityNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
-    auto left_type = left->get_type();
-    auto right_type = right->get_type();
+    auto left_type = left->get_expression_type();
+    auto right_type = right->get_expression_type();
 
-    if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
+    if (left_type.is_valid() && right_type.is_valid() &&
+        !Mixed::data_types_are_comparable(left_type.get_data_type(), right_type.get_data_type())) {
         throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                                 get_data_type_name(left_type), get_data_type_name(right_type)));
+                                                 get_data_type_name(left_type.get_data_type()),
+                                                 get_data_type_name(right_type.get_data_type())));
     }
 
     if (op == CompareNode::IN) {
@@ -328,33 +329,27 @@ Query EqualityNode::visit(ParserDriver* drv)
                         return drv->m_base_table->where().not_equal(col_key, realm::null());
                 }
             }
-            switch (left->get_type()) {
-                case type_Int:
+            switch (left->get_expression_type()) {
+                case exp_Int:
                     return drv->simple_query(op, col_key, val.get_int());
-                case type_Bool:
+                case exp_Bool:
                     return drv->simple_query(op, col_key, val.get_bool());
-                case type_String:
+                case exp_String:
                     return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
-                    break;
-                case type_Binary:
+                case exp_Binary:
                     return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
-                    break;
-                case type_Timestamp:
+                case exp_Timestamp:
                     return drv->simple_query(op, col_key, val.get<Timestamp>());
-                case type_Float:
+                case exp_Float:
                     return drv->simple_query(op, col_key, val.get_float());
-                    break;
-                case type_Double:
+                case exp_Double:
                     return drv->simple_query(op, col_key, val.get_double());
-                    break;
-                case type_Decimal:
+                case exp_Decimal:
                     return drv->simple_query(op, col_key, val.get<Decimal128>());
-                    break;
-                case type_ObjectId:
-                    break;
-                case type_UUID:
+                case exp_ObjectId:
+                    break; // FIXME: why?
+                case exp_UUID:
                     return drv->simple_query(op, col_key, val.get<UUID>());
-                    break;
                 default:
                     break;
             }
@@ -399,8 +394,8 @@ Query RelationalNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
-    auto left_type = left->get_type();
-    auto right_type = right->get_type();
+    auto left_type = left->get_expression_type();
+    auto right_type = right->get_expression_type();
 
     if (left_type == type_UUID) {
         throw std::logic_error(util::format(
@@ -408,37 +403,35 @@ Query RelationalNode::visit(ParserDriver* drv)
             opstr[op]));
     }
 
-    if (!left_type.is_valid() || !right_type.is_valid() || !Mixed::data_types_are_comparable(left_type, right_type)) {
+    if (!left_type.is_valid() || !right_type.is_valid() ||
+        !Mixed::data_types_are_comparable(left_type.get_data_type(), right_type.get_data_type())) {
         throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                              get_data_type_name(left_type), get_data_type_name(right_type)));
+                                              get_subexpr_type_name(left_type), get_subexpr_type_name(right_type)));
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
     if (prop && !prop->links_exist() && right->has_constant_evaluation() && left_type == right_type) {
         auto col_key = prop->column_key();
-        switch (left->get_type()) {
-            case type_Int:
+        switch (left->get_expression_type()) {
+            case exp_Int:
                 return drv->simple_query(op, col_key, right->get_mixed().get_int());
-            case type_Bool:
+            case exp_Bool:
                 break;
-            case type_String:
+            case exp_String:
                 break;
-            case type_Binary:
+            case exp_Binary:
                 break;
-            case type_Timestamp:
+            case exp_Timestamp:
                 return drv->simple_query(op, col_key, right->get_mixed().get<Timestamp>());
-            case type_Float:
+            case exp_Float:
                 return drv->simple_query(op, col_key, right->get_mixed().get_float());
-                break;
-            case type_Double:
+            case exp_Double:
                 return drv->simple_query(op, col_key, right->get_mixed().get_double());
-                break;
-            case type_Decimal:
+            case exp_Decimal:
                 return drv->simple_query(op, col_key, right->get_mixed().get<Decimal128>());
+            case exp_ObjectId:
                 break;
-            case type_ObjectId:
-                break;
-            case type_UUID:
+            case exp_UUID:
                 break;
             default:
                 break;
@@ -461,12 +454,13 @@ Query StringOpsNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
-    auto right_type = right->get_type();
+    auto right_type = right->get_expression_type();
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
     verify_only_string_types(right_type, opstr[op]);
 
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+        left->get_expression_type() == right_type) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {
             StringData val = right->get_mixed().get_string();
@@ -621,21 +615,28 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
 {
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
-        return s->count().clone();
+    if (op_type == PostOpNode::SIZE) {
+        if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
+            return s->count().clone();
+        }
+        if (auto s = dynamic_cast<ColumnListBase*>(subexpr)) {
+            return s->size().clone();
+        }
+        if (auto s = dynamic_cast<Columns<StringData>*>(subexpr)) {
+            return s->size().clone();
+        }
+        if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
+            return s->size().clone();
+        }
     }
-    if (auto s = dynamic_cast<ColumnListBase*>(subexpr)) {
-        return s->size().clone();
-    }
-    if (auto s = dynamic_cast<Columns<StringData>*>(subexpr)) {
-        return s->size().clone();
-    }
-    if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
-        return s->size().clone();
+    else if (op_type == PostOpNode::TYPE) {
+        if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr)) {
+            return s->type_of_value().clone();
+        }
     }
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
-                                              get_data_type_name(DataType(subexpr->get_type()))));
+                                              get_subexpr_type_name(subexpr->get_expression_type())));
     }
     REALM_UNREACHABLE();
     return {};
@@ -724,7 +725,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
     return agg;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
+std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, SubexprType hint)
 {
     Subexpr* ret = nullptr;
     switch (type) {
@@ -739,11 +740,11 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
         case Type::FLOAT: {
             switch (hint) {
-                case type_Float: {
+                case exp_Float: {
                     ret = new Value<float>(strtof(text.c_str(), nullptr));
                     break;
                 }
-                case type_Decimal:
+                case exp_Decimal:
                     ret = new Value<Decimal128>(Decimal128(text));
                     break;
                 default:
@@ -755,34 +756,35 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::INFINITY_VAL: {
             bool negative = text[0] == '-';
             switch (hint) {
-                case type_Float: {
+                case exp_Float: {
                     auto inf = std::numeric_limits<float>::infinity();
                     ret = new Value<float>(negative ? -inf : inf);
                     break;
                 }
-                case type_Double: {
+                case exp_Double: {
                     auto inf = std::numeric_limits<double>::infinity();
                     ret = new Value<double>(negative ? -inf : inf);
                     break;
                 }
-                case type_Decimal:
+                case exp_Decimal:
                     ret = new Value<Decimal128>(Decimal128(text));
                     break;
                 default:
-                    throw std::runtime_error(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                    throw std::runtime_error(
+                        util::format("Infinity not supported for %1", get_subexpr_type_name(hint)));
                     break;
             }
             break;
         }
         case Type::NAN_VAL: {
             switch (hint) {
-                case type_Float:
+                case exp_Float:
                     ret = new Value<float>(type_punning<float>(0x7fc00000));
                     break;
-                case type_Double:
+                case exp_Double:
                     ret = new Value<double>(type_punning<double>(0x7ff8000000000000));
                     break;
-                case type_Decimal:
+                case exp_Decimal:
                     ret = new Value<Decimal128>(Decimal128::nan("0"));
                     break;
                 default:
@@ -794,17 +796,20 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::STRING: {
             std::string str = text.substr(1, text.size() - 2);
             switch (hint) {
-                case type_Int:
+                case exp_Int:
                     ret = new Value<int64_t>(string_to<int64_t>(str));
                     break;
-                case type_Float:
+                case exp_Float:
                     ret = new Value<float>(string_to<float>(str));
                     break;
-                case type_Double:
+                case exp_Double:
                     ret = new Value<double>(string_to<double>(str));
                     break;
-                case type_Decimal:
+                case exp_Decimal:
                     ret = new Value<Decimal128>(Decimal128(str.c_str()));
+                    break;
+                case exp_QueryExpressionType:
+                    ret = new Value<int64_t>(TypeOfValue(str).get_attributes());
                     break;
                 default:
                     ret = new ConstantStringValue(str);
@@ -968,7 +973,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     if (!ret) {
         throw std::runtime_error(
             util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
-                         get_data_type_name(hint), text));
+                         get_subexpr_type_name(hint), text));
     }
     return std::unique_ptr<Subexpr>{ret};
 }
@@ -1085,12 +1090,12 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
     if (right_constant) {
         // Take left first - it cannot be a constant
         left = left_prop->visit(this);
-        right = right_constant->visit(this, left->get_type());
+        right = right_constant->visit(this, left->get_expression_type());
     }
     else {
         right = right_prop->visit(this);
         if (left_constant) {
-            left = left_constant->visit(this, right->get_type());
+            left = left_constant->visit(this, right->get_expression_type());
         }
         else {
             left = left_prop->visit(this);

@@ -116,7 +116,7 @@ public:
         , text(str)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+    std::unique_ptr<Subexpr> visit(ParserDriver*, SubexprType);
 };
 
 class PropertyNode : public ParserNode {
@@ -196,10 +196,11 @@ public:
 
 class PostOpNode : public ParserNode {
 public:
+    enum OpType { SIZE, TYPE } op_type;
     std::string op_name;
-
-    PostOpNode(const std::string op)
-        : op_name(op)
+    PostOpNode(std::string op_literal, OpType type)
+        : op_type(type)
+        , op_name(op_literal)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);

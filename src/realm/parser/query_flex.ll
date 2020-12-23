@@ -63,6 +63,7 @@ blank   [ \t\r]
 "@sum"                      return yy::parser::make_SUM    ();
 "@avg"                      return yy::parser::make_AVG    ();
 "@links"                    return yy::parser::make_BACKLINK();
+"@type"                     return yy::parser::make_TYPE    (yytext);
 "[c]"                       return yy::parser::make_CASE    ();
 (true|TRUE)                 return yy::parser::make_TRUE    ();
 (false|FALSE)               return yy::parser::make_FALSE    ();

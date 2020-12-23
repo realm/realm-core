@@ -708,6 +708,80 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
     return std::unique_ptr<Expression>(new T(std::forward<Args>(args)...));
 }
 
+struct SubexprType {
+    enum QueryTypeExtension { raw_data_type, type_of_query };
+    constexpr SubexprType(DataType::Type type, QueryTypeExtension expression_type = raw_data_type) noexcept
+        : m_data_type(type)
+        , m_expression_type(expression_type)
+    {
+    }
+    constexpr SubexprType(DataType type, QueryTypeExtension expression_type = raw_data_type) noexcept
+        : m_data_type(type)
+        , m_expression_type(expression_type)
+    {
+    }
+    QueryTypeExtension get_expression_type()
+    {
+        return m_expression_type;
+    }
+    constexpr operator int64_t() const noexcept
+    {
+        if (m_expression_type == type_of_query) {
+            return 0xff;
+        }
+        else {
+            return int64_t(m_data_type);
+        }
+    }
+    constexpr bool operator==(const DataType& rhs) const noexcept
+    {
+        return m_expression_type == raw_data_type && m_data_type == rhs;
+    }
+    constexpr bool operator!=(const DataType& rhs) const noexcept
+    {
+        return !(*this == rhs);
+    }
+    constexpr bool operator==(const SubexprType& rhs) const noexcept
+    {
+        return m_data_type == rhs.m_data_type &&
+               (m_expression_type == raw_data_type ? (m_data_type == rhs.m_data_type) : true);
+    }
+    constexpr bool operator!=(const SubexprType& rhs) const noexcept
+    {
+        return !(*this == rhs);
+    }
+    bool is_valid()
+    {
+        return m_expression_type == raw_data_type && m_data_type.is_valid();
+    }
+    DataType get_data_type()
+    {
+        REALM_ASSERT_EX(m_expression_type == raw_data_type, m_expression_type);
+        return m_data_type;
+    }
+
+private:
+    DataType m_data_type;
+    QueryTypeExtension m_expression_type;
+};
+
+static constexpr SubexprType exp_QueryExpressionType =
+    SubexprType{DataType::Type::Int, SubexprType::QueryTypeExtension::type_of_query};
+static constexpr SubexprType exp_Int = SubexprType{DataType::Type::Int};
+static constexpr SubexprType exp_Bool = SubexprType{DataType::Type::Bool};
+static constexpr SubexprType exp_String = SubexprType{DataType::Type::String};
+static constexpr SubexprType exp_Binary = SubexprType{DataType::Type::Binary};
+static constexpr SubexprType exp_Mixed = SubexprType{DataType::Type::Mixed};
+static constexpr SubexprType exp_Timestamp = SubexprType{DataType::Type::Timestamp};
+static constexpr SubexprType exp_Float = SubexprType{DataType::Type::Float};
+static constexpr SubexprType exp_Double = SubexprType{DataType::Type::Double};
+static constexpr SubexprType exp_Decimal = SubexprType{DataType::Type::Decimal};
+static constexpr SubexprType exp_Link = SubexprType{DataType::Type::Link};
+static constexpr SubexprType exp_LinkList = SubexprType{DataType::Type::LinkList};
+static constexpr SubexprType exp_ObjectId = SubexprType{DataType::Type::ObjectId};
+static constexpr SubexprType exp_TypedLink = SubexprType{DataType::Type::TypedLink};
+static constexpr SubexprType exp_UUID = SubexprType{DataType::Type::UUID};
+
 class Subexpr {
 public:
     virtual ~Subexpr() {}
@@ -757,7 +831,7 @@ public:
         return {};
     }
 
-    virtual DataType get_type() const = 0;
+    virtual SubexprType get_expression_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
     // This function supports SubColumnAggregate
@@ -794,6 +868,8 @@ template <class oper, class TLeft = Subexpr, class TRight = Subexpr>
 class Operator;
 template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
+template <class oper, class TLeft = Subexpr>
+class TypeOfValueOperator;
 template <class oper, class TLeft = Subexpr>
 class SizeOperator;
 template <class TCond>
@@ -1050,9 +1126,9 @@ class Subexpr2 : public Subexpr,
 public:
     virtual ~Subexpr2() {}
 
-    DataType get_type() const final
+    SubexprType get_expression_type() const final
     {
-        return ColumnTypeTraits<T>::id;
+        return SubexprType(ColumnTypeTraits<T>::id);
     }
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
@@ -1075,9 +1151,9 @@ public:
 template <>
 class Subexpr2<Link> : public Subexpr {
 public:
-    DataType get_type() const
+    SubexprType get_expression_type() const
     {
-        return type_Link;
+        return SubexprType(type_Link);
     }
 };
 
@@ -1096,9 +1172,9 @@ public:
     Query contains(const Subexpr2<StringData>& col, bool case_sensitive = true);
     Query like(StringData sd, bool case_sensitive = true);
     Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
-    DataType get_type() const final
+    SubexprType get_expression_type() const final
     {
-        return type_String;
+        return SubexprType(type_String);
     }
 };
 
@@ -1117,9 +1193,9 @@ public:
     Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
     Query like(BinaryData sd, bool case_sensitive = true);
     Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
-    DataType get_type() const final
+    SubexprType get_expression_type() const final
     {
-        return type_Binary;
+        return SubexprType(type_Binary);
     }
 };
 
@@ -2077,6 +2153,11 @@ public:
         return SizeOperator<T>(this->clone());
     }
 
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
+    }
+
 private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
@@ -2481,6 +2562,113 @@ private:
     LinkMap m_link_map;
 };
 
+struct TypeOfValue {
+    enum Attribute : size_t {
+        None = 0,
+        Null = 1,
+        Int = 2,
+        Double = 4,
+        Float = 8,
+        Bool = 16,
+        Timestamp = 32,
+        String = 64,
+        Binary = 128,
+        UUID = 256,
+        ObjectId = 512,
+        Decimal128 = 1024,
+        ObjectLink = 2048,
+        Mixed = 4096,
+        Numeric = Int + Double + Float + Decimal128,
+    };
+    TypeOfValue(size_t attributes)
+        : m_attributes(attributes)
+    {
+    }
+    TypeOfValue(const std::string& attribute_tags);
+    TypeOfValue(const class Mixed& value);
+    bool matches(const class Mixed& value);
+    bool matches(const TypeOfValue& other)
+    {
+        return (m_attributes & other.m_attributes) != 0;
+    }
+    int64_t get_attributes()
+    {
+        return m_attributes;
+    }
+
+private:
+    int64_t m_attributes;
+};
+
+template <class T, class TExpr>
+class TypeOfValueOperator : public Subexpr {
+public:
+    TypeOfValueOperator(std::unique_ptr<TExpr> left)
+        : m_expr(std::move(left))
+    {
+    }
+
+    TypeOfValueOperator(const TypeOfValueOperator& other)
+        : m_expr(other.m_expr->clone())
+    {
+    }
+
+    // See comment in base class
+    void set_base_table(ConstTableRef table) override
+    {
+        m_expr->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_expr->set_cluster(cluster);
+    }
+
+    SubexprType get_expression_type() const override
+    {
+        return SubexprType(type_Int, SubexprType::QueryTypeExtension::type_of_query);
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    ConstTableRef get_base_table() const override
+    {
+        return m_expr->get_base_table();
+    }
+
+    // destination = operator(left)
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<T> v;
+        m_expr->evaluate(index, v);
+
+        size_t sz = v.size();
+        destination.init(v.m_from_link_list, sz);
+
+        for (size_t i = 0; i < sz; i++) {
+            // FIXME:
+            auto elem = v[i].template get<T>();
+            destination.set(i, int64_t(TypeOfValue(elem).get_attributes()));
+        }
+    }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        if (m_expr) {
+            return m_expr->description(state) + util::serializer::value_separator + "@type";
+        }
+        return "@type";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new TypeOfValueOperator(*this));
+    }
+
+private:
+    std::unique_ptr<TExpr> m_expr;
+};
+
 template <class T, class TExpr>
 class SizeOperator : public Subexpr2<Int> {
 public:
@@ -2650,9 +2838,9 @@ public:
         return m_link_map;
     }
 
-    DataType get_type() const override
+    SubexprType get_expression_type() const override
     {
-        return m_is_list ? type_LinkList : type_Link;
+        return SubexprType(m_is_list ? type_LinkList : type_Link);
     }
 
     ConstTableRef get_base_table() const override
@@ -3536,9 +3724,9 @@ public:
     {
     }
 
-    DataType get_type() const final
+    SubexprType get_expression_type() const final
     {
-        return ColumnTypeTraits<T>::id;
+        return SubexprType(ColumnTypeTraits<T>::id);
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -4157,7 +4345,7 @@ public:
                 m_matches = m_right->find_all(Mixed());
             }
             else {
-                if (m_right->get_type() != m_left_value.get_type()) {
+                if (m_right->get_expression_type() != m_left_value.get_type()) {
                     // If the type we are looking for is not the same type as the target
                     // column, we cannot use the index
                     return dT;

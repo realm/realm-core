@@ -105,6 +105,7 @@ using namespace realm::query_parser;
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
 %token <std::string> SIZE "@size"
+%token <std::string> TYPE "@type"
 %type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
@@ -245,7 +246,8 @@ comp_type
 
 post_op
     : %empty                    { $$ = nullptr; }
-    | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2);}
+    | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
+    | '.' TYPE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::TYPE);}
 
 aggr_op
     : MAX                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);}

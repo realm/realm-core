@@ -4088,7 +4088,7 @@ TEST(Parser_Decimal128)
     verify_query(test_context, table, "dec != nullable_dec", num_different_rows);
 }
 
-TEST(Parser_Mixed)
+ONLY(Parser_Mixed)
 {
     Group g;
     auto table = g.add_table("Foo");
@@ -4115,6 +4115,7 @@ TEST(Parser_Mixed)
     table->get_object(15).set(col_any, Mixed());
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
+    nb_strings--;
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
 
@@ -4129,42 +4130,17 @@ TEST(Parser_Mixed)
             ++it;
         }
     }
+    verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
+    verify_query(test_context, table, "mixed.@type == 'double'", 2);
+    verify_query(test_context, table, "mixed.@type == 'Decimal'", 1);
+    verify_query(test_context, table, "mixed.@type == 'binary'", 1);
+    verify_query(test_context, table, "mixed.@type == 'binary|DECIMAL|Double'", 4);
+
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
-    verify_query(test_context, table, "mixed >= 50", int_over_50 + 1);
-    verify_query(test_context, table, "mixed <= 50", 100 - int_over_50 - nb_strings - 1);
-    verify_query(test_context, table, "mixed < 50", 100 - int_over_50 - nb_strings - 2);
-    verify_query(test_context, table, "mixed < 50 || mixed > 50", 100 - nb_strings - 2);
-    verify_query(test_context, table, "mixed != 50", 99);
-    verify_query(test_context, table, "mixed == null", 1);
-    verify_query(test_context, table, "mixed != null", 99);
-    verify_query(test_context, table, "mixed beginswith 'String2'", 3); // 20, 24, 28
-    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"",
-                 3); // 20, 24, 28, this string literal is base64 for 'String2'
-    verify_query(test_context, table, "mixed contains \"trin\"", 25);
-    verify_query(test_context, table, "mixed like \"Strin*\"", 25);
-    verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
-
-    char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin)};
-    size_t num_args = 1;
-    verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
-
-    verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
-    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
-    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 99);
-    verify_query(test_context, table, "mixed == \"String48\"", 1);
-    verify_query(test_context, table, "mixed == 3.0", 3);
-    verify_query(test_context, table, "mixed == NULL", 1);
-    verify_query(test_context, origin, "links.mixed > 50", 5);
-    verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
-    verify_query(test_context, origin, "link.mixed > 50", 2);
-    verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
-    verify_query(test_context, origin, "link.mixed == NULL", 0);
-    verify_query(test_context, origin, "links.mixed == NULL", 1);
-
-    // non-uniform type cross column comparisons
-    verify_query(test_context, table, "mixed == int", 72);
+    verify_query(test_context, table, "mixed > 50 && mixed.@type == 'double'", 1);
+    verify_query(test_context, table, "mixed > 50 && mixed.@type != 'double'", int_over_50 - 1);
+    verify_query(test_context, table, "mixed > 50 && mixed.@type == 'int'", int_over_50 - 1);
 }
 
 TEST(Parser_Dictionary)
