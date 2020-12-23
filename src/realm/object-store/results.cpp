@@ -532,9 +532,14 @@ size_t Results::index_of(T const& value)
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any((*m_list_indices)[i]);
+            // This will create a Decimal128 using from_int64_t(0) and not Decimal128(null)
             T val{};
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
+            } else {
+                // check if the mixed value matches the object to compare
+                if (mixed == value)
+                    return i;
             }
             if (val == value)
                 return i;
