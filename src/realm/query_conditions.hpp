@@ -390,6 +390,43 @@ struct NotEqual {
     }
 };
 
+struct BitwiseAndMatches {
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (m1.is_null() || m2.is_null())
+            return false;
+        if (m1.get_type() == type_Int && m2.get_type() == type_Int) {
+            Int v1 = m1.get_int();
+            Int v2 = m2.get_int();
+            return (v1 & v2) > 0;
+        }
+        return false;
+    }
+    static std::string description()
+    {
+        return "==";
+    }
+};
+
+struct BitwiseAndNoMatches {
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (m1.is_null() || m2.is_null()) {
+            return false;
+        }
+        if (m1.get_type() == type_Int && m2.get_type() == type_Int) {
+            Int v1 = m1.get_int();
+            Int v2 = m2.get_int();
+            return (v1 & v2) == 0;
+        }
+        return false;
+    }
+    static std::string description()
+    {
+        return "!=";
+    }
+};
+
 // Does v2 contain v1?
 struct ContainsIns : public HackClass {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,

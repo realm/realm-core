@@ -352,7 +352,7 @@ static std::unordered_map<std::string, TypeOfValue::Attribute> attribute_map = {
     {"binary", TypeOfValue::Binary},      {"mixed", TypeOfValue::Mixed},     {"timestamp", TypeOfValue::Timestamp},
     {"float", TypeOfValue::Float},        {"double", TypeOfValue::Double},   {"decimal128", TypeOfValue::Decimal128},
     {"decimal", TypeOfValue::Decimal128}, {"link", TypeOfValue::ObjectLink}, {"object", TypeOfValue::ObjectLink},
-    {"objectid", TypeOfValue::ObjectId},  {"uuid", TypeOfValue::UUID}};
+    {"objectid", TypeOfValue::ObjectId},  {"uuid", TypeOfValue::UUID},       {"numeric", TypeOfValue::Numeric}};
 constexpr char attribute_separator = '|';
 
 TypeOfValue::Attribute get_single_from(std::string str)
@@ -436,6 +436,33 @@ TypeOfValue::TypeOfValue(const class Mixed& value)
 bool TypeOfValue::matches(const class Mixed& value)
 {
     return matches(TypeOfValue(value));
+}
+
+std::string get_attribute_name_of(uint64_t att)
+{
+    for (auto& it : attribute_map) {
+        if (it.second == att) {
+            return it.first;
+        }
+    }
+    REALM_ASSERT_DEBUG(false);
+    return "unknown";
+}
+
+std::string TypeOfValue::to_string() const
+{
+    std::string value;
+    uint64_t bit_to_check = 1;
+    while (bit_to_check <= m_attributes) {
+        if (m_attributes & bit_to_check) {
+            if (!value.empty()) {
+                value += attribute_separator;
+            }
+            value += get_attribute_name_of(bit_to_check);
+        }
+        bit_to_check <<= 1;
+    }
+    return value;
 }
 
 SizeOperator<int64_t> Columns<Dictionary>::size()

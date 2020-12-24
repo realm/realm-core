@@ -367,6 +367,23 @@ Query EqualityNode::visit(ParserDriver* drv)
             }
         }
     }
+    if (left_type == exp_QueryExpressionType || right_type == exp_QueryExpressionType) {
+        if (left_type != right_type) {
+            throw std::invalid_argument(
+                util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
+                             get_subexpr_type_name(left_type), get_subexpr_type_name(right_type)));
+        }
+        if (op == CompareNode::EQUAL) {
+            return Query(
+                std::unique_ptr<Expression>(new Compare<BitwiseAndMatches>(std::move(right), std::move(left))));
+        }
+        else if (op == CompareNode::NOT_EQUAL) {
+            return Query(
+                std::unique_ptr<Expression>(new Compare<BitwiseAndNoMatches>(std::move(right), std::move(left))));
+        }
+        throw std::invalid_argument(util::format(
+            "Invalid comparison '%1'. Only == and != are valid comparisons for @type queries.", opstr[op]));
+    }
     if (case_sensitive) {
         switch (op) {
             case CompareNode::EQUAL:
@@ -809,7 +826,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, SubexprType hint
                     ret = new Value<Decimal128>(Decimal128(str.c_str()));
                     break;
                 case exp_QueryExpressionType:
-                    ret = new Value<int64_t>(TypeOfValue(str).get_attributes());
+                    ret = new ConstantTypeOfValue(TypeOfValue(str));
                     break;
                 default:
                     ret = new ConstantStringValue(str);

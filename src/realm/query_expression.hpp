@@ -359,6 +359,46 @@ struct OperatorOptionalAdapter {
     }
 };
 
+class TypeOfValue {
+public:
+    enum Attribute : size_t {
+        None = 0,
+        Null = 1,
+        Int = 2,
+        Double = 4,
+        Float = 8,
+        Bool = 16,
+        Timestamp = 32,
+        String = 64,
+        Binary = 128,
+        UUID = 256,
+        ObjectId = 512,
+        Decimal128 = 1024,
+        ObjectLink = 2048,
+        Mixed = 4096,
+        Numeric = Int + Double + Float + Decimal128,
+    };
+    TypeOfValue(size_t attributes)
+        : m_attributes(attributes)
+    {
+    }
+    TypeOfValue(const std::string& attribute_tags);
+    TypeOfValue(const class Mixed& value);
+    bool matches(const class Mixed& value);
+    bool matches(const TypeOfValue& other)
+    {
+        return (m_attributes & other.m_attributes) != 0;
+    }
+    uint64_t get_attributes() const
+    {
+        return m_attributes;
+    }
+    std::string to_string() const;
+
+private:
+    uint64_t m_attributes;
+};
+
 class ValueBase {
 public:
     static const size_t chunk_size = 8;
@@ -743,7 +783,7 @@ struct SubexprType {
     }
     constexpr bool operator==(const SubexprType& rhs) const noexcept
     {
-        return m_data_type == rhs.m_data_type &&
+        return m_expression_type == rhs.m_expression_type &&
                (m_expression_type == raw_data_type ? (m_data_type == rhs.m_data_type) : true);
     }
     constexpr bool operator!=(const SubexprType& rhs) const noexcept
@@ -1294,6 +1334,60 @@ public:
         return make_subexpr<Value<T>>(*this);
     }
 };
+
+class ConstantTypeOfValue : public ValueBase, public Subexpr {
+public:
+    ConstantTypeOfValue(const TypeOfValue& v)
+        : m_value(v)
+    {
+        set(0, int64_t(v.get_attributes()));
+    }
+    bool has_constant_evaluation() const override
+    {
+        return true;
+    }
+    Mixed get_mixed() override
+    {
+        return get(0);
+    }
+
+    SubexprType get_expression_type() const override
+    {
+        return exp_QueryExpressionType;
+    }
+
+    void evaluate(size_t, ValueBase& destination) override
+    {
+        destination = *this;
+    }
+
+    std::string description(util::serializer::SerialisationState&) const override
+    {
+        REALM_ASSERT_EX(!ValueBase::m_from_link_list, ValueBase::size());
+        if (size() > 0) {
+            if (get(0).is_null())
+                return "NULL";
+            else
+                return '"' + TypeOfValue(get(0).template get<Int>()).to_string() + '"';
+        }
+        return "";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantTypeOfValue(*this));
+    }
+
+private:
+    ConstantTypeOfValue(const ConstantTypeOfValue& other)
+        : m_value(other.m_value)
+    {
+        set(0, int64_t(m_value.get_attributes()));
+    }
+
+    TypeOfValue m_value;
+};
+
 
 class ConstantStringValue : public Value<StringData> {
 public:
@@ -2562,44 +2656,6 @@ private:
     LinkMap m_link_map;
 };
 
-struct TypeOfValue {
-    enum Attribute : size_t {
-        None = 0,
-        Null = 1,
-        Int = 2,
-        Double = 4,
-        Float = 8,
-        Bool = 16,
-        Timestamp = 32,
-        String = 64,
-        Binary = 128,
-        UUID = 256,
-        ObjectId = 512,
-        Decimal128 = 1024,
-        ObjectLink = 2048,
-        Mixed = 4096,
-        Numeric = Int + Double + Float + Decimal128,
-    };
-    TypeOfValue(size_t attributes)
-        : m_attributes(attributes)
-    {
-    }
-    TypeOfValue(const std::string& attribute_tags);
-    TypeOfValue(const class Mixed& value);
-    bool matches(const class Mixed& value);
-    bool matches(const TypeOfValue& other)
-    {
-        return (m_attributes & other.m_attributes) != 0;
-    }
-    int64_t get_attributes()
-    {
-        return m_attributes;
-    }
-
-private:
-    int64_t m_attributes;
-};
-
 template <class T, class TExpr>
 class TypeOfValueOperator : public Subexpr {
 public:
@@ -2646,8 +2702,8 @@ public:
         destination.init(v.m_from_link_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
-            // FIXME:
             auto elem = v[i].template get<T>();
+            // destination.set(i, TypeOfValue(elem)); // FIXME
             destination.set(i, int64_t(TypeOfValue(elem).get_attributes()));
         }
     }
