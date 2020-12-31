@@ -3901,8 +3901,8 @@ bool Table::has_any_embedded_objects()
                 auto target_table = get_parent_group()->get_table(target_table_key);
                 if (target_table->is_embedded()) {
                     m_has_any_embedded_objects = true;
+                    return true; // early out
                 }
-                return true; // early out
             }
             return false;
         });
