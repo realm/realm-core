@@ -213,6 +213,7 @@ public:
 
     /// Returns the version of the latest snapshot.
     version_type get_version_of_latest_snapshot();
+    VersionID get_version_id_of_latest_snapshot();
 
     /// Thrown by start_read() if the specified version does not correspond to a
     /// bound (AKA tethered) snapshot.
