@@ -63,7 +63,7 @@ RLM_API size_t realm_get_num_classes(const realm_t* realm)
     return n;
 }
 
-RLM_API bool realm_get_class_keys(const realm_t* realm, realm_table_key_t* out_keys, size_t max, size_t* out_n)
+RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_keys, size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
         const auto& shared_realm = **realm;
@@ -73,7 +73,7 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_table_key_t* out_k
             for (auto& os : schema) {
                 if (i >= max)
                     break;
-                out_keys[i++] = to_capi(os.table_key);
+                out_keys[i++] = os.table_key.value;
             }
             if (out_n)
                 *out_n = i;
@@ -107,7 +107,7 @@ RLM_API bool realm_find_class(const realm_t* realm, const char* name, bool* out_
     });
 }
 
-RLM_API bool realm_get_class(const realm_t* realm, realm_table_key_t key, realm_class_info_t* out_class_info)
+RLM_API bool realm_get_class(const realm_t* realm, realm_class_key_t key, realm_class_info_t* out_class_info)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(realm, key);
@@ -116,7 +116,7 @@ RLM_API bool realm_get_class(const realm_t* realm, realm_table_key_t key, realm_
     });
 }
 
-RLM_API bool realm_get_class_properties(const realm_t* realm, realm_table_key_t key,
+RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t key,
                                         realm_property_info_t* out_properties, size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
@@ -150,7 +150,7 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_table_key_t 
     });
 }
 
-RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key, realm_col_key_t* out_keys,
+RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key, realm_property_key_t* out_keys,
                                      size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
@@ -162,13 +162,13 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key
             for (auto& prop : os.persisted_properties) {
                 if (i >= max)
                     break;
-                out_keys[i++] = to_capi(prop.column_key);
+                out_keys[i++] = prop.column_key.value;
             }
 
             for (auto& prop : os.computed_properties) {
                 if (i >= max)
                     break;
-                out_keys[i++] = to_capi(prop.column_key);
+                out_keys[i++] = prop.column_key.value;
             }
 
             if (out_n) {
@@ -184,12 +184,12 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key
     });
 }
 
-RLM_API bool realm_get_property(const realm_t* realm, realm_table_key_t class_key, realm_col_key_t key,
+RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_key, realm_property_key_t key,
                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(realm, class_key);
-        auto col_key = from_capi(key);
+        auto col_key = ColKey(key);
 
         // FIXME: We can do better than linear search.
 
@@ -212,7 +212,7 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_table_key_t class_ke
     });
 }
 
-RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_key, const char* name, bool* out_found,
+RLM_API bool realm_find_property(const realm_t* realm, realm_class_key_t class_key, const char* name, bool* out_found,
                                  realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
@@ -234,7 +234,7 @@ RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_k
     });
 }
 
-RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_table_key_t class_key,
+RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_class_key_t class_key,
                                                 const char* public_name, bool* out_found,
                                                 realm_property_info_t* out_property_info)
 {

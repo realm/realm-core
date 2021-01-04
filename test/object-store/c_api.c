@@ -8,20 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static realm_table_key_t dummy_table_key()
-{
-    realm_table_key_t key;
-    key.table_key = (uint32_t)-1;
-    return key;
-}
-
-static realm_col_key_t dummy_col_key()
-{
-    realm_col_key_t key;
-    key.col_key = -1;
-    return key;
-}
-
 #define CHECK_ERROR()                                                                                                \
     do {                                                                                                             \
         realm_error_t err;                                                                                           \
@@ -39,7 +25,7 @@ static void check_property_info_equal(const realm_property_info_t* lhs, const re
     assert(lhs->collection_type == rhs->collection_type);
     assert(strcmp(lhs->link_target, rhs->link_target) == 0);
     assert(strcmp(lhs->link_origin_property_name, rhs->link_origin_property_name) == 0);
-    assert(lhs->key.col_key == rhs->key.col_key);
+    assert(lhs->key == rhs->key);
     assert(lhs->flags == rhs->flags);
 }
 
@@ -51,7 +37,7 @@ int realm_c_api_tests(const char* file)
             .primary_key = "",
             .num_properties = 3,
             .num_computed_properties = 0,
-            .key = dummy_table_key(),
+            .key = RLM_INVALID_CLASS_KEY,
             .flags = RLM_CLASS_NORMAL,
         },
         {
@@ -59,7 +45,7 @@ int realm_c_api_tests(const char* file)
             .primary_key = "int",
             .num_properties = 2,
             .num_computed_properties = 0,
-            .key = dummy_table_key(),
+            .key = RLM_INVALID_CLASS_KEY,
             .flags = RLM_CLASS_NORMAL,
         },
     };
@@ -72,7 +58,7 @@ int realm_c_api_tests(const char* file)
             .collection_type = RLM_COLLECTION_TYPE_NONE,
             .link_target = "",
             .link_origin_property_name = "",
-            .key = dummy_col_key(),
+            .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_NORMAL,
         },
         {
@@ -82,7 +68,7 @@ int realm_c_api_tests(const char* file)
             .collection_type = RLM_COLLECTION_TYPE_NONE,
             .link_target = "",
             .link_origin_property_name = "",
-            .key = dummy_col_key(),
+            .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_NORMAL,
         },
         {
@@ -92,7 +78,7 @@ int realm_c_api_tests(const char* file)
             .collection_type = RLM_COLLECTION_TYPE_LIST,
             .link_target = "Bar",
             .link_origin_property_name = "",
-            .key = dummy_col_key(),
+            .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_NORMAL,
         },
     };
@@ -105,7 +91,7 @@ int realm_c_api_tests(const char* file)
             .collection_type = RLM_COLLECTION_TYPE_NONE,
             .link_target = "",
             .link_origin_property_name = "",
-            .key = dummy_col_key(),
+            .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
         },
         {
@@ -115,7 +101,7 @@ int realm_c_api_tests(const char* file)
             .collection_type = RLM_COLLECTION_TYPE_LIST,
             .link_target = "",
             .link_origin_property_name = "",
-            .key = dummy_col_key(),
+            .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_NORMAL | RLM_PROPERTY_NULLABLE,
         },
     };
@@ -151,7 +137,7 @@ int realm_c_api_tests(const char* file)
     size_t num_classes = realm_get_num_classes(realm);
     assert(num_classes == 2);
 
-    realm_table_key_t class_keys[2];
+    realm_class_key_t class_keys[2];
     size_t n;
     realm_get_class_keys(realm, class_keys, 2, &n);
     CHECK_ERROR();
@@ -165,13 +151,13 @@ int realm_c_api_tests(const char* file)
     CHECK_ERROR();
     assert(found);
     assert(foo_info.num_properties == 3);
-    assert(foo_info.key.table_key == class_keys[0].table_key || foo_info.key.table_key == class_keys[1].table_key);
+    assert(foo_info.key == class_keys[0] || foo_info.key == class_keys[1]);
 
     realm_find_class(realm, "Bar", &found, &bar_info);
     CHECK_ERROR();
     assert(found);
     assert(bar_info.num_properties == 2);
-    assert(bar_info.key.table_key == class_keys[0].table_key || bar_info.key.table_key == class_keys[1].table_key);
+    assert(bar_info.key == class_keys[0] || bar_info.key == class_keys[1]);
 
     realm_class_info_t dummy_info;
     realm_find_class(realm, "DoesNotExist", &found, &dummy_info);
@@ -264,14 +250,14 @@ int realm_c_api_tests(const char* file)
         CHECK_ERROR();
         assert(realm_object_is_valid(foo_1));
 
-        realm_obj_key_t foo_1_key = realm_object_get_key(foo_1);
+        realm_object_key_t foo_1_key = realm_object_get_key(foo_1);
 
-        realm_table_key_t foo_1_table = realm_object_get_table(foo_1);
-        assert(foo_1_table.table_key == foo_info.key.table_key);
+        realm_class_key_t foo_1_table = realm_object_get_table(foo_1);
+        assert(foo_1_table == foo_info.key);
 
         realm_link_t foo_1_link = realm_object_as_link(foo_1);
-        assert(foo_1_link.target.obj_key == foo_1_key.obj_key);
-        assert(foo_1_link.target_table.table_key == foo_1_table.table_key);
+        assert(foo_1_link.target == foo_1_key);
+        assert(foo_1_link.target_table == foo_1_table);
 
         realm_commit(realm);
         CHECK_ERROR();

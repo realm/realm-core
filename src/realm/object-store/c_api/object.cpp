@@ -3,35 +3,35 @@
 
 #include <realm/util/overload.hpp>
 
-RLM_API bool realm_get_num_objects(const realm_t* realm, realm_table_key_t key, size_t* out_count)
+RLM_API bool realm_get_num_objects(const realm_t* realm, realm_class_key_t key, size_t* out_count)
 {
     return wrap_err([&]() {
         auto& rlm = **realm;
-        auto table = rlm.read_group().get_table(from_capi(key));
+        auto table = rlm.read_group().get_table(TableKey(key));
         if (out_count)
             *out_count = table->size();
         return true;
     });
 }
 
-RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_table_key_t tbl_key, realm_obj_key_t obj_key)
+RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_class_key_t tbl_key, realm_object_key_t obj_key)
 {
     return wrap_err([&]() {
         auto& shared_realm = *realm;
-        auto table_key = from_capi(tbl_key);
+        auto table_key = TableKey(tbl_key);
         auto table = shared_realm->read_group().get_table(table_key);
-        auto obj = table->get_object(from_capi(obj_key));
+        auto obj = table->get_object(ObjKey(obj_key));
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
     });
 }
 
-RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm, realm_table_key_t class_key,
+RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm, realm_class_key_t class_key,
                                                            realm_value_t pk, bool* out_found)
 {
     return wrap_err([&]() -> realm_object_t* {
         auto& shared_realm = *realm;
-        auto table_key = from_capi(class_key);
+        auto table_key = TableKey(class_key);
         auto table = shared_realm->read_group().get_table(table_key);
         auto pk_val = from_capi(pk);
 
@@ -63,11 +63,11 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm,
     });
 }
 
-RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_table_key_t table_key)
+RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t table_key)
 {
     return wrap_err([&]() {
         auto& shared_realm = *realm;
-        auto tblkey = from_capi(table_key);
+        auto tblkey = TableKey(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
 
         if (table->get_primary_key_column()) {
@@ -81,12 +81,12 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_table_key_t ta
     });
 }
 
-RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, realm_table_key_t table_key,
+RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
                                                              realm_value_t pk)
 {
     return wrap_err([&]() {
         auto& shared_realm = *realm;
-        auto tblkey = from_capi(table_key);
+        auto tblkey = TableKey(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
         // FIXME: Provide did_create?
         auto pkval = from_capi(pk);
@@ -152,14 +152,14 @@ RLM_API bool realm_object_is_valid(const realm_object_t* obj)
     return obj->is_valid();
 }
 
-RLM_API realm_obj_key_t realm_object_get_key(const realm_object_t* obj)
+RLM_API realm_object_key_t realm_object_get_key(const realm_object_t* obj)
 {
-    return to_capi(obj->obj().get_key());
+    return obj->obj().get_key().value;
 }
 
-RLM_API realm_table_key_t realm_object_get_table(const realm_object_t* obj)
+RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* obj)
 {
-    return to_capi(obj->obj().get_table()->get_key());
+    return obj->obj().get_table()->get_key().value;
 }
 
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
@@ -168,7 +168,7 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
     auto table = obj.get_table();
     auto table_key = table->get_key();
     auto obj_key = obj.get_key();
-    return realm_link_t{to_capi(table_key), to_capi(obj_key)};
+    return realm_link_t{table_key.value, obj_key.value};
 }
 
 RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* realm,
@@ -185,19 +185,19 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
     });
 }
 
-RLM_API bool realm_get_value(const realm_object_t* obj, realm_col_key_t col, realm_value_t* out_value)
+RLM_API bool realm_get_value(const realm_object_t* obj, realm_property_key_t col, realm_value_t* out_value)
 {
     return realm_get_values(obj, 1, &col, out_value);
 }
 
-RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, const realm_col_key_t* properties,
+RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, const realm_property_key_t* properties,
                               realm_value_t* out_values)
 {
     return wrap_err([&]() {
         obj->verify_attached();
 
         for (size_t i = 0; i < num_values; ++i) {
-            auto col_key = from_capi(properties[i]);
+            auto col_key = ColKey(properties[i]);
 
             if (col_key.is_collection()) {
                 // FIXME: Proper exception type.
@@ -213,12 +213,12 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
     });
 }
 
-RLM_API bool realm_set_value(realm_object_t* obj, realm_col_key_t col, realm_value_t new_value, bool is_default)
+RLM_API bool realm_set_value(realm_object_t* obj, realm_property_key_t col, realm_value_t new_value, bool is_default)
 {
     return realm_set_values(obj, 1, &col, &new_value, is_default);
 }
 
-RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const realm_col_key_t* properties,
+RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const realm_property_key_t* properties,
                               const realm_value_t* values, bool is_default)
 {
     return wrap_err([&]() {
@@ -230,7 +230,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         // not accessed here, just the bits of the column key and the input type.
 
         for (size_t i = 0; i < num_values; ++i) {
-            auto col_key = from_capi(properties[i]);
+            auto col_key = ColKey(properties[i]);
 
             if (col_key.is_collection()) {
                 // FIXME: Proper exception type.
@@ -241,14 +241,14 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 
             if (val.is_null() && !col_key.is_nullable()) {
                 auto table = o.get_table();
-                auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+                auto& schema = schema_for_table(obj->get_realm(), table->get_key().value);
                 throw NotNullableException{schema.name, table->get_column_name(col_key)};
             }
 
             if (!val.is_null() && col_key.get_type() != ColumnType(val.get_type()) &&
                 col_key.get_type() != col_type_Mixed) {
                 auto table = o.get_table();
-                auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+                auto& schema = schema_for_table(obj->get_realm(), table->get_key().value);
                 throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
             }
         }
@@ -256,7 +256,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         // Actually write the properties.
 
         for (size_t i = 0; i < num_values; ++i) {
-            auto col_key = from_capi(properties[i]);
+            auto col_key = ColKey(properties[i]);
             auto val = from_capi(values[i]);
             o.set_any(col_key, val, is_default);
         }
@@ -265,7 +265,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
     });
 }
 
-RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key)
+RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
         object->verify_attached();
@@ -273,7 +273,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key
         auto obj = object->obj();
         auto table = obj.get_table();
 
-        auto col_key = from_capi(key);
+        auto col_key = ColKey(key);
         table->report_invalid_key(col_key);
 
         if (!col_key.is_list()) {
@@ -312,8 +312,8 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
             [&](Obj*) {
                 Obj o = list->get<Obj>(index);
                 result.type = RLM_TYPE_LINK;
-                result.link.target_table = to_capi(o.get_table()->get_key());
-                result.link.target = to_capi(o.get_key());
+                result.link.target_table = o.get_table()->get_key().value;
+                result.link.target = o.get_key().value;
             },
             [&](util::Optional<Obj>*) {
                 REALM_TERMINATE("Nullable link lists not supported");
