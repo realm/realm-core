@@ -30,6 +30,7 @@
 #endif
 
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/table.hpp>
 
 namespace {
@@ -51,6 +52,7 @@ static const char* const c_sync_device_id = "device_id";
 
 /* User Profile keys */
 static const char* const c_sync_profile = "profile";
+static const char* const c_sync_profile_data = "profile_data";
 static const char* const c_sync_profile_name = "name";
 static const char* const c_sync_profile_first_name = "first_name";
 static const char* const c_sync_profile_last_name = "last_name";
@@ -105,7 +107,8 @@ realm::Schema make_schema()
                     {c_sync_identities, PropertyType::Object | PropertyType::Array, c_sync_identityMetadata},
                     {c_sync_profile, PropertyType::Object | PropertyType::Nullable, c_sync_profile},
                     {c_sync_state, PropertyType::Int},
-                    {c_sync_device_id, PropertyType::String}}},
+                    {c_sync_device_id, PropertyType::String},
+                    {c_sync_profile_data, PropertyType::String}}},
                   {c_sync_fileActionMetadata,
                    {
                        {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -191,7 +194,9 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key, object_schema->persisted_properties[7].column_key,
-        object_schema->persisted_properties[8].column_key, object_schema->persisted_properties[9].column_key};
+        object_schema->persisted_properties[8].column_key, object_schema->persisted_properties[9].column_key,
+        object_schema->persisted_properties[10].column_key
+    };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
@@ -632,6 +637,15 @@ void SyncUserMetadata::set_device_id(const std::string& device_id)
     m_realm->commit_transaction();
 }
 
+SyncUserProfile SyncUserMetadata::profile() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    StringData result = m_obj.get<String>(m_schema.idx_refresh_token);
+    return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string(result))));
+}
+
 void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
 {
     if (m_invalid)
@@ -640,34 +654,9 @@ void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-
-    Obj obj;
-    if (m_obj.is_null(m_schema.idx_profile)) {
-        obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
-    }
-    else {
-        obj = m_obj.get_linked_object(m_schema.idx_profile);
-    }
-
-    if (profile.name)
-        obj.set(c_sync_profile_name, *profile.name);
-    if (profile.first_name)
-        obj.set(c_sync_profile_first_name, *profile.first_name);
-    if (profile.last_name)
-        obj.set(c_sync_profile_last_name, *profile.last_name);
-    if (profile.gender)
-        obj.set(c_sync_profile_gender, *profile.gender);
-    if (profile.picture_url)
-        obj.set(c_sync_profile_picture_url, *profile.picture_url);
-    if (profile.birthday)
-        obj.set(c_sync_profile_birthday, *profile.birthday);
-    if (profile.min_age)
-        obj.set(c_sync_profile_min_age, *profile.min_age);
-    if (profile.max_age)
-        obj.set(c_sync_profile_max_age, *profile.max_age);
-    if (profile.email)
-        obj.set(c_sync_profile_email, *profile.email);
-
+    std::stringstream data;
+    data << profile.data();
+    m_obj.set("profile_data", data.str());
     m_realm->commit_transaction();
 }
 

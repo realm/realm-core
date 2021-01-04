@@ -2423,15 +2423,15 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                          CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
                                          SyncUserProfile user_profile = user->user_profile();
 
-                                         CHECK(user_profile.name == profile_0_name);
-                                         CHECK(user_profile.first_name == profile_0_first_name);
-                                         CHECK(user_profile.last_name == profile_0_last_name);
-                                         CHECK(user_profile.email == profile_0_email);
-                                         CHECK(user_profile.picture_url == profile_0_picture_url);
-                                         CHECK(user_profile.gender == profile_0_gender);
-                                         CHECK(user_profile.birthday == profile_0_birthday);
-                                         CHECK(user_profile.min_age == profile_0_min_age);
-                                         CHECK(user_profile.max_age == profile_0_max_age);
+                                         CHECK(user_profile.name() == profile_0_name);
+                                         CHECK(user_profile.first_name() == profile_0_first_name);
+                                         CHECK(user_profile.last_name() == profile_0_last_name);
+                                         CHECK(user_profile.email() == profile_0_email);
+                                         CHECK(user_profile.picture_url() == profile_0_picture_url);
+                                         CHECK(user_profile.gender() == profile_0_gender);
+                                         CHECK(user_profile.birthday() == profile_0_birthday);
+                                         CHECK(user_profile.min_age() == profile_0_min_age);
+                                         CHECK(user_profile.max_age() == profile_0_max_age);
 
                                          processed = true;
                                      });
