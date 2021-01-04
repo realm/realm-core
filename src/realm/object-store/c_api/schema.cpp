@@ -54,6 +54,14 @@ RLM_API bool realm_schema_validate(const realm_schema_t* schema)
     });
 }
 
+RLM_API bool realm_set_schema(realm_t* realm, const realm_schema_t* schema)
+{
+    return wrap_err([&]() {
+        realm->get()->update_schema(*schema->ptr);
+        return true;
+    });
+}
+
 RLM_API size_t realm_get_num_classes(const realm_t* realm)
 {
     size_t max = std::numeric_limits<size_t>::max();
@@ -177,7 +185,7 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key
         }
         else {
             if (out_n) {
-                *out_n = os.persisted_properties.size() + os.persisted_properties.size();
+                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;

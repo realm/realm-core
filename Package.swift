@@ -75,6 +75,9 @@ let package = Package(
         .library(
             name: "RealmObjectStore",
             targets: ["ObjectStore"]),
+        .library(
+            name: "RealmFFI",
+            targets: ["FFI"]),
     ],
     targets: [
         .target(
@@ -112,7 +115,8 @@ let package = Package(
                 "realm/util/network.cpp",
                 "realm/util/network_ssl.cpp",
                 "realm/util/http.cpp",
-                "realm/util/websocket.cpp"
+                "realm/util/websocket.cpp",
+                "realm/realm.h"
             ],
             sources: [
                 "realm"
@@ -165,20 +169,32 @@ let package = Package(
             ]),
         .target(
             name: "ObjectStore",
-            dependencies: ["Storage", "QueryParser", "SyncClient"],
+            dependencies: ["SyncClient", "QueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
-                "realm/object-store/c_api",
+                "realm/object-store/c_api/realm.c"
             ],
             sources: ["realm/object-store"],
             publicHeadersPath: "realm/object-store",
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .headerSearchPath("realm/object-store")
+                .headerSearchPath("realm/object-store"),
+                .headerSearchPath("external/pegtl/include/tao")
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "FFI",
+            dependencies: ["ObjectStore"],
+            path: "src/swift",
+            exclude: [
+            ],
+//            publicHeadersPath: "realm/realm.h",
+            cxxSettings: ([
+                .define("REALM_ENABLE_SYNC", to: "1"),
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
