@@ -71,12 +71,17 @@ void BackupHandler::unfake_versions()
 
 std::string BackupHandler::get_prefix_from_path(const std::string& path)
 {
-    // prefix is everything but the suffix here, so start from the back
-    for (auto i = path.size() - 1; i; --i) {
-        if (path[i] == '.')
-            return path.substr(0, i + 1);
+    auto size = path.size();
+
+    // remove a suffix ".realm" but add back the "."
+    if (size > 6 && path.substr(size - 6, 6) == ".realm") {
+        return path.substr(0, size - 5); // include '.'
     }
-    // if not on normal "prefix.suffix" form add "."
+
+    // if no ".realm" suffix, at least ensure a terminating "."
+    if (path[size - 1] == '.') {
+        return path;
+    }
     return path + ".";
 }
 
