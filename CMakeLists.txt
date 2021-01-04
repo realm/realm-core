@@ -160,7 +160,7 @@ if(UNIX)
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
-if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+if (NOT APPLE)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
 else()
     set(REALM_INCLUDE_CERTS_DEFAULT OFF)
