@@ -17,16 +17,11 @@ T checked(T x)
     return x;
 }
 
-realm_string_t rlm_str(const char* str)
-{
-    return realm_string_t{str, std::strlen(str)};
-}
-
 realm_value_t rlm_str_val(const char* str)
 {
     realm_value_t val;
     val.type = RLM_TYPE_STRING;
-    val.string = rlm_str(str);
+    val.string = realm_string_t{str, std::strlen(str)};
     return val;
 }
 
@@ -111,18 +106,18 @@ TEST_CASE("C API") {
     {
         const realm_class_info_t classes[2] = {
             {
-                rlm_str("foo"),
-                rlm_str(""), // primary key
-                3,           // properties
-                0,           // computed_properties
+                "foo",
+                "", // primary key
+                3,  // properties
+                0,  // computed_properties
                 realm_table_key_t{},
                 RLM_CLASS_NORMAL,
             },
             {
-                rlm_str("bar"),
-                rlm_str("int"), // primary key
-                2,              // properties
-                0,              // computed properties,
+                "bar",
+                "int", // primary key
+                2,     // properties
+                0,     // computed properties,
                 realm_table_key{},
                 RLM_CLASS_NORMAL,
             },
@@ -130,32 +125,32 @@ TEST_CASE("C API") {
 
         const realm_property_info_t foo_properties[3] = {
             {
-                rlm_str("int"),
-                rlm_str(""),
+                "int",
+                "",
                 RLM_PROPERTY_TYPE_INT,
                 RLM_COLLECTION_TYPE_NONE,
-                rlm_str(""),
-                rlm_str(""),
+                "",
+                "",
                 realm_col_key_t{},
                 RLM_PROPERTY_NORMAL,
             },
             {
-                rlm_str("str"),
-                rlm_str(""),
+                "str",
+                "",
                 RLM_PROPERTY_TYPE_STRING,
                 RLM_COLLECTION_TYPE_NONE,
-                rlm_str(""),
-                rlm_str(""),
+                "",
+                "",
                 realm_col_key_t{},
                 RLM_PROPERTY_NORMAL,
             },
             {
-                rlm_str("bars"),
-                rlm_str(""),
+                "bars",
+                "",
                 RLM_PROPERTY_TYPE_OBJECT,
                 RLM_COLLECTION_TYPE_LIST,
-                rlm_str("bar"),
-                rlm_str(""),
+                "bar",
+                "",
                 realm_col_key_t{},
                 RLM_PROPERTY_NORMAL,
             },
@@ -163,22 +158,22 @@ TEST_CASE("C API") {
 
         const realm_property_info_t bar_properties[2] = {
             {
-                rlm_str("int"),
-                rlm_str(""),
+                "int",
+                "",
                 RLM_PROPERTY_TYPE_INT,
                 RLM_COLLECTION_TYPE_NONE,
-                rlm_str(""),
-                rlm_str(""),
+                "",
+                "",
                 realm_col_key_t{},
                 RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
             },
             {
-                rlm_str("strings"),
-                rlm_str(""),
+                "strings",
+                "",
                 RLM_PROPERTY_TYPE_STRING,
                 RLM_COLLECTION_TYPE_LIST,
-                rlm_str(""),
-                rlm_str(""),
+                "",
+                "",
                 realm_col_key_t{},
                 RLM_PROPERTY_NORMAL | RLM_PROPERTY_NULLABLE,
             },
@@ -191,7 +186,7 @@ TEST_CASE("C API") {
         CHECK(checked(realm_schema_validate(schema)));
 
         auto config = realm_config_new();
-        CHECK(checked(realm_config_set_path(config, rlm_str("c_api_test.realm"))));
+        CHECK(checked(realm_config_set_path(config, "c_api_test.realm")));
         CHECK(checked(realm_config_set_schema(config, schema)));
         CHECK(checked(realm_config_set_schema_mode(config, RLM_SCHEMA_MODE_AUTOMATIC)));
         CHECK(checked(realm_config_set_schema_version(config, 1)));
@@ -220,23 +215,23 @@ TEST_CASE("C API") {
     bool found = false;
 
     realm_class_info_t foo_info, bar_info;
-    CHECK(checked(realm_find_class(realm, rlm_str("foo"), &found, &foo_info)));
+    CHECK(checked(realm_find_class(realm, "foo", &found, &foo_info)));
     CHECK(found);
-    CHECK(checked(realm_find_class(realm, rlm_str("bar"), &found, &bar_info)));
+    CHECK(checked(realm_find_class(realm, "bar", &found, &bar_info)));
     CHECK(found);
 
     realm_property_info_t foo_int_property, foo_str_property, foo_bars_property;
     realm_property_info_t bar_int_property, bar_strings_property;
 
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("int"), &found, &foo_int_property)));
+    CHECK(checked(realm_find_property(realm, foo_info.key, "int", &found, &foo_int_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("str"), &found, &foo_str_property)));
+    CHECK(checked(realm_find_property(realm, foo_info.key, "str", &found, &foo_str_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("bars"), &found, &foo_bars_property)));
+    CHECK(checked(realm_find_property(realm, foo_info.key, "bars", &found, &foo_bars_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("int"), &found, &bar_int_property)));
+    CHECK(checked(realm_find_property(realm, bar_info.key, "int", &found, &bar_int_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("strings"), &found, &bar_strings_property)));
+    CHECK(checked(realm_find_property(realm, bar_info.key, "strings", &found, &bar_strings_property)));
     CHECK(found);
 
     SECTION("missing primary key") {
@@ -296,7 +291,7 @@ TEST_CASE("C API") {
 
         SECTION("query basics") {
             auto arg = rlm_str_val("Hello, World!");
-            auto q = make_cptr(checked(realm_query_parse(realm, foo_info.key, rlm_str("str == $0"), 1, &arg)));
+            auto q = make_cptr(checked(realm_query_parse(realm, foo_info.key, "str == $0", 1, &arg)));
             size_t count;
             CHECK(checked(realm_query_count(q.get(), &count)));
             CHECK(count == 1);

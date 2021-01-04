@@ -8,14 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static realm_string_t rlm_str(const char* str)
-{
-    realm_string_t s;
-    s.data = str;
-    s.size = strlen(str);
-    return s;
-}
-
 static realm_table_key_t dummy_table_key()
 {
     realm_table_key_t key;
@@ -34,20 +26,19 @@ static realm_col_key_t dummy_col_key()
     do {                                                                                                             \
         realm_error_t err;                                                                                           \
         if (realm_get_last_error(&err)) {                                                                            \
-            fprintf(stderr, "ERROR: %s\n", err.message.data);                                                        \
+            fprintf(stderr, "ERROR: %s\n", err.message);                                                             \
             return 1;                                                                                                \
         }                                                                                                            \
     } while (0)
 
 static void check_property_info_equal(const realm_property_info_t* lhs, const realm_property_info_t* rhs)
 {
-    assert(strncmp(lhs->name.data, rhs->name.data, lhs->name.size) == 0);
-    assert(strncmp(lhs->public_name.data, rhs->public_name.data, lhs->public_name.size) == 0);
+    assert(strcmp(lhs->name, rhs->name) == 0);
+    assert(strcmp(lhs->public_name, rhs->public_name) == 0);
     assert(lhs->type == rhs->type);
     assert(lhs->collection_type == rhs->collection_type);
-    assert(strncmp(lhs->link_target.data, rhs->link_target.data, lhs->link_target.size) == 0);
-    assert(strncmp(lhs->link_origin_property_name.data, rhs->link_origin_property_name.data,
-                   lhs->link_origin_property_name.size) == 0);
+    assert(strcmp(lhs->link_target, rhs->link_target) == 0);
+    assert(strcmp(lhs->link_origin_property_name, rhs->link_origin_property_name) == 0);
     assert(lhs->key.col_key == rhs->key.col_key);
     assert(lhs->flags == rhs->flags);
 }
@@ -56,16 +47,16 @@ int realm_c_api_tests(const char* file)
 {
     const realm_class_info_t def_classes[] = {
         {
-            .name = rlm_str("Foo"),
-            .primary_key = rlm_str(""),
+            .name = "Foo",
+            .primary_key = "",
             .num_properties = 3,
             .num_computed_properties = 0,
             .key = dummy_table_key(),
             .flags = RLM_CLASS_NORMAL,
         },
         {
-            .name = rlm_str("Bar"),
-            .primary_key = rlm_str("int"),
+            .name = "Bar",
+            .primary_key = "int",
             .num_properties = 2,
             .num_computed_properties = 0,
             .key = dummy_table_key(),
@@ -75,32 +66,32 @@ int realm_c_api_tests(const char* file)
 
     const realm_property_info_t def_foo_properties[] = {
         {
-            .name = rlm_str("int"),
-            .public_name = rlm_str(""),
+            .name = "int",
+            .public_name = "",
             .type = RLM_PROPERTY_TYPE_INT,
             .collection_type = RLM_COLLECTION_TYPE_NONE,
-            .link_target = rlm_str(""),
-            .link_origin_property_name = rlm_str(""),
+            .link_target = "",
+            .link_origin_property_name = "",
             .key = dummy_col_key(),
             .flags = RLM_PROPERTY_NORMAL,
         },
         {
-            .name = rlm_str("str"),
-            .public_name = rlm_str(""),
+            .name = "str",
+            .public_name = "",
             .type = RLM_PROPERTY_TYPE_STRING,
             .collection_type = RLM_COLLECTION_TYPE_NONE,
-            .link_target = rlm_str(""),
-            .link_origin_property_name = rlm_str(""),
+            .link_target = "",
+            .link_origin_property_name = "",
             .key = dummy_col_key(),
             .flags = RLM_PROPERTY_NORMAL,
         },
         {
-            .name = rlm_str("bars"),
-            .public_name = rlm_str(""),
+            .name = "bars",
+            .public_name = "",
             .type = RLM_PROPERTY_TYPE_OBJECT,
             .collection_type = RLM_COLLECTION_TYPE_LIST,
-            .link_target = rlm_str("Bar"),
-            .link_origin_property_name = rlm_str(""),
+            .link_target = "Bar",
+            .link_origin_property_name = "",
             .key = dummy_col_key(),
             .flags = RLM_PROPERTY_NORMAL,
         },
@@ -108,22 +99,22 @@ int realm_c_api_tests(const char* file)
 
     const realm_property_info_t def_bar_properties[] = {
         {
-            .name = rlm_str("int"),
-            .public_name = rlm_str(""),
+            .name = "int",
+            .public_name = "",
             .type = RLM_PROPERTY_TYPE_INT,
             .collection_type = RLM_COLLECTION_TYPE_NONE,
-            .link_target = rlm_str(""),
-            .link_origin_property_name = rlm_str(""),
+            .link_target = "",
+            .link_origin_property_name = "",
             .key = dummy_col_key(),
             .flags = RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
         },
         {
-            .name = rlm_str("strings"),
-            .public_name = rlm_str(""),
+            .name = "strings",
+            .public_name = "",
             .type = RLM_PROPERTY_TYPE_STRING,
             .collection_type = RLM_COLLECTION_TYPE_LIST,
-            .link_target = rlm_str(""),
-            .link_origin_property_name = rlm_str(""),
+            .link_target = "",
+            .link_origin_property_name = "",
             .key = dummy_col_key(),
             .flags = RLM_PROPERTY_NORMAL | RLM_PROPERTY_NULLABLE,
         },
@@ -135,11 +126,10 @@ int realm_c_api_tests(const char* file)
     CHECK_ERROR();
 
     realm_config_t* config = realm_config_new();
-    realm_string_t path = rlm_str(file);
     realm_config_set_schema(config, schema);
     realm_config_set_schema_mode(config, RLM_SCHEMA_MODE_AUTOMATIC);
     realm_config_set_schema_version(config, 1);
-    realm_config_set_path(config, path);
+    realm_config_set_path(config, file);
 
     realm_t* realm = realm_open(config);
     CHECK_ERROR();
@@ -171,20 +161,20 @@ int realm_c_api_tests(const char* file)
     realm_class_info_t foo_info;
     realm_class_info_t bar_info;
 
-    realm_find_class(realm, rlm_str("Foo"), &found, &foo_info);
+    realm_find_class(realm, "Foo", &found, &foo_info);
     CHECK_ERROR();
     assert(found);
     assert(foo_info.num_properties == 3);
     assert(foo_info.key.table_key == class_keys[0].table_key || foo_info.key.table_key == class_keys[1].table_key);
 
-    realm_find_class(realm, rlm_str("Bar"), &found, &bar_info);
+    realm_find_class(realm, "Bar", &found, &bar_info);
     CHECK_ERROR();
     assert(found);
     assert(bar_info.num_properties == 2);
     assert(bar_info.key.table_key == class_keys[0].table_key || bar_info.key.table_key == class_keys[1].table_key);
 
     realm_class_info_t dummy_info;
-    realm_find_class(realm, rlm_str("DoesNotExist"), &found, &dummy_info);
+    realm_find_class(realm, "DoesNotExist", &found, &dummy_info);
     CHECK_ERROR();
     assert(!found);
 
@@ -198,19 +188,19 @@ int realm_c_api_tests(const char* file)
 
     // Find properties by name.
     realm_property_info_t foo_int, foo_str, foo_bars, bar_int, bar_strings;
-    realm_find_property(realm, foo_info.key, rlm_str("int"), &found, &foo_int);
+    realm_find_property(realm, foo_info.key, "int", &found, &foo_int);
     CHECK_ERROR();
     assert(found);
-    realm_find_property(realm, foo_info.key, rlm_str("str"), &found, &foo_str);
+    realm_find_property(realm, foo_info.key, "str", &found, &foo_str);
     CHECK_ERROR();
     assert(found);
-    realm_find_property(realm, foo_info.key, rlm_str("bars"), &found, &foo_bars);
+    realm_find_property(realm, foo_info.key, "bars", &found, &foo_bars);
     CHECK_ERROR();
     assert(found);
-    realm_find_property(realm, bar_info.key, rlm_str("int"), &found, &bar_int);
+    realm_find_property(realm, bar_info.key, "int", &found, &bar_int);
     CHECK_ERROR();
     assert(found);
-    realm_find_property(realm, bar_info.key, rlm_str("strings"), &found, &bar_strings);
+    realm_find_property(realm, bar_info.key, "strings", &found, &bar_strings);
     CHECK_ERROR();
     assert(found);
 

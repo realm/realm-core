@@ -14,8 +14,8 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
             auto computed_props_ptr = props_ptr + class_info.num_properties;
 
             ObjectSchema object_schema;
-            object_schema.name = capi_to_std(class_info.name);
-            object_schema.primary_key = capi_to_std(class_info.primary_key);
+            object_schema.name = class_info.name;
+            object_schema.primary_key = class_info.primary_key;
             object_schema.is_embedded = ObjectSchema::IsEmbedded{bool(class_info.flags & RLM_CLASS_EMBEDDED)};
             object_schema.persisted_properties.reserve(class_info.num_properties);
             object_schema.computed_properties.reserve(class_info.num_computed_properties);
@@ -87,12 +87,12 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_table_key_t* out_k
     });
 }
 
-RLM_API bool realm_find_class(const realm_t* realm, realm_string_t name, bool* out_found,
+RLM_API bool realm_find_class(const realm_t* realm, const char* name, bool* out_found,
                               realm_class_info_t* out_class_info)
 {
     return wrap_err([&]() {
         const auto& schema = (*realm)->schema();
-        auto it = schema.find(from_capi(name));
+        auto it = schema.find(name);
         if (it != schema.end()) {
             if (out_found)
                 *out_found = true;
@@ -212,12 +212,12 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_table_key_t class_ke
     });
 }
 
-RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_key, realm_string_t name,
-                                 bool* out_found, realm_property_info_t* out_property_info)
+RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_key, const char* name, bool* out_found,
+                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(realm, class_key);
-        auto prop = os.property_for_name(from_capi(name));
+        auto prop = os.property_for_name(name);
 
         if (prop) {
             if (out_found)
@@ -235,12 +235,12 @@ RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_k
 }
 
 RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_table_key_t class_key,
-                                                realm_string_t public_name, bool* out_found,
+                                                const char* public_name, bool* out_found,
                                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(realm, class_key);
-        auto prop = os.property_for_public_name(from_capi(public_name));
+        auto prop = os.property_for_public_name(public_name);
 
         if (prop) {
             if (out_found)

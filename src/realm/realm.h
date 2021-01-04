@@ -211,7 +211,7 @@ typedef enum realm_logic_error_kind {
 
 typedef struct realm_error {
     realm_errno_e error;
-    realm_string_t message;
+    const char* message;
     union {
         int code;
         realm_logic_error_kind_e logic_error_kind;
@@ -258,20 +258,20 @@ typedef enum realm_collection_type {
 } realm_collection_type_e;
 
 typedef struct realm_property_info {
-    realm_string_t name;
-    realm_string_t public_name;
+    const char* name;
+    const char* public_name;
     realm_property_type_e type;
     realm_collection_type_e collection_type;
 
-    realm_string_t link_target;
-    realm_string_t link_origin_property_name;
+    const char* link_target;
+    const char* link_origin_property_name;
     realm_col_key_t key;
     int flags;
 } realm_property_info_t;
 
 typedef struct realm_class_info {
-    realm_string_t name;
-    realm_string_t primary_key;
+    const char* name;
+    const char* primary_key;
     size_t num_properties;
     size_t num_computed_properties;
     realm_table_key_t key;
@@ -342,9 +342,6 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  *
  * Note: The error message in @a err will only be safe to use until the next API
  *       call is made on the current thread.
- *
- * Note: As opposed to other instances of `realm_string_t`, the error message
- *       string is guaranteed to be zero-terminated.
  *
  * Note: The error is not cleared by subsequent successful calls to this
  *       function, but it will be overwritten by subsequent failing calls to
@@ -498,7 +495,7 @@ RLM_API realm_config_t* realm_config_new();
 /**
  * Set the path of the realm being opened.
  */
-RLM_API bool realm_config_set_path(realm_config_t*, realm_string_t);
+RLM_API bool realm_config_set_path(realm_config_t*, const char* path);
 
 /**
  * Set the encryption key for the realm.
@@ -884,8 +881,7 @@ RLM_API bool realm_get_class_keys(const realm_t*, realm_table_key_t* out_keys, s
  *                       NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_class(const realm_t*, realm_string_t name, bool* out_found,
-                              realm_class_info_t* out_class_info);
+RLM_API bool realm_find_class(const realm_t*, const char* name, bool* out_found, realm_class_info_t* out_class_info);
 
 /**
  * Get the class with @a key from the schema.
@@ -960,7 +956,7 @@ RLM_API bool realm_get_property(const realm_t*, realm_table_key_t class_key, rea
  *                          be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_property(const realm_t*, realm_table_key_t class_key, realm_string_t name, bool* out_found,
+RLM_API bool realm_find_property(const realm_t*, realm_table_key_t class_key, const char* name, bool* out_found,
                                  realm_property_info_t* out_property_info);
 
 /**
@@ -975,9 +971,8 @@ RLM_API bool realm_find_property(const realm_t*, realm_table_key_t class_key, re
  *                          be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_table_key_t class_key,
-                                                realm_string_t public_name, bool* out_found,
-                                                realm_property_info_t* out_property_info);
+RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_table_key_t class_key, const char* public_name,
+                                                bool* out_found, realm_property_info_t* out_property_info);
 
 /**
  * Find the primary key property for a class, if it has one.
@@ -1430,14 +1425,15 @@ realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, real
  * `realm_get_last_error()`.
  *
  * @param target_table The table on which to run this query.
- * @param query_string A string in the Realm Query Language, optionally
- *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param query_string A zero-terminated string in the Realm Query Language,
+ *                     optionally containing argument placeholders (`$0`, `$1`,
+ *                     etc.).
  * @param num_args The number of arguments for this query.
  * @param args A pointer to a list of argument values.
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t target_table, realm_string_t query_string,
+RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t target_table, const char* query_string,
                                          size_t num_args, const realm_value_t* args);
 
 /**
@@ -1454,7 +1450,7 @@ RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t targe
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, realm_string_t query_string,
+RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, const char* query_string,
                                                   size_t num_args, const realm_value_t* values);
 
 /**
@@ -1464,16 +1460,16 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  * `realm_get_last_error()`.
  *
  * @param target_results The results on which to run this query.
- * @param query_string A string in the Realm Query Language, optionally
- *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param query_string A zero-terminated string in the Realm Query Language,
+ *                     optionally containing argument placeholders (`$0`, `$1`,
+ *                     etc.).
  * @param num_args The number of arguments for this query.
  * @param args A pointer to a list of argument values.
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results,
-                                                     realm_string_t query_string, size_t num_args,
-                                                     const realm_value_t* values);
+RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results, const char* query_string,
+                                                     size_t num_args, const realm_value_t* values);
 
 /**
  * Count the number of objects found by this query.

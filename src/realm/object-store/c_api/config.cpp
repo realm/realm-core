@@ -6,10 +6,10 @@ RLM_API realm_config_t* realm_config_new()
     return new realm_config_t{};
 }
 
-RLM_API bool realm_config_set_path(realm_config_t* config, realm_string_t path)
+RLM_API bool realm_config_set_path(realm_config_t* config, const char* path)
 {
     return wrap_err([&]() {
-        config->path = capi_to_std(path);
+        config->path = path;
         return true;
     });
 }

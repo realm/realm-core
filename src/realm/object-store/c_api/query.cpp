@@ -129,9 +129,9 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 } // namespace
 
 static void parse_and_apply_query(const std::shared_ptr<Realm>& realm, Query& q, DescriptorOrdering& ordering,
-                                  realm_string_t query_string, size_t num_args, const realm_value_t* args)
+                                  const char* query_string, size_t num_args, const realm_value_t* args)
 {
-    auto parser_result = parser::parse(from_capi(query_string));
+    auto parser_result = parser::parse(query_string);
 
     parser::KeyPathMapping mapping;
     realm::populate_keypath_mapping(mapping, *realm);
@@ -142,7 +142,7 @@ static void parse_and_apply_query(const std::shared_ptr<Realm>& realm, Query& q,
 }
 
 RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_table_key_t target_table_key,
-                                         realm_string_t query_string, size_t num_args, const realm_value_t* args)
+                                         const char* query_string, size_t num_args, const realm_value_t* args)
 {
     return wrap_err([&]() {
         auto table = (*realm)->read_group().get_table(from_capi(target_table_key));
@@ -153,8 +153,8 @@ RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_table_key_t
     });
 }
 
-RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, realm_string_t query_string,
-                                                  size_t num_args, const realm_value_t* args)
+RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, const char* query_string, size_t num_args,
+                                                  const realm_value_t* args)
 {
     return wrap_err([&]() {
         auto realm = list->get_realm();
@@ -165,7 +165,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, real
     });
 }
 
-RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* results, realm_string_t query_string,
+RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* results, const char* query_string,
                                                      size_t num_args, const realm_value_t* args)
 {
     return wrap_err([&]() {

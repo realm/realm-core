@@ -74,8 +74,7 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             err->error = error_number;
-            err->message.data = ex.what();
-            err->message.size = std::strlen(err->message.data);
+            err->message = ex.what();
             *ptr = std::current_exception();
         };
 
@@ -124,8 +123,7 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         // FIXME: Handle more exception types.
         catch (...) {
             err->error = RLM_ERR_UNKNOWN;
-            err->message.data = "Unknown error";
-            err->message.size = std::strlen(err->message.data);
+            err->message = "Unknown error";
             *ptr = std::current_exception();
         }
         return true;
