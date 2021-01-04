@@ -1614,13 +1614,15 @@ std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
     struct _stat statbuf;
-    auto stat = _stat;
+    if (::_stat(path.c_str(), &statbuf) != 0) {
+        throw std::system_error(errno, std::system_category(), "stat() failed");
+    }
 #else
     struct stat statbuf;
-#endif
     if (::stat(path.c_str(), &statbuf) != 0) {
         throw std::system_error(errno, std::system_category(), "stat() failed");
     }
+#endif
     return statbuf.st_mtime;
 }
 
