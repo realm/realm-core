@@ -76,44 +76,14 @@ static inline ObjectId from_capi(realm_object_id_t)
     REALM_TERMINATE("Not implemented yet.");
 }
 
-static inline realm_col_key_t to_capi(ColKey key)
-{
-    return realm_col_key_t{key.value};
-}
-
-static inline ColKey from_capi(realm_col_key_t key)
-{
-    return ColKey{key.col_key};
-}
-
-static inline realm_table_key_t to_capi(TableKey key)
-{
-    return realm_table_key_t{key.value};
-}
-
-static inline TableKey from_capi(realm_table_key_t key)
-{
-    return TableKey{key.table_key};
-}
-
-static inline realm_obj_key_t to_capi(ObjKey key)
-{
-    return realm_obj_key_t{key.value};
-}
-
-static inline ObjKey from_capi(realm_obj_key_t key)
-{
-    return ObjKey{key.obj_key};
-}
-
 static inline ObjLink from_capi(realm_link_t val)
 {
-    return ObjLink{from_capi(val.target_table), from_capi(val.target)};
+    return ObjLink{TableKey(val.target_table), ObjKey(val.target)};
 }
 
 static inline realm_link_t to_capi(ObjLink link)
 {
-    return realm_link_t{to_capi(link.get_table_key()), to_capi(link.get_obj_key())};
+    return realm_link_t{link.get_table_key().value, link.get_obj_key().value};
 }
 
 static inline UUID from_capi(realm_uuid_t val)
@@ -156,7 +126,7 @@ static inline Mixed from_capi(realm_value_t val)
         case RLM_TYPE_OBJECT_ID:
             return Mixed{from_capi(val.object_id)};
         case RLM_TYPE_LINK:
-            return Mixed{ObjLink{from_capi(val.link.target_table), from_capi(val.link.target)}};
+            return Mixed{ObjLink{TableKey(val.link.target_table), ObjKey(val.link.target)}};
         case RLM_TYPE_UUID:
             return Mixed{UUID{from_capi(val.uuid)}};
     }
@@ -222,8 +192,8 @@ static inline realm_value_t to_capi(Mixed value)
             case type_TypedLink: {
                 val.type = RLM_TYPE_LINK;
                 auto link = value.get<ObjLink>();
-                val.link.target_table = to_capi(link.get_table_key());
-                val.link.target = to_capi(link.get_obj_key());
+                val.link.target_table = link.get_table_key().value;
+                val.link.target = link.get_obj_key().value;
                 break;
             }
             case type_UUID: {
@@ -406,7 +376,7 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
     if (bool(prop.type & PropertyType::Dictionary))
         p.collection_type = RLM_COLLECTION_TYPE_DICTIONARY;
 
-    p.key = to_capi(prop.column_key);
+    p.key = prop.column_key.value;
 
     return p;
 }
@@ -418,7 +388,7 @@ static inline realm_class_info_t to_capi(const ObjectSchema& o)
     info.primary_key = o.primary_key.c_str();
     info.num_properties = o.persisted_properties.size();
     info.num_computed_properties = o.computed_properties.size();
-    info.key = to_capi(o.table_key);
+    info.key = o.table_key.value;
     if (o.is_embedded) {
         info.flags = RLM_CLASS_EMBEDDED;
     }

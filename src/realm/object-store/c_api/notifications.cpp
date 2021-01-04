@@ -92,7 +92,7 @@ RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_obje
 }
 
 RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t* changes,
-                                                            realm_col_key_t* out_properties, size_t max)
+                                                            realm_property_key_t* out_properties, size_t max)
 {
     if (!out_properties)
         return changes->columns.size();
@@ -102,7 +102,7 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
         if (i >= max) {
             break;
         }
-        out_properties[i].col_key = col_key_val;
+        out_properties[i] = col_key_val;
         ++i;
     }
     return i;

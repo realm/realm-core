@@ -110,7 +110,7 @@ TEST_CASE("C API") {
                 "", // primary key
                 3,  // properties
                 0,  // computed_properties
-                realm_table_key_t{},
+                RLM_INVALID_CLASS_KEY,
                 RLM_CLASS_NORMAL,
             },
             {
@@ -118,7 +118,7 @@ TEST_CASE("C API") {
                 "int", // primary key
                 2,     // properties
                 0,     // computed properties,
-                realm_table_key{},
+                RLM_INVALID_CLASS_KEY,
                 RLM_CLASS_NORMAL,
             },
         };
@@ -131,7 +131,7 @@ TEST_CASE("C API") {
                 RLM_COLLECTION_TYPE_NONE,
                 "",
                 "",
-                realm_col_key_t{},
+                RLM_INVALID_PROPERTY_KEY,
                 RLM_PROPERTY_NORMAL,
             },
             {
@@ -141,7 +141,7 @@ TEST_CASE("C API") {
                 RLM_COLLECTION_TYPE_NONE,
                 "",
                 "",
-                realm_col_key_t{},
+                RLM_INVALID_PROPERTY_KEY,
                 RLM_PROPERTY_NORMAL,
             },
             {
@@ -151,7 +151,7 @@ TEST_CASE("C API") {
                 RLM_COLLECTION_TYPE_LIST,
                 "bar",
                 "",
-                realm_col_key_t{},
+                RLM_INVALID_PROPERTY_KEY,
                 RLM_PROPERTY_NORMAL,
             },
         };
@@ -164,7 +164,7 @@ TEST_CASE("C API") {
                 RLM_COLLECTION_TYPE_NONE,
                 "",
                 "",
-                realm_col_key_t{},
+                RLM_INVALID_PROPERTY_KEY,
                 RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
             },
             {
@@ -174,7 +174,7 @@ TEST_CASE("C API") {
                 RLM_COLLECTION_TYPE_LIST,
                 "",
                 "",
-                realm_col_key_t{},
+                RLM_INVALID_PROPERTY_KEY,
                 RLM_PROPERTY_NORMAL | RLM_PROPERTY_NULLABLE,
             },
         };
@@ -280,7 +280,7 @@ TEST_CASE("C API") {
             CHECK(found);
             auto p_key = realm_object_get_key(p.get());
             auto obj2_key = realm_object_get_key(obj2.get());
-            CHECK(p_key.obj_key == obj2_key.obj_key);
+            CHECK(p_key == obj2_key);
 
             // Check that finding by type-mismatched values just find nothing.
             CHECK(!realm_object_find_with_primary_key(realm, bar_info.key, rlm_null(), &found));
@@ -302,8 +302,8 @@ TEST_CASE("C API") {
             CHECK(checked(realm_query_find_first(q.get(), &found_value, &found)));
             CHECK(found);
             CHECK(found_value.type == RLM_TYPE_LINK);
-            CHECK(found_value.link.target_table.table_key == foo_info.key.table_key);
-            CHECK(found_value.link.target.obj_key == realm_object_get_key(obj1.get()).obj_key);
+            CHECK(found_value.link.target_table == foo_info.key);
+            CHECK(found_value.link.target == realm_object_get_key(obj1.get()));
 
             auto r = make_cptr(checked(realm_query_find_all(q.get())));
 
@@ -422,13 +422,13 @@ TEST_CASE("C API") {
                     realm_value_t val;
                     CHECK(checked(realm_list_get(bars.get(), 0, &val)));
                     CHECK(val.type == RLM_TYPE_LINK);
-                    CHECK(val.link.target_table.table_key == bar_info.key.table_key);
-                    CHECK(val.link.target.obj_key == realm_object_get_key(obj2.get()).obj_key);
+                    CHECK(val.link.target_table == bar_info.key);
+                    CHECK(val.link.target == realm_object_get_key(obj2.get()));
 
                     CHECK(checked(realm_list_get(bars.get(), 1, &val)));
                     CHECK(val.type == RLM_TYPE_LINK);
-                    CHECK(val.link.target_table.table_key == bar_info.key.table_key);
-                    CHECK(val.link.target.obj_key == realm_object_get_key(obj2.get()).obj_key);
+                    CHECK(val.link.target_table == bar_info.key);
+                    CHECK(val.link.target == realm_object_get_key(obj2.get()));
 
                     auto result = realm_list_get(bars.get(), 2, &val);
                     CHECK(!result);
@@ -601,11 +601,11 @@ TEST_CASE("C API") {
                 CHECK(!deleted);
                 size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes.get());
                 CHECK(num_modified == 2);
-                realm_col_key_t modified_keys[2];
+                realm_property_key_t modified_keys[2];
                 size_t n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 2);
                 CHECK(n == 2);
-                CHECK(modified_keys[0].col_key == foo_int_property.key.col_key);
-                CHECK(modified_keys[1].col_key == foo_str_property.key.col_key);
+                CHECK(modified_keys[0] == foo_int_property.key);
+                CHECK(modified_keys[1] == foo_str_property.key);
             }
         }
     }
