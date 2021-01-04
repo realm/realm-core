@@ -46,7 +46,6 @@ public:
     void insertions_add(ObjectKeyType obj);
     void modifications_add(ObjectKeyType obj, ColKeyType col);
     void deletions_add(ObjectKeyType obj);
-    void clear(size_t old_size);
 
     bool insertions_remove(ObjectKeyType obj);
     bool modifications_remove(ObjectKeyType obj);
@@ -85,13 +84,9 @@ public:
         return m_deletions.size();
     }
 
-    bool clear_did_occur() const noexcept
-    {
-        return m_clear_did_occur;
-    }
     bool empty() const noexcept
     {
-        return m_deletions.empty() && m_insertions.empty() && m_modifications.empty() && !m_clear_did_occur;
+        return m_deletions.empty() && m_insertions.empty() && m_modifications.empty();
     }
 
     void merge(ObjectChangeSet&& other);
@@ -114,7 +109,6 @@ private:
     ObjectSet m_deletions;
     ObjectSet m_insertions;
     ObjectMapToColumnSet m_modifications;
-    bool m_clear_did_occur = false;
 };
 
 } // end namespace realm

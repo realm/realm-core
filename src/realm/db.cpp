@@ -2146,7 +2146,7 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
 }
 
 
-DB::version_type DB::get_version_of_latest_snapshot()
+VersionID DB::get_version_id_of_latest_snapshot()
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
@@ -2170,14 +2170,19 @@ DB::version_type DB::get_version_of_latest_snapshot()
         // while we read it.
         const Ringbuffer::ReadCount& r = r_info->readers.get(index);
         if (!atomic_double_inc_if_even(r.count)) {
-
             continue;
         }
-        version_type version = r.version;
+        VersionID version{r.version, index};
         // release the entry again:
         atomic_double_dec(r.count);
         return version;
     }
+}
+
+
+DB::version_type DB::get_version_of_latest_snapshot()
+{
+    return get_version_id_of_latest_snapshot().version;
 }
 
 

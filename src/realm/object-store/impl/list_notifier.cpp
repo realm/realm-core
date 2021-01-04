@@ -52,12 +52,13 @@ void ListNotifier::do_attach_to(Transaction& sg)
         m_list = obj.get_listbase_ptr(m_col);
     }
     catch (const KeyNotFound&) {
+        m_list = nullptr;
     }
 }
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    if (!m_list->is_attached())
+    if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
     info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
@@ -68,7 +69,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
-    if (!m_list->is_attached()) {
+    if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
         // the first run after that
         if (m_prev_size) {
