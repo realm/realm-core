@@ -177,7 +177,7 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key
         }
         else {
             if (out_n) {
-                *out_n = os.persisted_properties.size() + os.persisted_properties.size();
+                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;
