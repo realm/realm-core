@@ -536,7 +536,8 @@ size_t Results::index_of(T const& value)
             T val{};
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
-            } else {
+            }
+            else {
                 // check if the mixed value matches the object to compare
                 if (mixed == value)
                     return i;
