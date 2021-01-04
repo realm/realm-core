@@ -30,14 +30,6 @@ static inline realm_string_t to_capi(const std::string& str)
     return to_capi(StringData{str});
 }
 
-static inline std::string capi_to_std(realm_string_t str)
-{
-    if (str.data) {
-        return std::string{str.data, 0, str.size};
-    }
-    return std::string{};
-}
-
 static inline StringData from_capi(realm_string_t str)
 {
     return StringData{str.data, str.size};
@@ -84,44 +76,14 @@ static inline ObjectId from_capi(realm_object_id_t)
     REALM_TERMINATE("Not implemented yet.");
 }
 
-static inline realm_col_key_t to_capi(ColKey key)
-{
-    return realm_col_key_t{key.value};
-}
-
-static inline ColKey from_capi(realm_col_key_t key)
-{
-    return ColKey{key.col_key};
-}
-
-static inline realm_table_key_t to_capi(TableKey key)
-{
-    return realm_table_key_t{key.value};
-}
-
-static inline TableKey from_capi(realm_table_key_t key)
-{
-    return TableKey{key.table_key};
-}
-
-static inline realm_obj_key_t to_capi(ObjKey key)
-{
-    return realm_obj_key_t{key.value};
-}
-
-static inline ObjKey from_capi(realm_obj_key_t key)
-{
-    return ObjKey{key.obj_key};
-}
-
 static inline ObjLink from_capi(realm_link_t val)
 {
-    return ObjLink{from_capi(val.target_table), from_capi(val.target)};
+    return ObjLink{TableKey(val.target_table), ObjKey(val.target)};
 }
 
 static inline realm_link_t to_capi(ObjLink link)
 {
-    return realm_link_t{to_capi(link.get_table_key()), to_capi(link.get_obj_key())};
+    return realm_link_t{link.get_table_key().value, link.get_obj_key().value};
 }
 
 static inline UUID from_capi(realm_uuid_t val)
@@ -164,7 +126,7 @@ static inline Mixed from_capi(realm_value_t val)
         case RLM_TYPE_OBJECT_ID:
             return Mixed{from_capi(val.object_id)};
         case RLM_TYPE_LINK:
-            return Mixed{ObjLink{from_capi(val.link.target_table), from_capi(val.link.target)}};
+            return Mixed{ObjLink{TableKey(val.link.target_table), ObjKey(val.link.target)}};
         case RLM_TYPE_UUID:
             return Mixed{UUID{from_capi(val.uuid)}};
     }
@@ -230,8 +192,8 @@ static inline realm_value_t to_capi(Mixed value)
             case type_TypedLink: {
                 val.type = RLM_TYPE_LINK;
                 auto link = value.get<ObjLink>();
-                val.link.target_table = to_capi(link.get_table_key());
-                val.link.target = to_capi(link.get_obj_key());
+                val.link.target_table = link.get_table_key().value;
+                val.link.target = link.get_obj_key().value;
                 break;
             }
             case type_UUID: {
@@ -359,11 +321,11 @@ static inline PropertyType from_capi(realm_property_type_e type) noexcept
 static inline Property from_capi(const realm_property_info_t& p) noexcept
 {
     Property prop;
-    prop.name = capi_to_std(p.name);
-    prop.public_name = capi_to_std(p.public_name);
+    prop.name = p.name;
+    prop.public_name = p.public_name;
     prop.type = from_capi(p.type);
-    prop.object_type = capi_to_std(p.link_target);
-    prop.link_origin_property_name = capi_to_std(p.link_origin_property_name);
+    prop.object_type = p.link_target;
+    prop.link_origin_property_name = p.link_origin_property_name;
     prop.is_primary = Property::IsPrimary{bool(p.flags & RLM_PROPERTY_PRIMARY_KEY)};
     prop.is_indexed = Property::IsIndexed{bool(p.flags & RLM_PROPERTY_INDEXED)};
 
@@ -392,11 +354,11 @@ static inline Property from_capi(const realm_property_info_t& p) noexcept
 static inline realm_property_info_t to_capi(const Property& prop) noexcept
 {
     realm_property_info_t p;
-    p.name = to_capi(prop.name);
-    p.public_name = to_capi(prop.public_name);
+    p.name = prop.name.c_str();
+    p.public_name = prop.public_name.c_str();
     p.type = to_capi(prop.type & ~PropertyType::Flags);
-    p.link_target = to_capi(prop.object_type);
-    p.link_origin_property_name = to_capi(prop.link_origin_property_name);
+    p.link_target = prop.object_type.c_str();
+    p.link_origin_property_name = prop.link_origin_property_name.c_str();
 
     p.flags = RLM_PROPERTY_NORMAL;
     if (prop.is_indexed)
@@ -414,7 +376,7 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
     if (bool(prop.type & PropertyType::Dictionary))
         p.collection_type = RLM_COLLECTION_TYPE_DICTIONARY;
 
-    p.key = to_capi(prop.column_key);
+    p.key = prop.column_key.value;
 
     return p;
 }
@@ -422,11 +384,11 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
 static inline realm_class_info_t to_capi(const ObjectSchema& o)
 {
     realm_class_info_t info;
-    info.name = to_capi(o.name);
-    info.primary_key = to_capi(o.primary_key);
+    info.name = o.name.c_str();
+    info.primary_key = o.primary_key.c_str();
     info.num_properties = o.persisted_properties.size();
     info.num_computed_properties = o.computed_properties.size();
-    info.key = to_capi(o.table_key);
+    info.key = o.table_key.value;
     if (o.is_embedded) {
         info.flags = RLM_CLASS_EMBEDDED;
     }

@@ -71,22 +71,14 @@ typedef enum realm_schema_mode {
 } realm_schema_mode_e;
 
 /* Key types */
-typedef struct realm_table_key {
-    uint32_t table_key;
-} realm_table_key_t;
+typedef uint32_t realm_class_key_t;
+typedef int64_t realm_property_key_t;
+typedef int64_t realm_object_key_t;
+typedef uint64_t realm_version_t;
 
-typedef struct realm_col_key {
-    int64_t col_key;
-} realm_col_key_t;
-
-typedef struct realm_obj_key {
-    int64_t obj_key;
-} realm_obj_key_t;
-
-typedef struct realm_version {
-    uint64_t version;
-} realm_version_t;
-
+static const realm_class_key_t RLM_INVALID_CLASS_KEY = ((uint32_t)-1) >> 1;
+static const realm_property_key_t RLM_INVALID_PROPERTY_KEY = -1;
+static const realm_object_key_t RLM_INVALID_OBJECT_KEY = -1;
 
 /* Value types */
 
@@ -125,8 +117,8 @@ typedef struct realm_decimal128 {
 } realm_decimal128_t;
 
 typedef struct realm_link {
-    realm_table_key_t target_table;
-    realm_obj_key_t target;
+    realm_class_key_t target_table;
+    realm_object_key_t target;
 } realm_link_t;
 
 typedef struct realm_object_id {
@@ -211,7 +203,7 @@ typedef enum realm_logic_error_kind {
 
 typedef struct realm_error {
     realm_errno_e error;
-    realm_string_t message;
+    const char* message;
     union {
         int code;
         realm_logic_error_kind_e logic_error_kind;
@@ -258,23 +250,23 @@ typedef enum realm_collection_type {
 } realm_collection_type_e;
 
 typedef struct realm_property_info {
-    realm_string_t name;
-    realm_string_t public_name;
+    const char* name;
+    const char* public_name;
     realm_property_type_e type;
     realm_collection_type_e collection_type;
 
-    realm_string_t link_target;
-    realm_string_t link_origin_property_name;
-    realm_col_key_t key;
+    const char* link_target;
+    const char* link_origin_property_name;
+    realm_property_key_t key;
     int flags;
 } realm_property_info_t;
 
 typedef struct realm_class_info {
-    realm_string_t name;
-    realm_string_t primary_key;
+    const char* name;
+    const char* primary_key;
     size_t num_properties;
     size_t num_computed_properties;
-    realm_table_key_t key;
+    realm_class_key_t key;
     int flags;
 } realm_class_info_t;
 
@@ -342,9 +334,6 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  *
  * Note: The error message in @a err will only be safe to use until the next API
  *       call is made on the current thread.
- *
- * Note: As opposed to other instances of `realm_string_t`, the error message
- *       string is guaranteed to be zero-terminated.
  *
  * Note: The error is not cleared by subsequent successful calls to this
  *       function, but it will be overwritten by subsequent failing calls to
@@ -498,7 +487,7 @@ RLM_API realm_config_t* realm_config_new();
 /**
  * Set the path of the realm being opened.
  */
-RLM_API bool realm_config_set_path(realm_config_t*, realm_string_t);
+RLM_API bool realm_config_set_path(realm_config_t*, const char* path);
 
 RLM_API const char* realm_config_get_path(realm_config_t* config);
 /**
@@ -820,7 +809,7 @@ RLM_API bool realm_compact(realm_t*, bool* did_compact);
  *
  * Note: This function does not validate the schema.
  *
- * Note: `realm_table_key_t` and `realm_col_key_t` values inside
+ * Note: `realm_class_key_t` and `realm_property_key_t` values inside
  *       `realm_class_info_t` and `realm_property_info_t` are unused when
  *       defining the schema. Call `realm_get_schema()` to obtain the values for
  *       these fields in an open realm.
@@ -873,7 +862,7 @@ RLM_API size_t realm_get_num_classes(const realm_t*);
  * @param out_n The actual number of classes. May be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_class_keys(const realm_t*, realm_table_key_t* out_keys, size_t max, size_t* out_n);
+RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, size_t max, size_t* out_n);
 
 /**
  * Find a by the name of @a name.
@@ -886,8 +875,7 @@ RLM_API bool realm_get_class_keys(const realm_t*, realm_table_key_t* out_keys, s
  *                       NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_class(const realm_t*, realm_string_t name, bool* out_found,
-                              realm_class_info_t* out_class_info);
+RLM_API bool realm_find_class(const realm_t*, const char* name, bool* out_found, realm_class_info_t* out_class_info);
 
 /**
  * Get the class with @a key from the schema.
@@ -900,7 +888,7 @@ RLM_API bool realm_find_class(const realm_t*, realm_string_t name, bool* out_fou
  *                       NULL, though that's kind of pointless.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_class(const realm_t*, realm_table_key_t key, realm_class_info_t* out_class_info);
+RLM_API bool realm_get_class(const realm_t*, realm_class_key_t key, realm_class_info_t* out_class_info);
 
 /**
  * Get the list of properties for the class with this @a key.
@@ -917,7 +905,7 @@ RLM_API bool realm_get_class(const realm_t*, realm_table_key_t key, realm_class_
  * @param out_n The actual number of properties written to `out_properties`.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_class_properties(const realm_t*, realm_table_key_t key, realm_property_info_t* out_properties,
+RLM_API bool realm_get_class_properties(const realm_t*, realm_class_key_t key, realm_property_info_t* out_properties,
                                         size_t max, size_t* out_n);
 
 /**
@@ -932,8 +920,8 @@ RLM_API bool realm_get_class_properties(const realm_t*, realm_table_key_t key, r
  * @param out_n The actual number of properties written to `out_col_keys` (if
  *              non-NULL), or number of properties in the class.
  **/
-RLM_API bool realm_get_property_keys(const realm_t*, realm_table_key_t key, realm_col_key_t* out_col_keys, size_t max,
-                                     size_t* out_n);
+RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, realm_property_key_t* out_col_keys,
+                                     size_t max, size_t* out_n);
 
 
 /**
@@ -947,7 +935,7 @@ RLM_API bool realm_get_property_keys(const realm_t*, realm_table_key_t key, real
  *                          populated with information about the property.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_property(const realm_t*, realm_table_key_t class_key, realm_col_key_t key,
+RLM_API bool realm_get_property(const realm_t*, realm_class_key_t class_key, realm_property_key_t key,
                                 realm_property_info_t* out_property_info);
 
 /**
@@ -962,7 +950,7 @@ RLM_API bool realm_get_property(const realm_t*, realm_table_key_t class_key, rea
  *                          be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_property(const realm_t*, realm_table_key_t class_key, realm_string_t name, bool* out_found,
+RLM_API bool realm_find_property(const realm_t*, realm_class_key_t class_key, const char* name, bool* out_found,
                                  realm_property_info_t* out_property_info);
 
 /**
@@ -977,9 +965,8 @@ RLM_API bool realm_find_property(const realm_t*, realm_table_key_t class_key, re
  *                          be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_table_key_t class_key,
-                                                realm_string_t public_name, bool* out_found,
-                                                realm_property_info_t* out_property_info);
+RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_class_key_t class_key, const char* public_name,
+                                                bool* out_found, realm_property_info_t* out_property_info);
 
 /**
  * Find the primary key property for a class, if it has one.
@@ -992,7 +979,7 @@ RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_table_key_
  *                          was found. May be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_find_primary_key_property(const realm_t*, realm_table_key_t class_key, bool* out_found,
+RLM_API bool realm_find_primary_key_property(const realm_t*, realm_class_key_t class_key, bool* out_found,
                                              realm_property_info_t* out_property_info);
 
 /**
@@ -1002,7 +989,7 @@ RLM_API bool realm_find_primary_key_property(const realm_t*, realm_table_key_t c
  *                  objects, if successful.
  * @return True if the table key was valid for this realm.
  */
-RLM_API bool realm_get_num_objects(const realm_t*, realm_table_key_t, size_t* out_count);
+RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* out_count);
 
 /**
  * Get an object with a particular object key.
@@ -1012,7 +999,7 @@ RLM_API bool realm_get_num_objects(const realm_t*, realm_table_key_t, size_t* ou
  *                considered an error.
  * @return A non-NULL pointer if no exception occurred.
  */
-RLM_API realm_object_t* realm_get_object(const realm_t*, realm_table_key_t class_key, realm_obj_key_t obj_key);
+RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class_key, realm_object_key_t obj_key);
 
 /**
  * Find an object with a particular primary key value.
@@ -1021,7 +1008,7 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_table_key_t class
  *                  no error occurred.
  * @return A non-NULL pointer if the object was found and no exception occurred.
  */
-RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm_table_key_t, realm_value_t pk,
+RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm_class_key_t, realm_value_t pk,
                                                            bool* out_found);
 
 /**
@@ -1029,14 +1016,14 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
-RLM_API realm_object_t* realm_object_create(realm_t*, realm_table_key_t);
+RLM_API realm_object_t* realm_object_create(realm_t*, realm_class_key_t);
 
 /**
  * Create an object in a class with a primary key.
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
-RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_table_key_t, realm_value_t pk);
+RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_class_key_t, realm_value_t pk);
 
 /**
  * Delete a realm object.
@@ -1063,14 +1050,14 @@ RLM_API bool realm_object_is_valid(const realm_object_t*);
  *
  * This function cannot fail.
  */
-RLM_API realm_obj_key_t realm_object_get_key(const realm_object_t* object);
+RLM_API realm_object_key_t realm_object_get_key(const realm_object_t* object);
 
 /**
  * Get the table for this object.
  *
  * This function cannot fail.
  */
-RLM_API realm_table_key_t realm_object_get_table(const realm_object_t* object);
+RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* object);
 
 /**
  * Get a `realm_link_t` representing a link to @a object.
@@ -1101,7 +1088,7 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t*, 
  *
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_value(const realm_object_t*, realm_col_key_t, realm_value_t* out_value);
+RLM_API bool realm_get_value(const realm_object_t*, realm_property_key_t, realm_value_t* out_value);
 
 /**
  * Get the values for several properties.
@@ -1124,7 +1111,7 @@ RLM_API bool realm_get_value(const realm_object_t*, realm_col_key_t, realm_value
  *                   NULL.
  * @return True if no exception occurs.
  */
-RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const realm_col_key_t* properties,
+RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const realm_property_key_t* properties,
                               realm_value_t* out_values);
 
 /**
@@ -1136,7 +1123,7 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
  *                   non-sync'ed realms.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_set_value(realm_object_t*, realm_col_key_t, realm_value_t new_value, bool is_default);
+RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
  * Set the values for several properties.
@@ -1164,7 +1151,7 @@ RLM_API bool realm_set_value(realm_object_t*, realm_col_key_t, realm_value_t new
  *                   non-sync'ed realms.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_col_key_t* properties,
+RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_property_key_t* properties,
                               const realm_value_t* values, bool is_default);
 
 /**
@@ -1174,7 +1161,7 @@ RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_co
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_list_t* realm_get_list(realm_object_t*, realm_col_key_t);
+RLM_API realm_list_t* realm_get_list(realm_object_t*, realm_property_key_t);
 
 /**
  * Create a `realm_list_t` from a pointer to a `realm::List`, copy-constructing
@@ -1305,7 +1292,7 @@ RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_obje
  *         of modified properties if @a out_modified is NULL.
  */
 RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t*,
-                                                            realm_col_key_t* out_modified, size_t max);
+                                                            realm_property_key_t* out_modified, size_t max);
 
 /**
  * Get the number of various types of changes in a collection notification.
@@ -1393,7 +1380,7 @@ RLM_API void realm_collection_changes_get_ranges(
 
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
-RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_col_key_t);
+RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_property_key_t);
 RLM_API size_t realm_set_size(const realm_set_t*);
 RLM_API bool realm_set_get(const realm_set_t*, size_t index, realm_value_t* out_value);
 RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index);
@@ -1410,7 +1397,7 @@ RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_ob
 
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict, size_t n);
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_move(void* pdict, size_t n);
-RLM_API realm_dictionary_t* realm_get_dictionary(const realm_object_t*, realm_col_key_t);
+RLM_API realm_dictionary_t* realm_get_dictionary(const realm_object_t*, realm_property_key_t);
 RLM_API size_t realm_dictionary_size(const realm_dictionary_t*);
 RLM_API bool realm_dictionary_get(const realm_dictionary_t*, realm_value_t key, realm_value_t* out_value,
                                   bool* out_found);
@@ -1432,14 +1419,15 @@ realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, real
  * `realm_get_last_error()`.
  *
  * @param target_table The table on which to run this query.
- * @param query_string A string in the Realm Query Language, optionally
- *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param query_string A zero-terminated string in the Realm Query Language,
+ *                     optionally containing argument placeholders (`$0`, `$1`,
+ *                     etc.).
  * @param num_args The number of arguments for this query.
  * @param args A pointer to a list of argument values.
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t target_table, realm_string_t query_string,
+RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t target_table, const char* query_string,
                                          size_t num_args, const realm_value_t* args);
 
 /**
@@ -1456,7 +1444,7 @@ RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t targe
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, realm_string_t query_string,
+RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, const char* query_string,
                                                   size_t num_args, const realm_value_t* values);
 
 /**
@@ -1466,16 +1454,16 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  * `realm_get_last_error()`.
  *
  * @param target_results The results on which to run this query.
- * @param query_string A string in the Realm Query Language, optionally
- *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param query_string A zero-terminated string in the Realm Query Language,
+ *                     optionally containing argument placeholders (`$0`, `$1`,
+ *                     etc.).
  * @param num_args The number of arguments for this query.
  * @param args A pointer to a list of argument values.
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results,
-                                                     realm_string_t query_string, size_t num_args,
-                                                     const realm_value_t* values);
+RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results, const char* query_string,
+                                                     size_t num_args, const realm_value_t* values);
 
 /**
  * Count the number of objects found by this query.
@@ -1568,7 +1556,7 @@ RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const real
  * @param out_found Set to true if there are matching rows.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_results_min(realm_results_t*, realm_col_key_t, realm_value_t* out_min, bool* out_found);
+RLM_API bool realm_results_min(realm_results_t*, realm_property_key_t, realm_value_t* out_min, bool* out_found);
 
 /**
  * Compute the maximum value of a property in the results.
@@ -1577,7 +1565,7 @@ RLM_API bool realm_results_min(realm_results_t*, realm_col_key_t, realm_value_t*
  * @param out_found Set to true if there are matching rows.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_results_max(realm_results_t*, realm_col_key_t, realm_value_t* out_max, bool* out_found);
+RLM_API bool realm_results_max(realm_results_t*, realm_property_key_t, realm_value_t* out_max, bool* out_found);
 
 /**
  * Compute the sum value of a property in the results.
@@ -1586,7 +1574,7 @@ RLM_API bool realm_results_max(realm_results_t*, realm_col_key_t, realm_value_t*
  * @param out_found Set to true if there are matching rows.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_results_sum(realm_results_t*, realm_col_key_t, realm_value_t* out_sum, bool* out_found);
+RLM_API bool realm_results_sum(realm_results_t*, realm_property_key_t, realm_value_t* out_sum, bool* out_found);
 
 /**
  * Compute the average value of a property in the results.
@@ -1597,7 +1585,8 @@ RLM_API bool realm_results_sum(realm_results_t*, realm_col_key_t, realm_value_t*
  * @param out_found Set to true if there are matching rows.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_results_average(realm_results_t*, realm_col_key_t, realm_value_t* out_average, bool* out_found);
+RLM_API bool realm_results_average(realm_results_t*, realm_property_key_t, realm_value_t* out_average,
+                                   bool* out_found);
 
 RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
                                                                             realm_free_userdata_func_t,

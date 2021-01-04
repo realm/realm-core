@@ -45,9 +45,9 @@ static inline const T& cast_ref(const void* ptr)
     return *cast_ptr<T>(ptr);
 }
 
-static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_table_key_t key)
+static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_class_key_t key)
 {
-    auto table_key = from_capi(key);
+    auto table_key = TableKey(key);
 
     // Validate the table key.
     realm->read_group().get_table(table_key);
@@ -64,7 +64,7 @@ static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>&
     throw std::logic_error{"Class not in schema"};
 }
 
-static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_table_key_t key)
+static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_class_key_t key)
 {
     auto& shared_realm = *realm;
     return schema_for_table(shared_realm, key);

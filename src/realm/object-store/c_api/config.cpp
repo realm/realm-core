@@ -13,10 +13,10 @@ RLM_API const char* realm_config_get_path(realm_config_t* config)
     });
 }
 
-RLM_API bool realm_config_set_path(realm_config_t* config, realm_string_t path)
+RLM_API bool realm_config_set_path(realm_config_t* config, const char* path)
 {
     return wrap_err([&]() {
-        config->path = capi_to_std(path);
+        config->path = path;
         return true;
     });
 }
