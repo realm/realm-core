@@ -1,5 +1,5 @@
 module RealmFFI {
-    umbrella header "realm/realm.h"
+    header "realm/realm.h"
 
     export *
 }

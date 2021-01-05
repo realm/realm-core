@@ -76,6 +76,9 @@ let package = Package(
             name: "RealmObjectStore",
             targets: ["ObjectStore"]),
         .library(
+            name: "RealmCapi",
+            targets: ["Capi"]),
+        .library(
             name: "RealmFFI",
             targets: ["FFI"]),
     ],
@@ -175,7 +178,7 @@ let package = Package(
                 "realm/object-store/impl/epoll",
                 "realm/object-store/impl/generic",
                 "realm/object-store/impl/windows",
-                "realm/object-store/c_api/realm.c"
+                "realm/object-store/c_api"
             ],
             sources: ["realm/object-store"],
             publicHeadersPath: "realm/object-store",
@@ -186,16 +189,23 @@ let package = Package(
                 .headerSearchPath("external/pegtl/include/tao")
             ] + cxxSettings) as [CXXSetting]),
         .target(
-            name: "FFI",
+            name: "Capi",
             dependencies: ["ObjectStore"],
-            path: "src/swift",
+            path: "src",
             exclude: [
+                "realm/object-store/c_api/realm.c"
             ],
-//            publicHeadersPath: "realm/realm.h",
+            sources: ["realm/object-store/c_api"],
+            publicHeadersPath: "realm/object-store/c_api",
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
-                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .headerSearchPath("external/pegtl/include/tao")
             ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "FFI",
+            dependencies: ["Capi"],
+            path: "src/swift"),
         .target(
             name: "ObjectStoreTests",
             dependencies: ["ObjectStore", "SyncServer"],
@@ -203,14 +213,30 @@ let package = Package(
             exclude: [
                 "benchmarks",
                 "notifications-fuzzer",
-                "c_api.cpp",
-                "c_api.c",
+                "c_api"
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include")
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "CapiTests",
+            dependencies: ["Capi"],
+            path: "test/object-store/c_api",
+            exclude: [
+                "benchmarks",
+                "mongodb",
+                "notifications-fuzzer",
+                "sync",
+                "util"
+            ],
+            cxxSettings: ([
+                .define("REALM_ENABLE_SYNC", to: "1"),
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .headerSearchPath("../"),
+                .headerSearchPath("../../../external/catch/single_include")
             ] + cxxSettings) as [CXXSetting])
     ],
     cxxLanguageStandard: .cxx1z

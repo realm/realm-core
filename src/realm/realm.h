@@ -489,7 +489,11 @@ RLM_API realm_config_t* realm_config_new();
  */
 RLM_API bool realm_config_set_path(realm_config_t*, const char* path);
 
+/**
+ * Get the path of the realm config.
+ */
 RLM_API const char* realm_config_get_path(realm_config_t* config);
+
 /**
  * Set the encryption key for the realm.
  *
@@ -513,6 +517,10 @@ RLM_API bool realm_config_set_schema(realm_config_t*, const realm_schema_t* sche
  * Set the schema version of the schema.
  */
 RLM_API bool realm_config_set_schema_version(realm_config_t*, uint64_t version);
+
+/**
+ * Get the schema version of the schema.
+ */
 RLM_API uint64_t realm_config_get_schema_version(realm_config_t*);
 
 /**
@@ -844,7 +852,12 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
  *         validation failure.
  */
 RLM_API bool realm_schema_validate(const realm_schema_t*);
+
+/**
+ * Set the schema of an open realm.
+ */
 RLM_API bool realm_set_schema(realm_t* realm, const realm_schema_t* schema);
+
 /**
  * Return the number of classes in the Realm's schema.
  *
