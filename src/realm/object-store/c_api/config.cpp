@@ -9,7 +9,7 @@ RLM_API realm_config_t* realm_config_new()
 RLM_API const char* realm_config_get_path(realm_config_t* config)
 {
     return wrap_err([&]() {
-        return config->path.data();
+        return config->path.c_str();
     });
 }
 

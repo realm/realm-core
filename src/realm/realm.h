@@ -854,9 +854,9 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
 RLM_API bool realm_schema_validate(const realm_schema_t*);
 
 /**
- * Set the schema of an open realm.
+ * Update the schema of an open realm.
  */
-RLM_API bool realm_set_schema(realm_t* realm, const realm_schema_t* schema);
+RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema);
 
 /**
  * Return the number of classes in the Realm's schema.

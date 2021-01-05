@@ -190,7 +190,7 @@ TEST_CASE("C API") {
         CHECK(checked(realm_config_set_schema_mode(config, RLM_SCHEMA_MODE_AUTOMATIC)));
 
         realm = realm_open(config);
-        CHECK(realm_set_schema(realm, schema));
+        CHECK(realm_update_schema(realm, schema));
         CHECK(checked(realm));
         realm_release(schema);
         realm_release(config);
@@ -221,11 +221,14 @@ TEST_CASE("C API") {
         };
         realm_property_info_t* baz_properties = &int_property;
 
+        // get class count
         auto num_classes = realm_get_num_classes(realm);
         realm_class_key_t* out_keys = (realm_class_key_t*)malloc(sizeof(realm_class_key_t) * num_classes);
+        // get class keys
         realm_get_class_keys(realm, out_keys, num_classes, nullptr);
         realm_class_info_t classes[num_classes + 1];
         const realm_property_info_t* properties[num_classes + 1];
+        // iterating through each class, "recreate" the old schema
         for (size_t i = 0; i < num_classes; i++) {
             realm_get_class(realm, out_keys[i], &classes[i]);
             size_t out_n;
@@ -234,15 +237,23 @@ TEST_CASE("C API") {
             realm_get_class_properties(realm, out_keys[i], out_props, out_n, nullptr);
             properties[i] = out_props;
         }
+        // add the new class and its properties to the arrays
         classes[num_classes] = baz;
         properties[num_classes] = baz_properties;
 
+        // create a new schema and update the realm
         auto new_schema = realm_schema_new(classes, num_classes + 1, properties);
-        CHECK(realm_set_schema(realm, new_schema));
+        CHECK(realm_update_schema(realm, new_schema));
         auto new_num_classes = realm_get_num_classes(realm);
         CHECK(new_num_classes == (num_classes + 1));
 
-        REQUIRE(realm_set_schema(realm, old_schema));
+        bool found;
+        realm_class_info_t baz_info;
+        CHECK(checked(realm_find_class(realm, "baz", &found, &baz_info)));
+        CHECK(found);
+        realm_property_info_t baz_int_property;
+        CHECK(checked(realm_find_property(realm, baz_info.key, "int", &found, &baz_int_property)));
+        CHECK(found);
     }
 
     SECTION("schema validates") {
