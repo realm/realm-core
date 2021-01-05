@@ -44,12 +44,12 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
 
-    /*
+
     VersionID src_version =
         dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
     if (src_version != tr->get_version_of_current_transaction())
-        throw realm::LogicError(LogicError::bad_version);
-    */
+        was_in_sync = false;
+
 
     if (was_in_sync)
         m_last_seen_versions = get_dependency_versions();
