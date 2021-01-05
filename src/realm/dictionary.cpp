@@ -23,7 +23,21 @@
 #include <realm/replication.hpp>
 #include <algorithm>
 
+
 namespace realm {
+
+namespace {
+void validate_key_value(const Mixed& key)
+{
+    if (key.get_type() == type_String) {
+        const char* str = key.get_string().data();
+        if (str[0] == '$')
+            throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+        if (strchr(str, '.'))
+            throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+    }
+}
+} // namespace
 
 // Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
 static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
@@ -338,6 +352,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
+    validate_key_value(key);
     update_if_needed();
 
     ObjLink new_link;
@@ -448,6 +463,7 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 
 void Dictionary::erase(Mixed key)
 {
+    validate_key_value(key);
     update_if_needed();
 
     if (m_clusters) {

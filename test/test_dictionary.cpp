@@ -99,6 +99,8 @@ TEST(Dictionary_Basics)
         CHECK_EQUAL(dict["Goodbye"].get_string(), "cruel world");
         CHECK_THROW_ANY(dict.get("Baa").get_string()); // Within range
         CHECK_THROW_ANY(dict.get("Foo").get_string()); // Outside range
+        CHECK_THROW_ANY(dict.insert("$foo", ""));      // Must not start with '$'
+        CHECK_THROW_ANY(dict.insert("foo.bar", ""));   // Must not contain '.'
     }
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
@@ -118,6 +120,10 @@ TEST(Dictionary_Basics)
         // Check that you can insert after clear
         CHECK(dict.insert("Hello", 9).second);
         CHECK_EQUAL(dict.size(), 1);
+        dict.erase("Hello");
+        CHECK_EQUAL(dict.size(), 0);
+        CHECK_THROW_ANY(dict.erase("$foo"));    // Must not start with '$'
+        CHECK_THROW_ANY(dict.erase("foo.bar")); // Must not contain '.'
     }
     {
         Dictionary dict = obj2.get_dictionary(col_dict);
