@@ -826,6 +826,11 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
 RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 
 /**
+ * Update the schema of an open realm.
+ */
+RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema);
+
+/**
  * Get the `realm::Schema*` pointer for this realm.
  *
  * This is intended as a migration path for users of the C++ Object Store API.

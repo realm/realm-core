@@ -185,8 +185,7 @@ let package = Package(
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .headerSearchPath("realm/object-store"),
-                .headerSearchPath("external/pegtl/include/tao")
+                .headerSearchPath("realm/object-store")
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "Capi",
