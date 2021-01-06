@@ -201,23 +201,17 @@ TEST_CASE("C API") {
     SECTION("schema is set after opening") {
         auto old_schema = realm_get_schema(realm);
         const realm_class_info_t baz = {
-                "baz",
-                "", // primary key
-                1,  // properties
-                0,  // computed_properties
-                RLM_INVALID_CLASS_KEY,
-                RLM_CLASS_NORMAL,
+            "baz",
+            "", // primary key
+            1,  // properties
+            0,  // computed_properties
+            RLM_INVALID_CLASS_KEY,
+            RLM_CLASS_NORMAL,
         };
 
         auto int_property = realm_property_info_t{
-            "int",
-            "",
-            RLM_PROPERTY_TYPE_INT,
-            RLM_COLLECTION_TYPE_NONE,
-            "",
-            "",
-            RLM_INVALID_PROPERTY_KEY,
-            RLM_PROPERTY_NORMAL,
+            "int", "", RLM_PROPERTY_TYPE_INT,    RLM_COLLECTION_TYPE_NONE,
+            "",    "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
         };
         realm_property_info_t* baz_properties = &int_property;
 
