@@ -1,6 +1,6 @@
 #include "catch2/catch.hpp"
 
-#include <realm/realm.h>
+#include <realm.h>
 
 #include <realm/util/file.hpp>
 

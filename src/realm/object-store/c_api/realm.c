@@ -1,2 +1,2 @@
 /* Verify that realm.h compiles when included into a C object. */
-#include <realm/realm.h>
+#include <realm.h>

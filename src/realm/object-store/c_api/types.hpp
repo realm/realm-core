@@ -1,7 +1,7 @@
 #ifndef REALM_OBJECT_STORE_C_API_TYPES_HPP
 #define REALM_OBJECT_STORE_C_API_TYPES_HPP
 
-#include <realm/realm.h>
+#include <realm.h>
 #include <realm/object-store/c_api/conversion.hpp>
 
 #include <realm/util/to_string.hpp>

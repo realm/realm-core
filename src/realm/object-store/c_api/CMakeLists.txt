@@ -1,5 +1,5 @@
 set(REALM_FFI_SOURCES
-    ../../realm.h
+    ../../../realm.h
 
     config.cpp
     error.cpp
@@ -70,4 +70,4 @@ set_target_properties(RealmFFIStatic PROPERTIES
 # install(TARGETS RealmFFI DESTINATION lib COMPONENT devel)
 
 install(TARGETS RealmFFIStatic DESTINATION lib COMPONENT devel)
-install(FILES ../../realm.h DESTINATION include/realm COMPONENT devel)
+install(FILES ../../../realm.h DESTINATION include COMPONENT devel)
