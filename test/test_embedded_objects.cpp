@@ -40,6 +40,35 @@ TEST(EmbeddedObjects_Basic)
     CHECK(compare_groups(read_server, read_client_2));
 }
 
+TEST(Table_EmbeddedObjectsCircular)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    ColKey col_link1, col_link2, col_link3;
+
+    client_1->create_schema([&](WriteTransaction& tr) {
+        Group& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_table", type_Int, "id");
+        auto e1 = g.add_embedded_table("class_e1");
+        auto e2 = g.add_embedded_table("class_e2");
+        table->add_column(*table, "unused");
+        col_link1 = table->add_column(*e1, "link");
+        col_link2 = e1->add_column(*e2, "link");
+        col_link3 = e2->add_column(*table, "link");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto table = tr.get_table("class_table");
+        Obj obj = table->create_object_with_primary_key(1);
+        obj.create_and_set_linked_object(col_link1).create_and_set_linked_object(col_link2).set(col_link3,
+                                                                                                obj.get_key());
+        obj.invalidate();
+        obj = table->create_object_with_primary_key(1);
+    });
+}
+
+
 TEST(EmbeddedObjects_ArrayOfObjects)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);

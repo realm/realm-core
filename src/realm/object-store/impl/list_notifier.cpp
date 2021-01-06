@@ -26,7 +26,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list, PropertyType type)
+ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type)
     : CollectionNotifier(std::move(realm))
     , m_type(type)
     , m_table(list.get_table()->get_key())
@@ -49,15 +49,16 @@ void ListNotifier::do_attach_to(Transaction& sg)
 {
     try {
         auto obj = sg.get_table(m_table)->get_object(m_obj);
-        m_list = obj.get_listbase_ptr(m_col);
+        m_list = obj.get_collection_ptr(m_col);
     }
     catch (const KeyNotFound&) {
+        m_list = nullptr;
     }
 }
 
 bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    if (!m_list->is_attached())
+    if (!m_list || !m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
     info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
@@ -68,7 +69,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
 void ListNotifier::run()
 {
-    if (!m_list->is_attached()) {
+    if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed if this is
         // the first run after that
         if (m_prev_size) {

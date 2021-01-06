@@ -169,11 +169,11 @@ public:
         return true;
     }
 
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -274,8 +274,8 @@ public:
     bool set_erase(size_t set_ndx);
     bool set_clear(size_t set_ndx);
 
-    bool dictionary_insert(Mixed key);
-    bool dictionary_erase(Mixed key);
+    bool dictionary_insert(size_t dict_ndx, Mixed key);
+    bool dictionary_erase(size_t dict_ndx, Mixed key);
 
     /// End of methods expected by parser.
 
@@ -375,8 +375,8 @@ public:
     virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
     virtual void set_clear(const CollectionBase& set);
 
-    virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
-    virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
+    virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
+    virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -1050,7 +1050,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
-            if (!handler.dictionary_insert(key)) // Throws
+            size_t dict_ndx = read_int<size_t>();          // Throws
+            if (!handler.dictionary_insert(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
@@ -1058,7 +1059,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
-            if (!handler.dictionary_erase(key)) // Throws
+            size_t dict_ndx = read_int<size_t>();         // Throws
+            if (!handler.dictionary_erase(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
@@ -1295,24 +1297,15 @@ public:
         return true;
     }
 
-    bool dictionary_insert(Mixed key)
+    bool dictionary_insert(size_t dict_ndx, Mixed key)
     {
-        m_encoder.dictionary_erase(key);
+        m_encoder.dictionary_erase(dict_ndx, key);
         return true;
     }
 
-    bool dictionary_erase(Mixed key)
+    bool dictionary_erase(size_t dict_ndx, Mixed key)
     {
-        m_encoder.dictionary_insert(key);
-        return true;
-    }
-
-    bool clear_table(size_t old_size)
-    {
-        while (old_size--) {
-            m_encoder.create_object(null_key);
-            append_instruction();
-        }
+        m_encoder.dictionary_insert(dict_ndx, key);
         return true;
     }
 

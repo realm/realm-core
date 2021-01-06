@@ -22,6 +22,7 @@
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -108,6 +109,8 @@ public:
 
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()

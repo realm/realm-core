@@ -403,16 +403,25 @@ TEST_CASE("Schema") {
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects embedded objects self loop via top level object") {
+        SECTION("does not reject an embedded object loop via top level object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
                  ObjectSchema::IsEmbedded{true},
                  {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Cycles containing embedded objects are not currently supported: "
-                                      "'EmbeddedObject.link_to_top_level_object.link_to_embedded_object'");
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("does not reject a top level loop via embedded object link") {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"},
+                  {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
+            REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("rejects embedded objects loop to itself") {
@@ -427,7 +436,19 @@ TEST_CASE("Schema") {
                 "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
         }
 
-        SECTION("rejects embedded objects self loop via different embedded object") {
+        SECTION("rejects embedded objects loop to itself from a list") {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_self", PropertyType::Object | PropertyType::Array, "EmbeddedObject"}}}};
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(),
+                "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+        }
+
+        SECTION("rejects embedded objects loop via different embedded object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
@@ -462,15 +483,15 @@ TEST_CASE("Schema") {
             catch (const std::exception& e) {
                 message = e.what();
             }
-            bool found_loop_on_a = message.find("Cycles containing embedded objects are not currently supported: "
-                                                "'EmbeddedObjectA.link_to_c.link_to_a'") != std::string::npos ||
-                                   message.find("Cycles containing embedded objects are not currently supported: "
-                                                "'EmbeddedObjectA.link_to_b.link_to_a'") != std::string::npos;
+            bool found_loop_on_a = message.find("EmbeddedObjectA.link_to_c.link_to_a") != std::string::npos ||
+                                   message.find("EmbeddedObjectA.link_to_b.link_to_a") != std::string::npos;
+            bool found_loop_on_b = message.find("EmbeddedObjectB.link_to_a.link_to_b") != std::string::npos ||
+                                   message.find("EmbeddedObjectB.link_to_a.link_to_c.link_to_a") != std::string::npos;
+            bool found_loop_on_c = message.find("EmbeddedObjectC.link_to_a.link_to_c") != std::string::npos ||
+                                   message.find("EmbeddedObjectC.link_to_a.link_to_b.link_to_a") != std::string::npos;
             REQUIRE(found_loop_on_a);
-            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
-                                 "'EmbeddedObjectB.link_to_a.link_to_b'") != std::string::npos);
-            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
-                                 "'EmbeddedObjectC.link_to_a.link_to_c'") != std::string::npos);
+            REQUIRE(found_loop_on_b);
+            REQUIRE(found_loop_on_c);
         }
 
         SECTION("allows top level loops") {
@@ -484,6 +505,36 @@ TEST_CASE("Schema") {
                              {"EmbeddedObjectB",
                               ObjectSchema::IsEmbedded{true},
                               {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("distinct paths to an embedded object is not a loop") {
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link1_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
+                  {"link2_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
+                {"EmbeddedObjectA", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}},
+            };
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("linked distinct paths to an embedded object is not a loop") {
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link_to_embedded_A", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
+                  {"link_to_embedded_B", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
+                  {"link_to_b", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {
+                     {"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
+                 }},
+                {"EmbeddedObjectC", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}}
+
+            };
             REQUIRE_NOTHROW(schema.validate());
         }
 

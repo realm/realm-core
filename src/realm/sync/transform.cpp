@@ -1004,14 +1004,14 @@ struct MergeUtils {
     bool same_path_element(const Instruction::Path::Element& left,
                            const Instruction::Path::Element& right) const noexcept
     {
-        auto pred = util::overload{
+        const auto& pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
                 return lhs == rhs;
             },
             [&](InternString lhs, InternString rhs) {
                 return same_string(lhs, rhs);
             },
-            [&](auto&&, auto&&) {
+            [&](const auto&, const auto&) {
                 // FIXME: Paths contain incompatible element types. Should we raise an
                 // error here?
                 return false;

@@ -23,7 +23,21 @@
 #include <realm/replication.hpp>
 #include <algorithm>
 
+
 namespace realm {
+
+namespace {
+void validate_key_value(const Mixed& key)
+{
+    if (key.get_type() == type_String) {
+        const char* str = key.get_string().data();
+        if (str[0] == '$')
+            throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+        if (strchr(str, '.'))
+            throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+    }
+}
+} // namespace
 
 // Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
 static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
@@ -94,6 +108,7 @@ bool Dictionary::is_null(size_t ndx) const
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
+    update_if_needed();
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
@@ -101,25 +116,38 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
+std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx)
+{
+    update_if_needed();
+    if (ndx >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+    ObjKey k;
+    return do_get_pair(m_clusters->get(ndx, k));
+}
+
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
-    ArrayMixed leaf(m_obj.get_alloc());
-    size_t start_ndx = 0;
+    if (is_attached()) {
+        update_if_needed();
+        ArrayMixed leaf(m_obj.get_alloc());
+        size_t start_ndx = 0;
 
-    m_clusters->traverse([&](const Cluster* cluster) {
-        size_t e = cluster->node_size();
-        cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-        for (size_t i = 0; i < e; i++) {
-            if (leaf.get(i) == value) {
-                ret = start_ndx + i;
-                return true;
+        m_clusters->traverse([&](const Cluster* cluster) {
+            size_t e = cluster->node_size();
+            cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+            for (size_t i = 0; i < e; i++) {
+                if (leaf.get(i) == value) {
+                    ret = start_ndx + i;
+                    return true;
+                }
             }
-        }
-        start_ndx += e;
-        // Continue
-        return false;
-    });
+            start_ndx += e;
+            // Continue
+            return false;
+        });
+    }
 
     return ret;
 }
@@ -324,6 +352,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
+    validate_key_value(key);
     update_if_needed();
 
     ObjLink new_link;
@@ -346,21 +375,25 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
+    bool old_entry = false;
+    ClusterNode::State state;
+    try {
+        // We assume that we will most likely insert new values, so we try this first
+        state = m_clusters->insert(k, key, value);
+    }
+    catch (const KeyAlreadyUsed&) {
+        state = m_clusters->get(k);
+        old_entry = true;
+    }
+
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_insert(*this, key, value);
+        repl->dictionary_insert(*this, state.index, key, value);
     }
 
     bump_content_version();
-    try {
-        ClusterNode::State state = m_clusters->insert(k, key, value);
 
-        if (new_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, ObjLink(), new_link, cascade_state);
-        }
-        return {Iterator(this, state.index), true};
-    }
-    catch (const KeyAlreadyUsed&) {
+    ObjLink old_link;
+    if (old_entry) {
         auto state = m_clusters->get(k);
         Array fallback(m_obj.get_alloc());
         Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
@@ -369,19 +402,18 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.init_from_parent();
 
         Mixed old_value = values.get(state.index);
-        ObjLink old_link;
         if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
             old_link = old_value.get<ObjLink>();
         }
-
-        if (new_link != old_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
-        }
-
         values.set(state.index, value);
-        return {Iterator(this, state.index), false};
     }
+
+    if (new_link != old_link) {
+        CascadeState cascade_state;
+        m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+    }
+
+    return {Iterator(this, state.index), !old_entry};
 }
 
 const Mixed Dictionary::operator[](Mixed key)
@@ -402,6 +434,19 @@ const Mixed Dictionary::operator[](Mixed key)
     return ret;
 }
 
+bool Dictionary::contains(Mixed key)
+{
+    update_if_needed();
+    if (m_clusters) {
+        auto hash = key.hash();
+        ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+        auto state = m_clusters->try_get(k);
+        if (state.index != realm::npos)
+            return true;
+    }
+    return false;
+}
+
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
     if (m_clusters) {
@@ -418,16 +463,19 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 
 void Dictionary::erase(Mixed key)
 {
+    validate_key_value(key);
     update_if_needed();
 
     if (m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-        CascadeState state;
+        auto state = m_clusters->get(k);
+
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, key);
+            repl->dictionary_erase(*this, state.index, key);
         }
-        m_clusters->erase(k, state);
+        CascadeState dummy;
+        m_clusters->erase(k, dummy);
         bump_content_version();
     }
 }
@@ -456,8 +504,10 @@ void Dictionary::clear()
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
         if (Replication* repl = this->m_obj.get_replication()) {
+            size_t n = 0;
             for (auto&& elem : *this) {
-                repl->dictionary_erase(*this, elem.first);
+                repl->dictionary_erase(*this, n, elem.first);
+                n++;
             }
         }
         // Just destroy the whole cluster
@@ -492,7 +542,7 @@ bool Dictionary::init_from_parent() const
     return valid;
 }
 
-Mixed Dictionary::do_get(ClusterNode::State&& s) const
+Mixed Dictionary::do_get(const ClusterNode::State& s) const
 {
     ArrayMixed values(m_obj.get_alloc());
     ref_type ref = to_ref(Array::get(s.mem.get_addr(), 2));
@@ -513,9 +563,35 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
     return val;
 }
 
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+{
+    Mixed key;
+    switch (m_key_type) {
+        case type_String: {
+            ArrayString keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        case type_Int: {
+            ArrayInteger keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        default:
+            throw std::runtime_error("Not implemented");
+            break;
+    }
+    Mixed val = do_get(std::move(s));
+
+    return std::make_pair(key, val);
+}
 /************************* Dictionary::Iterator *************************/
 
-CollectionIterator<Dictionary>::CollectionIterator(const Dictionary* dict, size_t pos)
+Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {
@@ -544,7 +620,6 @@ auto Dictionary::Iterator::operator*() const -> value_type
             throw std::runtime_error("Not implemented");
             break;
     }
-
     ArrayMixed values(m_tree.get_alloc());
     ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
     values.init_from_ref(ref);

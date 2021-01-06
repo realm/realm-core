@@ -230,10 +230,6 @@ private:
     // Will have a read transaction iff m_notifiers is non-empty
     std::shared_ptr<Transaction> m_notifier_sg;
 
-    // Transaction used to advance notifiers in m_new_notifiers to the main shared
-    // group's transaction version
-    // Will have a read transaction iff m_new_notifiers is non-empty
-    std::shared_ptr<Transaction> m_advancer_sg;
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
@@ -247,8 +243,6 @@ private:
     std::shared_ptr<AuditInterface> m_audit_context;
 
     void open_db();
-
-    void pin_version(VersionID version) REQUIRES(m_notifier_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);

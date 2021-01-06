@@ -42,15 +42,6 @@ void ObjectChangeSet::deletions_add(ObjectKeyType obj)
     }
 }
 
-void ObjectChangeSet::clear(size_t old_size)
-{
-    static_cast<void>(old_size); // unused
-    m_clear_did_occur = true;
-    m_insertions.clear();
-    m_modifications.clear();
-    m_deletions.clear();
-}
-
 bool ObjectChangeSet::insertions_remove(ObjectKeyType obj)
 {
     return m_insertions.erase(obj) > 0;
@@ -68,11 +59,6 @@ bool ObjectChangeSet::deletions_remove(ObjectKeyType obj)
 
 bool ObjectChangeSet::deletions_contains(ObjectKeyType obj) const
 {
-    if (m_clear_did_occur) {
-        // FIXME: what are the expected notifications when an object is deleted
-        // and then another object is inserted with the same key?
-        return m_insertions.count(obj) == 0;
-    }
     return m_deletions.count(obj) > 0;
 }
 
@@ -103,7 +89,6 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
         *this = std::move(other);
         return;
     }
-    m_clear_did_occur = m_clear_did_occur || other.m_clear_did_occur;
 
     verify();
     other.verify();

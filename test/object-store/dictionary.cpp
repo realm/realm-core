@@ -19,6 +19,7 @@
 #include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
+#include "util/index_helpers.hpp"
 
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -28,8 +29,6 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/impl/object_accessor_impl.hpp>
-
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm.hpp>
@@ -47,8 +46,10 @@ TEST_CASE("dictionary") {
         {"object", {{"value", PropertyType::Dictionary | PropertyType::String}}},
     };
     auto r = Realm::get_shared_realm(config);
+    auto r2 = Realm::get_shared_realm(config);
 
     auto table = r->read_group().get_table("class_object");
+    auto table2 = r2->read_group().get_table("class_object");
     r->begin_transaction();
     Obj obj = table->create_object();
     ColKey col = table->get_column_key("value");
@@ -94,6 +95,114 @@ TEST_CASE("dictionary") {
         for (size_t i = 0; i < values.size(); ++i) {
             dict.insert(ctx, keys[i], util::Any(values[i]));
             REQUIRE(dict.get<StringData>(keys[i]) == values[i]);
+        }
+    }
+
+    SECTION("iteration") {
+        for (size_t i = 0; i < values.size(); ++i) {
+            auto ndx = dict.find_any(values[i]);
+            Dictionary::Iterator it = dict.begin() + ndx;
+            REQUIRE((*it).first.get_string() == keys[i]);
+            REQUIRE((*it).second.get_string() == values[i]);
+            auto element = results.get_dictionary_element(ndx);
+            REQUIRE(element.first == keys[i]);
+            REQUIRE(element.second.get_string() == values[i]);
+        }
+    }
+
+    SECTION("notifications") {
+        r->commit_transaction();
+
+        auto sorted = results.sort({{"self", true}});
+
+        size_t calls = 0;
+        CollectionChangeSet change, rchange, srchange;
+        auto token = dict.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            change = c;
+            ++calls;
+        });
+        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            rchange = c;
+            ++calls;
+        });
+        auto srtoken = sorted.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            srchange = c;
+            ++calls;
+        });
+
+        SECTION("add value to dictionary") {
+            // Remove the existing copy of this value so that the sorted list
+            // doesn't have dupes resulting in an unstable order
+            advance_and_notify(*r);
+            r->begin_transaction();
+            dict.erase("b");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            r->begin_transaction();
+            dict.insert("d", "dade");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            auto ndx = results.index_of(StringData("dade"));
+            REQUIRE_INDICES(change.insertions, ndx);
+            REQUIRE_INDICES(rchange.insertions, ndx);
+            // "dade" ends up at the end of the sorted list
+            REQUIRE_INDICES(srchange.insertions, values.size() - 1);
+        }
+
+        SECTION("remove value from list") {
+            advance_and_notify(*r);
+            auto ndx = results.index_of(StringData("apple"));
+            r->begin_transaction();
+            dict.erase("a");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.deletions, ndx);
+            REQUIRE_INDICES(rchange.deletions, ndx);
+            // apple comes first in the sorted result.
+            REQUIRE_INDICES(srchange.deletions, 0);
+        }
+
+        SECTION("clear list") {
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            dict.remove_all();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(rchange.deletions.count() == values.size());
+            REQUIRE(srchange.deletions.count() == values.size());
+        }
+
+        SECTION("delete containing row") {
+            advance_and_notify(*r);
+            REQUIRE(calls == 3);
+
+            r->begin_transaction();
+            obj.remove();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(calls == 6);
+            REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(rchange.deletions.count() == values.size());
+            REQUIRE(srchange.deletions.count() == values.size());
+
+            r->begin_transaction();
+            table->create_object();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(calls == 6);
+        }
+
+        SECTION("deleting containing row before first run of notifier") {
+            r2->begin_transaction();
+            table2->begin()->remove();
+            r2->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
         }
     }
 }

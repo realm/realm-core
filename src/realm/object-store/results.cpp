@@ -259,7 +259,7 @@ util::Optional<T> Results::try_get(size_t ndx)
         if (ndx < m_collection->size()) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any(ndx);
-            T val{};
+            T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
             }
@@ -385,6 +385,20 @@ Mixed Results::get_any(size_t ndx)
         }
     }
     return {};
+}
+std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
+{
+    if (m_mode == Mode::Collection && ndx < m_collection->size()) {
+        if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+            evaluate_sort_and_distinct_on_collection();
+            if (m_list_indices) {
+                ndx = (*m_list_indices)[ndx];
+            }
+            auto val = dict->get_pair(ndx);
+            return {val.first.get_string(), val.second};
+        }
+    }
+    return {"", {}};
 }
 
 template <typename T>

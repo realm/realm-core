@@ -1661,11 +1661,11 @@ public:
         return true; // No-op
     }
 
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true; // No-op
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_erase(size_t, Mixed)
     {
         return true; // No-op
     }

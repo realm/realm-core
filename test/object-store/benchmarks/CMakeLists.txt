@@ -26,18 +26,18 @@ if(REALM_ENABLE_SYNC)
     )
 endif()
 
-add_executable(benchmarks ${SOURCES} ${HEADERS})
+add_executable(object-store-benchmarks ${SOURCES} ${HEADERS})
 
-target_include_directories(benchmarks PRIVATE 
+target_include_directories(object-store-benchmarks PRIVATE 
     ${CATCH_INCLUDE_DIR}
     ../util
 )
 
 if(REALM_ENABLE_SYNC)
-    target_link_libraries(benchmarks SyncServer)
+    target_link_libraries(object-store-benchmarks SyncServer)
 endif()
 
-target_link_libraries(benchmarks ObjectStore)
-set_target_properties(benchmarks PROPERTIES
+target_link_libraries(object-store-benchmarks ObjectStore)
+set_target_properties(object-store-benchmarks PROPERTIES
       EXCLUDE_FROM_ALL 1
       EXCLUDE_FROM_DEFAULT_BUILD 1)

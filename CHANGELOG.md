@@ -6,10 +6,13 @@
   a backup, if a) an attempt is made to open a realm file whith a "future" file format and b) a backup file exist
   that fits the current file format.
   ([#4166](https://github.com/realm/realm-core/pull/4166))
+* Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Calling Table::clear() will in many cases not work for the data types introduced in v10.2.0. ([#4198](https://github.com/realm/realm-core/issues/4198), since v10.2.0)
+* Fix a race condition which would lead to "uncaught exception in notifier thread: N5realm15InvalidTableRefE: transaction_ended" and a crash when the source Realm was closed or invalidated at a very specific time during the first run of a collection notifier ([#3761](https://github.com/realm/realm-core/issues/3761), since v6.0.0).
+* Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
  
 ### Breaking changes
 * None.
@@ -18,6 +21,38 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.3.2 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+
+-----------
+
+### Internals
+* Fixed a syntax error in the packaged `RealmConfig.cmake` which prevented it from being imported in CMake projects.
+* The xcframework build was missing the arm64 slice for apple simulators.
+* The non-xcframework Apple build once again includes fat libraries for the parser rather than separate device/simulator ones.
+
+----------------------------------------------
+
+# 10.3.1 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* None.
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Add missing header from packages (`realm/dictionary_cluster_tree.hpp`).
 
 ----------------------------------------------
 
@@ -78,6 +113,13 @@
 ### Enhancements
 * Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
 
+----------------------------------------------
+
+# 10.1.4 Release notes
+
+### Fixed
+* You may get assertion "n != realm::npos" when integrating changesets from the server. ([#4180](https://github.com/realm/realm-core/pull/4180), since v10.0.0)
+ 
 ----------------------------------------------
 
 # 10.1.3 Release notes
