@@ -38,7 +38,7 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
     });
 }
 
-RLM_API const realm_schema_t* realm_get_schema(const realm_t* realm)
+RLM_API realm_schema_t* realm_get_schema(const realm_t* realm)
 {
     return wrap_err([&]() {
         auto& rlm = *realm;
@@ -118,7 +118,7 @@ RLM_API bool realm_find_class(const realm_t* realm, const char* name, bool* out_
 RLM_API bool realm_get_class(const realm_t* realm, realm_class_key_t key, realm_class_info_t* out_class_info)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, key);
+        auto& os = schema_for_table(*realm, TableKey(key));
         *out_class_info = to_capi(os);
         return true;
     });
@@ -128,7 +128,7 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
                                         realm_property_info_t* out_properties, size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, key);
+        auto& os = schema_for_table(*realm, TableKey(key));
 
         if (out_properties) {
             size_t i = 0;
@@ -162,7 +162,7 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
                                      size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, key);
+        auto& os = schema_for_table(*realm, TableKey(key));
 
         if (out_keys) {
             size_t i = 0;
@@ -196,7 +196,7 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, class_key);
+        auto& os = schema_for_table(*realm, TableKey(class_key));
         auto col_key = ColKey(key);
 
         // FIXME: We can do better than linear search.
@@ -224,7 +224,7 @@ RLM_API bool realm_find_property(const realm_t* realm, realm_class_key_t class_k
                                  realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, class_key);
+        auto& os = schema_for_table(*realm, TableKey(class_key));
         auto prop = os.property_for_name(name);
 
         if (prop) {
@@ -247,7 +247,7 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
                                                 realm_property_info_t* out_property_info)
 {
     return wrap_err([&]() {
-        auto& os = schema_for_table(realm, class_key);
+        auto& os = schema_for_table(*realm, TableKey(class_key));
         auto prop = os.property_for_public_name(public_name);
 
         if (prop) {

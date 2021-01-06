@@ -9,6 +9,13 @@ struct ObjectNotificationsCallback {
     realm_callback_error_func_t m_on_error = nullptr;
 
     ObjectNotificationsCallback() = default;
+    ObjectNotificationsCallback(ObjectNotificationsCallback&& other)
+        : m_userdata(std::exchange(other.m_userdata, nullptr))
+        , m_free(std::exchange(other.m_free, nullptr))
+        , m_on_change(std::exchange(other.m_on_change, nullptr))
+        , m_on_error(std::exchange(other.m_on_error, nullptr))
+    {
+    }
 
     ~ObjectNotificationsCallback()
     {
@@ -39,6 +46,13 @@ struct CollectionNotificationsCallback {
     realm_callback_error_func_t m_on_error = nullptr;
 
     CollectionNotificationsCallback() = default;
+    CollectionNotificationsCallback(CollectionNotificationsCallback&& other)
+        : m_userdata(std::exchange(other.m_userdata, nullptr))
+        , m_free(std::exchange(other.m_free, nullptr))
+        , m_on_change(std::exchange(other.m_on_change, nullptr))
+        , m_on_error(std::exchange(other.m_on_error, nullptr))
+    {
+    }
 
     ~CollectionNotificationsCallback()
     {
@@ -51,7 +65,7 @@ struct CollectionNotificationsCallback {
     {
         if (error) {
             if (m_on_error) {
-                realm_async_error_t err{std::move(err)};
+                realm_async_error_t err{std::move(error)};
                 m_on_error(m_userdata, &err);
             }
         }

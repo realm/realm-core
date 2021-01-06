@@ -490,11 +490,6 @@ RLM_API realm_config_t* realm_config_new(void);
 RLM_API bool realm_config_set_path(realm_config_t*, const char* path);
 
 /**
- * Get the path of the realm config.
- */
-RLM_API const char* realm_config_get_path(realm_config_t* config);
-
-/**
  * Set the encryption key for the realm.
  *
  * The key must be either 64 bytes long or have length zero (in which case
@@ -517,11 +512,6 @@ RLM_API bool realm_config_set_schema(realm_config_t*, const realm_schema_t* sche
  * Set the schema version of the schema.
  */
 RLM_API bool realm_config_set_schema_version(realm_config_t*, uint64_t version);
-
-/**
- * Get the schema version of the schema.
- */
-RLM_API uint64_t realm_config_get_schema_version(realm_config_t*);
 
 /**
  * Set the schema mode.
@@ -854,11 +844,6 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
 RLM_API bool realm_schema_validate(const realm_schema_t*);
 
 /**
- * Update the schema of an open realm.
- */
-RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema);
-
-/**
  * Return the number of classes in the Realm's schema.
  *
  * This cannot fail.
@@ -1023,16 +1008,6 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_class_key_t class
  */
 RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm_class_key_t, realm_value_t pk,
                                                            bool* out_found);
-
-/**
- * Produce a results object containing all objects in a class.
- *
- * Note: This is equivalent to getting the results of the query "TRUEPREDICATE",
- *       but is faster.
- *
- * @return A non-null pointer if no exception occurred.
- */
-RLM_API realm_results_t* realm_object_find_all(realm_t*, realm_class_key_t);
 
 /**
  * Create an object in a class without a primary key.
@@ -1335,9 +1310,9 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
  * compact in memory than getting the individual indices when multiple adjacent
  * elements have been modified.
  *
- * @param out_num_deletion_ranges The number of deletion ranges. May be NULL.
- * @param out_num_insertion_ranges The number of insertion ranges. May be NULL.
- * @param out_num_modification_ranges The number of modification ranges. May be
+ * @param out_num_deletion_ranges The number of deleted ranges. May be NULL.
+ * @param out_num_insertion_ranges The number of inserted ranges. May be NULL.
+ * @param out_num_modification_ranges The number of modified ranges. May be
  *                                    NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
  */
@@ -1487,7 +1462,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results, const char* query_string,
-                                                     size_t num_args, const realm_value_t* values);
+                                                     size_t num_args, const realm_value_t* args);
 
 /**
  * Count the number of objects found by this query.

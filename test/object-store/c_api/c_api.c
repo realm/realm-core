@@ -2,7 +2,7 @@
 #undef NDEBUG
 #endif
 
-#include <realm/realm.h>
+#include <realm.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>

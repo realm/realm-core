@@ -1,7 +1,7 @@
 #ifndef REALM_OBJECT_STORE_C_API_CONVERSION_HPP
 #define REALM_OBJECT_STORE_C_API_CONVERSION_HPP
 
-#include <realm/realm.h>
+#include <realm.h>
 
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
