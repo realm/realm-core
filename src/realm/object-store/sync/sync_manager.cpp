@@ -319,7 +319,8 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(), m_users.end(), [user_id, provider_type](const auto& user) {
-        return user->identity() == user_id && user->provider_type() == provider_type;
+        return user->identity() == user_id && user->provider_type() == provider_type &&
+               user->state() != SyncUser::State::Removed;
     });
     if (it == m_users.end()) {
         // No existing user.
@@ -331,11 +332,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
             m_current_user = new_user;
         return new_user;
     }
-    else {
+    else { // LoggedOut => LoggedIn
         auto user = *it;
-        if (user->state() == SyncUser::State::Removed) {
-            return nullptr;
-        }
+        REALM_ASSERT(user->state() != SyncUser::State::Removed);
 
         // It is important that the access token is set before the refresh token
         // as once each token is set it attempts to revive any pending sessions
@@ -343,10 +342,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
         // if the order of these were flipped).
         user->update_access_token(std::move(access_token));
         user->update_refresh_token(std::move(refresh_token));
-
-        if (user->state() == SyncUser::State::LoggedOut) {
-            user->set_state(SyncUser::State::LoggedIn);
-        }
+        user->set_state(SyncUser::State::LoggedIn);
         return user;
     }
 }

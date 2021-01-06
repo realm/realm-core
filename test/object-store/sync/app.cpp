@@ -446,6 +446,56 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
             });
         CHECK(processed);
     }
+
+    SECTION("log in, remove, log in") {
+
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                     });
+        CHECK(processed);
+        processed = false;
+        auto user = app->current_user();
+        REQUIRE(user);
+        CHECK(user->user_profile().email == email);
+
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+
+        app->remove_user(user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+
+        CHECK(user->state() == SyncUser::State::Removed);
+
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                     });
+        CHECK(processed);
+        processed = false;
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(app->current_user() != user);
+        user = app->current_user();
+        CHECK(user->user_profile().email == email);
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+
+        app->remove_user(user, [&](Optional<app::AppError> error) {
+            REQUIRE(!error);
+            CHECK(app->sync_manager()->all_users().size() == 0);
+            processed = true;
+        });
+
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(processed);
+        CHECK(app->all_users().size() == 0);
+    }
 }
 
 // MARK: - UserAPIKeyProviderClient Tests

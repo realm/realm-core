@@ -3563,45 +3563,117 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
-/*
-TEST_CASE("results: query helpers", "[include]") {
+TEST_CASE("notifications: objects with PK recreated") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object",
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"no_pk",
          {
+             {"id", PropertyType::Int},
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"int_pk",
+         {
+             {"id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+        {"string_pk",
+         {
+             {"id", PropertyType::String, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+    });
+
+    auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
+        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++calls;
+            changes = std::move(c);
+        });
     };
 
-    auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    auto col = table->get_column_key("value");
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table1 = r->read_group().get_table("class_no_pk");
+    auto table2 = r->read_group().get_table("class_int_pk");
+    auto table3 = r->read_group().get_table("class_string_pk");
 
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
-        table->create_object().set(col, (i + 2) % 4);
+    TestContext d(r);
+    auto create = [&](StringData type, util::Any&& value) {
+        return Object::create(d, r, *r->schema().find(type), value);
+    };
+
+    r->begin_transaction();
+    auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).obj().get_key();
+    r->commit_transaction();
+
+    Results results1(r, table1->where());
+    int calls1 = 0;
+    CollectionChangeSet changes1;
+    auto token1 = add_callback(results1, calls1, changes1);
+
+    Results results2(r, table2->where());
+    int calls2 = 0;
+    CollectionChangeSet changes2;
+    auto token2 = add_callback(results2, calls2, changes2);
+
+    Results results3(r, table3->where());
+    int calls3 = 0;
+    CollectionChangeSet changes3;
+    auto token3 = add_callback(results3, calls3, changes3);
+
+    advance_and_notify(*r);
+    REQUIRE(calls1 == 1);
+    REQUIRE(calls2 == 1);
+    REQUIRE(calls3 == 1);
+
+    SECTION("objects removed") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->remove_object(k1);
+        r->read_group().get_table("class_int_pk")->remove_object(k2);
+        r->read_group().get_table("class_string_pk")->remove_object(k3);
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
+
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
     }
-    realm->commit_transaction();
 
-    Results r(realm, table);
+    SECTION("table cleared") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->clear();
+        r->read_group().get_table("class_int_pk")->clear();
+        r->read_group().get_table("class_string_pk")->clear();
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
 
-    SECTION("not valid") {
-        std::vector<StringData> paths;
-        query_parser::KeyPathMapping mapping;
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(!includes.is_valid());
-    }
-    SECTION("valid") {
-        std::vector<StringData> paths = {"@links.linking_object.link"};
-        query_parser::KeyPathMapping mapping;
-        realm::populate_keypath_mapping(mapping, *realm);
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(includes.is_valid());
-        CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
     }
 }
-*/
