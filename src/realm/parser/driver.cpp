@@ -317,7 +317,7 @@ Query EqualityNode::visit(ParserDriver* drv)
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
     if (right->has_constant_evaluation() && left_type == right_type) {
-        Mixed val = right->get_mixed();
+        QueryValue val = right->get_query_value();
         if (prop && !prop->links_exist()) {
             auto col_key = prop->column_key();
             if (val.is_null()) {
@@ -331,25 +331,25 @@ Query EqualityNode::visit(ParserDriver* drv)
             }
             switch (left->get_expression_type()) {
                 case exp_Int:
-                    return drv->simple_query(op, col_key, val.get_int());
+                    return drv->simple_query(op, col_key, val.as_mixed().get_int());
                 case exp_Bool:
-                    return drv->simple_query(op, col_key, val.get_bool());
+                    return drv->simple_query(op, col_key, val.as_mixed().get_bool());
                 case exp_String:
-                    return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
+                    return drv->simple_query(op, col_key, val.as_mixed().get_string(), case_sensitive);
                 case exp_Binary:
-                    return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
+                    return drv->simple_query(op, col_key, val.as_mixed().get_binary(), case_sensitive);
                 case exp_Timestamp:
-                    return drv->simple_query(op, col_key, val.get<Timestamp>());
+                    return drv->simple_query(op, col_key, val.as_mixed().get<Timestamp>());
                 case exp_Float:
-                    return drv->simple_query(op, col_key, val.get_float());
+                    return drv->simple_query(op, col_key, val.as_mixed().get_float());
                 case exp_Double:
-                    return drv->simple_query(op, col_key, val.get_double());
+                    return drv->simple_query(op, col_key, val.as_mixed().get_double());
                 case exp_Decimal:
-                    return drv->simple_query(op, col_key, val.get<Decimal128>());
+                    return drv->simple_query(op, col_key, val.as_mixed().get<Decimal128>());
                 case exp_ObjectId:
                     break; // FIXME: why?
                 case exp_UUID:
-                    return drv->simple_query(op, col_key, val.get<UUID>());
+                    return drv->simple_query(op, col_key, val.as_mixed().get<UUID>());
                 default:
                     break;
             }
@@ -362,7 +362,7 @@ Query EqualityNode::visit(ParserDriver* drv)
                 // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
                 if (op == CompareNode::EQUAL) {
                     return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
-                                                               val.get<ObjKey>());
+                                                               val.as_mixed().get<ObjKey>());
                 }
             }
         }
@@ -373,16 +373,6 @@ Query EqualityNode::visit(ParserDriver* drv)
                 util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
                              get_subexpr_type_name(left_type), get_subexpr_type_name(right_type)));
         }
-        if (op == CompareNode::EQUAL) {
-            return Query(
-                std::unique_ptr<Expression>(new Compare<BitwiseAndMatches>(std::move(right), std::move(left))));
-        }
-        else if (op == CompareNode::NOT_EQUAL) {
-            return Query(
-                std::unique_ptr<Expression>(new Compare<BitwiseAndNoMatches>(std::move(right), std::move(left))));
-        }
-        throw std::invalid_argument(util::format(
-            "Invalid comparison '%1'. Only == and != are valid comparisons for @type queries.", opstr[op]));
     }
     if (case_sensitive) {
         switch (op) {
@@ -394,7 +384,7 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
     else {
-        verify_only_string_types(right_type, opstr[op]);
+        verify_only_string_types(right_type, util::format("%1[c]", opstr[op]));
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
@@ -431,7 +421,7 @@ Query RelationalNode::visit(ParserDriver* drv)
         auto col_key = prop->column_key();
         switch (left->get_expression_type()) {
             case exp_Int:
-                return drv->simple_query(op, col_key, right->get_mixed().get_int());
+                return drv->simple_query(op, col_key, right->get_query_value().as_mixed().get_int());
             case exp_Bool:
                 break;
             case exp_String:
@@ -439,13 +429,13 @@ Query RelationalNode::visit(ParserDriver* drv)
             case exp_Binary:
                 break;
             case exp_Timestamp:
-                return drv->simple_query(op, col_key, right->get_mixed().get<Timestamp>());
+                return drv->simple_query(op, col_key, right->get_query_value().as_mixed().get<Timestamp>());
             case exp_Float:
-                return drv->simple_query(op, col_key, right->get_mixed().get_float());
+                return drv->simple_query(op, col_key, right->get_query_value().as_mixed().get_float());
             case exp_Double:
-                return drv->simple_query(op, col_key, right->get_mixed().get_double());
+                return drv->simple_query(op, col_key, right->get_query_value().as_mixed().get_double());
             case exp_Decimal:
-                return drv->simple_query(op, col_key, right->get_mixed().get<Decimal128>());
+                return drv->simple_query(op, col_key, right->get_query_value().as_mixed().get<Decimal128>());
             case exp_ObjectId:
                 break;
             case exp_UUID:
@@ -480,7 +470,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
         left->get_expression_type() == right_type) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {
-            StringData val = right->get_mixed().get_string();
+            StringData val = right->get_query_value().as_mixed().get_string();
 
             switch (op) {
                 case CompareNode::BEGINSWITH:
@@ -494,7 +484,7 @@ Query StringOpsNode::visit(ParserDriver* drv)
             }
         }
         else if (right_type == type_Binary) {
-            BinaryData val = right->get_mixed().get_binary();
+            BinaryData val = right->get_query_value().as_mixed().get_binary();
 
             switch (op) {
                 case CompareNode::BEGINSWITH:

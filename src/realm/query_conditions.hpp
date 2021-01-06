@@ -25,6 +25,7 @@
 #include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/mixed.hpp>
+#include <realm/query_value.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {
@@ -125,6 +126,13 @@ struct Contains : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -186,6 +194,13 @@ struct Like : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -239,6 +254,13 @@ struct BeginsWith : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
     {
@@ -285,6 +307,13 @@ struct EndsWith : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -319,9 +348,9 @@ struct Equal {
         return v1 == v2;
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
     {
-        return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 == m2));
+        return (m1.is_null() && m2.is_null()) || (QueryValue::types_are_comparable(m1, m2) && (m1 == m2));
     }
 
     template <class T>
@@ -365,7 +394,7 @@ struct NotEqual {
         return true;
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
     {
         return !Equal()(m1, m2);
     }
@@ -384,43 +413,6 @@ struct NotEqual {
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const = delete;
 
-    static std::string description()
-    {
-        return "!=";
-    }
-};
-
-struct BitwiseAndMatches {
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
-    {
-        if (m1.is_null() || m2.is_null())
-            return false;
-        if (m1.get_type() == type_Int && m2.get_type() == type_Int) {
-            Int v1 = m1.get_int();
-            Int v2 = m2.get_int();
-            return (v1 & v2) > 0;
-        }
-        return false;
-    }
-    static std::string description()
-    {
-        return "==";
-    }
-};
-
-struct BitwiseAndNoMatches {
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
-    {
-        if (m1.is_null() || m2.is_null()) {
-            return false;
-        }
-        if (m1.get_type() == type_Int && m2.get_type() == type_Int) {
-            Int v1 = m1.get_int();
-            Int v2 = m2.get_int();
-            return (v1 & v2) == 0;
-        }
-        return false;
-    }
     static std::string description()
     {
         return "!=";
@@ -483,6 +475,13 @@ struct ContainsIns : public HackClass {
             return operator()(b1, b2, false, false);
         }
         return false;
+    }
+
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
     }
 
     template <class A, class B>
@@ -569,6 +568,13 @@ struct LikeIns : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -632,6 +638,13 @@ struct BeginsWithIns : public HackClass {
             return operator()(b1, b2, false, false);
         }
         return false;
+    }
+
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
     }
 
     template <class A, class B>
@@ -700,6 +713,13 @@ struct EndsWithIns : public HackClass {
         return false;
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -761,6 +781,13 @@ struct EqualIns : public HackClass {
                (Mixed::types_are_comparable(m1, m2) && operator()(m1.get_binary(), m2.get_binary(), false, false));
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -820,6 +847,13 @@ struct NotEqualIns : public HackClass {
         return !EqualIns()(m1, m2);
     }
 
+    bool operator()(const QueryValue& v1, const QueryValue& v2, bool = false, bool = false) const
+    {
+        REALM_ASSERT_EX(v1.get_type() != exp_QueryExpressionType && v2.get_type() != exp_QueryExpressionType,
+                        v1.get_type(), v2.get_type());
+        return operator()(v1.as_mixed(), v2.as_mixed());
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -855,6 +889,13 @@ struct Greater {
     {
         return Mixed::types_are_comparable(m1, m2) && (m1 > m2);
     }
+
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
+    {
+        return m1.get_type() != exp_QueryExpressionType &&
+               m2.get_type() != exp_QueryExpressionType && operator()(m1.as_mixed(), m2.as_mixed());
+    }
+
     static const int condition = cond_Greater;
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
@@ -964,6 +1005,12 @@ struct Less {
         return Mixed::types_are_comparable(m1, m2) && (m1 < m2);
     }
 
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
+    {
+        return m1.get_type() != exp_QueryExpressionType &&
+               m2.get_type() != exp_QueryExpressionType && operator()(m1.as_mixed(), m2.as_mixed());
+    }
+
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
     {
@@ -1010,6 +1057,14 @@ struct LessEqual : public HackClass {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 <= m2));
     }
 
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
+    {
+        if (m1.get_type() == exp_QueryExpressionType || m2.get_type() == exp_QueryExpressionType) {
+            return m1.get_type() == m2.get_type();
+        }
+        return operator()(m1.as_mixed(), m2.as_mixed());
+    }
+
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
     {
@@ -1044,6 +1099,14 @@ struct GreaterEqual : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 >= m2));
+    }
+
+    bool operator()(const QueryValue& m1, const QueryValue& m2, bool = false, bool = false) const
+    {
+        if (m1.get_type() == exp_QueryExpressionType || m2.get_type() == exp_QueryExpressionType) {
+            return m1.get_type() == m2.get_type();
+        }
+        return operator()(m1.as_mixed(), m2.as_mixed());
     }
 
     template <class A, class B, class C, class D>

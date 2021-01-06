@@ -4228,13 +4228,13 @@ TEST(Parser_TypeOfValue)
     // FIXME: should we allow @type on non-mixed properties?
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'asdf'", 1), message);
-    CHECK(message.find("unable to parse the type attribute string 'asdf'") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string 'asdf'") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == ''", 1), message);
-    CHECK(message.find("unable to parse the type attribute string ''") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'string|double|'", 1), message);
-    CHECK(message.find("unable to parse the type attribute string ''") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == '|'", 1), message);
-    CHECK(message.find("unable to parse the type attribute string ''") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 23", 1), message);
     CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'int'") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 2.5", 1), message);
@@ -4246,6 +4246,10 @@ TEST(Parser_TypeOfValue)
     CHECK(message.find("Operation '@type' is not supported on property of type 'int'") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.@type == 'object'", 1), message);
     CHECK(message.find("Operation '@type' is not supported on property of type 'link'") != std::string::npos);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), message);
+    CHECK_EQUAL(
+        message,
+        "Unsupported comparison operator '=[c]' against type '@type', right side must be a string or binary type");
 }
 
 TEST(Parser_Dictionary)

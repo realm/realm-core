@@ -140,6 +140,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/table.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
+#include <realm/query_value.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/metrics/query_info.hpp>
@@ -343,60 +344,24 @@ struct Common<T1, T2, true, false, b> {
 
 template <typename Operator>
 struct OperatorOptionalAdapter {
-    util::Optional<typename Operator::type> operator()(const Mixed& left, const Mixed& right)
+    util::Optional<typename Operator::type> operator()(const QueryValue& left, const QueryValue& right)
     {
         if (left.is_null() || right.is_null())
             return util::none;
-        return Operator()(left.template export_to_type<typename Operator::type>(),
-                          right.template export_to_type<typename Operator::type>());
+        if (left.get_type() == exp_QueryExpressionType || right.get_type() == exp_QueryExpressionType)
+            return util::none;
+        return Operator()(left.as_mixed().template export_to_type<typename Operator::type>(),
+                          right.as_mixed().template export_to_type<typename Operator::type>());
     }
 
-    util::Optional<typename Operator::type> operator()(const Mixed& arg)
+    util::Optional<typename Operator::type> operator()(const QueryValue& arg)
     {
         if (arg.is_null())
             return util::none;
-        return Operator()(arg.template export_to_type<typename Operator::type>());
+        if (arg.get_type() == exp_QueryExpressionType)
+            return util::none;
+        return Operator()(arg.as_mixed().template export_to_type<typename Operator::type>());
     }
-};
-
-class TypeOfValue {
-public:
-    enum Attribute : size_t {
-        None = 0,
-        Null = 1,
-        Int = 2,
-        Double = 4,
-        Float = 8,
-        Bool = 16,
-        Timestamp = 32,
-        String = 64,
-        Binary = 128,
-        UUID = 256,
-        ObjectId = 512,
-        Decimal128 = 1024,
-        ObjectLink = 2048,
-        Mixed = 4096,
-        Numeric = Int + Double + Float + Decimal128,
-    };
-    TypeOfValue(size_t attributes)
-        : m_attributes(attributes)
-    {
-    }
-    TypeOfValue(const std::string& attribute_tags);
-    TypeOfValue(const class Mixed& value);
-    bool matches(const class Mixed& value);
-    bool matches(const TypeOfValue& other)
-    {
-        return (m_attributes & other.m_attributes) != 0;
-    }
-    uint64_t get_attributes() const
-    {
-        return m_attributes;
-    }
-    std::string to_string() const;
-
-private:
-    uint64_t m_attributes;
 };
 
 class ValueBase {
@@ -450,7 +415,7 @@ public:
 
     void set_null(size_t ndx)
     {
-        m_first[ndx] = Mixed();
+        m_first[ndx] = QueryValue();
     }
 
     template <class T>
@@ -458,6 +423,9 @@ public:
     {
         if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value) {
             m_first[ndx] = null::is_null_float(val) ? Mixed() : Mixed(val);
+        }
+        else if constexpr (std::is_same_v<T, QueryValue>) {
+            m_first[ndx] = val;
         }
         else {
             m_first[ndx] = Mixed(val);
@@ -476,35 +444,35 @@ public:
         }
     }
 
-    Mixed& operator[](size_t n)
+    QueryValue& operator[](size_t n)
     {
         return m_first[n];
     }
 
-    const Mixed& operator[](size_t n) const
+    const QueryValue& operator[](size_t n) const
     {
         return m_first[n];
     }
 
-    const Mixed& get(size_t n) const
+    const QueryValue& get(size_t n) const
     {
         return m_first[n];
     }
 
-    Mixed* begin()
+    QueryValue* begin()
     {
         return m_first;
     }
-    const Mixed* begin() const
+    const QueryValue* begin() const
     {
         return m_first;
     }
 
-    Mixed* end()
+    QueryValue* end()
     {
         return m_first + m_size;
     }
-    const Mixed* end() const
+    const QueryValue* end() const
     {
         return m_first + m_size;
     }
@@ -561,7 +529,7 @@ public:
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(const Mixed& left, ValueBase& right,
+    REALM_FORCEINLINE static size_t compare_const(const QueryValue& left, ValueBase& right,
                                                   ExpressionComparisonType comparison)
     {
         TCond c;
@@ -631,7 +599,7 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left.size() > 0);
             const size_t num_right_values = right.size();
-            Mixed left_val = left[0];
+            QueryValue left_val = left[0];
             bool left_is_null = left[0].is_null();
             for (size_t r = 0; r < num_right_values; r++) {
                 bool match = c(left_val, right[r], left_is_null, right[r].is_null());
@@ -657,7 +625,7 @@ public:
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right.size() > 0);
             const size_t num_left_values = left.size();
-            Mixed right_val = right[0];
+            QueryValue right_val = right[0];
             bool right_is_null = right[0].is_null();
             for (size_t l = 0; l < num_left_values; l++) {
                 bool match = c(left[l], right_val, left[l].is_null(), right_is_null);
@@ -688,8 +656,8 @@ private:
     // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
     static constexpr size_t prealloc = 8;
 
-    Mixed m_cache[prealloc];
-    Mixed* m_first = &m_cache[0];
+    QueryValue m_cache[prealloc];
+    QueryValue* m_first = &m_cache[0];
     size_t m_size = 1;
 
     void resize(size_t size)
@@ -701,7 +669,7 @@ private:
         m_size = size;
         if (m_size > 0) {
             if (m_size > prealloc)
-                m_first = new Mixed[m_size];
+                m_first = new QueryValue[m_size];
             else
                 m_first = &m_cache[0];
         }
@@ -748,80 +716,6 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
     return std::unique_ptr<Expression>(new T(std::forward<Args>(args)...));
 }
 
-struct SubexprType {
-    enum QueryTypeExtension { raw_data_type, type_of_query };
-    constexpr SubexprType(DataType::Type type, QueryTypeExtension expression_type = raw_data_type) noexcept
-        : m_data_type(type)
-        , m_expression_type(expression_type)
-    {
-    }
-    constexpr SubexprType(DataType type, QueryTypeExtension expression_type = raw_data_type) noexcept
-        : m_data_type(type)
-        , m_expression_type(expression_type)
-    {
-    }
-    QueryTypeExtension get_expression_type()
-    {
-        return m_expression_type;
-    }
-    constexpr operator int64_t() const noexcept
-    {
-        if (m_expression_type == type_of_query) {
-            return 0xff;
-        }
-        else {
-            return int64_t(m_data_type);
-        }
-    }
-    constexpr bool operator==(const DataType& rhs) const noexcept
-    {
-        return m_expression_type == raw_data_type && m_data_type == rhs;
-    }
-    constexpr bool operator!=(const DataType& rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
-    constexpr bool operator==(const SubexprType& rhs) const noexcept
-    {
-        return m_expression_type == rhs.m_expression_type &&
-               (m_expression_type == raw_data_type ? (m_data_type == rhs.m_data_type) : true);
-    }
-    constexpr bool operator!=(const SubexprType& rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
-    bool is_valid()
-    {
-        return m_expression_type == raw_data_type && m_data_type.is_valid();
-    }
-    DataType get_data_type()
-    {
-        REALM_ASSERT_EX(m_expression_type == raw_data_type, m_expression_type);
-        return m_data_type;
-    }
-
-private:
-    DataType m_data_type;
-    QueryTypeExtension m_expression_type;
-};
-
-static constexpr SubexprType exp_QueryExpressionType =
-    SubexprType{DataType::Type::Int, SubexprType::QueryTypeExtension::type_of_query};
-static constexpr SubexprType exp_Int = SubexprType{DataType::Type::Int};
-static constexpr SubexprType exp_Bool = SubexprType{DataType::Type::Bool};
-static constexpr SubexprType exp_String = SubexprType{DataType::Type::String};
-static constexpr SubexprType exp_Binary = SubexprType{DataType::Type::Binary};
-static constexpr SubexprType exp_Mixed = SubexprType{DataType::Type::Mixed};
-static constexpr SubexprType exp_Timestamp = SubexprType{DataType::Type::Timestamp};
-static constexpr SubexprType exp_Float = SubexprType{DataType::Type::Float};
-static constexpr SubexprType exp_Double = SubexprType{DataType::Type::Double};
-static constexpr SubexprType exp_Decimal = SubexprType{DataType::Type::Decimal};
-static constexpr SubexprType exp_Link = SubexprType{DataType::Type::Link};
-static constexpr SubexprType exp_LinkList = SubexprType{DataType::Type::LinkList};
-static constexpr SubexprType exp_ObjectId = SubexprType{DataType::Type::ObjectId};
-static constexpr SubexprType exp_TypedLink = SubexprType{DataType::Type::TypedLink};
-static constexpr SubexprType exp_UUID = SubexprType{DataType::Type::UUID};
-
 class Subexpr {
 public:
     virtual ~Subexpr() {}
@@ -866,7 +760,7 @@ public:
         return false;
     }
 
-    virtual std::vector<ObjKey> find_all(Mixed) const
+    virtual std::vector<ObjKey> find_all(QueryValue) const
     {
         return {};
     }
@@ -880,7 +774,7 @@ public:
         REALM_ASSERT(false); // Unimplemented
     }
 
-    virtual Mixed get_mixed()
+    virtual QueryValue get_query_value()
     {
         return {};
     }
@@ -1308,8 +1202,15 @@ public:
         if (size() > 0) {
             if (get(0).is_null())
                 return "NULL";
-            else
-                return util::serializer::print_value(get(0).template get<T>());
+            else {
+                QueryValue val = get(0);
+                if (val.get_type() == exp_QueryExpressionType) {
+                    return util::serializer::print_value(val.as_type_of_value().to_string());
+                }
+                else {
+                    return util::serializer::print_value(val.as_mixed().template get<T>());
+                }
+            }
         }
         return "";
     }
@@ -1319,7 +1220,7 @@ public:
         return true;
     }
 
-    Mixed get_mixed() override
+    QueryValue get_query_value() override
     {
         return get(0);
     }
@@ -1340,13 +1241,13 @@ public:
     ConstantTypeOfValue(const TypeOfValue& v)
         : m_value(v)
     {
-        set(0, int64_t(v.get_attributes()));
+        set(0, QueryValue(v));
     }
     bool has_constant_evaluation() const override
     {
         return true;
     }
-    Mixed get_mixed() override
+    QueryValue get_query_value() override
     {
         return get(0);
     }
@@ -1368,7 +1269,7 @@ public:
             if (get(0).is_null())
                 return "NULL";
             else
-                return '"' + TypeOfValue(get(0).template get<Int>()).to_string() + '"';
+                return '"' + get(0).as_type_of_value().to_string() + '"';
         }
         return "";
     }
@@ -1382,7 +1283,7 @@ private:
     ConstantTypeOfValue(const ConstantTypeOfValue& other)
         : m_value(other.m_value)
     {
-        set(0, int64_t(m_value.get_attributes()));
+        set(0, QueryValue(m_value));
     }
 
     TypeOfValue m_value;
@@ -2083,7 +1984,7 @@ public:
         return target_table->get_primary_key_column() == m_column_key || target_table->has_search_index(m_column_key);
     }
 
-    std::vector<ObjKey> find_all(Mixed value) const final
+    std::vector<ObjKey> find_all(QueryValue value) const final
     {
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
@@ -2094,7 +1995,7 @@ public:
 
         if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
             // Only one object with a given key would be possible
-            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
+            if (auto k = m_link_map.get_target_table()->find_primary_key(value.as_mixed()))
                 result.push_back(k);
         }
         else {
@@ -2104,7 +2005,7 @@ public:
                 index->find_all(result, realm::null{});
             }
             else {
-                T val = value.get<T>();
+                T val = value.as_mixed().get<T>();
                 index->find_all(result, val);
             }
         }
@@ -2682,7 +2583,7 @@ public:
 
     SubexprType get_expression_type() const override
     {
-        return SubexprType(type_Int, SubexprType::QueryTypeExtension::type_of_query);
+        return exp_QueryExpressionType;
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -2702,9 +2603,7 @@ public:
         destination.init(v.m_from_link_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
-            auto elem = v[i].template get<T>();
-            // destination.set(i, TypeOfValue(elem)); // FIXME
-            destination.set(i, int64_t(TypeOfValue(elem).get_attributes()));
+            destination.set(i, QueryValue(TypeOfValue(v[i].as_mixed())));
         }
     }
 
@@ -2766,7 +2665,7 @@ public:
         destination.init(v.m_from_link_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
-            auto elem = v[i].template get<T>();
+            auto elem = v[i].as_mixed().template get<T>();
             if constexpr (std::is_same_v<T, int64_t>) {
                 // This is the size of a list
                 destination.set(i, elem);
@@ -3177,7 +3076,7 @@ private:
 
         std::vector<StorageType> values;
         for (auto&& i : list_refs) {
-            ref_type list_ref = to_ref(i.get_int());
+            ref_type list_ref = to_ref(i.as_mixed().get_int());
             if (list_ref) {
                 BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
@@ -3339,7 +3238,7 @@ private:
         this->get_lists(index, list_refs, 1);
         destination.init(list_refs.m_from_link_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
-            ref_type list_ref = to_ref(list_refs[i].get_int());
+            ref_type list_ref = to_ref(list_refs[i].as_mixed().get_int());
             if (list_ref) {
                 BPlusTree<StorageType> list(alloc);
                 list.init_from_ref(list_ref);
@@ -3372,7 +3271,7 @@ public:
         m_list.get_lists(index, list_refs, 1);
         std::vector<Int> sizes;
         for (size_t i = 0; i < list_refs.size(); i++) {
-            ref_type list_ref = to_ref(list_refs[i].get_int());
+            ref_type list_ref = to_ref(list_refs[i].as_mixed().get_int());
             if (list_ref) {
                 BPlusTree<T> list(alloc);
                 list.init_from_ref(list_ref);
@@ -3515,7 +3414,7 @@ private:
         // The result is an aggregate value for each table
         destination.init_for_links(!list_refs.m_from_link_list, sz);
         for (size_t i = 0; i < list_refs.size(); i++) {
-            auto list_ref = to_ref(list_refs[i].get_int());
+            auto list_ref = to_ref(list_refs[i].as_mixed().get_int());
             Operation op;
             if (list_ref) {
                 BPlusTree<StorageType> list(alloc);
@@ -3910,7 +3809,7 @@ public:
             m_column.evaluate(key, value);
             size_t value_index = 0;
             if (!value[value_index].is_null()) {
-                op.accumulate(value[value_index].template get<T>());
+                op.accumulate(value[value_index].as_mixed().template get<T>());
             }
         }
         if (op.is_null()) {
@@ -4370,7 +4269,7 @@ public:
     {
         m_left_is_const = m_left->has_constant_evaluation();
         if (m_left_is_const) {
-            m_left_value = m_left->get_mixed();
+            m_left_value = m_left->get_query_value();
         }
     }
 
@@ -4540,7 +4439,7 @@ private:
         , m_left_is_const(other.m_left_is_const)
     {
         if (m_left_is_const) {
-            m_left_value = m_left->get_mixed();
+            m_left_value = m_left->get_query_value();
         }
     }
 
@@ -4548,7 +4447,7 @@ private:
     std::unique_ptr<Subexpr> m_right;
     const Cluster* m_cluster;
     bool m_left_is_const;
-    Mixed m_left_value;
+    QueryValue m_left_value;
     bool m_has_matches = false;
     std::vector<ObjKey> m_matches;
     mutable size_t m_index_get = 0;
