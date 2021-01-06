@@ -224,12 +224,12 @@ TEST_CASE("C API") {
         realm_property_info_t* baz_properties = &int_property;
 
         // get class count
-        auto num_classes = realm_get_num_classes(realm);
+        size_t num_classes = realm_get_num_classes(realm);
         realm_class_key_t* out_keys = (realm_class_key_t*)malloc(sizeof(realm_class_key_t) * num_classes);
         // get class keys
         realm_get_class_keys(realm, out_keys, num_classes, nullptr);
-        realm_class_info_t classes[num_classes + 1];
-        const realm_property_info_t* properties[num_classes + 1];
+        realm_class_info_t* classes = (realm_class_info_t*)malloc(sizeof(realm_class_info_t) * (num_classes + 1));
+        const realm_property_info_t** properties = (const realm_property_info_t**)malloc(sizeof(realm_property_info_t*) * (num_classes + 1));
         // iterating through each class, "recreate" the old schema
         for (size_t i = 0; i < num_classes; i++) {
             realm_get_class(realm, out_keys[i], &classes[i]);
@@ -241,6 +241,7 @@ TEST_CASE("C API") {
         }
         // add the new class and its properties to the arrays
         classes[num_classes] = baz;
+
         properties[num_classes] = baz_properties;
 
         // create a new schema and update the realm
