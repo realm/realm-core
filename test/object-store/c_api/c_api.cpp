@@ -229,7 +229,8 @@ TEST_CASE("C API") {
         // get class keys
         realm_get_class_keys(realm, out_keys, num_classes, nullptr);
         realm_class_info_t* classes = (realm_class_info_t*)malloc(sizeof(realm_class_info_t) * (num_classes + 1));
-        const realm_property_info_t** properties = (const realm_property_info_t**)malloc(sizeof(realm_property_info_t*) * (num_classes + 1));
+        const realm_property_info_t** properties =
+            (const realm_property_info_t**)malloc(sizeof(realm_property_info_t*) * (num_classes + 1));
         // iterating through each class, "recreate" the old schema
         for (size_t i = 0; i < num_classes; i++) {
             realm_get_class(realm, out_keys[i], &classes[i]);
