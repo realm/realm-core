@@ -7,6 +7,7 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix a race condition which would lead to "uncaught exception in notifier thread: N5realm15InvalidTableRefE: transaction_ended" and a crash when the source Realm was closed or invalidated at a very specific time during the first run of a collection notifier ([#3761](https://github.com/realm/realm-core/issues/3761), since v6.0.0).
 * Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
+* SSL certificate validation would fail due to a build misconfiguration on Windows ([#4213](https://github.com/realm/realm-core/issues/4213), since v10.2.0).
  
 ### Breaking changes
 * None.
