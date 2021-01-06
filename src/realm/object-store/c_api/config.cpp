@@ -31,9 +31,7 @@ RLM_API bool realm_config_set_schema(realm_config_t* config, const realm_schema_
 
 RLM_API uint64_t realm_config_get_schema_version(realm_config_t* config)
 {
-    return wrap_err([&]() {
-        return config->schema_version;
-    });
+    return config->schema_version;
 }
 
 RLM_API bool realm_config_set_schema_version(realm_config_t* config, uint64_t version)
