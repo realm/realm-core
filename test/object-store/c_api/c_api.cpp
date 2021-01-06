@@ -258,6 +258,13 @@ TEST_CASE("C API") {
         realm_property_info_t baz_int_property;
         CHECK(checked(realm_find_property(realm, baz_info.key, "int", &found, &baz_int_property)));
         CHECK(found);
+
+        free(out_keys);
+        free(classes);
+        for (size_t i = 0; i < num_classes; i++) {
+            free((realm_property_info_t*)properties[i]);
+        }
+        free(properties);
     }
 
     SECTION("schema validates") {
