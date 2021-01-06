@@ -1010,6 +1010,16 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm
                                                            bool* out_found);
 
 /**
+ * Produce a results object containing all objects in a class.
+ *
+ * Note: This is equivalent to getting the results of the query "TRUEPREDICATE",
+ *       but is faster.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_object_find_all(realm_t*, realm_class_key_t);
+
+/**
  * Create an object in a class without a primary key.
  *
  * @return A non-NULL pointer if the object was created successfully.

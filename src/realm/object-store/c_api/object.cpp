@@ -63,6 +63,15 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm,
     });
 }
 
+RLM_API realm_results_t* realm_object_find_all(realm_t* realm, realm_class_key_t key)
+{
+    return wrap_err([&]() {
+        auto& shared_realm = *realm;
+        auto table = shared_realm->read_group().get_table(TableKey(key));
+        return new realm_results{Results{shared_realm, table}};
+    });
+}
+
 RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t table_key)
 {
     return wrap_err([&]() {
