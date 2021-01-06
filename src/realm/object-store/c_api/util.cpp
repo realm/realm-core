@@ -38,7 +38,7 @@ RLM_API bool realm_equals(const void* a, const void* b)
 {
     if (a == b)
         return true;
-    if (bool(a) != bool(b))
+    if (!a || !b)
         return false;
 
     auto lhs = static_cast<const WrapC*>(a);
