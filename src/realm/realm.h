@@ -312,7 +312,7 @@ typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, s
  *
  * @return A null-terminated string.
  */
-RLM_API const char* realm_get_library_version();
+RLM_API const char* realm_get_library_version(void);
 
 /**
  * Get individual components of the version number of the Realm library.
@@ -371,7 +371,7 @@ RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t
  * @see realm_get_async_error()
  * @see realm_clear_last_error()
  */
-RLM_API realm_async_error_t* realm_get_last_error_as_async_error();
+RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void);
 
 #if defined(__cplusplus)
 /**
@@ -382,7 +382,7 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error();
  * in a linker error. When called from C++, `std::rethrow_exception` will be
  * called to propagate the exception unchanged.
  */
-RLM_EXPORT void realm_rethrow_last_error();
+RLM_EXPORT void realm_rethrow_last_error(void);
 #endif // __cplusplus
 
 /**
@@ -393,7 +393,7 @@ RLM_EXPORT void realm_rethrow_last_error();
  *
  * @return True if an error was cleared.
  */
-RLM_API bool realm_clear_last_error();
+RLM_API bool realm_clear_last_error(void);
 
 /**
  * Free any Realm C Wrapper object.
@@ -482,7 +482,7 @@ RLM_API realm_thread_safe_reference_t* realm_create_thread_safe_reference(const 
 /**
  * Allocate a new configuration with default options.
  */
-RLM_API realm_config_t* realm_config_new();
+RLM_API realm_config_t* realm_config_new(void);
 
 /**
  * Set the path of the realm being opened.
@@ -620,7 +620,7 @@ realm_scheduler_new(void* userdata, realm_free_userdata_func_t, realm_scheduler_
  * Create an instance of the default scheduler for the current platform,
  * normally confined to the calling thread.
  */
-RLM_API realm_scheduler_t* realm_scheduler_make_default();
+RLM_API realm_scheduler_t* realm_scheduler_make_default(void);
 
 /**
  * Get the scheduler used by frozen realms. This scheduler does not support
@@ -628,7 +628,7 @@ RLM_API realm_scheduler_t* realm_scheduler_make_default();
  *
  * This function is thread-safe, and cannot fail.
  */
-RLM_API const realm_scheduler_t* realm_scheduler_get_frozen();
+RLM_API const realm_scheduler_t* realm_scheduler_get_frozen(void);
 
 /**
  * Returns true if there is a default scheduler implementation for the current
@@ -640,7 +640,7 @@ RLM_API const realm_scheduler_t* realm_scheduler_get_frozen();
  *
  * This function is thread-safe, and cannot fail.
  */
-RLM_API bool realm_scheduler_has_default_factory();
+RLM_API bool realm_scheduler_has_default_factory(void);
 
 /**
  * For platforms with no default scheduler implementation, register a factory
