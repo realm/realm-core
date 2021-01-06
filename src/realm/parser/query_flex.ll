@@ -15,7 +15,8 @@
 hex     [0-9a-fA-F]
 unicode "\\u"{hex}{4}
 escape  "\\"[\"\'/bfnrt0\\]
-char    [^\"\'\\]
+char1    [^\"\\]
+char2    [^\'\\]
 letter  [a-zA-Z_$]
 ws      "\\"[ nrt]
 id_char [a-zA-Z_\-$0-9]
@@ -79,10 +80,10 @@ blank   [ \t\r]
 "0"[xX]{hex}+               return yy::parser::make_NUMBER (yytext);
 [+-]?{int}{exp}?            return yy::parser::make_FLOAT (yytext);
 [+-]?(({int}"."{optint})|({optint}"."{int})){exp}? return yy::parser::make_FLOAT (yytext);
-("B64\""[a-zA-Z0-9/\+=]*\") return yy::parser::make_BASE64(yytext);
-('({char}|{escape}|{unicode})*')            return yy::parser::make_STRING (yytext);
-(\"({char}|{escape}|{unicode})*\")            return yy::parser::make_STRING (yytext);
-{letter}({id_char}|{ws})*   return yy::parser::make_ID (check_escapes(yytext));
+("B64\""[a-zA-Z0-9/\+=]*\")         return yy::parser::make_BASE64(yytext);
+(\"({char1}|{escape}|{unicode})*\") return yy::parser::make_STRING (yytext);
+('({char2}|{escape}|{unicode})*')   return yy::parser::make_STRING (yytext);
+{letter}({id_char}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
 
 .          {
              throw yy::parser::syntax_error

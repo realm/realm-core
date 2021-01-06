@@ -402,7 +402,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type == type_UUID) {
+    if (left_type == type_UUID || left_type == type_Link) {
         throw std::logic_error(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
             opstr[op]));
@@ -923,7 +923,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         ret = new ConstantStringValue(drv->m_args.string_for_argument(arg_no));
                         break;
                     case type_Binary:
-                        ret = new Value<BinaryData>(drv->m_args.binary_for_argument(arg_no));
+                        ret = new ConstantBinaryValue(drv->m_args.binary_for_argument(arg_no));
                         break;
                     case type_Bool:
                         ret = new Value<Bool>(drv->m_args.bool_for_argument(arg_no));
@@ -931,9 +931,27 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     case type_Float:
                         ret = new Value<float>(drv->m_args.float_for_argument(arg_no));
                         break;
-                    case type_Double:
-                        ret = new Value<double>(drv->m_args.double_for_argument(arg_no));
+                    case type_Double: {
+                        // In realm-js all number type arguments are returned as double. If we don't cast to the
+                        // expected type, we would in many cases miss the option to use the optimized query node
+                        // instead of the general Compare class.
+                        double val = drv->m_args.double_for_argument(arg_no);
+                        switch (hint) {
+                            case type_Int:
+                            case type_Bool:
+                                ret = new Value<int64_t>(int64_t(val));
+                                break;
+                            case type_Float:
+                                ret = new Value<float>(float(val));
+                                break;
+                            case type_Double:
+                                ret = new Value<double>(val);
+                                break;
+                            default:
+                                break;
+                        }
                         break;
+                    }
                     case type_Timestamp: {
                         try {
                             ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
@@ -957,6 +975,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         break;
                     case type_UUID:
                         ret = new Value<UUID>(drv->m_args.uuid_for_argument(arg_no));
+                        break;
+                    case type_Link:
+                        ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     default:
                         break;

@@ -295,6 +295,7 @@ public:
     std::string get_description(util::serializer::SerialisationState& state) const;
 
     Query& set_ordering(std::unique_ptr<DescriptorOrdering> ordering);
+    std::shared_ptr<DescriptorOrdering> get_ordering();
 
     bool eval_object(const Obj& obj) const;
 

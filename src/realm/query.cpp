@@ -1749,6 +1749,11 @@ Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)
     return *this;
 }
 
+std::shared_ptr<DescriptorOrdering> Query::get_ordering()
+{
+    return std::move(m_ordering);
+}
+
 std::string Query::get_description() const
 {
     util::serializer::SerialisationState state;
