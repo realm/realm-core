@@ -65,7 +65,7 @@ struct CollectionNotificationsCallback {
     {
         if (error) {
             if (m_on_error) {
-                realm_async_error_t err{std::move(err)};
+                realm_async_error_t err{std::move(error)};
                 m_on_error(m_userdata, &err);
             }
         }
