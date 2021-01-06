@@ -1310,9 +1310,10 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
  * compact in memory than getting the individual indices when multiple adjacent
  * elements have been modified.
  *
- * @param out_num_deletions The number of deletions. May be NULL.
- * @param out_num_insertions The number of insertions. May be NULL.
- * @param out_num_modifications The number of modifications. May be NULL.
+ * @param out_num_deletion_ranges The number of deleted ranges. May be NULL.
+ * @param out_num_insertion_ranges The number of inserted ranges. May be NULL.
+ * @param out_num_modification_ranges The number of modified ranges. May be
+ *                                    NULL.
  * @param out_num_moves The number of moved elements. May be NULL.
  */
 RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_changes_t*,
@@ -1443,7 +1444,7 @@ RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t targe
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, const char* query_string,
-                                                  size_t num_args, const realm_value_t* values);
+                                                  size_t num_args, const realm_value_t* args);
 
 /**
  * Parse a query string and bind it to another query result.
@@ -1461,7 +1462,7 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  *         exception occurred.
  */
 RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results, const char* query_string,
-                                                     size_t num_args, const realm_value_t* values);
+                                                     size_t num_args, const realm_value_t* args);
 
 /**
  * Count the number of objects found by this query.
