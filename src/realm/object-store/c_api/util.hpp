@@ -17,10 +17,8 @@ static inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
     };
 }
 
-static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_class_key_t key)
+static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, TableKey table_key)
 {
-    auto table_key = TableKey(key);
-
     // Validate the table key.
     realm->read_group().get_table(table_key);
     const auto& schema = realm->schema();
@@ -34,12 +32,6 @@ static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>&
 
     // FIXME: Proper exception type.
     throw std::logic_error{"Class not in schema"};
-}
-
-static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_class_key_t key)
-{
-    auto& shared_realm = *realm;
-    return schema_for_table(shared_realm, key);
 }
 
 #endif // REALM_OBJECT_STORE_C_API_UTIL_HPP

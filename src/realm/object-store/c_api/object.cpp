@@ -71,7 +71,7 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
         auto table = shared_realm->read_group().get_table(tblkey);
 
         if (table->get_primary_key_column()) {
-            auto& object_schema = schema_for_table(realm, table_key);
+            auto& object_schema = schema_for_table(*realm, tblkey);
             throw MissingPrimaryKeyException{object_schema.name};
         }
 
@@ -98,12 +98,12 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
         }
 
         if (pkval.is_null() && !pkcol.is_nullable()) {
-            auto& schema = schema_for_table(realm, table_key);
+            auto& schema = schema_for_table(*realm, tblkey);
             throw NotNullableException{schema.name, schema.primary_key};
         }
 
         if (!pkval.is_null() && pkval.get_type() != DataType(pkcol.get_type())) {
-            auto& schema = schema_for_table(realm, table_key);
+            auto& schema = schema_for_table(*realm, tblkey);
             throw WrongPrimaryKeyTypeException{schema.name};
         }
 
@@ -241,14 +241,14 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 
             if (val.is_null() && !col_key.is_nullable()) {
                 auto table = o.get_table();
-                auto& schema = schema_for_table(obj->get_realm(), table->get_key().value);
+                auto& schema = schema_for_table(obj->get_realm(), table->get_key());
                 throw NotNullableException{schema.name, table->get_column_name(col_key)};
             }
 
             if (!val.is_null() && col_key.get_type() != ColumnType(val.get_type()) &&
                 col_key.get_type() != col_type_Mixed) {
                 auto table = o.get_table();
-                auto& schema = schema_for_table(obj->get_realm(), table->get_key().value);
+                auto& schema = schema_for_table(obj->get_realm(), table->get_key());
                 throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
             }
         }
