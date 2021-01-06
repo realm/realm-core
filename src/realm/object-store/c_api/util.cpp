@@ -1,7 +1,7 @@
 #include <realm/object-store/c_api/util.hpp>
 #include <realm/object-store/c_api/types.hpp>
 
-RLM_API void realm_release(const void* ptr)
+RLM_API void realm_release(void* ptr)
 {
     if (!ptr)
         return;

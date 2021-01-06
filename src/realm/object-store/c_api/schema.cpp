@@ -38,7 +38,7 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
     });
 }
 
-RLM_API const realm_schema_t* realm_get_schema(const realm_t* realm)
+RLM_API realm_schema_t* realm_get_schema(const realm_t* realm)
 {
     return wrap_err([&]() {
         auto& rlm = *realm;

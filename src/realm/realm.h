@@ -408,7 +408,7 @@ RLM_API bool realm_clear_last_error();
  *
  * @param ptr A pointer to a Realm C Wrapper object. May be NULL.
  */
-RLM_API void realm_release(const void* ptr);
+RLM_API void realm_release(void* ptr);
 
 /**
  * Clone a Realm C Wrapper object.
@@ -823,7 +823,7 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
  * Note: The returned value is allocated by this function, so `realm_release()`
  *       must be called on it.
  */
-RLM_API const realm_schema_t* realm_get_schema(const realm_t*);
+RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 
 /**
  * Get the `realm::Schema*` pointer for this realm.

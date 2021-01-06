@@ -33,18 +33,6 @@ static inline const T* cast_ptr(const void* ptr)
     return static_cast<const T*>(rptr);
 }
 
-template <class T>
-static inline T& cast_ref(void* ptr)
-{
-    return *cast_ptr<T>(ptr);
-}
-
-template <class T>
-static inline const T& cast_ref(const void* ptr)
-{
-    return *cast_ptr<T>(ptr);
-}
-
 static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_class_key_t key)
 {
     auto table_key = TableKey(key);
