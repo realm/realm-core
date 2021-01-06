@@ -207,7 +207,6 @@ TEST_CASE("C API") {
     CHECK(realm_get_num_classes(realm) == 2);
 
     SECTION("schema is set after opening") {
-        auto old_schema = realm_get_schema(realm);
         const realm_class_info_t baz = {
             "baz",
             "", // primary key
@@ -265,6 +264,7 @@ TEST_CASE("C API") {
             free((realm_property_info_t*)properties[i]);
         }
         free(properties);
+        realm_release(new_schema);
     }
 
     SECTION("schema validates") {
