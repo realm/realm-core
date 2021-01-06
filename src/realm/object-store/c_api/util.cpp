@@ -1,6 +1,22 @@
 #include <realm/object-store/c_api/util.hpp>
 #include <realm/object-store/c_api/types.hpp>
 
+template <class T>
+static inline T* cast_ptr(void* ptr)
+{
+    auto rptr = static_cast<WrapC*>(ptr);
+    REALM_ASSERT(dynamic_cast<T*>(rptr) != nullptr);
+    return static_cast<T*>(rptr);
+}
+
+template <class T>
+static inline const T* cast_ptr(const void* ptr)
+{
+    auto rptr = static_cast<const WrapC*>(ptr);
+    REALM_ASSERT(dynamic_cast<const T*>(rptr) != nullptr);
+    return static_cast<const T*>(rptr);
+}
+
 RLM_API void realm_release(void* ptr)
 {
     if (!ptr)

@@ -17,22 +17,6 @@ static inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
     };
 }
 
-template <class T>
-static inline T* cast_ptr(void* ptr)
-{
-    auto rptr = static_cast<WrapC*>(ptr);
-    REALM_ASSERT(dynamic_cast<T*>(rptr) != nullptr);
-    return static_cast<T*>(rptr);
-}
-
-template <class T>
-static inline const T* cast_ptr(const void* ptr)
-{
-    auto rptr = static_cast<const WrapC*>(ptr);
-    REALM_ASSERT(dynamic_cast<const T*>(rptr) != nullptr);
-    return static_cast<const T*>(rptr);
-}
-
 static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_class_key_t key)
 {
     auto table_key = TableKey(key);
