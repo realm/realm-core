@@ -193,6 +193,14 @@ TEST_CASE("C API") {
 
         realm = realm_open(config);
         CHECK(checked(realm));
+
+        CHECK(!realm_equals(realm, nullptr));
+
+        auto realm2 = realm_open(config);
+        CHECK(checked(realm2));
+        CHECK(!realm_equals(realm, realm2));
+        realm_release(realm2);
+
         realm_release(schema);
         realm_release(config);
     }
@@ -201,6 +209,11 @@ TEST_CASE("C API") {
         auto schema = realm_get_schema(realm);
         CHECK(checked(schema));
         CHECK(checked(realm_schema_validate(schema)));
+
+        auto schema2 = realm_get_schema(realm);
+        CHECK(checked(schema2));
+        CHECK(realm_equals(schema, schema2));
+        realm_release(schema2);
         realm_release(schema);
     }
 
@@ -268,6 +281,9 @@ TEST_CASE("C API") {
             CHECK(obj2);
         });
 
+        CHECK(!realm_equals(obj1.get(), obj2.get()));
+        CHECK(realm_equals(obj1.get(), obj1.get()));
+
         size_t num_foos, num_bars;
         CHECK(checked(realm_get_num_objects(realm, foo_info.key, &num_foos)));
         CHECK(checked(realm_get_num_objects(realm, bar_info.key, &num_bars)));
@@ -281,6 +297,7 @@ TEST_CASE("C API") {
             auto p_key = realm_object_get_key(p.get());
             auto obj2_key = realm_object_get_key(obj2.get());
             CHECK(p_key == obj2_key);
+            CHECK(realm_equals(p.get(), obj2.get()));
 
             // Check that finding by type-mismatched values just find nothing.
             CHECK(!realm_object_find_with_primary_key(realm, bar_info.key, rlm_null(), &found));
@@ -398,6 +415,20 @@ TEST_CASE("C API") {
                         CHECK(rlm_stdstr(a2) == "a");
                         CHECK(rlm_stdstr(b2) == "b");
                         CHECK(c2.type == RLM_TYPE_NULL);
+                    });
+                }
+
+                SECTION("equality") {
+                    auto strings2 = checked(make_cptr(realm_get_list(obj2.get(), bar_strings_property.key)));
+                    CHECK(strings2);
+                    CHECK(realm_equals(strings.get(), strings2.get()));
+
+                    write([&]() {
+                        auto obj3 = checked(
+                            make_cptr(realm_object_create_with_primary_key(realm, bar_info.key, rlm_int_val(2))));
+                        CHECK(obj3);
+                        auto strings3 = checked(make_cptr(realm_get_list(obj3.get(), bar_strings_property.key)));
+                        CHECK(!realm_equals(strings.get(), strings3.get()));
                     });
                 }
             }
