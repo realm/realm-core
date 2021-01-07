@@ -2559,6 +2559,12 @@ private:
 
 template <class T, class TExpr>
 class TypeOfValueOperator : public Subexpr {
+    // We are only supporting @type queries on Mixed properties.
+    // If users wish to query other property types, SDKs may wish
+    // to convert those into a TypeOfValue constant as a convenience.
+    // See the TypeOfValue(ColKey) constructor.
+    static_assert(std::is_same_v<T, Mixed>);
+
 public:
     TypeOfValueOperator(std::unique_ptr<TExpr> left)
         : m_expr(std::move(left))
@@ -2568,6 +2574,11 @@ public:
     TypeOfValueOperator(const TypeOfValueOperator& other)
         : m_expr(other.m_expr->clone())
     {
+    }
+
+    ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_expr->get_comparison_type();
     }
 
     // See comment in base class
@@ -2990,6 +3001,11 @@ public:
     ColumnListElementLength<T> element_lengths() const
     {
         return {*this};
+    }
+
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
     }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const

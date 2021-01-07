@@ -640,6 +640,15 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
         if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr)) {
             return s->type_of_value().clone();
         }
+        if (auto s = dynamic_cast<ColumnsCollection<Mixed>*>(subexpr)) {
+            return s->type_of_value().clone();
+        }
+        if (auto s = dynamic_cast<ObjPropertyBase*>(subexpr)) {
+            return ConstantTypeOfValue(TypeOfValue(s->column_key())).clone();
+        }
+        if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
+            return ConstantTypeOfValue(TypeOfValue(TypeOfValue::Attribute::ObjectLink)).clone();
+        }
     }
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
@@ -1062,6 +1071,11 @@ void verify_conditions(Subexpr* left, Subexpr* right)
     if (left->has_multiple_values() && right->has_multiple_values()) {
         util::serializer::SerialisationState state;
         throw std::runtime_error(util::format("Comparison between two lists is not supported ('%1' and '%2')",
+                                              left->description(state), right->description(state)));
+    }
+    if (dynamic_cast<ConstantTypeOfValue*>(left) && dynamic_cast<ConstantTypeOfValue*>(right)) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));
     }
 }

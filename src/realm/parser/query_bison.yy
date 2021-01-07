@@ -177,6 +177,7 @@ value
 prop
     : comp_type path id         { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, ExpressionComparisonType($1)); }
     | path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
+    | comp_type path id post_op { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, $4, ExpressionComparisonType($1)); }
     | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
     | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
     | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }

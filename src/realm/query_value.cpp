@@ -21,7 +21,7 @@
 
 #include <realm/query_value.hpp>
 
-namespace realm {
+using namespace realm;
 
 // These keys must be stored as lowercase. Some naming comes from MongoDB's conventions
 // see https://docs.mongodb.com/manual/reference/operator/query/type/
@@ -32,7 +32,7 @@ static std::unordered_map<std::string, TypeOfValue::Attribute> attribute_map = {
     {"float", TypeOfValue::Float},        {"double", TypeOfValue::Double},   {"decimal128", TypeOfValue::Decimal128},
     {"decimal", TypeOfValue::Decimal128}, {"link", TypeOfValue::ObjectLink}, {"object", TypeOfValue::ObjectLink},
     {"objectid", TypeOfValue::ObjectId},  {"uuid", TypeOfValue::UUID},       {"numeric", TypeOfValue::Numeric},
-    {"long", TypeOfValue::Int},           {"date", TypeOfValue::Timestamp},  {"bindata", TypeOfValue::Binary}};
+    {"date", TypeOfValue::Timestamp},     {"bindata", TypeOfValue::Binary}};
 constexpr char attribute_separator = '|';
 
 TypeOfValue::Attribute get_single_from(std::string str)
@@ -51,6 +51,45 @@ TypeOfValue::Attribute get_single_from(std::string str)
     return it->second;
 }
 
+
+TypeOfValue::Attribute attribute_from(DataType type)
+{
+    switch (type) {
+        case DataType::Type::Int:
+            return TypeOfValue::Attribute::Int;
+        case DataType::Type::Bool:
+            return TypeOfValue::Attribute::Bool;
+        case DataType::Type::String:
+            return TypeOfValue::Attribute::String;
+        case DataType::Type::Binary:
+            return TypeOfValue::Attribute::Binary;
+        case DataType::Type::Mixed:
+            return TypeOfValue::Attribute::Mixed;
+        case DataType::Type::Timestamp:
+            return TypeOfValue::Attribute::Timestamp;
+        case DataType::Type::Float:
+            return TypeOfValue::Attribute::Float;
+        case DataType::Type::Double:
+            return TypeOfValue::Attribute::Double;
+        case DataType::Type::Decimal:
+            return TypeOfValue::Attribute::Decimal128;
+        case DataType::Type::Link:
+            return TypeOfValue::Attribute::ObjectLink;
+        case DataType::Type::ObjectId:
+            return TypeOfValue::Attribute::ObjectId;
+        case DataType::Type::TypedLink:
+            return TypeOfValue::Attribute::ObjectLink;
+        case DataType::Type::UUID:
+            return TypeOfValue::Attribute::UUID;
+        case DataType::Type::LinkList:
+            REALM_UNREACHABLE();
+            break;
+    }
+    return TypeOfValue::Attribute::None;
+}
+
+namespace realm {
+
 TypeOfValue::TypeOfValue(const std::string& attribute_tags)
 {
     size_t next = 0;
@@ -68,50 +107,19 @@ TypeOfValue::TypeOfValue(const class Mixed& value)
         m_attributes = Attribute::Null;
         return;
     }
-    switch (value.get_type()) {
-        case DataType::Type::Int:
-            m_attributes = Attribute::Int;
-            break;
-        case DataType::Type::Bool:
-            m_attributes = Attribute::Bool;
-            break;
-        case DataType::Type::String:
-            m_attributes = Attribute::String;
-            break;
-        case DataType::Type::Binary:
-            m_attributes = Attribute::Binary;
-            break;
-        case DataType::Type::Mixed:
-            m_attributes = Attribute::Mixed;
-            break;
-        case DataType::Type::Timestamp:
-            m_attributes = Attribute::Timestamp;
-            break;
-        case DataType::Type::Float:
-            m_attributes = Attribute::Float;
-            break;
-        case DataType::Type::Double:
-            m_attributes = Attribute::Double;
-            break;
-        case DataType::Type::Decimal:
-            m_attributes = Attribute::Decimal128;
-            break;
-        case DataType::Type::Link:
-            m_attributes = Attribute::ObjectLink;
-            break;
-        case DataType::Type::ObjectId:
-            m_attributes = Attribute::ObjectId;
-            break;
-        case DataType::Type::TypedLink:
-            m_attributes = Attribute::ObjectLink;
-            break;
-        case DataType::Type::UUID:
-            m_attributes = Attribute::UUID;
-            break;
-        case DataType::Type::LinkList:
-            REALM_UNREACHABLE();
-            return;
-    }
+    m_attributes = attribute_from(value.get_type());
+}
+
+TypeOfValue::TypeOfValue(const ColKey& col_key)
+{
+    // This constructor is a shortcut for creating a constant type value
+    // from a column. A mixed column should use the TypeOfValueOperator
+    // which will compute the type for each row value.
+    ColumnType col_type = col_key.get_type();
+    REALM_ASSERT_RELEASE(col_type != col_type_Mixed);
+    DataType data_type = DataType(col_type);
+    REALM_ASSERT_RELEASE(data_type.is_valid());
+    m_attributes = attribute_from(data_type);
 }
 
 bool TypeOfValue::matches(const class Mixed& value) const

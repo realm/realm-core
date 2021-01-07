@@ -4173,6 +4173,7 @@ TEST(Parser_TypeOfValue)
     auto origin = g.add_table("Origin");
     auto col_any = table->add_column(type_Mixed, "mixed");
     auto col_int = table->add_column(type_Int, "int");
+    auto col_primitive_list = table->add_column_list(type_Mixed, "list");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
     size_t int_over_50 = 0;
@@ -4197,6 +4198,14 @@ TEST(Parser_TypeOfValue)
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
 
+    auto list_0 = table->get_object(0).get_list<Mixed>(col_primitive_list);
+    list_0.add(Mixed{1});
+    list_0.add(Mixed{Decimal128(10)});
+    list_0.add(Mixed{Double{100}});
+    auto list_1 = table->get_object(1).get_list<Mixed>(col_primitive_list);
+    list_1.add(Mixed{std::string("hello")});
+    list_1.add(Mixed{1000});
+
     auto it = table->begin();
     for (int64_t i = 0; i < 10; i++) {
         auto obj = origin->create_object();
@@ -4218,14 +4227,32 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'numeric|string|binary|null'", table->size());
     verify_query(test_context, table, "mixed.@type == mixed.@type", table->size());
     verify_query(test_context, origin, "link.mixed.@type == 'numeric|string'", origin->size());
+    verify_query(test_context, origin, "links.mixed.@type == 'numeric|string'", origin->size());
+
+    verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
+    verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
+    verify_query(test_context, origin, "links.@type == links.mixed.@type", 0);
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed > 50 && mixed.@type == 'double'", 1);
     verify_query(test_context, table, "mixed > 50 && mixed.@type != 'double'", int_over_50 - 1);
     verify_query(test_context, table, "mixed > 50 && mixed.@type == 'int'", int_over_50 - 1);
 
-    // FIXME: test subqueries, list of primitives
-    // FIXME: should we allow @type on non-mixed properties?
+    verify_query(test_context, table, "list.@type == 'numeric'", 2);
+    verify_query(test_context, table, "list.@type == 'numeric' AND list >= 10 ", 2);
+    verify_query(test_context, table, "list.@type == mixed.@type", 1);
+    verify_query(test_context, table, "NONE list.@type == mixed.@type && list.@size > 0", 1);
+    verify_query(test_context, table, "ALL list.@type == mixed.@type && list.@size > 0", 0);
+    verify_query(test_context, table, "ALL list.@type == 'numeric' && list.@size > 0", 1);
+    verify_query(test_context, table, "NONE list.@type == 'binary' && list.@size > 0", 2);
+    verify_query(test_context, table, "NONE list.@type == 'string' && list.@size > 0", 1);
+
+    verify_query(test_context, origin, "links.mixed > 0", 10);
+    verify_query(test_context, origin, "links.mixed.@type == 'double'", 2);
+    verify_query(test_context, origin, "links.mixed > 0 && links.mixed.@type == 'double'", 2);
+    verify_query(test_context, origin,
+                 "SUBQUERY(links, $x, $x.mixed.@type == 'double' && $x.mixed == $x.int).@count > 0", 1);
+
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'asdf'", 1), message);
     CHECK(message.find("Unable to parse the type attribute string 'asdf'") != std::string::npos);
@@ -4243,9 +4270,10 @@ TEST(Parser_TypeOfValue)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == int", 1), message);
     CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'int'") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "int.@type == 'int'", 1), message);
-    CHECK(message.find("Operation '@type' is not supported on property of type 'int'") != std::string::npos);
+    CHECK(message.find("Comparison between two constants is not supported") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.@type == 'object'", 1), message);
-    CHECK(message.find("Operation '@type' is not supported on property of type 'link'") != std::string::npos);
+    CHECK(message.find("Comparison between two constants is not supported ('\"object\"' and '\"object\"')") !=
+          std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), message);
     CHECK_EQUAL(
         message,

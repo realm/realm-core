@@ -275,9 +275,11 @@ public:
         , comp_type(ct)
     {
     }
-    PropNode(PathNode* node, std::string id, PostOpNode* po_node)
+    PropNode(PathNode* node, std::string id, PostOpNode* po_node,
+             ExpressionComparisonType ct = ExpressionComparisonType::Any)
         : path(node)
         , identifier(id)
+        , comp_type(ct)
         , post_op(po_node)
     {
     }

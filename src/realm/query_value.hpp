@@ -51,6 +51,7 @@ public:
     }
     TypeOfValue(const std::string& attribute_tags);
     TypeOfValue(const class Mixed& value);
+    TypeOfValue(const ColKey& col_key);
     bool matches(const class Mixed& value) const;
     bool matches(const TypeOfValue& other) const
     {
@@ -158,12 +159,12 @@ struct QueryValue {
     }
     ~QueryValue() {}
 
-    Mixed as_mixed() const
+    inline Mixed as_mixed() const
     {
         REALM_ASSERT(m_type != exp_QueryExpressionType);
         return m_mixed;
     }
-    TypeOfValue as_type_of_value() const
+    inline TypeOfValue as_type_of_value() const
     {
         REALM_ASSERT_EX(m_type == exp_QueryExpressionType, m_type);
         return m_type_of_value;
@@ -179,7 +180,7 @@ struct QueryValue {
         return m_type.get_expression_type();
     }
 
-    bool is_null() const
+    inline bool is_null() const
     {
         return m_type.get_expression_type() == SubexprType::QueryTypeExtension::raw_data_type && m_mixed.is_null();
     }
@@ -192,7 +193,7 @@ struct QueryValue {
         return Mixed::types_are_comparable(v1.m_mixed, v2.m_mixed);
     }
 
-    bool operator==(const QueryValue& v2) const
+    inline bool operator==(const QueryValue& v2) const
     {
         if (m_type == exp_QueryExpressionType || v2.m_type == exp_QueryExpressionType) {
             return m_type == v2.m_type && m_type_of_value.matches(v2.m_type_of_value);
