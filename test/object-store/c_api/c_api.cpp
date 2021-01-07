@@ -35,7 +35,7 @@ realm_value_t rlm_int_val(int64_t n)
 
 realm_value_t rlm_null()
 {
-    realm_value_t null = {0};
+    realm_value_t null;
     null.type = RLM_TYPE_NULL;
     return null;
 }
