@@ -808,62 +808,63 @@ Query create(L left, const Subexpr2<R>& right)
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-    if constexpr (REALM_OLDQUERY_FALLBACK &&
-                  ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
-                   (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
-                   (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
-                   (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
-                   (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
-                   (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>))) {
-        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-        // TODO: recognize size operator expressions
-        // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    if constexpr (REALM_OLDQUERY_FALLBACK) {
+        if constexpr ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+                      (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
+                      (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
+                      (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
+                      (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
+                      (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
+                      (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
+                      (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>) || std::is_same_v<R, Mixed>) {
+            const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+            // TODO: recognize size operator expressions
+            // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-        if (column && !column->links_exist()) {
-            ConstTableRef t = column->get_base_table();
-            Query q = Query(t);
+            if (column && !column->links_exist()) {
+                ConstTableRef t = column->get_base_table();
+                Query q = Query(t);
 
-            if (std::is_same_v<Cond, Less>)
-                q.greater(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Greater>)
-                q.less(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Equal>)
-                q.equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, NotEqual>)
-                q.not_equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, LessEqual>)
-                q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, GreaterEqual>)
-                q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, EqualIns>)
-                q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, NotEqualIns>)
-                q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, BeginsWith>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, BeginsWithIns>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, EndsWith>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, EndsWithIns>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Contains>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, ContainsIns>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Like>)
-                q.like(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, LikeIns>)
-                q.like(column->column_key(), _impl::only_string_op_types(left), false);
-            else {
-                // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp
-                // or fallback to using use 'return new Compare<>' instead.
-                REALM_ASSERT(false);
+                if (std::is_same_v<Cond, Less>)
+                    q.greater(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Greater>)
+                    q.less(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Equal>)
+                    q.equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, NotEqual>)
+                    q.not_equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, LessEqual>)
+                    q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, GreaterEqual>)
+                    q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, EqualIns>)
+                    q.equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, NotEqualIns>)
+                    q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, BeginsWith>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, BeginsWithIns>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, EndsWith>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, EndsWithIns>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Contains>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, ContainsIns>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Like>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, LikeIns>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left), false);
+                else {
+                    // query_engine.hpp does not support this Cond. Please either add support for it in
+                    // query_engine.hpp or fallback to using use 'return new Compare<>' instead.
+                    REALM_ASSERT(false);
+                }
+                // Return query_engine.hpp node
+                return q;
             }
-            // Return query_engine.hpp node
-            return q;
         }
     }
 

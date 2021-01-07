@@ -485,7 +485,7 @@ TEST(Query_FindAllBegins)
     table.create_object().set_all(1, "foo");
     table.create_object().set_all(2, "foobar");
 
-    Query q1 = table.where().begins_with(col_str, "foo");
+    Query q1 = table.where().begins_with(col_str, StringData("foo"));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
@@ -502,7 +502,7 @@ TEST(Query_FindAllEnds)
     table.create_object().set_all(1, "barfoo");
     table.create_object().set_all(2, "barfoobar");
 
-    Query q1 = table.where().ends_with(col_str, "foo");
+    Query q1 = table.where().ends_with(col_str, StringData("foo"));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
@@ -523,7 +523,7 @@ TEST(Query_FindAllContains)
     table.create_object().set_all(5, "fobar");
     table.create_object().set_all(6, "barfo");
 
-    Query q1 = table.where().contains(col_str, "foo");
+    Query q1 = table.where().contains(col_str, StringData("foo"));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
@@ -531,7 +531,7 @@ TEST(Query_FindAllContains)
     CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
     CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 
-    q1 = table.where().like(col_str, "*foo*");
+    q1 = table.where().like(col_str, StringData("*foo*"));
     tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
@@ -567,7 +567,7 @@ TEST(Query_FindAllLikeCaseInsensitive)
     table.create_object().set_all(5, "Fobar");
     table.create_object().set_all(6, "baRFo");
 
-    Query q1 = table.where().like(col_str, "*foo*", false);
+    Query q1 = table.where().like(col_str, StringData("*foo*"), false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
@@ -800,7 +800,7 @@ TEST(Query_FindAllBeginsUnicode)
     table.create_object().set_all(1, uad "foo");
     table.create_object().set_all(2, uad "foobar");
 
-    Query q1 = table.where().begins_with(col_str, uad "foo");
+    Query q1 = table.where().begins_with(col_str, StringData(uad "foo"));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
@@ -818,12 +818,12 @@ TEST(Query_FindAllEndsUnicode)
     table.create_object().set_all(1, "barfoo" uad);
     table.create_object().set_all(2, "barfoobar");
 
-    Query q1 = table.where().ends_with(col_str, "foo" uad);
+    Query q1 = table.where().ends_with(col_str, StringData("foo" uad));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
 
-    Query q2 = table.where().ends_with(col_str, "foo" uAd, false);
+    Query q2 = table.where().ends_with(col_str, StringData("foo" uAd), false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
     CHECK_EQUAL(1, tv2[0].get<Int>(col_id));
@@ -844,7 +844,7 @@ TEST(Query_FindAllContainsUnicode)
     table.create_object().set_all(5, uad "fobar");
     table.create_object().set_all(6, uad "barfo");
 
-    Query q1 = table.where().contains(col_str, uad "foo");
+    Query q1 = table.where().contains(col_str, StringData(uad "foo"));
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1[0].get<Int>(col_id));
@@ -852,7 +852,7 @@ TEST(Query_FindAllContainsUnicode)
     CHECK_EQUAL(2, tv1[2].get<Int>(col_id));
     CHECK_EQUAL(3, tv1[3].get<Int>(col_id));
 
-    Query q2 = table.where().contains(col_str, uAd "foo", false);
+    Query q2 = table.where().contains(col_str, StringData(uAd "foo"), false);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(0, tv2[0].get<Int>(col_id));
@@ -5803,10 +5803,15 @@ TEST(Query_Mixed)
         }
     }
 
+    // g.to_json(std::cout);
     auto tv = (table->column<Mixed>(col_any) > Mixed(50)).find_all();
     CHECK_EQUAL(tv.size(), int_over_50);
     tv = (table->column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), int_over_50);
+    tv = (table->column<Mixed>(col_any) == 37).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().equal(col_any, Mixed(37)).find_all();
+    CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any) >= 50).find_all();
     CHECK_EQUAL(tv.size(), int_over_50 + 1);
     tv = (table->column<Mixed>(col_any) <= 50).find_all();
@@ -5828,26 +5833,26 @@ TEST(Query_Mixed)
     tv = table->where().not_equal(col_any, null()).find_all();
     CHECK_EQUAL(tv.size(), 99);
 
-    tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
+    tv = table->where().begins_with(col_any, StringData("String2")).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
     tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
 
-    tv = table->where().contains(col_any, "TRIN", false).find_all();
+    tv = table->where().contains(col_any, StringData("TRIN"), false).find_all();
     CHECK_EQUAL(tv.size(), 25);
     tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
     CHECK_EQUAL(tv.size(), 25);
 
-    tv = table->where().like(col_any, "Strin*").find_all();
+    tv = table->where().like(col_any, StringData("Strin*")).find_all();
     CHECK_EQUAL(tv.size(), 25);
 
-    tv = table->where().ends_with(col_any, "4").find_all(); // 4, 24, 44, 64, 84
+    tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
     char bin[1] = {0x34};
     tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
 
-    tv = table->where().equal(col_any, "String2Binary").find_all();
+    tv = table->where().equal(col_any, "String2Binary", true).find_all();
     CHECK_EQUAL(tv.size(), 1);
 
     tv = table->where().equal(col_any, "string2binary", false).find_all();
