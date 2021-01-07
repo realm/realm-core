@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <string>
+#include <realm/backup_restore.hpp>
 
 namespace realm {
 
@@ -35,6 +36,9 @@ struct DBOptions {
         Unsafe // If you use this, you loose ACID property
     };
 
+    using version_list_t = BackupHandler::version_list_t;
+    using version_time_list_t = BackupHandler::version_time_list_t;
+
     explicit DBOptions(Durability level = Durability::Full, const char* key = nullptr, bool allow_upgrade = true,
                        std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
                        std::string temp_directory = sys_tmp_dir, bool track_metrics = false,
@@ -47,6 +51,8 @@ struct DBOptions {
         , enable_metrics(track_metrics)
         , metrics_buffer_size(metrics_history_size)
         , backup_at_file_format_change(backup_at_file_format_change)
+        , accepted_versions(BackupHandler::accepted_versions_)
+        , to_be_deleted(BackupHandler::delete_versions_)
     {
     }
 
@@ -59,6 +65,8 @@ struct DBOptions {
         , enable_metrics(false)
         , metrics_buffer_size(10000)
         , backup_at_file_format_change(true)
+        , accepted_versions(BackupHandler::accepted_versions_)
+        , to_be_deleted(BackupHandler::delete_versions_)
     {
     }
 
@@ -104,6 +112,12 @@ struct DBOptions {
 
     /// Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change;
+
+    /// List of versions we can upgrade from
+    BackupHandler::version_list_t accepted_versions;
+
+    /// List of versions for which backup files are automatically removed at specified age.
+    BackupHandler::version_time_list_t to_be_deleted;
 
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.
     /// It must be writable and allowed to create pipe/fifo file on it.

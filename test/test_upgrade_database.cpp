@@ -30,7 +30,6 @@
 #endif
 
 #include <realm.hpp>
-#include <realm/backup_restore.hpp>
 #include <realm/history.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/util/file.hpp>
@@ -1706,7 +1705,7 @@ TEST(Upgrade_FixColumnKeys)
     DB::create(*hist)->start_read()->verify();
 }
 
-NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
+TEST(Upgrade_BackupAtoBtoAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
@@ -1715,10 +1714,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(200);
-    realm::BackupHandler::fake_versions({200}, {});
     {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->add_table("MyTable");
         table->add_column(type_String, "names");
@@ -1727,10 +1728,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // upgrade to format 201
     _impl::GroupFriend::fake_target_file_format(201);
-    realm::BackupHandler::fake_versions({201, 200}, {});
     {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1741,10 +1744,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // downgrade/restore backup of format 200
     _impl::GroupFriend::fake_target_file_format(200);
-    realm::BackupHandler::fake_versions({200}, {{201, 0}});
     {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1756,10 +1761,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 
     // move forward to version 202, bypassing the outlawed 201
     _impl::GroupFriend::fake_target_file_format(202);
-    realm::BackupHandler::fake_versions({202, 200}, {{201, 0}});
     {
+        DBOptions options;
+        options.accepted_versions = {202, 200};
+        options.to_be_deleted = {{201, 0}};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         CHECK(table->size() == 1);
@@ -1770,10 +1777,9 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
     // Cleanup file and disable mockup versioning
     File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format({});
-    realm::BackupHandler::unfake_versions();
 }
 
-NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
+TEST(Upgrade_BackupAtoBbypassAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
@@ -1783,10 +1789,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // Build a realm file with format 200
     _impl::GroupFriend::fake_target_file_format(200);
-    realm::BackupHandler::fake_versions({200}, {});
     {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->add_table("MyTable");
         table->add_column(type_String, "names");
@@ -1795,10 +1803,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // upgrade to format 201
     _impl::GroupFriend::fake_target_file_format(201);
-    realm::BackupHandler::fake_versions({201, 200}, {});
     {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1809,10 +1819,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // upgrade further to 202, based on 201, to create a v201 backup
     _impl::GroupFriend::fake_target_file_format(202);
-    realm::BackupHandler::fake_versions({202, 201, 200}, {});
     {
+        DBOptions options;
+        options.accepted_versions = {202, 201, 200};
+        options.to_be_deleted = {};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
@@ -1823,10 +1835,12 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // bypassing the outlawed 201 and 202. Set an age limit of 10 for any backuo
     // of version 201 to prevent it from being deleted
     _impl::GroupFriend::fake_target_file_format(203);
-    realm::BackupHandler::fake_versions({203, 200}, {{201, 10}});
     {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 10}};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         CHECK(table->size() == 0);
@@ -1838,11 +1852,13 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // Ask for v201 to have a max age of one sec.
     // When opened more than a sec later,
     // the v201 backup will be too old and automagically removed
-    realm::BackupHandler::fake_versions({203, 200}, {{201, 1}});
     millisleep(2000);
     {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 1}};
         auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist);
+        auto db = DB::create(*hist, options);
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
     CHECK(!File::exists(prefix + "v201.backup.realm"));
@@ -1850,7 +1866,6 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     // Cleanup file and disable mockup versioning
     File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format({});
-    realm::BackupHandler::unfake_versions();
 }
 
 /*

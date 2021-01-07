@@ -830,7 +830,8 @@ private:
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
-    /// upgrade logic in Group::upgrade_file_format().
+    /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
+    /// file formats and the version deletion list residing in "backup_restore.cpp"
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;

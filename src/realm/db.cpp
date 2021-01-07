@@ -27,7 +27,6 @@
 #include <type_traits>
 #include <random>
 
-#include <realm/backup_restore.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/group_writer.hpp>
 #include <realm/group_writer.hpp>
@@ -1031,7 +1030,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             current_file_format_version = alloc.get_committed_file_format_version();
             target_file_format_version =
                 Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
-            BackupHandler backup(path);
+            BackupHandler backup(path, options.accepted_versions, options.to_be_deleted);
             if (backup.must_restore_from_backup(current_file_format_version)) {
                 // we need to unmap before any file ops that'll change the realm
                 // file:
