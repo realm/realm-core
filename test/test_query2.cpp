@@ -5803,7 +5803,9 @@ TEST(Query_Mixed)
         }
     }
 
-    auto tv = (table->column<Mixed>(col_any) > 50).find_all();
+    auto tv = (table->column<Mixed>(col_any) > Mixed(50)).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50);
+    tv = (table->column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), int_over_50);
     tv = (table->column<Mixed>(col_any) >= 50).find_all();
     CHECK_EQUAL(tv.size(), int_over_50 + 1);
@@ -5816,6 +5818,8 @@ TEST(Query_Mixed)
     tv = (table->column<Mixed>(col_any) != 50).find_all();
     CHECK_EQUAL(tv.size(), 99);
 
+    tv = table->where().greater(col_any, Mixed(50)).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50);
     tv = table->where().greater(col_any, 50).find_all();
     CHECK_EQUAL(tv.size(), int_over_50);
 
@@ -5829,7 +5833,9 @@ TEST(Query_Mixed)
     tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
 
-    tv = table->where().contains(col_any, "trin").find_all();
+    tv = table->where().contains(col_any, "TRIN", false).find_all();
+    CHECK_EQUAL(tv.size(), 25);
+    tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
     CHECK_EQUAL(tv.size(), 25);
 
     tv = table->where().like(col_any, "Strin*").find_all();

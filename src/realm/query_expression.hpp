@@ -1041,6 +1041,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
                  public Overloads<T, UUID>,
+                 public Overloads<T, Mixed>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2() {}
@@ -1062,6 +1063,7 @@ public:
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
     RLM_U2(UUID, o)                                                                                                  \
+    RLM_U2(Mixed, o)                                                                                                 \
     RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
@@ -2145,12 +2147,6 @@ private:
     LeafPtr m_array_ptr;
     ArrayInteger* m_leaf_ptr = nullptr;
 };
-
-// Columns<Mixed> == String
-inline Query operator==(Columns<Mixed>&& left, const char* right)
-{
-    return left == StringData(right);
-}
 
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
