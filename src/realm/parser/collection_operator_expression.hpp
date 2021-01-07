@@ -84,7 +84,7 @@ struct CollectionOperatorGetter {
 template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Min, PropertyExpression,
-    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128, Timestamp>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Minimum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PropertyExpression>& expr)
     {
@@ -106,7 +106,7 @@ struct CollectionOperatorGetter<
 template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Min, PrimitiveListExpression,
-    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128, Timestamp>::value>> {
     static ListColumnAggregate<RetType, aggregate_operations::Minimum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Min, PrimitiveListExpression>& expr)
     {
@@ -117,7 +117,7 @@ struct CollectionOperatorGetter<
 template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Max, PropertyExpression,
-    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128, Timestamp>::value>> {
     static SubColumnAggregate<RetType, aggregate_operations::Maximum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PropertyExpression>& expr)
     {
@@ -139,7 +139,7 @@ struct CollectionOperatorGetter<
 template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Max, PrimitiveListExpression,
-    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
+    typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128, Timestamp>::value>> {
     static ListColumnAggregate<RetType, aggregate_operations::Maximum<RetType>>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Max, PrimitiveListExpression>& expr)
     {
