@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Query parser supports property names containing white space. White space characters must be excapes with a '\'.
+* Query parser supports `@type` for filtering based on the stored type of a Mixed property. ([#4239](https://github.com/realm/realm-core/pull/4239))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
