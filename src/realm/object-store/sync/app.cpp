@@ -342,7 +342,7 @@ void App::UserAPIKeyProviderClient::create_api_key(
 
         nlohmann::json json;
         try {
-            json = nlohmann::json::parse(response.body);
+            json = nlohmann::json::parse(*response.body);
         }
         catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -382,7 +382,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(
 
         nlohmann::json json;
         try {
-            json = nlohmann::json::parse(response.body);
+            json = nlohmann::json::parse(*response.body);
         }
         catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -419,7 +419,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(
 
         nlohmann::json json;
         try {
-            json = nlohmann::json::parse(response.body);
+            json = nlohmann::json::parse(*response.body);
         }
         catch (const std::exception& e) {
             return completion_block(std::vector<UserAPIKey>(),
@@ -540,7 +540,7 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
         nlohmann::json profile_json;
         try {
-            profile_json = nlohmann::json::parse(profile_response.body);
+            profile_json = nlohmann::json::parse(*profile_response.body);
         }
         catch (const std::domain_error& e) {
             return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -624,7 +624,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
 
         nlohmann::json json;
         try {
-            json = nlohmann::json::parse(response.body);
+            json = nlohmann::json::parse(*response.body);
         }
         catch (const std::exception& e) {
             return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -822,7 +822,7 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
     m_config.transport_generator()->send_request_to_server(req, [this, completion_block](const Response& response) {
         nlohmann::json json;
         try {
-            json = nlohmann::json::parse(response.body);
+            json = nlohmann::json::parse(*response.body);
         }
         catch (const std::exception& e) {
             return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()), response);
@@ -953,7 +953,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         }
 
         try {
-            nlohmann::json json = nlohmann::json::parse(response.body);
+            nlohmann::json json = nlohmann::json::parse(*response.body);
             auto access_token = value_from_json<std::string>(json, "access_token");
             sync_user->update_access_token(std::move(access_token));
         }
@@ -989,7 +989,7 @@ void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name,
         if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error, util::none);
         }
-        completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
+        completion_block(util::none, util::Optional<bson::Bson>(bson::parse(*response.body)));
     };
 
     bson::BsonDocument args{{"arguments", args_bson}, {"name", name}};
