@@ -5,9 +5,10 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* `App::call_function` now catches invalid json parse exceptions during a client timeout.
+* `App::call_function` now catches invalid json parse exceptions during a client timeout ([#4236](https://github.com/realm/realm-core/pull/4236)).
 * Fix a race condition which would lead to "uncaught exception in notifier thread: N5realm15InvalidTableRefE: transaction_ended" and a crash when the source Realm was closed or invalidated at a very specific time during the first run of a collection notifier ([#3761](https://github.com/realm/realm-core/issues/3761), since v6.0.0).
 * Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
+* Add comparison for source and desitnation transaction version when constructing `ConstTableView` ([#4254](https://github.com/realm/realm-core/pull/4254)).
  
 ### Breaking changes
 * None.
