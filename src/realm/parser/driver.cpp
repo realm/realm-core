@@ -938,9 +938,15 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         double val = drv->m_args.double_for_argument(arg_no);
                         switch (hint) {
                             case type_Int:
-                            case type_Bool:
-                                ret = new Value<int64_t>(int64_t(val));
+                            case type_Bool: {
+                                int64_t int_val = int64_t(val);
+                                // Only return an integer if it precisely represents val
+                                if (double(int_val) == val)
+                                    ret = new Value<int64_t>(int_val);
+                                else
+                                    ret = new Value<double>(val);
                                 break;
+                            }
                             case type_Float:
                                 ret = new Value<float>(float(val));
                                 break;
