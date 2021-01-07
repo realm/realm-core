@@ -131,6 +131,16 @@ void ResultsNotifier::calculate_changes()
         for (size_t i = 0; i < m_run_tv.size(); ++i)
             next_rows.push_back(m_run_tv.get_key(i).value);
 
+        auto table_key = m_query->get_table()->get_key();
+        if (auto it = m_info->tables.find(table_key.value); it != m_info->tables.end()) {
+            auto& changes = it->second;
+            for (auto& key_val : m_previous_rows) {
+                if (changes.deletions_contains(key_val)) {
+                    key_val = -1;
+                }
+            }
+        }
+
         m_change = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                       get_modification_checker(*m_info, m_query->get_table()),
                                                       m_target_is_in_table_order);

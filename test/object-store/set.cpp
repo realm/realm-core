@@ -74,7 +74,7 @@ TEST_CASE("set") {
             CHECK(set.insert(123).second);
             CHECK(set.insert(456).second);
             CHECK(set.insert(0).second);
-            CHECK(set.insert(-1).second);
+            CHECK(set.insert_any(-1).second);
             CHECK(!set.insert(456).second);
         });
 
@@ -82,14 +82,14 @@ TEST_CASE("set") {
         CHECK(set.size() == 4);
         CHECK(set.find(-1) == 0);
         CHECK(set.find(0) == 1);
-        CHECK(set.find(123) == 2);
-        CHECK(set.find(456) == 3);
+        CHECK(set.get_any(2) == Mixed(123));
+        CHECK(set.find_any(456) == 3);
         CHECK(set.find(999) == size_t(-1));
 
         write([&]() {
             CHECK(set.remove(123).second);
             CHECK(!set.remove(123).second);
-            CHECK(set.remove(-1).second);
+            CHECK(set.remove_any(-1).second);
         });
 
         CHECK(set.size() == 2);

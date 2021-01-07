@@ -195,10 +195,6 @@ public:
 
     Iterator& operator+=(ptrdiff_t adj);
 
-    Iterator operator+(ptrdiff_t adj)
-    {
-        return Iterator(m_tree, get_position() + adj);
-    }
     bool operator==(const Iterator& rhs) const
     {
         return m_key == rhs.m_key;

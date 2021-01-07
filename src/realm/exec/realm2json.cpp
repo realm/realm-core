@@ -93,7 +93,7 @@ int main(int argc, char const* argv[])
             g.to_json(std::cout, link_depth, &renames, output_mode);
         }
     }
-    catch (const realm::FileFormatUpgradeRequired& e) {
+    catch (const realm::FileFormatUpgradeRequired&) {
         // In realm history
         // Last chance - this one must succeed
         auto hist = realm::make_in_realm_history(path);
