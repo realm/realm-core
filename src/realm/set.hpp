@@ -300,6 +300,8 @@ public:
 
     std::unique_ptr<LnkSet> clone_linkset() const
     {
+        // FIXME: The copy constructor requires this.
+        update_if_needed();
         return std::make_unique<LnkSet>(*this);
     }
 
@@ -526,6 +528,10 @@ template <class T>
 inline Set<T>::Set(const Set& other)
     : Base(static_cast<const Base&>(other))
 {
+    // FIXME: If the other side needed an update, we could be using a stale ref
+    // below.
+    REALM_ASSERT(!other.update_if_needed());
+
     if (other.m_tree) {
         Allocator& alloc = other.m_tree->get_alloc();
         m_tree = std::make_unique<BPlusTree<T>>(alloc);
