@@ -28,12 +28,11 @@ using namespace realm;
 static std::unordered_map<std::string, TypeOfValue::Attribute> attribute_map = {
     {"null", TypeOfValue::Null},          {"int", TypeOfValue::Int},         {"integer", TypeOfValue::Int},
     {"bool", TypeOfValue::Bool},          {"boolean", TypeOfValue::Bool},    {"string", TypeOfValue::String},
-    {"binary", TypeOfValue::Binary},      {"mixed", TypeOfValue::Mixed},     {"timestamp", TypeOfValue::Timestamp},
+    {"binary", TypeOfValue::Binary},      {"date", TypeOfValue::Timestamp},  {"timestamp", TypeOfValue::Timestamp},
     {"float", TypeOfValue::Float},        {"double", TypeOfValue::Double},   {"decimal128", TypeOfValue::Decimal128},
     {"decimal", TypeOfValue::Decimal128}, {"link", TypeOfValue::ObjectLink}, {"object", TypeOfValue::ObjectLink},
     {"objectid", TypeOfValue::ObjectId},  {"uuid", TypeOfValue::UUID},       {"numeric", TypeOfValue::Numeric},
-    {"date", TypeOfValue::Timestamp},     {"bindata", TypeOfValue::Binary}};
-constexpr char attribute_separator = '|';
+    {"bindata", TypeOfValue::Binary}};
 
 TypeOfValue::Attribute get_single_from(std::string str)
 {
@@ -51,7 +50,6 @@ TypeOfValue::Attribute get_single_from(std::string str)
     return it->second;
 }
 
-
 TypeOfValue::Attribute attribute_from(DataType type)
 {
     switch (type) {
@@ -64,7 +62,7 @@ TypeOfValue::Attribute attribute_from(DataType type)
         case DataType::Type::Binary:
             return TypeOfValue::Attribute::Binary;
         case DataType::Type::Mixed:
-            return TypeOfValue::Attribute::Mixed;
+            throw std::runtime_error("Cannot construct a strongly typed 'TypeOfValue' from ambiguous 'mixed'");
         case DataType::Type::Timestamp:
             return TypeOfValue::Attribute::Timestamp;
         case DataType::Type::Float:
@@ -82,23 +80,24 @@ TypeOfValue::Attribute attribute_from(DataType type)
         case DataType::Type::UUID:
             return TypeOfValue::Attribute::UUID;
         case DataType::Type::LinkList:
-            REALM_UNREACHABLE();
             break;
     }
-    return TypeOfValue::Attribute::None;
+    throw std::runtime_error(util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));
 }
 
 namespace realm {
 
+TypeOfValue::TypeOfValue(uint64_t attributes)
+    : m_attributes(attributes)
+{
+    if (m_attributes == 0) {
+        throw std::runtime_error("Invalid value 0 found when converting to TypeOfValue; a type must be specified");
+    }
+}
+
 TypeOfValue::TypeOfValue(const std::string& attribute_tags)
 {
-    size_t next = 0;
-    m_attributes = TypeOfValue::None;
-    for (size_t begin = 0; next != std::string::npos; begin = next + 1) {
-        next = attribute_tags.find(attribute_separator, begin);
-        size_t substr_length = (next == std::string::npos ? attribute_tags.size() : next) - begin;
-        m_attributes |= get_single_from(attribute_tags.substr(begin, substr_length));
-    }
+    m_attributes = get_single_from(attribute_tags);
 }
 
 TypeOfValue::TypeOfValue(const class Mixed& value)
@@ -122,36 +121,53 @@ TypeOfValue::TypeOfValue(const ColKey& col_key)
     m_attributes = attribute_from(data_type);
 }
 
+TypeOfValue::TypeOfValue(const DataType& data_type)
+{
+    REALM_ASSERT_RELEASE(data_type.is_valid());
+    m_attributes = attribute_from(data_type);
+}
+
 bool TypeOfValue::matches(const class Mixed& value) const
 {
     return matches(TypeOfValue(value));
 }
 
-std::string get_attribute_name_of(uint64_t att)
+util::Optional<std::string> get_attribute_name_of(uint64_t att)
 {
     for (auto& it : attribute_map) {
         if (it.second == att) {
             return it.first;
         }
     }
-    REALM_ASSERT_DEBUG(false);
-    return "unknown";
+    return util::none;
 }
 
 std::string TypeOfValue::to_string() const
 {
-    std::string value;
+    if (auto value = get_attribute_name_of(m_attributes)) {
+        return *value;
+    }
+
+    std::vector<std::string> values;
     uint64_t bit_to_check = 1;
     while (bit_to_check <= m_attributes) {
         if (m_attributes & bit_to_check) {
-            if (!value.empty()) {
-                value += attribute_separator;
-            }
-            value += get_attribute_name_of(bit_to_check);
+            auto val = get_attribute_name_of(bit_to_check);
+            REALM_ASSERT_RELEASE_EX(val, bit_to_check);
+            values.push_back(*val);
         }
         bit_to_check <<= 1;
     }
-    return value;
+    REALM_ASSERT_RELEASE(values.size() > 0);
+    if (values.size() == 1) {
+        return values[0];
+    }
+    else {
+        return util::format("{%1}", std::accumulate(std::next(values.begin()), values.end(), values[0],
+                                                    [](std::string previous, std::string current) {
+                                                        return std::move(previous) + ", " + current;
+                                                    }));
+    }
 }
 
 } // namespace realm

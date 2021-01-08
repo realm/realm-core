@@ -4221,13 +4221,21 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
     verify_query(test_context, table, "mixed.@type == 'Decimal'", 1);
     verify_query(test_context, table, "mixed.@type == 'binary'", 1);
-    verify_query(test_context, table, "mixed.@type == 'binary|DECIMAL|Double'", 4);
+    verify_query(test_context, table,
+                 "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
     verify_query(test_context, table, "mixed.@type == 'null'", 1);
     verify_query(test_context, table, "mixed.@type == 'numeric'", table->size() - nb_strings - 2);
-    verify_query(test_context, table, "mixed.@type == 'numeric|string|binary|null'", table->size());
+    verify_query(
+        test_context, table,
+        "mixed.@type == 'numeric' || mixed.@type == 'string' || mixed.@type == 'binary' || mixed.@type == 'null'",
+        table->size());
     verify_query(test_context, table, "mixed.@type == mixed.@type", table->size());
-    verify_query(test_context, origin, "link.mixed.@type == 'numeric|string'", origin->size());
-    verify_query(test_context, origin, "links.mixed.@type == 'numeric|string'", origin->size());
+    verify_query(test_context, origin, "link.mixed.@type == 'numeric' || link.mixed.@type == 'string'",
+                 origin->size());
+    verify_query(test_context, origin, "links.mixed.@type == 'numeric' || links.mixed.@type == 'string'",
+                 origin->size());
+    // TODO: enable this when IN is supported for list constants
+    // verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
 
     verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
@@ -4259,9 +4267,9 @@ TEST(Parser_TypeOfValue)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == ''", 1), message);
     CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'string|double|'", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == '|'", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
+    CHECK(message.find("Unable to parse the type attribute string '") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 23", 1), message);
     CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'int'") != std::string::npos);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 2.5", 1), message);

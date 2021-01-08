@@ -374,6 +374,10 @@ public:
     {
         m_first[0] = init_val;
     }
+    ValueBase(const TypeOfValue& init_val)
+    {
+        m_first[0] = init_val;
+    }
     ~ValueBase()
     {
         dealloc();
@@ -1133,6 +1137,19 @@ public:
     }
 };
 
+template <>
+class Subexpr2<TypeOfValue> : public Subexpr, public Overloads<TypeOfValue, TypeOfValue> {
+public:
+    Query equal(TypeOfValue v);
+    Query equal(const TypeOfValueOperator<Mixed>& col);
+    Query not_equal(TypeOfValue v);
+    Query not_equal(const TypeOfValueOperator<Mixed>& col);
+    SubexprType get_expression_type() const final
+    {
+        return exp_QueryExpressionType;
+    }
+};
+
 
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
@@ -1189,7 +1206,7 @@ public:
     Value() = default;
 
     Value(T init)
-        : ValueBase(Mixed(init))
+        : ValueBase(init)
     {
     }
 
@@ -1204,11 +1221,16 @@ public:
                 return "NULL";
             else {
                 QueryValue val = get(0);
-                if (val.get_type() == exp_QueryExpressionType) {
-                    return util::serializer::print_value(val.as_type_of_value().to_string());
+                if constexpr (std::is_same_v<T, TypeOfValue>) {
+                    return '"' + val.as_type_of_value().to_string() + '"';
                 }
                 else {
-                    return util::serializer::print_value(val.as_mixed().template get<T>());
+                    if (val.get_type() == exp_QueryExpressionType) {
+                        return '"' + val.as_type_of_value().to_string() + '"';
+                    }
+                    else {
+                        return util::serializer::print_value(val.as_mixed().template get<T>());
+                    }
                 }
             }
         }
@@ -1235,60 +1257,6 @@ public:
         return make_subexpr<Value<T>>(*this);
     }
 };
-
-class ConstantTypeOfValue : public ValueBase, public Subexpr {
-public:
-    ConstantTypeOfValue(const TypeOfValue& v)
-        : m_value(v)
-    {
-        set(0, QueryValue(v));
-    }
-    bool has_constant_evaluation() const override
-    {
-        return true;
-    }
-    QueryValue get_query_value() override
-    {
-        return get(0);
-    }
-
-    SubexprType get_expression_type() const override
-    {
-        return exp_QueryExpressionType;
-    }
-
-    void evaluate(size_t, ValueBase& destination) override
-    {
-        destination = *this;
-    }
-
-    std::string description(util::serializer::SerialisationState&) const override
-    {
-        REALM_ASSERT_EX(!ValueBase::m_from_link_list, ValueBase::size());
-        if (size() > 0) {
-            if (get(0).is_null())
-                return "NULL";
-            else
-                return '"' + get(0).as_type_of_value().to_string() + '"';
-        }
-        return "";
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return std::unique_ptr<Subexpr>(new ConstantTypeOfValue(*this));
-    }
-
-private:
-    ConstantTypeOfValue(const ConstantTypeOfValue& other)
-        : m_value(other.m_value)
-    {
-        set(0, QueryValue(m_value));
-    }
-
-    TypeOfValue m_value;
-};
-
 
 class ConstantStringValue : public Value<StringData> {
 public:
@@ -2558,7 +2526,7 @@ private:
 };
 
 template <class T, class TExpr>
-class TypeOfValueOperator : public Subexpr {
+class TypeOfValueOperator : public Subexpr2<TypeOfValue> {
     // We are only supporting @type queries on Mixed properties.
     // If users wish to query other property types, SDKs may wish
     // to convert those into a TypeOfValue constant as a convenience.
@@ -2590,11 +2558,6 @@ public:
     void set_cluster(const Cluster* cluster) override
     {
         m_expr->set_cluster(cluster);
-    }
-
-    SubexprType get_expression_type() const override
-    {
-        return exp_QueryExpressionType;
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression

@@ -644,10 +644,10 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
             return s->type_of_value().clone();
         }
         if (auto s = dynamic_cast<ObjPropertyBase*>(subexpr)) {
-            return ConstantTypeOfValue(TypeOfValue(s->column_key())).clone();
+            return Value(TypeOfValue(s->column_key())).clone();
         }
-        if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
-            return ConstantTypeOfValue(TypeOfValue(TypeOfValue::Attribute::ObjectLink)).clone();
+        if (dynamic_cast<Columns<Link>*>(subexpr)) {
+            return Value(TypeOfValue(TypeOfValue::Attribute::ObjectLink)).clone();
         }
     }
     if (subexpr) {
@@ -825,7 +825,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, SubexprType hint
                     ret = new Value<Decimal128>(Decimal128(str.c_str()));
                     break;
                 case exp_QueryExpressionType:
-                    ret = new ConstantTypeOfValue(TypeOfValue(str));
+                    ret = new Value(TypeOfValue(str));
                     break;
                 default:
                     ret = new ConstantStringValue(str);
@@ -1073,7 +1073,7 @@ void verify_conditions(Subexpr* left, Subexpr* right)
         throw std::runtime_error(util::format("Comparison between two lists is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));
     }
-    if (dynamic_cast<ConstantTypeOfValue*>(left) && dynamic_cast<ConstantTypeOfValue*>(right)) {
+    if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
         util::serializer::SerialisationState state;
         throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));

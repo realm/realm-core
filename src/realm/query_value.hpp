@@ -29,7 +29,6 @@ namespace realm {
 class TypeOfValue {
 public:
     enum Attribute : uint64_t {
-        None = 0,
         Null = 1,
         Int = 2,
         Double = 4,
@@ -42,16 +41,13 @@ public:
         ObjectId = 512,
         Decimal128 = 1024,
         ObjectLink = 2048,
-        Mixed = 4096,
         Numeric = Int + Double + Float + Decimal128,
     };
-    TypeOfValue(uint64_t attributes)
-        : m_attributes(attributes)
-    {
-    }
-    TypeOfValue(const std::string& attribute_tags);
-    TypeOfValue(const class Mixed& value);
-    TypeOfValue(const ColKey& col_key);
+    explicit TypeOfValue(uint64_t attributes);
+    explicit TypeOfValue(const std::string& attribute_tags);
+    explicit TypeOfValue(const class Mixed& value);
+    explicit TypeOfValue(const ColKey& col_key);
+    explicit TypeOfValue(const DataType& data_type);
     bool matches(const class Mixed& value) const;
     bool matches(const TypeOfValue& other) const
     {
