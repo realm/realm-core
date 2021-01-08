@@ -1285,6 +1285,33 @@ private:
     util::Optional<std::string> m_string;
 };
 
+class ConstantBinaryValue : public Value<BinaryData> {
+public:
+    ConstantBinaryValue(const BinaryData& bin)
+        : Value()
+        , m_buffer(bin)
+    {
+        if (m_buffer.data())
+            set(0, BinaryData(m_buffer.data(), m_buffer.size()));
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantBinaryValue(*this));
+    }
+
+private:
+    ConstantBinaryValue(const ConstantBinaryValue& other)
+        : Value()
+        , m_buffer(other.m_buffer)
+    {
+        if (m_buffer.data())
+            set(0, BinaryData(m_buffer.data(), m_buffer.size()));
+    }
+
+    OwnedBinaryData m_buffer;
+};
+
 // All overloads where left-hand-side is L:
 //
 // left-hand-side       operator                              right-hand-side
