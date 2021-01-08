@@ -249,33 +249,6 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 }
 
 
-class bowl_of_stones_semaphore {
-public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0)
-        : m_num_stones(initial_number_of_stones)
-    {
-    }
-    void get_stone(int num_to_get)
-    {
-        LockGuard lock(m_mutex);
-        while (m_num_stones < num_to_get)
-            m_cond_var.wait(lock);
-        m_num_stones -= num_to_get;
-    }
-    void add_stone()
-    {
-        LockGuard lock(m_mutex);
-        ++m_num_stones;
-        m_cond_var.notify_all();
-    }
-
-private:
-    Mutex m_mutex;
-    int m_num_stones;
-    CondVar m_cond_var;
-};
-
-
 } // anonymous namespace
 
 
@@ -715,17 +688,6 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
     cv->notify_all();
 }
 
-
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, InterprocessMutex* mutex,
-                       InterprocessCondVar* cv)
-{
-    std::lock_guard<InterprocessMutex> l(*mutex);
-    ++*wait_counter;
-    feedback->add_stone();
-    cv->wait(*mutex, nullptr);
-    --*wait_counter;
-    feedback->add_stone();
-}
 
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv, std::mutex* control_mutex,
