@@ -950,10 +950,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                             case type_Float:
                                 ret = new Value<float>(float(val));
                                 break;
-                            case type_Double:
-                                ret = new Value<double>(val);
-                                break;
                             default:
+                                ret = new Value<double>(val);
                                 break;
                         }
                         break;
