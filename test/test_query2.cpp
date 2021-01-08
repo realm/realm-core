@@ -5872,6 +5872,14 @@ TEST(Query_Mixed)
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 2);
+    tv = (origin->link(col_links).column<Mixed>(col_any).contains("string2bin", false)).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (origin->link(col_links).column<Mixed>(col_any).like("*ring*", false)).find_all();
+    CHECK_EQUAL(tv.size(), 10);
+    tv = (origin->link(col_links).column<Mixed>(col_any).begins_with("String", true)).find_all();
+    CHECK_EQUAL(tv.size(), 10);
+    tv = (origin->link(col_links).column<Mixed>(col_any).ends_with("g40", true)).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 TEST(Query_ListOfMixed)
