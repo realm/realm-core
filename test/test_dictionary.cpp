@@ -80,7 +80,7 @@ TEST(Dictionary_Basics)
     };
 
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
+    auto col_dict = foo->add_column_dictionary(col_type_Mixed, "dictionaries");
 
     Obj obj1 = foo->create_object();
     Obj obj2 = foo->create_object();
@@ -139,9 +139,9 @@ TEST(Dictionary_Links)
         CHECK_EQUAL(x, y);
     };
 
-    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
-    auto cats = g.add_table_with_primary_key("cat", type_String, "name");
-    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto dogs = g.add_table_with_primary_key("dog", col_type_String, "name");
+    auto cats = g.add_table_with_primary_key("cat", col_type_String, "name");
+    auto persons = g.add_table_with_primary_key("person", col_type_String, "name");
     auto col_dict = persons->add_column_dictionary(*dogs, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
@@ -185,9 +185,9 @@ TEST(Dictionary_TypedLinks)
         CHECK_EQUAL(x, y);
     };
 
-    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
-    auto persons = g.add_table_with_primary_key("person", type_String, "name");
-    auto col_dict = persons->add_column_dictionary(type_TypedLink, "dictionaries");
+    auto dogs = g.add_table_with_primary_key("dog", col_type_String, "name");
+    auto persons = g.add_table_with_primary_key("person", col_type_String, "name");
+    auto col_dict = persons->add_column_dictionary(col_type_TypedLink, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
@@ -253,7 +253,7 @@ TEST(Dictionary_Transaction)
     {
         WriteTransaction wt(db);
         auto foo = wt.add_table("foo");
-        col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
+        col_dict = foo->add_column_dictionary(col_type_Mixed, "dictionaries");
 
         Obj obj1 = foo->create_object();
         Obj obj2 = foo->create_object();
@@ -301,7 +301,7 @@ TEST(Dictionary_Aggregate)
 {
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(col_type_Int, "dictionaries", col_type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -347,7 +347,7 @@ TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(col_type_Int, "dictionaries", col_type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -379,9 +379,9 @@ TEST(Dictionary_Performance)
 TEST(Dictionary_Tombstones)
 {
     Group g;
-    auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
-    auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+    auto foos = g.add_table_with_primary_key("class_Foo", col_type_Int, "id");
+    auto bars = g.add_table_with_primary_key("class_Bar", col_type_String, "id");
+    ColKey col_dict = foos->add_column_dictionary(col_type_Mixed, "dict", col_type_String);
 
     auto foo = foos->create_object_with_primary_key(123);
     auto a = bars->create_object_with_primary_key("a");

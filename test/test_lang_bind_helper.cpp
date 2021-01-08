@@ -105,7 +105,7 @@ TEST(Transactions_Frozen)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("my_table");
-        auto col = table->add_column(type_Int, "my_col_1");
+        auto col = table->add_column(col_type_Int, "my_col_1");
         for (int j = 0; j < 1000; ++j) {
             table->create_object().set_all(j);
         }
@@ -210,7 +210,7 @@ TEST(Transactions_ConcurrentFrozenQueryAndObj)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("MyTable");
-        table->add_column(type_Int, "MyCol");
+        table->add_column(col_type_Int, "MyCol");
         for (int i = 0; i < 1000; ++i) {
             obj_keys[i] = table->create_object().set_all(i).get_key();
         }
@@ -256,7 +256,7 @@ TEST_IF(Transactions_ConcurrentFrozenQueryAndObjAndTransactionClose, !REALM_TSAN
     {
         auto wt = db->start_write();
         auto table = wt->add_table("MyTable");
-        table->add_column(type_Int, "MyCol");
+        table->add_column(col_type_Int, "MyCol");
         for (int i = 0; i < 1000; ++i) {
             obj_keys[i] = table->create_object().set_all(i).get_key();
         }
@@ -339,8 +339,8 @@ public:
         m_changesets[m_incoming_version].changes = std::move(m_incoming_changeset);
         m_changesets[m_incoming_version].finalized = true;
     }
-    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
-        noexcept override
+    void get_changesets(version_type begin_version, version_type end_version,
+                        BinaryIterator* buffer) const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i < n; ++i) {
@@ -479,7 +479,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     {
         WriteTransaction wt(sg);
         TableRef foo_w = wt.add_table("foo");
-        foo_w->add_column(type_Int, "i");
+        foo_w->add_column(col_type_Int, "i");
         k0 = foo_w->create_object().get_key();
         wt.commit();
     }
@@ -490,7 +490,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     ConstTableRef foo = rt->get_table("foo");
     CHECK_EQUAL(1, foo->get_column_count());
     auto cols = foo->get_column_keys();
-    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(1, foo->size());
     CHECK_EQUAL(0, foo->get_object(k0).get<int64_t>(cols[0]));
     uint_fast64_t version = foo->get_content_version();
@@ -500,14 +500,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     {
         WriteTransaction wt(sg);
         TableRef foo_w = wt.get_table("foo");
-        foo_w->add_column(type_String, "s");
-        foo_w->add_column(type_Bool, "b");
-        foo_w->add_column(type_Float, "f");
-        foo_w->add_column(type_Double, "d");
-        foo_w->add_column(type_Binary, "bin");
-        foo_w->add_column(type_Timestamp, "t");
-        foo_w->add_column(type_Decimal, "dec");
-        foo_w->add_column(type_ObjectId, "oid");
+        foo_w->add_column(col_type_String, "s");
+        foo_w->add_column(col_type_Bool, "b");
+        foo_w->add_column(col_type_Float, "f");
+        foo_w->add_column(col_type_Double, "d");
+        foo_w->add_column(col_type_Binary, "bin");
+        foo_w->add_column(col_type_Timestamp, "t");
+        foo_w->add_column(col_type_Decimal, "dec");
+        foo_w->add_column(col_type_ObjectId, "oid");
         foo_w->add_column(*foo_w, "link");
         cols = foo_w->get_column_keys();
         auto obj1 = foo_w->create_object();
@@ -524,8 +524,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
     cols = foo->get_column_keys();
     CHECK_EQUAL(10, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
-    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
     auto obj0 = foo->get_object(k0);
     auto obj1 = foo->get_object(k1);
@@ -547,8 +547,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(10, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
-    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
     CHECK_EQUAL(1, obj0.get<int64_t>(cols[0]));
     CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
@@ -560,7 +560,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     {
         WriteTransaction wt(sg);
         TableRef bar_w = wt.add_table("bar");
-        bar_w->add_column(type_Int, "a");
+        bar_w->add_column(col_type_Int, "a");
         wt.commit();
     }
     {
@@ -570,7 +570,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     {
         WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
-        bar_w->add_column(type_Float, "b");
+        bar_w->add_column(col_type_Float, "b");
         wt.commit();
     }
     {
@@ -580,7 +580,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     {
         WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
-        bar_w->add_column(type_Double, "c");
+        bar_w->add_column(col_type_Double, "c");
         wt.commit();
     }
 
@@ -589,8 +589,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, rt->size());
     CHECK_EQUAL(10, foo->get_column_count());
     cols = foo->get_column_keys();
-    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
-    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
     CHECK_EQUAL(1, obj0.get<int64_t>(cols[0]));
     CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
@@ -600,9 +600,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     ConstTableRef bar = rt->get_table("bar");
     cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
-    CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
-    CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
+    CHECK_EQUAL(col_type_Int, bar->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_Float, bar->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Double, bar->get_column_type(cols[2]));
 
     // Clear tables - not supported before backlinks work again
     {
@@ -625,15 +625,15 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK(foo);
     cols = foo->get_column_keys();
     CHECK_EQUAL(10, foo->get_column_count());
-    CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
-    CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Int, foo->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
     CHECK(bar);
     cols = bar->get_column_keys();
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int, bar->get_column_type(cols[0]));
-    CHECK_EQUAL(type_Float, bar->get_column_type(cols[1]));
-    CHECK_EQUAL(type_Double, bar->get_column_type(cols[2]));
+    CHECK_EQUAL(col_type_Int, bar->get_column_type(cols[0]));
+    CHECK_EQUAL(col_type_Float, bar->get_column_type(cols[1]));
+    CHECK_EQUAL(col_type_Double, bar->get_column_type(cols[2]));
     CHECK_EQUAL(0, bar->size());
     CHECK_EQUAL(foo, rt->get_table("foo"));
     CHECK_EQUAL(bar, rt->get_table("bar"));
@@ -772,7 +772,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
         {
             WriteTransaction wt(sg);
             auto table = wt.add_table("table");
-            table->add_column(type_Int, "int");
+            table->add_column(col_type_Int, "int");
             wt.commit();
         }
         for (size_t i = 0; i < iterations; i++) {
@@ -844,11 +844,11 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
         WriteTransaction wt(sg_w);
 
         TableRef table = wt.add_table("table1");
-        table->add_column(type_Int, "col");
+        table->add_column(col_type_Int, "col");
 
         table = wt.add_table("table2");
-        table->add_column(type_Float, "col1");
-        table->add_column(type_Float, "col2");
+        table->add_column(col_type_Float, "col1");
+        table->add_column(col_type_Float, "col2");
 
         wt.commit();
     }
@@ -934,9 +934,9 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
     {
         WriteTransaction wt(sg);
         TableRef table_w = wt.add_table("t");
-        c0 = table_w->add_column(type_String, "a");
-        c1 = table_w->add_column(type_String, "b");
-        c2 = table_w->add_column(type_String, "c");
+        c0 = table_w->add_column(col_type_String, "a");
+        c1 = table_w->add_column(col_type_String, "b");
+        c2 = table_w->add_column(col_type_String, "c");
         for (int i = 0; i < 1000; ++i) {
             std::ostringstream out;
             out << i;
@@ -987,11 +987,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.add_table("t");
-        col_int = table_w->add_column(type_Int, "i0");
-        col_str1 = table_w->add_column(type_String, "s1");
-        col_str2 = table_w->add_column(type_String, "s2");
-        col_int3 = table_w->add_column(type_Int, "i3");
-        col_int4 = table_w->add_column(type_Int, "i4");
+        col_int = table_w->add_column(col_type_Int, "i0");
+        col_str1 = table_w->add_column(col_type_String, "s1");
+        col_str2 = table_w->add_column(col_type_String, "s2");
+        col_int3 = table_w->add_column(col_type_Int, "i3");
+        col_int4 = table_w->add_column(col_type_Int, "i4");
         table_w->add_search_index(col_int);
         table_w->add_search_index(col_str2);
         table_w->add_search_index(col_int4);
@@ -1085,7 +1085,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         WriteTransaction wt(sg_w);
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
-        target->add_column(type_Int, "value");
+        target->add_column(col_type_Int, "value");
         auto col = origin->add_column_list(*target, "list");
 
         std::vector<ObjKey> keys;
@@ -1307,7 +1307,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         TableRef origin_w = wt.add_table("origin");
         TableRef target_w = wt.add_table("target");
         col = origin_w->add_column(*target_w, "");
-        target_w->add_column(type_Int, "");
+        target_w->add_column(col_type_Int, "");
         target_key = target_w->create_object().get_key();
         wt.commit();
     }
@@ -1346,7 +1346,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkToNeighbour)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        table->add_column(type_Int, "integers");
+        table->add_column(col_type_Int, "integers");
         col = table->add_column(*table, "links");
         table->create_objects(10, keys);
         wt.commit();
@@ -1383,10 +1383,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         TableRef gamma_w = wt.add_table("gamma");
         TableRef delta_w = wt.add_table("delta");
         TableRef epsilon_w = wt.add_table("epsilon");
-        alpha_w->add_column(type_Int, "alpha-1");
+        alpha_w->add_column(col_type_Int, "alpha-1");
         beta_w->add_column(*delta_w, "beta-1");
         gamma_w->add_column(*gamma_w, "gamma-1");
-        delta_w->add_column(type_Int, "delta-1");
+        delta_w->add_column(col_type_Int, "delta-1");
         epsilon_w->add_column(*delta_w, "epsilon-1");
         wt.commit();
     }
@@ -1475,7 +1475,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
         auto origin = wt.add_table("origin");
         auto target = wt.add_embedded_table("target");
         col = origin->add_column(*target, "o_1");
-        target->add_column(type_Int, "t_1");
+        target->add_column(col_type_Int, "t_1");
         wt.commit();
     }
 
@@ -1560,7 +1560,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
         auto origin = wt.add_table("origin");
         auto target = wt.add_embedded_table("target");
         col = origin->add_column_list(*target, "o_1");
-        target->add_column(type_Int, "t_1");
+        target->add_column(col_type_Int, "t_1");
         wt.commit();
     }
 
@@ -1648,7 +1648,7 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     g->promote_to_write();
 
     TableRef target = g->add_table("target");
-    auto col = target->add_column(type_Int, "pk");
+    auto col = target->add_column(col_type_Int, "pk");
     target->add_search_index(col);
 
     std::vector<ObjKey> obj_keys;
@@ -1685,7 +1685,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        col = table->add_column(type_Int, "col");
+        col = table->add_column(col_type_Int, "col");
         table->create_object();
         wt.commit();
     }
@@ -1731,7 +1731,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        col = table->add_column(type_Int, "col");
+        col = table->add_column(col_type_Int, "col");
         first_obj = table->create_object().set_all(0).get_key();
         table->create_object().set_all(1);
         last_obj = table->create_object().set_all(2).get_key();
@@ -2025,8 +2025,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     ColKey c0, c1;
     {
         WriteTransaction wt(sg);
-        c0 = wt.add_table("table 1")->add_column(type_Int, "int");
-        c1 = wt.add_table("table 2")->add_column(type_Int, "int");
+        c0 = wt.add_table("table 1")->add_column(col_type_Int, "int");
+        c1 = wt.add_table("table 2")->add_column(col_type_Int, "int");
         wt.commit();
     }
 
@@ -2190,7 +2190,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     // Add some initial data and then begin a read transaction at that version
     auto wt1 = sg->start_write();
     TableRef table = wt1->add_table("Table");
-    col = table->add_column(type_Int, "int");
+    col = table->add_column(col_type_Int, "int");
     auto obj2 = table->create_object().set_all(10);
     wt1->commit_and_continue_as_read();
 
@@ -2245,10 +2245,10 @@ TEST(LangBindHelper_ImplicitTransactions)
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
-        col = table->add_column(type_Int, "first");
-        table->add_column(type_Int, "second");
-        table->add_column(type_Bool, "third");
-        table->add_column(type_String, "fourth");
+        col = table->add_column(col_type_Int, "first");
+        table->add_column(col_type_Int, "second");
+        table->add_column(col_type_Bool, "third");
+        table->add_column(col_type_String, "fourth");
         o = table->create_object().get_key();
         wt.commit();
     }
@@ -2301,7 +2301,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
         {
             group->promote_to_write();
             TableRef origin = group->get_or_add_table("origin");
-            col = origin->add_column(type_Int, "");
+            col = origin->add_column(col_type_Int, "");
             key = origin->create_object().set_all(42).get_key();
             group->commit_and_continue_as_read();
         }
@@ -2425,7 +2425,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
     {
         group->promote_to_write();
         t = group->get_or_add_table("a_table");
-        t->add_column(type_Int, "lorelei");
+        t->add_column(col_type_Int, "lorelei");
         t->create_object().set_all(43);
         CHECK_EQUAL(1, t->get_column_count());
         group->commit_and_continue_as_read();
@@ -2434,7 +2434,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
     {
         // add a column and regret it again
         group->promote_to_write();
-        auto col = t->add_column(type_Int, "riget");
+        auto col = t->add_column(col_type_Int, "riget");
         t->begin()->set(col, 44);
         CHECK_EQUAL(2, t->get_column_count());
         group->verify();
@@ -2560,7 +2560,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
     group->promote_to_write();
     group->get_or_add_table("filler");
     TableRef table = group->get_or_add_table("table");
-    auto col = table->add_column(type_Int, "i");
+    auto col = table->add_column(col_type_Int, "i");
     Obj o = table->create_object();
     group->commit_and_continue_as_read();
     group->promote_to_write();
@@ -2608,8 +2608,8 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
     {
         group->promote_to_write();
         t = group->get_or_add_table("a_table");
-        col = t->add_column(type_Int, "lorelei");
-        t->add_column(type_Int, "riget");
+        col = t->add_column(col_type_Int, "lorelei");
+        t->add_column(col_type_Int, "riget");
         t->create_object().set_all(43, 44);
         CHECK_EQUAL(2, t->get_column_count());
         group->commit_and_continue_as_read();
@@ -2639,7 +2639,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     auto col0 = origin->add_column_list(*target, "");
-    target->add_column(type_Int, "");
+    target->add_column(col_type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
     auto t1 = target->create_object();
@@ -2675,7 +2675,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     auto col0 = origin->add_column(*target, "");
-    target->add_column(type_Int, "");
+    target->add_column(col_type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
     auto t1 = target->create_object();
@@ -2710,7 +2710,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     auto col0 = origin->add_column_list(*target, "");
-    target->add_column(type_Int, "");
+    target->add_column(col_type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
     auto t1 = target->create_object();
@@ -2760,7 +2760,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef target = group->add_table("target");
 
     auto c1 = origin->add_column_list(*target, "linklist");
-    target->add_column(type_Int, "int");
+    target->add_column(col_type_Int, "int");
     auto c2 = origin->add_column(*target, "link");
 
     Obj t = target->create_object();
@@ -2788,7 +2788,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
     g->promote_to_write();
 
     TableRef target = g->add_table("target");
-    ColKey col = target->add_column(type_Int, "pk");
+    ColKey col = target->add_column(col_type_Int, "pk");
     target->add_search_index(col);
 
     std::vector<ObjKey> keys;
@@ -2820,8 +2820,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     ColKey c0, c1;
     {
         WriteTransaction wt(sg);
-        c0 = wt.add_table("table 1")->add_column(type_Int, "int");
-        c1 = wt.add_table("table 2")->add_column(type_Int, "int");
+        c0 = wt.add_table("table 1")->add_column(col_type_Int, "int");
+        c1 = wt.add_table("table 2")->add_column(col_type_Int, "int");
         wt.commit();
     }
 
@@ -2926,7 +2926,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
-            tr->add_column(type_Int, "first");
+            tr->add_column(col_type_Int, "first");
             for (int i = 0; i < 20; i++)
                 tr->create_object();
             wt.commit();
@@ -2955,7 +2955,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
     auto col = origin->add_column_list(*target, "");
-    target->add_column(type_Int, "");
+    target->add_column(col_type_Int, "");
     auto O0 = origin->create_object();
     auto T0 = target->create_object();
     auto link_list = O0.get_linklist(col);
@@ -2972,7 +2972,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto group = sg->start_write();
     TableRef table = group->add_table("a");
-    auto col = table->add_column(type_String, "b");
+    auto col = table->add_column(col_type_String, "b");
     table->add_search_index(col);
     group->verify();
     group->commit_and_continue_as_read();
@@ -3044,12 +3044,12 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         // initialize table with 200 entries holding 0..200
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("A");
-        auto col = tr->add_column(type_Int, "first");
+        auto col = tr->add_column(col_type_Int, "first");
         for (int j = 0; j < 200; j++) {
             tr->create_object().set(col, j);
         }
         auto table_b = wt.add_table("B");
-        table_b->add_column(type_Int, "bussemand");
+        table_b->add_column(col_type_Int, "bussemand");
         table_b->create_object().set_all(99);
         wt.add_table("C");
         wt.commit();
@@ -3112,12 +3112,12 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
             // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("A");
-            auto col = tr->add_column(type_Int, "first");
+            auto col = tr->add_column(col_type_Int, "first");
             for (int j = 0; j < 200; j++) {
                 tr->create_object().set(col, j);
             }
             auto table_b = wt.add_table("B");
-            table_b->add_column(type_Int, "bussemand");
+            table_b->add_column(col_type_Int, "bussemand");
             table_b->create_object().set_all(99);
             wt.add_table("C");
             wt.commit();
@@ -3218,7 +3218,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     auto group_w = sg->start_write();
 
     TableRef table_w = group_w->add_table("table");
-    auto col = table_w->add_column(type_Int, "");
+    auto col = table_w->add_column(col_type_Int, "");
     auto obj = table_w->create_object();
     group_w->commit_and_continue_as_read();
     group_w->verify();
@@ -3320,9 +3320,9 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     // Add initial data
     group_w->promote_to_write();
     TableRef table_w = group_w->add_table("table");
-    auto c0 = table_w->add_column(type_Int, "int1");
-    auto c1 = table_w->add_column(type_String, "str");
-    auto c2 = table_w->add_column(type_Int, "int2");
+    auto c0 = table_w->add_column(col_type_Int, "int1");
+    auto c1 = table_w->add_column(col_type_String, "str");
+    auto c2 = table_w->add_column(col_type_Int, "int2");
     auto ok = table_w->create_object(ObjKey{}, {{c1, "2"}, {c0, 1}, {c2, 3}}).get_key();
     group_w->commit_and_continue_as_read();
     group_w->verify();
@@ -3372,8 +3372,8 @@ TEST(LangBindHelper_HandoverQuery)
         WriteTransaction wt(sg);
         Group& group_w = wt.get_group();
         TableRef t = group_w.add_table("table2");
-        t->add_column(type_String, "first");
-        auto int_col = t->add_column(type_Int, "second");
+        t->add_column(col_type_String, "first");
+        auto int_col = t->add_column(col_type_Int, "second");
         for (int i = 0; i < 100; ++i) {
             t->create_object().set(int_col, i);
         }
@@ -3415,7 +3415,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
         TableView tv1;
         auto table = writer->add_table("table");
         auto table2 = writer->add_table("table2");
-        table2->add_column(type_Int, "int");
+        table2->add_column(col_type_Int, "int");
         auto key = table2->create_object().set_all(42).get_key();
 
         auto col = table->add_column_list(*table2, "first");
@@ -3469,8 +3469,8 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
             TableView tv1;
             auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
-            auto col0 = table->add_column(type_Int, "first");
-            col1 = table->add_column(type_Bool, "even");
+            auto col0 = table->add_column(col_type_Int, "first");
+            col1 = table->add_column(col_type_Bool, "even");
             for (int i = 0; i < 100; ++i) {
                 auto obj = table->create_object();
                 obj.set<int>(col0, i);
@@ -3508,8 +3508,8 @@ TEST(LangBindHelper_HandoverPartialQuery)
             TableView tv1;
             auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
-            col0 = table->add_column(type_Int, "first");
-            auto col1 = table->add_column(type_Bool, "even");
+            col0 = table->add_column(col_type_Int, "first");
+            auto col1 = table->add_column(col_type_Bool, "even");
             for (int i = 0; i < 100; ++i) {
                 auto obj = table->create_object();
                 obj.set<int>(col0, i);
@@ -3550,7 +3550,7 @@ TEST(LangBindHelper_HandoverNestedTableViews)
         {
             auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
-            auto col = table->add_column(type_Int, "first");
+            auto col = table->add_column(col_type_Int, "first");
             for (int i = 0; i < 100; ++i) {
                 table->create_object().set_all(i);
             }
@@ -3586,7 +3586,7 @@ TEST(LangBindHelper_HandoverAccessors)
         TableView tv;
         auto writer = sg->start_write();
         TableRef table = writer->add_table("table2");
-        col = table->add_column(type_Int, "first");
+        col = table->add_column(col_type_Int, "first");
         for (int i = 0; i < 100; ++i) {
             table->create_object().set_all(i);
         }
@@ -3674,7 +3674,7 @@ TEST(LangBindHelper_TableViewAndTransactionBoundaries)
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("myTable");
-        col = table->add_column(type_Int, "myColumn");
+        col = table->add_column(col_type_Int, "myColumn");
         table->create_object().set_all(42);
         wt.commit();
     }
@@ -3910,7 +3910,7 @@ TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
         DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
         auto g = sg->start_write();
         auto table = g->add_table("table");
-        col = table->add_column(type_Int, "first");
+        col = table->add_column(col_type_Int, "first");
         for (int i = 0; i < 1000; ++i)
             table->create_object(ObjKey(i));
         g->commit();
@@ -3934,7 +3934,7 @@ TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto g = sg->start_write();
     auto table = g->add_table("table");
-    table->add_column(type_Int, "first");
+    table->add_column(col_type_Int, "first");
     g->commit();
     g = sg->start_read();
     table = g->get_table("table");
@@ -3969,7 +3969,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             TableView tv2;
             auto group_w = db->start_write();
             TableRef table = group_w->add_table("table2");
-            col = table->add_column(type_Int, "first");
+            col = table->add_column(col_type_Int, "first");
             for (int i = 0; i < 100; ++i) {
                 table->create_object().set_all(i);
             }
@@ -4028,8 +4028,8 @@ TEST(LangBindHelper_HandoverTableViewWithLnkLst)
             TableRef table2 = group_w->add_table("table2");
 
             // add some more columns to table1 and table2
-            col0 = table1->add_column(type_Int, "col1");
-            table1->add_column(type_String, "str1");
+            col0 = table1->add_column(col_type_Int, "col1");
+            table1->add_column(col_type_String, "str1");
 
             // add some rows
             ok0 = table1->create_object().set_all(300, "delta").get_key();
@@ -4102,7 +4102,7 @@ TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
 
             TableRef table1 = group_w->add_table("table1");
             TableRef table2 = group_w->add_table("table2");
-            table1->add_column(type_Int, "col1");
+            table1->add_column(col_type_Int, "col1");
             auto col_link = table2->add_column(*table1, "link");
 
             target = table1->create_object().set_all(300).get_key();
@@ -4230,9 +4230,9 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
         Group& group = wt.get_group();
         TableRef t = rt->add_table("class_Table_Emulation_Name");
         // add a column for each thread to write to
-        t->add_column(type_Int, "count", true);
-        t->add_column(type_String, "char", true);
-        t->add_column(type_String, "payload", true);
+        t->add_column(col_type_Int, "count", true);
+        t->add_column(col_type_String, "char", true);
+        t->add_column(col_type_String, "payload", true);
         t->add_empty_row(num_rows);
         wt.commit();
     }
@@ -4297,8 +4297,8 @@ TEST(LangBindHelper_HandoverLinkView)
     TableRef table2 = writer->add_table("table2");
 
     // add some more columns to table1 and table2
-    col1 = table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    col1 = table1->add_column(col_type_Int, "col1");
+    table1->add_column(col_type_String, "str1");
 
     // add some rows
     auto to1 = table1->create_object().set_all(300, "delta");
@@ -4367,7 +4367,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             TableView tv1;
             auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
-            auto col = table->add_column(type_Int, "first");
+            auto col = table->add_column(col_type_Int, "first");
             auto obj1 = table->create_object().set_all(100);
             auto obj2 = table->create_object().set_all(100);
 
@@ -4415,7 +4415,7 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
         {
             trans->promote_to_write();
             TableRef table = trans->add_table("table2");
-            ck = table->add_column(type_Int, "first");
+            ck = table->add_column(col_type_Int, "first");
             for (int i = 0; i < 100; ++i) {
                 table->create_object().set_all(i);
             }
@@ -4446,7 +4446,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     auto group_w = sg->start_write();
 
     TableRef source = group_w->add_table("source");
-    source->add_column(type_Int, "int");
+    source->add_column(col_type_Int, "int");
 
     TableRef links = group_w->add_table("links");
     ColKey col = links->add_column(*source, "link");
@@ -4489,7 +4489,7 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
     auto group_w = sg->start_write();
 
     TableRef target = group_w->add_table("target");
-    target->add_column(type_Int, "int");
+    target->add_column(col_type_Int, "int");
 
     TableRef links = group_w->add_table("links");
     auto col = links->add_column(*target, "link");
@@ -4532,11 +4532,11 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     TableRef table1 = group_w->add_table("table1");
     TableRef table2 = group_w->add_table("table2");
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    table1->add_column(col_type_String, "str1");
 
-    table2->add_column(type_Int, "col1");
-    auto col_str = table2->add_column(type_String, "str2");
+    table2->add_column(col_type_Int, "col1");
+    auto col_str = table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto o10 = table1->create_object().set_all(100, "foo");
@@ -4611,7 +4611,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         TableRef target = group_w->add_table("target");
 
         ColKey col_link = source->add_column(*target, "link");
-        ColKey col_name = target->add_column(type_String, "name");
+        ColKey col_name = target->add_column(col_type_String, "name");
 
         std::vector<ObjKey> keys;
         target->create_objects(4, keys);
@@ -4703,7 +4703,7 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
         TableRef target = group_w->add_table("target");
 
         ColKey col_link = source->add_column(*target, "link");
-        ColKey col_name = target->add_column(type_String, "name");
+        ColKey col_name = target->add_column(col_type_String, "name");
 
         std::vector<ObjKey> keys;
         target->create_objects(3, keys);
@@ -4754,7 +4754,7 @@ TEST(LangBindHelper_VersionControl)
         auto reader = sg->start_read();
         {
             WriteTransaction wt(sg);
-            col = wt.get_or_add_table("test")->add_column(type_Int, "a");
+            col = wt.get_or_add_table("test")->add_column(col_type_Int, "a");
             wt.commit();
         }
         for (int i = 0; i < num_versions; ++i) {
@@ -4886,7 +4886,7 @@ TEST(LangBindHelper_Compact)
     {
         WriteTransaction w(sg);
         TableRef table = w.get_or_add_table("test");
-        table->add_column(type_Int, "int");
+        table->add_column(col_type_Int, "int");
         for (size_t i = 0; i < N; ++i) {
             table->create_object().set_all(static_cast<signed>(i));
         }
@@ -4928,7 +4928,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("test");
-        table->add_column(type_String, "string");
+        table->add_column(col_type_String, "string");
         for (size_t i = 0; i < N; ++i) {
             table->create_object().set_all(StringData(data.data(), data.size()));
         }
@@ -4979,7 +4979,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     {
         WriteTransaction w(sg_w);
         TableRef table = w.add_table("test");
-        col = table->add_column(type_Double, "double");
+        col = table->add_column(col_type_Double, "double");
         table->create_object().set_all(1234.0);
         table->create_object().set_all(-5678.0);
         table->create_object().set_all(1000.0);
@@ -5041,10 +5041,10 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         TableRef owner = rt->add_table("Owner");
         TableRef dog = rt->add_table("Dog");
 
-        c0 = owner->add_column(type_String, "name");
+        c0 = owner->add_column(col_type_String, "name");
         c1 = owner->add_column_list(*dog, "link");
 
-        c2 = dog->add_column(type_String, "name");
+        c2 = dog->add_column(col_type_String, "name");
         c3 = dog->add_column(*owner, "link");
 
         for (size_t i = 0; i < numberOfOwner; i++) {
@@ -5155,13 +5155,13 @@ TEST(LangBindHelper_TableViewClear)
         TableRef history = tr->add_table("history");
         TableRef line = tr->add_table("line");
 
-        col0 = history->add_column(type_Int, "id");
-        col1 = history->add_column(type_Int, "parent");
+        col0 = history->add_column(col_type_Int, "id");
+        col1 = history->add_column(col_type_Int, "parent");
         col2 = history->add_column_list(*line, "lines");
         history->add_search_index(col1);
 
-        colA = line->add_column(type_Int, "id");
-        colB = line->add_column(type_Int, "parent");
+        colA = line->add_column(col_type_Int, "id");
+        colB = line->add_column(col_type_Int, "parent");
         line->add_search_index(colB);
         tr->commit_and_continue_as_read();
     }
@@ -5380,8 +5380,8 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
     TableRef t = g->add_table("");
-    t->add_column(type_Int, "", nullable_toggle);
-    t->add_column(type_Timestamp, "gnyf", nullable_toggle);
+    t->add_column(col_type_Int, "", nullable_toggle);
+    t->add_column(col_type_Timestamp, "gnyf", nullable_toggle);
     g->commit_and_continue_as_read();
     g->promote_to_write();
     std::vector<ObjKey> keys;
@@ -5399,7 +5399,7 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
     TableRef t = g->add_table("");
-    t->add_column(type_Timestamp, "gnyf", nullable_toggle);
+    t->add_column(col_type_Timestamp, "gnyf", nullable_toggle);
 
     for (int i = 0; i < 27; ++i) {
         g->commit_and_continue_as_read();
@@ -5419,7 +5419,7 @@ TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
     DBRef sg = DB::create(*hist_w, DBOptions(crypt_key()));
     auto g = sg->start_write();
     auto table = g->add_table("");
-    table->add_column(type_Timestamp, "gnyf", nullable_toggle);
+    table->add_column(col_type_Timestamp, "gnyf", nullable_toggle);
     table->create_object().set_all(Timestamp(-1, -1));
     g->rollback_and_continue_as_read();
     g->verify();
@@ -5436,7 +5436,7 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
     auto g_r = sg->start_read();
     auto g_w = sg->start_write();
     auto table = g_w->add_table("");
-    table->add_column(type_Timestamp, "gnyf", nullable_toggle);
+    table->add_column(col_type_Timestamp, "gnyf", nullable_toggle);
     table->create_object().set_all(Timestamp(-1, -1));
     g_w->commit_and_continue_as_read();
     g_w->verify();
@@ -5453,7 +5453,7 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto g = sg->start_write();
     auto t = g->add_table("");
-    auto col = t->add_column(type_Bool, "gnyf", true);
+    auto col = t->add_column(col_type_Bool, "gnyf", true);
     std::vector<ObjKey> keys;
     t->create_objects(5, keys);
     t->get_object(keys[0]).set(col, false);
@@ -5476,7 +5476,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
 
     auto t1 = g_w->add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
     auto t2 = g_w->add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
-    t1->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
+    t1->add_column(col_type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
     t2->add_column_list(*t1, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr");
     std::vector<ObjKey> keys;
     t1->create_objects(375, keys);
@@ -5507,7 +5507,7 @@ TEST(LangBindHelper_Bug2321)
         WriteTransaction wt(sg);
         Group& group = wt.get_group();
         TableRef target = group.add_table("target");
-        target->add_column(type_Int, "data");
+        target->add_column(col_type_Int, "data");
         target->create_objects(REALM_MAX_BPNODE_SIZE + 2, target_keys);
         TableRef origin = group.add_table("origin");
         col = origin->add_column_list(*target, "_link");
@@ -5558,7 +5558,7 @@ TEST(LangBindHelper_Bug2295)
         WriteTransaction wt(sg);
         Group& group = wt.get_group();
         TableRef target = group.add_table("target");
-        target->add_column(type_Int, "data");
+        target->add_column(col_type_Int, "data");
         target->create_objects(REALM_MAX_BPNODE_SIZE + 2, target_keys);
         TableRef origin = group.add_table("origin");
         col = origin->add_column_list(*target, "_link");
@@ -5609,7 +5609,7 @@ ONLY(LangBindHelper_BigBinary)
 
     std::string data(16777362, 'y');
     TableRef target = wt->add_table("big");
-    auto col = target->add_column(type_Binary, "data");
+    auto col = target->add_column(col_type_Binary, "data");
     target->create_object().set(col, BinaryData(data.data(), data.size()));
     wt->commit();
     rt->advance_read();
@@ -5636,7 +5636,7 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
     auto g = sg->start_write();
     auto table = g->add_table("big");
     auto obj = table->create_object();
-    auto col = table->add_column(type_Binary, "data");
+    auto col = table->add_column(col_type_Binary, "data");
     std::string data(0xfffff0, 'x');
     obj.set(col, BinaryData(data.data(), data.size()));
     g->commit();
@@ -5656,7 +5656,7 @@ TEST(LangBindHelper_RollbackOptimize)
     auto g = sg_w->start_write();
 
     auto table = g->add_table("t0");
-    auto col = table->add_column(type_String, "str_col_0", true);
+    auto col = table->add_column(col_type_String, "str_col_0", true);
     g->commit_and_continue_as_read();
     g->verify();
     g->promote_to_write();
@@ -5677,7 +5677,7 @@ TEST(LangBindHelper_BinaryReallocOverMax)
     DBRef sg_w = DB::create(*hist_w, DBOptions(key));
     auto g = sg_w->start_write();
     auto table = g->add_table("table");
-    auto col = table->add_column(type_Binary, "binary_col", false);
+    auto col = table->add_column(col_type_Binary, "binary_col", false);
     auto obj = table->create_object();
 
     // The sizes of these binaries were found with AFL. Essentially we must hit
@@ -5707,7 +5707,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
         {
             WriteTransaction wt(sg_clear);
             TableRef target = wt.add_table("table");
-            target->add_column(type_String, "mixed_col");
+            target->add_column(col_type_String, "mixed_col");
             target->create_object();
             wt.commit();
         }
@@ -5741,7 +5741,7 @@ TEST(LangBindHelper_EnumColumnAddZeroRows)
     auto g_r = sg->start_read();
     auto table = g->add_table("");
 
-    auto col = table->add_column(DataType(2), "table", false);
+    auto col = table->add_column(ColumnType(2), "table", false);
     table->enumerate_string_column(col);
     g->commit_and_continue_as_read();
     g->verify();
@@ -5798,7 +5798,7 @@ TEST(LangBindHelper_RemoveObject)
     {
         auto wt = sg->start_write();
         TableRef t = wt->add_table("Foo");
-        col = t->add_column(type_Int, "int");
+        col = t->add_column(col_type_Int, "int");
         t->create_object(ObjKey(123)).set(col, 1);
         t->create_object(ObjKey(456)).set(col, 2);
         wt->commit();
@@ -5891,7 +5891,7 @@ TEST(LangBindHelper_AdvanceReadCluster)
     {
         auto wt = sg->start_write();
         TableRef t = wt->add_table("Foo");
-        auto int_col = t->add_column(type_Int, "int");
+        auto int_col = t->add_column(col_type_Int, "int");
         for (int64_t i = 0; i < 100; i++) {
             t->create_object(ObjKey(i)).set(int_col, i);
         }
@@ -5924,9 +5924,9 @@ TEST(LangBindHelper_ImportDetachedLinkList)
         auto persons = wt.add_table("person");
         auto dogs = wt.add_table("dog");
         col_pet = persons->add_column_list(*dogs, "pet");
-        col_addr = persons->add_column_list(type_String, "address");
-        col_name = dogs->add_column(type_String, "name");
-        col_age = dogs->add_column(type_Int, "age");
+        col_addr = persons->add_column_list(col_type_String, "address");
+        col_name = dogs->add_column(col_type_String, "name");
+        col_age = dogs->add_column(col_type_Int, "age");
 
         auto tago = dogs->create_object().set(col_name, "Tago").set(col_age, 9);
         auto hector = dogs->create_object().set(col_name, "Hector").set(col_age, 7);
@@ -5985,7 +5985,7 @@ TEST(LangBindHelper_SearchIndexAccessor)
     auto tr = db->start_write();
     {
         auto persons = tr->add_table("person");
-        col_name = persons->add_column(type_String, "name");
+        col_name = persons->add_column(col_type_String, "name");
         persons->add_search_index(col_name);
         persons->create_object().set(col_name, "Per");
     }
@@ -5995,7 +5995,7 @@ TEST(LangBindHelper_SearchIndexAccessor)
     {
         auto persons = tr->get_table("person");
         persons->remove_column(col_name);
-        auto col_age = persons->add_column(type_Int, "age");
+        auto col_age = persons->add_column(col_type_Int, "age");
         persons->add_search_index(col_age);
         // Index referring to col_age is now at position 0
         persons->create_object().set(col_age, 47);
@@ -6021,7 +6021,7 @@ TEST(LangBindHelper_ArrayXoverMapping)
     {
         auto tr = db->start_write();
         auto tbl = tr->add_table("my_table");
-        my_col = tbl->add_column(type_String, "my_col");
+        my_col = tbl->add_column(col_type_String, "my_col");
         std::string s(1'000'000, 'a');
         for (auto i = 0; i < 100; ++i)
             tbl->create_object().set_all(s);
@@ -6065,7 +6065,7 @@ TEST(LangBindHelper_SchemaChangeNotification)
     {
         auto tr = db->start_write();
         auto table = tr->get_table("my_table");
-        table->add_column(type_Int, "integer");
+        table->add_column(col_type_Int, "integer");
         tr->commit();
     }
     handler_called = false;

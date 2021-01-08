@@ -152,7 +152,7 @@ public:
     column(bool nullable = false, bool enumerated = false)
         : m_column(this)
     {
-        m_col_key = m_table.add_column(ColumnTypeTraits<T>::id, "values", nullable);
+        m_col_key = m_table.add_column(ColumnTypeTraits<T>::column_id, "values", nullable);
         if (enumerated) {
             m_table.enumerate_string_column(m_col_key);
         }
@@ -258,9 +258,9 @@ TEST(StringIndex_NonIndexable)
     TableRef target_table = group.add_table("target");
     table->add_column(*target_table, "link");
     table->add_column_list(*target_table, "linkList");
-    table->add_column(type_Double, "double");
-    table->add_column(type_Float, "float");
-    table->add_column(type_Binary, "binary");
+    table->add_column(col_type_Double, "double");
+    table->add_column(col_type_Float, "float");
+    table->add_column(col_type_Binary, "binary");
 
     for (auto col : table->get_column_keys()) {
         CHECK_LOGIC_ERROR(table->add_search_index(col), LogicError::illegal_combination);
@@ -970,7 +970,7 @@ TEST_TYPES(StringIndex_Zero_Crash, string_column, nullable_string_column, enum_c
 
     // StringIndex could crash if strings ended with one or more 0-bytes
     Table table;
-    auto col = table.add_column(type_String, "strings", nullable);
+    auto col = table.add_column(col_type_String, "strings", nullable);
 
     auto k0 = table.create_object().set(col, StringData("")).get_key();
     auto k1 = table.create_object().set(col, StringData("\0", 1)).get_key();
@@ -1001,7 +1001,7 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
     for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
         Table table;
-        auto col = table.add_column(type_String, "string", true);
+        auto col = table.add_column(col_type_String, "string", true);
 
         table.add_search_index(col);
 
@@ -1102,7 +1102,7 @@ TEST(StringIndex_Integer_Increasing)
 
     // StringIndex could crash if strings ended with one or more 0-bytes
     Table table;
-    auto col = table.add_column(type_Int, "int");
+    auto col = table.add_column(col_type_Int, "int");
     table.add_search_index(col);
 
     std::multiset<int64_t> reference;
@@ -1316,7 +1316,7 @@ TEST_TYPES(StringIndex_InsertLongPrefixAndQuery, string_column, nullable_string_
     bool nullable_column = TEST_TYPE::is_nullable();
     Group g;
     auto t = g.add_table("StringsOnly");
-    auto col = t->add_column(type_String, "first", nullable_column);
+    auto col = t->add_column(col_type_String, "first", nullable_column);
     t->add_search_index(col);
 
     std::string base(StringIndex::s_max_offset, 'a');
@@ -1380,8 +1380,8 @@ TEST(StringIndex_Fuzzy)
         Group g;
 
         auto t = g.add_table("StringsOnly");
-        auto col0 = t->add_column(type_String, "first");
-        auto col1 = t->add_column(type_String, "second");
+        auto col0 = t->add_column(col_type_String, "first");
+        auto col1 = t->add_column(col_type_String, "second");
 
         t->add_search_index(col0);
 
@@ -1482,12 +1482,33 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
     TEST_TYPE test_resources;
     typename TEST_TYPE::ColumnTestType& col = test_resources.get_column();
 
-    const char* strings[] = {
-        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
-        "hans", "Hansapark", "george", "billion dollar startup",
-        "abcde", "abcdE", "Abcde", "AbcdE",
-        "common", "common"
-    };
+    const char* strings[] = {"john",
+                             "John",
+                             "jOhn",
+                             "JOhn",
+                             "joHn",
+                             "JoHn",
+                             "jOHn",
+                             "JOHn",
+                             "johN",
+                             "JohN",
+                             "jOhN",
+                             "JOhN",
+                             "joHN",
+                             "JoHN",
+                             "jOHN",
+                             "JOHN",
+                             "john" /* yes, an extra to test the "bucket" case as well */,
+                             "hans",
+                             "Hansapark",
+                             "george",
+                             "billion dollar startup",
+                             "abcde",
+                             "abcdE",
+                             "Abcde",
+                             "AbcdE",
+                             "common",
+                             "common"};
 
     for (const char* string : strings) {
         col.add(string);
@@ -1521,7 +1542,6 @@ TEST_TYPES(StringIndex_Insensitive, string_column, nullable_string_column, enum_
         for (size_t i = 0; i < results.size(); ++i) {
             auto upper_result = case_map(col.get(results[i]), true);
             CHECK_EQUAL(upper_result, upper_needle);
-
         }
         check_result_order(results, test_context);
         results.clear();
@@ -1644,7 +1664,8 @@ TEST_TYPES(StringIndex_45, string_column, nullable_string_column, enum_column, n
 
 namespace {
 
-std::string create_random_a_string(size_t max_len) {
+std::string create_random_a_string(size_t max_len)
+{
     std::string s;
     size_t len = size_t(fastrand(max_len));
     for (size_t p = 0; p < len; p++) {
@@ -1653,7 +1674,7 @@ std::string create_random_a_string(size_t max_len) {
     return s;
 }
 
-}
+} // namespace
 
 
 // Excluded when run with valgrind because it takes a long time
@@ -1781,7 +1802,7 @@ TEST_TYPES(StringIndex_Rover, string_column, nullable_string_column, enum_column
 TEST(StringIndex_QuerySingleObject)
 {
     Group g;
-    auto table = g.add_table_with_primary_key("class_StringClass", type_String, "name", true);
+    auto table = g.add_table_with_primary_key("class_StringClass", col_type_String, "name", true);
     auto obj = table->create_object_with_primary_key("Foo");
 
     auto q = table->where().equal(table->get_column_key("name"), "Foo", true);

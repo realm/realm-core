@@ -51,7 +51,7 @@ void create_metadata_tables(Group& group)
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
 
     if (metadata_table->get_column_count() == 0) {
-        metadata_table->add_column(type_Int, c_versionColumnName);
+        metadata_table->add_column(col_type_Int, c_versionColumnName);
         metadata_table->create_object().set(c_versionColumnName, int64_t(ObjectStore::NotVersioned));
     }
 }
@@ -67,32 +67,32 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
     return ObjectStore::table_for_object_type(group, object_schema.name);
 }
 
-DataType to_core_type(PropertyType type)
+ColumnType to_core_type(PropertyType type)
 {
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
     switch (type & ~PropertyType::Flags) {
         case PropertyType::Int:
-            return type_Int;
+            return col_type_Int;
         case PropertyType::Bool:
-            return type_Bool;
+            return col_type_Bool;
         case PropertyType::Float:
-            return type_Float;
+            return col_type_Float;
         case PropertyType::Double:
-            return type_Double;
+            return col_type_Double;
         case PropertyType::String:
-            return type_String;
+            return col_type_String;
         case PropertyType::Date:
-            return type_Timestamp;
+            return col_type_Timestamp;
         case PropertyType::Data:
-            return type_Binary;
+            return col_type_Binary;
         case PropertyType::ObjectId:
-            return type_ObjectId;
+            return col_type_ObjectId;
         case PropertyType::Decimal:
-            return type_Decimal;
+            return col_type_Decimal;
         case PropertyType::UUID:
-            return type_UUID;
+            return col_type_UUID;
         case PropertyType::Mixed:
-            return type_Mixed;
+            return col_type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }

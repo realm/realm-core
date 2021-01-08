@@ -36,7 +36,7 @@ void TransactLogConvenientEncoder::add_class(TableKey table_key, StringData, boo
     m_encoder.insert_group_level_table(table_key); // Throws
 }
 
-void TransactLogConvenientEncoder::add_class_with_primary_key(TableKey tk, StringData, DataType, StringData, bool)
+void TransactLogConvenientEncoder::add_class_with_primary_key(TableKey tk, StringData, ColumnType, StringData, bool)
 {
     unselect_all();
     m_encoder.insert_group_level_table(tk); // Throws

@@ -115,10 +115,10 @@ public:
     ///
     bool is_embedded() const noexcept; // true if table holds embedded objects
     size_t get_column_count() const noexcept;
-    DataType get_column_type(ColKey column_key) const;
+    ColumnType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
-    DataType get_dictionary_key_type(ColKey column_key) const noexcept;
+    ColumnType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
@@ -136,18 +136,18 @@ public:
     ///
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
-    ColKey add_column(DataType type, StringData name, bool nullable = false);
+    ColKey add_column(ColumnType type, StringData name, bool nullable = false);
     ColKey add_column(Table& target, StringData name);
-    ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_list(ColumnType type, StringData name, bool nullable = false);
     ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_set(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_set(ColumnType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
-    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(ColumnType type, StringData name, ColumnType key_type = col_type_String);
+    ColKey add_column_dictionary(Table& target, StringData name, ColumnType key_type = col_type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
     ColKey
-    add_column_link(DataType type, StringData name, Table& target);
+    add_column_link(ColumnType type, StringData name, Table& target);
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
@@ -615,7 +615,7 @@ public:
 protected:
     /// Compare the objects of two tables under the assumption that the two tables
     /// have the same number of columns, and the same data type at each column
-    /// index (as expressed through the DataType enum).
+    /// index (as expressed through the ColumnType enum).
     bool compare_objects(const Table&) const;
 
     void check_lists_are_empty(size_t row_ndx) const;
@@ -696,15 +696,15 @@ private:
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
-                            DataType key_type = DataType(0));
+    ColKey do_insert_column(ColKey col_key, ColumnType type, StringData name, Table* target_table,
+                            ColumnType key_type = ColumnType(0));
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, ColumnType key_type = ColumnType(0));
     void do_erase_root_column(ColKey col_key);
 
     bool has_any_embedded_objects();
@@ -1100,9 +1100,9 @@ inline ColumnType Table::get_real_column_type(ColKey col_key) const noexcept
     return col_key.get_type();
 }
 
-inline DataType Table::get_column_type(ColKey column_key) const
+inline ColumnType Table::get_column_type(ColKey column_key) const
 {
-    return DataType(column_key.get_type());
+    return column_key.get_type();
 }
 
 inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
@@ -1110,7 +1110,7 @@ inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
     return column_key.get_attrs();
 }
 
-inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
+inline ColumnType Table::get_dictionary_key_type(ColKey column_key) const noexcept
 {
     auto spec_ndx = colkey2spec_ndx(column_key);
     REALM_ASSERT_3(spec_ndx, <, get_column_count());

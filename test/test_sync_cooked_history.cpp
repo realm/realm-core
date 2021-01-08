@@ -388,7 +388,7 @@ TEST(Sync_CookedHistory_LargeChangeset)
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
         auto table = sync::create_table(wt, "class_Table");
-        auto col_data = table->add_column(type_Binary, "data");
+        auto col_data = table->add_column(col_type_Binary, "data");
 
         {
             std::string data(data_size, '\0');
@@ -477,7 +477,7 @@ TEST(Sync_CookedHistory_RestrictsServerSideHistoryCompaction)
         TableRef table = wt.get_table("class_Foo");
         if (!table) {
             table = sync::create_table(wt, "class_Foo");
-            table->add_column(type_Int, "i");
+            table->add_column(col_type_Int, "i");
         }
         table->create_object();
         wt.commit();
@@ -677,7 +677,7 @@ TEST_IF(Sync_CookedHistory_MigrationFromSchemaVersion1, false)
         TableRef table = wt.get_table("class_Foo");
         if (!table) {
             table = sync::create_table(wt, "class_Foo");
-            table->add_column(type_Int, "i");
+            table->add_column(col_type_Int, "i");
         }
         table->create_object();
         return wt.commit();

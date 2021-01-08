@@ -43,7 +43,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 
 } // anonymous namespace
 
-DataType ClusterColumn::get_data_type() const
+ColumnType ClusterColumn::get_data_type() const
 {
     const Table* table = m_cluster_tree->get_owning_table();
     return table->get_column_type(m_column_key);
@@ -57,9 +57,9 @@ bool ClusterColumn::is_nullable() const
 StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buffer) const
 {
     const Obj obj{m_cluster_tree->get(key)};
-    DataType type = get_data_type();
+    ColumnType type = get_data_type();
 
-    if (type == type_Int) {
+    if (type == col_type_Int) {
         if (is_nullable()) {
             GetIndexData<Optional<int64_t>> stringifier;
             return stringifier.get_index_data(obj.get<Optional<int64_t>>(m_column_key), buffer);
@@ -69,7 +69,7 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
             return stringifier.get_index_data(obj.get<int64_t>(m_column_key), buffer);
         }
     }
-    else if (type == type_Bool) {
+    else if (type == col_type_Bool) {
         if (is_nullable()) {
             GetIndexData<Optional<bool>> stringifier;
             return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_key), buffer);
@@ -79,15 +79,15 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
             return stringifier.get_index_data(obj.get<bool>(m_column_key), buffer);
         }
     }
-    else if (type == type_String) {
+    else if (type == col_type_String) {
         GetIndexData<String> stringifier;
         return stringifier.get_index_data(obj.get<String>(m_column_key), buffer);
     }
-    else if (type == type_Timestamp) {
+    else if (type == col_type_Timestamp) {
         GetIndexData<Timestamp> stringifier;
         return stringifier.get_index_data(obj.get<Timestamp>(m_column_key), buffer);
     }
-    else if (type == type_ObjectId) {
+    else if (type == col_type_ObjectId) {
         if (is_nullable()) {
             GetIndexData<Optional<ObjectId>> stringifier;
             return stringifier.get_index_data(obj.get<Optional<ObjectId>>(m_column_key), buffer);
@@ -97,11 +97,11 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
             return stringifier.get_index_data(obj.get<ObjectId>(m_column_key), buffer);
         }
     }
-    else if (type == type_Mixed) {
+    else if (type == col_type_Mixed) {
         GetIndexData<Mixed> stringifier;
         return stringifier.get_index_data(obj.get<Mixed>(m_column_key), buffer);
     }
-    else if (type == type_UUID) {
+    else if (type == col_type_UUID) {
         if (is_nullable()) {
             GetIndexData<Optional<UUID>> stringifier;
             return stringifier.get_index_data(obj.get<Optional<UUID>>(m_column_key), buffer);
@@ -401,7 +401,8 @@ namespace {
 
 // replicates the 4 least significant bits each times 8
 // eg: abcd -> aaaaaaaabbbbbbbbccccccccdddddddd
-int32_t replicate_4_lsb_x8(int32_t i) {
+int32_t replicate_4_lsb_x8(int32_t i)
+{
     REALM_ASSERT_DEBUG(0 <= i && i <= 15);
     i *= 0x204081;
     i &= 0x1010101;
@@ -409,7 +410,8 @@ int32_t replicate_4_lsb_x8(int32_t i) {
     return i;
 }
 
-int32_t select_from_mask(int32_t a, int32_t b, int32_t mask) {
+int32_t select_from_mask(int32_t a, int32_t b, int32_t mask)
+{
     return a ^ ((a ^ b) & mask);
 }
 
@@ -420,7 +422,8 @@ int32_t select_from_mask(int32_t a, int32_t b, int32_t mask) {
 // Permutation 8  = "aBCD"
 // Permutation 15 = "abcd"
 using key_type = StringIndex::key_type;
-key_type generate_key(key_type upper, key_type lower, int permutation) {
+key_type generate_key(key_type upper, key_type lower, int permutation)
+{
     return select_from_mask(upper, lower, replicate_4_lsb_x8(permutation));
 }
 
@@ -675,7 +678,8 @@ void IndexArray::index_string_find_all(std::vector<ObjKey>& result, StringData v
 {
     if (case_insensitive) {
         index_string_all_ins(value, result, column);
-    } else {
+    }
+    else {
         index_string_all(value, result, column);
     }
 }

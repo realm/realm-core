@@ -43,7 +43,7 @@ namespace _impl {
 class GroupFriend;
 class TransactLogConvenientEncoder;
 class TransactLogParser;
-}
+} // namespace _impl
 
 
 /// A group is a collection of named tables.
@@ -219,7 +219,10 @@ public:
     /// results in undefined behavior.
     bool is_attached() const noexcept;
     /// A group is frozen only if it is actually a frozen transaction.
-    virtual bool is_frozen() const noexcept { return false; }
+    virtual bool is_frozen() const noexcept
+    {
+        return false;
+    }
     /// Returns true if, and only if the number of tables in this
     /// group is zero.
     bool is_empty() const noexcept;
@@ -339,7 +342,8 @@ public:
 
     TableRef add_table(StringData name);
     TableRef add_embedded_table(StringData name);
-    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
+    TableRef add_table_with_primary_key(StringData name, ColumnType pk_type, StringData pk_name,
+                                        bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
 
     void remove_table(TableKey key);
@@ -463,9 +467,9 @@ public:
                 , old_target_key(otk)
             {
             }
-            TableKey origin_table;     ///< A group-level table.
-            ColKey origin_col_key;     ///< Link column being nullified.
-            ObjKey origin_key;         ///< Row in column being nullified.
+            TableKey origin_table; ///< A group-level table.
+            ColKey origin_col_key; ///< Link column being nullified.
+            ObjKey origin_key;     ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
@@ -1148,9 +1152,7 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() noexcept
-    {
-    }
+    virtual ~TableWriter() noexcept {}
 };
 
 inline const Table* Group::do_get_table(size_t ndx) const
@@ -1214,8 +1216,7 @@ public:
     }
 
     static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
-                                             _impl::History::version_type& version,
-                                             int& history_type,
+                                             _impl::History::version_type& version, int& history_type,
                                              int& history_schema_version) noexcept
     {
         Array top{const_cast<Allocator&>(alloc)};
@@ -1269,9 +1270,9 @@ public:
     };
 
     struct Link {
-        TableKey origin_table;     ///< A group-level table.
-        ColKey origin_col_key;     ///< Link column being nullified.
-        ObjKey origin_key;         ///< Row in column being nullified.
+        TableKey origin_table; ///< A group-level table.
+        ColKey origin_col_key; ///< Link column being nullified.
+        ObjKey origin_key;     ///< Row in column being nullified.
         /// The target row index which is being removed. Mostly relevant for
         /// LinkList (to know which entries are being removed), but also
         /// valid for Link.

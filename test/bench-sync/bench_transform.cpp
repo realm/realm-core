@@ -49,7 +49,7 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
             {
                 peer.start_transaction();
                 TableRef t = sync::create_table(*peer.group, "class_t");
-                col_ndx = t->add_column(type_Int, "i");
+                col_ndx = t->add_column(col_type_Int, "i");
                 peer.commit();
             }
 
@@ -115,7 +115,7 @@ void transform_instructions(TestContext& test_context, BenchmarkResults& results
         auto make_instructions = [](Peer& peer) {
             peer.start_transaction();
             TableRef t = peer.group->add_table("class_t");
-            ColKey col_ndx = t->add_column(type_Int, "i");
+            ColKey col_ndx = t->add_column(col_type_Int, "i");
 
             for (size_t j = 0; j < num_iterations; ++j) {
                 Obj obj = t->create_object();
@@ -164,7 +164,7 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
 
         auto make_instructions = [](Peer& peer) {
             peer.start_transaction();
-            TableRef t = sync::create_table_with_primary_key(*peer.group, "class_t", type_String, "pk");
+            TableRef t = sync::create_table_with_primary_key(*peer.group, "class_t", col_type_String, "pk");
             auto col_key = t->add_column(*t, "l");
 
             // Everything links to this object!

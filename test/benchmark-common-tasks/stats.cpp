@@ -19,27 +19,28 @@ const static std::string transaction = "make_transactions";
 
 } // end namespace function
 
-void print_useage(std::string program_name) {
+void print_useage(std::string program_name)
+{
     std::cout << "This program performs different functions to profile\n"
-        << "a realm file based on the specified parameters.\n"
-        << function::binary << " will create a Realm file with the\n"
-        << "specified name with a binary blob of the specified size.\n"
-        << function::binary << " takes 2 arguments:\n"
-        << "\t-output filename\n"
-        << "\t-binary blob size\n"
-        << "If a file with the same name exists, it will be overwritten.\n"
-        << "For example: \n"
-        << program_name << " " << function::binary << " simple_realm500.realm 500\n"
-        << function::transaction << " will create a Realm file with the\n"
-        << "specified name containing the specified number of rows of integers\n"
-        << "which have each been set in the specified number of transactions\n"
-        << function::transaction << " takes 3 arguments:\n"
-        << "\t-output filename\n"
-        << "\t-number of transactions\n"
-        << "\t-number of rows\n"
-        << "If a file with the same name exists, it will be overwritten.\n"
-        << "For example: \n"
-        << program_name << " " << function::transaction << " trans_10_50.realm 10 50\n";
+              << "a realm file based on the specified parameters.\n"
+              << function::binary << " will create a Realm file with the\n"
+              << "specified name with a binary blob of the specified size.\n"
+              << function::binary << " takes 2 arguments:\n"
+              << "\t-output filename\n"
+              << "\t-binary blob size\n"
+              << "If a file with the same name exists, it will be overwritten.\n"
+              << "For example: \n"
+              << program_name << " " << function::binary << " simple_realm500.realm 500\n"
+              << function::transaction << " will create a Realm file with the\n"
+              << "specified name containing the specified number of rows of integers\n"
+              << "which have each been set in the specified number of transactions\n"
+              << function::transaction << " takes 3 arguments:\n"
+              << "\t-output filename\n"
+              << "\t-number of transactions\n"
+              << "\t-number of rows\n"
+              << "If a file with the same name exists, it will be overwritten.\n"
+              << "For example: \n"
+              << program_name << " " << function::transaction << " trans_10_50.realm 10 50\n";
 }
 
 void delete_file_if_exists(std::string file_name)
@@ -53,7 +54,7 @@ void create_realm_with_data(std::string file_name, size_t data_size)
     DBRef sg = create_new_shared_group(file_name, RealmDurability::Full, nullptr); // DB::create(file_name);
     WrtTrans tr(sg); // TransactionRef tr = sg->start_write();
     TableRef table = tr.add_table("t0");
-    auto c0 = table->add_column(type_Binary, "bin_col_0");
+    auto c0 = table->add_column(col_type_Binary, "bin_col_0");
     std::string blob(data_size, 'a');
     BinaryData binary(blob.data(), data_size);
 #ifdef REALM_CLUSTER_IF
@@ -66,9 +67,7 @@ void create_realm_with_data(std::string file_name, size_t data_size)
     sg->close();
 }
 
-void create_realm_with_transactions(std::string file_name,
-                                    size_t num_transactions,
-                                    size_t num_rows)
+void create_realm_with_transactions(std::string file_name, size_t num_transactions, size_t num_rows)
 {
     delete_file_if_exists(file_name);
     DBRef sg = create_new_shared_group(file_name, RealmDurability::Full, nullptr);
@@ -77,7 +76,7 @@ void create_realm_with_transactions(std::string file_name,
     {
         WrtTrans tr(sg);
         TableRef table = tr.add_table(table_name);
-        int_col = table->add_column(type_Int, "int_col_0");
+        int_col = table->add_column(col_type_Int, "int_col_0");
 #ifdef REALM_CLUSTER_IF
         std::vector<ObjKey> keys;
         table->create_objects(num_rows, keys);
@@ -141,8 +140,7 @@ int main(int argc, const char* argv[])
                     print_useage(program_name);
                     return 1;
                 }
-                create_realm_with_transactions(file_name,
-                                               static_cast<size_t>(num_transactions),
+                create_realm_with_transactions(file_name, static_cast<size_t>(num_transactions),
                                                static_cast<size_t>(num_rows));
             }
             else {
@@ -155,7 +153,8 @@ int main(int argc, const char* argv[])
             std::cout << "Unrecognised command \"" << command << "\"\n";
             print_useage(program_name);
         }
-    } else {
+    }
+    else {
         print_useage(program_name);
     }
     return 0;

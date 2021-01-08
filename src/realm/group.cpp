@@ -434,9 +434,9 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
         if (!progress_info) {
             // This is the first time. Prepare for moving objects in one go.
-            progress_info = this->add_table_with_primary_key("!UPDATE_PROGRESS", type_String, "table_name");
-            col_objects = progress_info->add_column(type_Bool, "objects_migrated");
-            col_links = progress_info->add_column(type_Bool, "links_migrated");
+            progress_info = this->add_table_with_primary_key("!UPDATE_PROGRESS", col_type_String, "table_name");
+            col_objects = progress_info->add_column(col_type_Bool, "objects_migrated");
+            col_links = progress_info->add_column(col_type_Bool, "links_migrated");
 
 
             for (auto k : table_accessors) {
@@ -844,7 +844,7 @@ Table* Group::do_get_table(StringData name)
     return table;
 }
 
-TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable)
+TableRef Group::add_table_with_primary_key(StringData name, ColumnType pk_type, StringData pk_name, bool nullable)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -856,8 +856,8 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     ColumnAttrMask attr;
     if (nullable)
         attr.set(col_attr_Nullable);
-    ColKey pk_col = table->generate_col_key(ColumnType(pk_type), attr);
-    table->do_insert_root_column(pk_col, ColumnType(pk_type), pk_name);
+    ColKey pk_col = table->generate_col_key(pk_type, attr);
+    table->do_insert_root_column(pk_col, pk_type, pk_name);
     table->do_set_primary_key_column(pk_col);
 
     if (Replication* repl = *get_repl())

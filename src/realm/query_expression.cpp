@@ -196,11 +196,11 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
 
         for (auto k : keys) {
             const Obj o = link_table.unchecked_ptr()->get_object(k);
-            if (forward_type == type_Link) {
+            if (forward_type == col_type_Link) {
                 ret.push_back(o.get<ObjKey>(link_col_ndx));
             }
             else {
-                REALM_ASSERT(forward_type == type_LinkList);
+                REALM_ASSERT(forward_type == col_type_LinkList);
                 auto ll = o.get_linklist(link_col_ndx);
                 auto sz = ll.size();
                 for (size_t i = 0; i < sz; i++) {
@@ -224,7 +224,7 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
 
 Columns<Dictionary>& Columns<Dictionary>::key(const Mixed& key_value)
 {
-    if (m_key_type != type_Mixed && key_value.get_type() != m_key_type) {
+    if (m_key_type != col_type_Mixed && ColumnType(key_value.get_type()) != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 

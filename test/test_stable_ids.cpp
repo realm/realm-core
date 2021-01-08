@@ -124,7 +124,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with integer primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", col_type_Int, "pk");
         auto obj0 = t1->create_object_with_primary_key(123);
 
         GlobalKey expected_object_id(123);
@@ -134,7 +134,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with string primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_String, "pk");
+        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", col_type_String, "pk");
         auto obj0 = t2->create_object_with_primary_key("foo");
 
         GlobalKey expected_object_id("foo");
@@ -145,20 +145,21 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // is used.
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
-        TableRef t11 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", col_type_Int, "pk");
+        TableRef t11 = sync::create_table_with_primary_key(wt, "class_t1", col_type_Int, "pk");
         CHECK_EQUAL(t1, t11);
 
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
-        TableRef t21 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
+        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", col_type_Int, "pk", /* nullable */ true);
+        TableRef t21 = sync::create_table_with_primary_key(wt, "class_t2", col_type_Int, "pk", /* nullable */ true);
         CHECK_EQUAL(t2, t21);
 
-        TableRef t3 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
-        TableRef t31 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
+        TableRef t3 = sync::create_table_with_primary_key(wt, "class_t3", col_type_String, "pk");
+        TableRef t31 = sync::create_table_with_primary_key(wt, "class_t3", col_type_String, "pk");
         CHECK_EQUAL(t3, t31);
 
-        TableRef t4 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
-        TableRef t41 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
+        TableRef t4 = sync::create_table_with_primary_key(wt, "class_t4", col_type_String, "pk", /* nullable */ true);
+        TableRef t41 =
+            sync::create_table_with_primary_key(wt, "class_t4", col_type_String, "pk", /* nullable */ true);
         CHECK_EQUAL(t4, t41);
     }
 
@@ -289,7 +290,7 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
         DBRef sg = DB::create(*history);
         {
             WriteTransaction wt{sg};
-            TableRef t0 = sync::create_table_with_primary_key(wt, "class_t0", type_String, "pk");
+            TableRef t0 = sync::create_table_with_primary_key(wt, "class_t0", col_type_String, "pk");
 
             char buffer[12];
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {

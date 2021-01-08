@@ -2137,7 +2137,7 @@ private:
     Mixed m_key;
     std::vector<std::string> m_prop_list;
     ObjKey m_objkey;
-    DataType m_key_type;
+    ColumnType m_key_type;
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
     using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;

@@ -136,7 +136,7 @@ public:
     }
 
 
-    DataType get_data_type() const;
+    ColumnType get_data_type() const;
     ColKey get_column_key() const
     {
         return m_column_key;
@@ -153,19 +153,18 @@ class StringIndex {
 public:
     StringIndex(const ClusterColumn& target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, const ClusterColumn& target_column, Allocator&);
-    ~StringIndex() noexcept
-    {
-    }
+    ~StringIndex() noexcept {}
 
     ColKey get_column_key() const
     {
         return m_target_column.get_column_key();
     }
 
-    static bool type_supported(realm::DataType type)
+    static bool type_supported(realm::ColumnType type)
     {
-        return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId || type == type_Mixed || type == type_UUID);
+        return (type == col_type_Int || type == col_type_String || type == col_type_Bool ||
+                type == col_type_Timestamp || type == col_type_ObjectId || type == col_type_Mixed ||
+                type == col_type_UUID);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -553,8 +552,8 @@ void StringIndex::set(ObjKey key, T new_value)
         // might find the duplicate if we insert before erasing.
         erase(key); // Throws
 
-        size_t offset = 0;                               // First key from beginning of string
-        insert_with_offset(key, new_value2, offset);     // Throws
+        size_t offset = 0;                           // First key from beginning of string
+        insert_with_offset(key, new_value2, offset); // Throws
     }
 }
 

@@ -51,8 +51,8 @@ public:
         return CollectionBaseImpl<CollectionBase>::operator==(other);
     }
 
-    DataType get_key_data_type() const;
-    DataType get_value_data_type() const;
+    ColumnType get_key_data_type() const;
+    ColumnType get_value_data_type() const;
 
     // Overriding members of CollectionBase:
     std::unique_ptr<CollectionBase> clone_collection() const;
@@ -118,7 +118,7 @@ public:
 
 private:
     mutable DictionaryClusterTree* m_clusters = nullptr;
-    DataType m_key_type = type_String;
+    ColumnType m_key_type = col_type_String;
 
     bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
@@ -156,7 +156,7 @@ private:
     friend class Dictionary;
     using ClusterTree::Iterator::get_position;
 
-    DataType m_key_type;
+    ColumnType m_key_type;
 
     Iterator(const Dictionary* dict, size_t pos);
 };

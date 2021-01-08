@@ -34,7 +34,7 @@ TEST(TypedLinks_Single)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_pet = person->add_column(type_TypedLink, "pet");
+    auto col_pet = person->add_column(col_type_TypedLink, "pet");
 
     auto pluto = dog->create_object();
     auto garfield = cat->create_object();
@@ -65,7 +65,7 @@ TEST(TypedLinks_List)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_pet = person->add_column_list(type_TypedLink, "pets");
+    auto col_pet = person->add_column_list(col_type_TypedLink, "pets");
 
     auto pluto = dog->create_object();
     auto garfield = cat->create_object();
@@ -107,7 +107,7 @@ TEST(TypedLinks_Mixed)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_pet = person->add_column(type_Mixed, "pet");
+    auto col_pet = person->add_column(col_type_Mixed, "pet");
 
     auto pluto = dog->create_object();
     auto garfield = cat->create_object();
@@ -139,7 +139,7 @@ TEST(TypedLinks_MixedList)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_pet = person->add_column_list(type_Mixed, "pets");
+    auto col_pet = person->add_column_list(col_type_Mixed, "pets");
 
     auto pluto = dog->create_object();
     auto garfield = cat->create_object();

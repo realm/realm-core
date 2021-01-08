@@ -110,116 +110,116 @@ TEST_CASE("ObjectSchema") {
     SECTION("from a Group") {
         Group g;
 
-        TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
+        TableRef table = g.add_table_with_primary_key("class_table", col_type_Int, "pk");
         TableRef target = g.add_table("class_target");
         TableRef embedded = g.add_embedded_table("class_embedded");
 
-        table->add_column(type_Int, "int");
-        table->add_column(type_Bool, "bool");
-        table->add_column(type_Float, "float");
-        table->add_column(type_Double, "double");
-        table->add_column(type_String, "string");
-        table->add_column(type_Binary, "data");
-        table->add_column(type_Timestamp, "date");
-        table->add_column(type_ObjectId, "object id");
-        table->add_column(type_Decimal, "decimal");
-        table->add_column(type_UUID, "uuid");
+        table->add_column(col_type_Int, "int");
+        table->add_column(col_type_Bool, "bool");
+        table->add_column(col_type_Float, "float");
+        table->add_column(col_type_Double, "double");
+        table->add_column(col_type_String, "string");
+        table->add_column(col_type_Binary, "data");
+        table->add_column(col_type_Timestamp, "date");
+        table->add_column(col_type_ObjectId, "object id");
+        table->add_column(col_type_Decimal, "decimal");
+        table->add_column(col_type_UUID, "uuid");
 
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
         table->add_column_set(*target, "set");
         table->add_column_dictionary(*target, "dictionary");
 
-        table->add_column(type_Int, "int?", true);
-        table->add_column(type_Bool, "bool?", true);
-        table->add_column(type_Float, "float?", true);
-        table->add_column(type_Double, "double?", true);
-        table->add_column(type_String, "string?", true);
-        table->add_column(type_Binary, "data?", true);
-        table->add_column(type_Timestamp, "date?", true);
-        table->add_column(type_ObjectId, "object id?", true);
-        table->add_column(type_Decimal, "decimal?", true);
-        table->add_column(type_UUID, "uuid?", true);
+        table->add_column(col_type_Int, "int?", true);
+        table->add_column(col_type_Bool, "bool?", true);
+        table->add_column(col_type_Float, "float?", true);
+        table->add_column(col_type_Double, "double?", true);
+        table->add_column(col_type_String, "string?", true);
+        table->add_column(col_type_Binary, "data?", true);
+        table->add_column(col_type_Timestamp, "date?", true);
+        table->add_column(col_type_ObjectId, "object id?", true);
+        table->add_column(col_type_Decimal, "decimal?", true);
+        table->add_column(col_type_UUID, "uuid?", true);
 
-        auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
+        auto add_list = [](TableRef table, ColumnType type, StringData name, bool nullable) {
             table->add_column_list(type, name, nullable);
         };
 
-        add_list(table, type_Int, "int array", false);
-        add_list(table, type_Bool, "bool array", false);
-        add_list(table, type_Float, "float array", false);
-        add_list(table, type_Double, "double array", false);
-        add_list(table, type_String, "string array", false);
-        add_list(table, type_Binary, "data array", false);
-        add_list(table, type_Timestamp, "date array", false);
-        add_list(table, type_ObjectId, "object id array", false);
-        add_list(table, type_Decimal, "decimal array", false);
-        add_list(table, type_UUID, "uuid array", false);
-        add_list(table, type_Int, "int? array", true);
-        add_list(table, type_Bool, "bool? array", true);
-        add_list(table, type_Float, "float? array", true);
-        add_list(table, type_Double, "double? array", true);
-        add_list(table, type_String, "string? array", true);
-        add_list(table, type_Binary, "data? array", true);
-        add_list(table, type_Timestamp, "date? array", true);
-        add_list(table, type_ObjectId, "object id? array", true);
-        add_list(table, type_Decimal, "decimal? array", true);
-        add_list(table, type_UUID, "uuid? array", true);
+        add_list(table, col_type_Int, "int array", false);
+        add_list(table, col_type_Bool, "bool array", false);
+        add_list(table, col_type_Float, "float array", false);
+        add_list(table, col_type_Double, "double array", false);
+        add_list(table, col_type_String, "string array", false);
+        add_list(table, col_type_Binary, "data array", false);
+        add_list(table, col_type_Timestamp, "date array", false);
+        add_list(table, col_type_ObjectId, "object id array", false);
+        add_list(table, col_type_Decimal, "decimal array", false);
+        add_list(table, col_type_UUID, "uuid array", false);
+        add_list(table, col_type_Int, "int? array", true);
+        add_list(table, col_type_Bool, "bool? array", true);
+        add_list(table, col_type_Float, "float? array", true);
+        add_list(table, col_type_Double, "double? array", true);
+        add_list(table, col_type_String, "string? array", true);
+        add_list(table, col_type_Binary, "data? array", true);
+        add_list(table, col_type_Timestamp, "date? array", true);
+        add_list(table, col_type_ObjectId, "object id? array", true);
+        add_list(table, col_type_Decimal, "decimal? array", true);
+        add_list(table, col_type_UUID, "uuid? array", true);
 
-        auto add_set = [](TableRef table, DataType type, StringData name, bool nullable) {
+        auto add_set = [](TableRef table, ColumnType type, StringData name, bool nullable) {
             table->add_column_set(type, name, nullable);
         };
 
-        add_set(table, type_Int, "int set", false);
-        add_set(table, type_Bool, "bool set", false);
-        add_set(table, type_Float, "float set", false);
-        add_set(table, type_Double, "double set", false);
-        add_set(table, type_String, "string set", false);
-        add_set(table, type_Binary, "data set", false);
-        add_set(table, type_Timestamp, "date set", false);
-        add_set(table, type_ObjectId, "object id set", false);
-        add_set(table, type_Decimal, "decimal set", false);
-        add_set(table, type_UUID, "uuid set", false);
-        add_set(table, type_Int, "int? set", true);
-        add_set(table, type_Bool, "bool? set", true);
-        add_set(table, type_Float, "float? set", true);
-        add_set(table, type_Double, "double? set", true);
-        add_set(table, type_String, "string? set", true);
-        add_set(table, type_Binary, "data? set", true);
-        add_set(table, type_Timestamp, "date? set", true);
-        add_set(table, type_ObjectId, "object id? set", true);
-        add_set(table, type_Decimal, "decimal? set", true);
-        add_set(table, type_UUID, "uuid? set", true);
+        add_set(table, col_type_Int, "int set", false);
+        add_set(table, col_type_Bool, "bool set", false);
+        add_set(table, col_type_Float, "float set", false);
+        add_set(table, col_type_Double, "double set", false);
+        add_set(table, col_type_String, "string set", false);
+        add_set(table, col_type_Binary, "data set", false);
+        add_set(table, col_type_Timestamp, "date set", false);
+        add_set(table, col_type_ObjectId, "object id set", false);
+        add_set(table, col_type_Decimal, "decimal set", false);
+        add_set(table, col_type_UUID, "uuid set", false);
+        add_set(table, col_type_Int, "int? set", true);
+        add_set(table, col_type_Bool, "bool? set", true);
+        add_set(table, col_type_Float, "float? set", true);
+        add_set(table, col_type_Double, "double? set", true);
+        add_set(table, col_type_String, "string? set", true);
+        add_set(table, col_type_Binary, "data? set", true);
+        add_set(table, col_type_Timestamp, "date? set", true);
+        add_set(table, col_type_ObjectId, "object id? set", true);
+        add_set(table, col_type_Decimal, "decimal? set", true);
+        add_set(table, col_type_UUID, "uuid? set", true);
 
-        auto add_dictionary = [](TableRef table, DataType type, StringData name) {
+        auto add_dictionary = [](TableRef table, ColumnType type, StringData name) {
             table->add_column_dictionary(type, name);
         };
 
-        add_dictionary(table, type_Int, "int dictionary");
-        add_dictionary(table, type_Bool, "bool dictionary");
-        add_dictionary(table, type_Float, "float dictionary");
-        add_dictionary(table, type_Double, "double dictionary");
-        add_dictionary(table, type_String, "string dictionary");
-        add_dictionary(table, type_Binary, "data dictionary");
-        add_dictionary(table, type_Timestamp, "date dictionary");
-        add_dictionary(table, type_ObjectId, "object id dictionary");
-        add_dictionary(table, type_Decimal, "decimal dictionary");
-        add_dictionary(table, type_UUID, "uuid dictionary");
+        add_dictionary(table, col_type_Int, "int dictionary");
+        add_dictionary(table, col_type_Bool, "bool dictionary");
+        add_dictionary(table, col_type_Float, "float dictionary");
+        add_dictionary(table, col_type_Double, "double dictionary");
+        add_dictionary(table, col_type_String, "string dictionary");
+        add_dictionary(table, col_type_Binary, "data dictionary");
+        add_dictionary(table, col_type_Timestamp, "date dictionary");
+        add_dictionary(table, col_type_ObjectId, "object id dictionary");
+        add_dictionary(table, col_type_Decimal, "decimal dictionary");
+        add_dictionary(table, col_type_UUID, "uuid dictionary");
 
         std::vector<ColKey> indexed_cols;
-        indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
-        indexed_cols.push_back(table->add_column(type_Bool, "indexed bool"));
-        indexed_cols.push_back(table->add_column(type_String, "indexed string"));
-        indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date"));
-        indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id"));
-        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid"));
+        indexed_cols.push_back(table->add_column(col_type_Int, "indexed int"));
+        indexed_cols.push_back(table->add_column(col_type_Bool, "indexed bool"));
+        indexed_cols.push_back(table->add_column(col_type_String, "indexed string"));
+        indexed_cols.push_back(table->add_column(col_type_Timestamp, "indexed date"));
+        indexed_cols.push_back(table->add_column(col_type_ObjectId, "indexed object id"));
+        indexed_cols.push_back(table->add_column(col_type_UUID, "indexed uuid"));
 
-        indexed_cols.push_back(table->add_column(type_Int, "indexed int?", true));
-        indexed_cols.push_back(table->add_column(type_Bool, "indexed bool?", true));
-        indexed_cols.push_back(table->add_column(type_String, "indexed string?", true));
-        indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date?", true));
-        indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id?", true));
-        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid?", true));
+        indexed_cols.push_back(table->add_column(col_type_Int, "indexed int?", true));
+        indexed_cols.push_back(table->add_column(col_type_Bool, "indexed bool?", true));
+        indexed_cols.push_back(table->add_column(col_type_String, "indexed string?", true));
+        indexed_cols.push_back(table->add_column(col_type_Timestamp, "indexed date?", true));
+        indexed_cols.push_back(table->add_column(col_type_ObjectId, "indexed object id?", true));
+        indexed_cols.push_back(table->add_column(col_type_UUID, "indexed uuid?", true));
 
         for (auto col : indexed_cols)
             table->add_search_index(col);

@@ -81,7 +81,7 @@ TEST_IF(Transactions_LargeMappingChange, REALM_ANDROID == 0 && TEST_DURATION > 0
     {
         TransactionRef tr = sg->start_write();
         TableRef table = tr->add_table("test");
-        auto col = table->add_column(type_Binary, "binary");
+        auto col = table->add_column(col_type_Binary, "binary");
         char c = 'A';
         for (int i = 0; i < 20; ++i) {
             std::string str(data_size, c);
@@ -143,7 +143,7 @@ TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
     {
         TransactionRef g = sg->start_write();
         TableRef tr = g->add_table("test");
-        auto col = tr->add_column(type_Binary, "binary");
+        auto col = tr->add_column(col_type_Binary, "binary");
         char* data = new char[data_size];
         for (int i = 0; i < data_size; i += 721) {
             data[i] = i & 0xFF;
@@ -228,8 +228,8 @@ TEST(Transactions_StateChanges)
     DBRef db = DB::create(*hist_w);
     TransactionRef writer = db->start_write();
     TableRef tr = writer->add_table("hygge");
-    auto col = tr->add_column(type_Int, "hejsa");
-    auto lcol = tr->add_column_list(type_Int, "gurgle");
+    auto col = tr->add_column(col_type_Int, "hejsa");
+    auto lcol = tr->add_column_list(col_type_Int, "gurgle");
     auto obj = tr->create_object().set_all(45);
     Lst<int64_t> list = obj.get_list<int64_t>(lcol);
     list.add(5);
@@ -347,8 +347,8 @@ TEST(Transactions_Threaded)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("my_table");
-        table->add_column(type_Int, "my_col_1");
-        table->add_column(type_Int, "my_col_2");
+        table->add_column(col_type_Int, "my_col_1");
+        table->add_column(col_type_Int, "my_col_2");
         table->create_object().set_all(1, 1);
         tk = table->get_key();
         wt->commit();
@@ -384,8 +384,8 @@ TEST(Transactions_ThreadedAdvanceRead)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("my_table");
-        table->add_column(type_Int, "my_col_1");
-        table->add_column(type_Int, "my_col_2");
+        table->add_column(col_type_Int, "my_col_1");
+        table->add_column(col_type_Int, "my_col_2");
         table->create_object().set_all(1, 1);
         tk = table->get_key();
         wt->commit();
@@ -419,7 +419,7 @@ TEST(Transactions_ListOfBinary)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("my_table");
-        table->add_column_list(type_Binary, "list");
+        table->add_column_list(col_type_Binary, "list");
         table->create_object();
         wt->commit();
     }
@@ -453,7 +453,7 @@ TEST(Transactions_RollbackCreateObject)
     TransactionRef tr = sg_w->start_write();
 
     auto tk = tr->add_table("t0")->get_key();
-    auto col = tr->get_table(tk)->add_column(type_Int, "integers");
+    auto col = tr->get_table(tk)->add_column(col_type_Int, "integers");
 
     tr->commit_and_continue_as_read();
     tr->promote_to_write();
@@ -556,7 +556,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     auto sg_w = DB::create(*hist_w);
     auto g = sg_w->start_write();
     auto t = g->add_table("t1");
-    auto col = t->add_column(type_String, "t1_col0_string");
+    auto col = t->add_column(col_type_String, "t1_col0_string");
 
     auto populate_with_string_enum = [&]() {
         t->create_object().set_all("simple_string");
@@ -661,7 +661,7 @@ void preparations(SharedGroup& sg_w)
         TableRef t = g.get_table("spoink");
         if (t.get() == nullptr) {
             t = g.add_table("spoink");
-            t->add_column(type_String,"spoink-column");
+            t->add_column(col_type_String,"spoink-column");
         }
         wt.commit();
     }

@@ -51,7 +51,7 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
             for (size_t i = 0; i < sz - 1; i++) {
                 ColKey col = columns[i];
                 ConstTableRef target_table;
-                if (t->get_column_type(col) == type_Link) {
+                if (t->get_column_type(col) == col_type_Link) {
                     target_table = t->get_link_target(col);
                 }
                 if (!target_table)

@@ -217,15 +217,13 @@ public:
         cluster_changed();
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
-    virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
+    virtual void aggregate_local_prepare(Action TAction, ColumnType col_id, bool nullable);
     template <Action action>
-    void aggregate_local_prepare(DataType col_id, bool nullable);
+    void aggregate_local_prepare(ColumnType col_id, bool nullable);
 
     template <Action TAction, class LeafType>
     bool column_action_specialization(QueryStateBase* st, ArrayPayload* source_column, size_t r)
@@ -360,9 +358,7 @@ protected:
     }
 
 private:
-    virtual void table_changed()
-    {
-    }
+    virtual void table_changed() {}
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
@@ -447,7 +443,7 @@ public:
     using TConditionValue = typename LeafType::value_type;
     // static const bool nullable = ColType::nullable;
 
-    template <class TConditionFunction, Action TAction, DataType::Type TDataType, bool Nullable>
+    template <class TConditionFunction, Action TAction, ColumnType::Type TDataType, bool Nullable>
     bool find_callback_specialization(size_t start_in_leaf, size_t end_in_leaf)
     {
         using AggregateLeafType = typename GetLeafType<TDataType, Nullable>::type;
@@ -558,7 +554,7 @@ protected:
     TFind_callback_specialized m_find_callback_specialized = nullptr;
 
     template <class TConditionFunction>
-    static TFind_callback_specialized get_specialized_callback(Action action, DataType col_id, bool is_nullable)
+    static TFind_callback_specialized get_specialized_callback(Action action, ColumnType col_id, bool is_nullable)
     {
         switch (action) {
             case act_Count:
@@ -581,19 +577,19 @@ protected:
     }
 
     template <Action TAction, class TConditionFunction>
-    static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool is_nullable)
+    static TFind_callback_specialized get_specialized_callback_2(ColumnType col_id, bool is_nullable)
     {
         switch (col_id) {
-            case type_Int:
-                return get_specialized_callback_3<TAction, type_Int, TConditionFunction>(is_nullable);
-            case type_Float:
-                return get_specialized_callback_3<TAction, type_Float, TConditionFunction>(is_nullable);
-            case type_Double:
-                return get_specialized_callback_3<TAction, type_Double, TConditionFunction>(is_nullable);
-            case type_Timestamp:
-                return get_specialized_callback_3<TAction, type_Timestamp, TConditionFunction>(is_nullable);
-            case type_Decimal:
-                return get_specialized_callback_3<TAction, type_Decimal, TConditionFunction>(is_nullable);
+            case col_type_Int:
+                return get_specialized_callback_3<TAction, col_type_Int, TConditionFunction>(is_nullable);
+            case col_type_Float:
+                return get_specialized_callback_3<TAction, col_type_Float, TConditionFunction>(is_nullable);
+            case col_type_Double:
+                return get_specialized_callback_3<TAction, col_type_Double, TConditionFunction>(is_nullable);
+            case col_type_Timestamp:
+                return get_specialized_callback_3<TAction, col_type_Timestamp, TConditionFunction>(is_nullable);
+            case col_type_Decimal:
+                return get_specialized_callback_3<TAction, col_type_Decimal, TConditionFunction>(is_nullable);
             default:
                 break;
         }
@@ -602,16 +598,16 @@ protected:
     }
 
     template <Action TAction, class TConditionFunction>
-    static TFind_callback_specialized get_specialized_callback_2_int(DataType col_id, bool is_nullable)
+    static TFind_callback_specialized get_specialized_callback_2_int(ColumnType col_id, bool is_nullable)
     {
-        if (col_id == type_Int) {
-            return get_specialized_callback_3<TAction, type_Int, TConditionFunction>(is_nullable);
+        if (col_id == col_type_Int) {
+            return get_specialized_callback_3<TAction, col_type_Int, TConditionFunction>(is_nullable);
         }
         REALM_ASSERT(false); // Invalid aggregate source column
         return nullptr;
     }
 
-    template <Action TAction, DataType::Type TDataType, class TConditionFunction>
+    template <Action TAction, ColumnType::Type TDataType, class TConditionFunction>
     static TFind_callback_specialized get_specialized_callback_3(bool is_nullable)
     {
         if (is_nullable) {
@@ -644,9 +640,9 @@ public:
     {
     }
 
-    void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
+    void aggregate_local_prepare(Action action, ColumnType col_id, bool is_nullable) override
     {
-        this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
+        this->m_fastmode_disabled = (col_id == col_type_Float || col_id == col_type_Double);
         this->m_action = action;
         this->m_find_callback_specialized =
             IntegerNodeBase<LeafType>::template get_specialized_callback<TConditionFunction>(action, col_id,
@@ -715,9 +711,7 @@ public:
         : BaseType(value, column_key)
     {
     }
-    ~IntegerNode()
-    {
-    }
+    ~IntegerNode() {}
 
     void init(bool will_query_ranges) override
     {
@@ -762,9 +756,9 @@ public:
         }
     }
 
-    void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
+    void aggregate_local_prepare(Action action, ColumnType col_id, bool is_nullable) override
     {
-        this->m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
+        this->m_fastmode_disabled = (col_id == col_type_Float || col_id == col_type_Double);
         this->m_action = action;
         this->m_find_callback_specialized =
             IntegerNodeBase<LeafType>::template get_specialized_callback<Equal>(action, col_id, is_nullable);
@@ -776,7 +770,7 @@ public:
         constexpr int cond = Equal::condition;
         return this->aggregate_local_impl(st, start, end, local_limit, source_column, cond);
     }
- 
+
     size_t find_first_local(size_t start, size_t end) override
     {
         REALM_ASSERT(this->m_table);
@@ -2553,16 +2547,16 @@ public:
     void table_changed() override
     {
         m_column_type = m_table.unchecked_ptr()->get_column_type(m_condition_column_key);
-        REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
+        REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
     }
 
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        if (m_column_type == type_Link) {
+        if (m_column_type == col_type_Link) {
             m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(m_table.unchecked_ptr()->get_alloc()));
         }
-        else if (m_column_type == type_LinkList) {
+        else if (m_column_type == col_type_LinkList) {
             m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         }
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
@@ -2585,7 +2579,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        if (m_column_type == type_Link) {
+        if (m_column_type == col_type_Link) {
             for (auto& key : m_target_keys) {
                 if (key) {
                     // LinkColumn stores link to row N as the integer N + 1
@@ -2596,7 +2590,7 @@ public:
                 }
             }
         }
-        else if (m_column_type == type_LinkList) {
+        else if (m_column_type == col_type_LinkList) {
             ArrayKeyNonNullable arr(m_table.unchecked_ptr()->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
@@ -2621,7 +2615,7 @@ public:
 
 private:
     std::vector<ObjKey> m_target_keys;
-    DataType m_column_type = type_Link;
+    ColumnType m_column_type = col_type_Link;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     union Storage {
         typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;

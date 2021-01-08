@@ -70,8 +70,8 @@ TEST(Array_Example)
 
     auto create_schema = [](WriteTransaction& tr) {
         TableRef foobar = sync::create_table(tr, "class_foobar");
-        foobar->add_column(type_Int, "foo");
-        sync::add_array_column(*foobar, type_Int, "bar");
+        foobar->add_column(col_type_Int, "foo");
+        sync::add_array_column(*foobar, col_type_Int, "bar");
     };
 
     client_1->create_schema(create_schema);

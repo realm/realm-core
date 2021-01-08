@@ -216,8 +216,8 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
             ColKey key_2 = table_2.get_column_key(name);
             if (!key_2)
                 continue;
-            DataType type_1 = table_1.get_column_type(key_1);
-            DataType type_2 = table_2.get_column_type(key_2);
+            ColumnType type_1 = table_1.get_column_type(key_1);
+            ColumnType type_2 = table_2.get_column_type(key_2);
             if (type_1 != type_2) {
                 logger.error("Type mismatch on column '%1'", name);
                 equal = false;
@@ -251,7 +251,7 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
                 equal = false;
                 continue;
             }
-            if (type_1 == type_Link || type_1 == type_LinkList) {
+            if (type_1 == col_type_Link || type_1 == col_type_LinkList) {
                 ConstTableRef target_1 = table_1.get_link_target(key_1);
                 ConstTableRef target_2 = table_2.get_link_target(key_2);
                 if (target_1->get_name() != target_2->get_name()) {

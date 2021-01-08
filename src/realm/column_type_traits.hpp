@@ -299,33 +299,33 @@ struct ColumnTypeTraits<Set<T>> {
     static constexpr const ColumnType column_id = ColumnTypeTraits<T>::column_id;
 };
 
-template <DataType::Type, bool Nullable>
+template <ColumnType::Type, bool Nullable>
 struct GetLeafType;
 template <>
-struct GetLeafType<DataType::Type::Int, false> {
+struct GetLeafType<ColumnType::Type::Int, false> {
     using type = ArrayInteger;
 };
 template <>
-struct GetLeafType<DataType::Type::Int, true> {
+struct GetLeafType<ColumnType::Type::Int, true> {
     using type = ArrayIntNull;
 };
 template <bool N>
-struct GetLeafType<DataType::Type::Float, N> {
+struct GetLeafType<ColumnType::Type::Float, N> {
     // FIXME: Null definition
     using type = BasicArray<float>;
 };
 template <bool N>
-struct GetLeafType<DataType::Type::Double, N> {
+struct GetLeafType<ColumnType::Type::Double, N> {
     // FIXME: Null definition
     using type = BasicArray<double>;
 };
 template <bool N>
-struct GetLeafType<DataType::Type::Timestamp, N> {
+struct GetLeafType<ColumnType::Type::Timestamp, N> {
     // FIXME: Null definition
     using type = ArrayTimestamp;
 };
 template <bool N>
-struct GetLeafType<DataType::Type::Decimal, N> {
+struct GetLeafType<ColumnType::Type::Decimal, N> {
     // FIXME: Null definition
     using type = ArrayDecimal128;
 };

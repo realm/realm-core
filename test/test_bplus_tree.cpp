@@ -198,7 +198,7 @@ TEST(BPlusTree_FuzzBinary)
 
     auto tr = db->start_write();
     auto table = tr->add_table("table");
-    auto col = table->add_column_list(type_Binary, "bin");
+    auto col = table->add_column_list(col_type_Binary, "bin");
     table->create_object();
     tr->commit_and_continue_as_read();
 
@@ -316,7 +316,7 @@ BPlusTree<Int> create_bplustree_int()
 
     return tree;
 }
-}
+} // namespace
 
 TEST(BPlusTree_Copy)
 {

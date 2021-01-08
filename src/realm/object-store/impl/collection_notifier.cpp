@@ -92,8 +92,8 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
 
     for (auto col_key : table.get_column_keys()) {
         auto type = table.get_column_type(col_key);
-        if (type == type_Link || type == type_LinkList) {
-            out[out_index].links.push_back({col_key.value, type == type_LinkList});
+        if (type == col_type_Link || type == col_type_LinkList) {
+            out[out_index].links.push_back({col_key.value, type == col_type_LinkList});
             find_related_tables(out, *table.get_link_target(col_key));
         }
     }

@@ -76,6 +76,11 @@ struct ColumnType {
         return int(m_type);
     }
 
+    constexpr explicit operator int64_t() const noexcept
+    {
+        return int64_t(m_type);
+    }
+
     // FIXME: Remove this
     constexpr explicit operator DataType() const noexcept
     {

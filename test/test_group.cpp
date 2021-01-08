@@ -82,10 +82,10 @@ namespace {
 template <class T>
 void test_table_add_columns(T t)
 {
-    t->add_column(type_String, "first");
-    t->add_column(type_Int, "second");
-    t->add_column(type_Bool, "third");
-    t->add_column(type_Int, "fourth");
+    t->add_column(col_type_String, "first");
+    t->add_column(col_type_Int, "second");
+    t->add_column(col_type_Bool, "third");
+    t->add_column(col_type_Int, "fourth");
 }
 
 template <class T>
@@ -223,7 +223,7 @@ TEST(Group_OpenUnencryptedFileWithKey)
         // read the footer would use the first non-zero field of the header as
         // the IV
         TableRef table = group.get_or_add_table("table");
-        auto col = table->add_column(type_String, "str");
+        auto col = table->add_column(col_type_String, "str");
         std::string data(page_size() - 100, '\1');
         table->create_object().set<String>(col, data);
         table->create_object().set<String>(col, data);
@@ -253,8 +253,8 @@ TEST(Group_Permissions)
     {
         Group group1;
         TableRef t1 = group1.add_table("table1");
-        t1->add_column(type_String, "s");
-        t1->add_column(type_Int, "i");
+        t1->add_column(col_type_String, "s");
+        t1->add_column(col_type_Int, "i");
         for (size_t i = 0; i < 4; ++i) {
             t1->create_object().set_all("a", 3);
         }
@@ -402,7 +402,7 @@ TEST(Group_AddTableWithLinks)
     Group group;
     TableRef a = group.add_table("a");
     TableRef b = group.add_table("b");
-    auto c0 = a->add_column(type_Int, "foo");
+    auto c0 = a->add_column(col_type_Int, "foo");
     auto c1 = b->add_column(*a, "bar");
 
     auto a_key = a->get_key();
@@ -559,7 +559,7 @@ TEST(Group_ObjUseAfterTableDetach)
     {
         Group group;
         TableRef alpha = group.add_table("alpha");
-        col = alpha->add_column(type_Int, "first");
+        col = alpha->add_column(col_type_Int, "first");
         obj = alpha->create_object();
         obj.set(col, 42);
         CHECK_EQUAL(obj.get<int64_t>(col), 42);
@@ -578,10 +578,10 @@ TEST(Group_RemoveTableWithColumns)
     TableRef epsilon = group.add_table("epsilon");
     CHECK_EQUAL(5, group.size());
 
-    alpha->add_column(type_Int, "alpha-1");
+    alpha->add_column(col_type_Int, "alpha-1");
     auto col_link = beta->add_column(*delta, "beta-1");
     gamma->add_column(*gamma, "gamma-1");
-    delta->add_column(type_Int, "delta-1");
+    delta->add_column(col_type_Int, "delta-1");
     epsilon->add_column(*delta, "epsilon-1");
 
     Obj obj = delta->create_object();
@@ -737,7 +737,7 @@ TEST(Group_RemoveLinkTable)
     CHECK(!table);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    target->add_column(type_Int, "int");
+    target->add_column(col_type_Int, "int");
     origin->add_column(*target, "link");
     CHECK_THROW(group.remove_table(target->get_key()), CrossTableLinkTarget);
     group.remove_table(origin->get_key());
@@ -1104,11 +1104,11 @@ TEST(Group_Serialize_All)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
 
-    table->add_column(type_Int, "int");
-    table->add_column(type_Bool, "bool");
-    table->add_column(type_Timestamp, "date");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
+    table->add_column(col_type_Int, "int");
+    table->add_column(col_type_Bool, "bool");
+    table->add_column(col_type_Timestamp, "date");
+    table->add_column(col_type_String, "string");
+    table->add_column(col_type_Binary, "binary");
 
     table->create_object(ObjKey(0)).set_all(12, true, Timestamp{12345, 0}, "test", BinaryData("binary", 7));
 
@@ -1140,11 +1140,11 @@ TEST(Group_Persist)
 
     // Insert some data
     TableRef table = db.add_table("test");
-    table->add_column(type_Int, "int");
-    table->add_column(type_Bool, "bool");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Timestamp, "timestamp");
+    table->add_column(col_type_Int, "int");
+    table->add_column(col_type_Bool, "bool");
+    table->add_column(col_type_String, "string");
+    table->add_column(col_type_Binary, "binary");
+    table->add_column(col_type_Timestamp, "timestamp");
     table->create_object(ObjKey(0)).set_all(12, true, "test", BinaryData("binary", 7), Timestamp{111, 222});
 
     // Write changes to file
@@ -1296,7 +1296,7 @@ TEST(Group_StockBug)
     Group group(path, crypt_key(), Group::mode_ReadWrite);
 
     TableRef table = group.add_table("stocks");
-    auto col = table->add_column(type_String, "ticker");
+    auto col = table->add_column(col_type_String, "ticker");
 
     for (size_t i = 0; i < 100; ++i) {
         table->verify();
@@ -1314,7 +1314,7 @@ TEST(Group_CommitLinkListChange)
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     auto col_link = origin->add_column_list(*target, "links");
-    target->add_column(type_Int, "integers");
+    target->add_column(col_type_Int, "integers");
     auto k = target->create_object().get_key();
     origin->create_object().get_linklist(col_link).add(k);
     group.commit();
@@ -1329,7 +1329,7 @@ TEST(Group_Commit_Update_Integer_Index)
 
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("table");
-    auto col = t->add_column(type_Int, "integer");
+    auto col = t->add_column(col_type_Int, "integer");
 
     auto k0 = t->create_object().set<Int>(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL).get_key();
     for (size_t i = 1; i < 200; i++) {
@@ -1354,7 +1354,7 @@ TEST(Group_CascadeNotify_SimpleWeak)
 
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
-    t->add_column(type_Int, "int");
+    t->add_column(col_type_Int, "int");
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column(*t, "link");
     auto col_link_list = origin->add_column_list(*t, "linklist");
@@ -1455,7 +1455,7 @@ TEST(Group_CascadeNotify_TableClearWeak)
 
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
-    t->add_column(type_Int, "int");
+    t->add_column(col_type_Int, "int");
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column(*t, "link");
     auto col_link_list = origin->add_column_list(*t, "linklist");
@@ -1514,7 +1514,7 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
 
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
-    t->add_column(type_Int, "int");
+    t->add_column(col_type_Int, "int");
     TableRef origin = g.add_table("origin");
     auto col_link = origin->add_column(*t, "link");
     auto col_link_list = origin->add_column_list(*t, "linklist");
@@ -1664,15 +1664,15 @@ TEST(Group_ToDot)
     // Create table with all column types
     TableRef table = mygroup.add_table("test");
     DescriptorRef subdesc;
-    table->add_column(type_Int, "int");
-    table->add_column(type_Bool, "bool");
-    table->add_column(type_String, "string");
-    table->add_column(type_String, "string_long");
-    table->add_column(type_String, "string_enum"); // becomes StringEnumColumn
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed, "mixed");
-    subdesc->add_column(type_Int, "sub_first");
-    subdesc->add_column(type_String, "sub_second");
+    table->add_column(col_type_Int, "int");
+    table->add_column(col_type_Bool, "bool");
+    table->add_column(col_type_String, "string");
+    table->add_column(col_type_String, "string_long");
+    table->add_column(col_type_String, "string_enum"); // becomes StringEnumColumn
+    table->add_column(col_type_Binary, "binary");
+    table->add_column(col_type_Mixed, "mixed");
+    subdesc->add_column(col_type_Int, "sub_first");
+    subdesc->add_column(col_type_String, "sub_second");
     subdesc.reset();
 
     // Add some rows
@@ -1721,8 +1721,8 @@ TEST(Group_ToDot)
             table->set_mixed(7, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(7, i);
 
-            st->add_column(type_Int, "first");
-            st->add_column(type_String, "second");
+            st->add_column(col_type_Int, "first");
+            st->add_column(col_type_String, "second");
 
             st->insert_empty_row(0);
             st->set_int(0, 0, 42);
@@ -1762,7 +1762,7 @@ TEST_TYPES(Group_TimestampAddAIndexAndThenInsertEmptyRows, std::true_type, std::
     constexpr bool nullable = TEST_TYPE::value;
     Group g;
     TableRef table = g.add_table("");
-    auto col = table->add_column(type_Timestamp, "date", nullable);
+    auto col = table->add_column(col_type_Timestamp, "date", nullable);
     table->add_search_index(col);
     std::vector<ObjKey> keys;
     table->create_objects(5, keys);
@@ -1775,7 +1775,7 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     {
         Group g;
         auto table = g.add_table("table");
-        table->add_column(type_Int, "col");
+        table->add_column(col_type_Int, "col");
         table->create_object();
         g.write(path, crypt_key());
     }
@@ -1805,7 +1805,7 @@ TEST(Group_RemoveRecursive)
     TableRef origin = g.add_table("origin");
     TableKey target_key = target->get_key();
 
-    target->add_column(type_Int, "integers", true);
+    target->add_column(col_type_Int, "integers", true);
     auto link_col_t = target->add_column(*target, "links");
     auto link_col_o = origin->add_column(*target, "links");
 
@@ -1870,7 +1870,7 @@ TEST(Group_RemoveRecursive)
 TEST(Group_IntPrimaryKeyCol)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary", true);
+    TableRef table = g.add_table_with_primary_key("class_foo", col_type_Int, "primary", true);
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
     CHECK_NOT(table->has_search_index(primary_key_column));
@@ -1894,12 +1894,12 @@ TEST(Group_IntPrimaryKeyCol)
 TEST(Group_StringPrimaryKeyCol)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("class_foo", type_String, "primary");
+    TableRef table = g.add_table_with_primary_key("class_foo", col_type_String, "primary");
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
     ColKey col1 = primary_key_column;
-    ColKey col2 = table->add_column(type_String, "secondary");
-    ColKey list_col = table->add_column_list(type_Float, "floats");
+    ColKey col2 = table->add_column(col_type_String, "secondary");
+    ColKey list_col = table->add_column_list(col_type_Float, "floats");
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK_NOT(table->has_search_index(primary_key_column));
 
@@ -1967,8 +1967,8 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
 {
     Group g;
     TableRef table = g.add_table("table");
-    ColKey string_col = table->add_column(type_String, "string");
-    ColKey int_col = table->add_column(type_Int, "int");
+    ColKey string_col = table->add_column(col_type_String, "string");
+    ColKey int_col = table->add_column(col_type_Int, "int");
 
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
@@ -1983,7 +1983,7 @@ TEST(Group_SetColumnWithNullPrimaryKeyy)
 {
     Group g;
     TableRef table = g.add_table("table");
-    ColKey string_col = table->add_column(type_String, "string", true);
+    ColKey string_col = table->add_column(col_type_String, "string", true);
 
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
@@ -2008,8 +2008,8 @@ TEST(Group_SetColumnWithNullPrimaryKeyy)
 TEST(Group_ChangeIntPrimaryKeyValuesInMigration)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("table", type_Int, "pk");
-    ColKey value_col = table->add_column(type_Int, "value");
+    TableRef table = g.add_table_with_primary_key("table", col_type_Int, "pk");
+    ColKey value_col = table->add_column(col_type_Int, "value");
     ColKey pk_col = table->get_primary_key_column();
 
     for (int i = 0; i < 10; ++i) {
@@ -2035,8 +2035,8 @@ TEST(Group_ChangeIntPrimaryKeyValuesInMigration)
 TEST(Group_ChangeStringPrimaryKeyValuesInMigration)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("table", type_String, "pk");
-    ColKey value_col = table->add_column(type_String, "value");
+    TableRef table = g.add_table_with_primary_key("table", col_type_String, "pk");
+    ColKey value_col = table->add_column(col_type_String, "value");
     ColKey pk_col = table->get_primary_key_column();
 
     for (int i = 0; i < 10; ++i) {
@@ -2071,8 +2071,8 @@ TEST(Group_UniqueColumnKeys)
     g.add_table("3");
     g.add_table("4");
     auto bar = g.add_table("bar"); // Tablekey == 5. Upper bit stripped off before fix, so equal to 1
-    auto col_foo = foo->add_column(type_Int, "ints");
-    auto col_bar = bar->add_column(type_Int, "ints");
+    auto col_foo = foo->add_column(col_type_Int, "ints");
+    auto col_bar = bar->add_column(col_type_Int, "ints");
     CHECK_NOT_EQUAL(col_foo, col_bar);
 }
 

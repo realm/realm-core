@@ -2048,7 +2048,7 @@ TEST_CASE("migration: Additive") {
         realm2->begin_transaction();
         auto table = ObjectStore::table_for_object_type(group, "object");
         auto col_keys = table->get_column_keys();
-        table->add_column(type_Int, "new column");
+        table->add_column(col_type_Int, "new column");
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
@@ -2063,7 +2063,7 @@ TEST_CASE("migration: Additive") {
         realm2->begin_transaction();
         auto table = ObjectStore::table_for_object_type(group, "object");
         auto col_keys = table->get_column_keys();
-        table->add_column(type_Double, "newcol");
+        table->add_column(col_type_Double, "newcol");
         realm2->commit_transaction();
 
         REQUIRE_NOTHROW(realm->refresh());
@@ -2217,13 +2217,13 @@ TEST_CASE("migration: Manual") {
                                                  {"value", PropertyType::Int},
                                              }}),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().add_table("class_new table")->add_column(type_Int, "value");
+                              realm->read_group().add_table("class_new table")->add_column(col_type_Int, "value");
                           });
     }
     SECTION("add property to table") {
         REQUIRE_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int}),
                           [&](SharedRealm, SharedRealm realm, Schema&) {
-                              get_table(realm, "object")->add_column(type_Int, "new");
+                              get_table(realm, "object")->add_column(col_type_Int, "new");
                           });
     }
     SECTION("remove property from table") {
@@ -2258,7 +2258,7 @@ TEST_CASE("migration: Manual") {
                           [&](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "object");
                               table->remove_column(col_keys[1]);
-                              auto col = table->add_column(type_Timestamp, "value");
+                              auto col = table->add_column(col_type_Timestamp, "value");
                               table->add_search_index(col);
                           });
     }
@@ -2283,7 +2283,7 @@ TEST_CASE("migration: Manual") {
                           [&](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "object");
                               table->remove_column(col_keys[1]);
-                              auto col = table->add_column(type_Int, "value", true);
+                              auto col = table->add_column(col_type_Int, "value", true);
                               table->add_search_index(col);
                           });
     }
@@ -2292,7 +2292,7 @@ TEST_CASE("migration: Manual") {
                           [&](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "object");
                               table->remove_column(col_keys[2]);
-                              table->add_column(type_Int, "optional", false);
+                              table->add_column(col_type_Int, "optional", false);
                           });
     }
     SECTION("add index") {

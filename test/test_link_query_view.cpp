@@ -71,9 +71,9 @@ TEST(LinkList_Basic1)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    auto c0 = table1->add_column(type_Int, "col1");
-    auto c1 = table1->add_column(type_String, "str1");
-    auto c2 = table1->add_column(type_Binary, "bin1", true /*nullable*/);
+    auto c0 = table1->add_column(col_type_Int, "col1");
+    auto c1 = table1->add_column(col_type_String, "str1");
+    auto c2 = table1->add_column(col_type_Binary, "bin1", true /*nullable*/);
 
     // add some rows
     auto o0 = table1->create_object().set_all(100, "foo", BinaryData("foo"));
@@ -116,7 +116,7 @@ TEST(LinkList_Basic1)
     CHECK_EQUAL(tv3.size(), 1);
     CHECK_EQUAL(tv3[0].get_key(), o1.get_key()); // "bar" contained an "A"
 
-    auto c22 = table2->add_column(type_String, "str2");
+    auto c22 = table2->add_column(col_type_String, "str2");
     o20.set(c22, "A");
     o21.set(c22, "A");
     // table2->set_string(1, 0, "A");
@@ -138,8 +138,8 @@ TEST(LinkList_MissingDeepCopy)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    auto c1 = table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    auto c1 = table1->add_column(col_type_String, "str1");
 
     // add some rows
     auto o1 = table1->create_object().set_all(100, "foo");
@@ -168,11 +168,11 @@ TEST(LinkList_Basic2)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    auto c1 = table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    auto c1 = table1->add_column(col_type_String, "str1");
 
-    auto c2 = table2->add_column(type_Int, "col1");
-    auto c3 = table2->add_column(type_String, "str2");
+    auto c2 = table2->add_column(col_type_Int, "col1");
+    auto c3 = table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto o10 = table1->create_object().set_all(100, "foo");
@@ -236,11 +236,11 @@ TEST(LinkList_QuerySingle)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    table1->add_column(col_type_String, "str1");
 
-    auto c0 = table2->add_column(type_Int, "col1");
-    auto c1 = table2->add_column(type_String, "str2");
+    auto c0 = table2->add_column(col_type_Int, "col1");
+    auto c1 = table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto x0 = table1->create_object().set_all(100, "foo");
@@ -279,8 +279,8 @@ TEST(LinkList_TableViewTracking)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    auto c1 = table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    auto c1 = table1->add_column(col_type_String, "str1");
 
     // add some rows
     auto o0 = table1->create_object().set_all(100, "foo");
@@ -316,11 +316,11 @@ TEST(LinkList_QueryFindLinkTarget)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    table1->add_column(col_type_String, "str1");
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    table2->add_column(col_type_Int, "col1");
+    table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto o10 = table1->create_object().set_all(100, "foo");
@@ -450,14 +450,14 @@ TEST(LinkList_MultiLinkQuery)
     ColKey col_link3 = table2->add_column(*table3, "link");
     ColKey col_linklist3 = table2->add_column_list(*table3, "linkl");
 
-    ColKey c40 = table4->add_column(type_Int, "int");
+    ColKey c40 = table4->add_column(col_type_Int, "int");
 
     table4->create_object(ObjKey(0)).set_all(1000);
     table4->create_object(ObjKey(1)).set_all(2000);
 
-    ColKey c30 = table3->add_column(type_Int, "int");
-    ColKey c31 = table3->add_column(type_String, "string");
-    ColKey c32 = table3->add_column(type_Float, "float");
+    ColKey c30 = table3->add_column(col_type_Int, "int");
+    ColKey c31 = table3->add_column(col_type_String, "string");
+    ColKey c32 = table3->add_column(col_type_Float, "float");
 
     ColKey col_link4 = table3->add_column(*table4, "link");
     ColKey col_linklist4 = table3->add_column_list(*table4, "linkl");
@@ -652,12 +652,12 @@ TEST(LinkList_SortLinkView)
     TableRef table2 = group.add_table("table2");
 
     // add some more columns to table1 and table2
-    auto col_int = table1->add_column(type_Int, "ints");
-    auto col_str1 = table1->add_column(type_String, "str1");
-    auto col_float = table1->add_column(type_Float, "floats");
-    auto col_double = table1->add_column(type_Double, "doubles");
-    auto col_str2 = table1->add_column(type_String, "str2");
-    auto col_date = table1->add_column(type_Timestamp, "ts");
+    auto col_int = table1->add_column(col_type_Int, "ints");
+    auto col_str1 = table1->add_column(col_type_String, "str1");
+    auto col_float = table1->add_column(col_type_Float, "floats");
+    auto col_double = table1->add_column(col_type_Double, "doubles");
+    auto col_str2 = table1->add_column(col_type_String, "str2");
+    auto col_date = table1->add_column(col_type_Timestamp, "ts");
     auto col_link2 = table2->add_column_list(*table1, "linklist");
 
     // add some rows - all columns in different sort order
@@ -772,12 +772,12 @@ TEST(Link_FindNullLink)
     TableRef table1 = group.add_table("table1");
     TableRef table2 = group.add_table("table2");
 
-    auto col_str0 = table0->add_column(type_String, "str1");
+    auto col_str0 = table0->add_column(col_type_String, "str1");
     ObjKey k0 = table0->create_object().set(col_str0, "hello").get_key();
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "int1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "int1");
+    table1->add_column(col_type_String, "str1");
 
     // add some rows
     Obj obj_1_0 = table1->create_object().set_all(100, "foo");
@@ -863,7 +863,7 @@ TEST(Link_FindNotNullLink)
     TableRef t0 = g.add_table("t0");
     TableRef t1 = g.add_table("t1");
     auto col_link = t0->add_column(*t1, "link");
-    auto col_int = t1->add_column(type_Int, "int");
+    auto col_int = t1->add_column(col_type_Int, "int");
 
     std::vector<ObjKey> keys0;
     std::vector<ObjKey> keys1;
@@ -906,7 +906,7 @@ TEST(LinkList_FindNotNullLink)
 
     auto col_linklist = lists->add_column_list(*items, "listItems");
     auto col_link = items->add_column(*datas, "localData");
-    auto col_str = datas->add_column(type_String, "title");
+    auto col_str = datas->add_column(col_type_String, "title");
 
     Obj obj0 = lists->create_object();
     std::vector<ObjKey> item_keys;
@@ -966,8 +966,8 @@ TEST(LinkList_QueryOnLinkList)
     TableRef origin = group.add_table("origin");
 
     // add some more columns to target and origin
-    auto col_int = target->add_column(type_Int, "col1");
-    target->add_column(type_String, "str1");
+    auto col_int = target->add_column(col_type_Int, "col1");
+    target->add_column(col_type_String, "str1");
     auto col_link2 = origin->add_column_list(*target, "linklist");
 
     // add some rows
@@ -1059,7 +1059,7 @@ TEST(LinkList_QueryOnLinkListWithDuplicates)
     Group group;
 
     TableRef target = group.add_table("target");
-    auto int_col = target->add_column(type_Int, "col1");
+    auto int_col = target->add_column(col_type_Int, "col1");
     TableRef origin = group.add_table("origin");
     auto link_col = origin->add_column_list(*target, "linklist");
 
@@ -1102,7 +1102,7 @@ TEST(LinkList_QueryOnLinkListWithNonTableOrderThroughLinkWithIndex)
     Group group;
 
     TableRef target = group.add_table("target");
-    auto int_col = target->add_column(type_Int, "col1");
+    auto int_col = target->add_column(col_type_Int, "col1");
     target->add_search_index(int_col);
     TableRef middle = group.add_table("middle");
     auto link_col = middle->add_column(*target, "link");
@@ -1134,7 +1134,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     Group group;
 
     TableRef data_table = group.add_table("data");
-    auto c0 = data_table->add_column(type_String, "col");
+    auto c0 = data_table->add_column(col_type_String, "col");
     data_table->add_search_index(c0);
 
     TableRef link_table = group.add_table("link");
@@ -1169,11 +1169,11 @@ TEST(LinkList_QueryLinkNull)
     Group group;
 
     TableRef data_table = group.add_table("data");
-    auto c0 = data_table->add_column(type_String, "string", true);
+    auto c0 = data_table->add_column(col_type_String, "string", true);
     auto c1 = data_table->add_column(*data_table, "link");
-    auto c2 = data_table->add_column(type_Int, "int", true);
-    auto c3 = data_table->add_column(type_Double, "double", true);
-    auto c4 = data_table->add_column(type_Timestamp, "date", true);
+    auto c2 = data_table->add_column(col_type_Int, "int", true);
+    auto c3 = data_table->add_column(col_type_Double, "double", true);
+    auto c4 = data_table->add_column(col_type_Timestamp, "date", true);
 
     // +-+--------+------+------+--------+------+
     // | |   0    |  1   |   2  |  3     |  4   |
@@ -1253,7 +1253,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
     Group group;
 
     TableRef data_table = group.add_table("data");
-    auto c0 = data_table->add_column(type_String, "col");
+    auto c0 = data_table->add_column(col_type_String, "col");
     data_table->add_search_index(c0);
 
     TableRef link_table = group.add_table("link");
@@ -1326,7 +1326,7 @@ TEST(LinkList_QueryUnsortedListWithOr)
     Group group;
 
     TableRef data_table = group.add_table("data");
-    auto int_col = data_table->add_column(type_Int, "col");
+    auto int_col = data_table->add_column(col_type_Int, "col");
 
     TableRef link_table = group.add_table("link");
     auto link_col = link_table->add_column_list(*data_table, "col");
@@ -1363,11 +1363,11 @@ TEST(BackLink_Query_TableViewSyncsWhenNeeded)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    ColKey col_int = source->add_column(type_Int, "id");
+    ColKey col_int = source->add_column(col_type_Int, "id");
     ColKey col_link = source->add_column(*target, "link");
     ColKey col_linklist = source->add_column_list(*target, "linklist");
 
-    target->add_column(type_Int, "id");
+    target->add_column(col_type_Int, "id");
 
     auto o0 = source->create_object().set_all(0);
     auto o1 = source->create_object().set_all(0);
@@ -1441,7 +1441,7 @@ TEST(BackLink_Query_Link)
     TableRef target = group.add_table("target");
 
 
-    target->add_column(type_Int, "id");
+    target->add_column(col_type_Int, "id");
 
     auto k0 = target->create_object().set_all(0).get_key();
     auto k1 = target->create_object().set_all(1).get_key();
@@ -1449,9 +1449,9 @@ TEST(BackLink_Query_Link)
     auto k3 = target->create_object().set_all(3).get_key();
 
     auto col_link = source->add_column(*target, "link");
-    auto col_int = source->add_column(type_Int, "int");
-    auto col_double = source->add_column(type_Double, "double");
-    auto col_string = source->add_column(type_String, "string");
+    auto col_int = source->add_column(col_type_Int, "int");
+    auto col_double = source->add_column(col_type_Double, "double");
+    auto col_string = source->add_column(col_type_String, "string");
 
     auto add_row = [&](std::vector<ObjKey> link_targets, int64_t i, double d, const char* string) {
         auto row = source->create_object();
@@ -1503,7 +1503,7 @@ TEST(BackLink_Query_LinkList)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    target->add_column(type_Int, "id");
+    target->add_column(col_type_Int, "id");
 
     auto k0 = target->create_object().set_all(0).get_key();
     auto k1 = target->create_object().set_all(1).get_key();
@@ -1512,9 +1512,9 @@ TEST(BackLink_Query_LinkList)
     auto k4 = target->create_object().set_all(4).get_key();
 
     auto col_linklist = source->add_column_list(*target, "linklist");
-    auto col_int = source->add_column(type_Int, "int");
-    auto col_double = source->add_column(type_Double, "double");
-    auto col_string = source->add_column(type_String, "string");
+    auto col_int = source->add_column(col_type_Int, "int");
+    auto col_double = source->add_column(col_type_Double, "double");
+    auto col_string = source->add_column(col_type_String, "string");
 
     auto add_row = [&](std::vector<ObjKey> link_targets, int64_t i, double d, const char* string) {
         auto row = source->create_object();
@@ -1574,8 +1574,8 @@ TEST(BackLink_Query_MultipleLevels)
 
     TableRef people = group.add_table("people");
 
-    auto col_name = people->add_column(type_String, "name");
-    auto col_age = people->add_column(type_Int, "age");
+    auto col_name = people->add_column(col_type_String, "name");
+    auto col_age = people->add_column(col_type_Int, "age");
     auto col_children = people->add_column_list(*people, "children");
 
     auto add_person = [&](std::string name, int age, std::vector<ObjKey> children) {
@@ -1674,13 +1674,13 @@ TEST(BackLink_Query_MultipleLevelsAndTables)
     TableRef c = group.add_table("c");
     TableRef d = group.add_table("d");
 
-    auto col_id = a->add_column(type_Int, "id");
+    auto col_id = a->add_column(col_type_Int, "id");
     auto col_a_to_b = a->add_column(*b, "link");
 
     auto col_b_to_c = b->add_column(*c, "link");
     auto col_c_to_d = c->add_column(*d, "link");
 
-    d->add_column(type_Int, "id");
+    d->add_column(col_type_Int, "id");
 
     auto k0 = d->create_object().set_all(0).get_key();
     auto k1 = d->create_object().set_all(1).get_key();

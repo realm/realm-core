@@ -435,7 +435,7 @@ void Peer::ensure_query_class(const std::string& class_name)
             queryable = sync::create_table(wt, table_name);
         ColKey level_ndx = queryable->get_column_key("level");
         if (!level_ndx) {
-            queryable->add_column(type_Int, "level");
+            queryable->add_column(col_type_Int, "level");
         }
         else if (queryable->get_column_type(level_ndx) != type_Int) {
             m_logger.error("Wrong data type for property 'level' in queryable class '%1'", class_name);
@@ -443,7 +443,7 @@ void Peer::ensure_query_class(const std::string& class_name)
         }
         ColKey text_ndx = queryable->get_column_key("text");
         if (!text_ndx) {
-            queryable->add_column(type_String, "text");
+            queryable->add_column(col_type_String, "text");
         }
         else if (queryable->get_column_type(text_ndx) != type_String) {
             m_logger.error("Wrong data type for property 'text' in queryable class '%1'", class_name);
@@ -514,12 +514,12 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
         TableRef result_sets = wt.get_table(result_sets_table_name);
         if (!result_sets) {
             result_sets = sync::create_table(wt, result_sets_table_name);
-            result_sets->add_column(type_String, "query");
-            result_sets->add_column(type_String, "matches_property");
+            result_sets->add_column(col_type_String, "query");
+            result_sets->add_column(col_type_String, "matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
-            result_sets->add_column(type_Int, "status");
-            result_sets->add_column(type_String, "error_message");
-            result_sets->add_column(type_Int, "query_parse_counter");
+            result_sets->add_column(col_type_Int, "status");
+            result_sets->add_column(col_type_String, "error_message");
+            result_sets->add_column(col_type_Int, "query_parse_counter");
         }
         const std::string& matches_column_name = class_to_matches_column_name(class_name, buffer);
         ColKey col_ndx_matches = result_sets->get_column_key(matches_column_name);
@@ -799,10 +799,10 @@ TableRef Peer::do_ensure_blob_class(WriteTransaction& wt, StringData table_name)
         DataType pk_type = type_ObjectId;
         StringData pk_column_name = "_id";
         table = sync::create_table_with_primary_key(wt, table_name, pk_type, pk_column_name);
-        table->add_column(type_Binary, "blob");
-        table->add_column(type_String, "label");
-        table->add_column(type_Int, "kind");
-        table->add_column(type_Int, "level");
+        table->add_column(col_type_Binary, "blob");
+        table->add_column(col_type_String, "label");
+        table->add_column(col_type_Int, "kind");
+        table->add_column(col_type_Int, "level");
     }
     return table;
 }
@@ -817,8 +817,8 @@ TableRef Peer::do_ensure_ptime_class(WriteTransaction& wt)
         DataType pk_type = type_ObjectId;
         StringData pk_column_name = "_id";
         table = sync::create_table_with_primary_key(wt, table_name, pk_type, pk_column_name);
-        table->add_column(type_Int, "originator");
-        table->add_column(type_Int, "timestamp");
+        table->add_column(col_type_Int, "originator");
+        table->add_column(col_type_Int, "timestamp");
     }
     return table;
 }

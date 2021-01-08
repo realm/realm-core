@@ -99,9 +99,7 @@ namespace {
 // both non-nullable:
 template <typename T1, typename T2>
 struct value_copier {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     T2 operator()(T1 from_value, bool = false)
     {
         return from_value;
@@ -146,9 +144,7 @@ struct value_copier<Optional<T1>, T2> {
 // identical to non-specialized case, but specialization needed to avoid capture by 2 previous decls
 template <typename T1, typename T2>
 struct value_copier<Optional<T1>, Optional<T2>> {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     Optional<T2> operator()(Optional<T1> from_value, bool)
     {
         return from_value;
@@ -241,7 +237,7 @@ struct value_copier<Timestamp, Timestamp> {
         return from_value;
     }
 };
-}
+} // namespace
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -292,7 +288,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        table->add_column(type_String, "name", true); // nullable = true
+        table->add_column(col_type_String, "name", true); // nullable = true
         Obj obj = table->create_object();
 
         CHECK(obj.get<String>("name").is_null());
@@ -303,7 +299,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        auto col = table->add_column(type_String, "name");
+        auto col = table->add_column(col_type_String, "name");
         CHECK(!table->is_nullable(col));
 
         Obj obj = table->create_object();
@@ -317,7 +313,7 @@ TEST(Table_Null)
         // Check that add_empty_row() adds null integer as default
         Group group;
         TableRef table = group.add_table("table");
-        auto col = table->add_column(type_Int, "age", true /*nullable*/);
+        auto col = table->add_column(col_type_Int, "age", true /*nullable*/);
         CHECK(table->is_nullable(col));
 
         Obj obj = table->create_object();
@@ -333,7 +329,7 @@ TEST(Table_Null)
         // Check that add_empty_row() adds 0 integer as default.
         Group group;
         TableRef table = group.add_table("test");
-        auto col = table->add_column(type_Int, "age");
+        auto col = table->add_column(col_type_Int, "age");
         CHECK(!table->is_nullable(col));
 
         Obj obj = table->create_object();
@@ -349,7 +345,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        auto col = table->add_column(type_Binary, "bin", true /*nullable*/);
+        auto col = table->add_column(col_type_Binary, "bin", true /*nullable*/);
         CHECK(table->is_nullable(col));
 
         Obj obj = table->create_object();
@@ -361,7 +357,7 @@ TEST(Table_Null)
         Group group;
         TableRef table = group.add_table("test");
 
-        auto col = table->add_column(type_Binary, "name");
+        auto col = table->add_column(col_type_Binary, "name");
         CHECK(!table->is_nullable(col));
 
         Obj obj = table->create_object();
@@ -377,7 +373,7 @@ TEST(Table_Null)
         TableRef target = group.add_table("target");
         TableRef table = group.add_table("table");
 
-        auto col_int = target->add_column(type_Int, "int");
+        auto col_int = target->add_column(col_type_Int, "int");
         auto col_link = table->add_column(*target, "link");
         CHECK(table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
@@ -389,7 +385,7 @@ TEST(Table_Null)
         TableRef target = group.add_table("target");
         TableRef table = group.add_table("table");
 
-        auto col_int = target->add_column(type_Int, "int");
+        auto col_int = target->add_column(col_type_Int, "int");
         auto col_link = table->add_column_list(*target, "link");
         CHECK(!table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
@@ -401,8 +397,8 @@ TEST(Table_DeleteCrash)
     Group group;
     TableRef table = group.add_table("test");
 
-    table->add_column(type_String, "name");
-    table->add_column(type_Int, "age");
+    table->add_column(col_type_String, "name");
+    table->add_column(col_type_Int, "age");
 
     ObjKey k0 = table->create_object().set_all("Alice", 17).get_key();
     ObjKey k1 = table->create_object().set_all("Bob", 50).get_key();
@@ -417,8 +413,8 @@ TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
     Table ttt;
-    ttt.add_column(type_Int, "first");
-    auto col = ttt.add_column(type_String, "second");
+    ttt.add_column(col_type_Int, "first");
+    auto col = ttt.add_column(col_type_String, "second");
     ttt.enumerate_string_column(col);
     ttt.add_search_index(col);
     ttt.clear();
@@ -430,11 +426,11 @@ TEST(Table_DateTimeMinMax)
     Group g;
     TableRef table = g.add_table("test_table");
 
-    auto col = table->add_column(type_Timestamp, "time", true);
+    auto col = table->add_column(col_type_Timestamp, "time", true);
 
-    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
-    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
-    // permutations in total.
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best
+    // candidate", then non-null first. For each case we then try both a substitution of best candidate, then
+    // non-substitution. 4 permutations in total.
 
     std::vector<Obj> objs(3);
     objs[0] = table->create_object();
@@ -483,9 +479,9 @@ TEST(Table_MinMaxSingleNullRow)
     Group g;
     TableRef table = g.add_table("test_table");
 
-    auto date_col = table->add_column(type_Timestamp, "time", true);
-    auto int_col = table->add_column(type_Int, "int", true);
-    auto float_col = table->add_column(type_Float, "float", true);
+    auto date_col = table->add_column(col_type_Timestamp, "time", true);
+    auto int_col = table->add_column(col_type_Int, "int", true);
+    auto float_col = table->add_column(col_type_Float, "float", true);
     table->create_object();
 
     ObjKey key;
@@ -518,8 +514,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->maximum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().maximum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->maximum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().maximum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -550,8 +546,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->minimum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().minimum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->minimum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().minimum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -564,8 +560,8 @@ TEST(TableView_AggregateBugs)
     // Tests against various aggregate bugs on TableViews: https://github.com/realm/realm-core/pull/2360
     {
         Table table;
-        auto int_col = table.add_column(type_Int, "ints", true);
-        auto double_col = table.add_column(type_Double, "doubles", true);
+        auto int_col = table.add_column(col_type_Int, "ints", true);
+        auto double_col = table.add_column(col_type_Double, "doubles", true);
 
         table.create_object().set_all(1, 1.);
         table.create_object().set_all(2, 2.);
@@ -621,7 +617,7 @@ TEST(TableView_AggregateBugs)
     // Same as above, with null entry first
     {
         Table table;
-        auto int_col = table.add_column(type_Int, "ints", true);
+        auto int_col = table.add_column(col_type_Int, "ints", true);
 
         table.create_object();
         table.create_object().set_all(1);
@@ -650,14 +646,13 @@ TEST(TableView_AggregateBugs)
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
-    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
-    {
+    for (int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++) {
         Group g;
         TableRef table = g.add_table("test_table");
 
-        auto date_col = table->add_column(type_Timestamp, "time", true);
-        auto int_col = table->add_column(type_Int, "int", true);
-        auto float_col = table->add_column(type_Float, "float", true);
+        auto date_col = table->add_column(col_type_Timestamp, "time", true);
+        auto int_col = table->add_column(col_type_Int, "int", true);
+        auto float_col = table->add_column(col_type_Float, "float", true);
 
         size_t rows = size_t(fastrand(10));
         std::vector<ObjKey> keys;
@@ -830,7 +825,6 @@ TEST(Table_AggregateFuzz)
 
             i = table->where().find_all().sum_int(int_col);
             CHECK_EQUAL(i, sum);
-
         }
 
         // Test methods on Query
@@ -910,13 +904,14 @@ TEST(Table_ColumnNameTooLong)
     const size_t buf_size = 64;
     char buf[buf_size];
     memset(buf, 'A', buf_size);
-    CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column(col_type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column_list(col_type_Int, StringData(buf, buf_size)),
+                      LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), LogicError::column_name_too_long);
 
-    table->add_column(type_Int, StringData(buf, buf_size - 1));
+    table->add_column(col_type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'B', buf_size); // Column names must be unique
-    table->add_column_list(type_Int, StringData(buf, buf_size - 1));
+    table->add_column_list(col_type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'C', buf_size);
     table->add_column(*table, StringData(buf, buf_size - 1));
 }
@@ -924,8 +919,8 @@ TEST(Table_ColumnNameTooLong)
 TEST(Table_StringOrBinaryTooBig)
 {
     Table table;
-    auto col_string = table.add_column(type_String, "s");
-    auto col_binary = table.add_column(type_Binary, "b");
+    auto col_string = table.add_column(col_type_String, "s");
+    auto col_binary = table.add_column(col_type_Binary, "b");
     Obj obj = table.create_object();
 
     obj.set(col_string, "01234567");
@@ -943,11 +938,11 @@ TEST(Table_StringOrBinaryTooBig)
 TEST(Table_Floats)
 {
     Table table;
-    auto float_col = table.add_column(type_Float, "first");
-    auto double_col = table.add_column(type_Double, "second");
+    auto float_col = table.add_column(col_type_Float, "first");
+    auto double_col = table.add_column(col_type_Double, "second");
 
-    CHECK_EQUAL(type_Float, table.get_column_type(float_col));
-    CHECK_EQUAL(type_Double, table.get_column_type(double_col));
+    CHECK_EQUAL(col_type_Float, table.get_column_type(float_col));
+    CHECK_EQUAL(col_type_Double, table.get_column_type(double_col));
     CHECK_EQUAL("first", table.get_column_name(float_col));
     CHECK_EQUAL("second", table.get_column_name(double_col));
 
@@ -980,7 +975,7 @@ TEST(Table_Delete)
 {
     Table table;
 
-    auto col_int = table.add_column(type_Int, "ints");
+    auto col_int = table.add_column(col_type_Int, "ints");
 
     for (int i = 0; i < 10; ++i) {
         table.create_object(ObjKey(i)).set(col_int, i);
@@ -1049,16 +1044,16 @@ namespace {
 void setup_multi_table(Table& table, size_t rows, std::vector<ObjKey>& keys, std::vector<ColKey>& column_keys)
 {
     // Create table with all column types
-    auto int_col = table.add_column(type_Int, "int");                        //  0
-    auto bool_col = table.add_column(type_Bool, "bool");                     //  1
-    auto float_col = table.add_column(type_Float, "float");                  //  2
-    auto double_col = table.add_column(type_Double, "double");               //  3
-    auto string_col = table.add_column(type_String, "string");               //  4
-    auto string_long_col = table.add_column(type_String, "string_long");     //  5
-    auto string_big_col = table.add_column(type_String, "string_big_blobs"); //  6
-    auto string_enum_col = table.add_column(type_String, "string_enum");     //  7 - becomes StringEnumColumn
-    auto bin_col = table.add_column(type_Binary, "binary");                  //  8
-    auto int_null_col = table.add_column(type_Int, "int_null", true);        //  9, nullable = true
+    auto int_col = table.add_column(col_type_Int, "int");                        //  0
+    auto bool_col = table.add_column(col_type_Bool, "bool");                     //  1
+    auto float_col = table.add_column(col_type_Float, "float");                  //  2
+    auto double_col = table.add_column(col_type_Double, "double");               //  3
+    auto string_col = table.add_column(col_type_String, "string");               //  4
+    auto string_long_col = table.add_column(col_type_String, "string_long");     //  5
+    auto string_big_col = table.add_column(col_type_String, "string_big_blobs"); //  6
+    auto string_enum_col = table.add_column(col_type_String, "string_enum");     //  7 - becomes StringEnumColumn
+    auto bin_col = table.add_column(col_type_Binary, "binary");                  //  8
+    auto int_null_col = table.add_column(col_type_Int, "int_null", true);        //  9, nullable = true
     column_keys.push_back(int_col);
     column_keys.push_back(bool_col);
     column_keys.push_back(float_col);
@@ -1187,7 +1182,7 @@ TEST(Table_FindAllInt)
 {
     Table table;
 
-    auto col_int = table.add_column(type_Int, "integers");
+    auto col_int = table.add_column(col_type_Int, "integers");
 
     table.create_object(ObjKey(0)).set(col_int, 10);
     table.create_object(ObjKey(1)).set(col_int, 20);
@@ -1223,7 +1218,7 @@ TEST(Table_SortedInt)
 {
     Table table;
 
-    auto col_int = table.add_column(type_Int, "integers");
+    auto col_int = table.add_column(col_type_Int, "integers");
 
     table.create_object(ObjKey(0)).set(col_int, 10); // 0: 4
     table.create_object(ObjKey(1)).set(col_int, 20); // 1: 7
@@ -1261,9 +1256,9 @@ TEST(Table_Sorted_Query_where)
 {
     Table table;
 
-    auto col_dummy = table.add_column(type_Int, "dummmy");
-    auto col_int = table.add_column(type_Int, "integers");
-    auto col_bool = table.add_column(type_Bool, "booleans");
+    auto col_dummy = table.add_column(col_type_Int, "dummmy");
+    auto col_int = table.add_column(col_type_Int, "integers");
+    auto col_bool = table.add_column(col_type_Bool, "booleans");
 
     table.create_object(ObjKey(0)).set(col_int, 10).set(col_bool, true);  // 0: 4
     table.create_object(ObjKey(1)).set(col_int, 20).set(col_bool, false); // 1: 7
@@ -1323,7 +1318,7 @@ inline bool isnan(Decimal128 val)
 TEST_TYPES(Table_SortFloat, float, double, Decimal128)
 {
     Table table;
-    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+    ColumnType type = ColumnTypeTraits<TEST_TYPE>::column_id;
     auto col = table.add_column(type, "value", true);
     ObjKeys keys;
     table.create_objects(900, keys);
@@ -1353,8 +1348,8 @@ TEST_TYPES(Table_SortFloat, float, double, Decimal128)
 TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
 {
     Table table;
-    auto col_0 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "first");
-    auto col_1 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "second");
+    auto col_0 = table.add_column(ColumnTypeTraits<TEST_TYPE>::column_id, "first");
+    auto col_1 = table.add_column(ColumnTypeTraits<TEST_TYPE>::column_id, "second");
 
     table.create_object(ObjKey(0)).set_all(TEST_TYPE(1), TEST_TYPE(10));
     table.create_object(ObjKey(1)).set_all(TEST_TYPE(2), TEST_TYPE(10));
@@ -1389,8 +1384,8 @@ TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
 TEST(Table_IndexString)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "first");
-    auto col_str = table.add_column(type_String, "second");
+    auto col_int = table.add_column(col_type_Int, "first");
+    auto col_str = table.add_column(col_type_String, "second");
 
     table.add_search_index(col_str);
     CHECK(table.has_search_index(col_str));
@@ -1427,8 +1422,8 @@ TEST(Table_IndexString)
 TEST(Table_IndexStringTwice)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    auto col_str = table.add_column(type_String, "second");
+    table.add_column(col_type_Int, "first");
+    auto col_str = table.add_column(col_type_String, "second");
 
     table.create_object().set_all(int(Mon), "jeff");
     table.create_object().set_all(int(Tue), "jim");
@@ -1453,9 +1448,9 @@ TEST(Table_IndexInteger)
     Table table;
     ObjKey k;
 
-    auto col_int = table.add_column(type_Int, "ints");
-    auto col_date = table.add_column(type_Timestamp, "date");
-    auto col_bool = table.add_column(type_Bool, "booleans");
+    auto col_int = table.add_column(col_type_Int, "ints");
+    auto col_date = table.add_column(col_type_Timestamp, "date");
+    auto col_bool = table.add_column(col_type_Bool, "booleans");
 
     std::vector<ObjKey> keys;
     table.create_objects(13, keys);
@@ -1513,8 +1508,8 @@ TEST(Table_IndexInteger)
 TEST(Table_AddInt)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "i");
-    auto col_int_null = t.add_column(type_Int, "ni", /*nullable*/ true);
+    auto col_int = t.add_column(col_type_Int, "i");
+    auto col_int_null = t.add_column(col_type_Int, "ni", /*nullable*/ true);
     Obj obj = t.create_object();
 
     obj.add_int(col_int, 1);
@@ -1535,7 +1530,7 @@ TEST(Table_AddInt)
 TEST(Table_AddIntIndexed)
 {
     Table table;
-    auto col = table.add_column(DataType(0), "int_1", false);
+    auto col = table.add_column(ColumnType(0), "int_1", false);
     Obj obj = table.create_object();
     table.add_search_index(col);
     obj.add_int(col, 8463800223514590069);
@@ -1545,7 +1540,7 @@ TEST(Table_AddIntIndexed)
 TEST(Table_IndexInt)
 {
     Table table;
-    auto col = table.add_column(type_Int, "first");
+    auto col = table.add_column(col_type_Int, "first");
 
     ObjKey k0 = table.create_object().set(col, 1).get_key();
     ObjKey k1 = table.create_object().set(col, 15).get_key();
@@ -1634,8 +1629,8 @@ TEST(Table_AutoEnumeration)
 {
     Table table;
 
-    auto col_int = table.add_column(type_Int, "first");
-    auto col_str = table.add_column(type_String, "second");
+    auto col_int = table.add_column(col_type_Int, "first");
+    auto col_str = table.add_column(col_type_String, "second");
 
     for (size_t i = 0; i < 5; ++i) {
         table.create_object().set_all(1, "abd");
@@ -1694,10 +1689,10 @@ TEST(Table_AutoEnumeration)
 TEST(Table_AutoEnumerationOptimize)
 {
     Table t;
-    auto col0 = t.add_column(type_String, "col1");
-    auto col1 = t.add_column(type_String, "col2");
-    auto col2 = t.add_column(type_String, "col3");
-    auto col3 = t.add_column(type_String, "col4");
+    auto col0 = t.add_column(col_type_String, "col1");
+    auto col1 = t.add_column(col_type_String, "col2");
+    auto col2 = t.add_column(col_type_String, "col3");
+    auto col3 = t.add_column(col_type_String, "col4");
 
     // Insert non-optimizable strings
     std::string s;
@@ -1741,8 +1736,8 @@ TEST(Table_AutoEnumerationOptimize)
 TEST(Table_OptimizeCompare)
 {
     Table t1, t2;
-    auto col_t1 = t1.add_column(type_String, "str");
-    auto col_t2 = t2.add_column(type_String, "str");
+    auto col_t1 = t1.add_column(col_type_String, "str");
+    auto col_t2 = t2.add_column(col_type_String, "str");
 
     std::vector<ObjKey> keys_t1;
     std::vector<ObjKey> keys_t2;
@@ -1775,10 +1770,10 @@ TEST(Table_SlabAlloc)
     alloc.attach_empty();
     Table table(alloc);
 
-    auto col_int0 = table.add_column(type_Int, "int0");
-    auto col_int1 = table.add_column(type_Int, "int1");
-    auto col_bool = table.add_column(type_Bool, "bool");
-    auto col_int2 = table.add_column(type_Int, "int2");
+    auto col_int0 = table.add_column(col_type_Int, "int0");
+    auto col_int1 = table.add_column(col_type_Int, "int1");
+    auto col_bool = table.add_column(col_type_Bool, "bool");
+    auto col_int2 = table.add_column(col_type_Int, "int2");
 
     Obj obj = table.create_object().set_all(0, 10, true, int(Wed));
     CHECK_EQUAL(0, obj.get<Int>(col_int0));
@@ -1806,7 +1801,7 @@ TEST(Table_NullInEnum)
 {
     Group group;
     TableRef table = group.add_table("test");
-    auto col = table->add_column(type_String, "second", true);
+    auto col = table->add_column(col_type_String, "second", true);
 
     for (size_t c = 0; c < 100; c++) {
         table->create_object().set(col, "hello");
@@ -1855,8 +1850,8 @@ TEST(Table_NullInEnum)
 TEST(Table_DateAndBinary)
 {
     Table t;
-    auto col_date = t.add_column(type_Timestamp, "date");
-    auto col_bin = t.add_column(type_Binary, "bin");
+    auto col_date = t.add_column(col_type_Timestamp, "date");
+    auto col_bin = t.add_column(col_type_Binary, "bin");
 
     const size_t size = 10;
     char data[size];
@@ -1884,11 +1879,11 @@ TEST(Table_DateAndBinary)
 TEST(Table_Aggregates)
 {
     Table table;
-    auto int_col = table.add_column(type_Int, "c_int");
-    auto float_col = table.add_column(type_Float, "c_float");
-    auto double_col = table.add_column(type_Double, "c_double");
-    auto str_col = table.add_column(type_String, "c_string");
-    auto decimal_col = table.add_column(type_Decimal, "c_decimal");
+    auto int_col = table.add_column(col_type_Int, "c_int");
+    auto float_col = table.add_column(col_type_Float, "c_float");
+    auto double_col = table.add_column(col_type_Double, "c_double");
+    auto str_col = table.add_column(col_type_String, "c_string");
+    auto decimal_col = table.add_column(col_type_Decimal, "c_decimal");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
@@ -1975,7 +1970,7 @@ TEST(Table_Aggregates)
 TEST(Table_Aggregates2)
 {
     Table table;
-    auto int_col = table.add_column(type_Int, "c_count");
+    auto int_col = table.add_column(col_type_Int, "c_count");
     int c = -420;
     int s = 0;
     while (c < -20) {
@@ -2003,10 +1998,10 @@ TEST(Table_Aggregates3)
         Group g;
         TableRef table = g.add_table("Inventory");
 
-        auto col_price = table->add_column(type_Int, "Price", nullable);
-        auto col_shipping = table->add_column(type_Float, "Shipping", nullable);
-        auto col_rating = table->add_column(type_Double, "Rating", nullable);
-        auto col_date = table->add_column(type_Timestamp, "Delivery date", nullable);
+        auto col_price = table->add_column(col_type_Int, "Price", nullable);
+        auto col_shipping = table->add_column(col_type_Float, "Shipping", nullable);
+        auto col_rating = table->add_column(col_type_Double, "Rating", nullable);
+        auto col_date = table->add_column(col_type_Timestamp, "Delivery date", nullable);
 
         Obj obj0 = table->create_object(ObjKey(0));
         Obj obj1 = table->create_object(ObjKey(1));
@@ -2155,7 +2150,7 @@ TEST(Table_EmptyMinmax)
 {
     Group g;
     TableRef table = g.add_table("");
-    auto col = table->add_column(type_Timestamp, "date");
+    auto col = table->add_column(col_type_Timestamp, "date");
 
     ObjKey min_key;
     Timestamp min_ts = table->minimum_timestamp(col, &min_key);
@@ -2171,7 +2166,7 @@ TEST(Table_EmptyMinmax)
 TEST(Table_EnumStringInsertEmptyRow)
 {
     Table table;
-    auto col_str = table.add_column(type_String, "strings");
+    auto col_str = table.add_column(col_type_String, "strings");
     for (int i = 0; i < 128; ++i)
         table.create_object().set(col_str, "foo");
 
@@ -2188,9 +2183,9 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
     std::vector<ObjKey> keys;
-    table.add_column(type_Int, "int0");
+    table.add_column(col_type_Int, "int0");
     table.create_objects(REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1, keys);
-    table.add_column(type_Int, "int1");
+    table.add_column(col_type_Int, "int1");
     table.verify();
 }
 
@@ -2198,7 +2193,7 @@ TEST(Table_DeleteObjectsInFirstCluster)
 {
     // Designed to exercise logic if cluster size is 4
     Table table;
-    table.add_column(type_Int, "int0");
+    table.add_column(col_type_Int, "int0");
 
     ObjKeys keys;
     table.create_objects(32, keys);
@@ -2223,7 +2218,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
     std::vector<ObjKey> keys;
-    table.add_column(type_String, "strings");
+    table.add_column(col_type_String, "strings");
     table.create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
     table.clear();
     table.verify();
@@ -2232,7 +2227,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 TEST(Table_IndexStringDelete)
 {
     Table t;
-    auto col = t.add_column(type_String, "str");
+    auto col = t.add_column(col_type_String, "str");
     t.add_search_index(col);
 
     for (size_t i = 0; i < 1000; ++i) {
@@ -2254,18 +2249,19 @@ TEST(Table_NullableChecks)
     Table t;
     TableView tv;
     constexpr bool nullable = true;
-    auto str_col = t.add_column(type_String, "str", nullable);
-    auto int_col = t.add_column(type_Int, "int", nullable);
-    auto bool_col = t.add_column(type_Bool, "bool", nullable);
-    auto ts_col = t.add_column(type_Timestamp, "timestamp", nullable);
-    auto float_col = t.add_column(type_Float, "float", nullable);
-    auto double_col = t.add_column(type_Double, "double", nullable);
-    auto binary_col = t.add_column(type_Binary, "binary", nullable);
+    auto str_col = t.add_column(col_type_String, "str", nullable);
+    auto int_col = t.add_column(col_type_Int, "int", nullable);
+    auto bool_col = t.add_column(col_type_Bool, "bool", nullable);
+    auto ts_col = t.add_column(col_type_Timestamp, "timestamp", nullable);
+    auto float_col = t.add_column(col_type_Float, "float", nullable);
+    auto double_col = t.add_column(col_type_Double, "double", nullable);
+    auto binary_col = t.add_column(col_type_Binary, "binary", nullable);
 
     Obj obj = t.create_object();
     StringData sd; // construct a null reference
-    Timestamp ts; // null
-    BinaryData bd;; // null
+    Timestamp ts;  // null
+    BinaryData bd;
+    ; // null
     obj.set(str_col, sd);
     obj.set(int_col, realm::null());
     obj.set(bool_col, realm::null());
@@ -2306,7 +2302,7 @@ TEST(Table_Nulls)
     for (size_t round = 0; round < 5; round++) {
         Table t;
         TableView tv;
-        auto col_str = t.add_column(type_String, "str", true /*nullable*/);
+        auto col_str = t.add_column(col_type_String, "str", true /*nullable*/);
 
         if (round == 1)
             t.add_search_index(col_str);
@@ -2392,9 +2388,9 @@ TEST(Table_Nulls)
 
     {
         Table t;
-        auto col_int = t.add_column(type_Int, "int", true);         // nullable = true
-        auto col_bool = t.add_column(type_Bool, "bool", true);      // nullable = true
-        auto col_date = t.add_column(type_Timestamp, "date", true); // nullable = true
+        auto col_int = t.add_column(col_type_Int, "int", true);         // nullable = true
+        auto col_bool = t.add_column(col_type_Bool, "bool", true);      // nullable = true
+        auto col_date = t.add_column(col_type_Timestamp, "date", true); // nullable = true
 
         Obj obj0 = t.create_object();
         Obj obj1 = t.create_object();
@@ -2445,8 +2441,8 @@ TEST(Table_Nulls)
     }
     {
         Table t;
-        auto col_float = t.add_column(type_Float, "float", true);    // nullable = true
-        auto col_double = t.add_column(type_Double, "double", true); // nullable = true
+        auto col_float = t.add_column(col_type_Float, "float", true);    // nullable = true
+        auto col_double = t.add_column(col_type_Double, "double", true); // nullable = true
 
         Obj obj0 = t.create_object();
         Obj obj1 = t.create_object();
@@ -2518,7 +2514,7 @@ TEST(Table_AllocatorCapacityBug)
     {
         Table t;
         std::vector<ObjKey> keys;
-        auto col_bin = t.add_column(type_Binary, "Binaries", true);
+        auto col_bin = t.add_column(col_type_Binary, "Binaries", true);
 
         for (size_t j = 0; j < 100; j++) {
             size_t r = (j * 123456789 + 123456789) % 100;
@@ -2547,9 +2543,9 @@ TEST(Table_DetachedAccessor)
 {
     Group group;
     TableRef table = group.add_table("table");
-    auto col_int = table->add_column(type_Int, "i");
-    auto col_str = table->add_column(type_String, "s");
-    table->add_column(type_Binary, "b");
+    auto col_int = table->add_column(col_type_Int, "i");
+    auto col_str = table->add_column(col_type_String, "s");
+    table->add_column(col_type_Binary, "b");
     table->add_column(*table, "l");
     ObjKey key0 = table->create_object().get_key();
     Obj obj1 = table->create_object();
@@ -2569,7 +2565,7 @@ TEST(Table_addRowsToTableWithNoColumns)
 
     t->create_object();
     CHECK_EQUAL(t->size(), 1);
-    auto col = t->add_column(type_String, "str_col");
+    auto col = t->add_column(col_type_String, "str_col");
     t->create_object();
     CHECK_EQUAL(t->size(), 2);
     t->add_search_index(col);
@@ -2603,13 +2599,13 @@ TEST(Table_addRowsToTableWithNoColumns)
 TEST(Table_getVersionCounterAfterRowAccessor)
 {
     Table t;
-    auto col_bool = t.add_column(type_Bool, "bool", true);
-    auto col_int = t.add_column(type_Int, "int", true);
-    auto col_string = t.add_column(type_String, "string", true);
-    auto col_float = t.add_column(type_Float, "float", true);
-    auto col_double = t.add_column(type_Double, "double", true);
-    auto col_binary = t.add_column(type_Binary, "binary", true);
-    auto col_date = t.add_column(type_Timestamp, "timestamp", true);
+    auto col_bool = t.add_column(col_type_Bool, "bool", true);
+    auto col_int = t.add_column(col_type_Int, "int", true);
+    auto col_string = t.add_column(col_type_String, "string", true);
+    auto col_float = t.add_column(col_type_Float, "float", true);
+    auto col_double = t.add_column(col_type_Double, "double", true);
+    auto col_binary = t.add_column(col_type_Binary, "binary", true);
+    auto col_date = t.add_column(col_type_Timestamp, "timestamp", true);
 
     Obj obj = t.create_object();
 
@@ -2651,8 +2647,8 @@ TEST(Table_getVersionCounterAfterRowAccessor)
 TEST(Table_object_basic)
 {
     Table table;
-    auto int_col = table.add_column(type_Int, "int");
-    auto intnull_col = table.add_column(type_Int, "intnull", true);
+    auto int_col = table.add_column(col_type_Int, "int");
+    auto intnull_col = table.add_column(col_type_Int, "intnull", true);
 
     char data[10];
     memset(data, 0x5a, 10);
@@ -2683,8 +2679,8 @@ TEST(Table_object_basic)
     CHECK(y.is_null(intnull_col));
 
     // Boolean
-    auto bool_col = table.add_column(type_Bool, "bool");
-    auto boolnull_col = table.add_column(type_Bool, "boolnull", true);
+    auto bool_col = table.add_column(col_type_Bool, "bool");
+    auto boolnull_col = table.add_column(col_type_Bool, "boolnull", true);
     y.set(bool_col, true);
     y.set(boolnull_col, false);
 
@@ -2701,8 +2697,8 @@ TEST(Table_object_basic)
     CHECK(y.is_null(boolnull_col));
 
     // Float
-    auto float_col = table.add_column(type_Float, "float");
-    auto floatnull_col = table.add_column(type_Float, "floatnull", true);
+    auto float_col = table.add_column(col_type_Float, "float");
+    auto floatnull_col = table.add_column(col_type_Float, "floatnull", true);
     y.set(float_col, 2.7182818f);
     y.set(floatnull_col, 3.1415927f);
 
@@ -2717,8 +2713,8 @@ TEST(Table_object_basic)
     CHECK(y.is_null(floatnull_col));
 
     // Double
-    auto double_col = table.add_column(type_Double, "double");
-    auto doublenull_col = table.add_column(type_Double, "doublenull", true);
+    auto double_col = table.add_column(col_type_Double, "double");
+    auto doublenull_col = table.add_column(col_type_Double, "doublenull", true);
     y.set(double_col, 2.718281828459045);
     y.set(doublenull_col, 3.141592653589793);
 
@@ -2733,8 +2729,8 @@ TEST(Table_object_basic)
     CHECK(y.is_null(doublenull_col));
 
     // String
-    auto str_col = table.add_column(type_String, "str");
-    auto strnull_col = table.add_column(type_String, "strnull", true);
+    auto str_col = table.add_column(col_type_String, "str");
+    auto strnull_col = table.add_column(col_type_String, "strnull", true);
     y.set(str_col, "Hello");
     y.set(strnull_col, "World");
 
@@ -2754,8 +2750,8 @@ TEST(Table_object_basic)
     CHECK(!y.is_null(str_col));
 
     // Binary
-    auto bin_col = table.add_column(type_Binary, "bin");
-    auto binnull_col = table.add_column(type_Binary, "binnull", true);
+    auto bin_col = table.add_column(col_type_Binary, "bin");
+    auto binnull_col = table.add_column(col_type_Binary, "binnull", true);
     y.set(bin_col, bin_data);
     y.set(binnull_col, bin_data);
 
@@ -2780,8 +2776,8 @@ TEST(Table_object_basic)
     CHECK(!y.is_null(bin_col));
 
     // Timestamp
-    auto ts_col = table.add_column(type_Timestamp, "ts");
-    auto tsnull_col = table.add_column(type_Timestamp, "tsnull", true);
+    auto ts_col = table.add_column(col_type_Timestamp, "ts");
+    auto tsnull_col = table.add_column(col_type_Timestamp, "tsnull", true);
     y.set(ts_col, Timestamp(123, 456));
     y.set(tsnull_col, Timestamp(789, 10));
 
@@ -2823,9 +2819,9 @@ TEST(Table_ObjectsWithNoColumns)
 TEST(Table_remove_column)
 {
     Table table;
-    table.add_column(type_Int, "int1");
-    auto int2_col = table.add_column(type_Int, "int2");
-    table.add_column(type_Int, "int3");
+    table.add_column(col_type_Int, "int1");
+    auto int2_col = table.add_column(col_type_Int, "int2");
+    table.add_column(col_type_Int, "int3");
 
     Obj obj = table.create_object(ObjKey(5)).set_all(100, 7, 25);
 
@@ -2838,14 +2834,14 @@ TEST(Table_remove_column)
     CHECK_EQUAL(obj.get<int64_t>("int1"), 100);
     CHECK_THROW(obj.get<int64_t>("int2"), LogicError);
     CHECK_EQUAL(obj.get<int64_t>("int3"), 25);
-    table.add_column(type_Int, "int4");
+    table.add_column(col_type_Int, "int4");
     CHECK_EQUAL(obj.get<int64_t>("int4"), 0);
 }
 
 TEST(Table_list_basic)
 {
     Table table;
-    auto list_col = table.add_column_list(type_Int, "int_list");
+    auto list_col = table.add_column_list(col_type_Int, "int_list");
     int sum = 0;
 
     {
@@ -2926,7 +2922,7 @@ struct NullableTypeConverter<Decimal128> {
 TEST_TYPES(Table_list_nullable, int64_t, float, double, Decimal128)
 {
     Table table;
-    auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
+    auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::column_id, "int_list", true);
     ColumnSumType<TEST_TYPE> sum = TEST_TYPE(0);
 
     {
@@ -2988,7 +2984,7 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal>, P
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
     Table table;
-    ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    ColKey col = table.add_column_list(TEST_TYPE::column_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
@@ -3036,11 +3032,11 @@ TEST(Table_ListOfPrimitives)
     Group g;
     std::vector<CollectionBase*> lists;
     TableRef t = g.add_table("table");
-    ColKey int_col = t->add_column_list(type_Int, "integers");
-    ColKey bool_col = t->add_column_list(type_Bool, "booleans");
-    ColKey string_col = t->add_column_list(type_String, "strings");
-    ColKey double_col = t->add_column_list(type_Double, "doubles");
-    ColKey timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    ColKey int_col = t->add_column_list(col_type_Int, "integers");
+    ColKey bool_col = t->add_column_list(col_type_Bool, "booleans");
+    ColKey string_col = t->add_column_list(col_type_String, "strings");
+    ColKey double_col = t->add_column_list(col_type_Double, "doubles");
+    ColKey timestamp_col = t->add_column_list(col_type_Timestamp, "timestamps");
     Obj obj = t->create_object(ObjKey(7));
 
     std::vector<int64_t> integer_vector = {1, 2, 3, 4};
@@ -3171,7 +3167,7 @@ TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>,
     TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    ColKey col = t->add_column_list(TEST_TYPE::column_type, "values", TEST_TYPE::is_nullable);
 
     auto obj = t->create_object();
     auto list = obj.get_list<type>(col);
@@ -3223,7 +3219,7 @@ TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<doub
     TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    ColKey col = t->add_column_list(TEST_TYPE::column_type, "values", TEST_TYPE::is_nullable);
 
     auto obj = t->create_object();
     auto list = obj.get_list<type>(col);
@@ -3261,8 +3257,8 @@ TEST(Table_object_merge_nodes)
     int nb_rows = REALM_MAX_BPNODE_SIZE * 8;
     Table table;
     std::vector<int64_t> key_set;
-    auto c0 = table.add_column(type_Int, "int1");
-    auto c1 = table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(col_type_Int, "int1");
+    auto c1 = table.add_column(col_type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(ObjKey(i)).set_all(i << 1, i << 2);
@@ -3291,8 +3287,8 @@ TEST(Table_object_forward_iterator)
 {
     int nb_rows = 1024;
     Table table;
-    auto c0 = table.add_column(type_Int, "int1");
-    auto c1 = table.add_column(type_Int, "int2", true);
+    auto c0 = table.add_column(col_type_Int, "int1");
+    auto c1 = table.add_column(col_type_Int, "int2", true);
 
     for (int i = 0; i < nb_rows; i++) {
         table.create_object(ObjKey(i));
@@ -3381,7 +3377,7 @@ TEST(Table_object_by_index)
 TEST(Table_QuickSort2)
 {
     Table ttt;
-    auto strings = ttt.add_column(type_String, "2");
+    auto strings = ttt.add_column(col_type_String, "2");
 
     for (size_t t = 0; t < 1000; t++) {
         Obj o = ttt.create_object();
@@ -3432,8 +3428,8 @@ TEST(Table_object_sequential)
         WriteTransaction wt(sg);
         auto table = wt.add_table("test");
 
-        c0 = table->add_column(type_Int, "int1");
-        c1 = table->add_column(type_Int, "int2", true);
+        c0 = table->add_column(col_type_Int, "int1");
+        c1 = table->add_column(col_type_Int, "int2", true);
 
 
         auto t1 = steady_clock::now();
@@ -3563,7 +3559,7 @@ TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
     size_t rows = 1'000'000;
-    int runs = 100;     // runs for building scenario
+    int runs = 100; // runs for building scenario
 #else
     size_t rows = 100'000;
     int runs = 100;
@@ -3579,7 +3575,7 @@ TEST(Table_object_seq_rnd)
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
         WriteTransaction wt(sg);
         auto table = wt.add_table("test");
-        c0 = table->add_column(type_Int, "int1");
+        c0 = table->add_column(col_type_Int, "int1");
 
         for (int run = 0; run < runs; ++run) {
             if (key_values.size() < rows) { // expanding by 2%!
@@ -3714,8 +3710,8 @@ TEST(Table_object_random)
         WriteTransaction wt(sg);
         auto table = wt.add_table("test");
 
-        c0 = table->add_column(type_Int, "int1");
-        c1 = table->add_column(type_Int, "int2", true);
+        c0 = table->add_column(col_type_Int, "int1");
+        c1 = table->add_column(col_type_Int, "int2", true);
 
 
         auto t1 = steady_clock::now();
@@ -3860,7 +3856,7 @@ TEST(Table_CollisionMapping)
         DBRef sg = DB::create(path);
         {
             auto wt = sg->start_write();
-            TableRef t0 = wt->add_table_with_primary_key("class_t0", type_String, "pk");
+            TableRef t0 = wt->add_table_with_primary_key("class_t0", col_type_String, "pk");
 
             char buffer[12];
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
@@ -3939,7 +3935,7 @@ TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
     DBRef sg = DB::create(path);
 
     auto wt = sg->start_write();
-    TableRef string_table = wt->add_table_with_primary_key("string pk", type_String, "pk", true);
+    TableRef string_table = wt->add_table_with_primary_key("string pk", col_type_String, "pk", true);
 
     bool did_create = false;
     string_table->create_object_with_primary_key(StringData("1"), &did_create);
@@ -3953,7 +3949,7 @@ TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
     string_table->create_object_with_primary_key(StringData(), &did_create);
     CHECK_NOT(did_create);
 
-    TableRef int_table = wt->add_table_with_primary_key("int pk", type_Int, "pk", true);
+    TableRef int_table = wt->add_table_with_primary_key("int pk", col_type_Int, "pk", true);
 
     did_create = false;
     int_table->create_object_with_primary_key(1, &did_create);
@@ -3973,7 +3969,7 @@ TEST(Table_PrimaryKeyIndexBug)
     Group g;
     TableRef table = g.add_table("table");
     TableRef origin = g.add_table("origin");
-    auto col_id = table->add_column(type_String, "id");
+    auto col_id = table->add_column(col_type_String, "id");
     auto col_link = origin->add_column(*table, "link");
     table->add_search_index(col_id);
     // Create an object where bit 62 is set in the ObkKey
@@ -3996,7 +3992,7 @@ TEST(Table_PrimaryKeyString)
 
     DBRef sg = DB::create(path);
     auto wt = sg->start_write();
-    TableRef t0 = wt->add_table_with_primary_key("class_t0", type_String, "pk");
+    TableRef t0 = wt->add_table_with_primary_key("class_t0", col_type_String, "pk");
     auto pk_col = t0->get_primary_key_column();
 
     auto t1 = steady_clock::now();
@@ -4032,10 +4028,10 @@ TEST(Table_3)
 {
     Table table;
 
-    auto col_int0 = table.add_column(type_Int, "first");
-    auto col_int1 = table.add_column(type_Int, "second");
-    auto col_bool2 = table.add_column(type_Bool, "third");
-    auto col_int3 = table.add_column(type_Int, "fourth");
+    auto col_int0 = table.add_column(col_type_Int, "first");
+    auto col_int1 = table.add_column(col_type_Int, "second");
+    auto col_bool2 = table.add_column(col_type_Bool, "third");
+    auto col_int3 = table.add_column(col_type_Int, "fourth");
 
     for (int64_t i = 0; i < 100; ++i) {
         table.create_object(ObjKey(i)).set_all(i, 10, true, int(Wed));
@@ -4061,7 +4057,7 @@ TEST(Table_3)
 TEST(Table_4)
 {
     Table table;
-    auto c0 = table.add_column(type_String, "strings");
+    auto c0 = table.add_column(col_type_String, "strings");
     const char* hello_hello = "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello";
 
     table.create_object(ObjKey(5)).set(c0, "Hello");
@@ -4083,14 +4079,14 @@ TEST(Table_SearchIndexFindFirst)
 {
     Table table;
 
-    auto c1 = table.add_column(type_Int, "a");
-    auto c2 = table.add_column(type_Int, "b", true);
-    auto c3 = table.add_column(type_String, "c");
-    auto c4 = table.add_column(type_String, "d", true);
-    auto c5 = table.add_column(type_Bool, "e");
-    auto c6 = table.add_column(type_Bool, "f", true);
-    auto c7 = table.add_column(type_Timestamp, "g");
-    auto c8 = table.add_column(type_Timestamp, "h", true);
+    auto c1 = table.add_column(col_type_Int, "a");
+    auto c2 = table.add_column(col_type_Int, "b", true);
+    auto c3 = table.add_column(col_type_String, "c");
+    auto c4 = table.add_column(col_type_String, "d", true);
+    auto c5 = table.add_column(col_type_Bool, "e");
+    auto c6 = table.add_column(col_type_Bool, "f", true);
+    auto c7 = table.add_column(col_type_Timestamp, "g");
+    auto c8 = table.add_column(col_type_Timestamp, "h", true);
 
     Obj o0 = table.create_object();
     Obj o1 = table.create_object();
@@ -4229,8 +4225,8 @@ TEST(Table_SearchIndexFindFirst)
 TEST(Table_SearchIndexFindAll)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "integers");
-    auto col_str = table.add_column(type_String, "strings");
+    auto col_int = table.add_column(col_type_Int, "integers");
+    auto col_str = table.add_column(col_type_String, "strings");
     // Add index before creating objects
     table.add_search_index(col_int);
     table.add_search_index(col_str);
@@ -4254,7 +4250,7 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
 {
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col0 = t->add_column(type_Int, "value", false);
+    ColKey col0 = t->add_column(col_type_Int, "value", false);
     ColKey col_link = t->add_column(*t, "link");
     t->add_search_index(col0);
 
@@ -4299,8 +4295,8 @@ TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
     TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col0 = t->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
-    ColKey col1 = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    ColKey col0 = t->add_column(TEST_TYPE::column_type, "value", TEST_TYPE::is_nullable);
+    ColKey col1 = t->add_column_list(TEST_TYPE::column_type, "values", TEST_TYPE::is_nullable);
     ColKey col_link = t->add_column(*t, "link");
 
     if constexpr (TEST_TYPE::is_indexed) {
@@ -4406,7 +4402,7 @@ struct Tester {
         }
     }
 
-    static void run(DBRef db, realm::DataType type)
+    static void run(DBRef db, realm::ColumnType type)
     {
         auto trans = db->start_write();
         auto table = trans->add_table("my_table");
@@ -4499,7 +4495,7 @@ struct Tester {
 
 template <class T, bool nullable>
 ColKey Tester<T, nullable>::col;
-}
+} // namespace
 
 // The run() method will first add lots of objects, and then remove them. This will test
 // both node splits and empty leaf destruction and get good search index code coverage
@@ -4513,41 +4509,41 @@ TEST(Table_search_index_fuzzer)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     auto db = DB::create(*hist);
-    Tester<bool, false>::run(db, type_Bool);
-    Tester<Optional<bool>, true>::run(db, type_Bool);
+    Tester<bool, false>::run(db, col_type_Bool);
+    Tester<Optional<bool>, true>::run(db, col_type_Bool);
 
-    Tester<int64_t, false>::run(db, type_Int);
-    Tester<Optional<int64_t>, true>::run(db, type_Int);
-
-    // Self-contained null state
-    Tester<Timestamp, false>::run(db, type_Timestamp);
-    Tester<Timestamp, true>::run(db, type_Timestamp);
+    Tester<int64_t, false>::run(db, col_type_Int);
+    Tester<Optional<int64_t>, true>::run(db, col_type_Int);
 
     // Self-contained null state
-    Tester<StringData, true>::run(db, type_String);
-    Tester<StringData, false>::run(db, type_String);
+    Tester<Timestamp, false>::run(db, col_type_Timestamp);
+    Tester<Timestamp, true>::run(db, col_type_Timestamp);
+
+    // Self-contained null state
+    Tester<StringData, true>::run(db, col_type_String);
+    Tester<StringData, false>::run(db, col_type_String);
 }
 
 TEST(Table_StaleColumnKey)
 {
     Table table;
 
-    auto col = table.add_column(type_Int, "age");
+    auto col = table.add_column(col_type_Int, "age");
 
     Obj obj = table.create_object();
     obj.set(col, 5);
 
     table.remove_column(col);
     // col is now obsolete
-    table.add_column(type_Int, "score");
+    table.add_column(col_type_Int, "score");
     CHECK_THROW_ANY(obj.get<Int>(col));
 }
 
 TEST(Table_KeysRow)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "int");
-    auto col_string = table.add_column(type_String, "string", true);
+    auto col_int = table.add_column(col_type_Int, "int");
+    auto col_string = table.add_column(col_type_String, "string", true);
     table.add_search_index(col_int);
     table.add_search_index(col_string);
 
@@ -4580,10 +4576,26 @@ std::string generate_value()
     return str;
 }
 
-template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
-template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
-template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
-template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+template <>
+bool generate_value()
+{
+    return test_util::random_int<int>() & 0x1;
+}
+template <>
+float generate_value()
+{
+    return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)));
+}
+template <>
+double generate_value()
+{
+    return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000));
+}
+template <>
+Timestamp generate_value()
+{
+    return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000));
+}
 template <>
 Decimal128 generate_value()
 {
@@ -4746,7 +4758,7 @@ struct generator<Optional<BinaryData>> {
 };
 
 template <typename T>
-void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+void test_lists(TestContext& test_context, DBRef sg, const realm::ColumnType type_id, bool optional = false)
 {
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
@@ -4805,31 +4817,31 @@ TEST(List_Ops)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_lists<int64_t>(test_context, sg, type_Int);
-    test_lists<StringData>(test_context, sg, type_String);
-    test_lists<BinaryData>(test_context, sg, type_Binary);
-    test_lists<bool>(test_context, sg, type_Bool);
-    test_lists<float>(test_context, sg, type_Float);
-    test_lists<double>(test_context, sg, type_Double);
-    test_lists<Timestamp>(test_context, sg, type_Timestamp);
-    test_lists<Decimal128>(test_context, sg, type_Decimal);
-    test_lists<ObjectId>(test_context, sg, type_ObjectId);
-    test_lists<UUID>(test_context, sg, type_UUID);
+    test_lists<int64_t>(test_context, sg, col_type_Int);
+    test_lists<StringData>(test_context, sg, col_type_String);
+    test_lists<BinaryData>(test_context, sg, col_type_Binary);
+    test_lists<bool>(test_context, sg, col_type_Bool);
+    test_lists<float>(test_context, sg, col_type_Float);
+    test_lists<double>(test_context, sg, col_type_Double);
+    test_lists<Timestamp>(test_context, sg, col_type_Timestamp);
+    test_lists<Decimal128>(test_context, sg, col_type_Decimal);
+    test_lists<ObjectId>(test_context, sg, col_type_ObjectId);
+    test_lists<UUID>(test_context, sg, col_type_UUID);
 
-    test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
-    test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
-    test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-    test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
-    test_lists<Optional<float>>(test_context, sg, type_Float, true);
-    test_lists<Optional<double>>(test_context, sg, type_Double, true);
-    test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
-    test_lists<Decimal128>(test_context, sg, type_Decimal, true);
-    test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
-    test_lists<Optional<UUID>>(test_context, sg, type_UUID, true);
+    test_lists<Optional<int64_t>>(test_context, sg, col_type_Int, true);
+    test_lists<StringData>(test_context, sg, col_type_String, true); // always Optional?
+    test_lists<BinaryData>(test_context, sg, col_type_Binary, true); // always Optional?
+    test_lists<Optional<bool>>(test_context, sg, col_type_Bool, true);
+    test_lists<Optional<float>>(test_context, sg, col_type_Float, true);
+    test_lists<Optional<double>>(test_context, sg, col_type_Double, true);
+    test_lists<Timestamp>(test_context, sg, col_type_Timestamp, true); // always Optional?
+    test_lists<Decimal128>(test_context, sg, col_type_Decimal, true);
+    test_lists<Optional<ObjectId>>(test_context, sg, col_type_ObjectId, true);
+    test_lists<Optional<UUID>>(test_context, sg, col_type_UUID, true);
 }
 
 template <typename T, typename U = T>
-void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::DataType type_id, U null_value = U{},
+void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::ColumnType type_id, U null_value = U{},
                             bool optional = false)
 {
     auto t = sg->start_write();
@@ -4921,15 +4933,15 @@ TEST(List_AggOps)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_lists_numeric_agg<int64_t>(test_context, sg, type_Int);
-    test_lists_numeric_agg<float>(test_context, sg, type_Float);
-    test_lists_numeric_agg<double>(test_context, sg, type_Double);
-    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal);
+    test_lists_numeric_agg<int64_t>(test_context, sg, col_type_Int);
+    test_lists_numeric_agg<float>(test_context, sg, col_type_Float);
+    test_lists_numeric_agg<double>(test_context, sg, col_type_Double);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, col_type_Decimal);
 
-    test_lists_numeric_agg<Optional<int64_t>>(test_context, sg, type_Int, Optional<int64_t>{}, true);
-    test_lists_numeric_agg<float>(test_context, sg, type_Float, realm::null::get_null_float<float>(), true);
-    test_lists_numeric_agg<double>(test_context, sg, type_Double, realm::null::get_null_float<double>(), true);
-    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
+    test_lists_numeric_agg<Optional<int64_t>>(test_context, sg, col_type_Int, Optional<int64_t>{}, true);
+    test_lists_numeric_agg<float>(test_context, sg, col_type_Float, realm::null::get_null_float<float>(), true);
+    test_lists_numeric_agg<double>(test_context, sg, col_type_Double, realm::null::get_null_float<double>(), true);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, col_type_Decimal, Decimal128(realm::null()), true);
 }
 
 TEST(List_DecimalMinMax)
@@ -4939,7 +4951,7 @@ TEST(List_DecimalMinMax)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
-    auto col = table->add_column_list(type_Decimal, "the column");
+    auto col = table->add_column_list(col_type_Decimal, "the column");
     Obj o = table->create_object();
     Lst<Decimal128> lst = o.get_list<Decimal128>(col);
     std::string larger_than_max_int64_t = "123.45e99";
@@ -4977,7 +4989,7 @@ void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::
 }
 
 template <typename T>
-void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+void test_tables(TestContext& test_context, DBRef sg, const realm::ColumnType type_id, bool optional = false)
 {
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
@@ -5035,38 +5047,38 @@ TEST(Table_Ops)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_tables<int64_t>(test_context, sg, type_Int);
-    test_tables<StringData>(test_context, sg, type_String);
-    test_tables<BinaryData>(test_context, sg, type_Binary);
-    test_tables<bool>(test_context, sg, type_Bool);
-    test_tables<float>(test_context, sg, type_Float);
-    test_tables<double>(test_context, sg, type_Double);
-    test_tables<Timestamp>(test_context, sg, type_Timestamp);
-    test_tables<Decimal128>(test_context, sg, type_Decimal);
-    test_tables<ObjectId>(test_context, sg, type_ObjectId);
-    test_tables<UUID>(test_context, sg, type_UUID);
+    test_tables<int64_t>(test_context, sg, col_type_Int);
+    test_tables<StringData>(test_context, sg, col_type_String);
+    test_tables<BinaryData>(test_context, sg, col_type_Binary);
+    test_tables<bool>(test_context, sg, col_type_Bool);
+    test_tables<float>(test_context, sg, col_type_Float);
+    test_tables<double>(test_context, sg, col_type_Double);
+    test_tables<Timestamp>(test_context, sg, col_type_Timestamp);
+    test_tables<Decimal128>(test_context, sg, col_type_Decimal);
+    test_tables<ObjectId>(test_context, sg, col_type_ObjectId);
+    test_tables<UUID>(test_context, sg, col_type_UUID);
 
-    test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
-    test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
-    test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-    test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
-    test_tables<Optional<float>>(test_context, sg, type_Float, true);
-    test_tables<Optional<double>>(test_context, sg, type_Double, true);
-    test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
-    test_tables<Decimal128>(test_context, sg, type_Decimal, true);
-    test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
-    test_tables<UUID>(test_context, sg, type_UUID, true);
+    test_tables<Optional<int64_t>>(test_context, sg, col_type_Int, true);
+    test_tables<StringData>(test_context, sg, col_type_String, true); // always Optional?
+    test_tables<BinaryData>(test_context, sg, col_type_Binary, true); // always Optional?
+    test_tables<Optional<bool>>(test_context, sg, col_type_Bool, true);
+    test_tables<Optional<float>>(test_context, sg, col_type_Float, true);
+    test_tables<Optional<double>>(test_context, sg, col_type_Double, true);
+    test_tables<Timestamp>(test_context, sg, col_type_Timestamp, true); // always Optional?
+    test_tables<Decimal128>(test_context, sg, col_type_Decimal, true);
+    test_tables<Optional<ObjectId>>(test_context, sg, col_type_ObjectId, true);
+    test_tables<UUID>(test_context, sg, col_type_UUID, true);
 }
 
 template <typename TFrom, typename TTo>
-void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataType type_id, bool from_nullable,
+void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::ColumnType type_id, bool from_nullable,
                              bool to_nullable)
 {
     // Create values of type TFrom and ask for dynamic conversion to TTo
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col_from = table->add_column(type_id, "the column", from_nullable);
-    if (type_id == type_String) {
+    if (type_id == col_type_String) {
         table->add_search_index(col_from);
     }
     std::map<int, managed<TTo>> reference;
@@ -5080,7 +5092,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
         reference[j] = managed<TTo>{conv_value};
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
-    if (type_id == type_String) {
+    if (type_id == col_type_String) {
         CHECK(table->has_search_index(col_to));
     }
     check_table_values(test_context, table, col_to, reference);
@@ -5088,7 +5100,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
 }
 
 template <typename TFrom, typename TTo>
-void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::DataType type_id, bool from_nullable,
+void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::ColumnType type_id, bool from_nullable,
                                   bool to_nullable)
 {
     // Create values of type TFrom and ask for dynamic conversion to TTo
@@ -5113,7 +5125,7 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
 }
 
 template <typename T>
-void test_dynamic_conversion_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
+void test_dynamic_conversion_combi(TestContext& test_context, DBRef sg, realm::ColumnType type_id)
 {
     test_dynamic_conversion<T, Optional<T>>(test_context, sg, type_id, false, true);
     test_dynamic_conversion<Optional<T>, T>(test_context, sg, type_id, true, false);
@@ -5122,7 +5134,7 @@ void test_dynamic_conversion_combi(TestContext& test_context, DBRef sg, realm::D
 }
 
 template <typename T>
-void test_dynamic_conversion_combi_sametype(TestContext& test_context, DBRef sg, realm::DataType type_id)
+void test_dynamic_conversion_combi_sametype(TestContext& test_context, DBRef sg, realm::ColumnType type_id)
 {
     test_dynamic_conversion<T, T>(test_context, sg, type_id, false, true);
     test_dynamic_conversion<T, T>(test_context, sg, type_id, true, false);
@@ -5131,7 +5143,7 @@ void test_dynamic_conversion_combi_sametype(TestContext& test_context, DBRef sg,
 }
 
 template <typename T>
-void test_dynamic_conversion_list_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
+void test_dynamic_conversion_list_combi(TestContext& test_context, DBRef sg, realm::ColumnType type_id)
 {
     test_dynamic_conversion_list<T, Optional<T>>(test_context, sg, type_id, false, true);
     test_dynamic_conversion_list<Optional<T>, T>(test_context, sg, type_id, true, false);
@@ -5140,7 +5152,7 @@ void test_dynamic_conversion_list_combi(TestContext& test_context, DBRef sg, rea
 }
 
 template <typename T>
-void test_dynamic_conversion_list_combi_sametype(TestContext& test_context, DBRef sg, realm::DataType type_id)
+void test_dynamic_conversion_list_combi_sametype(TestContext& test_context, DBRef sg, realm::ColumnType type_id)
 {
     test_dynamic_conversion_list<T, T>(test_context, sg, type_id, false, true);
     test_dynamic_conversion_list<T, T>(test_context, sg, type_id, true, false);
@@ -5155,29 +5167,29 @@ TEST(Table_Column_DynamicConversions)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_dynamic_conversion_combi<int64_t>(test_context, sg, type_Int);
-    test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
-    test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
-    test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
-    test_dynamic_conversion_combi<ObjectId>(test_context, sg, type_ObjectId);
+    test_dynamic_conversion_combi<int64_t>(test_context, sg, col_type_Int);
+    test_dynamic_conversion_combi<float>(test_context, sg, col_type_Float);
+    test_dynamic_conversion_combi<double>(test_context, sg, col_type_Double);
+    test_dynamic_conversion_combi<bool>(test_context, sg, col_type_Bool);
+    test_dynamic_conversion_combi<ObjectId>(test_context, sg, col_type_ObjectId);
 
-    test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
-    test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
-    test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
-    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
-    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
+    test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, col_type_String);
+    test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, col_type_Binary);
+    test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, col_type_Timestamp);
+    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, col_type_Decimal);
+    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, col_type_UUID);
     // lists...:
-    test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
-    test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
-    test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
-    test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
-    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, type_ObjectId);
+    test_dynamic_conversion_list_combi<int64_t>(test_context, sg, col_type_Int);
+    test_dynamic_conversion_list_combi<float>(test_context, sg, col_type_Float);
+    test_dynamic_conversion_list_combi<double>(test_context, sg, col_type_Double);
+    test_dynamic_conversion_list_combi<bool>(test_context, sg, col_type_Bool);
+    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, col_type_ObjectId);
 
-    test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
-    test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
-    test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
-    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
-    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
+    test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, col_type_String);
+    test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, col_type_Binary);
+    test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, col_type_Timestamp);
+    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, col_type_Decimal);
+    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, col_type_UUID);
 }
 
 /*
@@ -5188,26 +5200,27 @@ TEST(Table_Column_Conversions)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
-    test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
-    test_column_conversion<double, Optional<double>>(test_context, sg, type_Double);
-    test_column_conversion<bool, Optional<bool>>(test_context, sg, type_Bool);
-    test_column_conversion<StringData, StringData>(test_context, sg, type_String);
-    test_column_conversion<BinaryData, BinaryData>(test_context, sg, type_Binary);
-    test_column_conversion<Timestamp, Timestamp>(test_context, sg, type_Timestamp);
+    test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, col_type_Int);
+    test_column_conversion<float, Optional<float>>(test_context, sg, col_type_Float);
+    test_column_conversion<double, Optional<double>>(test_context, sg, col_type_Double);
+    test_column_conversion<bool, Optional<bool>>(test_context, sg, col_type_Bool);
+    test_column_conversion<StringData, StringData>(test_context, sg, col_type_String);
+    test_column_conversion<BinaryData, BinaryData>(test_context, sg, col_type_Binary);
+    test_column_conversion<Timestamp, Timestamp>(test_context, sg, col_type_Timestamp);
 
-    test_column_conversion_optional<int64_t>(test_context, sg, type_Int);
-    test_column_conversion_optional<float>(test_context, sg, type_Float);
-    test_column_conversion_optional<double>(test_context, sg, type_Double);
-    test_column_conversion_optional<bool>(test_context, sg, type_Bool);
+    test_column_conversion_optional<int64_t>(test_context, sg, col_type_Int);
+    test_column_conversion_optional<float>(test_context, sg, col_type_Float);
+    test_column_conversion_optional<double>(test_context, sg, col_type_Double);
+    test_column_conversion_optional<bool>(test_context, sg, col_type_Bool);
 
-    test_column_conversion_sametype<StringData>(test_context, sg, type_String);
-    test_column_conversion_sametype<BinaryData>(test_context, sg, type_Binary);
-    test_column_conversion_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_column_conversion_sametype<StringData>(test_context, sg, col_type_String);
+    test_column_conversion_sametype<BinaryData>(test_context, sg, col_type_Binary);
+    test_column_conversion_sametype<Timestamp>(test_context, sg, col_type_Timestamp);
 
 }
 */
-TEST(Table_MultipleObjs) {
+TEST(Table_MultipleObjs)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -5216,7 +5229,7 @@ TEST(Table_MultipleObjs) {
     auto tr = sg->start_write();
     auto table = tr->add_table("my_table");
     auto col = table->add_column_list(*table, "the links");
-    auto col_int = table->add_column_list(type_String, "the integers");
+    auto col_int = table->add_column_list(col_type_String, "the integers");
     auto obj_key = table->create_object().get_key();
     tr->commit();
     tr = sg->start_write();
@@ -5570,7 +5583,7 @@ TEST(Table_IndexOnMixed)
 
     auto bars = g.add_table("bar");
     auto foos = g.add_table("foo");
-    auto col = foos->add_column(type_Mixed, "any");
+    auto col = foos->add_column(col_type_Mixed, "any");
     foos->add_search_index(col);
 
     auto bar = bars->create_object();

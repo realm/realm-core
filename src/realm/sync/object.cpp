@@ -54,7 +54,7 @@ void erase_table(Transaction& g, StringData name)
     erase_table(g, g.get_table(name));
 }
 
-ColKey add_array_column(Table& table, DataType element_type, StringData column_name, bool is_nullable)
+ColKey add_array_column(Table& table, ColumnType element_type, StringData column_name, bool is_nullable)
 {
     return table.add_column_list(element_type, column_name, is_nullable);
 }

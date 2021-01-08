@@ -178,7 +178,7 @@ TEST(Decimal_Table)
     const char str1[] = "1000.00";
 
     Table t;
-    auto col_price = t.add_column(type_Decimal, "id");
+    auto col_price = t.add_column(col_type_Decimal, "id");
     auto obj0 = t.create_object().set(col_price, Decimal128(str0));
     auto obj1 = t.create_object().set(col_price, Decimal128(str1));
     CHECK_EQUAL(obj0.get<Decimal128>(col_price), Decimal128(str0));
@@ -198,9 +198,9 @@ TEST(Decimal_Query)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_dec = table->add_column(type_Decimal, "price", true);
-        auto col_int = table->add_column(type_Int, "size");
-        auto col_str = table->add_column(type_String, "description");
+        auto col_dec = table->add_column(col_type_Decimal, "price", true);
+        auto col_int = table->add_column(col_type_Int, "size");
+        auto col_str = table->add_column(col_type_String, "description");
         for (int i = 1; i < 100; i++) {
             auto obj = table->create_object().set(col_dec, Decimal128(i)).set(col_int, i % 10);
             if ((i % 19) == 0) {
@@ -210,7 +210,7 @@ TEST(Decimal_Query)
         table->create_object(); // Contains null
 
         auto bar = wt->add_table("Bar");
-        bar->add_column(type_Decimal, "dummy", true);
+        bar->add_column(col_type_Decimal, "dummy", true);
         ObjKeys keys;
         bar->create_objects(10, keys); // All nulls
 
@@ -285,7 +285,7 @@ TEST(Decimal_Distinct)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_dec = table->add_column(type_Decimal, "price", true);
+        auto col_dec = table->add_column(col_type_Decimal, "price", true);
         for (int i = 1; i < 100; i++) {
             auto obj = table->create_object().set(col_dec, Decimal128(i % 10));
         }
@@ -312,7 +312,7 @@ TEST(Decimal_Aggregates)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_dec = table->add_column(type_Decimal, "price", true);
+        auto col_dec = table->add_column(col_type_Decimal, "price", true);
         for (int i = 0; i < 100; i++) {
             Obj obj = table->create_object();
             if (i % 10) {

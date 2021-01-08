@@ -81,9 +81,9 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-// Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
-// it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
-// even read using Get()) without upgrading the database first.
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -266,8 +266,8 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     Group g;
     TableRef t = g.add_table("table");
-    t->add_column(type_String, "string");
-    t->add_column(type_Int, "integer");
+    t->add_column(col_type_String, "string");
+    t->add_column(col_type_Int, "integer");
 
     t->add_search_index(0);
     t->add_search_index(1);
@@ -381,7 +381,8 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
-TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction,
+        REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -543,14 +544,14 @@ TEST_IF(Upgrade_Database_Binary, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_
 
     // small blob size (< 64 bytes)
     t = g.add_table("short");
-    t->add_column(type_Binary, "bin");
+    t->add_column(col_type_Binary, "bin");
     t->add_empty_row(2);
     t->set_binary(0, 0, BinaryData("", 0)); // Empty string. Remember 0, else it will take up 1 byte!
     t->set_binary(0, 1, BinaryData("foo"));
 
     // long blocs
     t = g.add_table("long");
-    t->add_column(type_Binary, "bin");
+    t->add_column(col_type_Binary, "bin");
     t->add_empty_row(2);
     t->set_binary(0, 0, BinaryData("", 0)); // Empty string. Remember 0, else it will take up 1 byte!
     t->set_binary(0, 0, BinaryData("foo")); // Empty string. Remember 0, else it will take up 1 byte!
@@ -629,7 +630,7 @@ TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_MAX_BPNODE_SIZE == 4 || REALM_M
     Group g;
 
     TableRef t = g.add_table("table");
-    t->add_column(type_String, "strings_with_nul_bytes");
+    t->add_column(col_type_String, "strings_with_nul_bytes");
     t->add_empty_row(num_nul_strings);
     for (size_t i = 0; i < num_nul_strings; ++i) {
         t->set_string(0, i, StringData(nul_strings[i], i));
@@ -671,7 +672,9 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { DB sg(temp_copy); });
+        tt.start([&]() {
+            DB sg(temp_copy);
+        });
     }
 
     for (auto& tt : t)
@@ -778,7 +781,9 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int) { throw std::exception(); };
+    auto exception_callback = [&](int, int) {
+        throw std::exception();
+    };
     auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
@@ -884,11 +889,11 @@ TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_
     TableRef t = g.add_table("table");
 
     // No index
-    t->add_column(type_OldDateTime, "dt1", true);  // nullable
-    t->add_column(type_OldDateTime, "dt2", false); // nonnullable
+    t->add_column(col_type_OldDateTime, "dt1", true);  // nullable
+    t->add_column(col_type_OldDateTime, "dt2", false); // nonnullable
     // No index
-    t->add_column(type_OldDateTime, "dt3", true);  // nullable
-    t->add_column(type_OldDateTime, "dt4", false); // nonnullable
+    t->add_column(col_type_OldDateTime, "dt3", true);  // nullable
+    t->add_column(col_type_OldDateTime, "dt4", false); // nonnullable
 
     t->add_search_index(0);
     t->add_search_index(1);
@@ -1025,22 +1030,22 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
     TableRef t = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    size_t int_ndx = t->add_column(type_Int, "int");
-    size_t bool_ndx = t->add_column(type_Bool, "bool");
-    t->add_column(type_Float, "float");
-    t->add_column(type_Double, "double");
-    size_t str_ndx = t->add_column(type_String, "string");
-    t->add_column(type_Binary, "binary");
-    size_t ts_ndx = t->add_column(type_Timestamp, "timestamp");
-    t->add_column(type_Table, "table");
-    t->add_column(type_Mixed, "mixed");
+    size_t int_ndx = t->add_column(col_type_Int, "int");
+    size_t bool_ndx = t->add_column(col_type_Bool, "bool");
+    t->add_column(col_type_Float, "float");
+    t->add_column(col_type_Double, "double");
+    size_t str_ndx = t->add_column(col_type_String, "string");
+    t->add_column(col_type_Binary, "binary");
+    size_t ts_ndx = t->add_column(col_type_Timestamp, "timestamp");
+    t->add_column(col_type_Table, "table");
+    t->add_column(col_type_Mixed, "mixed");
     t->add_column_link(type_Link, "link", *t2);
     t->add_column_link(type_LinkList, "linklist", *t2);
 
-    size_t null_int_ndx = t->add_column(type_Int, "nullable int", true);
-    size_t null_bool_ndx = t->add_column(type_Bool, "nullable bool", true);
-    size_t null_str_ndx = t->add_column(type_String, "nullable string", true);
-    size_t null_ts_ndx = t->add_column(type_Timestamp, "nullable timestamp", true);
+    size_t null_int_ndx = t->add_column(col_type_Int, "nullable int", true);
+    size_t null_bool_ndx = t->add_column(col_type_Bool, "nullable bool", true);
+    size_t null_str_ndx = t->add_column(col_type_String, "nullable string", true);
+    size_t null_ts_ndx = t->add_column(col_type_Timestamp, "nullable timestamp", true);
 
     t->add_search_index(bool_ndx);
     t->add_search_index(int_ndx);
@@ -1108,7 +1113,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     Group g;
     TableRef t = g.add_table("table");
-    size_t col = t->add_column(type_Int, "value");
+    size_t col = t->add_column(col_type_Int, "value");
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
@@ -1152,7 +1157,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     Group g;
     TableRef t = g.add_table("table");
-    size_t col = t->add_column(type_Int, "value");
+    size_t col = t->add_column(col_type_Int, "value");
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
@@ -1199,8 +1204,8 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
 
     Group g;
     TableRef t = g.add_table("table");
-    size_t col = t->add_column(type_Int, "value");
-    size_t str_col = t->add_column(type_String, "str_col", true);
+    size_t col = t->add_column(col_type_Int, "value");
+    size_t str_col = t->add_column(col_type_String, "str_col", true);
     t->add_search_index(str_col);
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
@@ -1382,23 +1387,23 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(o->get_column_name(col_val), "val");
         CHECK_EQUAL(o->get_column_name(col_str_list), "strings");
 
-        CHECK_EQUAL(t->get_column_type(col_int_null), type_Int);
-        CHECK_EQUAL(t->get_column_type(col_bool), type_Bool);
-        CHECK_EQUAL(t->get_column_type(col_bool_null), type_Bool);
-        CHECK_EQUAL(t->get_column_type(col_float), type_Float);
-        CHECK_EQUAL(t->get_column_type(col_double), type_Double);
-        CHECK_EQUAL(t->get_column_type(col_string), type_String);
-        CHECK_EQUAL(t->get_column_type(col_string_i), type_String);
-        CHECK_EQUAL(t->get_column_type(col_binary), type_Binary);
-        CHECK_EQUAL(t->get_column_type(col_date), type_Timestamp);
-        CHECK_EQUAL(t->get_column_type(col_link), type_Link);
-        CHECK_EQUAL(t->get_column_type(col_linklist), type_LinkList);
-        CHECK_EQUAL(t->get_column_type(col_int_list), type_Int);
+        CHECK_EQUAL(t->get_column_type(col_int_null), col_type_Int);
+        CHECK_EQUAL(t->get_column_type(col_bool), col_type_Bool);
+        CHECK_EQUAL(t->get_column_type(col_bool_null), col_type_Bool);
+        CHECK_EQUAL(t->get_column_type(col_float), col_type_Float);
+        CHECK_EQUAL(t->get_column_type(col_double), col_type_Double);
+        CHECK_EQUAL(t->get_column_type(col_string), col_type_String);
+        CHECK_EQUAL(t->get_column_type(col_string_i), col_type_String);
+        CHECK_EQUAL(t->get_column_type(col_binary), col_type_Binary);
+        CHECK_EQUAL(t->get_column_type(col_date), col_type_Timestamp);
+        CHECK_EQUAL(t->get_column_type(col_link), col_type_Link);
+        CHECK_EQUAL(t->get_column_type(col_linklist), col_type_LinkList);
+        CHECK_EQUAL(t->get_column_type(col_int_list), col_type_Int);
         CHECK(t->get_column_attr(col_int_list).test(col_attr_List));
-        CHECK_EQUAL(t->get_column_type(col_int_null_list), type_Int);
+        CHECK_EQUAL(t->get_column_type(col_int_null_list), col_type_Int);
         CHECK(t->get_column_attr(col_int_null_list).test(col_attr_List));
-        CHECK_EQUAL(o->get_column_type(col_val), type_Int);
-        CHECK_EQUAL(o->get_column_type(col_str_list), type_String);
+        CHECK_EQUAL(o->get_column_type(col_val), col_type_Int);
+        CHECK_EQUAL(o->get_column_type(col_str_list), col_type_String);
         CHECK(col_str_list.get_attrs().test(col_attr_List));
 
         CHECK_EQUAL(t->is_nullable(col_int), false);
@@ -1517,29 +1522,29 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     TableRef t = g.add_table("table");
     TableRef o = g.add_table("other");
     g.add_table("empty");
-    size_t col_int = t->add_column(type_Int, "int");
-    size_t col_int_null = t->add_column(type_Int, "int", true); // Duplicate name
-    size_t col_bool = t->add_column(type_Bool, "");             // Missing name
-    size_t col_bool_null = t->add_column(type_Bool, "bool_null", true);
-    size_t col_float = t->add_column(type_Float, "float");
-    size_t col_double = t->add_column(type_Double, "double");
-    size_t col_string = t->add_column(type_String, "string");
-    size_t col_string_i = t->add_column(type_String, "string_i", true);
-    size_t col_binary = t->add_column(type_Binary, "binary");
-    size_t col_date = t->add_column(type_Timestamp, "date");
+    size_t col_int = t->add_column(col_type_Int, "int");
+    size_t col_int_null = t->add_column(col_type_Int, "int", true); // Duplicate name
+    size_t col_bool = t->add_column(col_type_Bool, "");             // Missing name
+    size_t col_bool_null = t->add_column(col_type_Bool, "bool_null", true);
+    size_t col_float = t->add_column(col_type_Float, "float");
+    size_t col_double = t->add_column(col_type_Double, "double");
+    size_t col_string = t->add_column(col_type_String, "string");
+    size_t col_string_i = t->add_column(col_type_String, "string_i", true);
+    size_t col_binary = t->add_column(col_type_Binary, "binary");
+    size_t col_date = t->add_column(col_type_Timestamp, "date");
     size_t col_link = t->add_column_link(type_Link, "link", *t);
     size_t col_linklist = t->add_column_link(type_LinkList, "linklist", *o);
 
     DescriptorRef subdesc;
-    size_t col_int_list = t->add_column(type_Table, "integers", false, &subdesc);
-    subdesc->add_column(type_Int, "list");
+    size_t col_int_list = t->add_column(col_type_Table, "integers", false, &subdesc);
+    subdesc->add_column(col_type_Int, "list");
 
-    size_t col_int_null_list = t->add_column(type_Table, "intnulls", false, &subdesc);
-    subdesc->add_column(type_Int, "list", nullptr, true);
+    size_t col_int_null_list = t->add_column(col_type_Table, "intnulls", false, &subdesc);
+    subdesc->add_column(col_type_Int, "list", nullptr, true);
 
-    size_t col_val = o->add_column(type_Int, "val");
-    size_t col_string_list = o->add_column(type_Table, "strings", false, &subdesc);
-    subdesc->add_column(type_String, "list", nullptr, true);
+    size_t col_val = o->add_column(col_type_Int, "val");
+    size_t col_string_list = o->add_column(col_type_Table, "strings", false, &subdesc);
+    subdesc->add_column(col_type_String, "list", nullptr, true);
 
     t->add_search_index(col_string_i);
 
@@ -1670,7 +1675,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     // core in order to create a file-format-version 10 test file!
 
     Group g;
-    TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
+    TableRef t = g.add_table_with_primary_key("table", col_type_Int, "id", false);
     TableRef o = g.add_table("origin");
     auto col = o->add_column_link(type_Link, "link", *t);
 

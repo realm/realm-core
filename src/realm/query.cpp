@@ -918,7 +918,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                 bool nullable = m_table->is_nullable(column_key);
 
                 for (size_t c = 0; c < node->m_children.size(); c++)
-                    node->m_children[c]->aggregate_local_prepare(action, ColumnTypeTraits<T>::id, nullable);
+                    node->m_children[c]->aggregate_local_prepare(action, ColumnTypeTraits<T>::column_id, nullable);
 
                 auto f = [column_key, &leaf, &node, &st, this](const Cluster* cluster) {
                     size_t e = cluster->node_size();
@@ -1389,7 +1389,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
-                node->m_children[c]->aggregate_local_prepare(act_FindAll, type_Int, false);
+                node->m_children[c]->aggregate_local_prepare(act_FindAll, col_type_Int, false);
 
             auto f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
@@ -1476,7 +1476,7 @@ size_t Query::do_count(size_t limit) const
         QueryState<int64_t> st(act_Count, limit);
 
         for (size_t c = 0; c < node->m_children.size(); c++)
-            node->m_children[c]->aggregate_local_prepare(act_Count, type_Int, false);
+            node->m_children[c]->aggregate_local_prepare(act_Count, col_type_Int, false);
 
         auto f = [&node, &st, this](const Cluster* cluster) {
             size_t e = cluster->node_size();

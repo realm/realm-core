@@ -96,7 +96,7 @@ inline void erase(TableRef table, const OrderVec& order)
 #endif
 }
 
-} // anonymous namepsace
+} // namespace
 
 
 int main()
@@ -137,12 +137,12 @@ int main()
     for (int i = 0; i < num_tables; ++i) {
         std::string name = "IntTable1_" + to_string(i);
         tables_1[i] = group->add_table(name);
-        tables_1[i]->add_column(type_Int, "i");
+        tables_1[i]->add_column(col_type_Int, "i");
     }
     for (int i = 0; i < num_tables; ++i) {
         std::string name = "IntTable2_" + to_string(i);
         tables_2[i] = group->add_table(name);
-        tables_2[i]->add_column(type_Int, "i");
+        tables_2[i]->add_column(col_type_Int, "i");
     }
 
     int_fast64_t dummy = 0;

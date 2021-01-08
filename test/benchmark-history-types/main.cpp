@@ -62,7 +62,7 @@ public:
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");
         for (size_t i = 0; i < num_cols; ++i)
-            table->add_column(type_Int, "");
+            table->add_column(col_type_Int, "");
         table->add_empty_row(num_rows);
         for (size_t i = 0; i < num_rows; ++i) {
             if (i % REALM_MAX_BPNODE_SIZE == 0) { // REALM_MAX_BPNODE_SIZE = 1000
@@ -115,8 +115,8 @@ public:
         std::string path = "/tmp/benchmark-history-types.realm";
         util::File::try_remove(path);
 
-        reader_histories.reset(new std::unique_ptr<Replication>[ num_readers ]);
-        reader_shared_groups.reset(new std::unique_ptr<DB>[ num_readers ]);
+        reader_histories.reset(new std::unique_ptr<Replication>[num_readers]);
+        reader_shared_groups.reset(new std::unique_ptr<DB>[num_readers]);
 
         for (int i = 0; i < num_readers; ++i) {
             reader_histories[i] = make_history(path);
@@ -128,7 +128,7 @@ public:
 
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");
-        table->add_column(type_Int, "i");
+        table->add_column(col_type_Int, "i");
         if (!grow)
             table->add_empty_row();
         wt.commit();

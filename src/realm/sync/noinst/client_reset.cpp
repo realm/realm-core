@@ -917,8 +917,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         std::vector<std::string> columns_to_remove;
         for (ColKey col_key : table_dst->get_column_keys()) {
-            DataType column_type = table_dst->get_column_type(col_key);
-            if (column_type == type_Link || column_type == type_LinkList) {
+            ColumnType column_type = table_dst->get_column_type(col_key);
+            if (column_type == col_type_Link || column_type == col_type_LinkList) {
                 TableRef table_target = table_dst->get_link_target(col_key);
                 StringData table_target_name = table_target->get_name();
                 if (tables_to_remove.find(table_target_name) != tables_to_remove.end()) {
@@ -953,7 +953,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             }
             else {
                 auto pk_col_src = table_src->get_primary_key_column();
-                DataType pk_type = DataType(pk_col_src.get_type());
+                ColumnType pk_type = pk_col_src.get_type();
                 StringData pk_col_name = table_src->get_column_name(pk_col_src);
                 group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
             }
@@ -1033,17 +1033,17 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             StringData col_name = table_src->get_column_name(col_key);
             ColKey col_key_dst = table_dst->get_column_key(col_name);
             if (!col_key_dst) {
-                DataType type = table_src->get_column_type(col_key);
+                ColumnType type = table_src->get_column_type(col_key);
                 bool nullable = table_src->is_nullable(col_key);
                 bool has_search_index = table_src->has_search_index(col_key);
                 logger.trace("Create column, table = %1, column name = %2, "
                              " type = %3, nullable = %4, has_search_index = %5",
                              table_name, col_name, type, nullable, has_search_index);
                 ColKey col_key_dst;
-                if (Table::is_link_type(ColumnType(type))) {
+                if (Table::is_link_type(type)) {
                     ConstTableRef target_src = table_src->get_link_target(col_key);
                     TableRef target_dst = group_dst.get_table(target_src->get_name());
-                    if (type == type_LinkList) {
+                    if (type == col_type_LinkList) {
                         col_key_dst = table_dst->add_column_list(*target_dst, col_name);
                     }
                     else {
@@ -1152,8 +1152,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 StringData col_name = table_src->get_column_name(col_key_src);
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
                 REALM_ASSERT(col_key_dst);
-                DataType col_type = table_src->get_column_type(col_key_src);
-                if (col_type == type_Link) {
+                ColumnType col_type = table_src->get_column_type(col_key_src);
+                if (col_type == col_type_Link) {
                     ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
                     TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
                     REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
@@ -1174,7 +1174,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                         }
                     }
                 }
-                else if (col_type == type_LinkList) {
+                else if (col_type == col_type_LinkList) {
                     ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
                     TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
                     REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
@@ -1233,7 +1233,7 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
         // Create the table.
         logger.trace("Recover the table %1", table_name);
         if (auto pk_col = table_src->get_primary_key_column()) {
-            DataType pk_type = DataType(pk_col.get_type());
+            ColumnType pk_type = pk_col.get_type();
             StringData pk_col_name = table_src->get_column_name(pk_col);
             group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col.is_nullable());
         }
@@ -1254,13 +1254,13 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
             StringData col_name = table_src->get_column_name(col_key);
             ColKey col_key_dst = table_dst->get_column_key(col_name);
             if (!col_key_dst) {
-                DataType type = table_src->get_column_type(col_key);
+                ColumnType type = table_src->get_column_type(col_key);
                 bool nullable = table_src->is_nullable(col_key);
                 logger.trace("Recover column, table = %1, column name = %2, "
                              " type = %3, nullable = %4",
                              table_name, col_name, type, nullable);
                 if (col_key.is_list()) {
-                    if (type == type_LinkList) {
+                    if (type == col_type_LinkList) {
                         ConstTableRef target_src = table_src->get_link_target(col_key);
                         TableRef target_dst = group_dst.get_table(target_src->get_name());
                         table_dst->add_column_list(*target_dst, col_name);
@@ -1270,7 +1270,7 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
                     }
                 }
                 else {
-                    if (type == type_Link) {
+                    if (type == col_type_Link) {
                         ConstTableRef target_src = table_src->get_link_target(col_key);
                         TableRef target_dst = group_dst.get_table(target_src->get_name());
                         table_dst->add_column(*target_dst, col_name);
