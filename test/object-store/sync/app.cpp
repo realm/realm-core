@@ -2507,10 +2507,10 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                           {},
                                           std::nullopt,
                                           nlohmann::json({{"deployment_model", "this"},
-                                              {"hostname", "field"},
-                                              {"ws_hostname", "shouldn't"},
-                                              {"location", "matter"}})
-                                          .dump()});
+                                                         {"hostname", "field"},
+                                                         {"ws_hostname", "shouldn't"},
+                                                         {"location", "matter"}})
+                                                     .dump()});
                     }
                 }
             };
@@ -2632,7 +2632,7 @@ TEST_CASE("app: user_semantics", "[app]") {
                                       {},
                                       std::nullopt,
                                       "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://"
-                                              "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                                      "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
