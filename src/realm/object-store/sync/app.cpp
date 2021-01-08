@@ -989,7 +989,14 @@ void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name,
         if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error, util::none);
         }
-        completion_block(util::none, util::Optional<bson::Bson>(bson::parse(*response.body)));
+        util::Optional<bson::Bson> body_as_bson;
+        try {
+            body_as_bson = bson::parse(*response.body);
+        }
+        catch (const std::exception& e) {
+            return completion_block(AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()), util::none);
+        };
+        completion_block(util::none, body_as_bson);
     };
 
     bson::BsonDocument args{{"arguments", args_bson}, {"name", name}};

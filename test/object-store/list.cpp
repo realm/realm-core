@@ -716,6 +716,23 @@ TEST_CASE("list") {
         REQUIRE(snapshot.size() == 10);
     }
 
+    SECTION("snapshot() after deletion") {
+        List list(r, *lv);
+
+        auto snapshot = list.snapshot();
+
+        for (size_t i = 0; i < snapshot.size(); ++i) {
+            r->begin_transaction();
+            Obj obj = snapshot.get<Obj>(i);
+            obj.remove();
+            r->commit_transaction();
+        }
+
+        auto snapshot2 = list.snapshot();
+        CHECK(snapshot2.size() == 0);
+        CHECK(list.size() == 0);
+    }
+
     SECTION("get_object_schema()") {
         List list(r, *lv);
         auto objectschema = &*r->schema().find("target");
