@@ -6,6 +6,13 @@ RLM_API realm_config_t* realm_config_new()
     return new realm_config_t{};
 }
 
+RLM_API const char* realm_config_get_path(realm_config_t* config)
+{
+    return wrap_err([&]() {
+        return config->path.c_str();
+    });
+}
+
 RLM_API bool realm_config_set_path(realm_config_t* config, const char* path)
 {
     return wrap_err([&]() {
@@ -20,6 +27,11 @@ RLM_API bool realm_config_set_schema(realm_config_t* config, const realm_schema_
         config->schema = *schema->ptr;
         return true;
     });
+}
+
+RLM_API uint64_t realm_config_get_schema_version(realm_config_t* config)
+{
+    return config->schema_version;
 }
 
 RLM_API bool realm_config_set_schema_version(realm_config_t* config, uint64_t version)

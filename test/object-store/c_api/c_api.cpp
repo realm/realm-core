@@ -187,11 +187,10 @@ TEST_CASE("C API") {
 
         auto config = realm_config_new();
         CHECK(checked(realm_config_set_path(config, "c_api_test.realm")));
-        CHECK(checked(realm_config_set_schema(config, schema)));
         CHECK(checked(realm_config_set_schema_mode(config, RLM_SCHEMA_MODE_AUTOMATIC)));
-        CHECK(checked(realm_config_set_schema_version(config, 1)));
 
         realm = realm_open(config);
+        CHECK(realm_update_schema(realm, schema));
         CHECK(checked(realm));
 
         CHECK(!realm_equals(realm, nullptr));
@@ -203,6 +202,69 @@ TEST_CASE("C API") {
 
         realm_release(schema);
         realm_release(config);
+    }
+
+    CHECK(realm_get_num_classes(realm) == 2);
+
+    SECTION("schema is set after opening") {
+        const realm_class_info_t baz = {
+            "baz",
+            "", // primary key
+            1,  // properties
+            0,  // computed_properties
+            RLM_INVALID_CLASS_KEY,
+            RLM_CLASS_NORMAL,
+        };
+
+        auto int_property = realm_property_info_t{
+            "int", "", RLM_PROPERTY_TYPE_INT,    RLM_COLLECTION_TYPE_NONE,
+            "",    "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
+        };
+        realm_property_info_t* baz_properties = &int_property;
+
+        // get class count
+        size_t num_classes = realm_get_num_classes(realm);
+        realm_class_key_t* out_keys = (realm_class_key_t*)malloc(sizeof(realm_class_key_t) * num_classes);
+        // get class keys
+        realm_get_class_keys(realm, out_keys, num_classes, nullptr);
+        realm_class_info_t* classes = (realm_class_info_t*)malloc(sizeof(realm_class_info_t) * (num_classes + 1));
+        const realm_property_info_t** properties =
+            (const realm_property_info_t**)malloc(sizeof(realm_property_info_t*) * (num_classes + 1));
+        // iterating through each class, "recreate" the old schema
+        for (size_t i = 0; i < num_classes; i++) {
+            realm_get_class(realm, out_keys[i], &classes[i]);
+            size_t out_n;
+            realm_get_class_properties(realm, out_keys[i], nullptr, 0, &out_n);
+            realm_property_info_t* out_props = (realm_property_info_t*)malloc(sizeof(realm_property_info_t) * out_n);
+            realm_get_class_properties(realm, out_keys[i], out_props, out_n, nullptr);
+            properties[i] = out_props;
+        }
+        // add the new class and its properties to the arrays
+        classes[num_classes] = baz;
+
+        properties[num_classes] = baz_properties;
+
+        // create a new schema and update the realm
+        auto new_schema = realm_schema_new(classes, num_classes + 1, properties);
+        CHECK(realm_update_schema(realm, new_schema));
+        auto new_num_classes = realm_get_num_classes(realm);
+        CHECK(new_num_classes == (num_classes + 1));
+
+        bool found;
+        realm_class_info_t baz_info;
+        CHECK(checked(realm_find_class(realm, "baz", &found, &baz_info)));
+        CHECK(found);
+        realm_property_info_t baz_int_property;
+        CHECK(checked(realm_find_property(realm, baz_info.key, "int", &found, &baz_int_property)));
+        CHECK(found);
+
+        free(out_keys);
+        free(classes);
+        for (size_t i = 0; i < num_classes; i++) {
+            free((realm_property_info_t*)properties[i]);
+        }
+        free(properties);
+        realm_release(new_schema);
     }
 
     SECTION("schema validates") {
@@ -224,7 +286,6 @@ TEST_CASE("C API") {
         checked(realm_refresh(realm));
     };
 
-    CHECK(realm_get_num_classes(realm) == 2);
     bool found = false;
 
     realm_class_info_t foo_info, bar_info;
