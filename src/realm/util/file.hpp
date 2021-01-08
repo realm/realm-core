@@ -264,6 +264,7 @@ public:
     /// an open file has undefined behavior.
     SizeType get_size() const;
     static SizeType get_size_static(FileDesc fd);
+    static SizeType get_size_static(const std::string& path);
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this function
@@ -445,6 +446,9 @@ public:
 
     /// Get the time of last modification made to the file
     static time_t last_write_time(const std::string& path);
+
+    /// Get freespace (in bytes) of filesystem containing path
+    static SizeType get_free_space(const std::string& path);
 
     /// Check whether the specified path exists and refers to a directory. If
     /// the referenced file system object resides in an inaccessible directory,

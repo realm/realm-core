@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
+#include <sys/statvfs.h>
 #endif
 
 #include <realm/exceptions.hpp>
@@ -606,6 +607,12 @@ uint64_t File::get_file_pos(FileDesc fd)
     }
     return uint64_t(pos);
 #endif
+}
+
+File::SizeType File::get_size_static(const std::string& path)
+{
+    File f(path);
+    return f.get_size();
 }
 
 File::SizeType File::get_size_static(FileDesc fd)
@@ -1626,6 +1633,30 @@ std::time_t File::last_write_time(const std::string& path)
     return statbuf.st_mtime;
 }
 
+File::SizeType File::get_free_space(const std::string& path)
+{
+#ifdef _WIN32
+    auto pos = path.find_last_of("/\\");
+    std::string dir_path;
+    if (pos != std::string::npos) {
+        dir_path = path.substr(0, pos);
+    }
+    else {
+        dir_path = path;
+    }
+    ULARGE_INTEGER available;
+    if (!GetDiskFreeSpaceExA(dir_path.c_str(), &available, NULL, NULL)) {
+        throw std::system_error(errno, std::system_category(), "GetDiskFreeSpaceExA failed");
+    }
+    return available.QuadPart;
+#else
+    struct statvfs stat;
+    if (statvfs(path.c_str(), &stat) != 0) {
+        throw std::system_error(errno, std::system_category(), "statvfs() failed");
+    }
+    return SizeType(stat.f_bavail) * stat.f_bsize;
+#endif
+}
 
 #ifndef _WIN32
 

@@ -147,6 +147,16 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
         std::cout << "Backup file already exists: " << backup_nm << std::endl;
         return;
     }
+    try {
+        // ignore it, if attempt to get free space fails for any reason
+        if (util::File::get_free_space(m_path) < util::File::get_size_static(m_path) * 2) {
+            std::cout << "Insufficient free space for backup: " << backup_nm << std::endl;
+            return;
+        }
+    }
+    catch (...) {
+        // ignore error
+    }
     std::cout << "Creating backup:   " << backup_nm << std::endl;
     std::string part_name = backup_nm + ".part";
     // The backup file should be a 1-1 copy, so that we can get the original
