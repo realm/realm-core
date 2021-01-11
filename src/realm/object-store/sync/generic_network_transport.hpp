@@ -205,10 +205,7 @@ struct Request {
     bool uses_refresh_token = false;
 };
 
-typedef enum {
-    success,
-    failure
-} ResponseStatus;
+typedef enum { success, failure } ResponseStatus;
 
 /**
  * The contents of an HTTP response.

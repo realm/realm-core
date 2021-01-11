@@ -23,8 +23,7 @@ namespace app {
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
-    if (response.status == ResponseStatus::failure &&
-        response.error.has_value()) {
+    if (response.status == ResponseStatus::failure && response.error.has_value()) {
         return *response.error;
     }
 
