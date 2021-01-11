@@ -1923,6 +1923,53 @@ TEST(Query_SetOfPrimitives)
     CHECK_EQUAL(tv.get_key(0), keys[2]);
 }
 
+TEST(Query_SetOfObjects)
+{
+    Group g;
+
+    TableRef table = g.add_table("foo");
+    TableRef table_bar = g.add_table("bar");
+
+    std::vector<ObjKey> bar_keys;
+    auto col_string = table_bar->add_column(type_String, "name");
+    table_bar->create_objects(3, bar_keys);
+    table_bar->get_object(bar_keys[0]).set(col_string, "zero");
+    table_bar->get_object(bar_keys[1]).set(col_string, "one");
+    table_bar->get_object(bar_keys[2]).set(col_string, "two");
+
+    auto col_obj_set = table->add_column_set(*table_bar, "objects");
+    std::vector<ObjKey> keys;
+
+    table->create_objects(4, keys);
+
+    auto set_values = [](Set<ObjKey> set, const std::vector<ObjKey>& value_list) {
+        for (auto val : value_list)
+            set.insert(val);
+    };
+
+    set_values(table->get_object(keys[0]).get_set<ObjKey>(col_obj_set), {bar_keys[0], bar_keys[1]});
+    set_values(table->get_object(keys[1]).get_set<ObjKey>(col_obj_set), {bar_keys[2]});
+    set_values(table->get_object(keys[2]).get_set<ObjKey>(col_obj_set), {bar_keys[0], bar_keys[1], bar_keys[2]});
+
+    Query q = table->where().links_to(col_obj_set, bar_keys[0]);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
+    CHECK_EQUAL(tv.get_key(1), keys[2]);
+
+    q = table->where().links_to(col_obj_set, {bar_keys[0], bar_keys[2]});
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
+    CHECK_EQUAL(tv.get_key(1), keys[1]);
+    CHECK_EQUAL(tv.get_key(2), keys[2]);
+
+    q = table->column<Set<ObjKey>>(col_obj_set).size() == 3;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;

@@ -2585,18 +2585,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        if (m_column_type == type_Link) {
-            for (auto& key : m_target_keys) {
-                if (key) {
-                    // LinkColumn stores link to row N as the integer N + 1
-                    auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
-                    if (pos != realm::npos) {
-                        return pos;
-                    }
-                }
-            }
-        }
-        else if (m_column_type == type_LinkList) {
+        if (m_column_type == type_LinkList || m_condition_column_key.is_set()) {
             ArrayKeyNonNullable arr(m_table.unchecked_ptr()->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
@@ -2606,6 +2595,17 @@ public:
                             if (arr.find_first(key, 0, arr.size()) != not_found)
                                 return i;
                         }
+                    }
+                }
+            }
+        }
+        else if (m_column_type == type_Link) {
+            for (auto& key : m_target_keys) {
+                if (key) {
+                    // LinkColumn stores link to row N as the integer N + 1
+                    auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+                    if (pos != realm::npos) {
+                        return pos;
                     }
                 }
             }
@@ -2630,7 +2630,6 @@ private:
     Storage m_storage;
     LeafPtr m_array_ptr;
     const ArrayPayload* m_leaf_ptr = nullptr;
-
 
     LinksToNode(const LinksToNode& source)
         : ParentNode(source)

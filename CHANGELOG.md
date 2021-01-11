@@ -11,6 +11,7 @@
 * Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
 * SSL certificate validation would fail due to a build misconfiguration on Windows ([#4213](https://github.com/realm/realm-core/issues/4213), since v10.2.0).
 * Fix implementation of `InterprocessCondVar` on Windows to not hang in the face of process death. ([#4174](https://github.com/realm/realm-core/issues/4174))
+* Fix `links_to()` queries on sets of objects. ([#4264](https://github.com/realm/realm-core/pull/4264)
  
 ### Breaking changes
 * The lock file format has changed, so a single Realm file may not be concurrently opened by processes running older and newer versions of Realm Database. Note that concurrently accessing a file with multiple versions of Realm is never officially supported.
