@@ -74,6 +74,7 @@ public:
     size_t find_any(Mixed value) const final;
 
     void remove_all();
+    void delete_all();
 
     // Replace the values in this set with the values from an enumerable object
     template <typename T, typename Context>

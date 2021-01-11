@@ -270,13 +270,19 @@ size_t Set::find_any(Mixed value) const
     return m_set_base->find_any(value);
 }
 
-void Set::remove_all()
+void Set::delete_all()
 {
     verify_in_transaction();
     if (m_type == PropertyType::Object)
         as<Obj>().remove_all_target_rows();
     else
         m_set_base->clear();
+}
+
+void Set::remove_all()
+{
+    verify_in_transaction();
+    m_set_base->clear();
 }
 
 template <>

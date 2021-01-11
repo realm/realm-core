@@ -532,9 +532,16 @@ size_t Results::index_of(T const& value)
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any((*m_list_indices)[i]);
-            if (mixed == value) {
-                return i;
+            T val{};
+            if (!mixed.is_null()) {
+                val = mixed.get<U>();
             }
+            else {
+                if (mixed == value)
+                    return i;
+            }
+            if (val == value)
+                return i;
         }
         return not_found;
     }
