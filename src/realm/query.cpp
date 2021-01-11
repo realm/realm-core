@@ -785,6 +785,70 @@ Query& Query::between(ColKey column_key, Decimal128 from, Decimal128 to)
     return *this;
 }
 
+// ------------- Mixed
+Query& Query::greater(ColKey column_key, Mixed value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        return add_condition<Equal>(column_key, value);
+    else
+        return add_condition<EqualIns>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        return add_condition<NotEqual>(column_key, value);
+    else
+        return add_condition<NotEqualIns>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, Mixed value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, Mixed value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, Mixed value)
+{
+    return add_condition<Less>(column_key, value);
+}
+Query& Query::begins_with(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<BeginsWith>(column_key, value);
+    else
+        add_condition<BeginsWithIns>(column_key, value);
+    return *this;
+}
+Query& Query::ends_with(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<EndsWith>(column_key, value);
+    else
+        add_condition<EndsWithIns>(column_key, value);
+    return *this;
+}
+Query& Query::contains(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Contains>(column_key, value);
+    else
+        add_condition<ContainsIns>(column_key, value);
+    return *this;
+}
+Query& Query::like(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Like>(column_key, value);
+    else
+        add_condition<LikeIns>(column_key, value);
+    return *this;
+}
+
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
 {

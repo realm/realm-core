@@ -678,4 +678,67 @@ Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sens
 {
     return binary_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
+
+// Mixed
+
+Query Subexpr2<Mixed>::equal(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, Equal, EqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::equal(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<Equal, EqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::not_equal(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::not_equal(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::begins_with(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::begins_with(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::ends_with(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::ends_with(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::contains(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, Contains, ContainsIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::contains(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<Contains, ContainsIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::like(Mixed sd, bool case_sensitive)
+{
+    return mixed_compare<Mixed, Like, LikeIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<Mixed>::like(const Subexpr2<Mixed>& col, bool case_sensitive)
+{
+    return mixed_compare<Like, LikeIns>(*this, col, case_sensitive);
+}
+
 } // namespace realm

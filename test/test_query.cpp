@@ -3441,7 +3441,7 @@ TEST(Query_FindAllContains2_2)
     ttt.create_object().set_all(8, "oobar");
 
     // FIXME: UTF-8 case handling is only implemented on msw for now
-    Query q1 = ttt.where().contains(col_str, "foO", false);
+    Query q1 = ttt.where().contains(col_str, StringData("foO"), false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
     CHECK_EQUAL(0, tv1.get(0).get<Int>(col_int));
@@ -3450,7 +3450,7 @@ TEST(Query_FindAllContains2_2)
     CHECK_EQUAL(3, tv1.get(3).get<Int>(col_int));
     CHECK_EQUAL(4, tv1.get(4).get<Int>(col_int));
     CHECK_EQUAL(5, tv1.get(5).get<Int>(col_int));
-    Query q2 = ttt.where().contains(col_str, "foO", true);
+    Query q2 = ttt.where().contains(col_str, StringData("foO"), true);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(3, tv2.get(0).get<Int>(col_int));
@@ -5386,7 +5386,10 @@ TEST(Query_StringNodeEqualBaseBug)
         table->create_object().set(col_type, "project").set(col_tags, "tag001");
     }
 
-    Query q = table->where().equal(col_type, "test", false).Or().contains(col_tags, "tag005", false);
+    Query q = table->where()
+                  .equal(col_type, StringData("test"), false)
+                  .Or()
+                  .contains(col_tags, StringData("tag005"), false);
     auto tv = q.find_all();
     CHECK_EQUAL(tv.size(), 0);
     table->begin()->set(col_type, "task");
@@ -5415,7 +5418,7 @@ TEST(Query_OptimalNode)
         obj.set(col_tags, tags);
     }
 
-    auto q1 = table->where().equal(col_type, "todo0", false);
+    auto q1 = table->where().equal(col_type, StringData("todo0"), false);
     q1.count(); // Warm up
     auto t1 = steady_clock::now();
     auto cnt = q1.count();
@@ -5424,7 +5427,7 @@ TEST(Query_OptimalNode)
     auto dur1 = duration_cast<microseconds>(t2 - t1).count();
     // std::cout << "cnt: " << cnt << " dur1: " << dur1 << " us" << std::endl;
 
-    auto q2 = table->where().contains(col_tags, "tag0", false);
+    auto q2 = table->where().contains(col_tags, StringData("tag0"), false);
     q2.count(); // Warm up
     t1 = steady_clock::now();
     cnt = q2.count();
