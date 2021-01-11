@@ -27,7 +27,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(ANDROID)
+if(NOT APPLE)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 elseif(APPLE)
@@ -291,6 +291,8 @@ set(REALM_EXPORTED_TARGETS
     Storage
     QueryParser
     ObjectStore
+    RealmFFI
+    RealmFFIStatic
 )
 if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
