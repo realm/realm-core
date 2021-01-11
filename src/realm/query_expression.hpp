@@ -3132,13 +3132,13 @@ private:
         size_t s = list.size();
         for (unsigned j = 0; j < s; j++) {
             auto v = list.get(j);
-            if constexpr (std::is_same_v<StorageType, util::Optional<T>>) {
-                if (v) {
+            if (!value_is_null(v)) {
+                if constexpr (std::is_same_v<StorageType, util::Optional<T>>) {
                     op.accumulate(*v);
                 }
-            }
-            else {
-                op.accumulate(v);
+                else {
+                    op.accumulate(v);
+                }
             }
         }
     }

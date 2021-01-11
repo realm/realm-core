@@ -1885,6 +1885,123 @@ TEST(Query_ListOfPrimitives)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+template <typename T>
+struct AggregateValues {
+    static std::vector<T> values()
+    {
+        return {std::numeric_limits<T>::lowest(), T{-1}, T{0}, T{1}, std::numeric_limits<T>::max()};
+    }
+    using OptionalT = util::Optional<T>;
+    static const constexpr util::None null = util::none;
+};
+
+template <>
+struct AggregateValues<Decimal128> {
+    static std::vector<Decimal128> values()
+    {
+        return {std::numeric_limits<Decimal128>::lowest(), Decimal128{-1}, Decimal128{0}, Decimal128{1},
+                std::numeric_limits<Decimal128>::max()};
+    }
+    using OptionalT = Decimal128;
+    static const constexpr realm::null null = realm::null();
+};
+
+template <>
+struct AggregateValues<Timestamp> {
+    static std::vector<Timestamp> values()
+    {
+        return {std::numeric_limits<Timestamp>::lowest(), Timestamp{-1, 0}, Timestamp{0, 0}, Timestamp{1, 0},
+                std::numeric_limits<Timestamp>::max()};
+    }
+    using OptionalT = Timestamp;
+    static const constexpr realm::null null = realm::null();
+};
+
+template <typename T>
+ColKey generate_all_combinations(Table& table)
+{
+    using OptionalT = typename AggregateValues<T>::OptionalT;
+    auto values = AggregateValues<T>::values();
+    size_t n = values.size() + 1;
+    auto col = table.add_column_list(ColumnTypeTraits<T>::id, "col", true);
+
+    // Add a row for each permutation of k=1..n values
+    for (size_t k = 1; k <= n; ++k) {
+        // Loop over each possible selection of k different values
+        std::vector<bool> selector(n);
+        std::fill(selector.begin(), selector.begin() + k, true);
+        do {
+            std::vector<OptionalT> selected_values;
+            for (size_t i = 0; i < n; i++) {
+                if (selector[i]) {
+                    if (i == 0)
+                        selected_values.push_back(AggregateValues<T>::null);
+                    else
+                        selected_values.push_back(values[i - 1]);
+                }
+            }
+
+            // Loop over each permutation of the selected values
+            REALM_ASSERT(std::is_sorted(selected_values.begin(), selected_values.end()));
+            do {
+                auto list = table.create_object().get_list<OptionalT>(col);
+                for (auto value : selected_values)
+                    list.add(value);
+            } while (std::next_permutation(selected_values.begin(), selected_values.end()));
+        } while (std::prev_permutation(selector.begin(), selector.end()));
+    }
+    return col;
+}
+
+template <typename T, typename Value, typename Getter>
+void validate_aggregate_results(unit_test::TestContext& test_context, Table& table, ColKey col, Value value,
+                                Getter getter)
+{
+    // min() and max() return sentinel values if there's no non-null values in
+    // the list so we want to turn that into a proper null result
+    auto handle_none = [](auto&& list, auto& getter) -> decltype(getter(list)) {
+        if (list.size() == 0 || (list.size() == 1 && list.is_null(0)))
+            return none;
+        return getter(list);
+    };
+
+    auto tv = (getter(table.column<Lst<T>>(col)) == value).find_all();
+    auto not_tv = (getter(table.column<Lst<T>>(col)) != value).find_all();
+
+    // Verify that all rows are present in one of the TVs and that each row in
+    // the TV should have matched the query
+    using OptionalT = typename AggregateValues<T>::OptionalT;
+    CHECK_EQUAL(tv.size() + not_tv.size(), table.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(handle_none(tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+    }
+    for (size_t i = 0; i < not_tv.size(); ++i) {
+        CHECK_NOT_EQUAL(handle_none(not_tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+    }
+}
+
+TEST_TYPES(Query_ListOfPrimitives_MinMax, int64_t, float, double, Decimal128, Timestamp)
+{
+    using T = TEST_TYPE;
+    auto values = AggregateValues<T>::values();
+    Table table;
+    auto col = generate_all_combinations<T>(table);
+
+    auto min = [](auto&& list) {
+        return list.min();
+    };
+    validate_aggregate_results<T>(test_context, table, col, null(), min);
+    for (auto value : values)
+        validate_aggregate_results<T>(test_context, table, col, value, min);
+
+    auto max = [](auto&& list) {
+        return list.max();
+    };
+    validate_aggregate_results<T>(test_context, table, col, null(), max);
+    for (auto value : values)
+        validate_aggregate_results<T>(test_context, table, col, value, max);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
