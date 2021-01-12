@@ -497,7 +497,7 @@ private:
             if (header_buffer[2] != 0 || header_buffer[3] != 0 || header_buffer[4] != 0 || header_buffer[5] != 0) {
                 // Message should be smaller than 4GB
                 // FIXME: We should introduce a maximum size for messages.
-                protocol_error = true;
+                set_protocol_error();
                 return;
             }
 
@@ -908,6 +908,31 @@ private:
         return true;
     }
 
+    std::pair<std::error_code, StringData> parse_close_message(const char* data, size_t size)
+    {
+        uint16_t error_code;
+        StringData error_message;
+        if (m_frame_reader.delivery_size < 2) {
+            // Error code 1005 is defined as
+            //     1005 is a reserved value and MUST NOT be set as a status code in a
+            //     Close control frame by an endpoint.  It is designated for use in
+            //     applications expecting a status code to indicate that no status
+            //     code was actually present.
+            // See https://tools.ietf.org/html/rfc6455#section-7.4.1 for more details
+            error_code = 1005;
+        }
+        else {
+            // Otherwise, the error code is the first two bytes of the body as a uint16_t in
+            // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
+            // details.
+            error_code = ntohs((m_frame_reader.delivery_buffer[1] << 8) | m_frame_reader.delivery_buffer[0]);
+            error_message = StringData(m_frame_reader.delivery_buffer + 2, m_frame_reader.delivery_size - 2);
+        }
+
+        std::error_code error_code_with_category{error_code, websocket::websocket_close_status_category()};
+        return std::make_pair(error_code_with_category, error_message);
+    }
+
     // frame_reader_loop() uses the frame_reader to read and process the incoming
     // WebSocket messages.
     void frame_reader_loop()
@@ -932,10 +957,12 @@ private:
                     should_continue = m_config.websocket_binary_message_received(m_frame_reader.delivery_buffer,
                                                                                  m_frame_reader.delivery_size);
                     break;
-                case websocket::Opcode::close:
-                    should_continue = m_config.websocket_close_message_received(m_frame_reader.delivery_buffer,
-                                                                                m_frame_reader.delivery_size);
+                case websocket::Opcode::close: {
+                    auto [error_code, error_message] =
+                        parse_close_message(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_close_message_received(error_code, error_message);
                     break;
+                }
                 case websocket::Opcode::ping:
                     should_continue = m_config.websocket_ping_message_received(m_frame_reader.delivery_buffer,
                                                                                m_frame_reader.delivery_size);
@@ -1053,6 +1080,48 @@ public:
 
 ErrorCategoryImpl g_error_category;
 
+class CloseStatusErrorCategory : public std::error_category {
+    const char* name() const noexcept final
+    {
+        return "realm::util::websocket::CloseStatus";
+    }
+    std::string message(int error_code) const final
+    {
+        // Converts an error_code to one of the pre-defined status codes in
+        // https://tools.ietf.org/html/rfc6455#section-7.4.1
+        switch (error_code) {
+            case 1000:
+                return "normal closure";
+            case 1001:
+                return "endpoint going away";
+            case 1002:
+                return "protocol error";
+            case 1003:
+                return "invalid data type";
+            case 1004:
+                return "reserved";
+            case 1005:
+                return "no status code present";
+            case 1006:
+                return "no close control frame sent";
+            case 1007:
+                return "message data type mis-match";
+            case 1008:
+                return "policy violation";
+            case 1009:
+                return "message too big";
+            case 1010:
+                return "missing extension";
+            case 1011:
+                return "unexpected error";
+            case 1015:
+                return "TLS handshake failure";
+            default:
+                return "unknown error";
+        };
+    }
+};
+
 } // unnamed namespace
 
 
@@ -1066,7 +1135,7 @@ bool websocket::Config::websocket_binary_message_received(const char*, size_t)
     return true;
 }
 
-bool websocket::Config::websocket_close_message_received(const char*, size_t)
+bool websocket::Config::websocket_close_message_received(std::error_code, StringData)
 {
     return true;
 }
@@ -1172,6 +1241,12 @@ util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& re
 const std::error_category& websocket::error_category() noexcept
 {
     return g_error_category;
+}
+
+const std::error_category& websocket::websocket_close_status_category() noexcept
+{
+    static const CloseStatusErrorCategory category = {};
+    return category;
 }
 
 std::error_code websocket::make_error_code(Error error_code) noexcept
