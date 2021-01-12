@@ -37,6 +37,9 @@
 #ifdef _WIN32
 #include <Windows.h>
 #include <set>
+#include <queue>
+#include <optional>
+#include <realm/util/function_ref.hpp>
 #endif
 
 // Theory of operation for windows implementation:
@@ -55,7 +58,10 @@
 // release this mutex if the process dies or is killed, so we will not be leaking the id. We try
 // to lock each number starting at 0 and going up until we are able to lock one, then use that as
 // our id. This ensures we get the lowest possible id that isn't currently in use to avoid raising
-// m_max_process_num unnecessarily.
+// m_max_process_num unnecessarily. We use a single dedicated thread for locking and unlocking this
+// mutex both to allow a different thread to destroy the ICV than created it, and to allow other
+// threads to continue using the ICV if the creating thread goes away, since windows will unlock
+// the mutex as soon as the thread dies, even if other threads in the process are still running.
 //
 // 2) The maximum process id is adjusted each time a new process joins and claims an id. If the
 // current value of m_max_process_num equals our id, nothing needs to be done. If our id is higher,
@@ -105,6 +111,93 @@ int64_t timediff(const timeval& tv1, const timespec& ts2)
 // Ensures we don't use the same process num twice for two ICVs within the same process.
 std::mutex g_process_nums_in_use_mutex;
 std::map<std::string, std::set<int32_t>> g_process_nums_in_use;
+
+// Provides a way to run a callable on a dedicated thread and wait for it to finish.
+// While this is general purpose functionality, the intended purpose is for owning mutexes that
+// would otherwise potentially be locked and unlocked on different threads.
+class MutexOwnerThread {
+public:
+    // Will block until task has run, and will return the result.
+    template <typename Func>
+    static auto run_on_thread(Func&& task) -> decltype(task())
+    {
+        using Result = decltype(task());
+        if constexpr (!std::is_same_v<Result, void>) {
+            std::optional<Result> out;
+            run_on_thread_impl([&] {
+                out.emplace(task());
+            });
+            return std::move(*out);
+        }
+        else {
+            run_on_thread_impl(task);
+        }
+    }
+
+private:
+    using Task = util::FunctionRef<void()>;
+    struct WorkItem {
+        std::condition_variable* cv;
+        bool* done;
+        Task task;
+    };
+
+    static void run_on_thread_impl(Task task)
+    {
+        auto& instance = get();
+
+        // In C++20, we could use std::atomic_bool::wait rather than a CV here.
+        std::condition_variable my_cv;
+        bool done = false;
+
+        auto lk = std::unique_lock(instance.mx);
+        instance.work.push({&my_cv, &done, task});
+        instance.worker_cv.notify_one();
+
+        my_cv.wait(lk, [&] {
+            return done;
+        });
+    }
+
+    MutexOwnerThread()
+        : worker([this] {
+            thread_loop();
+        })
+    {
+    }
+
+    static MutexOwnerThread& get() noexcept
+    {
+        // Note, intentionally not destroying at process end.
+        static MutexOwnerThread* const instance = new MutexOwnerThread();
+        return *instance;
+    }
+
+    void thread_loop() noexcept
+    {
+        auto lk = std::unique_lock(mx);
+        while (true) {
+            worker_cv.wait(lk, [&] {
+                return !work.empty();
+            });
+
+            auto work_item = std::move(work.front());
+            work.pop();
+            lk.unlock();
+            work_item.task();
+            lk.lock();
+            *work_item.done = true;
+            work_item.cv->notify_one();
+        }
+    }
+
+    std::queue<WorkItem> work;
+
+    std::mutex mx; // Guards work queue, as well as objects pointed to from WorkItems in the queue.
+    std::condition_variable worker_cv;
+    std::thread worker;
+};
+
 #else
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
 void notify_fd(int fd)
@@ -147,8 +240,11 @@ void InterprocessCondVar::close() noexcept
         m_fd_write = -1;
     }
 #else
-    if (m_my_mutex.handle)
-        m_my_mutex.unlock();
+    if (m_my_mutex.handle) {
+        MutexOwnerThread::run_on_thread([&] {
+            m_my_mutex.unlock();
+        });
+    }
 
     if (m_my_id != -1) {
         auto lk = std::lock_guard(g_process_nums_in_use_mutex);
@@ -258,7 +354,10 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
                 continue; // There is another ICV instance in this process for this CV.
 
             auto mutex = open_mutex(i);
-            if (mutex.try_lock()) {
+            if (MutexOwnerThread::run_on_thread([&] {
+                    return mutex.try_lock();
+                })) {
+                // We got the lock!
                 m_my_mutex = std::move(mutex);
                 m_my_id = i;
                 nums_in_use.insert(i);
