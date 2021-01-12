@@ -40,6 +40,11 @@ public:
         m_size = 0;
     }
 
+    ColKey get_keys_column_key() const
+    {
+        return m_keys_col;
+    }
+
     void add_columns()
     {
         insert_column(m_keys_col);
