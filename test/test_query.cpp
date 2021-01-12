@@ -1889,7 +1889,11 @@ template <typename T>
 struct AggregateValues {
     static std::vector<T> values()
     {
-        return {std::numeric_limits<T>::lowest(), T{-1}, T{0}, T{1}, std::numeric_limits<T>::max()};
+        std::vector<T> values = {std::numeric_limits<T>::lowest(), T{-1}, T{0}, T{1}, std::numeric_limits<T>::max()};
+        if (std::numeric_limits<T>::has_quiet_NaN) {
+            values.push_back(std::numeric_limits<T>::quiet_NaN());
+        }
+        return values;
     }
     using OptionalT = util::Optional<T>;
     static const constexpr util::None null = util::none;
@@ -1960,9 +1964,19 @@ void validate_aggregate_results(unit_test::TestContext& test_context, Table& tab
     // min() and max() return sentinel values if there's no non-null values in
     // the list so we want to turn that into a proper null result
     auto handle_none = [](auto&& list, auto& getter) -> decltype(getter(list)) {
-        if (list.size() == 0 || (list.size() == 1 && list.is_null(0)))
-            return none;
-        return getter(list);
+        for (size_t i = 0, size = list.size(); i < size; ++i) {
+            if constexpr (realm::is_any_v<T, float, double>) {
+                if (!list.is_null(i) && !std::isnan(*list.get(i))) {
+                    return getter(list);
+                }
+            }
+            else {
+                if (!list.is_null(i)) {
+                    return getter(list);
+                }
+            }
+        }
+        return none;
     };
 
     auto tv = (getter(table.column<Lst<T>>(col)) == value).find_all();

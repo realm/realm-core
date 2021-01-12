@@ -3724,12 +3724,27 @@ private:
 };
 
 namespace aggregate_operations {
+template <typename T>
+static bool is_nan(T value)
+{
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::isnan(value);
+    }
+    return false;
+}
+
+template <>
+inline bool is_nan<Decimal128>(Decimal128 value)
+{
+    return value.is_nan();
+}
+
 template <typename T, typename Compare>
 class MinMaxAggregateOperator {
 public:
     void accumulate(T value)
     {
-        if (!m_result || Compare()(value, *m_result)) {
+        if (!is_nan(value) && (!m_result || Compare()(value, *m_result))) {
             m_result = value;
         }
     }
@@ -3770,7 +3785,9 @@ class Sum {
 public:
     void accumulate(T value)
     {
-        m_result += value;
+        if (!is_nan(value)) {
+            m_result += value;
+        }
     }
 
     bool is_null() const
@@ -3796,8 +3813,10 @@ public:
     using ResultType = typename std::conditional<std::is_same_v<T, Decimal128>, Decimal128, double>::type;
     void accumulate(T value)
     {
-        m_count++;
-        m_result += value;
+        if (!is_nan(value)) {
+            m_count++;
+            m_result += value;
+        }
     }
 
     bool is_null() const
