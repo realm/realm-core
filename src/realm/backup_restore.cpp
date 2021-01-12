@@ -107,7 +107,7 @@ void BackupHandler::restore_from_backup(util::Logger& logger)
     for (auto v : m_accepted_versions) {
         if (backup_exists(m_prefix, v)) {
             auto backup_nm = backup_name(m_prefix, v);
-            logger.info("Restoring from backup: %s", backup_nm);
+            logger.info("Restoring from backup: %1", backup_nm);
             std::cout << "Restoring from:    " << backup_nm << std::endl;
             util::File::move(backup_nm, m_path);
             return;
@@ -152,7 +152,7 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     try {
         // ignore it, if attempt to get free space fails for any reason
         if (util::File::get_free_space(m_path) < util::File::get_size_static(m_path) * 2) {
-            logger.error("Insufficient free space for backup: %s", backup_nm);
+            logger.error("Insufficient free space for backup: %1", backup_nm);
             std::cout << "Insufficient free space for backup: " << backup_nm << std::endl;
             return;
         }
@@ -160,7 +160,7 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     catch (...) {
         // ignore error
     }
-    logger.info("Creating backup: %s", backup_nm);
+    logger.info("Creating backup: %1", backup_nm);
     std::cout << "Creating backup:   " << backup_nm << std::endl;
     std::string part_name = backup_nm + ".part";
     // The backup file should be a 1-1 copy, so that we can get the original
