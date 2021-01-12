@@ -2236,41 +2236,52 @@ TEST(Query_TwoCols0)
 
 TEST(Query_TwoSameCols)
 {
-    Table table;
+    Group g;
+    Table& table = *g.add_table("table");
     auto col_bool0 = table.add_column(type_Bool, "first1");
     auto col_bool1 = table.add_column(type_Bool, "first2");
     auto col_date2 = table.add_column(type_Timestamp, "second1");
     auto col_date3 = table.add_column(type_Timestamp, "second2");
     auto col_str4 = table.add_column(type_String, "third1");
     auto col_str5 = table.add_column(type_String, "third2");
+    auto col_obj1 = table.add_column(table, "obj1");
+    auto col_obj2 = table.add_column(table, "obj2");
 
     Timestamp d1(200, 0);
     Timestamp d2(300, 0);
-    ObjKey key0 = table.create_object().set_all(false, true, d1, d2, "a", "b").get_key();
-    ObjKey key1 = table.create_object().set_all(true, true, d2, d2, "b", "b").get_key();
-    table.create_object().set_all(false, true, d1, d2, "a", "b").get_key();
+    Obj obj0 = table.create_object();
+    ObjKey key0 = obj0.get_key();
+    obj0.set_all(false, true, d1, d2, "a", "b", key0);
+    ObjKey key1 = table.create_object().set_all(true, true, d2, d2, "b", "b", key0, key0).get_key();
+    table.create_object().set_all(false, true, d1, d2, "a", "b", key0, key1).get_key();
 
     Query q1 = table.column<Bool>(col_bool0) == table.column<Bool>(col_bool1);
     Query q2 = table.column<Timestamp>(col_date2) == table.column<Timestamp>(col_date3);
     Query q3 = table.column<String>(col_str4) == table.column<String>(col_str5);
+    Query q4 = table.column<Link>(col_obj1) == table.column<Link>(col_obj2);
 
     CHECK_EQUAL(key1, q1.find());
     CHECK_EQUAL(key1, q2.find());
     CHECK_EQUAL(key1, q3.find());
+    CHECK_EQUAL(key1, q4.find());
     CHECK_EQUAL(1, q1.count());
     CHECK_EQUAL(1, q2.count());
     CHECK_EQUAL(1, q3.count());
+    CHECK_EQUAL(1, q4.count());
 
-    Query q4 = table.column<Bool>(col_bool0) != table.column<Bool>(col_bool1);
-    Query q5 = table.column<Timestamp>(col_date2) != table.column<Timestamp>(col_date3);
-    Query q6 = table.column<String>(col_str4) != table.column<String>(col_str5);
+    Query q5 = table.column<Bool>(col_bool0) != table.column<Bool>(col_bool1);
+    Query q6 = table.column<Timestamp>(col_date2) != table.column<Timestamp>(col_date3);
+    Query q7 = table.column<String>(col_str4) != table.column<String>(col_str5);
+    Query q8 = table.column<Link>(col_obj1) != table.column<Link>(col_obj2);
 
-    CHECK_EQUAL(key0, q5.find());
     CHECK_EQUAL(key0, q5.find());
     CHECK_EQUAL(key0, q6.find());
-    CHECK_EQUAL(2, q5.count());
+    CHECK_EQUAL(key0, q7.find());
+    CHECK_EQUAL(key0, q8.find());
     CHECK_EQUAL(2, q5.count());
     CHECK_EQUAL(2, q6.count());
+    CHECK_EQUAL(2, q7.count());
+    CHECK_EQUAL(2, q8.count());
 }
 
 void construct_all_types_table(Table& table)
