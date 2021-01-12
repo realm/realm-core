@@ -4219,6 +4219,8 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, foo, "dict > 50", 50);
     verify_query(test_context, foo, "dict.Value > 50", expected);
+    verify_query(test_context, foo, "ANY dict.keys == 'Foo'", 20);
+    verify_query(test_context, foo, "NONE dict.keys == 'Value'", 23);
 
     verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict.Value > 50", 5);
