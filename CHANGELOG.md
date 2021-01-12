@@ -5,10 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* `App::call_function` now catches invalid json parse exceptions during a client timeout ([#4236](https://github.com/realm/realm-core/pull/4236)).
-* Fix a race condition which would lead to "uncaught exception in notifier thread: N5realm15InvalidTableRefE: transaction_ended" and a crash when the source Realm was closed or invalidated at a very specific time during the first run of a collection notifier ([#3761](https://github.com/realm/realm-core/issues/3761), since v6.0.0).
-* Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
-* Add comparison for source and desitnation transaction version when constructing `ConstTableView` ([#4254](https://github.com/realm/realm-core/pull/4254)).
+* Windows `InterprocessCondVar` changes reverted.
+* Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
  
 ### Breaking changes
 * None.
@@ -17,6 +15,21 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.3.3 Release notes
+
+### Fixed
+* `App::call_function` now catches invalid json parse exceptions during a client timeout.
+* Fix a race condition which would lead to "uncaught exception in notifier thread: N5realm15InvalidTableRefE: transaction_ended" and a crash when the source Realm was closed or invalidated at a very specific time during the first run of a collection notifier ([#3761](https://github.com/realm/realm-core/issues/3761), since v6.0.0).
+* Deleting and recreating objects with embedded objects may fail ([#4240](https://github.com/realm/realm-core/pull/4240), since v10.0.0)
+* SSL certificate validation would fail due to a build misconfiguration on Windows ([#4213](https://github.com/realm/realm-core/issues/4213), since v10.2.0).
+* Fix implementation of `InterprocessCondVar` on Windows to not hang in the face of process death. ([#4174](https://github.com/realm/realm-core/issues/4174))
+* Snapshotting a list of objects may trigger an assertion ([#4114](https://github.com/realm/realm-core/issues/4114), since v10.0.0)
+
+### Breaking changes
+* The lock file format has changed, so a single Realm file may not be concurrently opened by processes running older and newer versions of Realm Database. Note that concurrently accessing a file with multiple versions of Realm is never officially supported.
 
 ----------------------------------------------
 
