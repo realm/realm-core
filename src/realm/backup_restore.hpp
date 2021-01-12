@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include <realm/util/logger.hpp>
+
 namespace realm {
 
 class BackupHandler {
@@ -29,9 +31,10 @@ public:
     BackupHandler(const std::string& path, const version_list_t& accepted, const version_time_list_t& to_be_deleted);
     bool is_accepted_file_format(int current_file_format_version);
     bool must_restore_from_backup(int current_file_format_version);
-    void restore_from_backup();
+    void restore_from_backup(util::Logger& logger);
     void cleanup_backups();
-    void backup_realm_if_needed(int current_file_format_version, int target_file_format_version);
+    void backup_realm_if_needed(int current_file_format_version, int target_file_format_version,
+                                util::Logger& logger);
     std::string get_prefix();
 
     static std::string get_prefix_from_path(const std::string& path);
