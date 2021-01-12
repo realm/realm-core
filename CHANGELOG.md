@@ -1,14 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Add optional AppError in app::Response  
+* None.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Windows `InterprocessCondVar` changes reverted.
  
 ### Breaking changes
-* None.
+* Add `status` property to `app::Response` to reflect the request result. Optional `body` or `error` property will store the corresponding value.    
 
 -----------
 
