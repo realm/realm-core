@@ -1,20 +1,18 @@
 ---
 name: Bug report
-about: You think you have found a bug!
+about: You think you have found a buggy behaviour - not a crash. NOTE: Report SDK specific issues in the SDK specific repo.
 
 ---
 
-#### Goal
+#### Expected results
 <!-- What do you want to achieve? -->
 
 #### Actual Results
-<!-- What happened? If an exception was thrown please copy/paste the stack trace -->
+<!-- What happened instead? -->
 
 #### Steps & Code to Reproduce
-<!-- What steps resulted in the crash? Please show any relevant code or steps that can be used to -->
-<!-- reproduce it. Even better is a full sample project -->
-<!-- that can reproduce the crash. Code and realm files can be shared privately at help@realm.io if needed. -->
+<!-- What steps resulted in the unexpected behavior? -->
+<!-- Please show any relevant code or even better is a full sample project that can reproduce the problem -->
 
-#### Version of Realm
-
-SDK and version(s): ?
+#### Core version
+Core version: ?
