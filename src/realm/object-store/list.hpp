@@ -51,6 +51,7 @@ public:
     List& operator=(List&&);
 
     Query get_query() const;
+    ConstTableRef get_table() const;
 
     void move(size_t source_ndx, size_t dest_ndx);
     void remove(size_t list_ndx);

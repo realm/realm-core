@@ -934,6 +934,26 @@ Query Results::get_query() const
     return do_get_query();
 }
 
+ConstTableRef Results::get_table() const
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+        case Mode::Query:
+            return const_cast<Query&>(m_query).get_table();
+        case Mode::TableView:
+            return m_table_view.get_target_table();
+        case Mode::Collection:
+        case Mode::LinkList:
+        case Mode::LinkSet:
+            return m_collection->get_target_table();
+        case Mode::Table:
+            return m_table;
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
+}
+
 Query Results::do_get_query() const
 {
     validate_read();
@@ -1109,11 +1129,6 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
             case DescriptorType::Limit: {
                 auto limit = dynamic_cast<const LimitDescriptor*>(ordering[i]);
                 new_order.append_limit(std::move(*limit));
-                break;
-            }
-            case DescriptorType::Include: {
-                auto include = dynamic_cast<const IncludeDescriptor*>(ordering[i]);
-                new_order.append_include(std::move(*include));
                 break;
             }
         }

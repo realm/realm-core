@@ -209,7 +209,8 @@ TEST(Mixed_Compare)
     CHECK(Mixed(0 - int64_t(0x1234567812345678)) > Mixed(-1.e19));  // double more negative than most negative int
     CHECK(Mixed(nan("123")) < 5);
 
-    CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
+    std::string str("Hello");
+    CHECK(Mixed(str) == Mixed(BinaryData(str)));
     CHECK_NOT(Mixed::types_are_comparable(Mixed(), Mixed()));
     CHECK(Mixed() == Mixed());
     CHECK(Mixed(0.f) < Mixed(1));

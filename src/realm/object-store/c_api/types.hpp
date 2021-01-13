@@ -10,8 +10,6 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_accessor.hpp>
-#include <realm/parser/parser.hpp>
-#include <realm/parser/query_builder.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 

@@ -77,6 +77,7 @@ public:
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const

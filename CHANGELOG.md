@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Query parser supports property names containing white space. White space characters must be excapes with a '\'.
 * Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
 
 ### Fixed
@@ -10,7 +11,8 @@
 * Windows `InterprocessCondVar` changes reverted.
  
 ### Breaking changes
-* None.
+* Support for IncludeDescriptor has been removed.
+* The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
 
 -----------
 

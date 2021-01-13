@@ -1,70 +1,44 @@
-////////////////////////////////////////////////////////////////////////////
-//
-// Copyright 2015 Realm Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-////////////////////////////////////////////////////////////////////////////
+/*************************************************************************
+ *
+ * Copyright 2016 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
-#ifndef REALM_QUERY_BUILDER_HPP
-#define REALM_QUERY_BUILDER_HPP
+#ifndef REALM_PARSER_QUERY_PARSER_HPP
+#define REALM_PARSER_QUERY_PARSER_HPP
 
-#include <string>
-#include <memory>
-#include <vector>
-
-#include <realm/binary_data.hpp>
-#include <realm/decimal128.hpp>
-#include <realm/parser/keypath_mapping.hpp>
-#include <realm/null.hpp>
-#include <realm/object_id.hpp>
 #include <realm/string_data.hpp>
+#include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
-#include <realm/table.hpp>
-#include <realm/util/any.hpp>
+#include <realm/keys.hpp>
+#include <realm/object_id.hpp>
+#include <realm/decimal128.hpp>
+#include <realm/uuid.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/util/any.hpp>
 
-namespace realm {
-class Query;
-class Realm;
-class Table;
-template<typename> class BasicRowExpr;
-using RowExpr = BasicRowExpr<Table>;
+namespace realm::query_parser {
 
-namespace parser {
-    struct Predicate;
-    struct DescriptorOrderingState;
-}
-
-namespace query_builder {
-class Arguments;
-
-void apply_predicate(Query& query, const parser::Predicate& predicate, Arguments& arguments,
-                     parser::KeyPathMapping mapping = parser::KeyPathMapping());
-
-void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state,
-                    Arguments& arguments, parser::KeyPathMapping mapping = parser::KeyPathMapping());
-void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const parser::DescriptorOrderingState& state,
-                    parser::KeyPathMapping mapping = parser::KeyPathMapping());
-
-
-struct AnyContext
-{
-    template<typename T>
-    T unbox(const util::Any& wrapper) {
+struct AnyContext {
+    template <typename T>
+    T unbox(const util::Any& wrapper)
+    {
         return util::any_cast<T>(wrapper);
     }
-    bool is_null(const util::Any& wrapper) {
+    bool is_null(const util::Any& wrapper)
+    {
         if (!wrapper.has_value()) {
             return true;
         }
@@ -73,10 +47,49 @@ struct AnyContext
         }
         return false;
     }
+    DataType get_type_of(const util::Any& wrapper)
+    {
+        const std::type_info& type{wrapper.type()};
+        if (type == typeid(int64_t)) {
+            return type_Int;
+        }
+        if (type == typeid(StringData)) {
+            return type_String;
+        }
+        if (type == typeid(Timestamp)) {
+            return type_Timestamp;
+        }
+        if (type == typeid(double)) {
+            return type_Double;
+        }
+        if (type == typeid(bool)) {
+            return type_Bool;
+        }
+        if (type == typeid(float)) {
+            return type_Float;
+        }
+        if (type == typeid(BinaryData)) {
+            return type_Binary;
+        }
+        if (type == typeid(ObjKey)) {
+            return type_Link;
+        }
+        if (type == typeid(ObjectId)) {
+            return type_ObjectId;
+        }
+        if (type == typeid(Decimal128)) {
+            return type_Decimal;
+        }
+        if (type == typeid(UUID)) {
+            return type_UUID;
+        }
+        return DataType(-1);
+    }
 };
 
 class Arguments {
 public:
+    virtual ~Arguments();
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;
@@ -89,28 +102,52 @@ public:
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
+    virtual DataType type_for_argument(size_t argument_index) = 0;
 
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
     std::vector<util::StringBuffer> buffer_space;
 };
 
-template<typename ValueType, typename ContextType>
+
+template <typename ValueType, typename ContextType>
 class ArgumentConverter : public Arguments {
 public:
     ArgumentConverter(ContextType& context, const ValueType* arguments, size_t count)
-    : m_ctx(context)
-    , m_arguments(arguments)
-    , m_count(count)
-    {}
+        : m_ctx(context)
+        , m_arguments(arguments)
+        , m_count(count)
+    {
+    }
 
-    bool bool_for_argument(size_t i) override { return get<bool>(i); }
-    long long long_for_argument(size_t i) override { return get<int64_t>(i); }
-    float float_for_argument(size_t i) override { return get<float>(i); }
-    double double_for_argument(size_t i) override { return get<double>(i); }
-    StringData string_for_argument(size_t i) override { return get<StringData>(i); }
-    BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
-    Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
+    bool bool_for_argument(size_t i) override
+    {
+        return get<bool>(i);
+    }
+    long long long_for_argument(size_t i) override
+    {
+        return get<int64_t>(i);
+    }
+    float float_for_argument(size_t i) override
+    {
+        return get<float>(i);
+    }
+    double double_for_argument(size_t i) override
+    {
+        return get<double>(i);
+    }
+    StringData string_for_argument(size_t i) override
+    {
+        return get<StringData>(i);
+    }
+    BinaryData binary_for_argument(size_t i) override
+    {
+        return get<BinaryData>(i);
+    }
+    Timestamp timestamp_for_argument(size_t i) override
+    {
+        return get<Timestamp>(i);
+    }
     ObjectId objectid_for_argument(size_t i) override
     {
         return get<ObjectId>(i);
@@ -153,7 +190,12 @@ private:
         return m_arguments[index];
     }
 
-    template<typename T>
+    DataType type_for_argument(size_t i) override
+    {
+        return m_ctx.get_type_of(at(i));
+    }
+
+    template <typename T>
     T get(size_t index) const
     {
         return m_ctx.template unbox<T>(at(index));
@@ -218,9 +260,15 @@ public:
     {
         throw NoArgsError();
     }
+    DataType type_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
 };
 
-} // namespace query_builder
-} // namespace realm
+void parse(const std::string&);
 
-#endif // REALM_QUERY_BUILDER_HPP
+} // namespace realm::query_parser
+
+
+#endif /* REALM_PARSER_QUERY_PARSER_HPP */

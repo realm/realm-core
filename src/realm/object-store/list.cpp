@@ -66,9 +66,14 @@ List::List(std::shared_ptr<Realm> r, const LstBase& list)
 
 Query List::get_query() const
 {
+    return get_table()->where(as<Obj>());
+}
+
+ConstTableRef List::get_table() const
+{
     verify_attached();
     if (m_type == PropertyType::Object)
-        return static_cast<LnkLst&>(*m_list_base).get_target_table()->where(as<Obj>());
+        return m_list_base->get_target_table();
     throw std::runtime_error("not implemented");
 }
 
