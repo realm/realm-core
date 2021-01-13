@@ -513,7 +513,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         REQUIRE(second_manager.client_uuid() == first_client_uuid);
     }
 }
-#include "sync_test_utils.hpp"
+
 TEST_CASE("sync_metadata: encryption", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {

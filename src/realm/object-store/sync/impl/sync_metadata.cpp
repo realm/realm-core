@@ -435,7 +435,7 @@ util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_meta
 
 std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
 {
-    SharedRealm realm = Realm::get_shared_realm(m_metadata_config);
+    auto realm = Realm::get_shared_realm(m_metadata_config);
     realm->refresh();
     return realm;
 }
