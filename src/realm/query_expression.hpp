@@ -142,6 +142,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/query.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+#include <realm/query_value.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
@@ -796,6 +797,8 @@ template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
 template <class oper, class TLeft = Subexpr>
 class SizeOperator;
+template <class oper>
+class TypeOfValueOperator;
 template <class TCond>
 class Compare;
 template <bool has_links>
@@ -1161,6 +1164,19 @@ public:
 
     using T = Mixed; // used inside the following macros for operator overloads
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
+};
+
+template <>
+class Subexpr2<TypeOfValue> : public Subexpr, public Overloads<TypeOfValue, TypeOfValue> {
+public:
+    Query equal(TypeOfValue v);
+    Query equal(const TypeOfValueOperator<Mixed>& col);
+    Query not_equal(TypeOfValue v);
+    Query not_equal(const TypeOfValueOperator<Mixed>& col);
+    DataType get_type() const final
+    {
+        return type_TypeOfValue;
+    }
 };
 
 struct TrueExpression : Expression {
@@ -2143,6 +2159,11 @@ public:
         return SizeOperator<T>(this->clone());
     }
 
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
+    }
+
 private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
@@ -2633,6 +2654,74 @@ private:
     std::unique_ptr<TExpr> m_expr;
 };
 
+template <class T>
+class TypeOfValueOperator : public Subexpr2<TypeOfValue> {
+public:
+    TypeOfValueOperator(std::unique_ptr<Subexpr> left)
+        : m_expr(std::move(left))
+    {
+    }
+
+    TypeOfValueOperator(const TypeOfValueOperator& other)
+        : m_expr(other.m_expr->clone())
+    {
+    }
+
+    ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_expr->get_comparison_type();
+    }
+
+    // See comment in base class
+    void set_base_table(ConstTableRef table) override
+    {
+        m_expr->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_expr->set_cluster(cluster);
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    ConstTableRef get_base_table() const override
+    {
+        return m_expr->get_base_table();
+    }
+
+    // destination = operator(left)
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<T> v;
+        m_expr->evaluate(index, v);
+
+        size_t sz = v.size();
+        destination.init(v.m_from_link_list, sz);
+
+        for (size_t i = 0; i < sz; i++) {
+            auto elem = v[i].template get<T>();
+            destination.set(i, TypeOfValue(elem));
+        }
+    }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        if (m_expr) {
+            return m_expr->description(state) + util::serializer::value_separator + "@type";
+        }
+        return "@size";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new TypeOfValueOperator(*this));
+    }
+
+private:
+    std::unique_ptr<Subexpr> m_expr;
+};
+
 class KeyValue : public Subexpr2<Link> {
 public:
     KeyValue(ObjKey key)
@@ -2925,6 +3014,11 @@ public:
     ColumnListElementLength<T> element_lengths() const
     {
         return {*this};
+    }
+
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
     }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const

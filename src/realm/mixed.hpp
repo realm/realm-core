@@ -32,6 +32,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <realm/uuid.hpp>
+#include <realm/query_value.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -142,6 +143,7 @@ public:
     Mixed(UUID) noexcept;
     Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
+    Mixed(TypeOfValue val) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -408,6 +410,13 @@ inline Mixed::Mixed(ObjLink v) noexcept
     }
 }
 
+inline Mixed::Mixed(TypeOfValue v) noexcept
+{
+    m_type = int(type_TypeOfValue) + 1;
+    int_val = v.get_attributes();
+}
+
+
 template <>
 inline null Mixed::get<null>() const noexcept
 {
@@ -572,6 +581,13 @@ inline Mixed Mixed::get<Mixed>() const noexcept
 inline ObjLink Mixed::get_link() const
 {
     return get<ObjLink>();
+}
+
+template <>
+inline TypeOfValue Mixed::get<TypeOfValue>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_TypeOfValue);
+    return TypeOfValue(int_val);
 }
 
 inline bool Mixed::is_null() const

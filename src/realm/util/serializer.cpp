@@ -171,6 +171,12 @@ std::string print_value<>(realm::UUID uuid)
     return "uuid(" + uuid.to_string() + ")";
 }
 
+template <>
+std::string print_value<>(realm::TypeOfValue type)
+{
+    return '"' + type.to_string() + '"';
+}
+
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.
 // This assumes that columns can start with '$' and that we might one day want to support
