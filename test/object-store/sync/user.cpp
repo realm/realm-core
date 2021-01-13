@@ -146,7 +146,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
     auto sync_manager = init_sync_manager.app()->sync_manager();
     auto file_manager = SyncFileManager(base_path, "baz_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
 
     SECTION("properly persists a user's information upon creation") {
         const std::string identity = "test_identity_1";

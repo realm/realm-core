@@ -274,7 +274,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path, "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
     using Cfg = TestSyncManager::Config;
 
     const std::string url_1 = "https://realm.example.org/1/";
@@ -377,7 +377,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 
     auto file_manager = SyncFileManager(base_path, "bar_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
 
     const std::string realm_url = "https://example.realm.com/~/1";
     const std::string uuid_1 = "uuid-foo-1";
