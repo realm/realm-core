@@ -107,15 +107,17 @@ void BackupHandler::restore_from_backup(util::Logger& logger)
     for (auto v : m_accepted_versions) {
         if (backup_exists(m_prefix, v)) {
             auto backup_nm = backup_name(m_prefix, v);
-            logger.info("Restoring from backup: %1", backup_nm);
-            std::cout << "Restoring from:    " << backup_nm << std::endl;
+            char buf[100];
+            std::time_t t = std::time(nullptr);
+            std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
+            logger.info("%1 : Restoring from backup: %2", buf, backup_nm);
             util::File::move(backup_nm, m_path);
             return;
         }
     }
 }
 
-void BackupHandler::cleanup_backups()
+void BackupHandler::cleanup_backups(util::Logger& logger)
 {
     auto now = time(nullptr);
     for (auto v : m_delete_versions) {
@@ -126,7 +128,10 @@ void BackupHandler::cleanup_backups()
                 auto last_modified = util::File::last_write_time(fn);
                 double diff = difftime(now, last_modified);
                 if (diff > v.second) {
-                    std::cout << "Removing backup:   " << fn << "  - age: " << diff << std::endl;
+                    char buf[100];
+                    std::time_t t = std::time(nullptr);
+                    std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
+                    logger.info("%1 : Removing old backup: %2   (age %3)", buf, fn, diff);
                     util::File::remove(fn);
                 }
             }
@@ -140,28 +145,32 @@ void BackupHandler::cleanup_backups()
 void BackupHandler::backup_realm_if_needed(int current_file_format_version, int target_file_format_version,
                                            util::Logger& logger)
 {
+    char buf[100];
     if (current_file_format_version == 0)
         return;
     if (current_file_format_version >= target_file_format_version)
         return;
     std::string backup_nm = backup_name(m_prefix, current_file_format_version);
     if (util::File::exists(backup_nm)) {
-        std::cout << "Backup file already exists: " << backup_nm << std::endl;
         return;
     }
     try {
         // ignore it, if attempt to get free space fails for any reason
         if (util::File::get_free_space(m_path) < util::File::get_size_static(m_path) * 2) {
-            logger.error("Insufficient free space for backup: %1", backup_nm);
-            std::cout << "Insufficient free space for backup: " << backup_nm << std::endl;
+            std::time_t t = std::time(nullptr);
+            std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
+            logger.error("%1 : Insufficient free space for backup: %2", buf, backup_nm);
             return;
         }
     }
     catch (...) {
         // ignore error
     }
-    logger.info("Creating backup: %1", backup_nm);
-    std::cout << "Creating backup:   " << backup_nm << std::endl;
+    {
+        std::time_t t = std::time(nullptr);
+        std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
+        logger.info("%1 : Creating backup: %2", buf, backup_nm);
+    }
     std::string part_name = backup_nm + ".part";
     // The backup file should be a 1-1 copy, so that we can get the original
     // contents including unchanged layout of data, freelists, etc
@@ -171,6 +180,9 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     try {
         util::File::copy(m_path, part_name);
         util::File::move(part_name, backup_nm);
+        std::time_t t = std::time(nullptr);
+        std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
+        logger.info("%1 : Completed backup: %2", buf, backup_nm);
     }
     catch (...) {
         try {

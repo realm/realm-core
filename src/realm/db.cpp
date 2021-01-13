@@ -983,7 +983,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            logger = std::make_shared<util::FileLogger>(m_db_path + ".log_data");
+            logger = std::make_shared<util::AppendToFileLogger>(m_db_path + ".log_data");
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -1042,7 +1042,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // one:
                 continue;
             }
-            backup.cleanup_backups();
+            backup.cleanup_backups(*logger);
 
             // From here on, if we fail in any way, we must detach the
             // allocator.
