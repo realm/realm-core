@@ -9,6 +9,7 @@
 * Windows `InterprocessCondVar` changes reverted.
 * Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
 * `@min` and `@max` queries on a list of float, double or Decimal128 values could match the incorrect value if NaN or null was present in the list (since 5.0.0).
+* Opening a metadata realm with the wrong encryption key will remove that metadata realm and create a new realm using the new key. [#4285](https://github.com/realm/realm-core/pull/4285)
  
 ### Breaking changes
 * None.
