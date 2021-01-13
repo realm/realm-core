@@ -1233,6 +1233,13 @@ Query Table::query(const std::string& query_string, const std::vector<Mixed>& ar
     return query(query_string, args, {});
 }
 
+Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                   const query_parser::KeyPathMapping& mapping) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, mapping);
+}
+
 Query Table::query(const std::string& query_string, query_parser::Arguments& args,
                    const query_parser::KeyPathMapping& mapping) const
 {
