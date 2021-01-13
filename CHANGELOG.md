@@ -15,6 +15,8 @@
  
 ### Breaking changes
 * The lock file format has changed, so a single Realm file may not be concurrently opened by processes running older and newer versions of Realm Database. Note that concurrently accessing a file with multiple versions of Realm is never officially supported.
+* Support for IncludeDescriptor has been removed.
+* The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
 
 -----------
 
