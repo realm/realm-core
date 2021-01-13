@@ -1118,7 +1118,7 @@ TEST(Parser_TwoColumnAggregates)
         obj.set(item_price_col, item_info[i].second);
         obj.set(item_price_float_col, float(item_info[i].second));
         obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
-        obj.set(item_creation_date, Timestamp(item_info[i].second * 10, 0));
+        obj.set(item_creation_date, Timestamp(static_cast<int64_t>(item_info[i].second * 10), 0));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5

@@ -3730,7 +3730,11 @@ static bool is_nan(T value)
     if constexpr (std::is_floating_point_v<T>) {
         return std::isnan(value);
     }
-    return false;
+    else {
+        // gcc considers the argument unused if it's only used in one branch of if constexpr
+        static_cast<void>(value);
+        return false;
+    }
 }
 
 template <>
