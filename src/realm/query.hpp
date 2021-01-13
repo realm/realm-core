@@ -175,6 +175,18 @@ public:
     Query& less(ColKey column_key, Decimal128 value);
     Query& between(ColKey column_key, Decimal128 from, Decimal128 to);
 
+    // Conditions: Mixed
+    Query& equal(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& not_equal(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& greater(ColKey column_key, Mixed value);
+    Query& greater_equal(ColKey column_key, Mixed value);
+    Query& less(ColKey column_key, Mixed value);
+    Query& less_equal(ColKey column_key, Mixed value);
+    Query& begins_with(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& ends_with(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& contains(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& like(ColKey column_key, Mixed value, bool case_sensitive = true);
+
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);
     Query& size_not_equal(ColKey column_key, int64_t value);

@@ -12,6 +12,8 @@ GTAGS
 /gcovr.xml
 /tmp
 doc/html
+/html
+coverage-*
 
 # CMake artifacts
 CMakeFiles

@@ -1,3 +1,5 @@
+add_subdirectory(c_api)
+
 set(SOURCES
     binding_callback_thread_observer.cpp
     collection_notifications.cpp
@@ -80,7 +82,10 @@ set(HEADERS
     util/scheduler.hpp
     util/tagged_bool.hpp
     util/tagged_string.hpp
-    util/uuid.hpp)
+    util/uuid.hpp
+
+    c_api/conversion.hpp
+)
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS

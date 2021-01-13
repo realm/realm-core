@@ -1923,6 +1923,53 @@ TEST(Query_SetOfPrimitives)
     CHECK_EQUAL(tv.get_key(0), keys[2]);
 }
 
+TEST(Query_SetOfObjects)
+{
+    Group g;
+
+    TableRef table = g.add_table("foo");
+    TableRef table_bar = g.add_table("bar");
+
+    std::vector<ObjKey> bar_keys;
+    auto col_string = table_bar->add_column(type_String, "name");
+    table_bar->create_objects(3, bar_keys);
+    table_bar->get_object(bar_keys[0]).set(col_string, "zero");
+    table_bar->get_object(bar_keys[1]).set(col_string, "one");
+    table_bar->get_object(bar_keys[2]).set(col_string, "two");
+
+    auto col_obj_set = table->add_column_set(*table_bar, "objects");
+    std::vector<ObjKey> keys;
+
+    table->create_objects(4, keys);
+
+    auto set_values = [](Set<ObjKey> set, const std::vector<ObjKey>& value_list) {
+        for (auto val : value_list)
+            set.insert(val);
+    };
+
+    set_values(table->get_object(keys[0]).get_set<ObjKey>(col_obj_set), {bar_keys[0], bar_keys[1]});
+    set_values(table->get_object(keys[1]).get_set<ObjKey>(col_obj_set), {bar_keys[2]});
+    set_values(table->get_object(keys[2]).get_set<ObjKey>(col_obj_set), {bar_keys[0], bar_keys[1], bar_keys[2]});
+
+    Query q = table->where().links_to(col_obj_set, bar_keys[0]);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
+    CHECK_EQUAL(tv.get_key(1), keys[2]);
+
+    q = table->where().links_to(col_obj_set, {bar_keys[0], bar_keys[2]});
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv.get_key(0), keys[0]);
+    CHECK_EQUAL(tv.get_key(1), keys[1]);
+    CHECK_EQUAL(tv.get_key(2), keys[2]);
+
+    q = table->column<Set<ObjKey>>(col_obj_set).size() == 3;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
@@ -3451,7 +3498,7 @@ TEST(Query_FindAllContains2_2)
     ttt.create_object().set_all(8, "oobar");
 
     // FIXME: UTF-8 case handling is only implemented on msw for now
-    Query q1 = ttt.where().contains(col_str, "foO", false);
+    Query q1 = ttt.where().contains(col_str, StringData("foO"), false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
     CHECK_EQUAL(0, tv1.get(0).get<Int>(col_int));
@@ -3460,7 +3507,7 @@ TEST(Query_FindAllContains2_2)
     CHECK_EQUAL(3, tv1.get(3).get<Int>(col_int));
     CHECK_EQUAL(4, tv1.get(4).get<Int>(col_int));
     CHECK_EQUAL(5, tv1.get(5).get<Int>(col_int));
-    Query q2 = ttt.where().contains(col_str, "foO", true);
+    Query q2 = ttt.where().contains(col_str, StringData("foO"), true);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(3, tv2.get(0).get<Int>(col_int));
@@ -5815,7 +5862,10 @@ TEST(Query_StringNodeEqualBaseBug)
         table->create_object().set(col_type, "project").set(col_tags, "tag001");
     }
 
-    Query q = table->where().equal(col_type, "test", false).Or().contains(col_tags, "tag005", false);
+    Query q = table->where()
+                  .equal(col_type, StringData("test"), false)
+                  .Or()
+                  .contains(col_tags, StringData("tag005"), false);
     auto tv = q.find_all();
     CHECK_EQUAL(tv.size(), 0);
     table->begin()->set(col_type, "task");
@@ -5844,7 +5894,7 @@ TEST(Query_OptimalNode)
         obj.set(col_tags, tags);
     }
 
-    auto q1 = table->where().equal(col_type, "todo0", false);
+    auto q1 = table->where().equal(col_type, StringData("todo0"), false);
     q1.count(); // Warm up
     auto t1 = steady_clock::now();
     auto cnt = q1.count();
@@ -5853,7 +5903,7 @@ TEST(Query_OptimalNode)
     auto dur1 = duration_cast<microseconds>(t2 - t1).count();
     // std::cout << "cnt: " << cnt << " dur1: " << dur1 << " us" << std::endl;
 
-    auto q2 = table->where().contains(col_tags, "tag0", false);
+    auto q2 = table->where().contains(col_tags, StringData("tag0"), false);
     q2.count(); // Warm up
     t1 = steady_clock::now();
     cnt = q2.count();

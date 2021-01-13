@@ -808,62 +808,63 @@ Query create(L left, const Subexpr2<R>& right)
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-    if constexpr (REALM_OLDQUERY_FALLBACK &&
-                  ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
-                   (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
-                   (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
-                   (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
-                   (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
-                   (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>))) {
-        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-        // TODO: recognize size operator expressions
-        // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    if constexpr (REALM_OLDQUERY_FALLBACK) {
+        if constexpr ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+                      (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
+                      (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
+                      (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
+                      (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
+                      (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
+                      (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
+                      (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>) || std::is_same_v<R, Mixed>) {
+            const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+            // TODO: recognize size operator expressions
+            // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-        if (column && !column->links_exist()) {
-            ConstTableRef t = column->get_base_table();
-            Query q = Query(t);
+            if (column && !column->links_exist()) {
+                ConstTableRef t = column->get_base_table();
+                Query q = Query(t);
 
-            if (std::is_same_v<Cond, Less>)
-                q.greater(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Greater>)
-                q.less(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Equal>)
-                q.equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, NotEqual>)
-                q.not_equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, LessEqual>)
-                q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, GreaterEqual>)
-                q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, EqualIns>)
-                q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, NotEqualIns>)
-                q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, BeginsWith>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, BeginsWithIns>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, EndsWith>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, EndsWithIns>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Contains>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, ContainsIns>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Like>)
-                q.like(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, LikeIns>)
-                q.like(column->column_key(), _impl::only_string_op_types(left), false);
-            else {
-                // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp
-                // or fallback to using use 'return new Compare<>' instead.
-                REALM_ASSERT(false);
+                if (std::is_same_v<Cond, Less>)
+                    q.greater(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Greater>)
+                    q.less(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Equal>)
+                    q.equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, NotEqual>)
+                    q.not_equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, LessEqual>)
+                    q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, GreaterEqual>)
+                    q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, EqualIns>)
+                    q.equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, NotEqualIns>)
+                    q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, BeginsWith>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, BeginsWithIns>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, EndsWith>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, EndsWithIns>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Contains>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, ContainsIns>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Like>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, LikeIns>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left), false);
+                else {
+                    // query_engine.hpp does not support this Cond. Please either add support for it in
+                    // query_engine.hpp or fallback to using use 'return new Compare<>' instead.
+                    REALM_ASSERT(false);
+                }
+                // Return query_engine.hpp node
+                return q;
             }
-            // Return query_engine.hpp node
-            return q;
         }
     }
 
@@ -1041,6 +1042,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
                  public Overloads<T, UUID>,
+                 public Overloads<T, Mixed>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2() {}
@@ -1062,6 +1064,7 @@ public:
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
     RLM_U2(UUID, o)                                                                                                  \
+    RLM_U2(Mixed, o)                                                                                                 \
     RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
@@ -1118,6 +1121,42 @@ public:
     }
 };
 
+template <>
+class Subexpr2<Mixed> : public Subexpr,
+                        public Overloads<Mixed, Mixed>,
+                        public Overloads<Mixed, const char*>,
+                        public Overloads<Mixed, int>,
+                        public Overloads<Mixed, float>,
+                        public Overloads<Mixed, double>,
+                        public Overloads<Mixed, int64_t>,
+                        public Overloads<Mixed, StringData>,
+                        public Overloads<Mixed, bool>,
+                        public Overloads<Mixed, Timestamp>,
+                        public Overloads<Mixed, ObjectId>,
+                        public Overloads<Mixed, Decimal128>,
+                        public Overloads<Mixed, UUID>,
+                        public Overloads<Mixed, null> {
+public:
+    Query equal(Mixed sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query not_equal(Mixed sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query begins_with(Mixed sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query ends_with(Mixed sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query contains(Mixed sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query like(Mixed sd, bool case_sensitive = true);
+    Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    DataType get_type() const final
+    {
+        return type_Mixed;
+    }
+
+    using T = Mixed; // used inside the following macros for operator overloads
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
+};
 
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
@@ -2146,12 +2185,6 @@ private:
     ArrayInteger* m_leaf_ptr = nullptr;
 };
 
-// Columns<Mixed> == String
-inline Query operator==(Columns<Mixed>&& left, const char* right)
-{
-    return left == StringData(right);
-}
-
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
@@ -2219,6 +2252,24 @@ Query binary_compare(const Subexpr2<BinaryData>& left, const Subexpr2<BinaryData
         return make_expression<Compare<I>>(right.clone(), left.clone());
 }
 
+template <class T, class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, T right, bool case_sensitive)
+{
+    Mixed data(right);
+    if (case_sensitive)
+        return create<S>(data, left);
+    else
+        return create<I>(data, left);
+}
+
+template <class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, const Subexpr2<Mixed>& right, bool case_sensitive)
+{
+    if (case_sensitive)
+        return make_expression<Compare<S>>(right.clone(), left.clone());
+    else
+        return make_expression<Compare<I>>(right.clone(), left.clone());
+}
 
 // Columns<String> == Columns<String>
 inline Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)

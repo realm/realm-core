@@ -27,7 +27,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(ANDROID)
+if(NOT APPLE)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 elseif(APPLE)
@@ -160,7 +160,7 @@ if(UNIX)
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
-if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+if (NOT APPLE)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
 else()
     set(REALM_INCLUDE_CERTS_DEFAULT OFF)
@@ -177,7 +177,7 @@ option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
-option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" REALM_INCLUDE_CERTS_DEFAULT)
+option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
@@ -291,6 +291,8 @@ set(REALM_EXPORTED_TARGETS
     Storage
     QueryParser
     ObjectStore
+    RealmFFI
+    RealmFFIStatic
 )
 if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)

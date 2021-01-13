@@ -1142,7 +1142,7 @@ struct BenchmarkQueryNotChainedOrStrings : BenchmarkWithStringsTableForIn {
         query.Not();
         query.group();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         query.end_group();
         TableView results = query.find_all();
