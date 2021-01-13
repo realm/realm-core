@@ -1358,6 +1358,12 @@ TEST(Parser_substitution)
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $0", std::vector<Mixed>{}), message);
+    CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $1", std::vector<Mixed>{{1}}), message);
+    CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $2", std::vector<Mixed>{{1}, {2}}), message);
+    CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // Mixed types
     // int

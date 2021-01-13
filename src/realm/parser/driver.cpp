@@ -158,59 +158,73 @@ inline T string_to(const std::string& s)
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
-        : m_args(args)
+        : Arguments(args.size())
+        , m_args(args)
     {
     }
     bool bool_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<bool>();
     }
     long long long_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<int64_t>();
     }
     float float_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<float>();
     }
     double double_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<double>();
     }
     StringData string_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<StringData>();
     }
     BinaryData binary_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<BinaryData>();
     }
     Timestamp timestamp_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<Timestamp>();
     }
     ObjectId objectid_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<ObjectId>();
     }
     UUID uuid_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<Decimal128>();
     }
     ObjKey object_index_for_argument(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get<ObjKey>();
     }
     bool is_argument_null(size_t n) final
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).is_null();
     }
     DataType type_for_argument(size_t n)
     {
+        Arguments::verify_ndx(n);
         return m_args.at(n).get_type();
     }
 
