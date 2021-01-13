@@ -1,8 +1,5 @@
 #include <realm/object-store/c_api/types.hpp>
 
-// FIXME: Query parser throws raw pegtl exceptions.
-#include <pegtl.hpp>
-
 using namespace realm;
 
 #if REALM_PLATFORM_APPLE && !defined(RLM_NO_THREAD_LOCAL)
@@ -107,9 +104,6 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         }
         catch (const InvalidQueryException& ex) {
             populate_error(ex, RLM_ERR_INVALID_QUERY);
-        }
-        catch (const tao::pegtl::parse_error& ex) {
-            populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
         }
         catch (const std::invalid_argument& ex) {
             populate_error(ex, RLM_ERR_INVALID_ARGUMENT);

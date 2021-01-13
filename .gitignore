@@ -47,6 +47,8 @@ Thumbs.db
 /.vscode/settings.json
 /.vscode/tasks.json
 
+.cproject
+
 # Ignore Eclipse settings
 /.settings
 

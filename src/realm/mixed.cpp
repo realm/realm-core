@@ -198,6 +198,9 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
         (r_type == type_ObjectId && l_type == type_Timestamp)) {
         return true;
     }
+    if (l_type == type_Mixed || r_type == type_Mixed) {
+        return true; // Mixed is comparable with any type
+    }
     return false;
 }
 

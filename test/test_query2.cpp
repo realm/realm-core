@@ -5784,10 +5784,10 @@ TEST(Query_Mixed)
             nb_strings++;
         }
     }
-
+    std::string str2bin("String2Binary");
     table->get_object(15).set(col_any, Mixed());
     table->get_object(75).set(col_any, Mixed(75.));
-    table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
+    table->get_object(28).set(col_any, Mixed(BinaryData(str2bin)));
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
 

@@ -60,6 +60,7 @@ class SubQuery;
 class ColKeys;
 struct GlobalKey;
 class LinkChain;
+class Subexpr;
 
 struct Link {
 };
@@ -72,12 +73,11 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
-namespace query_builder {
+namespace query_parser {
 class Arguments;
-}
-namespace parser {
 class KeyPathMapping;
-}
+class ParserDriver;
+} // namespace query_parser
 
 class Table {
 public:
@@ -535,8 +535,8 @@ public:
     }
 
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
-    Query query(const std::string& query_string, query_builder::Arguments& arguments,
-                const parser::KeyPathMapping&) const;
+    Query query(const std::string& query_string, query_parser::Arguments& arguments,
+                const query_parser::KeyPathMapping&) const;
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
@@ -922,20 +922,35 @@ enum class ExpressionComparisonType : unsigned char {
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t, ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_current_table(t.unchecked_ptr())
+    LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
     {
     }
-    const Table* get_base_table()
+    ConstTableRef get_base_table()
     {
-        return m_base_table.unchecked_ptr();
+        return m_base_table;
+    }
+
+    ConstTableRef get_current_table() const
+    {
+        return m_current_table;
     }
 
     LinkChain& link(ColKey link_column)
     {
         add(link_column);
+        return *this;
+    }
+
+    LinkChain& link(std::string col_name)
+    {
+        auto ck = m_current_table->get_column_key(col_name);
+        if (!ck) {
+            throw std::runtime_error(util::format("%1 has no property %2", m_current_table->get_name(), col_name));
+        }
+        add(ck);
         return *this;
     }
 
@@ -945,6 +960,8 @@ public:
         return link(backlink_col_key);
     }
 
+    Subexpr* column(const std::string&);
+    Subexpr* subquery(Query subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -1003,9 +1020,10 @@ public:
 
 private:
     friend class Table;
+    friend class query_parser::ParserDriver;
 
     std::vector<ColKey> m_link_cols;
-    const Table* m_current_table;
+    ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
@@ -1014,14 +1032,23 @@ private:
         // Link column can be a single Link, LinkList, or BackLink.
         REALM_ASSERT(m_current_table->valid_column(ck));
         ColumnType type = ck.get_type();
-        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
+        if (ck.is_dictionary()) {
+        }
+        else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+            m_current_table = m_current_table->get_opposite_table(ck);
         }
         else {
             // Only last column in link chain is allowed to be non-link
-            throw(LogicError::type_mismatch);
+            throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
+                                                  m_current_table->get_column_name(ck)));
         }
         m_link_cols.push_back(ck);
+    }
+
+    template <class T>
+    Subexpr* create_subexpr(ColKey col_key)
+    {
+        return new Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
 };
 

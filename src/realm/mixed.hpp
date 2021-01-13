@@ -493,7 +493,7 @@ inline BinaryData Mixed::get<BinaryData>() const noexcept
         return binary_val;
     }
     REALM_ASSERT(get_type() == type_String);
-    return BinaryData(string_val.data(), string_val.size() + 1);
+    return BinaryData(string_val.data(), string_val.size());
 }
 
 inline BinaryData Mixed::get_binary() const

@@ -48,6 +48,7 @@ public:
         , m_size(data_size)
     {
     }
+    // Note! This version includes a trailing null character when using in place constant strings
     template <size_t N>
     explicit BinaryData(const char (&external_data)[N])
         : m_data(external_data)
@@ -76,13 +77,6 @@ public:
     size_t size() const noexcept
     {
         return m_size;
-    }
-    void remove_zero_term() noexcept
-    {
-        if (m_size > 0) {
-            REALM_ASSERT(m_data[m_size - 1] == '\0');
-            m_size--;
-        }
     }
 
     /// Is this a null reference?

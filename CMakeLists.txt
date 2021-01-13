@@ -187,6 +187,8 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(BISON 3.7.4)
+find_package(FLEX 2.6.4)
 
 set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
 if(UNIX AND NOT APPLE)
@@ -253,7 +255,6 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
-set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/pegtl/include/tao/)
 set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/single_include)
 set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 
