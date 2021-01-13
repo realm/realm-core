@@ -134,12 +134,8 @@ namespace realm {
 
 // MARK: - Sync metadata manager
 
-// reference to file manager in constructor
-// file manager has deletee
-// coordinator realm to clear cache if needed delete
-SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
+SyncMetadataManager::SyncMetadataManager(const SyncFileManager& file_manager, std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
-// const SyncFileManager& file_manager,
 {
     constexpr uint64_t SCHEMA_VERSION = 4;
 
@@ -192,8 +188,11 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     try {
         realm = get_realm();
     } catch(const std::exception& e) {
-//        assert(file_manager.remove_metadata_realm());
-//        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
+        if (!should_encrypt) throw(e);
+
+        assert(file_manager.remove_metadata_realm());
+        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
+        file_manager.metadata_path(); // Make new metadata realm directory
         realm = Realm::get_shared_realm(m_metadata_config);
     }
 
@@ -436,18 +435,7 @@ util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_meta
 
 std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
 {
-    SharedRealm realm;
-    try {
-        realm = Realm::get_shared_realm(m_metadata_config);
-        
-    } catch(const MismatchedConfigException& e) {
-        std::cout<<m_metadata_config.path;
-        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
-        auto dir = m_metadata_config.path.substr(0, m_metadata_config.path.find_last_of("\\/"));
-        assert(util::try_remove_dir_recursive(dir)); // should this be recursive?
-        util::make_dir(dir);
-        realm = Realm::get_shared_realm(m_metadata_config);
-    }
+    SharedRealm realm = Realm::get_shared_realm(m_metadata_config);
     realm->refresh();
     return realm;
 }
