@@ -188,7 +188,7 @@ SyncMetadataManager::SyncMetadataManager(const SyncFileManager& file_manager, st
     try {
         realm = get_realm();
     }
-    catch(const std::exception& e) {
+    catch (const std::exception& e) {
         if (!should_encrypt)
             throw(e);
 
