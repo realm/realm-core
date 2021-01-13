@@ -3045,10 +3045,8 @@ SizeOperator<int64_t> Columns<Lst<T>>::size()
 }
 
 template <typename T, typename Operation>
-class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
+class ListColumnAggregate : public Subexpr2<decltype(Operation().result())> {
 public:
-    using R = typename Operation::ResultType;
-
     ListColumnAggregate(ColKey column_key, Columns<Lst<T>> column)
         : m_column_key(column_key)
         , m_list(std::move(column))
@@ -3088,24 +3086,6 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
-            if (m_list.m_is_nullable_storage) {
-                evaluate<util::Optional<T>>(index, destination);
-                return;
-            }
-        }
-        evaluate<T>(index, destination);
-    }
-
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return m_list.description(state) + util::serializer::value_separator + Operation::description();
-    }
-
-private:
-    template <typename StorageType>
-    void evaluate(size_t index, ValueBase& destination)
-    {
         Allocator& alloc = get_base_table()->get_alloc();
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs, 1);
@@ -3117,11 +3097,16 @@ private:
             auto list_ref = to_ref(list_refs[i].get_int());
             Operation op;
             if (list_ref) {
-                BPlusTree<StorageType> list(alloc);
-                list.init_from_ref(list_ref);
-                size_t s = list.size();
-                for (unsigned j = 0; j < s; j++) {
-                    op.accumulate(list.get(j));
+                if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
+                    if (m_list.m_is_nullable_storage) {
+                        accumulate<util::Optional<T>>(op, alloc, list_ref);
+                    }
+                    else {
+                        accumulate<T>(op, alloc, list_ref);
+                    }
+                }
+                else {
+                    accumulate<T>(op, alloc, list_ref);
                 }
             }
             if (op.is_null()) {
@@ -3129,6 +3114,31 @@ private:
             }
             else {
                 destination.set(i, op.result());
+            }
+        }
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_list.description(state) + util::serializer::value_separator + Operation::description();
+    }
+
+private:
+    template <typename StorageType>
+    void accumulate(Operation& op, Allocator& alloc, ref_type list_ref)
+    {
+        BPlusTree<StorageType> list(alloc);
+        list.init_from_ref(list_ref);
+        size_t s = list.size();
+        for (unsigned j = 0; j < s; j++) {
+            auto v = list.get(j);
+            if (!value_is_null(v)) {
+                if constexpr (std::is_same_v<StorageType, util::Optional<T>>) {
+                    op.accumulate(*v);
+                }
+                else {
+                    op.accumulate(v);
+                }
             }
         }
     }
@@ -3552,7 +3562,7 @@ private:
 };
 
 template <typename T, typename Operation>
-class SubColumnAggregate : public Subexpr2<typename Operation::ResultType> {
+class SubColumnAggregate : public Subexpr2<decltype(Operation().result())> {
 public:
     SubColumnAggregate(const Columns<T>& column, const LinkMap& link_map)
         : m_column(column)
@@ -3714,25 +3724,102 @@ private:
 };
 
 namespace aggregate_operations {
-template <typename T, typename Derived, typename R = T>
-class BaseAggregateOperation {
-    static_assert(realm::is_any<T, Int, Float, Double, Decimal128>::value,
-                  "Numeric aggregates can only be used with subcolumns of numeric types");
+template <typename T>
+static bool is_nan(T value)
+{
+    if constexpr (std::is_floating_point_v<T>) {
+        return std::isnan(value);
+    }
+    else {
+        // gcc considers the argument unused if it's only used in one branch of if constexpr
+        static_cast<void>(value);
+        return false;
+    }
+}
 
+template <>
+inline bool is_nan<Decimal128>(Decimal128 value)
+{
+    return value.is_nan();
+}
+
+template <typename T, typename Compare>
+class MinMaxAggregateOperator {
 public:
-    using ResultType = R;
-
     void accumulate(T value)
     {
-        m_count++;
-        m_result = Derived::apply(m_result, value);
+        if (!is_nan(value) && (!m_result || Compare()(value, *m_result))) {
+            m_result = value;
+        }
     }
 
-    void accumulate(util::Optional<T> value)
+    bool is_null() const
     {
-        if (value) {
+        return !m_result;
+    }
+    T result() const
+    {
+        return *m_result;
+    }
+
+private:
+    util::Optional<T> m_result;
+};
+
+template <typename T>
+class Minimum : public MinMaxAggregateOperator<T, std::less<>> {
+public:
+    static const char* description()
+    {
+        return "@min";
+    }
+};
+
+template <typename T>
+class Maximum : public MinMaxAggregateOperator<T, std::greater<>> {
+public:
+    static const char* description()
+    {
+        return "@max";
+    }
+};
+
+template <typename T>
+class Sum {
+public:
+    void accumulate(T value)
+    {
+        if (!is_nan(value)) {
+            m_result += value;
+        }
+    }
+
+    bool is_null() const
+    {
+        return false;
+    }
+    T result() const
+    {
+        return m_result;
+    }
+    static const char* description()
+    {
+        return "@sum";
+    }
+
+private:
+    T m_result = {};
+};
+
+template <typename T>
+class Average {
+public:
+    using ResultType = typename std::conditional<std::is_same_v<T, Decimal128>, Decimal128, double>::type;
+    void accumulate(T value)
+    {
+        if (!is_nan(value)) {
             m_count++;
-            m_result = Derived::apply(m_result, *value);
+            m_result += value;
         }
     }
 
@@ -3742,147 +3829,16 @@ public:
     }
     ResultType result() const
     {
-        return m_result;
+        return m_result / m_count;
+    }
+    static const char* description()
+    {
+        return "@avg";
     }
 
-protected:
+private:
     size_t m_count = 0;
-    ResultType m_result = Derived::initial_value();
-};
-
-template <typename T>
-class Minimum : public BaseAggregateOperation<T, Minimum<T>> {
-public:
-    static T initial_value()
-    {
-        return std::numeric_limits<T>::max();
-    }
-    static T apply(T a, T b)
-    {
-        return std::min(a, b);
-    }
-    static std::string description()
-    {
-        return "@min";
-    }
-};
-
-template <>
-class Minimum<Decimal128> : public BaseAggregateOperation<Decimal128, Minimum<Decimal128>> {
-public:
-    static Decimal128 initial_value()
-    {
-        return Decimal128("+inf");
-    }
-    static Decimal128 apply(Decimal128 a, Decimal128 b)
-    {
-        return std::min(a, b);
-    }
-    static std::string description()
-    {
-        return "@min";
-    }
-};
-
-template <typename T>
-class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
-public:
-    static T initial_value()
-    {
-        return std::numeric_limits<T>::lowest();
-    }
-    static T apply(T a, T b)
-    {
-        return std::max(a, b);
-    }
-    static std::string description()
-    {
-        return "@max";
-    }
-};
-
-template <>
-class Maximum<Decimal128> : public BaseAggregateOperation<Decimal128, Maximum<Decimal128>> {
-public:
-    static Decimal128 initial_value()
-    {
-        return Decimal128("-inf");
-    }
-    static Decimal128 apply(Decimal128 a, Decimal128 b)
-    {
-        return std::max(a, b);
-    }
-    static std::string description()
-    {
-        return "@max";
-    }
-};
-
-template <typename T>
-class Sum : public BaseAggregateOperation<T, Sum<T>> {
-public:
-    static T initial_value()
-    {
-        return T();
-    }
-    static T apply(T a, T b)
-    {
-        return a + b;
-    }
-    bool is_null() const
-    {
-        return false;
-    }
-    static std::string description()
-    {
-        return "@sum";
-    }
-};
-
-template <typename T>
-class Average : public BaseAggregateOperation<T, Average<T>, double> {
-    using Base = BaseAggregateOperation<T, Average<T>, double>;
-
-public:
-    static double initial_value()
-    {
-        return 0;
-    }
-    static double apply(double a, T b)
-    {
-        return a + b;
-    }
-    double result() const
-    {
-        return Base::m_result / Base::m_count;
-    }
-    static std::string description()
-    {
-        return "@avg";
-    }
-};
-
-template <>
-class Average<Decimal128> : public BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128> {
-    using Base = BaseAggregateOperation<Decimal128, Average<Decimal128>, Decimal128>;
-
-public:
-    static Decimal128 initial_value()
-    {
-        return Decimal128(0);
-    }
-    static Decimal128 apply(Decimal128 a, Decimal128 b)
-    {
-        return a + b;
-    }
-    Decimal128 result() const
-    {
-        return Decimal128(Base::m_result) / Base::m_count;
-    }
-    static std::string description()
-    {
-        return "@avg";
-    }
+    ResultType m_result = {};
 };
 } // namespace aggregate_operations
 
