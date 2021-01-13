@@ -294,7 +294,7 @@ const char* get_data_type_name(DataType type) noexcept
         case type_Timestamp:
             return "timestamp";
         case type_ObjectId:
-            return "ObjectId";
+            return "objectId";
         case type_Decimal:
             return "decimal128";
         case type_UUID:

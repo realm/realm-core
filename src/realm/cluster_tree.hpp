@@ -58,6 +58,9 @@ public:
     {
         return m_size;
     }
+
+    static size_t size_from_ref(ref_type, Allocator& alloc);
+
     void destroy()
     {
         m_root->destroy_deep();
