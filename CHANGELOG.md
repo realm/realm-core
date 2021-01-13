@@ -1,11 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Add support for @min and @max queries on Timestamp lists.
+* Add support for comparing non-list link columns to other link columns in queries.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Windows `InterprocessCondVar` changes reverted.
+* Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
+* `@min` and `@max` queries on a list of float, double or Decimal128 values could match the incorrect value if NaN or null was present in the list (since 5.0.0).
  
 ### Breaking changes
 * None.
