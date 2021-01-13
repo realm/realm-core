@@ -15,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* Crashes will now request to create a github issue instead of an email.
 
 ----------------------------------------------
 
