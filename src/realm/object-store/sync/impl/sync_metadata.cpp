@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/object-store/object_schema.hpp>
@@ -133,8 +134,12 @@ namespace realm {
 
 // MARK: - Sync metadata manager
 
+// reference to file manager in constructor
+// file manager has deletee
+// coordinator realm to clear cache if needed delete
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
+// const SyncFileManager& file_manager,
 {
     constexpr uint64_t SCHEMA_VERSION = 4;
 
@@ -181,8 +186,16 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
             }
         }
     };
-
-    SharedRealm realm = Realm::get_shared_realm(config);
+    
+    m_metadata_config = std::move(config);
+    SharedRealm realm;
+    try {
+        realm = get_realm();
+    } catch(const std::exception& e) {
+//        assert(file_manager.remove_metadata_realm());
+//        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
+        realm = Realm::get_shared_realm(m_metadata_config);
+    }
 
     // Get data about the (hardcoded) schemas
     auto object_schema = realm->schema().find(c_sync_userMetadata);
@@ -220,8 +233,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key};
-
-    m_metadata_config = std::move(config);
 
     m_client_uuid = [&]() -> std::string {
         TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_clientMetadata);
@@ -425,7 +436,18 @@ util::Optional<SyncFileActionMetadata> SyncMetadataManager::get_file_action_meta
 
 std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
 {
-    auto realm = Realm::get_shared_realm(m_metadata_config);
+    SharedRealm realm;
+    try {
+        realm = Realm::get_shared_realm(m_metadata_config);
+        
+    } catch(const MismatchedConfigException& e) {
+        std::cout<<m_metadata_config.path;
+        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
+        auto dir = m_metadata_config.path.substr(0, m_metadata_config.path.find_last_of("\\/"));
+        assert(util::try_remove_dir_recursive(dir)); // should this be recursive?
+        util::make_dir(dir);
+        realm = Realm::get_shared_realm(m_metadata_config);
+    }
     realm->refresh();
     return realm;
 }
