@@ -520,7 +520,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    
+
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
             auto file_manager = SyncFileManager(base_path, "app_id");
@@ -536,7 +536,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             CHECK(user_metadata->provider_type() == auth_url);
             CHECK(user_metadata->access_token().empty());
             CHECK(user_metadata->is_valid());
-                        
+
             // Open metadata realm with different key
             std::vector<char> key1 = make_test_encryption_key(11);
             SyncMetadataManager manager1(file_manager, file_manager.metadata_path(), true, key1);
@@ -554,7 +554,8 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         }
         SECTION("different encryption settings") {
             auto file_manager = SyncFileManager(base_path, "app_id");
-            SyncMetadataManager first_manager(file_manager, file_manager.metadata_path(), true, make_test_encryption_key(10));
+            SyncMetadataManager first_manager(file_manager, file_manager.metadata_path(), true,
+                                              make_test_encryption_key(10));
             REQUIRE_THROWS(SyncMetadataManager(file_manager, file_manager.metadata_path(), false));
         }
     }

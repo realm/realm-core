@@ -182,13 +182,15 @@ SyncMetadataManager::SyncMetadataManager(const SyncFileManager& file_manager, st
             }
         }
     };
-    
+
     m_metadata_config = std::move(config);
     SharedRealm realm;
     try {
         realm = get_realm();
-    } catch(const std::exception& e) {
-        if (!should_encrypt) throw(e);
+    }
+    catch(const std::exception& e) {
+        if (!should_encrypt)
+            throw(e);
 
         assert(file_manager.remove_metadata_realm());
         _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
