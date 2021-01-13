@@ -3220,6 +3220,15 @@ inline Query operator!=(null, const Subexpr2<Link>& right)
     return compare<NotEqual>(right, null());
 }
 
+inline Query operator==(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
+{
+    return make_expression<Compare<Equal>>(left.clone(), right.clone());
+}
+inline Query operator!=(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
+{
+    return make_expression<Compare<NotEqual>>(left.clone(), right.clone());
+}
+
 
 template <class T>
 class Columns : public Subexpr2<T> {

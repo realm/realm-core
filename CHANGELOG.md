@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Add support for @min and @max queries on Timestamp lists.
+* Add support for comparing non-list link columns to other link columns in queries.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
