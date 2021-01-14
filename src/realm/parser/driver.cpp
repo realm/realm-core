@@ -6,6 +6,9 @@
 #include <realm/uuid.hpp>
 #include "realm/util/base64.hpp"
 
+#include <realm/object-store/keypath_helpers.hpp>
+#include <realm/object-store/results.hpp>
+
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
 #include "realm/parser/generated/query_flex.hpp"
@@ -1260,6 +1263,18 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+}
+
+Results Results::filter(const std::string& query_string, const std::vector<Mixed>& arguments) const
+{
+    query_parser::KeyPathMapping mapping;
+    populate_keypath_mapping(mapping, *this->get_realm());
+    Query parsed_query = get_query().get_table()->query(query_string, arguments, mapping);
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    if (auto parsed_ordering = parsed_query.get_ordering()) {
+        new_order.append(*parsed_ordering);
+    }
+    return Results(m_realm, get_query().and_query(std::move(parsed_query)), new_order);
 }
 
 Subexpr* LinkChain::column(const std::string& col)

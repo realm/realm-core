@@ -141,6 +141,8 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const REQUIRES(!m_mutex);
+    // The following method is based on core's string based query parser which is only defined
+    // if the parser is built with core.
     Results filter(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const
         REQUIRES(!m_mutex);
     Results sort(SortDescriptor&& sort) const REQUIRES(!m_mutex);

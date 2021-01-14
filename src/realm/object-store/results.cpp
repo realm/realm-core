@@ -18,7 +18,6 @@
 
 #include <realm/object-store/results.hpp>
 
-#include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/results_notifier.hpp>
 #include <realm/object-store/audit.hpp>
@@ -1103,18 +1102,6 @@ Results Results::filter(Query&& q) const
     if (m_descriptor_ordering.will_apply_limit())
         throw UnimplementedOperationException("Filtering a Results with a limit is not yet implemented");
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
-}
-
-Results Results::filter(const std::string& query_string, const std::vector<Mixed>& arguments) const
-{
-    query_parser::KeyPathMapping mapping;
-    populate_keypath_mapping(mapping, *this->get_realm());
-    Query parsed_query = get_query().get_table()->query(query_string, arguments, mapping);
-    DescriptorOrdering new_order = m_descriptor_ordering;
-    if (auto parsed_ordering = parsed_query.get_ordering()) {
-        new_order.append(*parsed_ordering);
-    }
-    return Results(m_realm, get_query().and_query(std::move(parsed_query)), new_order);
 }
 
 Results Results::limit(size_t max_count) const
