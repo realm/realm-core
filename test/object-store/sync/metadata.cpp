@@ -24,7 +24,6 @@
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>
@@ -118,8 +117,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
         }
         // Open v2 metadata
         {
-            auto file_manager = SyncFileManager(base_path, "app_id");
-            SyncMetadataManager manager(file_manager, metadata_path, false, none);
+            SyncMetadataManager manager(metadata_path, false, none);
             SECTION("for existing entries") {
                 auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
                 REQUIRE(bool(md_1));
@@ -177,8 +175,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
         }
         // Open v2 metadata
         {
-            auto file_manager = SyncFileManager(base_path, "app_id");
-            SyncMetadataManager manager(file_manager, metadata_path, false, none);
+            SyncMetadataManager manager(metadata_path, false, none);
             SECTION("for existing entries") {
                 auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
                 REQUIRE(bool(md_1));
@@ -216,8 +213,8 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    auto file_manager = SyncFileManager(base_path, "app_id");
-    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
+
+    SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
     SECTION("can be properly constructed") {
@@ -316,8 +313,8 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    auto file_manager = SyncFileManager(base_path, "app_id");
-    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
+
+    SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
     SECTION("properly list all marked and unmarked users") {
@@ -356,8 +353,8 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    auto file_manager = SyncFileManager(base_path, "app_id");
-    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
+
+    SyncMetadataManager manager(metadata_path, false);
 
     const std::string local_uuid_1 = "asdfg";
     const std::string local_uuid_2 = "qwerty";
@@ -408,8 +405,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    auto file_manager = SyncFileManager(base_path, "app_id");
-    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
+    SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion") {
         const auto filename1 = util::make_temp_dir() + "foobar/file1";
         const auto filename2 = util::make_temp_dir() + "foobar/file2";
@@ -438,8 +434,7 @@ TEST_CASE("sync_metadata: results", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-    auto file_manager = SyncFileManager(base_path, "app_id");
-    SyncMetadataManager manager(file_manager, file_manager.metadata_path(), false);
+    SyncMetadataManager manager(metadata_path, false);
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a1"; // same as identity 1
     const auto identity3 = "testcase3a3";
@@ -491,11 +486,11 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
     });
 
     SECTION("works for the basic case") {
-        auto file_manager = SyncFileManager(base_path, "app_id");
+
         const auto identity = "testcase4a";
         const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
-        SyncMetadataManager first_manager(file_manager, file_manager.metadata_path(), false);
+        SyncMetadataManager first_manager(metadata_path, false);
         auto first = first_manager.get_or_make_user_metadata(identity, provider_type);
         first->set_access_token(sample_token);
         REQUIRE(first->identity() == identity);
@@ -505,7 +500,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         auto first_client_uuid = first_manager.client_uuid();
         first->set_state(SyncUser::State::LoggedOut);
 
-        SyncMetadataManager second_manager(file_manager, file_manager.metadata_path(), false);
+        SyncMetadataManager second_manager(metadata_path, false);
         auto second = second_manager.get_or_make_user_metadata(identity, provider_type, false);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->provider_type() == provider_type);
@@ -524,13 +519,13 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
 
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
-            auto file_manager = SyncFileManager(base_path, "app_id");
             const auto identity0 = "identity0";
             const auto auth_url = "https://realm.example.org";
 
             // Open metadata realm, make metadata
             std::vector<char> key0 = make_test_encryption_key(10);
-            SyncMetadataManager manager0(file_manager, file_manager.metadata_path(), true, key0);
+            SyncMetadataManager manager0(metadata_path, true, key0);
+
             auto user_metadata = manager0.get_or_make_user_metadata(identity0, auth_url);
             REQUIRE(bool(user_metadata));
             CHECK(user_metadata->identity() == identity0);
@@ -539,11 +534,12 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             CHECK(user_metadata->is_valid());
 
             // Close realm
-            _impl::RealmCoordinator::get_coordinator(file_manager.metadata_path())->clear_cache();
+            _impl::RealmCoordinator::get_coordinator(metadata_path)->clear_cache();
 
             // Open metadata realm with different key
             std::vector<char> key1 = make_test_encryption_key(11);
-            SyncMetadataManager manager1(file_manager, file_manager.metadata_path(), true, key1);
+            SyncMetadataManager manager1(metadata_path, true, key1);
+
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
             // Expect previous metadata to no longer be stored
             CHECK_FALSE(bool(user_metadata1));
@@ -557,19 +553,17 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             CHECK(user_metadata2->is_valid());
         }
         SECTION("different encryption settings") {
-            auto file_manager = SyncFileManager(base_path, "app_id");
-            SyncMetadataManager first_manager(file_manager, file_manager.metadata_path(), true,
-                                              make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(file_manager, file_manager.metadata_path(), false));
+            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
+            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
         }
     }
 
     SECTION("works when enabled") {
-        auto file_manager = SyncFileManager(base_path, "app_id");
+
         std::vector<char> key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
         const auto auth_url = "https://realm.example.org";
-        SyncMetadataManager manager(file_manager, file_manager.metadata_path(), true, key);
+        SyncMetadataManager manager(metadata_path, true, key);
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_url);
         REQUIRE(bool(user_metadata));
         CHECK(user_metadata->identity() == identity);
@@ -577,7 +571,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         CHECK(user_metadata->access_token().empty());
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
-        SyncMetadataManager manager_2(file_manager, file_manager.metadata_path(), true, key);
+        SyncMetadataManager manager_2(metadata_path, true, key);
         auto user_metadata_2 = manager_2.get_or_make_user_metadata(identity, auth_url, false);
         REQUIRE(bool(user_metadata_2));
         CHECK(user_metadata_2->identity() == identity);
