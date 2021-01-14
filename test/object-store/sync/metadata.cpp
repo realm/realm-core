@@ -213,7 +213,6 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -313,7 +312,6 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
-
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -352,7 +350,6 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
-
 
     SyncMetadataManager manager(metadata_path, false);
 
@@ -486,7 +483,6 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
     });
 
     SECTION("works for the basic case") {
-
         const auto identity = "testcase4a";
         const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
@@ -515,7 +511,6 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
-
 
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
@@ -559,7 +554,6 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     }
 
     SECTION("works when enabled") {
-
         std::vector<char> key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
         const auto auth_url = "https://realm.example.org";
