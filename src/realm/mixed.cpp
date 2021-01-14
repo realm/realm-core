@@ -22,6 +22,7 @@
 #include <realm/column_type_traits.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/query_value.hpp>
 
 namespace realm {
 

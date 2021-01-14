@@ -22,11 +22,9 @@
 #include <string>
 
 #include <realm/data_type.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
-
-class Mixed;
-struct ColKey;
 
 class TypeOfValue {
 public:
@@ -63,6 +61,28 @@ public:
 
 private:
     int64_t m_attributes;
+};
+
+class QueryValue : public Mixed {
+public:
+    using Mixed::Mixed;
+
+    QueryValue(const Mixed& other)
+        : Mixed(other)
+    {
+    }
+
+    QueryValue(TypeOfValue v) noexcept
+    {
+        m_type = int(type_TypeOfValue) + 1;
+        int_val = v.get_attributes();
+    }
+
+    TypeOfValue get_type_of_value() const noexcept
+    {
+        REALM_ASSERT(get_type() == type_TypeOfValue);
+        return TypeOfValue(int_val);
+    }
 };
 
 } // namespace realm
