@@ -1268,9 +1268,13 @@ Subexpr* LinkChain::column(const std::string& col)
         auto current_column = m_link_cols.back();
         if (current_column.is_dictionary()) {
             m_link_cols.pop_back();
-            auto dict = new Columns<Dictionary>(current_column, m_base_table, m_link_cols, m_comparison_type);
-            dict->key(col);
-            return dict;
+            Columns<Dictionary> dict(current_column, m_base_table, m_link_cols, m_comparison_type);
+            if (col == "keys") {
+                return new ColumnDictionaryKeys(dict);
+            }
+            else {
+                return new ColumnDictionaryKey(Mixed(col), dict);
+            }
         }
     }
 

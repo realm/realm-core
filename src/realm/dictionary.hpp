@@ -113,6 +113,27 @@ public:
         }
     }
 
+    template <class T, class Func>
+    void for_all_keys(Func&& f)
+    {
+        if (m_clusters) {
+            typename ColumnTypeTraits<T>::cluster_leaf_type leaf(m_obj.get_alloc());
+            ColKey col = m_clusters->get_keys_column_key();
+            // Iterate through cluster and call f on each value
+            auto trv_func = [&leaf, &f, col](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                cluster->init_leaf(col, &leaf);
+                for (size_t i = 0; i < e; i++) {
+                    f(leaf.get(i));
+                }
+                // Continue
+                return false;
+            };
+            m_clusters->traverse(trv_func);
+        }
+    }
+
+
     Iterator begin() const;
     Iterator end() const;
 

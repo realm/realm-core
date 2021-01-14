@@ -10,7 +10,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     const realm_value_t* m_args = nullptr;
 
     QueryArgumentsAdapter(size_t num_args, const realm_value_t* args) noexcept
-        : query_parser::Arguments(num_args)
+        : Arguments(num_args)
         , m_args(args)
     {
     }
