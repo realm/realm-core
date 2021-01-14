@@ -2716,7 +2716,7 @@ public:
         if (m_expr) {
             return m_expr->description(state) + util::serializer::value_separator + "@type";
         }
-        return "@size";
+        return "@type";
     }
 
     std::unique_ptr<Subexpr> clone() const override

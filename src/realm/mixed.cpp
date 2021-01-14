@@ -338,7 +338,7 @@ int Mixed::compare(const Mixed& b) const
             }
             break;
         default:
-            if (type == type_TypeOfValue) {
+            if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
                 return TypeOfValue(int_val).matches(TypeOfValue(b.int_val))
                            ? 0
                            : _impl::compare_generic(int_val, b.int_val);

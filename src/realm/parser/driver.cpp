@@ -328,26 +328,20 @@ Query EqualityNode::visit(ParserDriver* drv)
                     return drv->simple_query(op, col_key, val.get_bool());
                 case type_String:
                     return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
-                    break;
                 case type_Binary:
                     return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
-                    break;
                 case type_Timestamp:
                     return drv->simple_query(op, col_key, val.get<Timestamp>());
                 case type_Float:
                     return drv->simple_query(op, col_key, val.get_float());
-                    break;
                 case type_Double:
                     return drv->simple_query(op, col_key, val.get_double());
-                    break;
                 case type_Decimal:
                     return drv->simple_query(op, col_key, val.get<Decimal128>());
-                    break;
                 case type_ObjectId:
-                    break;
+                    return drv->simple_query(op, col_key, val.get<ObjectId>());
                 case type_UUID:
                     return drv->simple_query(op, col_key, val.get<UUID>());
-                    break;
                 default:
                     break;
             }
