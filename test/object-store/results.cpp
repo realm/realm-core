@@ -2727,6 +2727,33 @@ TEST_CASE("results: distinct") {
         REQUIRE(further_filtered.size() == 1);
         REQUIRE(further_filtered.get(0).get<Int>(col_num2) == 9);
     }
+
+    SECTION("String based text parsing retains descriptors") {
+        Results filtered = results.filter("num2 > $0", {{5}});
+        // filtered:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        //   0, Foo_0,  7
+        //   1, Foo_1,  6
+        REQUIRE(filtered.size() == 5);
+
+        Results unique = filtered.filter("TRUEPREDICATE DISTINCT(num1)");
+        // unique:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get<Int>(col_num2) == 10);
+        REQUIRE(unique.get(1).get<Int>(col_num2) == 9);
+        REQUIRE(unique.get(2).get<Int>(col_num2) == 8);
+
+        Results further_filtered = unique.filter("num2 == 9");
+        // further_filtered:
+        //   1, Foo_1,  9
+        REQUIRE(further_filtered.size() == 1);
+        REQUIRE(further_filtered.get(0).get<Int>(col_num2) == 9);
+    }
 }
 
 TEST_CASE("results: sort") {

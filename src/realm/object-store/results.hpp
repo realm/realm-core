@@ -141,6 +141,8 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const REQUIRES(!m_mutex);
+    Results filter(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const
+        REQUIRES(!m_mutex);
     Results sort(SortDescriptor&& sort) const REQUIRES(!m_mutex);
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const REQUIRES(!m_mutex);
 
