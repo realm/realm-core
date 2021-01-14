@@ -77,6 +77,7 @@ public:
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const
@@ -161,7 +162,7 @@ public:
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
-    bool is_frozen() REQUIRES(!m_mutex);
+    bool is_frozen() const REQUIRES(!m_mutex);
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows

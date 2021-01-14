@@ -120,12 +120,6 @@ struct Contains : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -187,12 +181,6 @@ struct Like : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -246,12 +234,6 @@ struct BeginsWith : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return b2.begins_with(b1);
         }
         return false;
@@ -298,12 +280,6 @@ struct EndsWith : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -467,12 +443,6 @@ struct ContainsIns : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -557,12 +527,6 @@ struct LikeIns : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -628,12 +592,6 @@ struct BeginsWithIns : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -700,12 +658,6 @@ struct EndsWithIns : public HackClass {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;

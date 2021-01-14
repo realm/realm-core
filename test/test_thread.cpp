@@ -995,7 +995,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
             });
 
             // This thread calls notify() exactly one time after the other thread has invoked wait() and has
-            // released the mutex. If wait() misses the notify() then there is a bug, which will reveal itself 
+            // released the mutex. If wait() misses the notify() then there is a bug, which will reveal itself
             // by both threads hanging infinitely.
             std::thread t2([&]() {
                 for (int i = 0; i < iter; i++) {

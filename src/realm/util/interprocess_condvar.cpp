@@ -80,9 +80,7 @@ void notify_fd(int fd)
 #endif // REALM_CONDVAR_EMULATION
 
 
-InterprocessCondVar::InterprocessCondVar()
-{
-}
+InterprocessCondVar::InterprocessCondVar() {}
 
 
 void InterprocessCondVar::close() noexcept
@@ -152,14 +150,14 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
     if (!try_create_fifo(m_resource_path)) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
-            // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems.
-            std::ostringstream ss;
-            ss << normalize_dir(tmp_path);
-            ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
-            m_resource_path = ss.str();
-            create_fifo(m_resource_path);
+        // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
+        // Hash collisions are okay here because they just result in doing
+        // extra work, as opposed to correctness problems.
+        std::ostringstream ss;
+        ss << normalize_dir(tmp_path);
+        ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
+        m_resource_path = ss.str();
+        create_fifo(m_resource_path);
     }
     m_fd_read = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_read == -1) {
@@ -190,9 +188,9 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #else // _WIN32
     // If the named objects are alive in the Windows kernel space, then their handles are cloned and
-    // you get returned a new HANDLE number (differs from that of other processes) which represents the 
-    // same object. If not then they are created. When the last process that has handles to an object 
-    // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
+    // you get returned a new HANDLE number (differs from that of other processes) which represents the
+    // same object. If not then they are created. When the last process that has handles to an object
+    // terminates, the objects are destructed automatically by the kernel, so there will be no handle
     // leaks or other kinds of leak.
 
     // replace backslashes because they're significant in object namespace names
@@ -206,24 +204,22 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     std::wstring se = std::wstring(sem.begin(), sem.end());
     std::wstring ev = std::wstring(eve.begin(), eve.end());
 
-    m_sema = CreateSemaphoreW(
-        nullptr,     // no security
-        0,           // initially 0
-        0x7fffffff,  // max count
-        LPWSTR(se.c_str()));
+    m_sema = CreateSemaphoreW(nullptr,    // no security
+                              0,          // initially 0
+                              0x7fffffff, // max count
+                              LPWSTR(se.c_str()));
     if (!m_sema) {
         throw std::system_error(GetLastError(), std::system_category(), "Error opening semaphore");
     }
 
-    m_waiters_done = CreateEventW(
-        nullptr,    // no security
-        false,      // auto-reset
-        false,      // non-signaled initially
-        LPWSTR(ev.c_str()));
+    m_waiters_done = CreateEventW(nullptr, // no security
+                                  false,   // auto-reset
+                                  false,   // non-signaled initially
+                                  LPWSTR(ev.c_str()));
     if (!m_waiters_done) {
         throw std::system_error(GetLastError(), std::system_category(), "Error opening event");
     }
-    
+
     // InterprocessMutex::SharedPart() is an unused dummy object
     m_waiters_lockcount.set_shared_part(InterprocessMutex::SharedPart(), base_path, condvar_name);
 
@@ -303,19 +299,19 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     // Check to see if we're the last waiter after notify_all().
     bool last_waiter = m_shared_part->m_was_broadcast && m_shared_part->m_waiters_count == 0;
 
-   // m_shared_part->m_waiters_countlock.unlock();
+    // m_shared_part->m_waiters_countlock.unlock();
     m_waiters_lockcount.unlock();
 
     // If we're the last waiter thread during this particular broadcast then let all the other threads proceed.
     if (last_waiter) {
-        // This call atomically signals the <m_waiters_done> event and waits until it can acquire the 
+        // This call atomically signals the <m_waiters_done> event and waits until it can acquire the
         // external mutex. This is required to ensure fairness. This need to signal an event back means
-        // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex, 
+        // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex,
         // m_waiters_countlock.
         SetEvent(m_waiters_done);
     }
 
-    // Always regain the external mutex since that's the guarantee we give to our callers. 
+    // Always regain the external mutex since that's the guarantee we give to our callers.
     m.lock();
     return;
 #else
@@ -417,9 +413,9 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
 #endif // _WIN32
 
 #else
-    m_shared_part->wait(*m.m_shared_part, []() {}, tp);
+    m_shared_part->wait(
+        *m.m_shared_part, []() {}, tp);
 #endif
-
 }
 
 
@@ -439,7 +435,7 @@ void InterprocessCondVar::notify() noexcept
 
     m_waiters_lockcount.unlock();
 
-    // If there aren't any waiters, then this is a no-op.  
+    // If there aren't any waiters, then this is a no-op.
     if (have_waiters) {
         ReleaseSemaphore(m_sema, 1, 0);
     }
@@ -485,11 +481,11 @@ void InterprocessCondVar::notify_all() noexcept
         m_waiters_lockcount.unlock();
 
         // Wait for all the awakened threads to acquire the counting
-        // semaphore. 
+        // semaphore.
         DWORD d = WaitForSingleObject(m_waiters_done, INFINITE);
         REALM_ASSERT_RELEASE(d != WAIT_FAILED);
 
-        // This assignment is okay, even without the <m_waiters_countlock> held 
+        // This assignment is okay, even without the <m_waiters_countlock> held
         // because no other waiter threads can wake up to access it.
         m_shared_part->m_was_broadcast = 0;
     }

@@ -742,6 +742,11 @@ public:
         return false;
     }
 
+    virtual bool has_multiple_values() const
+    {
+        return false;
+    }
+
     virtual bool has_search_index() const
     {
         return false;
@@ -808,62 +813,63 @@ Query create(L left, const Subexpr2<R>& right)
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-    if constexpr (REALM_OLDQUERY_FALLBACK &&
-                  ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-                   (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
-                   (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
-                   (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
-                   (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
-                   (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
-                   (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>))) {
-        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-        // TODO: recognize size operator expressions
-        // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    if constexpr (REALM_OLDQUERY_FALLBACK) {
+        if constexpr ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+                      (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
+                      (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
+                      (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
+                      (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
+                      (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
+                      (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
+                      (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>) || std::is_same_v<R, Mixed>) {
+            const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+            // TODO: recognize size operator expressions
+            // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-        if (column && !column->links_exist()) {
-            ConstTableRef t = column->get_base_table();
-            Query q = Query(t);
+            if (column && !column->links_exist()) {
+                ConstTableRef t = column->get_base_table();
+                Query q = Query(t);
 
-            if (std::is_same_v<Cond, Less>)
-                q.greater(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Greater>)
-                q.less(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, Equal>)
-                q.equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, NotEqual>)
-                q.not_equal(column->column_key(), left);
-            else if (std::is_same_v<Cond, LessEqual>)
-                q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, GreaterEqual>)
-                q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-            else if (std::is_same_v<Cond, EqualIns>)
-                q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, NotEqualIns>)
-                q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, BeginsWith>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, BeginsWithIns>)
-                q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, EndsWith>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, EndsWithIns>)
-                q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Contains>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, ContainsIns>)
-                q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-            else if (std::is_same_v<Cond, Like>)
-                q.like(column->column_key(), _impl::only_string_op_types(left));
-            else if (std::is_same_v<Cond, LikeIns>)
-                q.like(column->column_key(), _impl::only_string_op_types(left), false);
-            else {
-                // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp
-                // or fallback to using use 'return new Compare<>' instead.
-                REALM_ASSERT(false);
+                if (std::is_same_v<Cond, Less>)
+                    q.greater(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Greater>)
+                    q.less(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, Equal>)
+                    q.equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, NotEqual>)
+                    q.not_equal(column->column_key(), left);
+                else if (std::is_same_v<Cond, LessEqual>)
+                    q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, GreaterEqual>)
+                    q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
+                else if (std::is_same_v<Cond, EqualIns>)
+                    q.equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, NotEqualIns>)
+                    q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, BeginsWith>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, BeginsWithIns>)
+                    q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, EndsWith>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, EndsWithIns>)
+                    q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Contains>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, ContainsIns>)
+                    q.contains(column->column_key(), _impl::only_string_op_types(left), false);
+                else if (std::is_same_v<Cond, Like>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left));
+                else if (std::is_same_v<Cond, LikeIns>)
+                    q.like(column->column_key(), _impl::only_string_op_types(left), false);
+                else {
+                    // query_engine.hpp does not support this Cond. Please either add support for it in
+                    // query_engine.hpp or fallback to using use 'return new Compare<>' instead.
+                    REALM_ASSERT(false);
+                }
+                // Return query_engine.hpp node
+                return q;
             }
-            // Return query_engine.hpp node
-            return q;
         }
     }
 
@@ -1041,6 +1047,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
                  public Overloads<T, UUID>,
+                 public Overloads<T, Mixed>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2() {}
@@ -1062,6 +1069,7 @@ public:
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
     RLM_U2(UUID, o)                                                                                                  \
+    RLM_U2(Mixed, o)                                                                                                 \
     RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
@@ -1070,7 +1078,7 @@ public:
 template <>
 class Subexpr2<Link> : public Subexpr {
 public:
-    DataType get_type() const final
+    DataType get_type() const
     {
         return type_Link;
     }
@@ -1118,6 +1126,42 @@ public:
     }
 };
 
+template <>
+class Subexpr2<Mixed> : public Subexpr,
+                        public Overloads<Mixed, Mixed>,
+                        public Overloads<Mixed, const char*>,
+                        public Overloads<Mixed, int>,
+                        public Overloads<Mixed, float>,
+                        public Overloads<Mixed, double>,
+                        public Overloads<Mixed, int64_t>,
+                        public Overloads<Mixed, StringData>,
+                        public Overloads<Mixed, bool>,
+                        public Overloads<Mixed, Timestamp>,
+                        public Overloads<Mixed, ObjectId>,
+                        public Overloads<Mixed, Decimal128>,
+                        public Overloads<Mixed, UUID>,
+                        public Overloads<Mixed, null> {
+public:
+    Query equal(Mixed sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query not_equal(Mixed sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query begins_with(Mixed sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query ends_with(Mixed sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query contains(Mixed sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query like(Mixed sd, bool case_sensitive = true);
+    Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    DataType get_type() const final
+    {
+        return type_Mixed;
+    }
+
+    using T = Mixed; // used inside the following macros for operator overloads
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
+};
 
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
@@ -1239,6 +1283,33 @@ private:
     }
 
     util::Optional<std::string> m_string;
+};
+
+class ConstantBinaryValue : public Value<BinaryData> {
+public:
+    ConstantBinaryValue(const BinaryData& bin)
+        : Value()
+        , m_buffer(bin)
+    {
+        if (m_buffer.data())
+            set(0, BinaryData(m_buffer.data(), m_buffer.size()));
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantBinaryValue(*this));
+    }
+
+private:
+    ConstantBinaryValue(const ConstantBinaryValue& other)
+        : Value()
+        , m_buffer(other.m_buffer)
+    {
+        if (m_buffer.data())
+            set(0, BinaryData(m_buffer.data(), m_buffer.size()));
+    }
+
+    OwnedBinaryData m_buffer;
 };
 
 // All overloads where left-hand-side is L:
@@ -1695,6 +1766,12 @@ public:
         return m_link_column_keys.size() > 0;
     }
 
+    ColKey get_first_column_key() const
+    {
+        REALM_ASSERT(has_links());
+        return m_link_column_keys[0];
+    }
+
     void set_base_table(ConstTableRef table);
 
     void set_cluster(const Cluster* cluster)
@@ -1824,41 +1901,91 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
     return value;
 }
 
-// This class can be used as base for expressions that handle object properties
-template <class T>
-class ObjPropertyExpr : public Subexpr2<T> {
+// This class can be used as untyped base for expressions that handle object properties
+class ObjPropertyBase {
 public:
-    ObjPropertyExpr(ColKey column, ConstTableRef table, std::vector<ColKey> links, ExpressionComparisonType type)
+    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links, ExpressionComparisonType type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_comparison_type(type)
     {
     }
+    ObjPropertyBase(const ObjPropertyBase& other)
+        : m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
+        , m_comparison_type(other.m_comparison_type)
+    {
+    }
+    ObjPropertyBase(ColKey column, const LinkMap& link_map, ExpressionComparisonType type)
+        : m_link_map(link_map)
+        , m_column_key(column)
+        , m_comparison_type(type)
+    {
+    }
 
-    bool is_nullable() const noexcept
+    bool links_exist() const
+    {
+        return m_link_map.has_links();
+    }
+
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
+    bool is_nullable() const
     {
         return m_column_key.get_attrs().test(col_attr_Nullable);
     }
 
-    ConstTableRef get_base_table() const override
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
+    }
+
+    ColKey column_key() const noexcept
+    {
+        return m_column_key;
+    }
+
+protected:
+    LinkMap m_link_map;
+    // Column index of payload column of m_table
+    mutable ColKey m_column_key;
+    ExpressionComparisonType m_comparison_type; // Any, All, None
+};
+
+// Combines Subexpr2<T> and ObjPropertyBase
+// Implements virtual functions defined in Expression/Subexpr
+template <class T>
+class ObjPropertyExpr : public Subexpr2<T>, public ObjPropertyBase {
+public:
+    using ObjPropertyBase::ObjPropertyBase;
+
+    bool has_multiple_values() const override
+    {
+        return m_link_map.has_links() && !m_link_map.only_unary_links();
+    }
+
+    ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
     }
 
-    void set_base_table(ConstTableRef table) override
+    void set_base_table(ConstTableRef table) final
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
         }
     }
 
-    bool has_search_index() const override
+    bool has_search_index() const final
     {
         auto target_table = m_link_map.get_target_table();
         return target_table->get_primary_key_column() == m_column_key || target_table->has_search_index(m_column_key);
     }
 
-    std::vector<ObjKey> find_all(Mixed value) const override
+    std::vector<ObjKey> find_all(Mixed value) const final
     {
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
@@ -1892,25 +2019,9 @@ public:
         return ret;
     }
 
-    void collect_dependencies(std::vector<TableKey>& tables) const override
+    void collect_dependencies(std::vector<TableKey>& tables) const final
     {
         m_link_map.collect_dependencies(tables);
-    }
-
-
-    bool links_exist() const
-    {
-        return m_link_map.has_links();
-    }
-
-    bool only_unary_links() const
-    {
-        return m_link_map.only_unary_links();
-    }
-
-    LinkMap get_link_map() const
-    {
-        return m_link_map;
     }
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
@@ -1918,34 +2029,15 @@ public:
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const override
+    virtual ExpressionComparisonType get_comparison_type() const final
     {
         return m_comparison_type;
-    }
-
-    ObjPropertyExpr(ObjPropertyExpr const& other)
-        : Subexpr2<T>(other)
-        , m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-        , m_comparison_type(other.m_comparison_type)
-    {
-    }
-
-    ColKey column_key() const
-    {
-        return m_column_key;
     }
 
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
     }
-
-protected:
-    LinkMap m_link_map;
-    // Column key of payload column of m_table
-    mutable ColKey m_column_key;
-    ExpressionComparisonType m_comparison_type; // Any, All, None
 };
 
 // If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
@@ -1959,8 +2051,6 @@ template <class T>
 class SimpleQuerySupport : public ObjPropertyExpr<T> {
 public:
     using ObjPropertyExpr<T>::links_exist;
-    using ObjPropertyExpr<T>::m_link_map;
-    using ObjPropertyExpr<T>::m_column_key;
 
     SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
                        ExpressionComparisonType type = ExpressionComparisonType::Any)
@@ -2060,6 +2150,9 @@ public:
     }
 
 private:
+    using ObjPropertyExpr<T>::m_link_map;
+    using ObjPropertyExpr<T>::m_column_key;
+
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -2098,59 +2191,6 @@ template <>
 class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
-
-template <>
-class Columns<Dictionary> : public ObjPropertyExpr<Mixed> {
-public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : ObjPropertyExpr<Mixed>(column, table, std::move(links), type)
-    {
-        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
-    }
-
-    Columns& key(const Mixed& key_value);
-    Columns& property(const std::string& prop)
-    {
-        REALM_ASSERT(!m_key.is_null());
-        m_prop_list.push_back(prop);
-        return *this;
-    }
-    void set_cluster(const Cluster* cluster) override;
-    void evaluate(size_t index, ValueBase& destination) override;
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns>(static_cast<const Columns&>(*this));
-    }
-
-    Columns(Columns const& other)
-        : ObjPropertyExpr<Mixed>(other)
-        , m_key(other.m_key)
-        , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
-        , m_key_type(other.m_key_type)
-    {
-    }
-
-private:
-    Mixed m_key;
-    std::vector<std::string> m_prop_list;
-    ObjKey m_objkey;
-    DataType m_key_type;
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
-};
-
-// Columns<Mixed> == String
-inline Query operator==(Columns<Mixed>&& left, const char* right)
-{
-    return left == StringData(right);
-}
 
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
@@ -2219,6 +2259,24 @@ Query binary_compare(const Subexpr2<BinaryData>& left, const Subexpr2<BinaryData
         return make_expression<Compare<I>>(right.clone(), left.clone());
 }
 
+template <class T, class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, T right, bool case_sensitive)
+{
+    Mixed data(right);
+    if (case_sensitive)
+        return create<S>(data, left);
+    else
+        return create<I>(data, left);
+}
+
+template <class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, const Subexpr2<Mixed>& right, bool case_sensitive)
+{
+    if (case_sensitive)
+        return make_expression<Compare<S>>(right.clone(), left.clone());
+    else
+        return make_expression<Compare<I>>(right.clone(), left.clone());
+}
 
 // Columns<String> == Columns<String>
 inline Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)
@@ -2630,6 +2688,7 @@ public:
         : Subexpr2<Link>(other)
         , m_link_map(other.m_link_map)
         , m_comparison_type(other.m_comparison_type)
+        , m_is_list(other.m_is_list)
     {
     }
 
@@ -2675,6 +2734,11 @@ public:
         return m_link_map;
     }
 
+    DataType get_type() const override
+    {
+        return m_is_list ? type_LinkList : type_Link;
+    }
+
     ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
@@ -2716,6 +2780,7 @@ public:
 private:
     LinkMap m_link_map;
     ExpressionComparisonType m_comparison_type;
+    bool m_is_list;
     friend class Table;
     friend class LinkChain;
 
@@ -2723,8 +2788,8 @@ private:
             ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, links)
         , m_comparison_type(type)
+        , m_is_list(column_key.is_list())
     {
-        static_cast<void>(column_key);
     }
 };
 
@@ -2774,14 +2839,21 @@ public:
         return m_link_map.has_links();
     }
 
+    virtual SizeOperator<int64_t> size() = 0;
+    virtual std::unique_ptr<Subexpr> get_element_length() = 0;
+    virtual std::unique_ptr<Subexpr> max_of() = 0;
+    virtual std::unique_ptr<Subexpr> min_of() = 0;
+    virtual std::unique_ptr<Subexpr> sum_of() = 0;
+    virtual std::unique_ptr<Subexpr> avg_of() = 0;
+
     mutable ColKey m_column_key;
     LinkMap m_link_map;
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    ArrayList* m_leaf_ptr = nullptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
     ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
@@ -2800,11 +2872,17 @@ public:
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
     }
+
     ColumnsCollection(const ColumnsCollection& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
+    }
+
+    bool has_multiple_values() const override
+    {
+        return true;
     }
 
     ConstTableRef get_base_table() const final
@@ -2838,7 +2916,7 @@ public:
         evaluate<T>(index, destination);
     }
 
-    std::string description(util::serializer::SerialisationState& state) const final
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return ColumnListBase::description(state);
     }
@@ -2848,7 +2926,7 @@ public:
         return ColumnListBase::m_comparison_type;
     }
 
-    SizeOperator<int64_t> size();
+    SizeOperator<int64_t> size() override;
 
     ColumnListElementLength<T> element_lengths() const
     {
@@ -2857,23 +2935,71 @@ public:
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
 
     ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
-        return {m_column_key, *this};
+        return {*this};
     }
+
+    std::unique_ptr<Subexpr> max_of() override
+    {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+            return max().clone();
+        }
+        else {
+            return {};
+        }
+    }
+    std::unique_ptr<Subexpr> min_of() override
+    {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+            return min().clone();
+        }
+        else {
+            return {};
+        }
+    }
+    std::unique_ptr<Subexpr> sum_of() override
+    {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+            return sum().clone();
+        }
+        else {
+            return {};
+        }
+    }
+    std::unique_ptr<Subexpr> avg_of() override
+    {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+            return average().clone();
+        }
+        else {
+            return {};
+        }
+    }
+
+    std::unique_ptr<Subexpr> get_element_length() override
+    {
+        if constexpr (realm::is_any_v<T, StringData, BinaryData, Mixed>) {
+            return element_lengths().clone();
+        }
+        else {
+            return {};
+        }
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return std::unique_ptr<Subexpr>(new ColumnsCollection(*this));
@@ -2951,6 +3077,171 @@ public:
     }
 };
 
+// Returns the keys
+class ColumnDictionaryKeys;
+
+// Returns the values of a given key
+class ColumnDictionaryKey;
+
+// Returns the values
+template <>
+class Columns<Dictionary> : public ColumnsCollection<Mixed> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnsCollection<Mixed>(column, table, std::move(links), type)
+    {
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+    }
+
+    DataType get_key_type() const
+    {
+        return m_key_type;
+    }
+
+    ColumnDictionaryKey key(const Mixed& key_value);
+    ColumnDictionaryKeys keys();
+
+    SizeOperator<int64_t> size() override;
+    std::unique_ptr<Subexpr> get_element_length() override
+    {
+        // Not supported for Dictionary
+        return {};
+    }
+    std::unique_ptr<Subexpr> max_of() override;
+    std::unique_ptr<Subexpr> min_of() override;
+    std::unique_ptr<Subexpr> sum_of() override;
+    std::unique_ptr<Subexpr> avg_of() override;
+
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Dictionary>>(*this);
+    }
+
+    Columns(Columns const& other)
+        : ColumnsCollection<Mixed>(other)
+        , m_key_type(other.m_key_type)
+    {
+    }
+
+protected:
+    DataType m_key_type;
+};
+
+class ColumnDictionaryKey : public Columns<Dictionary> {
+public:
+    ColumnDictionaryKey(Mixed key_value, const Columns<Dictionary>& dict)
+        : Columns<Dictionary>(dict)
+    {
+        init_key(key_value);
+    }
+
+    ColumnDictionaryKey& property(const std::string& prop)
+    {
+        m_prop_list.push_back(prop);
+        return *this;
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state) + std::string(".") + std::string(m_key.get_string());
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnDictionaryKey(*this));
+    }
+
+    ColumnDictionaryKey(ColumnDictionaryKey const& other)
+        : Columns<Dictionary>(other)
+        , m_prop_list(other.m_prop_list)
+        , m_objkey(other.m_objkey)
+    {
+        init_key(other.m_key);
+    }
+
+private:
+    Mixed m_key;
+    std::string m_buffer;
+    std::vector<std::string> m_prop_list;
+    ObjKey m_objkey;
+
+    void init_key(Mixed key_value);
+};
+
+// Returns the keys
+class ColumnDictionaryKeys : public Subexpr2<StringData> {
+public:
+    ColumnDictionaryKeys(const Columns<Dictionary>& dict)
+        : m_key_type(dict.get_key_type())
+        , m_column_key(dict.m_column_key)
+        , m_link_map(dict.m_link_map)
+        , m_comparison_type(dict.get_comparison_type())
+    {
+        REALM_ASSERT(m_key_type == type_String);
+    }
+
+    ConstTableRef get_base_table() const final
+    {
+        return m_link_map.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) final
+    {
+        m_link_map.set_base_table(table);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const final
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    ExpressionComparisonType get_comparison_type() const final
+    {
+        return m_comparison_type;
+    }
+
+    void set_cluster(const Cluster* cluster) override;
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key) +
+               ".keys";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnDictionaryKeys(*this));
+    }
+
+    ColumnDictionaryKeys(const ColumnDictionaryKeys& other)
+        : m_key_type(other.m_key_type)
+        , m_column_key(other.m_column_key)
+        , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
+    {
+    }
+
+private:
+    DataType m_key_type;
+    ColKey m_column_key;
+    LinkMap m_link_map;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
+
+
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
+};
+
 template <typename T>
 class ColumnListSize : public ColumnsCollection<T> {
 public:
@@ -3005,6 +3296,10 @@ public:
         : m_list(source)
     {
     }
+    bool has_multiple_values() const override
+    {
+        return true;
+    }
     void evaluate(size_t index, ValueBase& destination) override
     {
         Allocator& alloc = m_list.get_base_table()->get_alloc();
@@ -3019,7 +3314,20 @@ public:
                 const size_t list_size = list.size();
                 sizes.reserve(sizes.size() + list_size);
                 for (size_t j = 0; j < list_size; j++) {
-                    sizes.push_back(list.get(j).size());
+                    if constexpr (std::is_same_v<T, Mixed>) {
+                        Mixed v = list.get(j);
+                        if (!v.is_null()) {
+                            if (v.get_type() == type_String) {
+                                sizes.push_back(v.get_string().size());
+                            }
+                            else if (v.get_type() == type_Binary) {
+                                sizes.push_back(v.get_binary().size());
+                            }
+                        }
+                    }
+                    else {
+                        sizes.push_back(list.get(j).size());
+                    }
                 }
             }
         }
@@ -3079,15 +3387,13 @@ class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     using R = typename Operation::ResultType;
 
-    ListColumnAggregate(ColKey column_key, ColumnsCollection<T> column)
-        : m_column_key(column_key)
-        , m_list(std::move(column))
+    ListColumnAggregate(ColumnsCollection<T> column)
+        : m_list(std::move(column))
     {
     }
 
     ListColumnAggregate(const ListColumnAggregate& other)
-        : m_column_key(other.m_column_key)
-        , m_list(other.m_list)
+        : m_list(other.m_list)
     {
     }
 
@@ -3162,7 +3468,6 @@ private:
             }
         }
     }
-    ColKey m_column_key;
     ColumnsCollection<T> m_list;
 };
 
@@ -3240,53 +3545,22 @@ inline Query operator!=(null, const Subexpr2<Link>& right)
     return compare<NotEqual>(right, null());
 }
 
-
 template <class T>
-class Columns : public Subexpr2<T> {
+class Columns : public ObjPropertyExpr<T> {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+    using ObjPropertyExpr<T>::links_exist;
+    using ObjPropertyBase::is_nullable;
 
     Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
             ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_link_map(table, std::move(links))
-        , m_column_key(column)
-        , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
-        , m_comparison_type(type)
+        : ObjPropertyExpr<T>(column, table, std::move(links), type)
     {
     }
 
     Columns(const Columns& other)
-        : m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-        , m_nullable(other.m_nullable)
-        , m_comparison_type(other.m_comparison_type)
+        : ObjPropertyExpr<T>(other)
     {
-    }
-
-    Columns& operator=(const Columns& other)
-    {
-        if (this != &other) {
-            m_link_map = other.m_link_map;
-            m_column_key = other.m_column_key;
-            m_nullable = other.m_nullable;
-            m_comparison_type = other.m_comparison_type;
-        }
-        return *this;
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns<T>>(*this);
-    }
-
-    // See comment in base class
-    void set_base_table(ConstTableRef table) override
-    {
-        if (table == get_base_table())
-            return;
-
-        m_link_map.set_base_table(table);
-        m_nullable = m_link_map.get_target_table()->is_nullable(m_column_key);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -3298,62 +3572,10 @@ public:
         }
         else {
             // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(get_base_table()->get_alloc()));
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(this->get_base_table()->get_alloc()));
             cluster->init_leaf(m_column_key, m_array_ptr.get());
             m_leaf_ptr = m_array_ptr.get();
         }
-    }
-
-    bool has_search_index() const override
-    {
-        return m_link_map.get_target_table()->has_search_index(m_column_key);
-    }
-
-    std::vector<ObjKey> find_all(Mixed value) const override
-    {
-        std::vector<ObjKey> ret;
-        std::vector<ObjKey> result;
-
-        if (value.is_null() && !m_nullable) {
-            return ret;
-        }
-
-        if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
-            // Only one object with a given key would be possible
-            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
-                result.push_back(k);
-        }
-        else {
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            REALM_ASSERT(index);
-
-            if (value.is_null()) {
-                index->find_all(result, realm::null{});
-            }
-            else {
-                T val = value.get<T>();
-                index->find_all(result, val);
-            }
-        }
-
-        for (auto k : result) {
-            auto ndxs = m_link_map.get_origin_ndxs(k);
-            ret.insert(ret.end(), ndxs.begin(), ndxs.end());
-        }
-
-        return ret;
-    }
-
-    void collect_dependencies(std::vector<TableKey>& tables) const override
-    {
-        m_link_map.collect_dependencies(tables);
-    }
-
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
-    // and binds it to a Query at a later time
-    ConstTableRef get_base_table() const override
-    {
-        return m_link_map.get_base_table();
     }
 
     template <class LeafType2 = LeafType>
@@ -3395,29 +3617,30 @@ public:
             // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
             // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
             // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same_v<U, int64_t> && index + ValueBase::chunk_size <= colsize) {
-                // If you want to modify 'chunk_size' then update Array::get_chunk()
-                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
+            if constexpr (std::is_same_v<U, int64_t>) {
+                if (index + ValueBase::chunk_size <= colsize) {
+                    // If you want to modify 'chunk_size' then update Array::get_chunk()
+                    REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
-                auto leaf_2 = static_cast<const Array*>(leaf);
-                int64_t res[ValueBase::chunk_size];
-                leaf_2->get_chunk(index, res);
+                    auto leaf_2 = static_cast<const Array*>(leaf);
+                    int64_t res[ValueBase::chunk_size];
+                    leaf_2->get_chunk(index, res);
 
-                destination.set(res, res + ValueBase::chunk_size);
+                    destination.set(res, res + ValueBase::chunk_size);
+                    return;
+                }
             }
-            else {
-                size_t rows = colsize - index;
-                if (rows > ValueBase::chunk_size)
-                    rows = ValueBase::chunk_size;
-                destination.init(false, rows);
+            size_t rows = colsize - index;
+            if (rows > ValueBase::chunk_size)
+                rows = ValueBase::chunk_size;
+            destination.init(false, rows);
 
-                for (size_t t = 0; t < rows; t++) {
-                    if (leaf->is_null(index + t)) {
-                        destination.set_null(t);
-                    }
-                    else {
-                        destination.set(t, leaf->get(index + t));
-                    }
+            for (size_t t = 0; t < rows; t++) {
+                if (leaf->is_null(index + t)) {
+                    destination.set_null(t);
+                }
+                else {
+                    destination.set(t, leaf->get(index + t));
                 }
             }
         }
@@ -3425,16 +3648,17 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
+        return state.describe_expression_type(this->m_comparison_type) +
+               state.describe_columns(m_link_map, m_column_key);
     }
 
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (m_nullable && std::is_same_v<typename LeafType::value_type, int64_t>) {
+        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
             evaluate_internal<ArrayIntNull>(index, destination);
         }
-        else if (m_nullable && std::is_same_v<typename LeafType::value_type, bool>) {
+        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
             evaluate_internal<ArrayBoolNull>(index, destination);
         }
         else {
@@ -3447,10 +3671,10 @@ public:
         destination.init(false, 1);
         auto table = m_link_map.get_target_table();
         auto obj = table.unchecked_ptr()->get_object(key);
-        if (m_nullable && std::is_same_v<typename LeafType::value_type, int64_t>) {
+        if (is_nullable() && std::is_same_v<typename LeafType::value_type, int64_t>) {
             destination.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
         }
-        else if (m_nullable && std::is_same_v<typename LeafType::value_type, bool>) {
+        else if (is_nullable() && std::is_same_v<typename LeafType::value_type, bool>) {
             destination.set(0, obj.template get<util::Optional<bool>>(m_column_key));
         }
         else {
@@ -3458,38 +3682,9 @@ public:
         }
     }
 
-    bool links_exist() const
-    {
-        return m_link_map.has_links();
-    }
-
-    bool only_unary_links() const
-    {
-        return m_link_map.only_unary_links();
-    }
-
-    bool is_nullable() const
-    {
-        return m_nullable;
-    }
-
-    LinkMap get_link_map() const
-    {
-        return m_link_map;
-    }
-
-    ColKey column_key() const noexcept
-    {
-        return m_column_key;
-    }
-
-    virtual ExpressionComparisonType get_comparison_type() const override
-    {
-        return m_comparison_type;
-    }
-
 private:
-    LinkMap m_link_map;
+    using ObjPropertyExpr<T>::m_link_map;
+    using ObjPropertyExpr<T>::m_column_key;
 
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -3497,21 +3692,22 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     const ArrayPayload* m_leaf_ptr = nullptr;
-
-    // Column index of payload column of m_table
-    mutable ColKey m_column_key;
-
-    // set to false by default for stand-alone Columns declaration that are not yet associated with any table
-    // or column. Call init() to update it or use a constructor that takes table + column index as argument.
-    bool m_nullable = false;
-    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 template <typename T, typename Operation>
 class SubColumnAggregate;
 
+// Defines a uniform interface for aggregation methods.
+class SubColumnBase {
+public:
+    virtual std::unique_ptr<Subexpr> max_of() = 0;
+    virtual std::unique_ptr<Subexpr> min_of() = 0;
+    virtual std::unique_ptr<Subexpr> sum_of() = 0;
+    virtual std::unique_ptr<Subexpr> avg_of() = 0;
+};
+
 template <typename T>
-class SubColumns : public Subexpr {
+class SubColumns : public Subexpr, public SubColumnBase {
 public:
     SubColumns(Columns<T>&& column, const LinkMap& link_map)
         : m_column(std::move(column))
@@ -3574,6 +3770,23 @@ public:
     SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
         return {m_column, m_link_map};
+    }
+
+    std::unique_ptr<Subexpr> max_of() override
+    {
+        return max().clone();
+    }
+    std::unique_ptr<Subexpr> min_of() override
+    {
+        return min().clone();
+    }
+    std::unique_ptr<Subexpr> sum_of() override
+    {
+        return sum().clone();
+    }
+    std::unique_ptr<Subexpr> avg_of() override
+    {
+        return average().clone();
     }
 
 private:

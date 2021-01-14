@@ -100,6 +100,7 @@ Query::Query(const Query& source)
     : error_code(source.error_code)
     , m_groups(source.m_groups)
     , m_table(source.m_table)
+    , m_ordering(source.m_ordering)
 {
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
@@ -159,6 +160,7 @@ Query& Query::operator=(const Query& source)
                 m_view = m_source_link_set.get();
             }
         }
+        m_ordering = source.m_ordering;
     }
     return *this;
 }
@@ -780,6 +782,70 @@ Query& Query::between(ColKey column_key, Decimal128 from, Decimal128 to)
     greater_equal(column_key, from);
     less_equal(column_key, to);
     end_group();
+    return *this;
+}
+
+// ------------- Mixed
+Query& Query::greater(ColKey column_key, Mixed value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        return add_condition<Equal>(column_key, value);
+    else
+        return add_condition<EqualIns>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        return add_condition<NotEqual>(column_key, value);
+    else
+        return add_condition<NotEqualIns>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, Mixed value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, Mixed value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, Mixed value)
+{
+    return add_condition<Less>(column_key, value);
+}
+Query& Query::begins_with(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<BeginsWith>(column_key, value);
+    else
+        add_condition<BeginsWithIns>(column_key, value);
+    return *this;
+}
+Query& Query::ends_with(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<EndsWith>(column_key, value);
+    else
+        add_condition<EndsWithIns>(column_key, value);
+    return *this;
+}
+Query& Query::contains(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Contains>(column_key, value);
+    else
+        add_condition<ContainsIns>(column_key, value);
+    return *this;
+}
+Query& Query::like(ColKey column_key, Mixed value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Like>(column_key, value);
+    else
+        add_condition<LikeIns>(column_key, value);
     return *this;
 }
 
@@ -1423,6 +1489,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 #endif
 
     TableView ret(m_table, *this, start, end, limit);
+    if (m_ordering) {
+        ret.apply_descriptor_ordering(*m_ordering);
+    }
     ret.do_sync();
     return ret;
 }
@@ -1720,15 +1789,33 @@ std::string Query::validate()
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    std::string description;
     if (root_node()) {
         if (m_view) {
             throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
         }
-        return root_node()->describe_expression(state);
+        description = root_node()->describe_expression(state);
     }
-    // An empty query returns all results and one way to indicate this
-    // is to serialise TRUEPREDICATE which is functionally equivilent
-    return "TRUEPREDICATE";
+    else {
+        // An empty query returns all results and one way to indicate this
+        // is to serialise TRUEPREDICATE which is functionally equivilent
+        description = "TRUEPREDICATE";
+    }
+    if (this->m_ordering) {
+        description += " " + m_ordering->get_description(m_table);
+    }
+    return description;
+}
+
+Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)
+{
+    m_ordering = std::move(ordering);
+    return *this;
+}
+
+std::shared_ptr<DescriptorOrdering> Query::get_ordering()
+{
+    return std::move(m_ordering);
 }
 
 std::string Query::get_description() const

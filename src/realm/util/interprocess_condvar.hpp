@@ -56,12 +56,12 @@ public:
     InterprocessCondVar(const InterprocessCondVar&) = delete;
     InterprocessCondVar& operator=(const InterprocessCondVar&) = delete;
 
-/// To use the InterprocessCondVar, you also must place a structure of type
-/// InterprocessCondVar::SharedPart in memory shared by multiple processes
-/// or in a memory mapped file, and use set_shared_part() to associate
-/// the condition variable with it's shared part. You must initialize
-/// the shared part using InterprocessCondVar::init_shared_part(), but only before
-/// first use and only when you have exclusive access to the shared part.
+    /// To use the InterprocessCondVar, you also must place a structure of type
+    /// InterprocessCondVar::SharedPart in memory shared by multiple processes
+    /// or in a memory mapped file, and use set_shared_part() to associate
+    /// the condition variable with it's shared part. You must initialize
+    /// the shared part using InterprocessCondVar::init_shared_part(), but only before
+    /// first use and only when you have exclusive access to the shared part.
 
 #ifdef REALM_CONDVAR_EMULATION
     struct SharedPart {
@@ -125,11 +125,11 @@ private:
 
 #ifdef _WIN32
     // Semaphore used to queue up threads waiting for the condition to
-    // become signaled. 
+    // become signaled.
     HANDLE m_sema = 0;
     // An auto-reset event used by the broadcast/signal thread to wait
     // for all the waiting thread(s) to wake up and be released from the
-    // semaphore. 
+    // semaphore.
     HANDLE m_waiters_done = 0;
     std::string m_name;
 

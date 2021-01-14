@@ -175,6 +175,18 @@ public:
     Query& less(ColKey column_key, Decimal128 value);
     Query& between(ColKey column_key, Decimal128 from, Decimal128 to);
 
+    // Conditions: Mixed
+    Query& equal(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& not_equal(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& greater(ColKey column_key, Mixed value);
+    Query& greater_equal(ColKey column_key, Mixed value);
+    Query& less(ColKey column_key, Mixed value);
+    Query& less_equal(ColKey column_key, Mixed value);
+    Query& begins_with(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& ends_with(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& contains(ColKey column_key, Mixed value, bool case_sensitive = true);
+    Query& like(ColKey column_key, Mixed value, bool case_sensitive = true);
+
     // Conditions: size
     Query& size_equal(ColKey column_key, int64_t value);
     Query& size_not_equal(ColKey column_key, int64_t value);
@@ -294,6 +306,9 @@ public:
     std::string get_description() const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
+    Query& set_ordering(std::unique_ptr<DescriptorOrdering> ordering);
+    std::shared_ptr<DescriptorOrdering> get_ordering();
+
     bool eval_object(const Obj& obj) const;
 
 private:
@@ -374,6 +389,7 @@ private:
     LnkSetPtr m_source_link_set;                   // link sets are owned by the query.
     ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
     std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
+    std::shared_ptr<DescriptorOrdering> m_ordering;
 };
 
 // Implementation:

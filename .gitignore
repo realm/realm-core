@@ -12,6 +12,8 @@ GTAGS
 /gcovr.xml
 /tmp
 doc/html
+/html
+coverage-*
 
 # CMake artifacts
 CMakeFiles
@@ -44,6 +46,8 @@ Thumbs.db
 /.vscode/launch.json
 /.vscode/settings.json
 /.vscode/tasks.json
+
+.cproject
 
 # Ignore Eclipse settings
 /.settings

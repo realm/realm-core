@@ -24,7 +24,7 @@
 
 namespace realm {
 /// Populate the mapping from public name to internal name for queries.
-inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& realm)
+inline void populate_keypath_mapping(query_parser::KeyPathMapping& mapping, Realm& realm)
 {
     mapping.set_backlink_class_prefix("class_");
 
@@ -50,13 +50,14 @@ inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
     }
 }
 
+/*
 /// Generate an IncludeDescriptor from a list of key paths.
 ///
 /// Each key path in the list is a period ('.') seperated property path, beginning
 /// at the class defined by `object_schema` and ending with a linkingObjects relationship.
 inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> const& paths, Realm& realm,
                                                         ObjectSchema const& object_schema,
-                                                        parser::KeyPathMapping& mapping)
+                                                        query_parser::KeyPathMapping& mapping)
 {
     auto base_table = realm.read_group().get_table(object_schema.table_key);
     REALM_ASSERT(base_table);
@@ -74,7 +75,8 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
         ConstTableRef cur_table = base_table;
 
         while (index < path.size()) {
-            parser::KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
+            // throws if invalid
+            query_parser::KeyPathElement element = mapping.process_next_path(cur_table, path, index);
             // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
             if (!element.table->is_link_type(element.col_key.get_type()) &&
                 element.col_key.get_type() != col_type_BackLink) {
@@ -93,7 +95,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
             else {
                 cur_table = element.table; // advance through backlink
             }
-            LinkPathPart link = element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal
+            LinkPathPart link = element.operation == query_parser::KeyPathElement::KeyPathOperation::BacklinkTraversal
                                     ? LinkPathPart(element.col_key, element.table)
                                     : LinkPathPart(element.col_key);
             links.emplace_back(std::move(link));
@@ -102,4 +104,5 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
     }
     return IncludeDescriptor{base_table, properties};
 }
+*/
 } // namespace realm
