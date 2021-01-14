@@ -11,20 +11,14 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     const realm_value_t* m_args = nullptr;
 
     QueryArgumentsAdapter(size_t num_args, const realm_value_t* args) noexcept
-        : m_num_args(num_args)
+        : Arguments(num_args)
         , m_args(args)
     {
     }
 
-    void check_index(size_t i) const
-    {
-        if (i >= m_num_args)
-            throw std::out_of_range{"Query argument out of range"};
-    }
-
     bool bool_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_BOOL) {
             return m_args[i].boolean;
         }
@@ -33,7 +27,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     long long long_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_INT) {
             return m_args[i].integer;
         }
@@ -42,7 +36,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     float float_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_FLOAT) {
             return m_args[i].fnum;
         }
@@ -51,7 +45,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     double double_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_DOUBLE) {
             return m_args[i].dnum;
         }
@@ -60,7 +54,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     StringData string_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_STRING) {
             return from_capi(m_args[i].string);
         }
@@ -69,7 +63,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     BinaryData binary_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_BINARY) {
             return from_capi(m_args[i].binary);
         }
@@ -78,7 +72,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     Timestamp timestamp_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
             return from_capi(m_args[i].timestamp);
         }
@@ -87,7 +81,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     ObjKey object_index_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_LINK) {
             // FIXME: Somehow check the target table type?
             return from_capi(m_args[i].link).get_obj_key();
@@ -97,7 +91,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     ObjectId objectid_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
             return from_capi(m_args[i].object_id);
         }
@@ -106,7 +100,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     Decimal128 decimal128_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_DECIMAL128) {
             return from_capi(m_args[i].decimal128);
         }
@@ -115,7 +109,7 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     UUID uuid_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_UUID) {
             return from_capi(m_args[i].uuid);
         }
@@ -124,12 +118,12 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
 
     bool is_argument_null(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         return m_args[i].type == RLM_TYPE_NULL;
     }
     DataType type_for_argument(size_t i) override
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_INT) {
             return type_Int;
         }
