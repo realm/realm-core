@@ -272,6 +272,7 @@ public:
     void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
+    void append(const DescriptorOrdering& other);
     realm::util::Optional<size_t> get_min_limit() const;
     /// Remove all LIMIT statements from this descriptor ordering, returning the
     /// minimum LIMIT value that existed. If there was no LIMIT statement,

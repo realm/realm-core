@@ -399,6 +399,13 @@ void DescriptorOrdering::append_limit(LimitDescriptor limit)
     }
 }
 
+void DescriptorOrdering::append(const DescriptorOrdering& other)
+{
+    for (const auto& d : other.m_descriptors) {
+        m_descriptors.emplace_back(d->clone());
+    }
+}
+
 DescriptorType DescriptorOrdering::get_type(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
