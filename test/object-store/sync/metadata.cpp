@@ -23,6 +23,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
@@ -536,6 +537,9 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             CHECK(user_metadata->provider_type() == auth_url);
             CHECK(user_metadata->access_token().empty());
             CHECK(user_metadata->is_valid());
+
+            // Close realm
+            _impl::RealmCoordinator::get_coordinator(file_manager.metadata_path())->clear_cache();
 
             // Open metadata realm with different key
             std::vector<char> key1 = make_test_encryption_key(11);
