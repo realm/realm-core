@@ -383,48 +383,37 @@ TEST_CASE("Schema") {
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded object 'origin' is unreachable by any link path from top level objects.");
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(),
+                "Embedded object 'origin' is unreachable by any link path from top level objects.");
         }
 
         SECTION("allows embedded object chains starting from a top level object") {
             Schema schema = {
-                {"top", {
-                    {"linkA", PropertyType::Object|PropertyType::Nullable, "A"}
-                }},
-                {"A", ObjectSchema::IsEmbedded{true}, {
-                    {"link", PropertyType::Object|PropertyType::Nullable, "B"}
-                }},
-                {"B", ObjectSchema::IsEmbedded{true}, {
-                    {"link", PropertyType::Object|PropertyType::Nullable, "C"}
-                }},
-                {"C", ObjectSchema::IsEmbedded{true}, {
-                    {"value", PropertyType::Int}
-                }}
-            };
+                {"top", {{"linkA", PropertyType::Object | PropertyType::Nullable, "A"}}},
+                {"A", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "B"}}},
+                {"B", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "C"}}},
+                {"C", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("allows link properties from embedded to top-level") {
-            Schema schema = {
-                {"target", {
-                    {"value", PropertyType::Int},
-                    {"link_to_embedded_object", PropertyType::Object|PropertyType::Nullable, "origin"}
-                }},
-                {"origin", ObjectSchema::IsEmbedded{true}, {
-                    {"link", PropertyType::Object|PropertyType::Nullable, "target"}
-                }}
-            };
+            Schema schema = {{"target",
+                              {{"value", PropertyType::Int},
+                               {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "origin"}}},
+                             {"origin",
+                              ObjectSchema::IsEmbedded{true},
+                              {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("allows array properties from embedded to top-level") {
-            Schema schema = {{"target", {
-                                {"value", PropertyType::Int},
-                                {"link_to_embedded_object", PropertyType::Object|PropertyType::Array, "origin"}
-                             }},
-                             {"origin", ObjectSchema::IsEmbedded{true}, {
-                                 {"array", PropertyType::Array | PropertyType::Object, "target"}}
-                             }};
+            Schema schema = {{"target",
+                              {{"value", PropertyType::Int},
+                               {"link_to_embedded_object", PropertyType::Object | PropertyType::Array, "origin"}}},
+                             {"origin",
+                              ObjectSchema::IsEmbedded{true},
+                              {{"array", PropertyType::Array | PropertyType::Object, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 
@@ -529,18 +518,18 @@ TEST_CASE("Schema") {
         }
 
         SECTION("allows top level loops") {
-            Schema schema = {{"TopLevelObjectA",
-                              {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"},
-                               {"link_to_embedded_b", PropertyType::Object|PropertyType::Nullable, "EmbeddedObjectB"}
-                              }},
-                             {"TopLevelObjectB",
-                              {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
-                             {"EmbeddedObjectA",
-                              ObjectSchema::IsEmbedded{true},
-                              {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
-                             {"EmbeddedObjectB",
-                              ObjectSchema::IsEmbedded{true},
-                              {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"},
+                  {"link_to_embedded_b", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"TopLevelObjectB",
+                 {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 

@@ -183,7 +183,8 @@ void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectS
     }
 
     for (auto name : orphans) {
-        exceptions.push_back(util::format("Embedded object '%1' is unreachable by any link path from top level objects.", name));
+        exceptions.push_back(
+            util::format("Embedded object '%1' is unreachable by any link path from top level objects.", name));
     }
 }
 } // end anonymous namespace
