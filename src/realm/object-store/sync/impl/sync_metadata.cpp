@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
-#include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/object-store/object_schema.hpp>
@@ -134,7 +133,7 @@ namespace realm {
 
 // MARK: - Sync metadata manager
 
-SyncMetadataManager::SyncMetadataManager(const SyncFileManager& file_manager, std::string path, bool should_encrypt,
+SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
     constexpr uint64_t SCHEMA_VERSION = 4;
@@ -184,18 +183,17 @@ SyncMetadataManager::SyncMetadataManager(const SyncFileManager& file_manager, st
     };
 
     m_metadata_config = std::move(config);
+
     SharedRealm realm;
     try {
         realm = get_realm();
     }
-    catch (const std::exception& e) {
+    catch (const RealmFileException& e) {
         if (!should_encrypt)
-            throw(e);
+            throw;
 
-        assert(file_manager.remove_metadata_realm());
-        _impl::RealmCoordinator::get_coordinator(m_metadata_config.path)->clear_cache();
-        file_manager.metadata_path(); // Make new metadata realm directory
-        realm = Realm::get_shared_realm(m_metadata_config);
+        util::File::remove(m_metadata_config.path);
+        realm = get_realm();
     }
 
     // Get data about the (hardcoded) schemas

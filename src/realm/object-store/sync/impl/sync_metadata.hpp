@@ -33,7 +33,6 @@ template <typename T>
 class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 class SyncMetadataManager;
-class SyncFileManager;
 
 // A facade for a metadata Realm object representing app metadata
 class SyncAppMetadata {
@@ -261,7 +260,7 @@ public:
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
-    SyncMetadataManager(const SyncFileManager& file_manager, std::string path, bool should_encrypt,
+    SyncMetadataManager(std::string path, bool should_encrypt,
                         util::Optional<std::vector<char>> encryption_key = none);
 
 private:
