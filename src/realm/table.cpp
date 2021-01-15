@@ -308,6 +308,9 @@ const char* get_data_type_name(DataType type) noexcept
             return "linklist";
         case type_TypedLink:
             return "typedLink";
+        default:
+            if (type == type_TypeOfValue)
+                return "@type";
     }
     return "unknown";
 }

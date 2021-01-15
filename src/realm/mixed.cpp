@@ -22,6 +22,7 @@
 #include <realm/column_type_traits.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/query_value.hpp>
 
 namespace realm {
 
@@ -213,7 +214,8 @@ int Mixed::compare(const Mixed& b) const
         return 1;
 
     // None is null
-    switch (get_type()) {
+    auto type = get_type();
+    switch (type) {
         case type_Bool: {
             int64_t i_val = bool_val ? 1 : 0;
             switch (b.get_type()) {
@@ -336,6 +338,11 @@ int Mixed::compare(const Mixed& b) const
             }
             break;
         default:
+            if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
+                return TypeOfValue(int_val).matches(TypeOfValue(b.int_val))
+                           ? 0
+                           : _impl::compare_generic(int_val, b.int_val);
+            }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
