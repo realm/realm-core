@@ -20,16 +20,6 @@ static bool trace_scanning = false;
 
 namespace {
 
-StringData get_printable_table_name(StringData name)
-{
-    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
-    static const std::string prefix = "class_";
-    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
-        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
-    }
-    return name;
-}
-
 const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
 {
     switch (type) {
@@ -226,6 +216,7 @@ namespace query_parser {
 
 NoArguments ParserDriver::s_default_args;
 query_parser::KeyPathMapping ParserDriver::s_default_mapping;
+using util::serializer::get_printable_table_name;
 
 Arguments::~Arguments() {}
 
@@ -1062,9 +1053,10 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
                     ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
                     if (!col_key) {
-                        throw std::runtime_error(util::format(
-                            "No property '%1' found on object type '%2' specified in '%3' clause",
-                            col_names[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                        throw std::runtime_error(
+                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
+                                         col_names[ndx_in_path], get_printable_table_name(cur_table->get_name()),
+                                         is_distinct ? "distinct" : "sort"));
                     }
                     columns.push_back(col_key);
                     if (ndx_in_path < col_names.size() - 1) {
@@ -1294,7 +1286,8 @@ Subexpr* LinkChain::column(const std::string& col)
 
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
-        throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
+        throw std::runtime_error(
+            util::format("'%1' has no property: '%2'", get_printable_table_name(m_current_table->get_name()), col));
     }
     size_t list_count = 0;
     for (ColKey link_key : m_link_cols) {

@@ -25,6 +25,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -314,6 +315,26 @@ const char* get_data_type_name(DataType type) noexcept
     return "unknown";
 }
 } // namespace realm
+
+void LinkChain::add(ColKey ck)
+{
+    // Link column can be a single Link, LinkList, or BackLink.
+    REALM_ASSERT(m_current_table->valid_column(ck));
+    ColumnType type = ck.get_type();
+    if (ck.is_dictionary()) {
+    }
+    else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+        m_current_table = m_current_table->get_opposite_table(ck);
+    }
+    else {
+        // Only last column in link chain is allowed to be non-link
+        throw std::runtime_error(util::format("%1.%2 is not a link column",
+                                              util::serializer::get_printable_table_name(m_current_table->get_name()),
+                                              m_current_table->get_column_name(ck)));
+    }
+    m_link_cols.push_back(ck);
+}
+
 
 // -- Table ---------------------------------------------------------------------------------
 

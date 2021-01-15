@@ -91,6 +91,8 @@ std::string print_value(Optional<T> value)
     }
 }
 
+StringData get_printable_table_name(StringData name);
+
 struct SerialisationState {
     std::string describe_column(ConstTableRef table, ColKey col_key);
     std::string describe_columns(const LinkMap& link_map, ColKey target_col_key);

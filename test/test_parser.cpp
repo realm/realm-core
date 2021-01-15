@@ -2211,7 +2211,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
            Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
 {
     Group g;
-    TableRef t = g.add_table("table");
+    TableRef t = g.add_table("class_table");
     TestValueGenerator gen;
 
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;

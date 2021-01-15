@@ -1029,23 +1029,7 @@ private:
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
-    void add(ColKey ck)
-    {
-        // Link column can be a single Link, LinkList, or BackLink.
-        REALM_ASSERT(m_current_table->valid_column(ck));
-        ColumnType type = ck.get_type();
-        if (ck.is_dictionary()) {
-        }
-        else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck);
-        }
-        else {
-            // Only last column in link chain is allowed to be non-link
-            throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
-                                                  m_current_table->get_column_name(ck)));
-        }
-        m_link_cols.push_back(ck);
-    }
+    void add(ColKey ck);
 
     template <class T>
     Subexpr* create_subexpr(ColKey col_key)
