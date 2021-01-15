@@ -44,7 +44,6 @@ TEST_CASE("set") {
     auto other_table2 = r->read_group().get_table("class_table2");
 
     ColKey col_int_set = table->get_column_key("int_set");
-    ColKey col_int_list = table->get_column_key("int_list");
 
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
