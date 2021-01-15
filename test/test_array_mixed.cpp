@@ -190,9 +190,9 @@ TEST(Mixed_SortNumeric)
     tv.sort(col_data);
     std::ostringstream out;
     out.precision(8);
-    std::string expected = "Mixed(null)\nMixed(-278987.9)\nMixed(-500)\nMixed(-258)\nMixed(false)\nMixed(0.001f)\n"
-                           "Mixed(true)\nMixed(5)\nMixed(7.5f)\nMixed(34.8)\nMixed(42)\nMixed(42.125f)\nMixed(100)\n"
-                           "Mixed(129.85)\nMixed(256.25f)\nMixed(500)\nMixed(10000)\nMixed(Hello)\n";
+    std::string expected = "null\n-278987.9\n-500\n-258\nfalse\n0.001\n"
+                           "true\n5\n7.5\n34.8\n42\n42.125\n100\n"
+                           "129.85\n256.25\n500\n10000\n\"Hello\"\n";
     for (size_t i = 0; i < sz; i++) {
         Mixed val = tv.get(i).get<Mixed>(col_data);
         out << val << std::endl;

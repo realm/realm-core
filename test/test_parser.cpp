@@ -4124,6 +4124,8 @@ TEST(Parser_Mixed)
     table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+    auto id = ObjectId::gen();
+    table->get_object(37).set(col_any, Mixed(id));
 
     auto it = table->begin();
     for (int64_t i = 0; i < 10; i++) {
@@ -4138,9 +4140,9 @@ TEST(Parser_Mixed)
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed >= 50", int_over_50 + 1);
-    verify_query(test_context, table, "mixed <= 50", 100 - int_over_50 - nb_strings - 1);
-    verify_query(test_context, table, "mixed < 50", 100 - int_over_50 - nb_strings - 2);
-    verify_query(test_context, table, "mixed < 50 || mixed > 50", 100 - nb_strings - 2);
+    verify_query(test_context, table, "mixed <= 50", 100 - int_over_50 - nb_strings - 2);
+    verify_query(test_context, table, "mixed < 50", 100 - int_over_50 - nb_strings - 3);
+    verify_query(test_context, table, "mixed < 50 || mixed > 50", 100 - nb_strings - 3);
     verify_query(test_context, table, "mixed != 50", 99);
     verify_query(test_context, table, "mixed == null", 1);
     verify_query(test_context, table, "mixed != null", 99);
@@ -4150,6 +4152,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed contains \"trin\"", 25);
     verify_query(test_context, table, "mixed like \"Strin*\"", 25);
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+    verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
     util::Any args[] = {BinaryData(bin)};
@@ -4170,7 +4173,7 @@ TEST(Parser_Mixed)
     verify_query(test_context, origin, "links.mixed == NULL", 1);
 
     // non-uniform type cross column comparisons
-    verify_query(test_context, table, "mixed == int", 72);
+    verify_query(test_context, table, "mixed == int", 71);
 }
 
 TEST(Parser_TypeOfValue)

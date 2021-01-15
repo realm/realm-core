@@ -313,7 +313,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (right->has_constant_evaluation() && left_type == right_type) {
+    if (right->has_constant_evaluation() && (left_type == right_type || left_type == type_Mixed)) {
         Mixed val = right->get_mixed();
         if (prop && !prop->links_exist()) {
             auto col_key = prop->column_key();
@@ -347,6 +347,8 @@ Query EqualityNode::visit(ParserDriver* drv)
                     return drv->simple_query(op, col_key, val.get<ObjectId>());
                 case type_UUID:
                     return drv->simple_query(op, col_key, val.get<UUID>());
+                case type_Mixed:
+                    return drv->simple_query(op, col_key, val, case_sensitive);
                 default:
                     break;
             }
@@ -406,7 +408,8 @@ Query RelationalNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left_type == right_type) {
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+        (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         switch (left->get_type()) {
             case type_Int:
@@ -429,8 +432,13 @@ Query RelationalNode::visit(ParserDriver* drv)
                 return drv->simple_query(op, col_key, right->get_mixed().get<Decimal128>());
                 break;
             case type_ObjectId:
+                return drv->simple_query(op, col_key, right->get_mixed().get<ObjectId>());
                 break;
             case type_UUID:
+                return drv->simple_query(op, col_key, right->get_mixed().get<UUID>());
+                break;
+            case type_Mixed:
+                return drv->simple_query(op, col_key, right->get_mixed());
                 break;
             default:
                 break;
@@ -453,12 +461,14 @@ Query StringOpsNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
+    auto left_type = left->get_type();
     auto right_type = right->get_type();
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
     verify_only_string_types(right_type, opstr[op]);
 
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+        (left_type == right_type || left_type == type_Mixed)) {
         auto col_key = prop->column_key();
         if (right_type == type_String) {
             StringData val = right->get_mixed().get_string();
