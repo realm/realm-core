@@ -339,7 +339,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
         // We consider null or a missing value to be equivalent to an empty
         // array/set for historical reasons; the original implementation did this
         // accidentally and it's not worth changing.
-        if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !(is_array(prop.type) || is_set(prop.type))) {
+        if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_collection(prop.type)) {
             if (prop.is_primary || !ctx.allow_missing(value))
                 throw MissingPropertyValueException(object_schema.name, prop.name);
         }
