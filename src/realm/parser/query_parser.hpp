@@ -89,6 +89,10 @@ struct AnyContext {
 
 class Arguments {
 public:
+    Arguments(size_t num_args)
+        : m_count(num_args)
+    {
+    }
     virtual ~Arguments();
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
@@ -103,10 +107,31 @@ public:
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     virtual DataType type_for_argument(size_t argument_index) = 0;
+    size_t get_num_args() const
+    {
+        return m_count;
+    }
 
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
     std::vector<util::StringBuffer> buffer_space;
+
+protected:
+    void verify_ndx(size_t ndx) const
+    {
+        if (ndx >= m_count) {
+            std::string error_message;
+            if (m_count) {
+                error_message = util::format("Request for argument at index %1 but only %2 argument%3 provided", ndx,
+                                             m_count, m_count == 1 ? " is" : "s are");
+            }
+            else {
+                error_message = util::format("Request for argument at index %1 but no arguments are provided", ndx);
+            }
+            throw std::out_of_range(error_message);
+        }
+    }
+    size_t m_count;
 };
 
 
@@ -114,9 +139,9 @@ template <typename ValueType, typename ContextType>
 class ArgumentConverter : public Arguments {
 public:
     ArgumentConverter(ContextType& context, const ValueType* arguments, size_t count)
-        : m_ctx(context)
+        : Arguments(count)
+        , m_ctx(context)
         , m_arguments(arguments)
-        , m_count(count)
     {
     }
 
@@ -172,21 +197,10 @@ public:
 private:
     ContextType& m_ctx;
     const ValueType* m_arguments;
-    size_t m_count;
 
     const ValueType& at(size_t index) const
     {
-        if (index >= m_count) {
-            std::string error_message;
-            if (m_count) {
-                error_message = util::format("Request for argument at index %1 but only %2 argument%3 provided",
-                                             index, m_count, m_count == 1 ? " is" : "s are");
-            }
-            else {
-                error_message = util::format("Request for argument at index %1 but no arguments are provided", index);
-            }
-            throw std::out_of_range(error_message);
-        }
+        Arguments::verify_ndx(index);
         return m_arguments[index];
     }
 
@@ -212,6 +226,10 @@ public:
 
 class NoArguments : public Arguments {
 public:
+    NoArguments()
+        : Arguments(0)
+    {
+    }
     bool bool_for_argument(size_t)
     {
         throw NoArgsError();

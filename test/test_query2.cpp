@@ -5954,6 +5954,7 @@ TEST(Query_Dictionary)
                 incr = true;
         }
         else if ((i % 10) == 0) {
+            dict.insert("Foo", "Bar");
             dict.insert("Value", 100.);
             incr = true;
         }
@@ -5982,7 +5983,7 @@ TEST(Query_Dictionary)
     }
 
     // g.to_json(std::cout);
-    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > Mixed(50)).find_all();
     CHECK_EQUAL(tv.size(), expected);
     tv = (foo->column<Dictionary>(col_dict) > 50).find_all(); // Any key will do
     CHECK_EQUAL(tv.size(), 50);                               // 0 and 51..99
@@ -5995,6 +5996,11 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 6);
     tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") == null()).find_all();
     CHECK_EQUAL(tv.size(), 7);
+
+    tv = (foo->column<Dictionary>(col_dict).keys().begins_with("F")).find_all();
+    CHECK_EQUAL(tv.size(), 5);
+    tv = (origin->link(col_link).column<Dictionary>(col_dict).keys() == "Foo").find_all();
+    CHECK_EQUAL(tv.size(), 5);
 }
 
 TEST(Query_DictionaryTypedLinks)

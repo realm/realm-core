@@ -1916,6 +1916,12 @@ public:
         , m_comparison_type(other.m_comparison_type)
     {
     }
+    ObjPropertyBase(ColKey column, const LinkMap& link_map, ExpressionComparisonType type)
+        : m_link_map(link_map)
+        , m_column_key(column)
+        , m_comparison_type(type)
+    {
+    }
 
     bool links_exist() const
     {
@@ -3071,6 +3077,13 @@ public:
     }
 };
 
+// Returns the keys
+class ColumnDictionaryKeys;
+
+// Returns the values of a given key
+class ColumnDictionaryKey;
+
+// Returns the values
 template <>
 class Columns<Dictionary> : public ColumnsCollection<Mixed> {
 public:
@@ -3086,13 +3099,8 @@ public:
         return m_key_type;
     }
 
-    Columns& key(const Mixed& key_value);
-    Columns& property(const std::string& prop)
-    {
-        REALM_ASSERT(!m_key.is_null());
-        m_prop_list.push_back(prop);
-        return *this;
-    }
+    ColumnDictionaryKey key(const Mixed& key_value);
+    ColumnDictionaryKeys keys();
 
     SizeOperator<int64_t> size() override;
     std::unique_ptr<Subexpr> get_element_length() override
@@ -3107,15 +3115,6 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override;
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        std::string key_str;
-        if (!m_key.is_null()) {
-            key_str = std::string(".") + std::string(m_key.get_string());
-        }
-        return ColumnListBase::description(state) + key_str;
-    }
-
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Dictionary>>(*this);
@@ -3123,23 +3122,125 @@ public:
 
     Columns(Columns const& other)
         : ColumnsCollection<Mixed>(other)
-        , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
         , m_key_type(other.m_key_type)
     {
-        if (!other.m_key.is_null()) {
-            key(other.m_key);
-        }
     }
 
 protected:
+    DataType m_key_type;
+};
+
+class ColumnDictionaryKey : public Columns<Dictionary> {
+public:
+    ColumnDictionaryKey(Mixed key_value, const Columns<Dictionary>& dict)
+        : Columns<Dictionary>(dict)
+    {
+        init_key(key_value);
+    }
+
+    ColumnDictionaryKey& property(const std::string& prop)
+    {
+        m_prop_list.push_back(prop);
+        return *this;
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state) + std::string(".") + std::string(m_key.get_string());
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnDictionaryKey(*this));
+    }
+
+    ColumnDictionaryKey(ColumnDictionaryKey const& other)
+        : Columns<Dictionary>(other)
+        , m_prop_list(other.m_prop_list)
+        , m_objkey(other.m_objkey)
+    {
+        init_key(other.m_key);
+    }
+
+private:
     Mixed m_key;
     std::string m_buffer;
     std::vector<std::string> m_prop_list;
     ObjKey m_objkey;
-    DataType m_key_type;
+
+    void init_key(Mixed key_value);
 };
 
+// Returns the keys
+class ColumnDictionaryKeys : public Subexpr2<StringData> {
+public:
+    ColumnDictionaryKeys(const Columns<Dictionary>& dict)
+        : m_key_type(dict.get_key_type())
+        , m_column_key(dict.m_column_key)
+        , m_link_map(dict.m_link_map)
+        , m_comparison_type(dict.get_comparison_type())
+    {
+        REALM_ASSERT(m_key_type == type_String);
+    }
+
+    ConstTableRef get_base_table() const final
+    {
+        return m_link_map.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) final
+    {
+        m_link_map.set_base_table(table);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const final
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    ExpressionComparisonType get_comparison_type() const final
+    {
+        return m_comparison_type;
+    }
+
+    void set_cluster(const Cluster* cluster) override;
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key) +
+               ".keys";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ColumnDictionaryKeys(*this));
+    }
+
+    ColumnDictionaryKeys(const ColumnDictionaryKeys& other)
+        : m_key_type(other.m_key_type)
+        , m_column_key(other.m_column_key)
+        , m_link_map(other.m_link_map)
+        , m_comparison_type(other.m_comparison_type)
+    {
+    }
+
+private:
+    DataType m_key_type;
+    ColKey m_column_key;
+    LinkMap m_link_map;
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
+
+
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
+};
 
 template <typename T>
 class ColumnListSize : public ColumnsCollection<T> {

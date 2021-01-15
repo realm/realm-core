@@ -44,6 +44,8 @@ TEST_CASE("set") {
     auto other_table2 = r->read_group().get_table("class_table2");
 
     ColKey col_int_set = table->get_column_key("int_set");
+    ColKey col_int_list = table->get_column_key("int_list");
+
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
     ColKey other_col_link_set = table->get_column_key("link_set");
@@ -143,23 +145,6 @@ TEST_CASE("set") {
         });
         CHECK(set.find(target2));
         CHECK(set.size() == 3);
-    }
-
-    SECTION("max / min / sum / avg") {
-        object_store::Set set{r, obj, col_int_set};
-
-        write([&]() {
-            CHECK(set.insert(123).second);
-            CHECK(set.insert(456).second);
-            CHECK(set.insert(0).second);
-            CHECK(set.insert(-1).second);
-        });
-
-        REQUIRE(set.is_valid());
-        CHECK(set.sum() == 578);
-        CHECK(set.min() == -1);
-        CHECK(set.max() == 456);
-        CHECK(set.average() == 144.5);
     }
 
     SECTION("add_notification_block()") {
