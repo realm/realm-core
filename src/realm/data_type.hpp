@@ -152,6 +152,7 @@ static constexpr DataType type_OldTable = DataType{5};
 static constexpr DataType type_OldDateTime = DataType{7};
 static_assert(!type_OldTable.is_valid());
 static_assert(!type_OldDateTime.is_valid());
+static constexpr DataType type_TypeOfValue = DataType{18};
 
 constexpr inline DataType::operator util::Printable() const noexcept
 {

@@ -142,6 +142,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/query.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+#include <realm/query_value.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
@@ -361,11 +362,13 @@ struct OperatorOptionalAdapter {
 
 class ValueBase {
 public:
+    using ValueType = QueryValue;
+
     static const size_t chunk_size = 8;
     bool m_from_link_list = false;
 
     ValueBase() = default;
-    ValueBase(const Mixed& init_val)
+    ValueBase(const ValueType& init_val)
     {
         m_first[0] = init_val;
     }
@@ -410,17 +413,17 @@ public:
 
     void set_null(size_t ndx)
     {
-        m_first[ndx] = Mixed();
+        m_first[ndx] = ValueType();
     }
 
     template <class T>
     void set(size_t ndx, const T& val)
     {
         if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value) {
-            m_first[ndx] = null::is_null_float(val) ? Mixed() : Mixed(val);
+            m_first[ndx] = null::is_null_float(val) ? ValueType() : ValueType(val);
         }
         else {
-            m_first[ndx] = Mixed(val);
+            m_first[ndx] = ValueType(val);
         }
     }
 
@@ -436,35 +439,35 @@ public:
         }
     }
 
-    Mixed& operator[](size_t n)
+    ValueType& operator[](size_t n)
     {
         return m_first[n];
     }
 
-    const Mixed& operator[](size_t n) const
+    const ValueType& operator[](size_t n) const
     {
         return m_first[n];
     }
 
-    const Mixed& get(size_t n) const
+    const ValueType& get(size_t n) const
     {
         return m_first[n];
     }
 
-    Mixed* begin()
+    ValueType* begin()
     {
         return m_first;
     }
-    const Mixed* begin() const
+    const ValueType* begin() const
     {
         return m_first;
     }
 
-    Mixed* end()
+    ValueType* end()
     {
         return m_first + m_size;
     }
-    const Mixed* end() const
+    const ValueType* end() const
     {
         return m_first + m_size;
     }
@@ -521,23 +524,22 @@ public:
 
     // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare_const(const Mixed& left, ValueBase& right,
+    REALM_FORCEINLINE static size_t compare_const(const ValueType& left, ValueBase& right,
                                                   ExpressionComparisonType comparison)
     {
         TCond c;
         const size_t sz = right.size();
-        bool left_is_null = left.is_null();
         if (!right.m_from_link_list) {
             REALM_ASSERT_DEBUG(comparison ==
                                ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             for (size_t m = 0; m < sz; m++) {
-                if (c(left, right[m], left_is_null, right[m].is_null()))
+                if (c(left, right[m]))
                     return m;
             }
         }
         else {
             for (size_t m = 0; m < sz; m++) {
-                bool match = c(left, right[m], left_is_null, right[m].is_null());
+                bool match = c(left, right[m]);
                 if (match) {
                     if (comparison == ExpressionComparisonType::Any) {
                         return 0;
@@ -574,7 +576,7 @@ public:
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left.size(), right.size());
             for (size_t m = 0; m < min; m++) {
-                if (c(left[m], right[m], left[m].is_null(), right[m].is_null()))
+                if (c(left[m], right[m]))
                     return m;
             }
         }
@@ -591,10 +593,9 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left.size() > 0);
             const size_t num_right_values = right.size();
-            Mixed left_val = left[0];
-            bool left_is_null = left[0].is_null();
+            ValueType left_val = left[0];
             for (size_t r = 0; r < num_right_values; r++) {
-                bool match = c(left_val, right[r], left_is_null, right[r].is_null());
+                bool match = c(left_val, right[r]);
                 if (match) {
                     if (right_cmp_type == ExpressionComparisonType::Any) {
                         return 0;
@@ -617,10 +618,9 @@ public:
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right.size() > 0);
             const size_t num_left_values = left.size();
-            Mixed right_val = right[0];
-            bool right_is_null = right[0].is_null();
+            ValueType right_val = right[0];
             for (size_t l = 0; l < num_left_values; l++) {
-                bool match = c(left[l], right_val, left[l].is_null(), right_is_null);
+                bool match = c(left[l], right_val);
                 if (match) {
                     if (left_cmp_type == ExpressionComparisonType::Any) {
                         return 0;
@@ -648,8 +648,8 @@ private:
     // false, then values come from successive rows of m_table (query operations are operated on in bulks for speed)
     static constexpr size_t prealloc = 8;
 
-    Mixed m_cache[prealloc];
-    Mixed* m_first = &m_cache[0];
+    QueryValue m_cache[prealloc];
+    QueryValue* m_first = &m_cache[0];
     size_t m_size = 1;
 
     void resize(size_t size)
@@ -661,7 +661,7 @@ private:
         m_size = size;
         if (m_size > 0) {
             if (m_size > prealloc)
-                m_first = new Mixed[m_size];
+                m_first = new QueryValue[m_size];
             else
                 m_first = &m_cache[0];
         }
@@ -674,7 +674,7 @@ private:
             m_first = nullptr;
         }
     }
-    void fill(const Mixed& val)
+    void fill(const QueryValue& val)
     {
         for (size_t i = 0; i < m_size; i++) {
             m_first[i] = val;
@@ -796,6 +796,8 @@ template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
 template <class oper, class TLeft = Subexpr>
 class SizeOperator;
+template <class oper>
+class TypeOfValueOperator;
 template <class TCond>
 class Compare;
 template <bool has_links>
@@ -1163,6 +1165,19 @@ public:
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
+template <>
+class Subexpr2<TypeOfValue> : public Subexpr, public Overloads<TypeOfValue, TypeOfValue> {
+public:
+    Query equal(TypeOfValue v);
+    Query equal(const TypeOfValueOperator<Mixed>& col);
+    Query not_equal(TypeOfValue v);
+    Query not_equal(const TypeOfValueOperator<Mixed>& col);
+    DataType get_type() const final
+    {
+        return type_TypeOfValue;
+    }
+};
+
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
     {
@@ -1218,7 +1233,7 @@ public:
     Value() = default;
 
     Value(T init)
-        : ValueBase(Mixed(init))
+        : ValueBase(QueryValue(init))
     {
     }
 
@@ -1229,10 +1244,17 @@ public:
                                                  (ValueBase::size() == 1 ? " value" : " values"));
         }
         if (size() > 0) {
-            if (get(0).is_null())
+            auto val = get(0);
+            if (val.is_null())
                 return "NULL";
-            else
-                return util::serializer::print_value(get(0).template get<T>());
+            else {
+                if constexpr (std::is_same_v<T, TypeOfValue>) {
+                    return util::serializer::print_value(val.get_type_of_value());
+                }
+                else {
+                    return util::serializer::print_value(val.template get<T>());
+                }
+            }
         }
         return "";
     }
@@ -2149,6 +2171,11 @@ public:
         return SizeOperator<T>(this->clone());
     }
 
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
+    }
+
 private:
     using ObjPropertyExpr<T>::m_link_map;
     using ObjPropertyExpr<T>::m_column_key;
@@ -2639,6 +2666,74 @@ private:
     std::unique_ptr<TExpr> m_expr;
 };
 
+template <class T>
+class TypeOfValueOperator : public Subexpr2<TypeOfValue> {
+public:
+    TypeOfValueOperator(std::unique_ptr<Subexpr> left)
+        : m_expr(std::move(left))
+    {
+    }
+
+    TypeOfValueOperator(const TypeOfValueOperator& other)
+        : m_expr(other.m_expr->clone())
+    {
+    }
+
+    ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_expr->get_comparison_type();
+    }
+
+    // See comment in base class
+    void set_base_table(ConstTableRef table) override
+    {
+        m_expr->set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_expr->set_cluster(cluster);
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    ConstTableRef get_base_table() const override
+    {
+        return m_expr->get_base_table();
+    }
+
+    // destination = operator(left)
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<T> v;
+        m_expr->evaluate(index, v);
+
+        size_t sz = v.size();
+        destination.init(v.m_from_link_list, sz);
+
+        for (size_t i = 0; i < sz; i++) {
+            auto elem = v[i].template get<T>();
+            destination.set(i, TypeOfValue(elem));
+        }
+    }
+
+    std::string description(util::serializer::SerialisationState& state) const override
+    {
+        if (m_expr) {
+            return m_expr->description(state) + util::serializer::value_separator + "@type";
+        }
+        return "@type";
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new TypeOfValueOperator(*this));
+    }
+
+private:
+    std::unique_ptr<Subexpr> m_expr;
+};
+
 class KeyValue : public Subexpr2<Link> {
 public:
     KeyValue(ObjKey key)
@@ -2931,6 +3026,11 @@ public:
     ColumnListElementLength<T> element_lengths() const
     {
         return {*this};
+    }
+
+    TypeOfValueOperator<T> type_of_value()
+    {
+        return TypeOfValueOperator<T>(this->clone());
     }
 
     ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
@@ -4483,7 +4583,7 @@ private:
     std::unique_ptr<Subexpr> m_right;
     const Cluster* m_cluster;
     bool m_left_is_const;
-    Mixed m_left_value;
+    QueryValue m_left_value;
     bool m_has_matches = false;
     std::vector<ObjKey> m_matches;
     mutable size_t m_index_get = 0;
