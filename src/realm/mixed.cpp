@@ -23,6 +23,7 @@
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
 #include <realm/query_value.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
@@ -440,7 +441,6 @@ size_t Mixed::hash() const
 // LCOV_EXCL_START
 std::ostream& operator<<(std::ostream& out, const Mixed& m)
 {
-    out << "Mixed(";
     if (m.is_null()) {
         out << "null";
     }
@@ -453,27 +453,26 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << (m.bool_val ? "true" : "false");
                 break;
             case type_Float:
-                out << m.float_val << 'f';
+                out << m.float_val;
                 break;
             case type_Double:
                 out << m.double_val;
                 break;
             case type_String:
-                out << m.string_val;
+                out << util::serializer::print_value(m.string_val);
                 break;
             case type_Binary:
-                out << m.binary_val;
+                out << util::serializer::print_value(m.binary_val);
                 break;
             case type_Timestamp:
-                out << m.date_val;
+                out << util::serializer::print_value(m.date_val);
                 break;
             case type_Decimal:
                 out << m.decimal_val;
                 break;
-            case type_ObjectId: {
-                out << m.get<ObjectId>();
+            case type_ObjectId:
+                out << util::serializer::print_value(m.id_val);
                 break;
-            }
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;
@@ -481,14 +480,13 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << m.link_val;
                 break;
             case type_UUID:
-                out << m.get<UUID>();
+                out << util::serializer::print_value(m.uuid_val);
                 break;
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);
         }
     }
-    out << ")";
     return out;
 }
 // LCOV_EXCL_STOP
