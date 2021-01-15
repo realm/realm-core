@@ -250,7 +250,7 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
     if (both_non_negative || both_non_positive) {
         return Timestamp(seconds, nanoseconds);
     }
-    throw std::runtime_error("Invalid timestamp format");
+    throw SyntaxError("Invalid timestamp format");
 }
 
 ParserNode::~ParserNode() {}
@@ -303,7 +303,7 @@ Query AndNode::visit(ParserDriver* drv)
 void verify_only_string_types(DataType type, const std::string& op_string)
 {
     if (type != type_String && type != type_Binary && type != type_Mixed) {
-        throw std::runtime_error(util::format(
+        throw InvalidQueryError(util::format(
             "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
             op_string, get_data_type_name(type)));
     }
@@ -417,14 +417,14 @@ Query RelationalNode::visit(ParserDriver* drv)
     auto right_type = right->get_type();
 
     if (left_type == type_UUID || left_type == type_Link) {
-        throw std::logic_error(util::format(
+        throw InvalidQueryError(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
             opstr[op]));
     }
 
     if (!left_type.is_valid() || !right_type.is_valid() || !Mixed::data_types_are_comparable(left_type, right_type)) {
-        throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                              get_data_type_name(left_type), get_data_type_name(right_type)));
+        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                             get_data_type_name(left_type), get_data_type_name(right_type)));
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
@@ -595,9 +595,9 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
 {
     if (variable_name.size() < 2 || variable_name[0] != '$') {
-        throw std::runtime_error(util::format("The subquery variable '%1' is invalid. The variable must start with "
-                                              "'$' and cannot be empty; for example '$x'.",
-                                              variable_name));
+        throw SyntaxError(util::format("The subquery variable '%1' is invalid. The variable must start with "
+                                       "'$' and cannot be empty; for example '$x'.",
+                                       variable_name));
     }
     LinkChain lc = prop->path->visit(drv, prop->comp_type);
     drv->translate(lc, prop->identifier);
@@ -608,13 +608,13 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
     else {
         ColKey col_key = lc.get_current_table()->get_column_key(prop->identifier);
         if (col_key.is_list() && col_key.get_type() != col_type_LinkList) {
-            throw std::runtime_error(util::format(
+            throw InvalidQueryError(util::format(
                 "A subquery can not operate on a list of primitive values (property '%1')", prop->identifier));
         }
         if (col_key.get_type() != col_type_LinkList) {
-            throw std::runtime_error(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
-                                                  prop->identifier,
-                                                  realm::get_data_type_name(DataType(col_key.get_type()))));
+            throw InvalidQueryError(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
+                                                 prop->identifier,
+                                                 realm::get_data_type_name(DataType(col_key.get_type()))));
         }
         lc.link(prop->identifier);
     }
@@ -622,9 +622,9 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
     drv->m_base_table = lc.get_current_table().cast_away_const();
     bool did_add = drv->m_mapping.add_mapping(drv->m_base_table, variable_name, "");
     if (!did_add) {
-        throw std::runtime_error(util::format("Unable to create a subquery expression with variable '%1' since an "
-                                              "identical variable already exists in this context",
-                                              variable_name));
+        throw InvalidQueryError(util::format("Unable to create a subquery expression with variable '%1' since an "
+                                             "identical variable already exists in this context",
+                                             variable_name));
     }
     Query sub = subquery->visit(drv);
     drv->m_mapping.remove_mapping(drv->m_base_table, variable_name);
@@ -648,8 +648,8 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
         return s->size().clone();
     }
     if (subexpr) {
-        throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
-                                              get_data_type_name(DataType(subexpr->get_type()))));
+        throw InvalidQueryError(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
+                                             get_data_type_name(DataType(subexpr->get_type()))));
     }
     REALM_UNREACHABLE();
     return {};
@@ -661,8 +661,8 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
     auto subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
-        throw std::runtime_error(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
-                                              agg_op_type_to_str(aggr_op->type), link));
+        throw InvalidQueryError(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
+                                             agg_op_type_to_str(aggr_op->type), link));
     }
     drv->translate(link_chain, prop);
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
@@ -682,8 +682,8 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
             sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
         default:
-            throw std::runtime_error(util::format("collection aggregate not supported for type '%1'",
-                                                  get_data_type_name(DataType(col_key.get_type()))));
+            throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
+                                                 get_data_type_name(DataType(col_key.get_type()))));
     }
     return aggr_op->visit(drv, sub_column.get());
 }
@@ -731,7 +731,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
         }
     }
     if (!agg) {
-        throw std::runtime_error(
+        throw InvalidQueryError(
             util::format("Cannot use aggregate '%1' for this type of property", agg_op_type_to_str(type)));
     }
 
@@ -783,7 +783,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     ret = new Value<Decimal128>(Decimal128(text));
                     break;
                 default:
-                    throw std::runtime_error(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
                     break;
             }
             break;
@@ -835,7 +835,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             StringData window(text.c_str() + 4, encoded_size);
             util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
             if (!decoded_size) {
-                throw std::runtime_error("Invalid base64 value");
+                throw SyntaxError("Invalid base64 value");
             }
             REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
             decode_buffer.resize(*decoded_size); // truncate
@@ -875,7 +875,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 
                 if (tmp.tm_year < 0) {
                     // platform timegm functions do not throw errors, they return -1 which is also a valid time
-                    throw std::logic_error("Conversion of dates before 1900 is not supported.");
+                    throw InvalidQueryError("Conversion of dates before 1900 is not supported.");
                 }
 
                 seconds = platform_timegm(tmp); // UTC time
@@ -883,7 +883,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     nanoseconds = 0;
                 }
                 if (nanoseconds < 0) {
-                    throw std::logic_error("The nanoseconds of a Timestamp cannot be negative.");
+                    throw SyntaxError("The nanoseconds of a Timestamp cannot be negative.");
                 }
                 if (seconds < 0) { // seconds determines the sign of the nanoseconds part
                     nanoseconds *= -1;
@@ -910,7 +910,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 ret = new Value<Binary>(BinaryData()); // Null string
             }
             else if (hint == type_LinkList) {
-                throw std::runtime_error("Cannot compare linklist with NULL");
+                throw InvalidQueryError("Cannot compare linklist with NULL");
             }
             else {
                 ret = new Value<null>(realm::null());
@@ -1005,7 +1005,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
     }
     if (!ret) {
-        throw std::runtime_error(
+        throw InvalidQueryError(
             util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
                          get_data_type_name(hint), text));
     }
@@ -1053,7 +1053,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
                     ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
                     if (!col_key) {
-                        throw std::runtime_error(util::format(
+                        throw InvalidQueryError(util::format(
                             "No property '%1' found on object type '%2' specified in '%3' clause",
                             col_names[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
                     }
@@ -1082,14 +1082,14 @@ void verify_conditions(Subexpr* left, Subexpr* right)
 {
     if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
         util::serializer::SerialisationState state;
-        throw std::runtime_error(
+        throw InvalidQueryError(
             util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
                          left->description(state), right->description(state)));
     }
     if (left->has_multiple_values() && right->has_multiple_values()) {
         util::serializer::SerialisationState state;
-        throw std::runtime_error(util::format("Comparison between two lists is not supported ('%1' and '%2')",
-                                              left->description(state), right->description(state)));
+        throw InvalidQueryError(util::format("Comparison between two lists is not supported ('%1' and '%2')",
+                                             left->description(state), right->description(state)));
     }
 }
 
@@ -1118,7 +1118,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
     auto right_prop = values[1]->prop;
 
     if (left_constant && right_constant) {
-        throw std::runtime_error("Cannot compare two constants");
+        throw InvalidQueryError("Cannot compare two constants");
     }
 
     if (right_constant) {
@@ -1168,9 +1168,9 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
     }
     if (!origin_column) {
         auto current_table_name = link_chain.get_current_table()->get_name();
-        throw std::runtime_error(util::format("No property '%1' found in type '%2' which links to type '%3'",
-                                              column_name, get_printable_table_name(table_name),
-                                              get_printable_table_name(current_table_name)));
+        throw InvalidQueryError(util::format("No property '%1' found in type '%2' which links to type '%3'",
+                                             column_name, get_printable_table_name(table_name),
+                                             get_printable_table_name(current_table_name)));
     }
     link_chain.backlink(*origin_table, origin_column);
 }
@@ -1183,7 +1183,7 @@ void ParserDriver::translate(LinkChain& link_chain, std::string& identifier)
     auto tk = table->get_key();
     while (auto mapped = m_mapping.get_mapping(tk, identifier)) {
         if (substitutions > max_substitutions_allowed) {
-            throw std::runtime_error(
+            throw InvalidQueryError(
                 util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'",
                              identifier, *mapped, get_printable_table_name(table->get_name())));
         }
@@ -1203,7 +1203,7 @@ int ParserDriver::parse(const std::string& str)
     int res = parse();
     if (parse_error) {
         std::string msg = "Invalid predicate: '" + str + "': " + error_string;
-        throw std::runtime_error(msg);
+        throw SyntaxError(msg);
     }
     return res;
 }
@@ -1280,7 +1280,7 @@ Subexpr* LinkChain::column(const std::string& col)
 
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
-        throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
+        throw InvalidQueryError(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
     }
     size_t list_count = 0;
     for (ColKey link_key : m_link_cols) {
@@ -1356,8 +1356,8 @@ Subexpr* LinkChain::column(const std::string& col)
     }
     else {
         if (m_comparison_type != ExpressionComparisonType::Any && list_count == 0) {
-            throw std::runtime_error(util::format("The keypath following '%1' must contain a list",
-                                                  expression_cmp_type_to_str(m_comparison_type)));
+            throw InvalidQueryError(util::format("The keypath following '%1' must contain a list",
+                                                 expression_cmp_type_to_str(m_comparison_type)));
         }
 
         switch (col_key.get_type()) {

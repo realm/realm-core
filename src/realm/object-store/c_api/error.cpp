@@ -1,4 +1,5 @@
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/parser/query_parser.hpp>
 
 using namespace realm;
 
@@ -102,8 +103,11 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         catch (const List::OutOfBoundsIndexException& ex) {
             populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
         }
-        catch (const InvalidQueryException& ex) {
+        catch (const query_parser::InvalidQueryError& ex) {
             populate_error(ex, RLM_ERR_INVALID_QUERY);
+        }
+        catch (const query_parser::SyntaxError& ex) {
+            populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
         }
         catch (const std::invalid_argument& ex) {
             populate_error(ex, RLM_ERR_INVALID_ARGUMENT);
