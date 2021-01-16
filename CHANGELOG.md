@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Query parser supports property names containing white space. White space characters must be excapes with a '\'.
+* Query parser supports `@type` for filtering based on the stored type of a Mixed property. ([#4239](https://github.com/realm/realm-core/pull/4239))
 * Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
 * Add `Set::delete_all`, `Set::is_subset_of`, `Set::is_superset_of`, `Set::intersects`, `Set::assign_intersection`, `Set::assign_union` & `Set::assign_difference` methods to `object_store::Set`.
 

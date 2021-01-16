@@ -7,7 +7,6 @@
 
 namespace {
 struct QueryArgumentsAdapter : query_parser::Arguments {
-    size_t m_num_args = 0;
     const realm_value_t* m_args = nullptr;
 
     QueryArgumentsAdapter(size_t num_args, const realm_value_t* args) noexcept

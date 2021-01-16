@@ -20,16 +20,6 @@ static bool trace_scanning = false;
 
 namespace {
 
-StringData get_printable_table_name(StringData name)
-{
-    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
-    static const std::string prefix = "class_";
-    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
-        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
-    }
-    return name;
-}
-
 const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
 {
     switch (type) {
@@ -77,20 +67,6 @@ bool is_length_suffix(const std::string& s)
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
            (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
            (s[5] == 'h' || s[5] == 'H');
-}
-
-// Converts ascii c-locale uppercase characters to lower case,
-// leaves other char values unchanged.
-inline char toLowerAscii(char c)
-{
-    if (isascii(c) && isupper(c)) {
-#if REALM_ANDROID
-        return tolower(c); // _tolower is not supported on all ABI levels
-#else
-        return _tolower(c);
-#endif
-    }
-    return c;
 }
 
 template <typename T>
@@ -240,6 +216,7 @@ namespace query_parser {
 
 NoArguments ParserDriver::s_default_args;
 query_parser::KeyPathMapping ParserDriver::s_default_mapping;
+using util::serializer::get_printable_table_name;
 
 Arguments::~Arguments() {}
 
@@ -320,6 +297,13 @@ Query EqualityNode::visit(ParserDriver* drv)
         throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
                                                  get_data_type_name(left_type), get_data_type_name(right_type)));
     }
+    if (left_type == type_TypeOfValue || right_type == type_TypeOfValue) {
+        if (left_type != right_type) {
+            throw std::invalid_argument(
+                util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
+                             get_data_type_name(left_type), get_data_type_name(right_type)));
+        }
+    }
 
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
@@ -349,26 +333,20 @@ Query EqualityNode::visit(ParserDriver* drv)
                     return drv->simple_query(op, col_key, val.get_bool());
                 case type_String:
                     return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
-                    break;
                 case type_Binary:
                     return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
-                    break;
                 case type_Timestamp:
                     return drv->simple_query(op, col_key, val.get<Timestamp>());
                 case type_Float:
                     return drv->simple_query(op, col_key, val.get_float());
-                    break;
                 case type_Double:
                     return drv->simple_query(op, col_key, val.get_double());
-                    break;
                 case type_Decimal:
                     return drv->simple_query(op, col_key, val.get<Decimal128>());
-                    break;
                 case type_ObjectId:
-                    break;
+                    return drv->simple_query(op, col_key, val.get<ObjectId>());
                 case type_UUID:
                     return drv->simple_query(op, col_key, val.get<UUID>());
-                    break;
                 default:
                     break;
             }
@@ -396,7 +374,7 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
     }
     else {
-        verify_only_string_types(right_type, opstr[op]);
+        verify_only_string_types(right_type, opstr[op] + "[c]");
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
@@ -416,7 +394,7 @@ Query RelationalNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
-    if (left_type == type_UUID || left_type == type_Link) {
+    if (left_type == type_UUID || left_type == type_Link || left_type == type_TypeOfValue) {
         throw std::logic_error(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
             opstr[op]));
@@ -635,18 +613,35 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
 {
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
-        return s->count().clone();
+    if (op_type == PostOpNode::SIZE) {
+        if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
+            return s->count().clone();
+        }
+        if (auto s = dynamic_cast<ColumnListBase*>(subexpr)) {
+            return s->size().clone();
+        }
+        if (auto s = dynamic_cast<Columns<StringData>*>(subexpr)) {
+            return s->size().clone();
+        }
+        if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
+            return s->size().clone();
+        }
     }
-    if (auto s = dynamic_cast<ColumnListBase*>(subexpr)) {
-        return s->size().clone();
+    else if (op_type == PostOpNode::TYPE) {
+        if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr)) {
+            return s->type_of_value().clone();
+        }
+        if (auto s = dynamic_cast<ColumnsCollection<Mixed>*>(subexpr)) {
+            return s->type_of_value().clone();
+        }
+        if (auto s = dynamic_cast<ObjPropertyBase*>(subexpr)) {
+            return Value<TypeOfValue>(TypeOfValue(s->column_key())).clone();
+        }
+        if (dynamic_cast<Columns<Link>*>(subexpr)) {
+            return Value<TypeOfValue>(TypeOfValue(TypeOfValue::Attribute::ObjectLink)).clone();
+        }
     }
-    if (auto s = dynamic_cast<Columns<StringData>*>(subexpr)) {
-        return s->size().clone();
-    }
-    if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
-        return s->size().clone();
-    }
+
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
                                               get_data_type_name(DataType(subexpr->get_type()))));
@@ -821,7 +816,12 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     ret = new Value<Decimal128>(Decimal128(str.c_str()));
                     break;
                 default:
-                    ret = new ConstantStringValue(str);
+                    if (hint == type_TypeOfValue) {
+                        ret = new Value<TypeOfValue>(TypeOfValue(str));
+                    }
+                    else {
+                        ret = new ConstantStringValue(str);
+                    }
                     break;
             }
             break;
@@ -1053,9 +1053,10 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
                     ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
                     if (!col_key) {
-                        throw std::runtime_error(util::format(
-                            "No property '%1' found on object type '%2' specified in '%3' clause",
-                            col_names[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                        throw std::runtime_error(
+                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
+                                         col_names[ndx_in_path], get_printable_table_name(cur_table->get_name()),
+                                         is_distinct ? "distinct" : "sort"));
                     }
                     columns.push_back(col_key);
                     if (ndx_in_path < col_names.size() - 1) {
@@ -1089,6 +1090,11 @@ void verify_conditions(Subexpr* left, Subexpr* right)
     if (left->has_multiple_values() && right->has_multiple_values()) {
         util::serializer::SerialisationState state;
         throw std::runtime_error(util::format("Comparison between two lists is not supported ('%1' and '%2')",
+                                              left->description(state), right->description(state)));
+    }
+    if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));
     }
 }
@@ -1280,7 +1286,8 @@ Subexpr* LinkChain::column(const std::string& col)
 
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
-        throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
+        throw std::runtime_error(
+            util::format("'%1' has no property: '%2'", get_printable_table_name(m_current_table->get_name()), col));
     }
     size_t list_count = 0;
     for (ColKey link_key : m_link_cols) {

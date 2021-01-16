@@ -79,6 +79,12 @@ class KeyPathMapping;
 class ParserDriver;
 } // namespace query_parser
 
+enum class ExpressionComparisonType : unsigned char {
+    Any,
+    All,
+    None,
+};
+
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -196,7 +202,7 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key) const; // FIXME: Should this one have been declared noexcept?
+    Columns<T> column(ColKey col_key, ExpressionComparisonType = ExpressionComparisonType::Any) const;
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
@@ -914,12 +920,6 @@ private:
     const Table* m_table;
 };
 
-enum class ExpressionComparisonType : unsigned char {
-    Any,
-    All,
-    None,
-};
-
 // Class used to collect a chain of links when building up a Query following links.
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
@@ -1029,23 +1029,7 @@ private:
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
-    void add(ColKey ck)
-    {
-        // Link column can be a single Link, LinkList, or BackLink.
-        REALM_ASSERT(m_current_table->valid_column(ck));
-        ColumnType type = ck.get_type();
-        if (ck.is_dictionary()) {
-        }
-        else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck);
-        }
-        else {
-            // Only last column in link chain is allowed to be non-link
-            throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
-                                                  m_current_table->get_column_name(ck)));
-        }
-        m_link_cols.push_back(ck);
-    }
+    void add(ColKey ck);
 
     template <class T>
     Subexpr* create_subexpr(ColKey col_key)
@@ -1210,9 +1194,9 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key) const
+inline Columns<T> Table::column(ColKey col_key, ExpressionComparisonType cmp_type) const
 {
-    LinkChain lc(m_own_ref);
+    LinkChain lc(m_own_ref, cmp_type);
     return lc.column<T>(col_key);
 }
 
