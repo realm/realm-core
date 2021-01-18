@@ -97,6 +97,9 @@ public:
     util::Optional<Mixed> min(ColKey column = {}) const;
     util::Optional<Mixed> average(ColKey column = {}) const;
     Mixed sum(ColKey column = {}) const;
+    bool is_subset_of(const Set& rhs) const;
+    bool is_superset_of(const Set& rhs) const;
+    bool intersects(const Set& rhs) const;
 
     bool operator==(const Set& rhs) const noexcept;
 
