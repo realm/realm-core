@@ -1101,6 +1101,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey item_price_float_col = items->add_column(type_Float, "price_float");
     ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
     ColKey item_discount_col = items->add_column(*discounts, "discount");
+    ColKey item_creation_date = items->add_column(type_Timestamp, "creation_date");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> item_keys;
@@ -1111,6 +1112,7 @@ TEST(Parser_TwoColumnAggregates)
         obj.set(item_price_col, item_info[i].second);
         obj.set(item_price_float_col, float(item_info[i].second));
         obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
+        obj.set(item_creation_date, Timestamp(static_cast<int64_t>(item_info[i].second * 10), 0));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
@@ -1122,6 +1124,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey items_col = t->add_column_list(*items, "items");
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
     ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
+    ColKey account_creation_date_col = t->add_column(type_Timestamp, "account_creation_date");
 
     Obj person0 = t->create_object();
     Obj person1 = t->create_object();
@@ -1131,14 +1134,17 @@ TEST(Parser_TwoColumnAggregates)
     person0.set(account_col, double(10.0));
     person0.set(account_float_col, float(10.0));
     person0.set(account_decimal_col, Decimal128(10.0));
+    person0.set(account_creation_date_col, Timestamp(30, 0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
     person1.set(account_float_col, float(20.0));
     person1.set(account_decimal_col, Decimal128(20.0));
+    person1.set(account_creation_date_col, Timestamp(50, 0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
     person2.set(account_float_col, float(30.0));
     person2.set(account_decimal_col, Decimal128(30.0));
+    person2.set(account_creation_date_col, Timestamp(70, 0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
@@ -1195,6 +1201,11 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@min.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@max.price_decimal > account_balance_decimal", 0);
     verify_query(test_context, t, "items.@avg.price_decimal > account_balance_decimal", 0);
+    // Timestamp vs Timestamp
+    verify_query(test_context, t, "items.@min.creation_date == T40:0", 1); // person0
+    verify_query(test_context, t, "items.@max.creation_date == T95:0", 2); // person0, person2
+    verify_query(test_context, t, "items.@min.creation_date > account_creation_date", 2);
+    verify_query(test_context, t, "items.@max.creation_date > account_creation_date", 3);
 
     // cannot aggregate string
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
@@ -1206,6 +1217,9 @@ TEST(Parser_TwoColumnAggregates)
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@max.discount > account_balance", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.discount > account_balance", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
+    // cannot do avg and sum on timestamp
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@sum.creation_date > account_creation_date", 2));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.creation_date > account_creation_date", 3));
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
     verify_query(test_context, t, "items.@count > 3", 2);               // linklist count vs literal int
@@ -1651,6 +1665,7 @@ TEST(Parser_collection_aggregates)
     auto credits_col = courses->add_column(type_Double, "credits");
     auto hours_col = courses->add_column(type_Int, "hours_required");
     auto fail_col = courses->add_column(type_Float, "failure_percentage");
+    auto start_date_col = courses->add_column(type_Timestamp, "start_date");
     auto int_col = people->add_column(type_Int, "age");
     auto str_col = people->add_column(type_String, "name");
     auto courses_col = people->add_column_list(*courses, "courses_taken");
@@ -1666,10 +1681,11 @@ TEST(Parser_collection_aggregates)
         BinaryData payload(hash);
         obj.set(binary_col, payload);
     }
-    using cinfo = std::tuple<std::string, double, int64_t, float>;
-    std::vector<cinfo> course_info = {cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f},
-                                      cinfo{"Chemistry", 4.0, 41, 0.40f}, cinfo{"English", 3.5, 40, 0.07f},
-                                      cinfo{"Physics", 4.5, 42, 0.42f}};
+    using cinfo = std::tuple<std::string, double, int64_t, float, Timestamp>;
+    std::vector<cinfo> course_info = {
+        cinfo{"Math", 5.0, 42, 0.36f, {10, 0}}, cinfo{"Comp Sci", 4.5, 45, 0.25f, {11, 0}},
+        cinfo{"Chemistry", 4.0, 41, 0.40f, {12, 0}}, cinfo{"English", 3.5, 40, 0.07f, {13, 0}},
+        cinfo{"Physics", 4.5, 42, 0.42f, {14, 0}}};
     std::vector<ObjKey> course_keys;
     for (cinfo course : course_info) {
         Obj obj = courses->create_object();
@@ -1678,6 +1694,7 @@ TEST(Parser_collection_aggregates)
         obj.set(credits_col, std::get<1>(course));
         obj.set(hours_col, std::get<2>(course));
         obj.set(fail_col, std::get<3>(course));
+        obj.set(start_date_col, std::get<4>(course));
     }
     auto it = people->begin();
     LnkLstPtr billy_courses = it->get_linklist_ptr(courses_col);
@@ -1716,6 +1733,10 @@ TEST(Parser_collection_aggregates)
     verify_query(test_context, people, "courses_taken.@max.failure_percentage > 0.40", 2);
     verify_query(test_context, people, "courses_taken.@sum.failure_percentage > 0.5", 3);
     verify_query(test_context, people, "courses_taken.@avg.failure_percentage > 0.40", 1);
+
+    // timestamp
+    verify_query(test_context, people, "courses_taken.@min.start_date < T12:0", 2);
+    verify_query(test_context, people, "courses_taken.@max.start_date > T12:0", 3);
 
     // count and size are interchangeable but only operate on certain types
     // count of lists

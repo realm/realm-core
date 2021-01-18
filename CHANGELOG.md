@@ -4,6 +4,8 @@
 * Query parser supports property names containing white space. White space characters must be excapes with a '\'.
 * Query parser supports `@type` for filtering based on the stored type of a Mixed property. ([#4239](https://github.com/realm/realm-core/pull/4239))
 * Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
+* Add support for @min and @max queries on Timestamp lists.
+* Add support for comparing non-list link columns to other link columns in queries.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -11,6 +13,9 @@
 * Fix `links_to()` queries on sets of objects. ([#4264](https://github.com/realm/realm-core/pull/4264)
 * Windows `InterprocessCondVar` changes reverted.
 * Operations like Set::assign_union() can fail on StringData sets, ([#4288](https://github.com/realm/realm-core/issues/4288)
+* Windows `InterprocessCondVar` no longer crashes if destroyed on a different thread than created  ([#4174](https://github.com/realm/realm-core/issues/4174), since v10.3.3)
+* Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
+* `@min` and `@max` queries on a list of float, double or Decimal128 values could match the incorrect value if NaN or null was present in the list (since 5.0.0).
  
 ### Breaking changes
 * Support for IncludeDescriptor has been removed.
@@ -19,7 +24,7 @@
 -----------
 
 ### Internals
-* None.
+* Crashes will now request to create a github issue instead of an email.
 
 ----------------------------------------------
 
