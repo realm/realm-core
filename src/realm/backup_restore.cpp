@@ -102,22 +102,20 @@ bool BackupHandler::is_accepted_file_format(int version)
     return false;
 }
 
-void BackupHandler::restore_from_backup(util::Logger& logger)
+void BackupHandler::restore_from_backup()
 {
     for (auto v : m_accepted_versions) {
         if (backup_exists(m_prefix, v)) {
+            prep_logging();
             auto backup_nm = backup_name(m_prefix, v);
-            char buf[100];
-            std::time_t t = std::time(nullptr);
-            std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
-            logger.info("%1 : Restoring from backup: %2", buf, backup_nm);
+            m_logger->info("%1 : Restoring from backup: %2", m_time_buf, backup_nm);
             util::File::move(backup_nm, m_path);
             return;
         }
     }
 }
 
-void BackupHandler::cleanup_backups(util::Logger& logger)
+void BackupHandler::cleanup_backups()
 {
     auto now = time(nullptr);
     for (auto v : m_delete_versions) {
@@ -128,10 +126,8 @@ void BackupHandler::cleanup_backups(util::Logger& logger)
                 auto last_modified = util::File::last_write_time(fn);
                 double diff = difftime(now, last_modified);
                 if (diff > v.second) {
-                    char buf[100];
-                    std::time_t t = std::time(nullptr);
-                    std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
-                    logger.info("%1 : Removing old backup: %2   (age %3)", buf, fn, diff);
+                    prep_logging();
+                    m_logger->info("%1 : Removing old backup: %2   (age %3)", m_time_buf, fn, diff);
                     util::File::remove(fn);
                 }
             }
@@ -142,10 +138,22 @@ void BackupHandler::cleanup_backups(util::Logger& logger)
     }
 }
 
-void BackupHandler::backup_realm_if_needed(int current_file_format_version, int target_file_format_version,
-                                           util::Logger& logger)
+void BackupHandler::ensure_logger()
 {
-    char buf[100];
+    m_logger = std::make_unique<util::AppendToFileLogger>(m_path + ".backup-log");
+}
+
+void BackupHandler::prep_logging()
+{
+    ensure_logger();
+    // preformat time string for later logging
+    std::time_t t = std::time(nullptr);
+    std::strftime(m_time_buf, sizeof(m_time_buf), "%c", std::gmtime(&t));
+}
+
+
+void BackupHandler::backup_realm_if_needed(int current_file_format_version, int target_file_format_version)
+{
     if (current_file_format_version == 0)
         return;
     if (current_file_format_version >= target_file_format_version)
@@ -157,9 +165,8 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     try {
         // ignore it, if attempt to get free space fails for any reason
         if (util::File::get_free_space(m_path) < util::File::get_size_static(m_path) * 2) {
-            std::time_t t = std::time(nullptr);
-            std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
-            logger.error("%1 : Insufficient free space for backup: %2", buf, backup_nm);
+            prep_logging();
+            m_logger->error("%1 : Insufficient free space for backup: %2", m_time_buf, backup_nm);
             return;
         }
     }
@@ -167,9 +174,8 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
         // ignore error
     }
     {
-        std::time_t t = std::time(nullptr);
-        std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
-        logger.info("%1 : Creating backup: %2", buf, backup_nm);
+        prep_logging();
+        m_logger->info("%1 : Creating backup: %2", m_time_buf, backup_nm);
     }
     std::string part_name = backup_nm + ".part";
     // The backup file should be a 1-1 copy, so that we can get the original
@@ -180,9 +186,8 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     try {
         util::File::copy(m_path, part_name);
         util::File::move(part_name, backup_nm);
-        std::time_t t = std::time(nullptr);
-        std::strftime(buf, sizeof(buf), "%c", std::gmtime(&t));
-        logger.info("%1 : Completed backup: %2", buf, backup_nm);
+        prep_logging();
+        m_logger->info("%1 : Completed backup: %2", m_time_buf, backup_nm);
     }
     catch (...) {
         try {

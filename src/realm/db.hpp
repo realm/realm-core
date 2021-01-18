@@ -394,7 +394,6 @@ private:
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    std::shared_ptr<util::AppendToFileLogger> logger;
     bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
     bool m_write_transaction_open = false;
     std::string m_lockfile_path;

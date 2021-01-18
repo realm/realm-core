@@ -983,7 +983,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            logger = std::make_shared<util::AppendToFileLogger>(m_db_path + ".log_data");
             // we need a thread-local copy of the number of ringbuffer entries in order
             // to later detect concurrent expansion of the ringbuffer.
             m_local_max_entry = info->readers.get_num_entries();
@@ -1037,12 +1036,12 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // file:
                 // (only strictly needed for Windows)
                 alloc.detach();
-                backup.restore_from_backup(*logger);
+                backup.restore_from_backup();
                 // finally, retry with the restored file instead of the original
                 // one:
                 continue;
             }
-            backup.cleanup_backups(*logger);
+            backup.cleanup_backups();
 
             // From here on, if we fail in any way, we must detach the
             // allocator.
@@ -1074,7 +1073,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 }
             }
             if (options.backup_at_file_format_change) {
-                backup.backup_realm_if_needed(current_file_format_version, target_file_format_version, *logger);
+                backup.backup_realm_if_needed(current_file_format_version, target_file_format_version);
             }
             using gf = _impl::GroupFriend;
             bool file_format_ok;

@@ -31,10 +31,9 @@ public:
     BackupHandler(const std::string& path, const version_list_t& accepted, const version_time_list_t& to_be_deleted);
     bool is_accepted_file_format(int current_file_format_version);
     bool must_restore_from_backup(int current_file_format_version);
-    void restore_from_backup(util::Logger& logger);
-    void cleanup_backups(util::Logger& logger);
-    void backup_realm_if_needed(int current_file_format_version, int target_file_format_version,
-                                util::Logger& logger);
+    void restore_from_backup();
+    void cleanup_backups();
+    void backup_realm_if_needed(int current_file_format_version, int target_file_format_version);
     std::string get_prefix();
 
     static std::string get_prefix_from_path(const std::string& path);
@@ -43,11 +42,14 @@ public:
     static version_time_list_t delete_versions_;
 
 private:
+    void prep_logging();
+    void ensure_logger();
     std::string m_path;
     std::string m_prefix;
-
+    char m_time_buf[100];
     version_list_t m_accepted_versions;
     version_time_list_t m_delete_versions;
+    std::unique_ptr<util::AppendToFileLogger> m_logger;
 };
 
 } // namespace realm
