@@ -23,7 +23,7 @@ namespace app {
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
-    if (response.status == ResponseStatus::Failure && response.error) {
+    if (response.status == ResponseResult::Failure && response.error) {
         return *response.error;
     }
 

@@ -206,7 +206,7 @@ struct Request {
     bool uses_refresh_token = false;
 };
 
-enum class ResponseStatus { Success, Failure };
+enum class ResponseResult { Success, Failure };
 
 /**
  * The contents of an HTTP response.
@@ -215,7 +215,7 @@ struct Response {
     /**
      * Response result - success or failure
      */
-    ResponseStatus status;
+    ResponseResult status;
 
     /**
      * The status code of the HTTP response.
