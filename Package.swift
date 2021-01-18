@@ -80,7 +80,7 @@ let package = Package(
             targets: ["Capi"]),
         .library(
             name: "RealmFFI",
-            targets: ["FFI"]),
+            targets: ["RealmFFI"]),
     ],
     targets: [
         .target(
@@ -202,7 +202,7 @@ let package = Package(
                 .headerSearchPath("external/pegtl/include/tao")
             ] + cxxSettings) as [CXXSetting]),
         .target(
-            name: "FFI",
+            name: "RealmFFI",
             dependencies: ["Capi"],
             path: "src/swift"),
         .target(
