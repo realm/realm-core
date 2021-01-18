@@ -531,7 +531,7 @@ bool Obj::is_null(ColKey col_key) const
     update_if_needed();
     ColumnAttrMask attr = col_key.get_attrs();
     ColKey::Idx col_ndx = col_key.get_index();
-    if (attr.test(col_attr_Nullable) && !(attr.test(col_attr_List) || attr.test(col_attr_Set))) {
+    if (attr.test(col_attr_Nullable) && !attr.test(col_attr_Collection)) {
         switch (col_key.get_type()) {
             case col_type_Int:
                 return do_is_null<ArrayIntNull>(col_ndx);
