@@ -27,6 +27,7 @@ TEST_CASE("set") {
     r->update_schema({
         {"table",
          {{"int_set", PropertyType::Set | PropertyType::Int},
+          {"decimal_set", PropertyType::Set | PropertyType::Decimal | PropertyType::Nullable},
           {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
         {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
         {"other_table",
@@ -44,6 +45,7 @@ TEST_CASE("set") {
     auto other_table2 = r->read_group().get_table("class_table2");
 
     ColKey col_int_set = table->get_column_key("int_set");
+    ColKey col_decimal_set = table->get_column_key("decimal_set");
 
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
@@ -103,6 +105,23 @@ TEST_CASE("set") {
             obj.remove();
         });
         CHECK(!set.is_valid());
+    }
+
+    SECTION("nullable decimal") {
+        object_store::Set set{r, obj, col_decimal_set};
+        auto results = set.as_results();
+
+        write([&]() {
+            CHECK(set.insert(Decimal128(5)).second);
+            CHECK(set.insert(Decimal128(realm::null())).second);
+            CHECK(set.insert(Decimal128(7)).second);
+        });
+
+        REQUIRE(set.is_valid());
+        CHECK(set.size() == 3);
+        CHECK(results.index_of(Decimal128(realm::null())) == 0);
+        auto sorted = results.sort({{"self", false}});
+        CHECK(sorted.index_of(Decimal128(realm::null())) == 2);
     }
 
     SECTION("objects / links") {
