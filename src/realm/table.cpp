@@ -445,11 +445,13 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key_type)
+ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullable, DataType key_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }

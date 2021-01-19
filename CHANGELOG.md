@@ -7,6 +7,7 @@
 * Add support for @min and @max queries on Timestamp lists.
 * Add support for comparing non-list link columns to other link columns in queries.
 * Add `Set::delete_all`, `Set::is_subset_of`, `Set::is_superset_of`, `Set::intersects`, `Set::assign_intersection`, `Set::assign_union` & `Set::assign_difference` methods to `object_store::Set`.
+* Dictionaries can be defined as nullable.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

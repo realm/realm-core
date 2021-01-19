@@ -468,10 +468,6 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                             col_name);
     }
 
-    if (instr.collection_type == CollectionType::Dictionary && instr.nullable) {
-        bad_transaction_log("AddColumn '%1.%3' adding dictinoary with nullable keys", table->get_name(), col_name);
-    }
-
     if (instr.type != Type::Link) {
         DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
         switch (instr.collection_type) {
@@ -485,7 +481,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
             }
             case CollectionType::Dictionary: {
                 DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
-                table->add_column_dictionary(type, col_name, key_type);
+                table->add_column_dictionary(type, col_name, instr.nullable, key_type);
                 break;
             }
             case CollectionType::Set: {

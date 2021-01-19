@@ -301,7 +301,7 @@ TEST(Dictionary_Aggregate)
 {
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false, type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -347,7 +347,7 @@ TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false, type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -381,7 +381,7 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
     auto foo = foos->create_object_with_primary_key(123);
     auto a = bars->create_object_with_primary_key("a");
