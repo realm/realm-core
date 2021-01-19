@@ -8042,16 +8042,19 @@ TEST(Sync_Dictionary)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction tr{db_2};
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
         // tr.get_group().to_json(std::cout);
 
-        auto foos = tr.get_table("class_Foo");
+        auto foos = read_2.get_table("class_Foo");
 
         CHECK_EQUAL(foos->size(), 1);
 
         auto it = foos->begin();
         auto dict = it->get_dictionary(foos->get_column_key("dict"));
         CHECK_EQUAL(dict.size(), 0);
+
+        CHECK(compare_groups(read_1, read_2));
     }
 }
 
