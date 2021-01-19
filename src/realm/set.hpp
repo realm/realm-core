@@ -765,24 +765,28 @@ inline void Set<T>::clear()
 template <class T>
 inline Mixed Set<T>::min(size_t* return_ndx) const
 {
+    update_if_needed();
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::max(size_t* return_ndx) const
 {
+    update_if_needed();
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Set<T>::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 

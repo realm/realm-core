@@ -618,24 +618,28 @@ inline size_t Lst<T>::find_first(const T& value) const
 template <class T>
 inline Mixed Lst<T>::min(size_t* return_ndx) const
 {
+    update_if_needed();
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::max(size_t* return_ndx) const
 {
+    update_if_needed();
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Lst<T>::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 

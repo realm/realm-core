@@ -297,6 +297,7 @@ size_t Dictionary::find_any(Mixed value) const
 
 Mixed Dictionary::min(size_t* return_ndx) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->min(return_ndx);
     }
@@ -307,6 +308,7 @@ Mixed Dictionary::min(size_t* return_ndx) const
 
 Mixed Dictionary::max(size_t* return_ndx) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->max(return_ndx);
     }
@@ -317,6 +319,7 @@ Mixed Dictionary::max(size_t* return_ndx) const
 
 Mixed Dictionary::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->sum(return_cnt);
     }
@@ -327,6 +330,7 @@ Mixed Dictionary::sum(size_t* return_cnt) const
 
 Mixed Dictionary::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->avg(return_cnt);
     }
