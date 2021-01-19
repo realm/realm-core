@@ -1634,7 +1634,6 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     /*************************** Create objects ******************************/
 
-    int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
     ColKey orig_row_ndx_col;
@@ -1667,13 +1666,16 @@ bool Table::migrate_objects(ColKey pk_col_key)
             // Generate key from pk value
             GlobalKey object_id{pk_val};
             obj_key = global_to_local_object_id_hashed(object_id);
+            // Check for collision
+            if (is_valid(obj_key)) {
+                Obj existing_obj = m_clusters.get(obj_key);
+                auto existing_pk_value = existing_obj.get_any(pk_col_key);
+                GlobalKey existing_id{existing_pk_value};
+                obj_key = allocate_local_id_after_hash_collision(object_id, existing_id, obj_key);
+            }
         }
         else {
             obj_key = ObjKey(row_ndx);
-        }
-
-        if (obj_key.value > max_key_value) {
-            max_key_value = obj_key.value;
         }
 
         // Create object with the initial values
@@ -1728,13 +1730,15 @@ bool Table::migrate_objects(ColKey pk_col_key)
         col_refs.set(ndx, 0);
     }
 
-    // We need to be sure that the stored 'next sequence number' is bigger than
-    // the biggest ObjKey currently used.
-    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
-    uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
-    if (uint64_t(max_key_value) >= sn) {
-        rot = RefOrTagged::make_tagged(max_key_value + 1);
-        m_top.set(top_position_for_sequence_number, rot);
+    if (pk_col_key) {
+        // If we have a primary key column, the sequence number is used to generate unique
+        // keys after collision and must not be updated here.
+    }
+    else {
+        // We need to be sure that the stored 'next sequence number' is bigger than
+        // the biggest ObjKey currently used.
+        auto max_key_value = m_clusters.get_last_key_value();
+        this->set_sequence_number(uint64_t(max_key_value + 1));
     }
 
 #if 0
@@ -2036,14 +2040,14 @@ size_t Table::get_index_in_group() const noexcept
     return m_top.get_ndx_in_parent();
 }
 
-uint64_t Table::allocate_sequence_number()
+uint32_t Table::allocate_sequence_number()
 {
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
     uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
     rot = RefOrTagged::make_tagged(sn + 1);
     m_top.set(top_position_for_sequence_number, rot);
 
-    return sn;
+    return uint32_t(sn);
 }
 
 void Table::set_sequence_number(uint64_t seq)
@@ -3262,7 +3266,7 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
         ++num_entries;
     };
 
-    uint64_t sequence_number_for_local_id = allocate_sequence_number();
+    auto sequence_number_for_local_id = allocate_sequence_number();
     ObjKey new_local_id = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
     insert_collision(incoming_id, new_local_id);
     insert_collision(colliding_id, colliding_local_id);
@@ -3568,7 +3572,7 @@ void Table::rebuild_table_with_pk_column()
             // new PK column.
             // Create temporary object to hold the values of the current object,
             // and then we'll move the object to its final key in a second pass.
-            uint64_t sequence_number_for_local_id = allocate_sequence_number();
+            auto sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
             auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
