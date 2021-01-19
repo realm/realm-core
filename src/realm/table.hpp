@@ -148,7 +148,8 @@ public:
     ColKey add_column_list(Table& target, StringData name);
     ColKey add_column_set(DataType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String);
     ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
