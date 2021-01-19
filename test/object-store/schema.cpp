@@ -383,8 +383,9 @@ TEST_CASE("Schema") {
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
+            REQUIRE_NOTHROW(schema.validate());
             REQUIRE_THROWS_CONTAINING(
-                schema.validate(),
+                schema.validate(SchemaValidationMode::validate_no_embedded_orphans),
                 "Embedded object 'origin' is unreachable by any link path from top level objects.");
         }
 

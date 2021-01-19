@@ -102,8 +102,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
-        SECTION("migration function for additive-only") {
-            config.schema_mode = SchemaMode::Additive;
+        SECTION("migration function for additive discovered") {
+            config.schema_mode = SchemaMode::AdditiveDiscovered;
+            config.migration_function = [](auto, auto, auto) {};
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("migration function for additive explicit") {
+            config.schema_mode = SchemaMode::AdditiveExplicit;
             config.migration_function = [](auto, auto, auto) {};
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }

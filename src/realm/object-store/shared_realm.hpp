@@ -116,10 +116,22 @@ enum class SchemaMode : uint8_t {
     // modes, the schema version is allowed to be less than the existing
     // one).
     // The migration function is not used.
+    // This should be used when including discovered user classes.
+    // Previously called Additive.
     //
     // This mode allows updating the schema with additive changes even
     // if the Realm is already open on another thread.
-    Additive,
+    AdditiveDiscovered,
+
+    // The same additive properties as AdditiveDiscovered, except
+    // in this mode, all classes in the schema have been explicitly
+    // included by the user. This means that stricter schema checks are
+    // run such as throwing an error when an embedded object type which
+    // is not linked from any top level object types is included.
+    AdditiveExplicit,
+
+    // For convienence, will be removed
+    Additive = AdditiveDiscovered,
 
     // Verify that the schema version has increased, call the migraiton
     // function, and then verify that the schema now matches.

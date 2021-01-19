@@ -22,6 +22,8 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/shared_realm.hpp>
+
 
 #include <algorithm>
 #include <queue>
@@ -189,7 +191,7 @@ void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectS
 }
 } // end anonymous namespace
 
-void Schema::validate(bool for_sync) const
+void Schema::validate(uint64_t validation_mode) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -205,6 +207,7 @@ void Schema::validate(bool for_sync) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
+    const bool for_sync = validation_mode & SchemaValidationMode::validate_for_sync;
     for (auto const& object : *this) {
         object.validate(*this, exceptions, for_sync);
     }
@@ -215,7 +218,9 @@ void Schema::validate(bool for_sync) const
         // only attempt to check for loops if the rest of the schema is valid
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
-        check_for_embedded_object_orphans(*this, exceptions);
+        if (validation_mode & SchemaValidationMode::validate_no_embedded_orphans) {
+            check_for_embedded_object_orphans(*this, exceptions);
+        }
     }
 
     if (exceptions.size()) {
