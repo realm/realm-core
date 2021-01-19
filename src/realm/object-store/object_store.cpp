@@ -866,7 +866,7 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 {
     create_metadata_tables(group);
 
-    if (mode == SchemaMode::Additive) {
+    if (mode == SchemaMode::AdditiveDiscovered || mode == SchemaMode::AdditiveExplicit) {
         bool target_schema_is_newer =
             (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
 

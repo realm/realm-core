@@ -130,9 +130,6 @@ enum class SchemaMode : uint8_t {
     // is not linked from any top level object types is included.
     AdditiveExplicit,
 
-    // For convienence, will be removed
-    Additive = AdditiveDiscovered,
-
     // Verify that the schema version has increased, call the migraiton
     // function, and then verify that the schema now matches.
     // The migration function is mandatory for this mode.

@@ -1952,7 +1952,7 @@ TEST_CASE("migration: Additive") {
     };
 
     TestFile config;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveDiscovered;
     config.cache = false;
     config.schema = schema;
     auto realm = Realm::get_shared_realm(config);
@@ -2143,7 +2143,7 @@ TEST_CASE("migration: Additive") {
     SECTION("increasing schema version without modifying schema properly leaves the schema untouched") {
         TestFile config1;
         config1.schema = schema;
-        config1.schema_mode = SchemaMode::Additive;
+        config1.schema_mode = SchemaMode::AdditiveDiscovered;
         config1.schema_version = 0;
 
         auto realm1 = Realm::get_shared_realm(config1);

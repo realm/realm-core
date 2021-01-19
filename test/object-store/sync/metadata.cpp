@@ -94,7 +94,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             config.path = metadata_path;
             config.schema = v0_schema;
             config.schema_version = 0;
-            config.schema_mode = SchemaMode::Additive;
+            config.schema_mode = SchemaMode::AdditiveExplicit;
             auto realm = Realm::get_shared_realm(std::move(config));
             REQUIRE(realm);
 
