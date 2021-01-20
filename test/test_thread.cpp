@@ -931,6 +931,19 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
     }
 }
 
+NONCONCURRENT_TEST(Thread_Condvar_CreateDestroyDifferentThreads)
+{
+    auto cv = std::make_unique<InterprocessCondVar>();
+    InterprocessCondVar::SharedPart condvar_part;
+    InterprocessCondVar::init_shared_part(condvar_part);
+    TEST_PATH(path);
+    DBOptions default_options;
+    cv->set_shared_part(condvar_part, path, "Thread_CondvarTimeout_CondVar", default_options.temp_dir);
+    std::thread([&] {
+        cv.reset();
+    }).join();
+}
+
 #ifdef _WIN32
 TEST(Thread_Win32InterprocessBackslashes)
 {

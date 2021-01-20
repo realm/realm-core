@@ -2251,8 +2251,15 @@ void Session::send_upload_message()
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
-            logger.trace("Changeset: %1",
-                         _impl::clamped_hex_dump(uc.changeset.get_first_chunk())); // Throws
+            BinaryData changeset_data = uc.changeset.get_first_chunk();
+            if (changeset_data.size() < 1024) {
+                logger.trace("Changeset: %1",
+                             _impl::clamped_hex_dump(changeset_data)); // Throws
+            }
+            else {
+                logger.trace("Changeset(comp): %1 % 2", changeset_data.size(),
+                             protocol.compressed_hex_dump(changeset_data));
+            }
         }
 
         if (!get_client().m_disable_upload_compaction) {

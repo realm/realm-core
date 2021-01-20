@@ -4,8 +4,6 @@
 
 #include <realm/util/value_reset_guard.hpp>
 #include <realm/util/hex_dump.hpp>
-#include <realm/parser/parser.hpp>
-#include <realm/parser/query_builder.hpp>
 #include <realm/table_view.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>

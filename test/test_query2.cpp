@@ -5784,10 +5784,10 @@ TEST(Query_Mixed)
             nb_strings++;
         }
     }
-
+    std::string str2bin("String2Binary");
     table->get_object(15).set(col_any, Mixed());
     table->get_object(75).set(col_any, Mixed(75.));
-    table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
+    table->get_object(28).set(col_any, Mixed(BinaryData(str2bin)));
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
 
@@ -5954,6 +5954,7 @@ TEST(Query_Dictionary)
                 incr = true;
         }
         else if ((i % 10) == 0) {
+            dict.insert("Foo", "Bar");
             dict.insert("Value", 100.);
             incr = true;
         }
@@ -5982,7 +5983,7 @@ TEST(Query_Dictionary)
     }
 
     // g.to_json(std::cout);
-    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > Mixed(50)).find_all();
     CHECK_EQUAL(tv.size(), expected);
     tv = (foo->column<Dictionary>(col_dict) > 50).find_all(); // Any key will do
     CHECK_EQUAL(tv.size(), 50);                               // 0 and 51..99
@@ -5995,6 +5996,11 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 6);
     tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") == null()).find_all();
     CHECK_EQUAL(tv.size(), 7);
+
+    tv = (foo->column<Dictionary>(col_dict).keys().begins_with("F")).find_all();
+    CHECK_EQUAL(tv.size(), 5);
+    tv = (origin->link(col_link).column<Dictionary>(col_dict).keys() == "Foo").find_all();
+    CHECK_EQUAL(tv.size(), 5);
 }
 
 TEST(Query_DictionaryTypedLinks)
@@ -6034,6 +6040,88 @@ TEST(Query_DictionaryTypedLinks)
     cnt = (person->column<Dictionary>(col_data).key("Pet").property("Parent").property("Name") == StringData("Fido"))
               .count();
     CHECK_EQUAL(cnt, 1);
+}
+
+TEST(Query_TypeOfValue)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column(type_Mixed, "mixed");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_primitive_list = table->add_column_list(type_Mixed, "list");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t nb_ints = 0;
+    size_t nb_strings = 0;
+    for (int64_t i = 0; i < 100; i++) {
+        if (i % 4) {
+            nb_ints++;
+            table->create_object().set(col_any, Mixed(i)).set(col_int, i);
+        }
+        else {
+            std::string str = "String" + util::to_string(i);
+            table->create_object().set(col_any, Mixed(str)).set(col_int, i);
+            nb_strings++;
+        }
+    }
+    std::string bin_data("String2Binary");
+    table->get_object(15).set(col_any, Mixed());
+    nb_ints--;
+    table->get_object(75).set(col_any, Mixed(75.));
+    nb_ints--;
+    table->get_object(28).set(col_any, Mixed(BinaryData(bin_data)));
+    nb_strings--;
+    table->get_object(25).set(col_any, Mixed(3.));
+    nb_ints--;
+    table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+    nb_ints--;
+
+    auto list_0 = table->get_object(0).get_list<Mixed>(col_primitive_list);
+    list_0.add(Mixed{1});
+    list_0.add(Mixed{Decimal128(10)});
+    list_0.add(Mixed{Double{100}});
+    auto list_1 = table->get_object(1).get_list<Mixed>(col_primitive_list);
+    list_1.add(Mixed{std::string("hello")});
+    list_1.add(Mixed{1000});
+
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("string"))).find_all();
+    CHECK_EQUAL(tv.size(), nb_strings);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("double"))).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(std::string("Decimal128"))).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(BinaryData(bin_data))).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(util::none)).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(type_String)).find_all();
+    CHECK_EQUAL(tv.size(), nb_strings);
+    tv = (table->column<Mixed>(col_any).type_of_value() == TypeOfValue(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), nb_ints);
+    tv = (table->column<Lst<Mixed>>(col_primitive_list).type_of_value() == TypeOfValue(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    tv = (table->column<Lst<Mixed>>(col_primitive_list).type_of_value() == TypeOfValue(type_Decimal)).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Lst<Mixed>>(col_primitive_list).type_of_value() == TypeOfValue(type_Int)).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    tv = (table->column<Lst<Mixed>>(col_primitive_list, ExpressionComparisonType::All).type_of_value() ==
+              TypeOfValue(TypeOfValue::Attribute::Numeric) &&
+          table->column<Lst<Mixed>>(col_primitive_list).size() > 0)
+             .find_all();
+    CHECK_EQUAL(tv.size(), 1);
 }
 
 #endif // TEST_QUERY

@@ -44,12 +44,10 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
 
-    /*
     VersionID src_version =
         dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
     if (src_version != tr->get_version_of_current_transaction())
-        throw realm::LogicError(LogicError::bad_version);
-    */
+        was_in_sync = false;
 
     if (was_in_sync)
         m_last_seen_versions = get_dependency_versions();
@@ -547,17 +545,6 @@ void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ord
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
     do_sync();
-}
-
-void ConstTableView::include(IncludeDescriptor include_paths)
-{
-    m_descriptor_ordering.append_include(std::move(include_paths));
-    do_sync();
-}
-
-IncludeDescriptor ConstTableView::get_include_descriptors()
-{
-    return m_descriptor_ordering.compile_included_backlinks();
 }
 
 std::string ConstTableView::get_descriptor_ordering_description() const

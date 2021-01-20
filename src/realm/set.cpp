@@ -223,4 +223,19 @@ void LnkSet::remove_all_target_rows()
     }
 }
 
+bool LnkSet::is_subset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_subset_of(rhs.m_set);
+}
+
+bool LnkSet::is_superset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_superset_of(rhs.m_set);
+}
+
+bool LnkSet::intersects(const LnkSet& rhs) const
+{
+    return this->m_set.intersects(rhs.m_set);
+}
+
 } // namespace realm

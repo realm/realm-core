@@ -23,6 +23,10 @@ namespace app {
 
 util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
 {
+    if (response.status == ResponseResult::Failure && response.error) {
+        return *response.error;
+    }
+
     bool http_status_code_is_fatal =
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
@@ -40,7 +44,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     try {
         auto ct = find_case_insensitive_header("content-type");
         if (ct != response.headers.end() && ct->second == "application/json") {
-            auto body = nlohmann::json::parse(response.body);
+            auto body = nlohmann::json::parse(*response.body);
             auto message = body.find("error");
             auto link = body.find("link");
             std::string parsed_link = link == body.end() ? "" : link->get<std::string>();
@@ -63,8 +67,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
     }
 
     if (response.custom_status_code != 0) {
-        std::string error_msg =
-            (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        std::string error_msg = response.body.value_or("non-zero custom status code considered fatal");
         return AppError(make_custom_error_code(response.custom_status_code), error_msg, "",
                         response.http_status_code);
     }

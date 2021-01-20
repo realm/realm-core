@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.3.2"
+let versionStr = "10.3.3"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -80,7 +80,7 @@ let package = Package(
             targets: ["Capi"]),
         .library(
             name: "RealmFFI",
-            targets: ["FFI"]),
+            targets: ["RealmFFI"]),
     ],
     targets: [
         .target(
@@ -133,7 +133,7 @@ let package = Package(
             sources: ["realm/parser"],
             publicHeadersPath: "realm/parser",
             cxxSettings: [
-                .headerSearchPath("external/pegtl/include/tao")
+                .headerSearchPath("realm/parser/generated")
             ] + cxxSettings),
         .target(
             name: "SyncClient",
@@ -202,7 +202,7 @@ let package = Package(
                 .headerSearchPath("external/pegtl/include/tao")
             ] + cxxSettings) as [CXXSetting]),
         .target(
-            name: "FFI",
+            name: "RealmFFI",
             dependencies: ["Capi"],
             path: "src/swift"),
         .target(

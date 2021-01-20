@@ -3563,47 +3563,6 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
-TEST_CASE("results: query helpers", "[include]") {
-    InMemoryTestFile config;
-    config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object",
-         {
-             {"value", PropertyType::Int},
-         }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
-    };
-
-    auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    auto col = table->get_column_key("value");
-
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
-        table->create_object().set(col, (i + 2) % 4);
-    }
-    realm->commit_transaction();
-
-    Results r(realm, table);
-
-    SECTION("not valid") {
-        std::vector<StringData> paths;
-        parser::KeyPathMapping mapping;
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(!includes.is_valid());
-    }
-    SECTION("valid") {
-        std::vector<StringData> paths = {"@links.linking_object.link"};
-        parser::KeyPathMapping mapping;
-        realm::populate_keypath_mapping(mapping, *realm);
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(includes.is_valid());
-        CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
-    }
-}
-
 TEST_CASE("notifications: objects with PK recreated") {
     _impl::RealmCoordinator::assert_no_open_realms();
 

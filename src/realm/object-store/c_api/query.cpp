@@ -2,27 +2,22 @@
 #include <realm/object-store/c_api/util.hpp>
 
 #include <realm/object-store/keypath_helpers.hpp>
+#include <realm/parser/query_parser.hpp>
+#include <realm/parser/keypath_mapping.hpp>
 
 namespace {
-struct QueryArgumentsAdapter : query_builder::Arguments {
-    size_t m_num_args = 0;
+struct QueryArgumentsAdapter : query_parser::Arguments {
     const realm_value_t* m_args = nullptr;
 
     QueryArgumentsAdapter(size_t num_args, const realm_value_t* args) noexcept
-        : m_num_args(num_args)
+        : Arguments(num_args)
         , m_args(args)
     {
     }
 
-    void check_index(size_t i) const
-    {
-        if (i >= m_num_args)
-            throw std::out_of_range{"Query argument out of range"};
-    }
-
     bool bool_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_BOOL) {
             return m_args[i].boolean;
         }
@@ -31,7 +26,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     long long long_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_INT) {
             return m_args[i].integer;
         }
@@ -40,7 +35,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     float float_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_FLOAT) {
             return m_args[i].fnum;
         }
@@ -49,7 +44,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     double double_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_DOUBLE) {
             return m_args[i].dnum;
         }
@@ -58,7 +53,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     StringData string_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_STRING) {
             return from_capi(m_args[i].string);
         }
@@ -67,7 +62,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     BinaryData binary_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_BINARY) {
             return from_capi(m_args[i].binary);
         }
@@ -76,7 +71,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     Timestamp timestamp_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
             return from_capi(m_args[i].timestamp);
         }
@@ -85,7 +80,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     ObjKey object_index_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_LINK) {
             // FIXME: Somehow check the target table type?
             return from_capi(m_args[i].link).get_obj_key();
@@ -95,7 +90,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     ObjectId objectid_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
             return from_capi(m_args[i].object_id);
         }
@@ -104,7 +99,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     Decimal128 decimal128_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_DECIMAL128) {
             return from_capi(m_args[i].decimal128);
         }
@@ -113,7 +108,7 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     UUID uuid_for_argument(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         if (m_args[i].type == RLM_TYPE_UUID) {
             return from_capi(m_args[i].uuid);
         }
@@ -122,23 +117,61 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
 
     bool is_argument_null(size_t i) final
     {
-        check_index(i);
+        verify_ndx(i);
         return m_args[i].type == RLM_TYPE_NULL;
+    }
+    DataType type_for_argument(size_t i) override
+    {
+        verify_ndx(i);
+        if (m_args[i].type == RLM_TYPE_INT) {
+            return type_Int;
+        }
+        if (m_args[i].type == RLM_TYPE_STRING) {
+            return type_String;
+        }
+        if (m_args[i].type == RLM_TYPE_BOOL) {
+            return type_Bool;
+        }
+        if (m_args[i].type == RLM_TYPE_FLOAT) {
+            return type_Float;
+        }
+        if (m_args[i].type == RLM_TYPE_DOUBLE) {
+            return type_Double;
+        }
+        if (m_args[i].type == RLM_TYPE_BINARY) {
+            return type_Binary;
+        }
+        if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
+            return type_Timestamp;
+        }
+        if (m_args[i].type == RLM_TYPE_LINK) {
+            return type_Link;
+        }
+        if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
+            return type_ObjectId;
+        }
+        if (m_args[i].type == RLM_TYPE_DECIMAL128) {
+            return type_Decimal;
+        }
+        if (m_args[i].type == RLM_TYPE_UUID) {
+            return type_UUID;
+        }
+        throw LogicError{LogicError::type_mismatch};
     }
 };
 } // namespace
 
-static void parse_and_apply_query(const std::shared_ptr<Realm>& realm, Query& q, DescriptorOrdering& ordering,
-                                  const char* query_string, size_t num_args, const realm_value_t* args)
+static Query parse_and_apply_query(const std::shared_ptr<Realm>& realm, ConstTableRef table,
+                                   DescriptorOrdering& ordering, const char* query_string, size_t num_args,
+                                   const realm_value_t* args)
 {
-    auto parser_result = parser::parse(query_string);
-
-    parser::KeyPathMapping mapping;
+    query_parser::KeyPathMapping mapping;
     realm::populate_keypath_mapping(mapping, *realm);
     QueryArgumentsAdapter arguments{num_args, args};
-
-    query_builder::apply_predicate(q, parser_result.predicate, arguments, mapping);
-    query_builder::apply_ordering(ordering, q.get_table(), parser_result.ordering, mapping);
+    Query query = table->query(query_string, arguments, mapping);
+    if (auto opt_ordering = query.get_ordering())
+        ordering = *opt_ordering;
+    return query;
 }
 
 RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_class_key_t target_table_key,
@@ -146,9 +179,8 @@ RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_class_key_t
 {
     return wrap_err([&]() {
         auto table = (*realm)->read_group().get_table(TableKey(target_table_key));
-        auto query = table->where();
         DescriptorOrdering ordering;
-        parse_and_apply_query(*realm, query, ordering, query_string, num_args, args);
+        Query query = parse_and_apply_query(*realm, table, ordering, query_string, num_args, args);
         return new realm_query_t{std::move(query), std::move(ordering), *realm};
     });
 }
@@ -158,9 +190,9 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, cons
 {
     return wrap_err([&]() {
         auto realm = list->get_realm();
-        auto query = list->get_query();
+        auto table = list->get_table();
         DescriptorOrdering ordering;
-        parse_and_apply_query(realm, query, ordering, query_string, num_args, args);
+        Query query = parse_and_apply_query(realm, table, ordering, query_string, num_args, args);
         return new realm_query_t{std::move(query), std::move(ordering), realm};
     });
 }
@@ -170,9 +202,9 @@ RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* resu
 {
     return wrap_err([&]() {
         auto realm = results->get_realm();
-        auto query = results->get_query();
+        auto table = results->get_table();
         DescriptorOrdering ordering;
-        parse_and_apply_query(realm, query, ordering, query_string, num_args, args);
+        Query query = parse_and_apply_query(realm, table, ordering, query_string, num_args, args);
         return new realm_query_t{std::move(query), std::move(ordering), realm};
     });
 }
@@ -205,7 +237,7 @@ RLM_API realm_results_t* realm_query_find_all(realm_query_t* query)
     return wrap_err([&]() {
         auto shared_realm = query->weak_realm.lock();
         REALM_ASSERT_RELEASE(shared_realm);
-        return new realm_results{Results{shared_realm, query->query}};
+        return new realm_results{Results{shared_realm, query->query, query->ordering}};
     });
 }
 

@@ -24,7 +24,7 @@
 
 #include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/mixed.hpp>
+#include <realm/query_value.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {
@@ -113,19 +113,13 @@ struct Contains : public HackClass {
         return v2.contains(v1, charmap);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (m1.is_null())
             return !m2.is_null();
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -180,19 +174,13 @@ struct Like : public HackClass {
         return s2.like(s1);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (m1.is_null() && m2.is_null())
             return true;
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -241,17 +229,11 @@ struct BeginsWith : public HackClass {
         return v2.begins_with(v1);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return b2.begins_with(b1);
         }
         return false;
@@ -293,17 +275,11 @@ struct EndsWith : public HackClass {
         return v2.ends_with(v1);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -343,7 +319,7 @@ struct Equal {
         return v1 == v2;
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 == m2));
     }
@@ -389,7 +365,7 @@ struct NotEqual {
         return true;
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const Mixed& m2) const
     {
         return !Equal()(m1, m2);
     }
@@ -460,19 +436,13 @@ struct ContainsIns : public HackClass {
         return contains_ins(v2, v1_upper, v1_lower, v1.size(), charmap);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (m1.is_null())
             return !m2.is_null();
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -550,19 +520,13 @@ struct LikeIns : public HackClass {
         return string_like_ins(s2, s1_lower, s1_upper);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (m1.is_null() && m2.is_null())
             return true;
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -623,17 +587,11 @@ struct BeginsWithIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -695,17 +653,11 @@ struct EndsWithIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         if (Mixed::types_are_comparable(m1, m2)) {
             BinaryData b1 = m1.get_binary();
             BinaryData b2 = m2.get_binary();
-            if (m1.get_type() == type_String) {
-                b1.remove_zero_term();
-            }
-            if (m2.get_type() == type_String) {
-                b2.remove_zero_term();
-            }
             return operator()(b1, b2, false, false);
         }
         return false;
@@ -766,7 +718,7 @@ struct EqualIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) ||
                (Mixed::types_are_comparable(m1, m2) && operator()(m1.get_binary(), m2.get_binary(), false, false));
@@ -826,7 +778,7 @@ struct NotEqualIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return !EqualIns()(m1, m2);
     }
@@ -862,7 +814,7 @@ struct Greater {
 
         return v1 > v2;
     }
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return Mixed::types_are_comparable(m1, m2) && (m1 > m2);
     }
@@ -970,7 +922,7 @@ struct Less {
         return v1 < v2;
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return Mixed::types_are_comparable(m1, m2) && (m1 < m2);
     }
@@ -1016,7 +968,7 @@ struct LessEqual : public HackClass {
         return (!v1null && !v2null && v1.value() <= v2.value());
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 <= m2));
     }
@@ -1052,7 +1004,7 @@ struct GreaterEqual : public HackClass {
         return (!v1null && !v2null && v1.value() >= v2.value());
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return (m1.is_null() && m2.is_null()) || (Mixed::types_are_comparable(m1, m2) && (m1 >= m2));
     }

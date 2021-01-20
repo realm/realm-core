@@ -143,12 +143,13 @@ functions:
         shell: bash
         script: |-
           set -o errexit
+          set -o verbose
           CTEST=$(pwd)/${cmake_bindir}/ctest
 
           if [[ -n "${test_filter}" ]]; then
               TEST_FLAGS="-R ${test_filter}"
           fi
-          TETS_FLAGS="$TEST_FLAGS ${test_flags|}"
+          TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
           cd build
           $CTEST -V $TEST_FLAGS
@@ -190,6 +191,7 @@ tasks:
       content_type: '${content_type|application/x-gzip}'
 
 - name: core-tests
+  tags: [ "test_suite" ]
   commands:
   - func: "compile"
   - func: "run tests"
@@ -211,6 +213,7 @@ tasks:
       path_to_benchmark: ./build/test/benchmark-crud/realm-benchmark-crud
 
 - name: sync-tests
+  tags: [ "test_suite" ]
   commands:
   - func: "compile"
   - func: "run tests"
@@ -218,6 +221,7 @@ tasks:
       test_filter: SyncTests
 
 - name: object-store-tests
+  tags: [ "disabled_on_windows", "test_suite" ]
   commands:
   - func: "compile"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
@@ -301,9 +305,20 @@ task_groups:
   - func: "fetch binaries"
   tasks:
   - compile
-  - core-tests
-  - sync-tests
-  - object-store-tests
+  - .test_suite
+  - package
+
+# The object-store tests currently fail to start on Windows. There's a separate evergreen config to
+# disable them until that's fixed.
+- name: compile_test_and_package_windows
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  tasks:
+  - compile
+  - "!.disabled_on_windows .test_suite"
   - package
 
 - name: compile_test
@@ -314,9 +329,7 @@ task_groups:
   - func: "fetch binaries"
   tasks:
   - compile
-  - core-tests
-  - sync-tests
-  - object-store-tests
+  - .test_suite
 
 - name: benchmarks
   setup_group_can_fail_task: true
@@ -447,7 +460,7 @@ buildvariants:
     fetch_missing_dependencies: On
     build_zlib: On
   tasks:
-  - name: compile_test_and_package
+  - name: compile_test_and_package_windows
     distros:
     - windows-64-vs2019-large
 

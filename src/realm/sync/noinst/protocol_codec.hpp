@@ -114,6 +114,8 @@ public:
 
     void make_ping(OutputBuffer&, milliseconds_type timestamp, milliseconds_type rtt);
 
+    std::string compressed_hex_dump(BinaryData blob);
+
     // Messages received by the client.
 
     // parse_pong_received takes a (WebSocket) pong and parses it.
@@ -267,8 +269,14 @@ public:
                                  server_version, client_version, origin_timestamp, origin_file_ident,
                                  original_changeset_size,
                                  changeset_size); // Throws
-                    logger.trace("Changeset: %1",
-                                 clamped_hex_dump(changeset_data)); // Throws
+                    if (changeset_data.size() < 1056) {
+                        logger.trace("Changeset: %1",
+                                     clamped_hex_dump(changeset_data)); // Throws
+                    }
+                    else {
+                        logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
+                                     compressed_hex_dump(changeset_data)); // Throws
+                    }
 #if REALM_DEBUG
                     ChunkedBinaryInputStream in{changeset_data};
                     sync::Changeset log;

@@ -262,6 +262,10 @@ public:
     template <class It1, class It2>
     void assign_symmetric_difference(It1, It2);
 
+    bool is_subset_of(const LnkSet& rhs) const;
+    bool is_superset_of(const LnkSet& rhs) const;
+    bool intersects(const LnkSet& rhs) const;
+
     // Overriding members of CollectionBase:
     using CollectionBase::get_key;
     CollectionBasePtr clone_collection() const
@@ -761,49 +765,28 @@ inline void Set<T>::clear()
 template <class T>
 inline Mixed Set<T>::min(size_t* return_ndx) const
 {
-    if (size() != 0) {
-        if (return_ndx) {
-            *return_ndx = 0;
-        }
-        return *begin();
-    }
-    else {
-        if (return_ndx) {
-            *return_ndx = not_found;
-        }
-        return Mixed{};
-    }
+    update_if_needed();
+    return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::max(size_t* return_ndx) const
 {
-    auto sz = size();
-    if (sz != 0) {
-        if (return_ndx) {
-            *return_ndx = sz - 1;
-        }
-        auto e = end();
-        --e;
-        return *e;
-    }
-    else {
-        if (return_ndx) {
-            *return_ndx = not_found;
-        }
-        return Mixed{};
-    }
+    update_if_needed();
+    return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Set<T>::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
@@ -905,10 +888,11 @@ template <class T>
 template <class It1, class It2>
 void Set<T>::assign_union(It1 first, It2 last)
 {
-    std::vector<T> the_union;
-    std::set_union(begin(), end(), first, last, std::back_inserter(the_union), SetElementLessThan<T>{});
-    clear();
-    for (auto value : the_union) {
+    std::vector<T> the_diff;
+    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<T>{});
+    // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
+    // Now insert those elements
+    for (auto value : the_diff) {
         insert(value);
     }
 }
@@ -925,8 +909,9 @@ template <class It1, class It2>
 void Set<T>::assign_intersection(It1 first, It2 last)
 {
     std::vector<T> intersection;
-    std::set_intersection(begin(), end(), first, last, std::back_inserter(intersection), SetElementLessThan<T>{});
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
     clear();
+    // Elements in intersection comes from foreign set, so ok to use here
     for (auto value : intersection) {
         insert(value);
     }
@@ -943,11 +928,12 @@ template <class T>
 template <class It1, class It2>
 void Set<T>::assign_difference(It1 first, It2 last)
 {
-    std::vector<T> difference;
-    std::set_difference(begin(), end(), first, last, std::back_inserter(difference), SetElementLessThan<T>{});
-    clear();
-    for (auto value : difference) {
-        insert(value);
+    std::vector<T> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
+    // 'intersection' now contains all the elements that are in both foreign set and 'this'.
+    // Remove those elements. The elements comes from the foreign set, so ok to refer to.
+    for (auto value : intersection) {
+        erase(value);
     }
 }
 
@@ -963,9 +949,13 @@ template <class It1, class It2>
 void Set<T>::assign_symmetric_difference(It1 first, It2 last)
 {
     std::vector<T> difference;
-    std::set_symmetric_difference(begin(), end(), first, last, std::back_inserter(difference),
-                                  SetElementLessThan<T>{});
-    clear();
+    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<T>{});
+    std::vector<T> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
+    // Now remove the common elements and add the differences
+    for (auto value : intersection) {
+        erase(value);
+    }
     for (auto value : difference) {
         insert(value);
     }
