@@ -34,6 +34,7 @@
 #endif // REALM_ENABLE_SYNC
 
 #include <string.h>
+#include <unordered_set>
 
 using namespace realm;
 
@@ -664,42 +665,55 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
     }
 }
 
-void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange> const& changes, bool update_indexes)
+void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange> const& changes, bool update_indexes,
+                                         std::unordered_set<std::string>&& ignore_types)
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, bool update_indexes)
+        Applier(Group& group, bool update_indexes, std::unordered_set<std::string>&& ignore_types)
             : group{group}
             , table{group}
             , update_indexes{update_indexes}
+            , ignored_types{std::move(ignore_types)}
         {
         }
         Group& group;
         TableHelper table;
         bool update_indexes;
+        std::unordered_set<std::string> ignored_types;
 
         void operator()(AddTable op)
         {
-            create_table(group, *op.object);
+            if (!ignored_types.count(op.object->name)) {
+                create_table(group, *op.object);
+            }
         }
         void operator()(RemoveTable) {}
         void operator()(AddInitialProperties op)
         {
-            add_initial_columns(group, *op.object);
+            if (!ignored_types.count(op.object->name)) {
+                add_initial_columns(group, *op.object);
+            }
         }
         void operator()(AddProperty op)
         {
-            add_column(group, table(op.object), *op.property);
+            if (!ignored_types.count(op.object->name)) {
+                add_column(group, table(op.object), *op.property);
+            }
         }
         void operator()(AddIndex op)
         {
-            if (update_indexes)
-                table(op.object).add_search_index(op.property->column_key);
+            if (!ignored_types.count(op.object->name)) {
+                if (update_indexes)
+                    table(op.object).add_search_index(op.property->column_key);
+            }
         }
         void operator()(RemoveIndex op)
         {
-            if (update_indexes)
-                table(op.object).remove_search_index(op.property->column_key);
+            if (!ignored_types.count(op.object->name)) {
+                if (update_indexes)
+                    table(op.object).remove_search_index(op.property->column_key);
+            }
         }
         void operator()(RemoveProperty) {}
 
@@ -709,7 +723,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         void operator()(ChangePropertyType) {}
         void operator()(MakePropertyNullable) {}
         void operator()(MakePropertyRequired) {}
-    } applier{group, update_indexes};
+    } applier{group, update_indexes, std::move(ignore_types)};
 
     for (auto& change : changes) {
         change.visit(applier);
@@ -870,9 +884,14 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
         bool target_schema_is_newer =
             (schema_version < target_schema_version || schema_version == ObjectStore::NotVersioned);
 
+        std::unordered_set<std::string> embedded_orphan_types;
+        if (mode == SchemaMode::AdditiveDiscovered) {
+            // we choose not to create backing tables for embedded orphan types when in discovered schema mode
+            embedded_orphan_types = target_schema.get_embedded_object_orphans();
+        }
         // With sync v2.x, indexes are no longer synced, so there's no reason to avoid creating them.
         bool update_indexes = true;
-        apply_additive_changes(group, changes, update_indexes);
+        apply_additive_changes(group, changes, update_indexes, std::move(embedded_orphan_types));
 
         if (target_schema_is_newer)
             set_schema_version(group, target_schema_version);

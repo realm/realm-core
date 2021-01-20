@@ -139,16 +139,18 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
     }
 }
 
-void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
+} // end anonymous namespace
+
+std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
 {
     std::unordered_set<std::string> orphans;
     std::unordered_set<std::string> visitable;
-    for (auto const& object : schema) {
+    for (auto const& object : *this) {
         if (!object.is_embedded) {
             for (auto const& prop : object.persisted_properties) {
                 if (prop.type == PropertyType::Object) {
-                    auto it = schema.find(prop.object_type);
-                    REALM_ASSERT(it != schema.end());
+                    auto it = this->find(prop.object_type);
+                    REALM_ASSERT(it != this->end());
                     if (it->is_embedded) {
                         visitable.insert(it->name);
                     }
@@ -172,8 +174,8 @@ void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectS
     while (orphans.size() > 0 && changes_to_process) {
         changes_to_process = false;
         for (auto& name : visitable) {
-            auto it = schema.find(name);
-            REALM_ASSERT(it != schema.end());
+            auto it = this->find(name);
+            REALM_ASSERT(it != this->end());
             for (auto const& prop : it->persisted_properties) {
                 if (prop.type == PropertyType::Object && orphans.find(prop.object_type) != orphans.end()) {
                     visitable.insert(prop.object_type);
@@ -183,13 +185,9 @@ void check_for_embedded_object_orphans(Schema const& schema, std::vector<ObjectS
             }
         }
     }
-
-    for (auto name : orphans) {
-        exceptions.push_back(
-            util::format("Embedded object '%1' is unreachable by any link path from top level objects.", name));
-    }
+    return orphans;
 }
-} // end anonymous namespace
+
 
 void Schema::validate(uint64_t validation_mode) const
 {
@@ -218,8 +216,13 @@ void Schema::validate(uint64_t validation_mode) const
         // only attempt to check for loops if the rest of the schema is valid
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
+
         if (validation_mode & SchemaValidationMode::validate_no_embedded_orphans) {
-            check_for_embedded_object_orphans(*this, exceptions);
+            auto orphans = this->get_embedded_object_orphans();
+            for (auto name : orphans) {
+                exceptions.push_back(util::format(
+                    "Embedded object '%1' is unreachable by any link path from top level objects.", name));
+            }
         }
     }
 
