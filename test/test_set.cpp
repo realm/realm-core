@@ -377,6 +377,35 @@ TEST(Set_Union)
     CHECK_EQUAL(set1.get(4), 5);
 }
 
+TEST(Set_UnionString)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_strings = foos->add_column_set(type_String, "strings");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<String>(col_strings);
+    auto set2 = obj2.get_set<String>(col_strings);
+
+    set1.insert("FooBar");
+    set1.insert("A");
+    set1.insert("The fox jumps over the lazy dog");
+
+    set2.insert("FooBar");
+    set2.insert("World");
+    set2.insert("Atomic");
+
+    set1.assign_union(set2);
+    CHECK_EQUAL(set1.size(), 5);
+    CHECK_EQUAL(set1.get(0), "A");
+    CHECK_EQUAL(set1.get(1), "Atomic");
+    CHECK_EQUAL(set1.get(2), "FooBar");
+    CHECK_EQUAL(set1.get(3), "The fox jumps over the lazy dog");
+    CHECK_EQUAL(set1.get(4), "World");
+}
+
 TEST(Set_Intersection)
 {
     Group g;
@@ -412,6 +441,40 @@ TEST(Set_Intersection)
     CHECK_EQUAL(set1.size(), 2);
     CHECK_EQUAL(set1.get(0), 4);
     CHECK_EQUAL(set1.get(1), 5);
+}
+
+TEST(Set_IntersectionString)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_strings = foos->add_column_set(type_String, "strings");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<String>(col_strings);
+    auto set2 = obj2.get_set<String>(col_strings);
+
+    set1.insert("FooBar");
+    set1.insert("A");
+    set1.insert("Hello");
+    set1.insert("The fox jumps over the lazy dog");
+
+    set2.insert("FooBar");
+    set2.insert("World");
+    set2.insert("The fox jumps over the lazy dog");
+
+    CHECK(set1.intersects(set2));
+    CHECK(set2.intersects(set1));
+    CHECK(!set1.is_subset_of(set2));
+    CHECK(!set2.is_subset_of(set1));
+    CHECK(!set1.is_superset_of(set2));
+    CHECK(!set2.is_superset_of(set1));
+
+    set1.assign_intersection(set2);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), "FooBar");
+    CHECK_EQUAL(set1.get(1), "The fox jumps over the lazy dog");
 }
 
 TEST(Set_Difference)
@@ -465,4 +528,32 @@ TEST(Set_SymmetricDifference)
     CHECK_EQUAL(set1.get(0), 1);
     CHECK_EQUAL(set1.get(1), 2);
     CHECK_EQUAL(set1.get(2), 3);
+}
+
+TEST(Set_SymmetricDifferenceString)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_strings = foos->add_column_set(type_String, "strings");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<String>(col_strings);
+    auto set2 = obj2.get_set<String>(col_strings);
+
+    set1.insert("FooBar");
+    set1.insert("A");
+    set1.insert("The fox jumps over the lazy dog");
+
+    set2.insert("FooBar");
+    set2.insert("World");
+    set2.insert("Cosmic love");
+
+    set1.assign_symmetric_difference(set2);
+    CHECK_EQUAL(set1.size(), 4);
+    CHECK_EQUAL(set1.get(0), "A");
+    CHECK_EQUAL(set1.get(1), "Cosmic love");
+    CHECK_EQUAL(set1.get(2), "The fox jumps over the lazy dog");
+    CHECK_EQUAL(set1.get(3), "World");
 }

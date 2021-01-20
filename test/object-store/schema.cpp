@@ -191,11 +191,11 @@ TEST_CASE("ObjectSchema") {
         add_set(table, type_Decimal, "decimal? set", true);
         add_set(table, type_UUID, "uuid? set", true);
 
-        auto add_dictionary = [](TableRef table, DataType type, StringData name) {
-            table->add_column_dictionary(type, name);
+        auto add_dictionary = [](TableRef table, DataType type, StringData name, bool nullable = false) {
+            table->add_column_dictionary(type, name, nullable);
         };
 
-        add_dictionary(table, type_Int, "int dictionary");
+        add_dictionary(table, type_Int, "int dictionary?", true);
         add_dictionary(table, type_Bool, "bool dictionary");
         add_dictionary(table, type_Float, "float dictionary");
         add_dictionary(table, type_Double, "double dictionary");
@@ -314,7 +314,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
 
-        REQUIRE_PROPERTY("int dictionary", Int | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("int dictionary?", Int | PropertyType::Dictionary | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool dictionary", Bool | PropertyType::Dictionary);
         REQUIRE_PROPERTY("float dictionary", Float | PropertyType::Dictionary);
         REQUIRE_PROPERTY("double dictionary", Double | PropertyType::Dictionary);

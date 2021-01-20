@@ -297,6 +297,7 @@ size_t Dictionary::find_any(Mixed value) const
 
 Mixed Dictionary::min(size_t* return_ndx) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->min(return_ndx);
     }
@@ -307,6 +308,7 @@ Mixed Dictionary::min(size_t* return_ndx) const
 
 Mixed Dictionary::max(size_t* return_ndx) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->max(return_ndx);
     }
@@ -317,6 +319,7 @@ Mixed Dictionary::max(size_t* return_ndx) const
 
 Mixed Dictionary::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->sum(return_cnt);
     }
@@ -327,6 +330,7 @@ Mixed Dictionary::sum(size_t* return_cnt) const
 
 Mixed Dictionary::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     if (m_clusters) {
         return m_clusters->avg(return_cnt);
     }
@@ -416,32 +420,41 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
-    if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
-        if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-            throw std::runtime_error("Dictionary::insert: Wrong object type");
+    if (value.is_null()) {
+        if (!m_col_key.is_nullable()) {
+            throw LogicError(LogicError::type_mismatch);
         }
     }
-    else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-        throw LogicError(LogicError::collection_type_mismatch);
+    else {
+        if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
+            if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
+                throw std::runtime_error("Dictionary::insert: Wrong object type");
+            }
+        }
+        else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
+            throw LogicError(LogicError::type_mismatch);
+        }
     }
 
     validate_key_value(key);
     update_if_needed();
 
     ObjLink new_link;
-    if (value.get_type() == type_TypedLink) {
-        new_link = value.get<ObjLink>();
-        m_obj.get_table()->get_parent_group()->validate(new_link);
-    }
-    else if (value.get_type() == type_Link) {
-        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
-        auto key = value.get<ObjKey>();
-        if (!target_table->is_valid(key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+    if (!value.is_null()) {
+        if (value.get_type() == type_TypedLink) {
+            new_link = value.get<ObjLink>();
+            m_obj.get_table()->get_parent_group()->validate(new_link);
         }
+        else if (value.get_type() == type_Link) {
+            auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+            auto key = value.get<ObjKey>();
+            if (!target_table->is_valid(key)) {
+                throw LogicError(LogicError::target_row_index_out_of_range);
+            }
 
-        new_link = ObjLink(target_table->get_key(), key);
-        value = Mixed(new_link);
+            new_link = ObjLink(target_table->get_key(), key);
+            value = Mixed(new_link);
+        }
     }
 
     create();

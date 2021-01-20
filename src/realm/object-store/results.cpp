@@ -532,7 +532,7 @@ size_t Results::index_of(T const& value)
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any((*m_list_indices)[i]);
-            T val{};
+            T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
             }
