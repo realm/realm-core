@@ -30,7 +30,6 @@
 #include <string>
 #include <system_error>
 #include <vector>
-#include <optional>
 
 #include <external/json/json.hpp>
 
