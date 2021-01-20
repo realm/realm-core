@@ -205,6 +205,10 @@ struct Request {
     bool uses_refresh_token = false;
 };
 
+/**
+ * The content of Response.status can be Success of Failure. In case of successful Request the response should have a body (optional) and status = Success.
+ * In case of error please provide Response.error and ResponseResult::Failure is a flag for Response.status
+ */
 enum class ResponseResult { Success, Failure };
 
 /**
@@ -212,7 +216,9 @@ enum class ResponseResult { Success, Failure };
  */
 struct Response {
     /**
-     * Response result - success or failure
+     * Response result - Success or Failure
+     * In case of successful request the Response should have a value for body and Success for status.
+     * With Failure a value for error property should be set.
      */
     ResponseResult status;
 

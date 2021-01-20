@@ -77,7 +77,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
                         response.http_status_code);
     }
 
-    return {};
+    return AppError(make_error_code(ServiceErrorCode::unknown), (!response.body.empty()) ? response.body : "unexpected error");
 }
 
 } // namespace app
