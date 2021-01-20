@@ -3665,7 +3665,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     }
                     else if (request.url.find("/session") != std::string::npos &&
                              request.method == HttpMethod::post) {
-
                         CHECK(login_hit);
                         CHECK(get_profile_1_hit);
                         CHECK(!get_profile_2_hit);
