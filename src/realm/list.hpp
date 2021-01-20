@@ -123,6 +123,7 @@ public:
     void set_any(size_t ndx, Mixed val) final;
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
+    size_t find_any(Mixed val) const final;
     void resize(size_t new_size) final;
     void remove(size_t from, size_t to) final;
     void move(size_t from, size_t to) final;
@@ -292,6 +293,7 @@ public:
     void set_any(size_t ndx, Mixed val) final;
     void insert_null(size_t ndx) final;
     void insert_any(size_t ndx, Mixed val) final;
+    size_t find_any(Mixed value) const final;
     void resize(size_t new_size) final;
     void remove(size_t from, size_t to) final;
     void move(size_t from, size_t to) final;
@@ -616,24 +618,28 @@ inline size_t Lst<T>::find_first(const T& value) const
 template <class T>
 inline Mixed Lst<T>::min(size_t* return_ndx) const
 {
+    update_if_needed();
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::max(size_t* return_ndx) const
 {
+    update_if_needed();
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Lst<T>::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
@@ -684,6 +690,23 @@ inline void Lst<T>::insert_any(size_t ndx, Mixed val)
         else {
             insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
         }
+    }
+}
+
+template <class T>
+size_t Lst<T>::find_any(Mixed val) const
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        return find_first(val);
+    }
+    else {
+        if (val.is_null()) {
+            return find_first(BPlusTree<T>::default_value(m_nullable));
+        }
+        else if (val.get_type() == ColumnTypeTraits<T>::id) {
+            return find_first(val.get<typename util::RemoveOptional<T>::type>());
+        }
+        return realm::not_found;
     }
 }
 
@@ -920,6 +943,17 @@ inline void LnkLst::insert_any(size_t ndx, Mixed val)
 {
     update_if_needed();
     m_list.insert_any(virtual2real(ndx), val);
+}
+
+inline size_t LnkLst::find_any(Mixed value) const
+{
+    if (value.is_null()) {
+        return find_first(ObjKey());
+    }
+    else if (value.get_type() == type_Link) {
+        return find_first(value.get<ObjKey>());
+    }
+    return realm::not_found;
 }
 
 inline void LnkLst::resize(size_t new_size)

@@ -131,6 +131,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     config.schema = Schema{{"object",
                             {{"value", PropertyType::Int},
                              {"int_array", PropertyType::Array | PropertyType::Int},
+                             {"int_dict", PropertyType::Dictionary | PropertyType::Int},
                              {"object_array", PropertyType::Array | PropertyType::Object, "linked to object"}}},
                            {"linked to object", {{"value", PropertyType::Int}}}
 
@@ -141,7 +142,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     auto linked_table = realm->read_group().get_table("class_linked to object");
     auto value_col = table->get_column_key("value");
     auto object_link_col = table->get_column_key("object_array");
-    auto int_link_col = table->get_column_key("int_array");
+    auto int_list_col = table->get_column_key("int_array");
+    auto int_dict_col = table->get_column_key("int_dict");
     auto linked_object_value_col = linked_table->get_column_key("value");
 
     realm->begin_transaction();
@@ -149,12 +151,15 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Obj obj = table->create_object();
         obj.set(value_col, (i + 2));
         std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
-        auto int_list = List(realm, obj, int_link_col);
+        auto int_list = List(realm, obj, int_list_col);
+        object_store::Dictionary int_dict(realm, obj, int_dict_col);
         for (int j = 0; j < 5; ++j) {
             auto child_obj = linked_table->create_object();
             child_obj.set(linked_object_value_col, j + 10);
             object_link_view->add(child_obj.get_key());
             int_list.add(static_cast<Int>(j + 42));
+            std::string key = "Key" + util::to_string(j);
+            int_dict.insert(key, i);
         }
     }
     realm->commit_transaction();
@@ -184,6 +189,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
+            REQUIRE(frozen_res.get_any(0).is_null());
         });
     }
 
@@ -192,7 +198,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
             REQUIRE(obj.is_valid());
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 2);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 2);
@@ -200,7 +208,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     }
 
     SECTION("Result constructor - Primitive list") {
-        const List list = List(frozen_realm, table->get_object(0), int_link_col);
+        const List list = List(frozen_realm, table->get_object(0), int_list_col);
         auto list_results = list.as_results();
 
         Results frozen_res = list_results.freeze(frozen_realm);
@@ -218,6 +226,18 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         });
     }
 
+    SECTION("Result constructor - Dictionary") {
+        const object_store::Dictionary dict(frozen_realm, table->get_object(0), int_dict_col);
+        auto dict_results = dict.as_results();
+
+        Results frozen_res = dict_results.freeze(frozen_realm);
+        JoiningThread thread1([&] {
+            REQUIRE(frozen_res.is_frozen());
+            REQUIRE(frozen_res.size() == 5);
+            REQUIRE(frozen_res.get<Int>(0) == 0);
+        });
+    }
+
     SECTION("Result constructor - Query") {
         Query q = table->column<Int>(value_col) > 0;
         DescriptorOrdering ordering;
@@ -226,7 +246,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
             REQUIRE(obj.is_valid());
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<Int>(value_col) == 9);
             REQUIRE(frozen_res.first()->get<Int>(value_col) == 9);
@@ -242,8 +264,11 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         auto obj = query_results.get(0);
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
+            auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(frozen_res.is_frozen());
-            REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 3);
+            REQUIRE(obj.get<int64_t>(value_col) == 3);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 3);
         });
     }
@@ -256,7 +281,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
-            Object o = Object(frozen_realm, frozen_res.get(0));
+            auto any = frozen_res.get_any(0);
+            Object o = Object(frozen_realm, any.get_link());
             REQUIRE(o.is_frozen());
             REQUIRE(o.get_column_value<Int>("value") == 10);
             REQUIRE(frozen_res.get(0).get<Int>(linked_object_value_col) == 10);

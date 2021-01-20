@@ -2883,8 +2883,23 @@ struct ResultsFromLinkView {
     }
 };
 
+struct ResultsFromLinkSet {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table)
+    {
+        r->begin_transaction();
+        auto link_table = r->read_group().get_table("class_linking_object");
+        std::shared_ptr<LnkSet> link_set =
+            link_table->create_object().get_linkset_ptr(link_table->get_column_key("linkset"));
+        for (auto& o : *table) {
+            link_set->insert(o.get_key());
+        }
+        r->commit_transaction();
+        return Results(r, link_set);
+    }
+};
+
 TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2895,7 +2910,11 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -2933,7 +2952,7 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
 }
 
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2948,7 +2967,11 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -3014,7 +3037,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 }
 
 TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable, ResultsFromQuery,
-                   ResultsFromTableView, ResultsFromLinkView)
+                   ResultsFromTableView, ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -3028,7 +3051,11 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -3358,6 +3385,57 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 }
 
+TEST_CASE("results: nullable list of primitives") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema =
+        Schema{{"ListTypes",
+                {
+                    {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                    {"nullable decimal list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+                    {"non nullable decimal list", PropertyType::Array | PropertyType::Decimal},
+                    {"nullable objectid list", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
+                    {"non nullable objectid list", PropertyType::Array | PropertyType::ObjectId},
+                }}};
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_ListTypes");
+    auto nullable_decimal_col = table->get_column_key("nullable decimal list");
+    auto non_nullable_decimal_col = table->get_column_key("non nullable decimal list");
+    auto nullable_oid_col = table->get_column_key("nullable objectid list");
+    auto non_nullable_oid_col = table->get_column_key("non nullable objectid list");
+    realm->begin_transaction();
+    auto obj = table->create_object_with_primary_key(1);
+    List nullable_decimal_list(realm, obj, nullable_decimal_col);
+    List non_nullable_decimal_list(realm, obj, non_nullable_decimal_col);
+    nullable_decimal_list.add(Decimal128{realm::null()});
+    non_nullable_decimal_list.add(Decimal128{});
+    List nullable_oid_list(realm, obj, nullable_oid_col);
+    List non_nullable_oid_list(realm, obj, non_nullable_oid_col);
+    nullable_oid_list.add(util::Optional<ObjectId>{});
+    non_nullable_oid_list.add(ObjectId()); // all zeros
+    realm->commit_transaction();
+    TestContext ctx(realm);
+
+    SECTION("check property values on internal null type") {
+        Results r_nullable = nullable_decimal_list.as_results();
+        Results r_non_nullable = non_nullable_decimal_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<Decimal128>(0) == Decimal128(realm::null()));
+        CHECK(r_non_nullable.get<Decimal128>(0) == Decimal128(0));
+    }
+
+    SECTION("check property values on optional type") {
+        Results r_nullable = nullable_oid_list.as_results();
+        Results r_non_nullable = non_nullable_oid_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<util::Optional<ObjectId>>(0) == util::Optional<ObjectId>());
+        CHECK(r_non_nullable.get<ObjectId>(0) == ObjectId());
+    }
+}
+
 TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     // config.cache = false;
@@ -3482,47 +3560,6 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
         REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
-    }
-}
-
-TEST_CASE("results: query helpers", "[include]") {
-    InMemoryTestFile config;
-    config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object",
-         {
-             {"value", PropertyType::Int},
-         }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
-    };
-
-    auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    auto col = table->get_column_key("value");
-
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
-        table->create_object().set(col, (i + 2) % 4);
-    }
-    realm->commit_transaction();
-
-    Results r(realm, table);
-
-    SECTION("not valid") {
-        std::vector<StringData> paths;
-        parser::KeyPathMapping mapping;
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(!includes.is_valid());
-    }
-    SECTION("valid") {
-        std::vector<StringData> paths = {"@links.linking_object.link"};
-        parser::KeyPathMapping mapping;
-        realm::populate_keypath_mapping(mapping, *realm);
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(includes.is_valid());
-        CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
     }
 }
 

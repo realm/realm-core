@@ -40,6 +40,7 @@
 #include <realm/table_view.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/set.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -79,7 +80,12 @@ const uint16_t relaxed_sync_threshold = 50;
 //  9      Fair write transactions requires an additional condition variable,
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
-const uint_fast16_t g_shared_info_version = 10;
+// 11      New impl of InterprocessCondVar on windows.
+#ifdef _WIN32
+const uint_fast16_t g_shared_info_version = 11;
+#else
+const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anything on non-windows platforms
+#endif
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -2034,7 +2040,7 @@ void DB::finish_begin_write()
 
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
-            m_work_to_do.notify();
+            m_work_to_do.notify_all();
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
             m_room_to_write.wait(m_balancemutex, 0);
@@ -2643,6 +2649,15 @@ LstBasePtr Transaction::import_copy_of(const LstBase& original)
     return {};
 }
 
+SetBasePtr Transaction::import_copy_of(const SetBase& original)
+{
+    if (Obj obj = import_copy_of(original.get_obj())) {
+        ColKey ck = original.get_col_key();
+        return obj.get_setbase_ptr(ck);
+    }
+    return {};
+}
+
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
     if (Obj obj = import_copy_of(original.get_obj())) {
@@ -2661,6 +2676,17 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
         return obj.get_linklist_ptr(ck);
     }
     return std::make_unique<LnkLst>();
+}
+
+LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_obj())) {
+        ColKey ck = original->get_col_key();
+        return obj.get_linkset_ptr(ck);
+    }
+    return std::make_unique<LnkSet>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)

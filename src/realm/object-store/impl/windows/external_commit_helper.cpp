@@ -50,14 +50,14 @@ static std::string create_condvar_sharedmemory_name(std::string realm_path)
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     : m_parent(parent)
-    , m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()))
+    , m_shared_part(create_condvar_sharedmemory_name(parent.get_path()))
 {
     m_mutex.set_shared_part(InterprocessMutex::SharedPart(),
                             normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
                             "ExternalCommitHelper_ControlMutex");
 
     m_commit_available.set_shared_part(
-        m_condvar_shared.get(), normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+        m_shared_part->cv, normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
         "ExternalCommitHelper_CommitCondVar",
         normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().u8string()));
 
@@ -81,18 +81,25 @@ ExternalCommitHelper::~ExternalCommitHelper()
 void ExternalCommitHelper::notify_others()
 {
     std::lock_guard<InterprocessMutex> lock(m_mutex);
+    m_shared_part->num_signals++;
     m_commit_available.notify_all();
 }
 
 void ExternalCommitHelper::listen()
 {
-    std::lock_guard<InterprocessMutex> lock(m_mutex);
-    while (m_keep_listening) {
-        m_commit_available.wait(m_mutex, nullptr);
-        if (m_keep_listening) {
-            m_mutex.unlock();
-            m_parent.on_change();
-            m_mutex.lock();
-        }
+    auto lock = std::unique_lock(m_mutex);
+    auto last_count = m_shared_part->num_signals;
+    while (true) {
+        m_commit_available.wait(m_mutex, nullptr, [&] {
+            return !m_keep_listening || m_shared_part->num_signals != last_count;
+        });
+        last_count = m_shared_part->num_signals;
+
+        if (!m_keep_listening)
+            return;
+
+        lock.unlock();
+        m_parent.on_change();
+        lock.lock();
     }
 }

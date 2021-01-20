@@ -1142,7 +1142,7 @@ struct BenchmarkQueryNotChainedOrStrings : BenchmarkWithStringsTableForIn {
         query.Not();
         query.group();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         query.end_group();
         TableView results = query.find_all();
@@ -1889,7 +1889,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
 
         benchmark.after_all(group);
 
-        results.finish(ident, lead_text_ss.str());
+        results.finish(ident, lead_text_ss.str(), "runtime_secs");
     }
     std::cout << std::endl;
 }
@@ -1901,7 +1901,7 @@ extern "C" int benchmark_common_tasks_main();
 int benchmark_common_tasks_main()
 {
     std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
-    BenchmarkResults results(40, results_file_stem.c_str());
+    BenchmarkResults results(40, "benchmark-common-tasks", results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)

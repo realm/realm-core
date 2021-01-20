@@ -44,12 +44,10 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
     if (mode == PayloadPolicy::Stay)
         was_in_sync = false;
 
-    /*
     VersionID src_version =
         dynamic_cast<Transaction*>(src.m_table->get_parent_group())->get_version_of_current_transaction();
     if (src_version != tr->get_version_of_current_transaction())
-        throw realm::LogicError(LogicError::bad_version);
-    */
+        was_in_sync = false;
 
     if (was_in_sync)
         m_last_seen_versions = get_dependency_versions();
@@ -57,6 +55,7 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
         m_last_seen_versions.clear();
     m_table = tr->import_copy_of(src.m_table);
     m_linklist_source = tr->import_copy_of(src.m_linklist_source);
+    m_linkset_source = tr->import_copy_of(src.m_linkset_source);
     if (src.m_source_column_key) {
         m_linked_table = tr->import_copy_of(src.m_linked_table);
     }
@@ -117,12 +116,12 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 
     // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
 
-/*
-    const ArrType* arrp = nullptr;
-    size_t leaf_start = 0;
-    size_t leaf_end = 0;
-    size_t row_ndx;
-*/
+    /*
+        const ArrType* arrp = nullptr;
+        size_t leaf_start = 0;
+        size_t leaf_end = 0;
+        size_t row_ndx;
+    */
     R res = R{};
     bool is_first = true;
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
@@ -134,15 +133,15 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
             continue;
 
         // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
-/*
-        if (row_ndx < leaf_start || row_ndx >= leaf_end) {
-            size_t ndx_in_leaf;
-            typename ColType::LeafInfo leaf{&arrp, &arr};
-            column->get_leaf(row_ndx, ndx_in_leaf, leaf);
-            leaf_start = row_ndx - ndx_in_leaf;
-            leaf_end = leaf_start + arrp->size();
-        }
-*/
+        /*
+                if (row_ndx < leaf_start || row_ndx >= leaf_end) {
+                    size_t ndx_in_leaf;
+                    typename ColType::LeafInfo leaf{&arrp, &arr};
+                    column->get_leaf(row_ndx, ndx_in_leaf, leaf);
+                    leaf_start = row_ndx - ndx_in_leaf;
+                    leaf_end = leaf_start + arrp->size();
+                }
+        */
         // aggregation must be robust in the face of stale keys:
         if (!m_table->is_valid(key))
             continue;
@@ -406,6 +405,9 @@ bool ConstTableView::depends_on_deleted_object() const
     if (m_linklist_source && !m_linklist_source->is_attached()) {
         return true;
     }
+    if (m_linkset_source && !m_linkset_source->is_attached()) {
+        return true;
+    }
 
     if (m_source_column_key && !(m_linked_table && m_linked_table->is_valid(m_linked_obj_key))) {
         return true;
@@ -422,6 +424,13 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
             Table& table = *m_linklist_source->get_target_table();
+            ret.emplace_back(table.get_key(), table.get_content_version());
+        }
+    }
+    else if (m_linkset_source) {
+        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
+        if (m_linkset_source->is_attached()) {
+            Table& table = *m_linkset_source->get_target_table();
             ret.emplace_back(table.get_key(), table.get_content_version());
         }
     }
@@ -538,17 +547,6 @@ void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ord
     do_sync();
 }
 
-void ConstTableView::include(IncludeDescriptor include_paths)
-{
-    m_descriptor_ordering.append_include(std::move(include_paths));
-    do_sync();
-}
-
-IncludeDescriptor ConstTableView::get_include_descriptors()
-{
-    return m_descriptor_ordering.compile_included_backlinks();
-}
-
 std::string ConstTableView::get_descriptor_ordering_description() const
 {
     return m_descriptor_ordering.get_description(m_table);
@@ -583,8 +581,15 @@ void ConstTableView::do_sync()
 
     if (m_linklist_source) {
         m_key_values.clear();
-        std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
-                      [this](ObjKey key) { m_key_values.add(key); });
+        std::for_each(m_linklist_source->begin(), m_linklist_source->end(), [this](ObjKey key) {
+            m_key_values.add(key);
+        });
+    }
+    else if (m_linkset_source) {
+        m_key_values.clear();
+        std::for_each(m_linkset_source->begin(), m_linkset_source->end(), [this](ObjKey key) {
+            m_key_values.add(key);
+        });
     }
     else if (m_source_column_key) {
         m_key_values.clear();
@@ -675,6 +680,9 @@ bool ConstTableView::is_in_table_order() const
         return false;
     }
     else if (m_linklist_source) {
+        return false;
+    }
+    else if (m_linkset_source) {
         return false;
     }
     else if (m_source_column_key) {

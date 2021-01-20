@@ -321,6 +321,19 @@ OutputIt safe_copy_n(InputIt first, Size count, OutputIt result)
 #endif
 }
 
+// Converts ascii c-locale uppercase characters to lower case,
+// leaves other char values unchanged.
+inline char toLowerAscii(char c)
+{
+    if (isascii(c) && isupper(c)) {
+#if REALM_ANDROID
+        return tolower(c); // _tolower is not supported on all ABI levels
+#else
+        return _tolower(c);
+#endif
+    }
+    return c;
+}
 
 template <class T>
 struct Wrap {

@@ -123,7 +123,6 @@ struct GlobalKey {
     ObjKey get_local_key(uint64_t sync_file_id)
     {
         REALM_ASSERT(m_hi <= 0x3fffffff);
-        REALM_ASSERT(lo() <= std::numeric_limits<uint32_t>::max());
 
         auto high = m_hi;
         if (high == sync_file_id)

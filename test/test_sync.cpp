@@ -7965,6 +7965,7 @@ TEST(Sync_Dictionary)
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
+        auto col_dict_str = foos->add_column_dictionary(type_String, "str_dict", true);
 
         auto foo = foos->create_object_with_primary_key(123);
 
@@ -7972,6 +7973,10 @@ TEST(Sync_Dictionary)
         dict.insert("hello", "world");
         dict.insert("cnt", 7);
         dict.insert("when", now);
+
+        auto dict_str = foo.get_dictionary(col_dict_str);
+        dict_str.insert("some", "text");
+        dict_str.insert("nothing", null());
 
         session_1.nonsync_transact_notify(tr.commit());
     }
@@ -7991,6 +7996,12 @@ TEST(Sync_Dictionary)
         auto dict = it->get_dictionary(foos->get_column_key("dict"));
         CHECK(dict.get_value_data_type() == type_Mixed);
         CHECK_EQUAL(dict.size(), 3);
+
+        auto col_dict_str = foos->get_column_key("str_dict");
+        auto dict_str = it->get_dictionary(col_dict_str);
+        CHECK(col_dict_str.is_nullable());
+        CHECK(dict_str.get_value_data_type() == type_String);
+        CHECK_EQUAL(dict_str.size(), 2);
 
         Mixed val = dict["hello"];
         CHECK_EQUAL(val.get_string(), "world");
@@ -8031,16 +8042,19 @@ TEST(Sync_Dictionary)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction tr{db_2};
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
         // tr.get_group().to_json(std::cout);
 
-        auto foos = tr.get_table("class_Foo");
+        auto foos = read_2.get_table("class_Foo");
 
         CHECK_EQUAL(foos->size(), 1);
 
         auto it = foos->begin();
         auto dict = it->get_dictionary(foos->get_column_key("dict"));
         CHECK_EQUAL(dict.size(), 0);
+
+        CHECK(compare_groups(read_1, read_2));
     }
 }
 
@@ -8073,7 +8087,7 @@ TEST(Sync_Dictionary_Links)
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-        col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+        col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
         auto foo = foos->create_object_with_primary_key(123);
         auto a = bars->create_object_with_primary_key("a");

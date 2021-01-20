@@ -36,7 +36,7 @@ fi
 if [ "$OS" = "Windows_NT" ]; then
     PREFIX=$(cygpath -ma $PREFIX)
 else
-    PREFIX=$($BASE_PATH/realpath.sh $PREFIX)
+    PREFIX=$($BASE_PATH/abspath.sh $PREFIX)
 fi
 
 BUILD_CONFIG=${BUILD_CONFIG:=Debug}

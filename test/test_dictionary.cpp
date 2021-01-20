@@ -91,6 +91,7 @@ TEST(Dictionary_Basics)
         CHECK(dict.insert("Hello", 9).second);
         CHECK_EQUAL(dict.size(), 1);
         CHECK_EQUAL(dict.get("Hello").get_int(), 9);
+        CHECK(dict.contains("Hello"));
         CHECK_NOT(dict.insert("Hello", 10).second);
         CHECK_EQUAL(dict.get("Hello").get_int(), 10);
         dict.insert("Goodbye", "cruel world");
@@ -98,6 +99,8 @@ TEST(Dictionary_Basics)
         CHECK_EQUAL(dict["Goodbye"].get_string(), "cruel world");
         CHECK_THROW_ANY(dict.get("Baa").get_string()); // Within range
         CHECK_THROW_ANY(dict.get("Foo").get_string()); // Outside range
+        CHECK_THROW_ANY(dict.insert("$foo", ""));      // Must not start with '$'
+        CHECK_THROW_ANY(dict.insert("foo.bar", ""));   // Must not contain '.'
     }
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
@@ -117,6 +120,10 @@ TEST(Dictionary_Basics)
         // Check that you can insert after clear
         CHECK(dict.insert("Hello", 9).second);
         CHECK_EQUAL(dict.size(), 1);
+        dict.erase("Hello");
+        CHECK_EQUAL(dict.size(), 0);
+        CHECK_THROW_ANY(dict.erase("$foo"));    // Must not start with '$'
+        CHECK_THROW_ANY(dict.erase("foo.bar")); // Must not contain '.'
     }
     {
         Dictionary dict = obj2.get_dictionary(col_dict);
@@ -212,6 +219,25 @@ TEST(Dictionary_TypedLinks)
     }
 }
 
+TEST(Dictionary_Clear)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict_typed = persons->add_column_dictionary(type_TypedLink, "typed");
+    auto col_dict_implicit = persons->add_column_dictionary(*dogs, "implicit");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+
+    adam.get_dictionary(col_dict_typed).insert("Dog1", pluto);
+    adam.get_dictionary(col_dict_implicit).insert("DOg2", lady.get_key());
+
+    persons->clear();
+    g.verify();
+}
+
 TEST(Dictionary_Transaction)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -273,9 +299,12 @@ TEST(Dictionary_Transaction)
 
 TEST(Dictionary_Aggregate)
 {
-    Group g;
-    auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    auto tr = db->start_write();
+    auto foo = tr->add_table("foo");
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -284,7 +313,7 @@ TEST(Dictionary_Aggregate)
     std::shuffle(random_idx.begin(), random_idx.end(), std::mt19937(unit_test_random_seed));
 
     for (int i = 0; i < 100; i++) {
-        dict.insert(i, random_idx[i]);
+        dict.insert(util::to_string(i), random_idx[i]);
     }
 
     std::vector<size_t> indices;
@@ -295,15 +324,14 @@ TEST(Dictionary_Aggregate)
         CHECK_GREATER(val, last);
         last = val;
     }
+    tr->commit_and_continue_as_read();
 
     size_t ndx;
     auto max = dict.max(&ndx);
     CHECK_EQUAL(max.get_int(), 99);
-    CHECK_EQUAL(random_idx[ndx], 99);
 
     auto min = dict.min(&ndx);
     CHECK_EQUAL(min.get_int(), 0);
-    CHECK_EQUAL(random_idx[ndx], 0);
 
     size_t cnt;
     auto sum = dict.sum(&cnt);
@@ -321,7 +349,7 @@ TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false, type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -355,7 +383,7 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
     auto foo = foos->create_object_with_primary_key(123);
     auto a = bars->create_object_with_primary_key("a");

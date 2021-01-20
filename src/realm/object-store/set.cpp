@@ -47,6 +47,15 @@ Set::Set(std::shared_ptr<Realm> r, const SetBase& set)
 {
 }
 
+Query Set::get_query() const
+{
+    verify_attached();
+    if (m_type == PropertyType::Object) {
+        return static_cast<LnkSet&>(*m_set_base).get_target_table()->where(as<Obj>());
+    }
+    throw std::runtime_error("not implemented");
+}
+
 ConstTableRef Set::get_target_table() const
 {
     auto table = m_set_base->get_table();
@@ -61,6 +70,16 @@ size_t Set::find(const T& value) const
 {
     verify_attached();
     return as<T>().find(value);
+}
+
+size_t Set::find(Query&& q) const
+{
+    verify_attached();
+    if (m_type == PropertyType::Object) {
+        ObjKey key = get_query().and_query(std::move(q)).find();
+        return key ? as<Obj>().find_first(key) : not_found;
+    }
+    throw std::runtime_error("not implemented");
 }
 
 template <typename T>
@@ -137,9 +156,11 @@ util::Optional<Mixed> Set::average(ColKey col) const
     return count == 0 ? none : util::make_optional(result);
 }
 
-bool Set::operator==(const Set&) const noexcept
+bool Set::operator==(const Set& rgt) const noexcept
 {
-    REALM_TERMINATE("Not implemented yet");
+    return m_set_base->get_table() == rgt.m_set_base->get_table() &&
+           m_set_base->get_key() == rgt.m_set_base->get_key() &&
+           m_set_base->get_col_key() == rgt.m_set_base->get_col_key();
 }
 
 Results Set::snapshot() const
@@ -151,9 +172,7 @@ Results Set::sort(SortDescriptor order) const
 {
     verify_attached();
     if ((m_type == PropertyType::Object)) {
-        REALM_TERMINATE("Not implemented yet");
-        //        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none,
-        //        std::move(order));
+        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none, std::move(order));
     }
     else {
         DescriptorOrdering o;
@@ -169,16 +188,13 @@ Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) con
 
 Results Set::filter(Query q) const
 {
-    static_cast<void>(q);
-    REALM_TERMINATE("Not implemented yet");
-    return {};
+    verify_attached();
+    return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), get_query().and_query(std::move(q)));
 }
 
-Set Set::freeze(const std::shared_ptr<Realm>& realm) const
+Set Set::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    static_cast<void>(realm);
-    REALM_TERMINATE("Not implemented yet");
-    return *this;
+    return Set(frozen_realm, *frozen_realm->import_copy_of(*m_set_base));
 }
 
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
@@ -231,6 +247,38 @@ std::pair<size_t, bool> Set::remove<int>(const int& value)
     return remove(int64_t(value));
 }
 
+std::pair<size_t, bool> Set::insert_any(Mixed value)
+{
+    verify_in_transaction();
+    return m_set_base->insert_any(value);
+}
+
+Mixed Set::get_any(size_t ndx) const
+{
+    verify_valid_row(ndx);
+    return m_set_base->get_any(ndx);
+}
+
+std::pair<size_t, bool> Set::remove_any(Mixed value)
+{
+    verify_in_transaction();
+    return m_set_base->erase_any(value);
+}
+
+size_t Set::find_any(Mixed value) const
+{
+    return m_set_base->find_any(value);
+}
+
+void Set::delete_all()
+{
+    verify_in_transaction();
+    if (m_type == PropertyType::Object)
+        as<Obj>().remove_all_target_rows();
+    else
+        m_set_base->clear();
+}
+
 void Set::remove_all()
 {
     verify_in_transaction();
@@ -278,4 +326,68 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
     return as<ObjKey>().insert(obj.get_key());
 }
 
+bool Set::is_subset_of(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+bool Set::is_superset_of(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+bool Set::intersects(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_intersection(const Set& rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_union(const Set& rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_difference(const Set& rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
 } // namespace realm::object_store
+
+namespace {
+size_t hash_combine()
+{
+    return 0;
+}
+template <typename T, typename... Rest>
+size_t hash_combine(const T& v, Rest... rest)
+{
+    size_t h = hash_combine(rest...);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    return h;
+}
+} // namespace
+
+namespace std {
+size_t hash<realm::object_store::Set>::operator()(realm::object_store::Set const& set) const
+{
+    auto& impl = *set.m_set_base;
+    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+}
+} // namespace std

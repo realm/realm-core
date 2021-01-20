@@ -44,7 +44,7 @@ def get_loc(directory, recursive=True, exclusions=()):
 
 
 def get_lines_of_code(rootSourceDir):
-    exclude_dirs = ("src/external/pegtl", "src/win32/kalven-sha2")
+    exclude_dirs = ("src/realm/parser/generated", "src/win32/kalven-sha2")
     src_loc = get_loc(os.path.join(rootSourceDir, "src"), recursive=True, exclusions=exclude_dirs)
     print("Lines of source code: %s" % src_loc)
     return src_loc

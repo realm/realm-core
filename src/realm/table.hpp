@@ -60,6 +60,7 @@ class SubQuery;
 class ColKeys;
 struct GlobalKey;
 class LinkChain;
+class Subexpr;
 
 struct Link {
 };
@@ -72,12 +73,17 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
-namespace query_builder {
+namespace query_parser {
 class Arguments;
-}
-namespace parser {
 class KeyPathMapping;
-}
+class ParserDriver;
+} // namespace query_parser
+
+enum class ExpressionComparisonType : unsigned char {
+    Any,
+    All,
+    None,
+};
 
 class Table {
 public:
@@ -142,7 +148,8 @@ public:
     ColKey add_column_list(Table& target, StringData name);
     ColKey add_column_set(DataType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String);
     ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
@@ -196,7 +203,7 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key) const; // FIXME: Should this one have been declared noexcept?
+    Columns<T> column(ColKey col_key, ExpressionComparisonType = ExpressionComparisonType::Any) const;
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
@@ -339,7 +346,7 @@ public:
     size_t get_index_in_group() const noexcept;
     TableKey get_key() const noexcept;
 
-    uint64_t allocate_sequence_number();
+    uint32_t allocate_sequence_number();
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
@@ -528,9 +535,17 @@ public:
         return Query(m_own_ref, list);
     }
 
+    // Perform queries on a LnkSet. The returned Query holds a reference to set.
+    Query where(const LnkSet& set) const
+    {
+        return Query(m_own_ref, set);
+    }
+
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
-    Query query(const std::string& query_string, query_builder::Arguments& arguments,
-                const parser::KeyPathMapping&) const;
+    Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                const query_parser::KeyPathMapping& mapping) const;
+    Query query(const std::string& query_string, query_parser::Arguments& arguments,
+                const query_parser::KeyPathMapping&) const;
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
@@ -906,30 +921,39 @@ private:
     const Table* m_table;
 };
 
-enum class ExpressionComparisonType : unsigned char {
-    Any,
-    All,
-    None,
-};
-
 // Class used to collect a chain of links when building up a Query following links.
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t, ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_current_table(t.unchecked_ptr())
+    LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
     {
     }
-    const Table* get_base_table()
+    ConstTableRef get_base_table()
     {
-        return m_base_table.unchecked_ptr();
+        return m_base_table;
+    }
+
+    ConstTableRef get_current_table() const
+    {
+        return m_current_table;
     }
 
     LinkChain& link(ColKey link_column)
     {
         add(link_column);
+        return *this;
+    }
+
+    LinkChain& link(std::string col_name)
+    {
+        auto ck = m_current_table->get_column_key(col_name);
+        if (!ck) {
+            throw std::runtime_error(util::format("%1 has no property %2", m_current_table->get_name(), col_name));
+        }
+        add(ck);
         return *this;
     }
 
@@ -939,6 +963,8 @@ public:
         return link(backlink_col_key);
     }
 
+    Subexpr* column(const std::string&);
+    Subexpr* subquery(Query subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -997,25 +1023,19 @@ public:
 
 private:
     friend class Table;
+    friend class query_parser::ParserDriver;
 
     std::vector<ColKey> m_link_cols;
-    const Table* m_current_table;
+    ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
-    void add(ColKey ck)
+    void add(ColKey ck);
+
+    template <class T>
+    Subexpr* create_subexpr(ColKey col_key)
     {
-        // Link column can be a single Link, LinkList, or BackLink.
-        REALM_ASSERT(m_current_table->valid_column(ck));
-        ColumnType type = ck.get_type();
-        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
-        }
-        else {
-            // Only last column in link chain is allowed to be non-link
-            throw(LogicError::type_mismatch);
-        }
-        m_link_cols.push_back(ck);
+        return new Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
 };
 
@@ -1175,9 +1195,9 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key) const
+inline Columns<T> Table::column(ColKey col_key, ExpressionComparisonType cmp_type) const
 {
-    LinkChain lc(m_own_ref);
+    LinkChain lc(m_own_ref, cmp_type);
     return lc.column<T>(col_key);
 }
 

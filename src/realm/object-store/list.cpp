@@ -18,8 +18,6 @@
 
 #include <realm/object-store/list.hpp>
 
-#include <realm/object-store/impl/list_notifier.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
@@ -68,9 +66,14 @@ List::List(std::shared_ptr<Realm> r, const LstBase& list)
 
 Query List::get_query() const
 {
+    return get_table()->where(as<Obj>());
+}
+
+ConstTableRef List::get_table() const
+{
     verify_attached();
     if (m_type == PropertyType::Object)
-        return static_cast<LnkLst&>(*m_list_base).get_target_table()->where(as<Obj>());
+        return m_list_base->get_target_table();
     throw std::runtime_error("not implemented");
 }
 
@@ -184,6 +187,31 @@ void List::set(size_t row_ndx, T value)
     verify_valid_row(row_ndx);
     //    validate(row);
     as<T>().set(row_ndx, value);
+}
+
+void List::insert_any(size_t row_ndx, Mixed value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx, true);
+    m_list_base->insert_any(row_ndx, value);
+}
+
+void List::set_any(size_t row_ndx, Mixed value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx);
+    m_list_base->set_any(row_ndx, value);
+}
+
+Mixed List::get_any(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    return m_list_base->get_any(row_ndx);
+}
+
+size_t List::find_any(Mixed value) const
+{
+    return m_list_base->find_any(value);
 }
 
 template <>
@@ -391,25 +419,6 @@ bool List::operator==(List const& rgt) const noexcept
     return m_list_base->get_table() == rgt.m_list_base->get_table() &&
            m_list_base->get_key() == rgt.m_list_base->get_key() &&
            m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
-}
-
-NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
-{
-    verify_attached();
-    m_realm->verify_notifications_available();
-    // Adding a new callback to a notifier which had all of its callbacks
-    // removed does not properly reinitialize the notifier. Work around this by
-    // recreating it instead.
-    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
-    // from a notifier a zombie is left sitting around uselessly) and should be
-    // cleaned up.
-    if (m_notifier && !m_notifier->have_callbacks())
-        m_notifier.reset();
-    if (!m_notifier) {
-        m_notifier = std::make_shared<ListNotifier>(m_realm, *m_list_base, m_type);
-        RealmCoordinator::register_notifier(m_notifier);
-    }
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
 List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const

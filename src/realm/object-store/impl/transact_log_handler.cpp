@@ -73,7 +73,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            if (table->get_column_attr(key).test(col_attr_List))
+            if (table->get_column_attr(key).test(col_attr_Collection))
                 m_lists.push_back({&observer, {}, key});
         }
     }
@@ -287,11 +287,11 @@ public:
     {
         return true;
     }
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -447,6 +447,19 @@ public:
     {
         if (m_active_collection)
             m_active_collection->clear(old_size);
+        return true;
+    }
+    bool dictionary_insert(size_t index, Mixed)
+    {
+        if (m_active_collection) {
+            m_active_collection->insert(index);
+        }
+        return true;
+    }
+    bool dictionary_erase(size_t index, Mixed)
+    {
+        if (m_active_collection)
+            m_active_collection->erase(index);
         return true;
     }
 

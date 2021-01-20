@@ -23,17 +23,17 @@
 
 #include <realm/object-store/property.hpp>
 
-#include <realm/list.hpp>
+#include <realm/collection.hpp>
 
 namespace realm {
 namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
-    ListNotifier(std::shared_ptr<Realm> realm, LstBase const& list, PropertyType type);
+    ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type);
 
 private:
     PropertyType m_type;
-    std::unique_ptr<LstBase> m_list;
+    std::unique_ptr<CollectionBase> m_list;
 
     TableKey m_table;
     ColKey m_col;

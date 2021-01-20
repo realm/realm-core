@@ -45,6 +45,7 @@ set(REALM_SOURCES
     global_key.cpp
     query_engine.cpp
     query_expression.cpp
+    query_value.cpp
     replication.cpp
     set.cpp
     spec.cpp
@@ -66,6 +67,7 @@ set(UTIL_SOURCES
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
+    util/cli_args.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp
@@ -165,6 +167,7 @@ set(REALM_INSTALL_HEADERS
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
+    query_value.hpp
     realm_nmmintrin.h
     replication.hpp
     set.hpp
@@ -331,6 +334,6 @@ add_subdirectory(object-store)
 if (REALM_ENABLE_SYNC)
     add_subdirectory(sync)
 endif()
-if(NOT REALM_BUILD_LIB_ONLY)
+if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
 endif()

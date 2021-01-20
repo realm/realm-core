@@ -469,8 +469,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
         case col_type_TypedLink:
         case col_type_BackLink:
         case col_type_LinkList:
-        case col_type_OldDateTime:
-        case col_type_OldTable:
             break;
     };
     REALM_UNREACHABLE();
@@ -552,13 +550,11 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_OldTable:
         case col_type_Link:
         case col_type_BackLink:
-        case col_type_OldDateTime:
-            REALM_ASSERT(false);
+            break;
     }
-    return 0;
+    REALM_TERMINATE("Unsupported column type.");
 }
 
 } // namespace realm
@@ -697,7 +693,7 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 }
 
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
-: m_expression(std::move(expression))
+    : m_expression(std::move(expression))
 {
     m_dT = 50.0;
 }

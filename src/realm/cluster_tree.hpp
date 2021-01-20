@@ -58,6 +58,9 @@ public:
     {
         return m_size;
     }
+
+    static size_t size_from_ref(ref_type, Allocator& alloc);
+
     void destroy()
     {
         m_root->destroy_deep();
@@ -192,10 +195,6 @@ public:
 
     Iterator& operator+=(ptrdiff_t adj);
 
-    Iterator operator+(ptrdiff_t adj)
-    {
-        return Iterator(m_tree, get_position() + adj);
-    }
     bool operator==(const Iterator& rhs) const
     {
         return m_key == rhs.m_key;

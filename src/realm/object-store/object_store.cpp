@@ -136,7 +136,8 @@ ColKey add_column(Group& group, Table& table, Property const& property)
                                     is_nullable(property.type));
     }
     else if (is_dictionary(property.type)) {
-        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name);
+        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name,
+                                           is_nullable(property.type));
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));

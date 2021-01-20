@@ -981,7 +981,7 @@ TEST(Transform_Randomized)
 
     // FIXME: Unfortunately these rounds are terribly slow, presumable due to
     // sync-to-disk. Can we use "in memory" mode too boost them?
-    int num_major_rounds = 1;
+    int num_major_rounds = 100;
     int num_minor_rounds = 1;
 
     Random random(unit_test_random_seed); // Seed from slow global generator

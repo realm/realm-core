@@ -98,30 +98,32 @@ void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, si
 
 /******************************** Dictionary *********************************/
 
-bool TransactLogEncoder::dictionary_insert(Mixed key)
+bool TransactLogEncoder::dictionary_insert(size_t dict_ndx, Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);
     append_string_instr(instr_DictionaryInsert, key.get_string()); // Throws
+    append_simple_instr(dict_ndx);
     return true;
 }
 
-void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed)
+void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed)
 {
     select_collection(dict);
-    m_encoder.dictionary_insert(key);
+    m_encoder.dictionary_insert(ndx, key);
 }
 
-bool TransactLogEncoder::dictionary_erase(Mixed key)
+bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);
     append_string_instr(instr_DictionaryErase, key.get_string()); // Throws
+    append_simple_instr(ndx);
     return true;
 }
 
-void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, Mixed key)
+void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
     select_collection(dict);
-    m_encoder.dictionary_insert(key);
+    m_encoder.dictionary_erase(ndx, key);
 }
 
 REALM_NORETURN

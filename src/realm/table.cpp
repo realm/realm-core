@@ -25,6 +25,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -294,7 +295,7 @@ const char* get_data_type_name(DataType type) noexcept
         case type_Timestamp:
             return "timestamp";
         case type_ObjectId:
-            return "ObjectId";
+            return "objectId";
         case type_Decimal:
             return "decimal128";
         case type_UUID:
@@ -305,16 +306,35 @@ const char* get_data_type_name(DataType type) noexcept
             return "link";
         case type_LinkList:
             return "linklist";
-        case type_OldTable:
-            return "oldTable";
-        case type_OldDateTime:
-            return "oldDateTime";
         case type_TypedLink:
             return "typedLink";
+        default:
+            if (type == type_TypeOfValue)
+                return "@type";
     }
     return "unknown";
 }
 } // namespace realm
+
+void LinkChain::add(ColKey ck)
+{
+    // Link column can be a single Link, LinkList, or BackLink.
+    REALM_ASSERT(m_current_table->valid_column(ck));
+    ColumnType type = ck.get_type();
+    if (ck.is_dictionary()) {
+    }
+    else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+        m_current_table = m_current_table->get_opposite_table(ck);
+    }
+    else {
+        // Only last column in link chain is allowed to be non-link
+        throw std::runtime_error(util::format("%1.%2 is not a link column",
+                                              util::serializer::get_printable_table_name(m_current_table->get_name()),
+                                              m_current_table->get_column_name(ck)));
+    }
+    m_link_cols.push_back(ck);
+}
+
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -425,11 +445,13 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key_type)
+ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullable, DataType key_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
@@ -1612,7 +1634,6 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     /*************************** Create objects ******************************/
 
-    int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
     ColKey orig_row_ndx_col;
@@ -1645,13 +1666,16 @@ bool Table::migrate_objects(ColKey pk_col_key)
             // Generate key from pk value
             GlobalKey object_id{pk_val};
             obj_key = global_to_local_object_id_hashed(object_id);
+            // Check for collision
+            if (is_valid(obj_key)) {
+                Obj existing_obj = m_clusters.get(obj_key);
+                auto existing_pk_value = existing_obj.get_any(pk_col_key);
+                GlobalKey existing_id{existing_pk_value};
+                obj_key = allocate_local_id_after_hash_collision(object_id, existing_id, obj_key);
+            }
         }
         else {
             obj_key = ObjKey(row_ndx);
-        }
-
-        if (obj_key.value > max_key_value) {
-            max_key_value = obj_key.value;
         }
 
         // Create object with the initial values
@@ -1706,13 +1730,15 @@ bool Table::migrate_objects(ColKey pk_col_key)
         col_refs.set(ndx, 0);
     }
 
-    // We need to be sure that the stored 'next sequence number' is bigger than
-    // the biggest ObjKey currently used.
-    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
-    uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
-    if (uint64_t(max_key_value) >= sn) {
-        rot = RefOrTagged::make_tagged(max_key_value + 1);
-        m_top.set(top_position_for_sequence_number, rot);
+    if (pk_col_key) {
+        // If we have a primary key column, the sequence number is used to generate unique
+        // keys after collision and must not be updated here.
+    }
+    else {
+        // We need to be sure that the stored 'next sequence number' is bigger than
+        // the biggest ObjKey currently used.
+        auto max_key_value = m_clusters.get_last_key_value();
+        this->set_sequence_number(uint64_t(max_key_value + 1));
     }
 
 #if 0
@@ -2014,14 +2040,14 @@ size_t Table::get_index_in_group() const noexcept
     return m_top.get_ndx_in_parent();
 }
 
-uint64_t Table::allocate_sequence_number()
+uint32_t Table::allocate_sequence_number()
 {
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
     uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
     rot = RefOrTagged::make_tagged(sn + 1);
     m_top.set(top_position_for_sequence_number, rot);
 
-    return sn;
+    return uint32_t(sn);
 }
 
 void Table::set_sequence_number(uint64_t seq)
@@ -3240,7 +3266,7 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
         ++num_entries;
     };
 
-    uint64_t sequence_number_for_local_id = allocate_sequence_number();
+    auto sequence_number_for_local_id = allocate_sequence_number();
     ObjKey new_local_id = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
     insert_collision(incoming_id, new_local_id);
     insert_collision(colliding_id, colliding_local_id);
@@ -3445,8 +3471,8 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
-    noexcept
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
+                                                  StringData origin_col_name) const noexcept
 {
     BacklinkOrigin ret;
     auto f = [&](ColKey backlink_col_key) {
@@ -3546,7 +3572,7 @@ void Table::rebuild_table_with_pk_column()
             // new PK column.
             // Create temporary object to hold the values of the current object,
             // and then we'll move the object to its final key in a second pass.
-            uint64_t sequence_number_for_local_id = allocate_sequence_number();
+            auto sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
             auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
@@ -3773,9 +3799,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_TypedLink:
             case type_LinkList:
                 // Can't have lists of these types
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
@@ -3833,9 +3857,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 // Always nullable, so can't convert
             case type_LinkList:
                 // Never nullable, so can't convert
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;

@@ -48,6 +48,8 @@ public:
     Set(Set&&);
     Set& operator=(Set&&);
 
+    Query get_query() const;
+
     template <class T>
     size_t find(const T&) const;
     template <class T>
@@ -57,12 +59,22 @@ public:
 
     template <class T, class Context>
     size_t find(Context&, const T&) const;
+
+    // Find the index in the Set of the first row matching the query
+    size_t find(Query&& query) const;
+
     template <class T, class Context>
     std::pair<size_t, bool> insert(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
 
+    std::pair<size_t, bool> insert_any(Mixed value);
+    Mixed get_any(size_t ndx) const final;
+    std::pair<size_t, bool> remove_any(Mixed value);
+    size_t find_any(Mixed value) const final;
+
     void remove_all();
+    void delete_all();
 
     // Replace the values in this set with the values from an enumerable object
     template <typename T, typename Context>
@@ -90,6 +102,14 @@ public:
     util::Optional<Mixed> min(ColKey column = {}) const;
     util::Optional<Mixed> average(ColKey column = {}) const;
     Mixed sum(ColKey column = {}) const;
+
+    bool is_subset_of(const Set& rhs) const;
+    bool is_superset_of(const Set& rhs) const;
+    bool intersects(const Set& rhs) const;
+
+    void assign_intersection(const Set& rhs);
+    void assign_union(const Set& rhs);
+    void assign_difference(const Set& rhs);
 
     bool operator==(const Set& rhs) const noexcept;
 
@@ -197,5 +217,12 @@ void Set::assign(Context& ctx, T&& values, CreatePolicy policy)
 
 } // namespace object_store
 } // namespace realm
+
+namespace std {
+template <>
+struct hash<realm::object_store::Set> {
+    size_t operator()(realm::object_store::Set const&) const;
+};
+} // namespace std
 
 #endif // REALM_OS_SET_HPP
