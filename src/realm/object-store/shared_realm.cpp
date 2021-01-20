@@ -330,10 +330,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
     uint64_t validation_mode = SchemaValidationMode::validate_basic;
-    validation_mode |= (m_config.sync_config ? SchemaValidationMode::validate_for_sync : 0);
-    validation_mode |=
-        (m_config.schema_mode == SchemaMode::AdditiveExplicit ? SchemaValidationMode::validate_no_embedded_orphans
-                                                              : 0);
+    if (m_config.sync_config) {
+        validation_mode |= SchemaValidationMode::validate_for_sync;
+    }
+    if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
+        validation_mode |= SchemaValidationMode::validate_no_embedded_orphans;
+    }
 
     schema.validate(validation_mode);
 
