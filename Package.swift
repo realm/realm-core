@@ -172,7 +172,7 @@ let package = Package(
             ]),
         .target(
             name: "ObjectStore",
-            dependencies: ["SyncClient", "QueryParser"],
+            dependencies: ["SyncClient"],
             path: "src",
             exclude: [
                 "realm/object-store/impl/epoll",
@@ -189,7 +189,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "Capi",
-            dependencies: ["ObjectStore"],
+            dependencies: ["ObjectStore", "QueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -207,7 +207,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "SyncServer"],
+            dependencies: ["ObjectStore", "SyncServer", "QueryParser"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
