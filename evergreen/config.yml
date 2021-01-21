@@ -283,7 +283,13 @@ tasks:
 
         export PATH=$(./evergreen/abspath.sh ./clang_binaries/bin):$PATH
 
-        readonly out=$(git clang-format -v --diff ${revision})
+        if [[ "${is_patch}" == "true" ]]; then
+            format_ref="$(git merge-base origin/${branch_name} HEAD)"
+        else
+            format_ref="${revision}"
+        fi
+
+        readonly out=$(git clang-format -v --diff $format_ref)
 
         if [[ "$out" == *"no modified files to format"* ]]; then
             exit 0
