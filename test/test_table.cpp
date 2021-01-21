@@ -5904,4 +5904,18 @@ TEST(Table_AsymmetricObjects)
     tr->commit();
 }
 
+TEST(Table_FullTextIndex)
+{
+    Table t;
+    auto col = t.add_column(type_String, "str");
+    t.add_search_index(col, true);
+
+    t.create_object().set(col, "This is a test, with  spaces!");
+    t.create_object().set(col, "More testing, with normal spaces");
+    t.create_object().set(col, "ål, ø og æbler");
+
+    TableView res = t.find_all_fulltext(col, "spaces with");
+    CHECK_EQUAL(2, res.size());
+}
+
 #endif // TEST_TABLE

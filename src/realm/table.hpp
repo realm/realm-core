@@ -199,7 +199,7 @@ public:
     /// \param col_key The key of a column of the table.
 
     bool has_search_index(ColKey col_key) const noexcept;
-    void add_search_index(ColKey col_key);
+    void add_search_index(ColKey col_key, bool fulltext = false);
     void remove_search_index(ColKey col_key);
 
     void enumerate_string_column(ColKey col_key);
@@ -442,6 +442,8 @@ public:
     TableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     TableView find_all_null(ColKey col_key) const;
+
+    TableView find_all_fulltext(ColKey col_key, StringData value) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     TableView get_sorted_view(ColKey col_key, bool ascending = true) const;
@@ -757,7 +759,7 @@ private:
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
-    void do_add_search_index(ColKey col_key);
+    void do_add_search_index(ColKey col_key, bool fulltext);
 
     bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
