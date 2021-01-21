@@ -22,6 +22,7 @@
 #include <cstring>
 #include <memory>
 #include <array>
+#include <set>
 
 #include <realm/array.hpp>
 #include <realm/table_cluster_tree.hpp>
@@ -116,9 +117,10 @@ static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key, bool fulltext)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
+        , m_fulltext(fulltext)
     {
     }
     size_t size() const
@@ -141,12 +143,21 @@ public:
     {
         return m_column_key;
     }
-    bool is_nullable() const;
+    bool is_nullable() const
+    {
+        return m_column_key.is_nullable();
+    }
+    bool is_fulltext() const
+    {
+        return m_fulltext;
+    }
+
     StringData get_index_data(ObjKey key, StringConversionBuffer& buffer) const;
 
 private:
     const TableClusterTree* m_cluster_tree;
     ColKey m_column_key;
+    bool m_fulltext;
 };
 
 class StringIndex {
@@ -187,6 +198,10 @@ public:
     // StringIndex interface:
 
     bool is_empty() const;
+    bool is_fulltext_index() const
+    {
+        return this->m_target_column.is_fulltext();
+    }
 
     template <class T>
     void insert(ObjKey key, T value);
@@ -211,6 +226,8 @@ public:
     template <class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
 
+    void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
+
     void clear();
 
     bool has_duplicate_values() const noexcept;
@@ -221,6 +238,8 @@ public:
     void verify_entries(const ClusterColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
+
+    static std::set<std::string> tokenize(const StringData text);
 
     typedef int32_t key_type;
 
@@ -297,6 +316,9 @@ private:
     bool leaf_insert(ObjKey obj_key, key_type, size_t offset, StringData value, bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
+    // Erase without getting string from parent column (useful when string stored
+    // does not directly match string in parent, like with full-text indexing)
+    void erase_string(ObjKey key, StringData value);
     void do_delete(ObjKey key, StringData, size_t offset);
 
     StringData get(ObjKey key, StringConversionBuffer& buffer) const;
@@ -311,7 +333,7 @@ private:
 class SortedListComparator {
 public:
     SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
-        : m_column(cluster_tree, column_key)
+        : m_column(cluster_tree, column_key, false)
     {
     }
     SortedListComparator(const ClusterColumn& column)
@@ -457,7 +479,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
     : m_array(create_node(alloc, false)) // Throws
-    , m_target_column(ClusterColumn(nullptr, {}))
+    , m_target_column(ClusterColumn(nullptr, {}, false))
 {
 }
 
@@ -527,6 +549,9 @@ void StringIndex::insert(ObjKey key, T value)
     insert_with_offset(key, to_str(value, buffer), offset); // Throws
 }
 
+template <>
+void StringIndex::insert<StringData>(ObjKey key, StringData value);
+
 template <class T>
 void StringIndex::insert(ObjKey key, util::Optional<T> value)
 {
@@ -557,6 +582,9 @@ void StringIndex::set(ObjKey key, T new_value)
         insert_with_offset(key, new_value2, offset);     // Throws
     }
 }
+
+template <>
+void StringIndex::set<StringData>(ObjKey key, StringData new_value);
 
 template <class T>
 void StringIndex::set(ObjKey key, util::Optional<T> new_value)

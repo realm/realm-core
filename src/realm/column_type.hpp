@@ -165,6 +165,10 @@ enum ColumnAttr {
     /// Each element is a set of values
     col_attr_Set = 128,
 
+    /// Specifies that elements in the column are full-text indexed
+    col_attr_FullText_Indexed = 256,
+
+
     /// Either list, dictionary, or set
     col_attr_Collection = 128 + 64 + 32
 };
