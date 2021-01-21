@@ -473,7 +473,12 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_insert(*this, state.index, key, value);
+        if (old_entry) {
+            repl->dictionary_set(*this, state.index, key, value);
+        }
+        else {
+            repl->dictionary_insert(*this, state.index, key, value);
+        }
     }
 
     bump_content_version();

@@ -27,6 +27,7 @@
 * Add support for comparing non-list link columns to other link columns in queries.
 * Add `Set::delete_all`, `Set::is_subset_of`, `Set::is_superset_of`, `Set::intersects`, `Set::assign_intersection`, `Set::assign_union` & `Set::assign_difference` methods to `object_store::Set`.
 * Dictionaries can be defined as nullable.
+* When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
 
 ### Fixed
 * Calling max/min/sum/avg on a List or Set may give wrong results ([#4252](https://github.com/realm/realm-core/issues/4252), since v10.0.0)

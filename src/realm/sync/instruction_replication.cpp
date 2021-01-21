@@ -603,10 +603,8 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
 {
-    TrivialReplication::dictionary_insert(dict, ndx, key, value);
-
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
         if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
@@ -627,6 +625,18 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, 
         instr.is_default = false;
         emit(instr);
     }
+}
+
+void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+{
+    TrivialReplication::dictionary_insert(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
+}
+
+void SyncReplication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+{
+    TrivialReplication::dictionary_set(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
 }
 
 void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
