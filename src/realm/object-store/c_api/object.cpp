@@ -315,7 +315,7 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
 {
     return wrap_err([&]() {
         list->verify_attached();
-        realm_value_t result;
+        realm_value_t result{};
 
         auto getter = util::overload{
             [&](Obj*) {
