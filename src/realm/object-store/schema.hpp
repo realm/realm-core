@@ -31,7 +31,7 @@ class SchemaChange;
 class StringData;
 struct Property;
 
-enum SchemaValidationMode : uint64_t { validate_basic = 0, validate_for_sync = 1, validate_no_embedded_orphans = 2 };
+enum SchemaValidationMode : uint64_t { Basic = 0, Sync = 1, RejectEmbeddedOrphans = 2 };
 
 class Schema : private std::vector<ObjectSchema> {
 private:
@@ -59,7 +59,7 @@ public:
 
     // Verify that this schema is internally consistent (i.e. all properties are
     // valid, links link to types that actually exist, etc.)
-    void validate(uint64_t validation_mode = SchemaValidationMode::validate_basic) const;
+    void validate(uint64_t validation_mode = SchemaValidationMode::Basic) const;
     std::unordered_set<std::string> get_embedded_object_orphans() const;
 
     // Get the changes which must be applied to this schema to produce the passed-in schema

@@ -22,8 +22,6 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
-#include <realm/object-store/shared_realm.hpp>
-
 
 #include <algorithm>
 #include <queue>
@@ -143,46 +141,34 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
 
 std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
 {
-    std::unordered_set<std::string> orphans;
-    std::unordered_set<std::string> visitable;
-    for (auto const& object : *this) {
+    std::queue<const ObjectSchema*> to_check;
+    for (auto& object : *this) {
         if (!object.is_embedded) {
-            for (auto const& prop : object.persisted_properties) {
-                if (prop.type == PropertyType::Object) {
-                    auto it = this->find(prop.object_type);
-                    REALM_ASSERT(it != this->end());
-                    if (it->is_embedded) {
-                        visitable.insert(it->name);
-                    }
+            to_check.push(&object);
+        }
+    }
+    // Perform a breadth-first search of the schema graph to discover all object
+    // types which are reachable from any of the root types
+    std::unordered_set<const ObjectSchema*> reachable;
+    while (!to_check.empty()) {
+        auto object = to_check.front();
+        reachable.insert(object);
+        for (auto& prop : object->persisted_properties) {
+            if (prop.type == PropertyType::Object) {
+                auto it = find(prop.object_type);
+                REALM_ASSERT(it != this->end());
+                if (it->is_embedded && reachable.insert(&*it).second) {
+                    to_check.push(&*it);
                 }
             }
         }
-        else {
+        to_check.pop();
+    }
+    // Any object types which weren't found above are orphans
+    std::unordered_set<std::string> orphans;
+    for (auto& object : *this) {
+        if (object.is_embedded && !reachable.count(&object)) {
             orphans.insert(object.name);
-        }
-    }
-    for (auto it = orphans.begin(); it != orphans.end();) {
-        if (visitable.find(*it) != visitable.end()) {
-            it = orphans.erase(it);
-        }
-        else {
-            ++it;
-        }
-    }
-    // at this point any remaining orphans can only be reached by another embedded object
-    bool changes_to_process = true;
-    while (orphans.size() > 0 && changes_to_process) {
-        changes_to_process = false;
-        for (auto& name : visitable) {
-            auto it = this->find(name);
-            REALM_ASSERT(it != this->end());
-            for (auto const& prop : it->persisted_properties) {
-                if (prop.type == PropertyType::Object && orphans.find(prop.object_type) != orphans.end()) {
-                    visitable.insert(prop.object_type);
-                    orphans.erase(prop.object_type);
-                    changes_to_process = true;
-                }
-            }
         }
     }
     return orphans;
@@ -205,7 +191,7 @@ void Schema::validate(uint64_t validation_mode) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
-    const bool for_sync = validation_mode & SchemaValidationMode::validate_for_sync;
+    const bool for_sync = validation_mode & SchemaValidationMode::Sync;
     for (auto const& object : *this) {
         object.validate(*this, exceptions, for_sync);
     }
@@ -217,9 +203,9 @@ void Schema::validate(uint64_t validation_mode) const
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
 
-        if (validation_mode & SchemaValidationMode::validate_no_embedded_orphans) {
+        if (validation_mode & SchemaValidationMode::RejectEmbeddedOrphans) {
             auto orphans = this->get_embedded_object_orphans();
-            for (auto name : orphans) {
+            for (auto& name : orphans) {
                 exceptions.push_back(util::format(
                     "Embedded object '%1' is unreachable by any link path from top level objects.", name));
             }

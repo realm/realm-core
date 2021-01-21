@@ -183,7 +183,7 @@ TEST_CASE("C API") {
 
         auto schema = realm_schema_new(classes, 2, class_properties);
         CHECK(checked(schema));
-        CHECK(checked(realm_schema_validate(schema, realm_schema_validation_mode::RLM_VALIDATE_BASIC)));
+        CHECK(checked(realm_schema_validate(schema, realm_schema_validation_mode::RLM_SCHEMA_VALIDATION_BASIC)));
 
         auto config = realm_config_new();
         CHECK(checked(realm_config_set_path(config, "c_api_test.realm")));
@@ -270,7 +270,7 @@ TEST_CASE("C API") {
     SECTION("schema validates") {
         auto schema = realm_get_schema(realm);
         CHECK(checked(schema));
-        CHECK(checked(realm_schema_validate(schema, realm_schema_validation_mode::RLM_VALIDATE_BASIC)));
+        CHECK(checked(realm_schema_validate(schema, realm_schema_validation_mode::RLM_SCHEMA_VALIDATION_BASIC)));
 
         auto schema2 = realm_get_schema(realm);
         CHECK(checked(schema2));

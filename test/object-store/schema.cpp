@@ -385,7 +385,7 @@ TEST_CASE("Schema") {
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
             REQUIRE_NOTHROW(schema.validate());
             REQUIRE_THROWS_CONTAINING(
-                schema.validate(SchemaValidationMode::validate_no_embedded_orphans),
+                schema.validate(SchemaValidationMode::RejectEmbeddedOrphans),
                 "Embedded object 'origin' is unreachable by any link path from top level objects.");
         }
 
@@ -396,6 +396,7 @@ TEST_CASE("Schema") {
                 {"B", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "C"}}},
                 {"C", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("allows link properties from embedded to top-level") {
@@ -435,6 +436,7 @@ TEST_CASE("Schema") {
                  ObjectSchema::IsEmbedded{true},
                  {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("does not reject a top level loop via embedded object link") {
@@ -532,6 +534,7 @@ TEST_CASE("Schema") {
                  ObjectSchema::IsEmbedded{true},
                  {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("distinct paths to an embedded object is not a loop") {
@@ -542,6 +545,7 @@ TEST_CASE("Schema") {
                 {"EmbeddedObjectA", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}},
             };
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("linked distinct paths to an embedded object is not a loop") {
@@ -562,6 +566,7 @@ TEST_CASE("Schema") {
 
             };
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("rejects linking objects without a source object") {
