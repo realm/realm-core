@@ -8011,6 +8011,7 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(val.get<Timestamp>(), now);
 
         dict.erase("cnt");
+        dict.insert("hello", "goodbye");
 
         session_2.nonsync_transact_notify(tr.commit());
     }
@@ -8030,7 +8031,7 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(dict.size(), 2);
 
         Mixed val = dict["hello"];
-        CHECK_EQUAL(val.get_string(), "world");
+        CHECK_EQUAL(val.get_string(), "goodbye");
         val = dict.get("when");
         CHECK_EQUAL(val.get<Timestamp>(), now);
 

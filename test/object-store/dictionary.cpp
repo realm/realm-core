@@ -151,6 +151,19 @@ TEST_CASE("dictionary") {
             REQUIRE_INDICES(srchange.insertions, values.size() - 1);
         }
 
+        SECTION("replace value in dictionary") {
+            advance_and_notify(*r);
+            r->begin_transaction();
+            dict.insert("b", "blueberry");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            auto ndx = results.index_of(StringData("blueberry"));
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.modifications, ndx);
+            REQUIRE_INDICES(change.deletions);
+        }
+
         SECTION("remove value from list") {
             advance_and_notify(*r);
             auto ndx = results.index_of(StringData("apple"));
