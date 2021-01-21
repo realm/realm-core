@@ -1,4 +1,5 @@
 #include <realm/util/assert.hpp>
+#include <realm/util/base64.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server_impl_base.hpp>
 
@@ -158,6 +159,20 @@ void ClientProtocol::make_ping(OutputBuffer& out, milliseconds_type timestamp, m
     out << "ping " << timestamp << " " << rtt << "\n"; // Throws
 }
 
+
+std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
+{
+    std::vector<char> buf;
+    size_t sz = _impl::compression::allocate_and_compress(m_compress_memory_arena, blob,
+                                                          buf); // Throws
+
+    util::StringBuffer encode_buffer;
+    auto encoded_size = util::base64_encoded_size(sz);
+    encode_buffer.resize(encoded_size);
+    util::base64_encode(buf.data(), sz, encode_buffer.data(), encode_buffer.size());
+
+    return encode_buffer.str();
+}
 
 // Server protocol
 
