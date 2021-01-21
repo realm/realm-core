@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.3.3"
+let versionStr = "10.4.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -172,7 +172,7 @@ let package = Package(
             ]),
         .target(
             name: "ObjectStore",
-            dependencies: ["SyncClient", "QueryParser"],
+            dependencies: ["SyncClient"],
             path: "src",
             exclude: [
                 "realm/object-store/impl/epoll",
@@ -189,7 +189,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "Capi",
-            dependencies: ["ObjectStore"],
+            dependencies: ["ObjectStore", "QueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -207,7 +207,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "SyncServer"],
+            dependencies: ["ObjectStore", "SyncServer", "QueryParser"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",

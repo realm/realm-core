@@ -27,24 +27,30 @@ using namespace realm;
 
 // These keys must be stored as lowercase. Some naming comes from MongoDB's conventions
 // see https://docs.mongodb.com/manual/reference/operator/query/type/
-static std::unordered_map<std::string, TypeOfValue::Attribute> attribute_map = {
-    {"null", TypeOfValue::Null},          {"int", TypeOfValue::Int},         {"integer", TypeOfValue::Int},
-    {"bool", TypeOfValue::Bool},          {"boolean", TypeOfValue::Bool},    {"string", TypeOfValue::String},
-    {"binary", TypeOfValue::Binary},      {"date", TypeOfValue::Timestamp},  {"timestamp", TypeOfValue::Timestamp},
-    {"float", TypeOfValue::Float},        {"double", TypeOfValue::Double},   {"decimal128", TypeOfValue::Decimal128},
-    {"decimal", TypeOfValue::Decimal128}, {"link", TypeOfValue::ObjectLink}, {"object", TypeOfValue::ObjectLink},
-    {"objectid", TypeOfValue::ObjectId},  {"uuid", TypeOfValue::UUID},       {"numeric", TypeOfValue::Numeric},
+static const std::vector<std::pair<std::string, TypeOfValue::Attribute>> attribute_map = {
+    {"null", TypeOfValue::Null},           {"int", TypeOfValue::Int},
+    {"integer", TypeOfValue::Int},         {"bool", TypeOfValue::Bool},
+    {"boolean", TypeOfValue::Bool},        {"string", TypeOfValue::String},
+    {"binary", TypeOfValue::Binary},       {"date", TypeOfValue::Timestamp},
+    {"timestamp", TypeOfValue::Timestamp}, {"float", TypeOfValue::Float},
+    {"double", TypeOfValue::Double},       {"decimal128", TypeOfValue::Decimal128},
+    {"decimal", TypeOfValue::Decimal128},  {"object", TypeOfValue::ObjectLink},
+    {"link", TypeOfValue::ObjectLink},     {"objectid", TypeOfValue::ObjectId},
+    {"uuid", TypeOfValue::UUID},           {"numeric", TypeOfValue::Numeric},
     {"bindata", TypeOfValue::Binary}};
 
 TypeOfValue::Attribute get_single_from(std::string str)
 {
     std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
-    auto it = attribute_map.find(str);
+    auto it = std::find_if(attribute_map.begin(), attribute_map.end(), [&](const auto& attr_pair) {
+        return attr_pair.first == str;
+    });
     if (it == attribute_map.end()) {
-        std::string all_keys = std::accumulate(std::next(attribute_map.begin()), attribute_map.end(),
-                                               attribute_map.begin()->first, [](std::string s, auto it) {
-                                                   return std::move(s) + ", " + it.first;
-                                               });
+        std::string all_keys =
+            std::accumulate(std::next(attribute_map.begin()), attribute_map.end(), attribute_map.begin()->first,
+                            [](const std::string& s, const auto& it) {
+                                return s + ", " + it.first;
+                            });
         throw std::runtime_error(util::format(
             "Unable to parse the type attribute string '%1', supported case insensitive values are: [%2]", str,
             all_keys));
@@ -136,7 +142,7 @@ bool TypeOfValue::matches(const class Mixed& value) const
 
 util::Optional<std::string> get_attribute_name_of(int64_t att)
 {
-    for (auto& it : attribute_map) {
+    for (const auto& it : attribute_map) {
         if (it.second == att) {
             return it.first;
         }
