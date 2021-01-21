@@ -1964,14 +1964,12 @@ TEST_CASE("migration: AdditiveDiscovered") {
         std::string mode_string = util::format(
             " with mode: %1", mode == SchemaMode::AdditiveDiscovered ? "AdditiveDiscovered" : "AdditiveExplicit");
 
-        DYNAMIC_SECTION("can add new properties to existing tables" << mode_string)
-        {
+        DYNAMIC_SECTION("can add new properties to existing tables" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(add_property(schema, "object", {"value 3", PropertyType::Int})));
             REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 3);
         }
 
-        DYNAMIC_SECTION("can add new tables" << mode_string)
-        {
+        DYNAMIC_SECTION("can add new tables" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(add_table(schema, {"object 2",
                                                                     {
                                                                         {"value", PropertyType::Int},
@@ -1980,8 +1978,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
         }
 
-        DYNAMIC_SECTION("embedded orphan types" << mode_string)
-        {
+        DYNAMIC_SECTION("embedded orphan types" << mode_string) {
             if (mode == SchemaMode::AdditiveDiscovered) {
                 // in discovered mode, adding embedded orphan types is allowed but ignored
                 REQUIRE_NOTHROW(realm->update_schema(
@@ -2000,13 +1997,11 @@ TEST_CASE("migration: AdditiveDiscovered") {
             }
         }
 
-        DYNAMIC_SECTION("cannot change existing table type" << mode_string)
-        {
+        DYNAMIC_SECTION("cannot change existing table type" << mode_string) {
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true)));
         }
 
-        DYNAMIC_SECTION("indexes are updated when schema version is bumped" << mode_string)
-        {
+        DYNAMIC_SECTION("indexes are updated when schema version is bumped" << mode_string) {
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto col_keys = table->get_column_keys();
             REQUIRE(table->has_search_index(col_keys[0]));
@@ -2019,8 +2014,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(table->has_search_index(col_keys[1]));
         }
 
-        DYNAMIC_SECTION("indexes are not updated when schema version is not bumped" << mode_string)
-        {
+        DYNAMIC_SECTION("indexes are not updated when schema version is not bumped" << mode_string) {
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto col_keys = table->get_column_keys();
             REQUIRE(table->has_search_index(col_keys[0]));
@@ -2033,8 +2027,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(!table->has_search_index(col_keys[1]));
         }
 
-        DYNAMIC_SECTION("can remove properties from existing tables, but column is not removed" << mode_string)
-        {
+        DYNAMIC_SECTION("can remove properties from existing tables, but column is not removed" << mode_string) {
             auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_NOTHROW(realm->update_schema(remove_property(schema, "object", "value")));
             REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 2);
@@ -2045,19 +2038,16 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(properties[0].column_key == col_keys[1]);
         }
 
-        DYNAMIC_SECTION("cannot change existing property types" << mode_string)
-        {
+        DYNAMIC_SECTION("cannot change existing property types" << mode_string) {
             REQUIRE_THROWS(realm->update_schema(set_type(schema, "object", "value", PropertyType::Float)));
         }
 
-        DYNAMIC_SECTION("cannot change existing property nullability" << mode_string)
-        {
+        DYNAMIC_SECTION("cannot change existing property nullability" << mode_string) {
             REQUIRE_THROWS(realm->update_schema(set_optional(schema, "object", "value", true)));
             REQUIRE_THROWS(realm->update_schema(set_optional(schema, "object", "value 2", false)));
         }
 
-        DYNAMIC_SECTION("cannot change existing link targets" << mode_string)
-        {
+        DYNAMIC_SECTION("cannot change existing link targets" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(
                 add_table(schema, {"object 2",
                                    {
@@ -2066,8 +2056,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE_THROWS(realm->update_schema(set_target(realm->schema(), "object 2", "link", "object 2")));
         }
 
-        DYNAMIC_SECTION("cannot change primary keys" << mode_string)
-        {
+        DYNAMIC_SECTION("cannot change primary keys" << mode_string) {
             REQUIRE_THROWS(realm->update_schema(set_primary_key(schema, "object", "value")));
 
             REQUIRE_NOTHROW(
@@ -2079,23 +2068,20 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE_THROWS(realm->update_schema(set_primary_key(realm->schema(), "object 2", "")));
         }
 
-        DYNAMIC_SECTION("schema version is allowed to go down" << mode_string)
-        {
+        DYNAMIC_SECTION("schema version is allowed to go down" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(schema, 1));
             REQUIRE(realm->schema_version() == 1);
             REQUIRE_NOTHROW(realm->update_schema(schema, 0));
             REQUIRE(realm->schema_version() == 1);
         }
 
-        DYNAMIC_SECTION("migration function is not used" << mode_string)
-        {
+        DYNAMIC_SECTION("migration function is not used" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(schema, 1, [&](SharedRealm, SharedRealm, Schema&) {
                 REQUIRE(false);
             }));
         }
 
-        DYNAMIC_SECTION("add new columns from different SG" << mode_string)
-        {
+        DYNAMIC_SECTION("add new columns from different SG" << mode_string) {
             auto realm2 = Realm::get_shared_realm(config);
             auto& group = realm2->read_group();
             realm2->begin_transaction();
@@ -2110,8 +2096,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         }
 
-        DYNAMIC_SECTION("opening new Realms uses the correct schema after an external change" << mode_string)
-        {
+        DYNAMIC_SECTION("opening new Realms uses the correct schema after an external change" << mode_string) {
             auto realm2 = Realm::get_shared_realm(config);
             auto& group = realm2->read_group();
             realm2->begin_transaction();
@@ -2141,8 +2126,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(realm->schema().find("object")->persisted_properties[1].column_key == col_keys[1]);
         }
 
-        DYNAMIC_SECTION("can have different subsets of columns in different Realm instances" << mode_string)
-        {
+        DYNAMIC_SECTION("can have different subsets of columns in different Realm instances" << mode_string) {
             auto config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
             auto config3 = config;
@@ -2167,8 +2151,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(realm4->schema().find("object")->persisted_properties.size() == 3);
         }
 
-        DYNAMIC_SECTION("updating a schema to include already-present column" << mode_string)
-        {
+        DYNAMIC_SECTION("updating a schema to include already-present column" << mode_string) {
             auto config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
             auto realm2 = Realm::get_shared_realm(config2);
@@ -2183,8 +2166,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("increasing schema version without modifying schema properly leaves the schema untouched"
-                        << mode_string)
-        {
+                        << mode_string) {
             TestFile config1;
             config1.schema = schema;
             config1.schema_mode = SchemaMode::AdditiveDiscovered;
@@ -2201,8 +2183,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             REQUIRE(realm2->schema() == schema1);
         }
 
-        DYNAMIC_SECTION("invalid schema update leaves the schema untouched" << mode_string)
-        {
+        DYNAMIC_SECTION("invalid schema update leaves the schema untouched" << mode_string) {
             auto config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
             auto realm2 = Realm::get_shared_realm(config2);
@@ -2212,8 +2193,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("update_schema() does not begin a write transaction when extra columns are present"
-                        << mode_string)
-        {
+                        << mode_string) {
             realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
@@ -2224,8 +2204,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         DYNAMIC_SECTION(
             "update_schema() does not begin a write transaction when indexes are changed without bumping schema "
             "version"
-            << mode_string)
-        {
+            << mode_string) {
             realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
@@ -2234,8 +2213,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("update_schema() does not begin a write transaction for invalid schema changes"
-                        << mode_string)
-        {
+                        << mode_string) {
             realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
