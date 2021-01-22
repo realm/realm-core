@@ -41,7 +41,6 @@
 ### Breaking changes
 * Support for IncludeDescriptor has been removed.
 * The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
-* Add `status` property to `app::Response` to reflect the request result. Optional `body` or `error` property will store the corresponding value.    
 
 -----------
 
