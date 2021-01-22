@@ -4346,23 +4346,28 @@ TEST(Parser_Dictionary)
     auto col_link = origin->add_column(*foo, "link");
     auto col_links = origin->add_column_list(*foo, "links");
     size_t expected = 0;
+    size_t num_ints_for_value = 0;
 
     for (int64_t i = 0; i < 100; i++) {
         auto obj = foo->create_object();
         Dictionary dict = obj.get_dictionary(col_dict);
         bool incr = false;
+        bool incr_num_ints = false;
         if ((i % 4) == 0) {
             dict.insert("Value", i);
+            incr_num_ints = true;
             if (i > 50)
                 incr = true;
         }
         else if ((i % 10) == 0) {
             dict.insert("Value", 100);
             incr = true;
+            incr_num_ints = true;
         }
         if (i % 3) {
             dict.insert("Value", 3);
             incr = false;
+            incr_num_ints = true;
         }
         if ((i % 5) == 0) {
             dict.insert("Foo", 5);
@@ -4370,6 +4375,9 @@ TEST(Parser_Dictionary)
         dict.insert("Bar", i);
         if (incr) {
             expected++;
+        }
+        if (incr_num_ints) {
+            num_ints_for_value++;
         }
     }
 
@@ -4390,6 +4398,11 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "dict.Value > 50", expected);
     verify_query(test_context, foo, "ANY dict.keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.keys == 'Value'", 23);
+    verify_query(test_context, foo, "dict.Value.@type == 'int'", num_ints_for_value);
+    verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
+    verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
+    verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
+    verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
 
     verify_query(test_context, origin, "link.dict.Value > 50", 3);
     verify_query(test_context, origin, "links.dict.Value > 50", 5);
