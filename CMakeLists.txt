@@ -99,7 +99,9 @@ if(ANDROID)
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     #
     # On some architectures char is unsigned by default. Make it signed
-    add_compile_options($<$<CONFIG:Release>:-Oz>)
+    if(NOT CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        add_compile_options($<$<CONFIG:Release>:-Oz>)
+    endif()
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 
