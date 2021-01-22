@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* ThreadSafeReference for Dictionary added
 
 ----------------------------------------------
 

@@ -110,6 +110,23 @@ TEST_CASE("dictionary") {
         }
     }
 
+    SECTION("handover") {
+        r->commit_transaction();
+
+        auto dict2 = ThreadSafeReference(dict).resolve<object_store::Dictionary>(r);
+        REQUIRE(dict == dict2);
+        ThreadSafeReference ref(results);
+        auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(results2.get<String>(i) == values[i]);
+        }
+        r->begin_transaction();
+        obj.remove();
+        r->commit_transaction();
+        results2 = ref.resolve<Results>(r);
+        REQUIRE(!results2.is_valid());
+    }
+
     SECTION("notifications") {
         r->commit_transaction();
 
