@@ -9,6 +9,7 @@
  
 ### Breaking changes
 * The SchemaMode::Additive has been replaced by two different modes: AdditiveDiscovered and AdditiveExplicit. The former should be used when the schema has been automatically discovered, and the latter should be used when the user has explicitly included the types in the schema. Different schema checks are enforced for each scenario. ([#4306](https://github.com/realm/realm-core/pull/4306))
+* Revert change in `app::Response`.    
 
 -----------
 
@@ -41,6 +42,7 @@
 ### Breaking changes
 * Support for IncludeDescriptor has been removed.
 * The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
+* Add `status` property to `app::Response` to reflect the request result. Optional `body` or `error` property will store the corresponding value.    
 
 -----------
 
