@@ -135,7 +135,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw InvalidEncryptionKeyException();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
-    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+    if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
+         config.schema_mode == SchemaMode::AdditiveExplicit) &&
+        config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");

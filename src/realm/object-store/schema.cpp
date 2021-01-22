@@ -136,9 +136,46 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
         }
     }
 }
-} // namespace
 
-void Schema::validate(bool for_sync) const
+} // end anonymous namespace
+
+std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
+{
+    std::queue<const ObjectSchema*> to_check;
+    for (auto& object : *this) {
+        if (!object.is_embedded) {
+            to_check.push(&object);
+        }
+    }
+    // Perform a breadth-first search of the schema graph to discover all object
+    // types which are reachable from any of the root types
+    std::unordered_set<const ObjectSchema*> reachable;
+    while (!to_check.empty()) {
+        auto object = to_check.front();
+        reachable.insert(object);
+        for (auto& prop : object->persisted_properties) {
+            if (prop.type == PropertyType::Object) {
+                auto it = find(prop.object_type);
+                REALM_ASSERT(it != this->end());
+                if (it->is_embedded && reachable.insert(&*it).second) {
+                    to_check.push(&*it);
+                }
+            }
+        }
+        to_check.pop();
+    }
+    // Any object types which weren't found above are orphans
+    std::unordered_set<std::string> orphans;
+    for (auto& object : *this) {
+        if (object.is_embedded && !reachable.count(&object)) {
+            orphans.insert(object.name);
+        }
+    }
+    return orphans;
+}
+
+
+void Schema::validate(uint64_t validation_mode) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -154,6 +191,7 @@ void Schema::validate(bool for_sync) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
+    const bool for_sync = validation_mode & SchemaValidationMode::Sync;
     for (auto const& object : *this) {
         object.validate(*this, exceptions, for_sync);
     }
@@ -164,6 +202,14 @@ void Schema::validate(bool for_sync) const
         // only attempt to check for loops if the rest of the schema is valid
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
+
+        if (validation_mode & SchemaValidationMode::RejectEmbeddedOrphans) {
+            auto orphans = this->get_embedded_object_orphans();
+            for (auto& name : orphans) {
+                exceptions.push_back(util::format(
+                    "Embedded object '%1' is unreachable by any link path from top level objects.", name));
+            }
+        }
     }
 
     if (exceptions.size()) {

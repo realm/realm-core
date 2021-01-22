@@ -252,7 +252,8 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             reset_file(schema, changes);
             return true;
 
-        case SchemaMode::Additive: {
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit: {
             bool will_apply_index_changes = version > m_schema_version;
             if (ObjectStore::verify_valid_additive_changes(changes, will_apply_index_changes))
                 return true;
@@ -312,7 +313,8 @@ void Realm::set_schema_subset(Schema schema)
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
-        case SchemaMode::Additive:
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit:
             ObjectStore::verify_valid_additive_changes(changes);
             break;
 
@@ -327,7 +329,15 @@ void Realm::set_schema_subset(Schema schema)
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
-    schema.validate(bool(m_config.sync_config));
+    uint64_t validation_mode = SchemaValidationMode::Basic;
+    if (m_config.sync_config) {
+        validation_mode |= SchemaValidationMode::Sync;
+    }
+    if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
+        validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
+    }
+
+    schema.validate(validation_mode);
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -369,7 +379,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     uint64_t old_schema_version = m_schema_version;
-    bool additive = m_config.schema_mode == SchemaMode::Additive;
+    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;

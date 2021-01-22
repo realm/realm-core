@@ -102,8 +102,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
-        SECTION("migration function for additive-only") {
-            config.schema_mode = SchemaMode::Additive;
+        SECTION("migration function for additive discovered") {
+            config.schema_mode = SchemaMode::AdditiveDiscovered;
+            config.migration_function = [](auto, auto, auto) {};
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("migration function for additive explicit") {
+            config.schema_mode = SchemaMode::AdditiveExplicit;
             config.migration_function = [](auto, auto, auto) {};
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
@@ -276,7 +282,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = util::none;
         config.cache = false;
-        config.schema_mode = SchemaMode::Additive;
+        config.schema_mode = SchemaMode::AdditiveExplicit;
         config.schema_version = 0;
 
         auto realm = Realm::get_shared_realm(config);
@@ -769,7 +775,7 @@ TEST_CASE("SharedRealm: notifications") {
 TEST_CASE("SharedRealm: schema updating from external changes") {
     TestFile config;
     config.schema_version = 0;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
         {"object",
          {
@@ -1583,7 +1589,7 @@ struct ModeAutomatic {
 struct ModeAdditive {
     static SchemaMode mode()
     {
-        return SchemaMode::Additive;
+        return SchemaMode::AdditiveExplicit;
     }
     static bool should_call_init_on_version_bump()
     {

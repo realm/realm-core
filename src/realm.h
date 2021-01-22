@@ -66,7 +66,8 @@ typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_IMMUTABLE,
     RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE,
     RLM_SCHEMA_MODE_RESET_FILE,
-    RLM_SCHEMA_MODE_ADDITIVE,
+    RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED,
+    RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT,
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
@@ -96,6 +97,12 @@ typedef enum realm_value_type {
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
 } realm_value_type_e;
+
+typedef enum realm_schema_validation_mode {
+    RLM_SCHEMA_VALIDATION_BASIC = 0,
+    RLM_SCHEMA_VALIDATION_SYNC = 1,
+    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2
+} realm_schema_validation_mode_e;
 
 typedef struct realm_string {
     const char* data;
@@ -842,11 +849,14 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
 /**
  * Validate the schema.
  *
+ *  @param validation_mode A bitwise combination of values from the
+ *                         enum realm_schema_validation_mode.
+ *
  * @return True if the schema passed validation. If validation failed,
  *         `realm_get_last_error()` will produce an error describing the
  *         validation failure.
  */
-RLM_API bool realm_schema_validate(const realm_schema_t*);
+RLM_API bool realm_schema_validate(const realm_schema_t*, uint64_t validation_mode);
 
 /**
  * Return the number of classes in the Realm's schema.

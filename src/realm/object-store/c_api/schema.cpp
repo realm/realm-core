@@ -46,10 +46,10 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t* realm)
     });
 }
 
-RLM_API bool realm_schema_validate(const realm_schema_t* schema)
+RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {
-        schema->ptr->validate();
+        schema->ptr->validate(validation_mode);
         return true;
     });
 }
