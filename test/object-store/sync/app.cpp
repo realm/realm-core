@@ -165,22 +165,16 @@ public:
             int http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
-            auto response_result = ResponseResult::Success;
-            Optional<AppError> error;
             /* Check for errors */
-            if (response_code != CURLE_OK) {
+            if (response_code != CURLE_OK)
                 fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
                         request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
-                response_result = ResponseResult::Failure;
-                error = AppError(make_http_error_code(http_code), curl_easy_strerror(response_code));
-            }
 
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
-            completion_block(
-                Response{response_result, http_code, binding_response_code, response_headers, error, response});
+            completion_block(Response{http_code, binding_response_code, response_headers, response});
         }
 
         curl_global_cleanup();
@@ -3621,7 +3615,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     }
                     else if (request.url.find("/session") != std::string::npos &&
                              request.method == HttpMethod::post) {
-
                         CHECK(login_hit);
                         CHECK(get_profile_1_hit);
                         CHECK(!get_profile_2_hit);
