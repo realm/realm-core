@@ -37,6 +37,23 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace Catch {
+template <>
+struct StringMaker<object_store::Dictionary> {
+    static std::string convert(const object_store::Dictionary& dict)
+    {
+        std::stringstream ss;
+        ss << "{";
+        for (auto [key, value] : dict) {
+            ss << '{' << key << ',' << value << "}, ";
+        }
+        auto str = ss.str();
+        str.pop_back();
+        str.back() = '}';
+        return str;
+    }
+};
+} // namespace Catch
 
 TEST_CASE("dictionary") {
     InMemoryTestFile config;

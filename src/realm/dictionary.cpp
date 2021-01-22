@@ -259,7 +259,7 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
-std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx)
+std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     update_if_needed();
     if (ndx >= size()) {
