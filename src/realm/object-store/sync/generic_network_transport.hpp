@@ -205,17 +205,10 @@ struct Request {
     bool uses_refresh_token = false;
 };
 
-enum class ResponseResult { Success, Failure };
-
 /**
  * The contents of an HTTP response.
  */
 struct Response {
-    /**
-     * Response result - success or failure
-     */
-    ResponseResult status;
-
     /**
      * The status code of the HTTP response.
      */
@@ -232,13 +225,9 @@ struct Response {
     std::map<std::string, std::string> headers;
 
     /**
-     * The optional error. Should be assigned if status is failed.
+     * The body of the HTTP response.
      */
-    util::Optional<AppError> error;
-    /**
-     * The body of the HTTP response. Optional.  Should be assigned if status is success.
-     */
-    util::Optional<std::string> body;
+    std::string body;
 };
 
 /// Generic network transport for foreign interfaces.
