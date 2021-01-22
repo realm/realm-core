@@ -4283,4 +4283,59 @@ TEST(Shared_ManyColumns)
     foo->create_object().set("Prop0", 500);
 }
 
+enum step_type { DIRECT, INDEXED, PK };
+ONLY(Shared_Insertions)
+{
+    auto run_steps = [&](int num_steps, int step_size, step_type st) {
+                         SHARED_GROUP_TEST_PATH(path);
+                         DBOptions options;
+                         DBRef db = DB::create(path, false, options);
+                         {
+                             WriteTransaction wt(db);
+                             auto t = wt.add_table("table");
+                             auto col = t->add_column(type_String, "str");
+                             if (st == INDEXED) {
+                                 t->add_search_index(col);
+                             }
+                             if (st == PK) {
+                                 t->set_primary_key_column(col);
+                             }
+                             wt.commit();
+                         }
+                         std::cout << "Run with type " << st << " format " << num_steps << " x " << step_size << std::endl;
+                         auto start = std::chrono::steady_clock::now();
+                         for (int j = 0; j < num_steps * step_size; j += step_size) {
+                             WriteTransaction wt(db);
+                             auto t = wt.get_table("table");
+                             auto col = t->get_column_key("str");
+                             for (int i = j; i < j + step_size; ++i) {
+                                 if (st == DIRECT || st == INDEXED) {
+                                     auto o = t->create_object();
+                                     o.set(col, std::to_string(i));
+                                 } else { // PK
+                                     auto o = t->create_object_with_primary_key(Mixed(std::to_string(i)),{});
+                                 }
+                             }
+                             wt.commit();
+                             auto end = std::chrono::steady_clock::now();
+                             auto diff = end - start;
+                             auto print_diff = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
+                             std::cout << j << " " << print_diff.count()  << std::endl;
+                         }
+                     };
+    auto run_type = [&](step_type st) {
+                        std::cout << "Run for type " << st << std::endl;
+                        run_steps(10, 1000000, st);
+                        run_steps(30, 333333, st);
+                        run_steps(100, 100000, st);
+                        run_steps(300, 33333, st);
+                        run_steps(1000, 10000, st);
+                        run_steps(3000, 3333, st);
+                        run_steps(10000, 1000, st);
+                    };
+    run_type(DIRECT);
+    run_type(INDEXED);
+    run_type(PK);
+}
+
 #endif // TEST_SHARED
