@@ -37,6 +37,23 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace Catch {
+template <>
+struct StringMaker<object_store::Dictionary> {
+    static std::string convert(const object_store::Dictionary& dict)
+    {
+        std::stringstream ss;
+        ss << "{";
+        for (auto [key, value] : dict) {
+            ss << '{' << key << ',' << value << "}, ";
+        }
+        auto str = ss.str();
+        str.pop_back();
+        str.back() = '}';
+        return str;
+    }
+};
+} // namespace Catch
 
 TEST_CASE("dictionary") {
     InMemoryTestFile config;
@@ -108,6 +125,23 @@ TEST_CASE("dictionary") {
             REQUIRE(element.first == keys[i]);
             REQUIRE(element.second.get_string() == values[i]);
         }
+    }
+
+    SECTION("handover") {
+        r->commit_transaction();
+
+        auto dict2 = ThreadSafeReference(dict).resolve<object_store::Dictionary>(r);
+        REQUIRE(dict == dict2);
+        ThreadSafeReference ref(results);
+        auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(results2.get<String>(i) == values[i]);
+        }
+        r->begin_transaction();
+        obj.remove();
+        r->commit_transaction();
+        results2 = ref.resolve<Results>(r);
+        REQUIRE(!results2.is_valid());
     }
 
     SECTION("notifications") {

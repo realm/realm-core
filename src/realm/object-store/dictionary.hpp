@@ -64,11 +64,11 @@ public:
         verify_valid_row(ndx);
         return m_dict->get_any(ndx);
     }
-    util::Optional<Mixed> try_get_any(StringData key)
+    util::Optional<Mixed> try_get_any(StringData key) const
     {
         return m_dict->try_get(key);
     }
-    std::pair<StringData, Mixed> get_pair(size_t ndx)
+    std::pair<StringData, Mixed> get_pair(size_t ndx) const
     {
         verify_valid_row(ndx);
         auto pair = m_dict->get_pair(ndx);
@@ -96,12 +96,12 @@ public:
     Results snapshot() const;
     Dictionary freeze(const std::shared_ptr<Realm>& realm) const;
 
-    Iterator begin()
+    Iterator begin() const
     {
         return m_dict->begin();
     }
 
-    Iterator end()
+    Iterator end() const
     {
         return m_dict->end();
     }
