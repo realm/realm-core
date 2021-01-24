@@ -1100,6 +1100,9 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         IntegerColumn::const_iterator lower = it_end;
 
         auto value_exists_in_list = [&]() {
+            if (m_target_column.is_fulltext()) {
+                return reconstruct_string(offset, key, index_data) == value.get_string();
+            }
             SortedListComparator slc(m_target_column);
             lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
 
@@ -1113,7 +1116,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         };
 
         // If we found the value in this list, add the duplicate to the list.
-        if (m_target_column.is_fulltext() || value_exists_in_list()) {
+        if (value_exists_in_list()) {
             insert_to_existing_list_at_lower(obj_key, value, sub, lower);
         }
         else {
