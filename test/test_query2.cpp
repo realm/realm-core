@@ -6124,4 +6124,167 @@ TEST(Query_TypeOfValue)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+
+TEST(Query_FullText)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_String, "text");
+
+    // Add before index creation
+    table->create_object().set(col, "This is a test, with  spaces!");
+    Obj obj2 = table->create_object().set(col, "Ål, ø og æbler");
+    Obj obj3 = table->create_object().set(
+        col,
+        "An object database (also object-oriented database management system) is a database management system in "
+        "which information is represented in the form of objects as used in object-oriented programming. Object "
+        "databases are different from relational databases which are table-oriented. Object-relational databases "
+        "are a hybrid of both approaches.");
+    table->create_object().set(
+        col,
+        "Object database management systems grew out of research during the early to mid-1970s into having "
+        "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+        "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+        "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+        "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+        "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+        "compiled the best of those papers in a book published by The MIT Press.");
+    table->create_object().set(
+        col, "Lilleø er i mange år blevet anvendt til græsning af Askø-bøndernes kreaturer. I 1788 blev en del af "
+             "Askøs gårde flyttet til Lilleø, og tre gårde eksisterer fortsat på øen. Hovederhvervet på Lilleø er i "
+             "dag frugtavl, og der dyrkes især æbler, pærer og blommer.");
+
+    // Create the fulltext index
+    table->add_search_index(col, true);
+
+    auto tv = table->where().fulltext(col, "object").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // Add after index creation
+    auto k5 =
+        table->create_object()
+            .set(
+                col,
+                "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+                "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter "
+                "the market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer "
+                "Associates), Matisse (Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress "
+                "Software, acquired from eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name "
+                "changed from Ontologic), O2[6] (O2 Technology, merged with several companies, acquired by Informix, "
+                "which was in turn acquired by IBM), POET (now FastObjects from Versant which acquired Poet Software)"
+                ", Versant Object Database (Versant Corporation), VOSS (Logic Arts) and JADE (Jade Software "
+                "Corporation). Some of these products remain on the market and have been joined by new open source "
+                "and commercial products such as InterSystems Caché.")
+            .get_key();
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(3, tv.size());
+
+    // Add another
+    table->create_object().set(
+        col, "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+             "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+             "specifically designed to store data as objects gives an advantage to those companies that are geared "
+             "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]");
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(3, tv.size());
+
+    // Delete one
+    table->remove_object(k5);
+    tv.sync_if_needed();
+    CHECK_EQUAL(2, tv.size());
+
+    tv = table->where().fulltext(col, "hybrid").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    // Change value in place
+    obj3.set(
+        col,
+        "Object database management systems added the concept of persistence to object programming languages. The "
+        "early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase "
+        "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
+        "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
+
+    tv = table->where().fulltext(col, "hybrid").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    tv = table->where().fulltext(col, "Gemstone").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    tv = table->where().fulltext(col, "æbler").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    obj2.remove();
+    tv.sync_if_needed();
+    CHECK_EQUAL(1, tv.size());
+
+    table->clear();
+    CHECK(table->get_search_index(col)->is_empty());
+}
+
+TEST(Query_FullTextMulti)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column(type_String, "text");
+    table->add_search_index(col, true);
+
+    table->create_object().set(
+        col,
+        "An object database (also object-oriented database management system) is a database management system in "
+        "which information is represented in the form of objects as used in object-oriented programming. Object "
+        "databases are different from relational databases which are table-oriented. Object-relational databases "
+        "are a hybrid of both approaches.");
+    table->create_object().set(
+        col,
+        "Object database management systems grew out of research during the early to mid-1970s into having "
+        "intrinsic database management support for graph-structured objects. The term 'object-oriented database "
+        "system' first appeared around 1985.[4] Notable research projects included Encore-Ob/Server (Brown "
+        "University), EXODUS (University of Wisconsin–Madison), IRIS (Hewlett-Packard), ODE (Bell Labs), ORION "
+        "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
+        "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
+        "compiled the best of those papers in a book published by The MIT Press.");
+    table->create_object().set(
+        col,
+        "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
+        "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
+        "market. These included ITASCA (Itasca Systems), Jasmine (Fujitsu, marketed by Computer Associates), Matisse "
+        "(Matisse Software), Objectivity/DB (Objectivity, Inc.), ObjectStore (Progress Software, acquired from "
+        "eXcelon which was originally Object Design), ONTOS (Ontos, Inc., name changed from Ontologic), O2[6] (O2 "
+        "Technology, merged with several companies, acquired by Informix, which was in turn acquired by IBM), POET "
+        "(now FastObjects from Versant which acquired Poet Software), Versant Object Database (Versant Corporation), "
+        "VOSS (Logic Arts) and JADE (Jade Software Corporation). Some of these products remain on the market and "
+        "have been joined by new open source and commercial products such as InterSystems Caché.");
+    table->create_object().set(
+        col, "As the usage of web-based technology increases with the implementation of Intranets and extranets, "
+             "companies have a vested interest in OODBMSs to display their complex data. Using a DBMS that has been "
+             "specifically designed to store data as objects gives an advantage to those companies that are geared "
+             "towards multimedia presentation or organizations that utilize computer-aided design (CAD).[3]");
+    table->create_object().set(
+        col,
+        "Object database management systems added the concept of persistence to object programming languages. The "
+        "early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase "
+        "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
+        "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
+
+    // search with multiple terms
+    auto tv = table->where().fulltext(col, "object gemstone").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // search for combination that is not present
+    tv = table->where().fulltext(col, "object data").find_all();
+    CHECK_EQUAL(0, tv.size());
+
+    // many terms
+    tv = table->where().fulltext(col, "object database management brown").find_all();
+    CHECK_EQUAL(1, tv.size());
+
+    while (table->size() > 0) {
+        table->begin()->remove();
+    }
+
+    CHECK(table->get_search_index(col)->is_empty());
+}
+
 #endif // TEST_QUERY

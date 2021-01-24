@@ -2541,19 +2541,7 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::find_all_fulltext(ColKey col_key, StringData terms) const
 {
-    TableView tv(m_own_ref);
-    auto index = get_search_index(col_key);
-    if (index && index->is_fulltext_index()) {
-        std::vector<ObjKey> results;
-        index->find_all_fulltext(results, terms);
-        for (auto k : results) {
-            tv.m_key_values.add(k);
-        }
-    }
-    else {
-        util::runtime_error("Column has no fulltext index");
-    }
-    return tv;
+    return where().fulltext(col_key, terms).find_all();
 }
 
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
