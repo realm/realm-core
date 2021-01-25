@@ -912,7 +912,7 @@ private:
     {
         uint16_t error_code;
         StringData error_message;
-        if (m_frame_reader.delivery_size < 2) {
+        if (size < 2) {
             // Error code 1005 is defined as
             //     1005 is a reserved value and MUST NOT be set as a status code in a
             //     Close control frame by an endpoint.  It is designated for use in
@@ -925,8 +925,8 @@ private:
             // Otherwise, the error code is the first two bytes of the body as a uint16_t in
             // network byte order. See https://tools.ietf.org/html/rfc6455#section-5.5.1 for more
             // details.
-            error_code = ntohs((m_frame_reader.delivery_buffer[1] << 8) | m_frame_reader.delivery_buffer[0]);
-            error_message = StringData(m_frame_reader.delivery_buffer + 2, m_frame_reader.delivery_size - 2);
+            error_code = ntohs((data[1] << 8) | data[0]);
+            error_message = StringData(data + 2, size - 2);
         }
 
         std::error_code error_code_with_category{error_code, websocket::websocket_close_status_category()};
