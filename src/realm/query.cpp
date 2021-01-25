@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include "realm/util/checked_cast.hpp"
 #include <realm/query.hpp>
 
 #include <realm/array.hpp>
@@ -1594,8 +1595,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
             break;
         }
         else {
-            REALM_ASSERT(dynamic_cast<const LimitDescriptor*>(descriptor[i]));
-            const LimitDescriptor* limit = static_cast<const LimitDescriptor*>(descriptor[i]);
+            const LimitDescriptor* limit = util::checked_cast<const LimitDescriptor*>(descriptor[i]);
             min_limit = std::min(min_limit, limit->get_limit());
         }
     }
@@ -1864,15 +1864,13 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
     auto& current_group = m_groups.back();
     switch (current_group.m_state) {
         case QueryGroup::State::OrCondition: {
-            REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
-            OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+            OrNode* or_node = util::checked_cast<OrNode*>(current_group.m_root_node.get());
             or_node->m_conditions.emplace_back(std::move(node));
             current_group.m_state = State::OrConditionChildren;
             break;
         }
         case QueryGroup::State::OrConditionChildren: {
-            REALM_ASSERT_DEBUG(dynamic_cast<OrNode*>(current_group.m_root_node.get()));
-            OrNode* or_node = static_cast<OrNode*>(current_group.m_root_node.get());
+            OrNode* or_node = util::checked_cast<OrNode*>(current_group.m_root_node.get());
             or_node->m_conditions.back()->add_child(std::move(node));
             break;
         }

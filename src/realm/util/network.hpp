@@ -1,6 +1,7 @@
 #ifndef REALM_UTIL_NETWORK_HPP
 #define REALM_UTIL_NETWORK_HPP
 
+#include "realm/util/checked_cast.hpp"
 #include <cstddef>
 #include <memory>
 #include <chrono>
@@ -2755,8 +2756,7 @@ std::unique_ptr<Oper, Service::LendersOperDeleter> Service::alloc(OwnersOperPtr&
         size = owners_ptr->m_size;
         // We can use static dispatch in the destructor call here, since an
         // object, that is not in use, is always an instance of UnusedOper.
-        REALM_ASSERT(dynamic_cast<UnusedOper*>(owners_ptr.get()));
-        static_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
+        util::checked_cast<UnusedOper*>(owners_ptr.get())->UnusedOper::~UnusedOper();
         if (REALM_UNLIKELY(size < sizeof(Oper))) {
             owners_ptr.release();
             delete[] static_cast<char*>(addr);

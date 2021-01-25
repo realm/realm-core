@@ -18,6 +18,7 @@
 
 #include <realm/array_key.hpp>
 #include <realm/table.hpp>
+#include <realm/util/checked_cast.hpp>
 
 namespace realm {
 
@@ -79,8 +80,7 @@ void ArrayKeyBase<1>::verify() const
 {
 #ifdef REALM_DEBUG
     Array::verify();
-    REALM_ASSERT(dynamic_cast<Cluster*>(get_parent()));
-    auto cluster = static_cast<Cluster*>(get_parent());
+    auto cluster = util::checked_cast<Cluster*>(get_parent());
     const Table* origin_table = cluster->get_owning_table();
     ColKey link_col_key = cluster->get_col_key(get_ndx_in_parent());
 

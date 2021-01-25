@@ -1,4 +1,5 @@
 
+#include "realm/util/checked_cast.hpp"
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <cerrno>
@@ -1482,8 +1483,7 @@ public:
             if (m_post_oper && m_post_oper->m_size >= size) {
                 // Reuse old memory
                 AsyncOper* op = m_post_oper.release();
-                REALM_ASSERT(dynamic_cast<UnusedOper*>(op));
-                static_cast<UnusedOper*>(op)->UnusedOper::~UnusedOper(); // Static dispatch
+                util::checked_cast<UnusedOper*>(op)->UnusedOper::~UnusedOper(); // Static dispatch
                 mem.reset(static_cast<char*>(static_cast<void*>(op)));
             }
             else {

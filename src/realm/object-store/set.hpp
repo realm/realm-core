@@ -19,6 +19,7 @@
 #ifndef REALM_OS_SET_HPP
 #define REALM_OS_SET_HPP
 
+#include "realm/util/checked_cast.hpp"
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 
@@ -146,22 +147,19 @@ auto Set::dispatch(Fn&& fn) const
 template <class T>
 auto& Set::as() const
 {
-    REALM_ASSERT(dynamic_cast<realm::Set<T>*>(m_set_base.get()));
-    return static_cast<realm::Set<T>&>(*m_set_base);
+    return util::checked_cast<realm::Set<T>&>(*m_set_base);
 }
 
 template <>
 inline auto& Set::as<Obj>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
-    return static_cast<LnkSet&>(*m_set_base);
+    return util::checked_cast<LnkSet&>(*m_set_base);
 }
 
 template <>
 inline auto& Set::as<ObjKey>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
-    return static_cast<LnkSet&>(*m_set_base);
+    return util::checked_cast<LnkSet&>(*m_set_base);
 }
 
 template <class T, class Context>

@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/util/checked_cast.hpp"
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
@@ -57,8 +58,7 @@ Results Dictionary::snapshot() const
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
     auto frozen_collection = frozen_realm->import_copy_of(*m_dict);
-    REALM_ASSERT(dynamic_cast<realm::Dictionary*>(frozen_collection.get()));
-    realm::Dictionary* frozen_dict = static_cast<realm::Dictionary*>(frozen_collection.get());
+    realm::Dictionary* frozen_dict = util::checked_cast<realm::Dictionary*>(frozen_collection.get());
     return Dictionary(frozen_realm, *frozen_dict);
 }
 

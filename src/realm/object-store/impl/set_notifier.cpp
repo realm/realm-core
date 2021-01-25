@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/util/checked_cast.hpp"
 #include <realm/object-store/impl/set_notifier.hpp>
 
 #include <realm/object-store/set.hpp>
@@ -84,8 +85,7 @@ void SetNotifier::run()
     m_prev_size = m_set->size();
 
     if (m_type == PropertyType::Object) {
-        REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set));
-        auto& set = static_cast<LnkSet&>(*m_set);
+        auto& set = util::checked_cast<LnkSet&>(*m_set);
         auto object_did_change = get_modification_checker(*m_info, set.get_target_table());
         for (size_t i = 0; i < set.size(); ++i) {
             if (m_change.modifications.contains(i))

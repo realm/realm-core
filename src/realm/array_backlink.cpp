@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include "realm/util/checked_cast.hpp"
 #include <realm/array_backlink.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/table.hpp>
@@ -38,8 +39,7 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
     // The table which holds the corresponding fwd links is the source.
 
     // determine target table, column and key.
-    REALM_ASSERT_DEBUG(dynamic_cast<Cluster*>(get_parent()));
-    auto cluster = static_cast<Cluster*>(get_parent());
+    auto cluster = util::checked_cast<Cluster*>(get_parent());
     const Table* target_table = cluster->get_owning_table();
     ColKey target_col_key = cluster->get_col_key(get_ndx_in_parent());
     ObjKey target_key = cluster->get_real_key(ndx);
@@ -184,8 +184,7 @@ void ArrayBacklink::verify() const
 #ifdef REALM_DEBUG
     Array::verify();
 
-    REALM_ASSERT(dynamic_cast<Cluster*>(get_parent()));
-    auto cluster = static_cast<Cluster*>(get_parent());
+    auto cluster = util::checked_cast<Cluster*>(get_parent());
     const Table* target_table = cluster->get_owning_table();
     ColKey backlink_col_key = cluster->get_col_key(get_ndx_in_parent());
 

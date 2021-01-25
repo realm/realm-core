@@ -107,6 +107,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/table.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/checked_cast.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
 #include <realm/util/shared_ptr.hpp>
@@ -243,11 +244,9 @@ public:
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is
         // discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
-            REALM_ASSERT_DEBUG(dynamic_cast<LeafType*>(source_column) != nullptr);
-            av = static_cast<LeafType*>(source_column)->get(r);
+            av = util::checked_cast<LeafType*>(source_column)->get(r);
         }
-        REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
-        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
+        bool cont = util::checked_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
         return cont;
     }
 

@@ -15,6 +15,7 @@
 
 ### Internals
 * ThreadSafeReference for Dictionary added
+* `util::checked_cast<T>()` introduced to simplify down-casting with a validity check in debug builds.
 
 ----------------------------------------------
 
