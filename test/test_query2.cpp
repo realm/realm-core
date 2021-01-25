@@ -6133,7 +6133,7 @@ TEST(Query_FullText)
 
     // Add before index creation
     table->create_object().set(col, "This is a test, with  spaces!");
-    Obj obj2 = table->create_object().set(col, "Ål, ø og æbler");
+    Obj obj2 = table->create_object().set(col, "Ål, ø og Æbler");
     Obj obj3 = table->create_object().set(
         col,
         "An object database (also object-oriented database management system) is a database management system in "
