@@ -1831,4 +1831,17 @@ TEST(StringIndex_MixedEqualBitPattern)
     CHECK_EQUAL(tv.get_object(1).get_any(col), val1);
 }
 
+TEST(StringIndex_CaseMap)
+{
+    StringData chars("±ÀÁÂÃÄÅÆÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝß×÷");
+    auto lower = case_map(chars, false);
+    if (CHECK(lower)) {
+        CHECK_EQUAL(*lower, "±àáâãäåæèéêëìíîïñòóôõöøùúûüýß×÷");
+    }
+    auto upper = case_map(*lower, true);
+    if (CHECK(upper)) {
+        CHECK_EQUAL(*upper, chars);
+    }
+}
+
 #endif // TEST_INDEX_STRING
