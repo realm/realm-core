@@ -1003,7 +1003,7 @@ void RealmCoordinator::run_async_notifiers()
         version = m_db->get_version_id_of_latest_snapshot();
         if (version == m_notifier_sg->get_version_of_current_transaction()) {
             // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(!skip_version.version);
             m_notifier_cv.notify_all();
             return;
         }
