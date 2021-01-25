@@ -8336,7 +8336,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
         auto wt = local_db->start_write();
         auto source_table = sync::create_table_with_primary_key(*wt, "class_source", type_String, "_id");
         auto target_table = sync::create_table_with_primary_key(*wt, "class_target", type_String, "_id");
-        source_table->add_column_link(type_LinkList, "links", *target_table);
+        source_table->add_column_list(*target_table, "links");
 
         source_table_key = source_table->get_key();
         target_table_key = target_table->get_key();
