@@ -37,11 +37,11 @@ template <typename T, typename U,
           typename = std::void_t<decltype(static_cast<T>(std::declval<U>()))>>
 inline T checked_cast(U&& u) noexcept
 {
-#if REALM_ASSERTIONS_ENABLED
+#if REALM_DEBUG
     if constexpr (std::is_pointer_v<std::remove_reference_t<U>>) {
         if (!u)
             return nullptr;
-        REALM_ASSERT(dynamic_cast<T>(u));
+        REALM_ASSERT_DEBUG(dynamic_cast<T>(u));
     }
     else {
         REALM_ASSERT(dynamic_cast<std::add_pointer_t<T>>(&u));
@@ -54,10 +54,10 @@ namespace checked_cast_detail {
 template <typename T, typename U>
 inline std::shared_ptr<T> checked_pointer_cast(U&& u) noexcept
 {
-#if REALM_ASSERTIONS_ENABLED
+#if REALM_DEBUG
     if (!u)
         return nullptr;
-    REALM_ASSERT(std::dynamic_pointer_cast<T>(std::forward<U>(u)));
+    REALM_ASSERT_DEBUG(std::dynamic_pointer_cast<T>(std::forward<U>(u)));
 #endif
     return std::static_pointer_cast<T>(std::forward<U>(u));
 }
