@@ -2088,17 +2088,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto config = setup_and_get_config(app);
 
         std::mutex sync_error_mutex;
-        util::Optional<SyncError> sync_error;
+        std::vector<SyncError> sync_errors;
         config.sync_config->error_handler = [&](auto, SyncError error) {
-            if (error.error_code.category() != util::websocket::websocket_close_status_category()) {
-                // Ignore any errors not related to this test.
-                return;
-            }
-
             std::lock_guard<std::mutex> lk(sync_error_mutex);
-            if (!sync_error) {
-                sync_error = error;
-            }
+            sync_errors.push_back(std::move(error));
         };
         auto r = realm::Realm::get_shared_realm(config);
         auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -2118,6 +2111,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->commit_transaction();
 
         const auto wait_start = std::chrono::steady_clock::now();
+        auto pred = [](const SyncError& error) {
+                return error.error_code.category() == util::websocket::websocket_close_status_category();
+        };
         util::EventLoop::main().run_until([&]() -> bool {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
             // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
@@ -2125,13 +2121,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             if (std::chrono::steady_clock::now() - wait_start > std::chrono::minutes(2)) {
                 return false;
             }
-            return static_cast<bool>(sync_error);
+            return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
         });
 
         auto captured_error = [&] {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
-            REQUIRE(sync_error);
-            return *sync_error;
+            const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
+            REQUIRE(it != sync_errors.end());
+            return *it;
         }();
 
         REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
