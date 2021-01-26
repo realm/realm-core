@@ -2117,15 +2117,23 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
         r->commit_transaction();
 
+        const auto wait_start = std::chrono::steady_clock::now();
         util::EventLoop::main().run_until([&]() -> bool {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
+            // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+            // and we should fail the test.
+            if (std::chrono::steady_clock::now() - wait_start > std::chrono::minutes(2)) {
+                return false;
+            }
             return static_cast<bool>(sync_error);
         });
 
         auto captured_error = [&] {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
+            REQUIRE(sync_error);
             return *sync_error;
         }();
+
         REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
         REQUIRE(captured_error.error_code.value() == 1009);
         REQUIRE(captured_error.message == "read limited at 16777217 bytes");
