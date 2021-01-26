@@ -44,18 +44,19 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
-    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
+    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties, name_alias)
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
                            std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
     : name(std::move(name))
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , is_embedded(is_embedded)
+    , alias(name_alias)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
