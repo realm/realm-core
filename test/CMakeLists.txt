@@ -85,8 +85,7 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
-    test_uuid.cpp
-    test_version.cpp)
+    test_uuid.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
 	list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
