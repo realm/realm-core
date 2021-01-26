@@ -463,6 +463,17 @@ bool Connection::websocket_pong_message_received(const char* data, std::size_t s
 }
 
 
+bool Connection::websocket_close_message_received(std::error_code error_code, StringData message)
+{
+    if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
+        error_code.value() != 1000) {
+        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+        involuntary_disconnect(error_code, false, &message);
+    }
+
+    return true;
+}
+
 // Guarantees that handle_reconnect_wait() is never called from within the
 // execution of initiate_reconnect_wait() (no callback reentrance).
 void Connection::initiate_reconnect_wait()
