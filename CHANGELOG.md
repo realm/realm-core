@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 11.0.0-beta.0 Release notes
 
 ### Enhancements
 * Sync client now logs error messages received from server rather than just the size of the error message ([RCORE-425](https://jira.mongodb.org/browse/RCORE-425)).
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
  
 ### Breaking changes
