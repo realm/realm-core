@@ -35,6 +35,7 @@
 #include <external/json/json.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
+#include <realm/util/websocket.hpp>
 #include <thread>
 
 using namespace realm;
@@ -2089,6 +2090,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex sync_error_mutex;
         util::Optional<SyncError> sync_error;
         config.sync_config->error_handler = [&](auto, SyncError error) {
+            if (error.error_code.category() != util::websocket::websocket_close_status_category()) {
+                // Ignore any errors not related to this test.
+                return;
+            }
+
             std::lock_guard<std::mutex> lk(sync_error_mutex);
             if (!sync_error) {
                 sync_error = error;
@@ -2120,6 +2126,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
             return *sync_error;
         }();
+        REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
         REQUIRE(captured_error.error_code.value() == 1009);
         REQUIRE(captured_error.message == "read limited at 16777217 bytes");
     }
