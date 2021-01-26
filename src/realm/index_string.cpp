@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include "realm/string_data.hpp"
 #include <cstdio>
 #include <iomanip>
 
@@ -1171,41 +1172,81 @@ Mixed StringIndex::get(ObjKey key) const
     return m_target_column.get_value(key);
 }
 
+static const uint8_t utf8_map[32] = {0x61, 0x61, 0x61, 0x61, 0x61, 0xe5, 0xe6, 0x63, 0x65, 0x65, 0x65,
+                                     0x65, 0x69, 0x69, 0x69, 0x69, 0xf0, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f,
+                                     0x6f, 0x0,  0xf8, 0x75, 0x75, 0x75, 0x75, 0x79, 0xfe, 0x0};
+
 std::set<std::string> StringIndex::tokenize(const StringData text)
 {
     std::set<std::string> words;
 
-    const char* str = text.data();
-    const size_t len = text.size();
-    size_t start = 0;
+    auto current = text.data();
+    auto end = current + text.size();
+    char buffer[32];
+    char* bufp = buffer;
+    char* end_buffer = &buffer[sizeof(buffer)];
 
-    for (size_t i = 0; i < len; ++i) {
-        signed char c = static_cast<signed char>(str[i]); // char may not be signed by default
-
-        // Words are alnum + unicode chars above 128 (special unicode whitespace
-        // chars are not used as word separators)
-        bool is_alnum = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                        c < 0; // sign bit is set = unicode above 128
-
-        if (is_alnum)
-            continue;
-
-        if (i > start) {
-            StringData w(str + start, i - start);
-
-            // All words are converted to lowercase (not very unicode aware)
-            // This is also where we could do stemming.
-            if (auto opt = case_map(w, false)) {
-                words.emplace(*opt);
+    typedef std::char_traits<char> traits;
+    while (current < end) {
+        auto c = *current;
+        bool alnum = false;
+        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')) {
+            // c is a lowercase ASCII character. Can be added directly.
+            alnum = true;
+            if (bufp < end_buffer)
+                *bufp++ = c;
+        }
+        else if ((c >= 'A' && c <= 'Z')) {
+            // c is an uppercase ASCII character. Can be added after adding 0x20.
+            alnum = true;
+            if (bufp < end_buffer)
+                *bufp++ = c + 0x20;
+        }
+        else if (traits::to_int_type(c) > 0x7f) {
+            auto i = traits::to_int_type(c);
+            if ((i & 0xE0) == 0xc0) {
+                // 2 byte utf-8
+                current++;
+                // Construct unicode value
+                auto u = ((i << 6) + (traits::to_int_type(*current) & 0x3F)) & 0x7FF;
+                if ((u >= 0xC0) && (u < 0x100)) {
+                    // u is a letter from Latin-1 Supplement block - map to output
+                    alnum = true;
+                    if (auto o = utf8_map[u & 0x1f]) {
+                        if (o < 0x80) {
+                            // ASCII
+                            if (bufp < end_buffer)
+                                *bufp++ = char(o);
+                        }
+                        else {
+                            if (bufp < end_buffer - 1) {
+                                *bufp++ = static_cast<char>((o >> 6) | 0xC0);
+                                *bufp++ = static_cast<char>((o & 0x3f) | 0x80);
+                            }
+                        }
+                    }
+                }
+            }
+            else if ((i & 0xF0) == 0xE0) {
+                // 3 byte utf-8
+                current += 2;
+            }
+            else if ((i & 0xF8) == 0xF0) {
+                // 4 byte utf-8
+                current += 3;
             }
         }
-        start = i + 1;
-    }
-    if (start < len) {
-        StringData w(str + start, len - start);
-        if (auto opt = case_map(w, false)) {
-            words.emplace(*opt);
+        // If prevp == bufp then nothing was added to buffer and the current
+        // character is interpreted as a separator and we can store the
+        // word collected so far
+        if (!alnum && bufp > buffer) {
+            words.emplace(buffer, bufp);
+            bufp = buffer;
         }
+        current++;
+    }
+    if (bufp > buffer) {
+        words.emplace(buffer, bufp);
     }
 
     return words;
@@ -1488,11 +1529,13 @@ void StringIndex::insert<StringData>(ObjKey key, StringData value)
     StringConversionBuffer buffer;
 
     if (this->m_target_column.is_fulltext()) {
-        std::set<std::string> words = tokenize(value);
+        if (value.size() > 0) {
+            std::set<std::string> words = tokenize(value);
 
-        for (auto& word : words) {
-            Mixed m(word);
-            insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+            for (auto& word : words) {
+                Mixed m(word);
+                insert_with_offset(key, m.get_index_data(buffer), m, 0); // Throws
+            }
         }
     }
     else {
@@ -1509,37 +1552,40 @@ void StringIndex::set<StringData>(ObjKey key, StringData new_value)
     Mixed new_value2 = Mixed(new_value);
 
     if (this->m_target_column.is_fulltext()) {
-        std::set<std::string> old_words = tokenize(old_value.get_string());
+        StringData old_string = old_value.get_index_data(buffer);
         std::set<std::string> new_words = tokenize(new_value);
-
-        auto w1 = old_words.begin();
         auto w2 = new_words.begin();
 
-        // Do a diff, deleting words no longer present and
-        // inserting new words
-        while (w1 != old_words.end() && w2 != new_words.end()) {
-            if (*w1 < *w2) {
+        if (old_string.size() > 0) {
+            std::set<std::string> old_words = tokenize(old_string);
+            auto w1 = old_words.begin();
+
+            // Do a diff, deleting words no longer present and
+            // inserting new words
+            while (w1 != old_words.end() && w2 != new_words.end()) {
+                if (*w1 < *w2) {
+                    erase_string(key, *w1);
+                    ++w1;
+                }
+                else if (*w2 < *w1) {
+                    Mixed m(*w2);
+                    insert_with_offset(key, m.get_index_data(buffer), m, 0);
+                    ++w2;
+                }
+                else {
+                    ++w1;
+                    ++w2;
+                }
+            }
+            while (w1 != old_words.end()) {
                 erase_string(key, *w1);
                 ++w1;
             }
-            else if (*w2 < *w1) {
-                Mixed m(*w2);
-                insert_with_offset(key, m.get_index_data(buffer), m, 0);
-                ++w2;
-            }
-            else {
-                ++w1;
-                ++w2;
-            }
         }
-        while (w1 != old_words.end()) {
-            erase_string(key, *w1);
-            ++w1;
-        }
+
         while (w2 != new_words.end()) {
             Mixed m(*w2);
             insert_with_offset(key, m.get_index_data(buffer), m, 0);
-
             ++w2;
         }
     }
