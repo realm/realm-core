@@ -2080,6 +2080,49 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                                "Realm but none was found for type 'Dog'",
                                                valid_pk_name));
     }
+
+    SECTION("too large sync message error handling") {
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+
+        std::mutex sync_error_mutex;
+        util::Optional<SyncError> sync_error;
+        config.sync_config->error_handler = [&](auto, SyncError error) {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            if (!sync_error) {
+                sync_error = error;
+            }
+        };
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+        // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
+        // and get uploaded at once, which for now is an error on the server.
+        r->begin_transaction();
+        CppContext c;
+        for (auto i = 'a'; i < 'z'; ++i) {
+            Object::create(c, r, "Dog",
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                    {"breed", std::string("bulldog")},
+                                                    {"name", random_string(1024 * 1024)},
+                                                    {"realm_id", std::string("foo")}}),
+                           CreatePolicy::ForceCreate);
+        }
+        r->commit_transaction();
+
+        util::EventLoop::main().run_until([&]() -> bool {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            return static_cast<bool>(sync_error);
+        });
+
+        auto captured_error = [&] {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            return *sync_error;
+        }();
+        REQUIRE(captured_error.error_code.value() == 1009);
+        REQUIRE(captured_error.message == "read limited at 16777217 bytes");
+    }
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
