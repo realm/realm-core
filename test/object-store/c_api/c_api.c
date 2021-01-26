@@ -238,7 +238,7 @@ int realm_c_api_tests(const char* file)
     realm_object_create(realm, foo_info.key);
     realm_error_t err;
     assert(realm_get_last_error(&err));
-    assert(err.error == RLM_ERR_OTHER_EXCEPTION); // FIXME: RLM_ERR_NOT_IN_A_WRITE_TRANSACTION
+    assert(err.error == RLM_ERR_NOT_IN_A_TRANSACTION);
     realm_clear_last_error();
 
     realm_object_t* foo_1;

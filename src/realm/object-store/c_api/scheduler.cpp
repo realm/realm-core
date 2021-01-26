@@ -13,6 +13,9 @@
 
 using namespace realm::util;
 
+// LCOV_EXCL_START
+
+namespace realm::c_api {
 namespace {
 
 // A callback coming from C++ code registered in a scheduler created by
@@ -286,3 +289,7 @@ RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t* scheduler, v
         return true;
     });
 }
+
+} // namespace realm::c_api
+
+// LCOV_EXCL_STOP
