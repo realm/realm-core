@@ -377,6 +377,61 @@ template int64_t Mixed::export_to_type<int64_t>() const noexcept;
 template float Mixed::export_to_type<float>() const noexcept;
 template double Mixed::export_to_type<double>() const noexcept;
 
+template <>
+util::Optional<int64_t> Mixed::get<util::Optional<int64_t>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<int64_t>();
+}
+
+template <>
+util::Optional<bool> Mixed::get<util::Optional<bool>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<bool>();
+}
+
+template <>
+util::Optional<float> Mixed::get<util::Optional<float>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<float>();
+}
+
+template <>
+util::Optional<double> Mixed::get<util::Optional<double>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<double>();
+}
+
+template <>
+util::Optional<ObjectId> Mixed::get<util::Optional<ObjectId>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<ObjectId>();
+}
+
+template <>
+util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<UUID>();
+}
+
+
 size_t Mixed::hash() const
 {
     REALM_ASSERT(!is_null());
