@@ -2112,7 +2112,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         const auto wait_start = std::chrono::steady_clock::now();
         auto pred = [](const SyncError& error) {
-                return error.error_code.category() == util::websocket::websocket_close_status_category();
+            return error.error_code.category() == util::websocket::websocket_close_status_category();
         };
         util::EventLoop::main().run_until([&]() -> bool {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
