@@ -700,7 +700,7 @@ RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);
  *
  * This function cannot fail.
  */
-RLM_API size_t realm_config_get_max_number_of_active_versions(const realm_config_t*);
+RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_config_t*);
 
 /**
  * Set maximum number of active versions in the realm file allowed before an
@@ -708,7 +708,7 @@ RLM_API size_t realm_config_get_max_number_of_active_versions(const realm_config
  *
  * This function cannot fail.
  */
-RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, size_t);
+RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uint64_t);
 
 /**
  * Create a custom scheduler object from callback functions.

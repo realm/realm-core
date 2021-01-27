@@ -167,12 +167,12 @@ RLM_API void realm_config_set_scheduler(realm_config_t* config, const realm_sche
     config->scheduler = *scheduler;
 }
 
-RLM_API size_t realm_config_get_max_number_of_active_versions(const realm_config_t* config)
+RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_config_t* config)
 {
-    return config->max_number_of_active_versions;
+    return uint64_t(config->max_number_of_active_versions);
 }
 
-RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t* config, size_t n)
+RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t* config, uint64_t n)
 {
-    config->max_number_of_active_versions = n;
+    config->max_number_of_active_versions = uint_fast64_t(n);
 }
