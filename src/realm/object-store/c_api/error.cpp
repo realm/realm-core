@@ -201,8 +201,9 @@ RLM_API bool realm_clear_last_error()
 
 RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void)
 {
-    if (g_last_exception) {
-        return new realm_async_error_t{g_last_exception};
+    auto p = get_last_exception();
+    if (p && *p) {
+        return new realm_async_error_t{*p};
     }
     return nullptr;
 }
