@@ -740,7 +740,6 @@ TEST_CASE("C API") {
     }
 
     realm_t* realm;
-    ConfigUserdata userdata;
     {
         auto schema = make_schema();
         CHECK(checked(schema.get()));
