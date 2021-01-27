@@ -2146,6 +2146,54 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
+class StringNodeFulltext : public StringNodeEqualBase {
+public:
+    using StringNodeEqualBase::StringNodeEqualBase;
+
+    void table_changed() override
+    {
+        StringNodeBase::table_changed();
+        m_has_search_index = true;
+    }
+
+    void _search_index_init() override;
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new StringNodeFulltext(*this));
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return "FULLTEXT";
+    }
+
+    StringNodeFulltext(const StringNodeFulltext& from) = default;
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (auto k : m_index_matches) {
+            if (evaluator(m_table->get_object(k))) {
+                if (--limit == 0)
+                    return;
+            }
+        }
+    }
+
+private:
+    std::vector<ObjKey> m_index_matches;
+
+    ObjKey get_key(size_t ndx) override
+    {
+        return m_index_matches[ndx];
+    }
+
+    size_t _find_first_local(size_t, size_t) override
+    {
+        REALM_UNREACHABLE();
+    }
+};
+
 // OR node contains at least two node pointers: Two or more conditions to OR
 // together in m_conditions, and the next AND condition (if any) in m_child.
 //

@@ -187,7 +187,7 @@ public:
     /// \param col_key The key of a column of the table.
 
     bool has_search_index(ColKey col_key) const noexcept;
-    void add_search_index(ColKey col_key);
+    void add_search_index(ColKey col_key, bool fulltext = false);
     void remove_search_index(ColKey col_key);
 
     void enumerate_string_column(ColKey col_key);
@@ -419,6 +419,8 @@ public:
     ConstTableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
+
+    TableView find_all_fulltext(ColKey col_key, StringData value) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;

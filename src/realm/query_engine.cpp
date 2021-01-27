@@ -435,6 +435,21 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+void StringNodeFulltext::_search_index_init()
+{
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    m_index_matches.clear();
+    REALM_ASSERT(index && index->is_fulltext_index());
+    index->find_all_fulltext(m_index_matches, StringData(StringNodeBase::m_value));
+    m_results_start = 0;
+    m_results_ndx = 0;
+    m_results_end = m_index_matches.size();
+    if (m_results_start != m_results_end) {
+        m_actual_key = m_index_matches[0];
+    }
+}
+
+
 std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
                                                                                          const ColKey& col_key)
 {

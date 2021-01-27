@@ -5614,4 +5614,18 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 }
 
+TEST(Table_FullTextIndex)
+{
+    Table t;
+    auto col = t.add_column(type_String, "str");
+    t.add_search_index(col, true);
+
+    t.create_object().set(col, "This is a test, with  spaces!");
+    t.create_object().set(col, "More testing, with normal spaces");
+    t.create_object().set(col, "ål, ø og æbler");
+
+    TableView res = t.find_all_fulltext(col, "spaces with");
+    CHECK_EQUAL(2, res.size());
+}
+
 #endif // TEST_TABLE
