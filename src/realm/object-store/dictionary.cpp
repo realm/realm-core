@@ -54,6 +54,18 @@ Results Dictionary::snapshot() const
     return as_results().snapshot();
 }
 
+Results Dictionary::get_keys() const
+{
+    verify_attached();
+    return Results(m_realm, m_coll_base, true);
+}
+
+Results Dictionary::get_values() const
+{
+    return as_results();
+}
+
+
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
     auto frozen_collection = frozen_realm->import_copy_of(*m_dict);

@@ -49,8 +49,8 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, bool as_keys = false);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o, bool = false);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
@@ -357,6 +357,7 @@ private:
     } m_table_iterator;
 
     util::CheckedOptionalMutex m_mutex;
+    bool m_dictionary_keys = false;
 
     // A work around for what appears to be a false positive in clang's thread
     // analysis when constructing a different object of the same type within a

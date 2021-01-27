@@ -72,12 +72,13 @@ TEST_CASE("dictionary") {
     ColKey col = table->get_column_key("value");
 
     object_store::Dictionary dict(r, obj, col);
-    auto results = dict.as_results();
+    auto keys_as_results = dict.get_keys();
+    auto values_as_results = dict.get_values();
     CppContext ctx(r);
 
     SECTION("get_realm()") {
         REQUIRE(dict.get_realm() == r);
-        REQUIRE(results.get_realm() == r);
+        REQUIRE(values_as_results.get_realm() == r);
     }
 
     std::vector<std::string> keys = {"a", "b", "c"};
@@ -90,9 +91,9 @@ TEST_CASE("dictionary") {
 
     SECTION("clear()") {
         REQUIRE(dict.size() == 3);
-        results.clear();
+        values_as_results.clear();
         REQUIRE(dict.size() == 0);
-        REQUIRE(results.size() == 0);
+        REQUIRE(values_as_results.size() == 0);
     }
 
     SECTION("get()") {
@@ -121,10 +122,18 @@ TEST_CASE("dictionary") {
             Dictionary::Iterator it = dict.begin() + ndx;
             REQUIRE((*it).first.get_string() == keys[i]);
             REQUIRE((*it).second.get_string() == values[i]);
-            auto element = results.get_dictionary_element(ndx);
+            auto element = values_as_results.get_dictionary_element(ndx);
             REQUIRE(element.first == keys[i]);
             REQUIRE(element.second.get_string() == values[i]);
+            std::string key = keys_as_results.get<StringData>(ndx);
+            REQUIRE(key == keys[i]);
         }
+    }
+
+    SECTION("keys sorted") {
+        auto sorted = keys_as_results.sort({{"self", false}});
+        std::string key = sorted.get<StringData>(0);
+        REQUIRE(key == "c");
     }
 
     SECTION("handover") {
@@ -132,7 +141,7 @@ TEST_CASE("dictionary") {
 
         auto dict2 = ThreadSafeReference(dict).resolve<object_store::Dictionary>(r);
         REQUIRE(dict == dict2);
-        ThreadSafeReference ref(results);
+        ThreadSafeReference ref(values_as_results);
         auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(results2.get<String>(i) == values[i]);
@@ -147,7 +156,7 @@ TEST_CASE("dictionary") {
     SECTION("notifications") {
         r->commit_transaction();
 
-        auto sorted = results.sort({{"self", true}});
+        auto sorted = values_as_results.sort({{"self", true}});
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
@@ -155,7 +164,7 @@ TEST_CASE("dictionary") {
             change = c;
             ++calls;
         });
-        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             rchange = c;
             ++calls;
         });
@@ -178,7 +187,7 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
 
             advance_and_notify(*r);
-            auto ndx = results.index_of(StringData("dade"));
+            auto ndx = values_as_results.index_of(StringData("dade"));
             REQUIRE_INDICES(change.insertions, ndx);
             REQUIRE_INDICES(rchange.insertions, ndx);
             // "dade" ends up at the end of the sorted list
@@ -192,7 +201,7 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
 
             advance_and_notify(*r);
-            auto ndx = results.index_of(StringData("blueberry"));
+            auto ndx = values_as_results.index_of(StringData("blueberry"));
             REQUIRE_INDICES(change.insertions);
             REQUIRE_INDICES(change.modifications, ndx);
             REQUIRE_INDICES(change.deletions);
@@ -200,7 +209,7 @@ TEST_CASE("dictionary") {
 
         SECTION("remove value from list") {
             advance_and_notify(*r);
-            auto ndx = results.index_of(StringData("apple"));
+            auto ndx = values_as_results.index_of(StringData("apple"));
             r->begin_transaction();
             dict.erase("a");
             r->commit_transaction();

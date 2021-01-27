@@ -52,20 +52,22 @@ Results::Results(SharedRealm r, ConstTableRef table)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, bool as_keys)
     : m_realm(std::move(r))
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
+    , m_dictionary_keys(as_keys)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o, bool as_keys)
     : m_realm(std::move(r))
     , m_descriptor_ordering(std::move(o))
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
+    , m_dictionary_keys(as_keys)
 {
 }
 
@@ -258,7 +260,16 @@ util::Optional<T> Results::try_get(size_t ndx)
         }
         if (ndx < m_collection->size()) {
             using U = typename util::RemoveOptional<T>::type;
-            auto mixed = m_collection->get_any(ndx);
+            Mixed mixed;
+            if (m_dictionary_keys) {
+                if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                    auto key_value = dict->get_pair(ndx);
+                    mixed = key_value.first;
+                }
+            }
+            else {
+                mixed = m_collection->get_any(ndx);
+            }
             T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
@@ -1093,7 +1104,7 @@ Results Results::sort(SortDescriptor&& sort) const
     if (m_mode == Mode::LinkList)
         return Results(m_realm, m_link_list, util::none, std::move(sort));
     else if (m_mode == Mode::Collection)
-        return Results(m_realm, m_collection, std::move(new_order));
+        return Results(m_realm, m_collection, std::move(new_order), m_dictionary_keys);
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 

@@ -95,6 +95,8 @@ public:
 
     Results snapshot() const;
     Dictionary freeze(const std::shared_ptr<Realm>& realm) const;
+    Results get_keys() const;
+    Results get_values() const;
 
     Iterator begin() const
     {
