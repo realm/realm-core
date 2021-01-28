@@ -127,13 +127,19 @@ TEST_CASE("dictionary") {
             REQUIRE(element.second.get_string() == values[i]);
             std::string key = keys_as_results.get<StringData>(ndx);
             REQUIRE(key == keys[i]);
+            Mixed m = keys_as_results.get_any(ndx);
+            REQUIRE(m.get_string() == keys[i]);
         }
     }
 
     SECTION("keys sorted") {
-        auto sorted = keys_as_results.sort({{"self", false}});
+        auto sorted = keys_as_results.sort({{"self", true}});
         std::string key = sorted.get<StringData>(0);
-        REQUIRE(key == "c");
+        REQUIRE(key == "a");
+        Mixed m = sorted.get_any(0);
+        REQUIRE(m.get_string() == "a");
+        m = sorted.get_any(4);
+        REQUIRE(m.is_null());
     }
 
     SECTION("handover") {

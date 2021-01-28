@@ -361,12 +361,20 @@ Mixed Results::get_any(size_t ndx)
         case Mode::Collection:
             evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {
-                if (ndx < m_list_indices->size())
-                    return m_collection->get_any((*m_list_indices)[ndx]);
+                ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
             }
-            else {
-                if (ndx < m_collection->size())
-                    return m_collection->get_any(ndx);
+            if (ndx < m_collection->size()) {
+                Mixed mixed;
+                if (m_dictionary_keys) {
+                    if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                        auto key_value = dict->get_pair(ndx);
+                        mixed = key_value.first;
+                    }
+                }
+                else {
+                    mixed = m_collection->get_any(ndx);
+                }
+                return mixed;
             }
             break;
         case Mode::Table:
