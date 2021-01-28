@@ -59,19 +59,26 @@ TEST_CASE("dictionary") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object", {{"value", PropertyType::Dictionary | PropertyType::String}}},
-    };
+    config.schema =
+        Schema{{"object",
+                {{"value", PropertyType::Dictionary | PropertyType::String},
+                 {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+               {"target", {{"value", PropertyType::Int}}}};
+
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
 
     auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
     auto table2 = r2->read_group().get_table("class_object");
     r->begin_transaction();
     Obj obj = table->create_object();
+    Obj another = target->create_object();
     ColKey col = table->get_column_key("value");
+    ColKey col_links = table->get_column_key("links");
 
     object_store::Dictionary dict(r, obj, col);
+    object_store::Dictionary links(r, obj, col_links);
     auto results = dict.as_results();
     CppContext ctx(r);
 
@@ -250,6 +257,20 @@ TEST_CASE("dictionary") {
             r2->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
+        }
+
+        SECTION("now with links") {
+            CollectionChangeSet local_change;
+            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
+                local_change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            links.insert("l", another.get_key());
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(local_change.insertions.count() == 1);
         }
     }
 }
