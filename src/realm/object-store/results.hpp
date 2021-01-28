@@ -49,8 +49,8 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, bool as_keys = false);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o, bool = false);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
@@ -296,6 +296,11 @@ public:
     void set_update_policy(UpdatePolicy policy)
     {
         m_update_policy = policy;
+    }
+
+    void as_keys(bool dictionary_keys)
+    {
+        m_dictionary_keys = dictionary_keys;
     }
 
 private:

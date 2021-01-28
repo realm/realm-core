@@ -57,7 +57,9 @@ Results Dictionary::snapshot() const
 Results Dictionary::get_keys() const
 {
     verify_attached();
-    return Results(m_realm, m_coll_base, true);
+    Results ret(m_realm, m_coll_base);
+    ret.as_keys(true);
+    return ret;
 }
 
 Results Dictionary::get_values() const

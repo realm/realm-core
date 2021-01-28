@@ -52,22 +52,20 @@ Results::Results(SharedRealm r, ConstTableRef table)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, bool as_keys)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll)
     : m_realm(std::move(r))
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
-    , m_dictionary_keys(as_keys)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o, bool as_keys)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o)
     : m_realm(std::move(r))
     , m_descriptor_ordering(std::move(o))
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
-    , m_dictionary_keys(as_keys)
 {
 }
 
@@ -1109,10 +1107,14 @@ Results Results::sort(SortDescriptor&& sort) const
     util::CheckedUniqueLock lock(m_mutex);
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
-    if (m_mode == Mode::LinkList)
+    if (m_mode == Mode::LinkList) {
         return Results(m_realm, m_link_list, util::none, std::move(sort));
-    else if (m_mode == Mode::Collection)
-        return Results(m_realm, m_collection, std::move(new_order), m_dictionary_keys);
+    }
+    else if (m_mode == Mode::Collection) {
+        Results ret(m_realm, m_collection, std::move(new_order));
+        ret.as_keys(m_dictionary_keys);
+        return ret;
+    }
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
