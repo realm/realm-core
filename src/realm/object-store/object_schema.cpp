@@ -235,7 +235,8 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
         exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
                                 string_for_property_type(prop.type));
     }
-    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
+    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) &&
+             !(is_array(prop.type) || is_set(prop.type))) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
     else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type) && !is_collection(prop.type)) {
