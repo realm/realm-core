@@ -5586,7 +5586,8 @@ TEST(Query_StringNodeEqualBaseBug)
     CHECK_EQUAL(tv.size(), 0);
 }
 
-TEST(Query_OptimalNode)
+// Disabled because it is timing-dependent and frequently causes spurious failures on CI.
+TEST_IF(Query_OptimalNode, false)
 {
     const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
     Group g;
