@@ -470,6 +470,8 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
 
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
+    attr.set(col_attr_Nullable);
+
     ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
     return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
 }

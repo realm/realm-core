@@ -327,7 +327,8 @@ inline bool Property::type_is_indexable() const noexcept
 
 inline bool Property::type_is_nullable() const noexcept
 {
-    return !(is_array(type) && type == PropertyType::Object) && type != PropertyType::LinkingObjects;
+    return !((is_array(type) || is_set(type)) && type == PropertyType::Object) &&
+           type != PropertyType::LinkingObjects;
 }
 
 inline std::string Property::type_string() const
