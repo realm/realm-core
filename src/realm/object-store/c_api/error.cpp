@@ -186,7 +186,7 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
     if (ptr) {
         return convert_error(ptr, err);
     }
-    return bool(*ptr);
+    return false;
 }
 
 RLM_API bool realm_clear_last_error()
