@@ -17,7 +17,9 @@
  **************************************************************************/
 
 #include <realm/util/to_string.hpp>
+
 #include <realm/util/assert.hpp>
+#include <realm/string_data.hpp>
 
 #include <cstring>
 #include <iomanip>
@@ -26,10 +28,32 @@
 
 namespace {
 std::locale locale_classic = std::locale::classic();
+
+template <typename T, typename = decltype(std::quoted(std::declval<T>()))>
+void quoted(std::ostream& out, T&& str, int)
+{
+    out << std::quoted(str);
+}
+template <typename T>
+void quoted(std::ostream& out, T&& str, ...)
+{
+    out << '"' << str << '"';
+}
 }
 
 namespace realm {
 namespace util {
+
+Printable::Printable(StringData value)
+    : m_type(Type::String)
+{
+    if (value.is_null()) {
+        m_string = "<null>";
+    }
+    else {
+        m_string = std::string_view(value.data(), value.size());
+    }
+}
 
 void Printable::print(std::ostream& out, bool quote) const
 {
@@ -47,15 +71,13 @@ void Printable::print(std::ostream& out, bool quote) const
             out << m_double;
             break;
         case Printable::Type::String:
-            if (quote) {
-#if __cplusplus >= 201402L
-                out << std::quoted(m_string);
-#else
-                out << '"' << m_string << '"';
-#endif
-            }
+            if (quote)
+                quoted(out, m_string, 0);
             else
                 out << m_string;
+            break;
+        case Printable::Type::Callback:
+            m_callback.fn(out, m_callback.data);
             break;
     }
 }
@@ -85,26 +107,25 @@ std::string Printable::str() const
     return ss.str();
 }
 
-std::string format(const char* fmt, std::initializer_list<Printable> values)
+void format(std::ostream& os, const char* fmt, std::initializer_list<Printable> values)
 {
-    std::stringstream ss;
     while (*fmt) {
         auto next = strchr(fmt, '%');
 
         // emit the rest of the format string if there are no more percents
         if (!next) {
-            ss << fmt;
+            os << fmt;
             break;
         }
 
         // emit everything up to the next percent
-        ss.write(fmt, next - fmt);
+        os.write(fmt, next - fmt);
         ++next;
         REALM_ASSERT(*next);
 
         // %% produces a single escaped %
         if (*next == '%') {
-            ss << '%';
+            os << '%';
             fmt = next + 1;
             continue;
         }
@@ -114,11 +135,17 @@ std::string format(const char* fmt, std::initializer_list<Printable> values)
         // the pointed-to string, but it lacks a const overload
         auto index = strtoul(next, const_cast<char**>(&fmt), 10) - 1;
         REALM_ASSERT(index < values.size());
-        (values.begin() + index)->print(ss, false);
+        (values.begin() + index)->print(os, false);
     }
-    return ss.str();
 }
 
+std::string format(const char* fmt, std::initializer_list<Printable> values)
+{
+    std::stringstream ss;
+    ss.imbue(locale_classic);
+    format(ss, fmt, values);
+    return ss.str();
+}
 
 } // namespace util
 } // namespace realm

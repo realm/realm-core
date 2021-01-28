@@ -78,6 +78,13 @@ TEST(ToString_Basic)
 
     {
         std::ostringstream ostr;
+        Printable::print_all(ostr, {0, true, "Hello"}, true);
+        std::string s = ostr.str();
+        CHECK_EQUAL(s, " [0, true, \"Hello\"]");
+    }
+
+    {
+        std::ostringstream ostr;
         Printable::print_all(ostr, {}, false);
         std::string s = ostr.str();
         CHECK_EQUAL(s, "");

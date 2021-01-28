@@ -32,6 +32,7 @@
 
 ### Internals
 * DB::write_copy will not use write transaction
+* Refactor the string formatting logic for logging, reducing the compiled size of the library.
 
 ----------------------------------------------
 

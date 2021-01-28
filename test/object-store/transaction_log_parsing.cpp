@@ -33,6 +33,8 @@
 #include <realm.hpp>
 #include <realm/history.hpp>
 
+#include <iostream>
+
 using namespace realm;
 
 class CaptureHelper {

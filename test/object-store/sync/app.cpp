@@ -37,8 +37,10 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
+
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 using namespace realm;
 using namespace realm::app;
