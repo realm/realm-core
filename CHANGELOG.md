@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Mixed property can now be indexed ([#4342](https://github.com/realm/realm-core/issues/4342))
  
 ### Breaking changes
 * None.

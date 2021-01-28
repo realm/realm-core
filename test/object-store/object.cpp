@@ -110,7 +110,8 @@ TEST_CASE("object") {
              {"object id", PropertyType::ObjectId},
              {"decimal", PropertyType::Decimal},
              {"uuid", PropertyType::UUID},
-             {"mixed", PropertyType::Mixed | PropertyType::Nullable},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable, Property::IsPrimary{false},
+              Property::IsIndexed{true}},
              {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
              {"bool array", PropertyType::Array | PropertyType::Bool},
