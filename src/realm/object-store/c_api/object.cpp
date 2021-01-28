@@ -262,11 +262,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
             auto val = from_capi(values[i]);
-
-            if (col_key.get_type() != col_type_TypedLink && col_key.get_type() != col_type_Mixed) {
-                val = typed_link_to_objkey(val);
-            }
-
+            val = typed_link_to_objkey(val, col_key);
             o.set_any(col_key, val, is_default);
         }
 
@@ -350,9 +346,7 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
         check_value_assignable(*list, val);
 
         auto col_key = list->get_parent_column_key();
-        if (col_key.get_type() != col_type_TypedLink && col_key.get_type() != col_type_Mixed) {
-            val = typed_link_to_objkey(val);
-        }
+        val = typed_link_to_objkey(val, col_key);
 
         list->insert_any(index, val);
         return true;
@@ -366,9 +360,7 @@ RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t valu
         check_value_assignable(*list, val);
 
         auto col_key = list->get_parent_column_key();
-        if (col_key.get_type() != col_type_TypedLink && col_key.get_type() != col_type_Mixed) {
-            val = typed_link_to_objkey(val);
-        }
+        val = typed_link_to_objkey(val, col_key);
 
         list->set_any(index, val);
         return true;

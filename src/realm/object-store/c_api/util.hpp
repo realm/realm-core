@@ -41,6 +41,9 @@ inline void report_type_mismatch(const SharedRealm& realm, const Table& table, C
     throw PropertyTypeMismatch{schema.name, table.get_column_name(col_key)};
 }
 
+/// Check that the value within a mixed is appropriate for a particular column.
+///
+/// Checks: Base type, nullability, link target match.
 inline void check_value_assignable(const SharedRealm& realm, const Table& table, ColKey col_key, Mixed val)
 {
     if (val.is_null()) {
@@ -65,6 +68,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
     }
 }
 
+/// Check that a mixed value can be inserted in a list.
 inline void check_value_assignable(const List& list, Mixed val)
 {
     auto realm = list.get_realm();
@@ -74,11 +78,16 @@ inline void check_value_assignable(const List& list, Mixed val)
     return check_value_assignable(realm, *table, col_key, val);
 }
 
-inline Mixed typed_link_to_objkey(Mixed val)
+/// If the value is Mixed(ObjLink), and the target column is an strongly-typed
+/// link column, coerce it to Mixed(ObjKey). This is supposed to happen after
+/// calling `check_value_assignable()`.
+inline Mixed typed_link_to_objkey(Mixed val, ColKey col_key)
 {
-    if (!val.is_null() && val.get_type() == type_TypedLink) {
-        auto link = val.get<ObjLink>();
-        return link.get_obj_key();
+    if (col_key.get_type() == col_type_Link || col_key.get_type() == col_type_LinkList) {
+        if (!val.is_null() && val.get_type() == type_TypedLink) {
+            auto link = val.get<ObjLink>();
+            return link.get_obj_key();
+        }
     }
     return val;
 }
