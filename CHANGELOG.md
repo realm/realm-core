@@ -10,7 +10,7 @@
 * Subscribing for notifications on Dictionaries of Objects results in access violation ([#4346](https://github.com/realm/realm-core/issues/4346))
 
 ### Breaking changes
-* None.
+* Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.
 
 -----------
 
