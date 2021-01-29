@@ -1,9 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Sync client now logs error messages received from server rather than just the size of the error message ([RCORE-425](https://jira.mongodb.org/browse/RCORE-425)).
+* Sync client now logs error messages received from server rather than just the size of the error message.
 * Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
-* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError ([RCORE-422](https://jira.mongodb.org/browse/RCORE-422))
+* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
