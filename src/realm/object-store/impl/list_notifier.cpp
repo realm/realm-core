@@ -89,7 +89,8 @@ void ListNotifier::run()
         for (size_t i = 0; i < m_prev_size; ++i) {
             if (m_change.modifications.contains(i))
                 continue;
-            if (object_did_change(m_list->get_any(i).get<ObjKey>().value))
+            auto m = m_list->get_any(i);
+            if (!m.is_null() && object_did_change(m.get<ObjKey>().value))
                 m_change.modifications.add(i);
         }
 
