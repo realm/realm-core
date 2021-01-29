@@ -67,6 +67,44 @@ Results Dictionary::get_values() const
     return as_results();
 }
 
+class NotificationHandler {
+public:
+    NotificationHandler(realm::Dictionary& dict, Dictionary::CBFunc cb)
+        : m_dict(dict)
+        , m_cb(cb)
+    {
+    }
+    void before(CollectionChangeSet const&) {}
+    void after(CollectionChangeSet const& c)
+    {
+        DictionaryChangeSet changes;
+        for (auto ndx : c.deletions.as_indexes()) {
+            changes.deletions.push_back(ndx);
+        }
+        for (auto ndx : c.insertions.as_indexes()) {
+            changes.insertions.push_back(m_dict.get_key(ndx));
+        }
+        for (auto ndx : c.modifications_new.as_indexes()) {
+            changes.modifications.push_back(m_dict.get_key(ndx));
+        }
+        m_cb(changes, {});
+    }
+    void error(std::exception_ptr ptr)
+    {
+        m_cb({}, ptr);
+    }
+
+private:
+    realm::Dictionary& m_dict;
+    Dictionary::CBFunc m_cb;
+};
+
+
+NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb) &
+{
+    return add_notification_callback(NotificationHandler(*this->m_dict, cb));
+}
+
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
