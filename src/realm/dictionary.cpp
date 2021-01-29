@@ -269,6 +269,16 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
     return do_get_pair(m_clusters->get(ndx, k));
 }
 
+Mixed Dictionary::get_key(size_t ndx) const
+{
+    update_if_needed();
+    if (ndx >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+    ObjKey k;
+    return do_get_key(m_clusters->get(ndx, k));
+}
+
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
@@ -686,7 +696,7 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
     return val;
 }
 
-std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+Mixed Dictionary::do_get_key(const ClusterNode::State& s) const
 {
     Mixed key;
     switch (m_key_type) {
@@ -708,9 +718,12 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) con
             throw std::runtime_error("Not implemented");
             break;
     }
-    Mixed val = do_get(std::move(s));
+    return key;
+}
 
-    return std::make_pair(key, val);
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+{
+    return {do_get_key(s), do_get(s)};
 }
 
 bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const

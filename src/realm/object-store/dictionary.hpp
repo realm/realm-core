@@ -24,6 +24,18 @@
 #include <realm/dictionary.hpp>
 
 namespace realm {
+
+struct DictionaryChangeSet {
+    // Indexes which were removed from the _old_ dictionary
+    std::vector<size_t> deletions;
+
+    // Keys in the _new_ dictionary which are new insertions
+    std::vector<Mixed> insertions;
+
+    // Keys of objects/values which were modified
+    std::vector<Mixed> modifications;
+};
+
 namespace object_store {
 
 class Dictionary : public object_store::Collection {
@@ -106,6 +118,9 @@ public:
     Dictionary freeze(const std::shared_ptr<Realm>& realm) const;
     Results get_keys() const;
     Results get_values() const;
+
+    using CBFunc = std::function<void(DictionaryChangeSet, std::exception_ptr)>;
+    NotificationToken add_key_based_notification_callback(CBFunc cb) &;
 
     Iterator begin() const
     {

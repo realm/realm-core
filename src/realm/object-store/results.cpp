@@ -263,8 +263,7 @@ util::Optional<T> Results::try_get(size_t ndx)
             Mixed mixed;
             if (m_dictionary_keys) {
                 if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
-                    auto key_value = dict->get_pair(ndx);
-                    mixed = key_value.first;
+                    mixed = dict->get_key(ndx);
                 }
             }
             else {
@@ -372,8 +371,7 @@ Mixed Results::get_from_collection(size_t ndx)
         Mixed mixed;
         if (m_dictionary_keys) {
             if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
-                auto key_value = dict->get_pair(ndx);
-                mixed = key_value.first;
+                mixed = dict->get_key(ndx);
             }
         }
         else {

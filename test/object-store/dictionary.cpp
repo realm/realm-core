@@ -233,6 +233,22 @@ TEST_CASE("dictionary") {
             REQUIRE_INDICES(srchange.deletions, 0);
         }
 
+        SECTION("key based notification") {
+            DictionaryChangeSet key_change;
+            auto token =
+                dict.add_key_based_notification_callback([&key_change](DictionaryChangeSet c, std::exception_ptr) {
+                    key_change = c;
+                });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            dict.insert("a", "apricot");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE(key_change.modifications[0].get_string() == "a");
+        }
+
         SECTION("clear list") {
             advance_and_notify(*r);
 

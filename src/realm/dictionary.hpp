@@ -60,6 +60,7 @@ public:
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
     std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
+    Mixed get_key(size_t ndx) const;
     size_t find_any(Mixed value) const final;
 
     Mixed min(size_t* return_ndx = nullptr) const final;
@@ -157,6 +158,7 @@ private:
 
     bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
+    Mixed do_get_key(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
     bool clear_backlink(Mixed value, CascadeState& state) const;
 
