@@ -494,7 +494,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
             } else if (test.hasValue(TestAction.Build)) {
                 // TODO: should we build sync tests, too?
-                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON'
+                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
             }
 
             def doBuild = {
@@ -506,13 +506,15 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                         filters: warningFilters,
                     )
                 }
-                dir(buildDir) {
-                    archiveArtifacts('realm-*.tar.gz')
-                    stash includes: 'realm-*.tar.gz', name: stashName
-                }
-                androidStashes << stashName
-                if (gitTag) {
-                    publishingStashes << stashName
+                if (test == TestAction.None) {
+                    dir(buildDir) {
+                        archiveArtifacts('realm-*.tar.gz')
+                        stash includes: 'realm-*.tar.gz', name: stashName
+                    }
+                    androidStashes << stashName
+                    if (gitTag) {
+                        publishingStashes << stashName
+                    }
                 }
             }
 
