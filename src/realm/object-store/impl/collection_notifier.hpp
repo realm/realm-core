@@ -358,23 +358,6 @@ private:
     std::exception_ptr m_error;
 };
 
-// Find which column of the row in the table contains the given container.
-//
-// LinkViews and Subtables know what row of their parent they're in, but not
-// what column, so we have to just check each one.
-template <typename Table, typename T, typename U>
-size_t find_container_column(Table& table, size_t row_ndx, T const& expected, int type,
-                             U (Table::*getter)(size_t, size_t))
-{
-    for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
-        if (table.get_column_type(i) == type && (table.*getter)(i, row_ndx) == expected) {
-            return i;
-        }
-    }
-    REALM_UNREACHABLE();
-}
-
-
 } // namespace _impl
 } // namespace realm
 

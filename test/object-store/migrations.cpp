@@ -73,7 +73,8 @@ void verify_schema(Realm& r, int line, bool in_migration)
         CAPTURE(object_schema.name);
         std::string primary_key;
         if (!in_migration) {
-            primary_key = ObjectStore::get_primary_key_for_object(r.read_group(), object_schema.name);
+            auto col = table->get_primary_key_column();
+            primary_key = col ? table->get_column_name(col) : "";
             REQUIRE(primary_key == object_schema.primary_key);
         }
         else {
@@ -2280,23 +2281,18 @@ TEST_CASE("migration: Manual") {
     SECTION("add primary key to table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "link origin", "not a pk"),
                           [&](SharedRealm, SharedRealm realm, Schema&) {
-                              ObjectStore::set_primary_key_for_object(realm->read_group(), "link origin", "not a pk");
                               auto table = get_table(realm, "link origin");
-                              table->add_search_index(table->get_column_key("not a pk"));
+                              table->set_primary_key_column(table->get_column_key("not a pk"));
                           });
     }
     SECTION("remove primary key from table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", ""), [&](SharedRealm, SharedRealm realm, Schema&) {
-            ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "");
-            get_table(realm, "object")->remove_search_index(col_keys[0]);
+            get_table(realm, "object")->set_primary_key_column({});
         });
     }
     SECTION("change primary key") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", "value"), [&](SharedRealm, SharedRealm realm, Schema&) {
-            ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "value");
-            auto table = get_table(realm, "object");
-            table->remove_search_index(col_keys[0]);
-            table->add_search_index(col_keys[1]);
+            get_table(realm, "object")->set_primary_key_column(col_keys[1]);
         });
     }
     SECTION("change property type") {
