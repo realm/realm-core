@@ -95,7 +95,6 @@ TEST_CASE("dictionary") {
         dict.insert(keys[i], values[i]);
     }
 
-
     SECTION("clear()") {
         REQUIRE(dict.size() == 3);
         values_as_results.clear();
@@ -286,6 +285,12 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(local_change.insertions.count() == 1);
+
+            r->begin_transaction();
+            another.remove();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(local_change.modifications.count() == 1);
         }
     }
 }

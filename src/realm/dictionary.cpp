@@ -580,10 +580,12 @@ void Dictionary::nullify(Mixed key)
 {
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-
-    bump_content_version();
-
     auto state = m_clusters->get(k);
+
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_set(*this, state.index, key, Mixed());
+    }
+
     ArrayMixed values(m_obj.get_alloc());
     ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
     values.init_from_ref(ref);
