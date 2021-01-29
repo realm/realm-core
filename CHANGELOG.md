@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* 
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -15,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* object_store::Dictionary has now get_keys() and get_values() that will return a Results object giving access to the keys and values resp. ([#4233](https://github.com/realm/realm-core/issues/4233))
 
 ----------------------------------------------
 

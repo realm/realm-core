@@ -258,7 +258,16 @@ util::Optional<T> Results::try_get(size_t ndx)
         }
         if (ndx < m_collection->size()) {
             using U = typename util::RemoveOptional<T>::type;
-            auto mixed = m_collection->get_any(ndx);
+            Mixed mixed;
+            if (m_dictionary_keys) {
+                if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                    auto key_value = dict->get_pair(ndx);
+                    mixed = key_value.first;
+                }
+            }
+            else {
+                mixed = m_collection->get_any(ndx);
+            }
             T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
@@ -350,12 +359,20 @@ Mixed Results::get_any(size_t ndx)
         case Mode::Collection:
             evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {
-                if (ndx < m_list_indices->size())
-                    return m_collection->get_any((*m_list_indices)[ndx]);
+                ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
             }
-            else {
-                if (ndx < m_collection->size())
-                    return m_collection->get_any(ndx);
+            if (ndx < m_collection->size()) {
+                Mixed mixed;
+                if (m_dictionary_keys) {
+                    if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                        auto key_value = dict->get_pair(ndx);
+                        mixed = key_value.first;
+                    }
+                }
+                else {
+                    mixed = m_collection->get_any(ndx);
+                }
+                return mixed;
             }
             break;
         case Mode::Table:
@@ -1090,10 +1107,14 @@ Results Results::sort(SortDescriptor&& sort) const
     util::CheckedUniqueLock lock(m_mutex);
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
-    if (m_mode == Mode::LinkList)
+    if (m_mode == Mode::LinkList) {
         return Results(m_realm, m_link_list, util::none, std::move(sort));
-    else if (m_mode == Mode::Collection)
-        return Results(m_realm, m_collection, std::move(new_order));
+    }
+    else if (m_mode == Mode::Collection) {
+        Results ret(m_realm, m_collection, std::move(new_order));
+        ret.as_keys(m_dictionary_keys);
+        return ret;
+    }
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 

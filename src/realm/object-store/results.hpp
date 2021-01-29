@@ -298,6 +298,11 @@ public:
         m_update_policy = policy;
     }
 
+    void as_keys(bool dictionary_keys)
+    {
+        m_dictionary_keys = dictionary_keys;
+    }
+
 private:
     std::shared_ptr<Realm> m_realm;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
@@ -357,6 +362,7 @@ private:
     } m_table_iterator;
 
     util::CheckedOptionalMutex m_mutex;
+    bool m_dictionary_keys = false;
 
     // A work around for what appears to be a false positive in clang's thread
     // analysis when constructing a different object of the same type within a
