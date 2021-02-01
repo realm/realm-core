@@ -825,6 +825,8 @@ private:
     ///
     ///  20 New data types: Decimal128 and ObjectId. Embedded tables.
     ///
+    ///  21 New data types: UUID, Mixed, Set and Dictionary.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in

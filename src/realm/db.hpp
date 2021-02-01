@@ -215,6 +215,8 @@ public:
     version_type get_version_of_latest_snapshot();
     VersionID get_version_id_of_latest_snapshot();
 
+    int get_file_format_version() const noexcept;
+
     /// Thrown by start_read() if the specified version does not correspond to a
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
@@ -509,8 +511,6 @@ private:
     /// Upgrade file format and/or history schema
     void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
                              int current_hist_schema_version, int target_hist_schema_version);
-
-    int get_file_format_version() const noexcept;
 
     /// finish up the process of starting a write transaction. Internal use only.
     void finish_begin_write();

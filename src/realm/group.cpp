@@ -321,6 +321,11 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
         return 11;
     }
 
+    if (current_file_format_version > 20) {
+        return current_file_format_version;
+    }
+
+    // The default file format version is 20.
     return 20;
 }
 
@@ -547,6 +552,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
         case 11:
         case 20:
+        case 21:
             file_format_ok = true;
             break;
     }
