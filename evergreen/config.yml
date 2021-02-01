@@ -108,6 +108,7 @@ functions:
 
           ${cmake_bindir}/cmake \
               --build build \
+              --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
               --target ${target_to_build|}
 
