@@ -1725,7 +1725,7 @@ public:
             default:
                 break;
         }
-        // m_tables[0]->report_invalid_key(m_link_column_keys[0]);
+        // m_tables[0]->check_column(m_link_column_keys[0]);
         cluster->init_leaf(m_link_column_keys[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }

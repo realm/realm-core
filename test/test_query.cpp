@@ -4208,8 +4208,7 @@ TEST(Query_LinkChainSortErrors)
     ColKey backlink_ndx(2);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
                       LogicError::type_mismatch);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
-                      LogicError::column_does_not_exist);
+    CHECK_THROW(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})), ColumnNotFound);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
 }
 

@@ -598,7 +598,7 @@ void ConstTableView::do_sync()
             if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
                 ColKey backlink_col = m_table->get_opposite_column(m_source_column_key);
                 REALM_ASSERT(backlink_col);
-                m_linked_table->report_invalid_key(backlink_col);
+                m_linked_table->check_column(backlink_col);
                 auto backlinks = m_linked_obj.get_all_backlinks(backlink_col);
                 for (auto k : backlinks) {
                     m_key_values.add(k);

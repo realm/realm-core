@@ -660,7 +660,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
 
     if (target_table) {
         auto backlink_col_key = target_table->do_insert_root_column(ColKey{}, col_type_BackLink, ""); // Throws
-        target_table->report_invalid_key(backlink_col_key);
+        target_table->check_column(backlink_col_key);
 
         set_opposite_column(col_key, target_table->get_key(), backlink_col_key);
         target_table->set_opposite_column(backlink_col_key, get_key(), col_key);
