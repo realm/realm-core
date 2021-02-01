@@ -1586,26 +1586,25 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 }
 
 
-bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                 bool nullable_array, bool find_null) const
+bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     if (cond == cond_Equal) {
-        return find<Equal>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<Equal>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_NotEqual) {
-        return find<NotEqual>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<NotEqual>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_Greater) {
-        return find<Greater>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<Greater>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_Less) {
-        return find<Less>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<Less>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_None) {
-        return find<None>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<None>(value, start, end, baseindex, state, nullptr);
     }
     else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
+        return find<NotNull>(value, start, end, baseindex, state, nullptr);
     }
     REALM_ASSERT_DEBUG(false);
     return false;

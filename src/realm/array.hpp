@@ -478,12 +478,11 @@ public:
     static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    bool find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-              bool nullable_array = false, bool find_null = false) const;
+    bool find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class cond, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
-              bool nullable_array = false, bool find_null = false) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+              Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
@@ -708,8 +707,9 @@ private:
     // Optimized implementation for release mode
     template <class cond, size_t bitwidth, class Callback>
     bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                        Callback callback, bool nullable_array = false, bool find_null = false) const;
+                        Callback callback) const;
 
+protected:
     // Called for each search result
     template <class Callback>
     bool find_action(size_t index, util::Optional<int64_t> value, QueryStateBase* state, Callback callback) const;
@@ -1269,61 +1269,14 @@ uint64_t Array::cascade(uint64_t a) const
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
 // Search for 'value' using condition cond (Equal, NotEqual, Less, etc) and call find_action() or
 // find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
-
-// If nullable_array is set, then find_optimized() will treat the array is being nullable, i.e. it will skip the
-// first entry and compare correctly against null, etc.
-//
-// If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
-// then nullable_array must be set too.
 template <class cond, size_t bitwidth, class Callback>
 bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                           Callback callback, bool nullable_array, bool find_null) const
+                           Callback callback) const
 {
-    REALM_ASSERT(!(find_null && !nullable_array));
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
     size_t start2 = start;
     cond c;
-
-    if (end == npos)
-        end = nullable_array ? size() - 1 : size();
-
-    if (nullable_array) {
-        if (std::is_same<cond, Equal>::value) {
-            // In case of Equal it is safe to use the optimized logic. We just have to fetch the null value
-            // if this is what we are looking for. And we have to adjust the indexes to compensate for the
-            // null value at position 0.
-            if (find_null) {
-                value = get(0);
-            }
-            else {
-                // If the value to search for is equal to the null value, the value cannot be in the array
-                if (value == get(0)) {
-                    return true;
-                }
-            }
-            start2++;
-            end++;
-            baseindex--;
-        }
-        else {
-            // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc.
-            // Fixme:
-            // Huge speed optimizations are possible here! This is a very simple generic method.
-            auto null_value = get(0);
-            for (; start2 < end; start2++) {
-                int64_t v = get<bitwidth>(start2 + 1);
-                bool value_is_null = (v == null_value);
-                if (c(v, value, value_is_null, find_null)) {
-                    util::Optional<int64_t> v2(value_is_null ? util::none : util::make_optional(v));
-                    if (!find_action(start2 + baseindex, v2, state, callback))
-                        return false; // tell caller to stop aggregating/search
-                }
-            }
-            return true; // tell caller to continue aggregating/search (on next array leafs)
-        }
-    }
-
 
     // Test first few items with no initial time overhead
     if (start2 > 0) {
@@ -1803,11 +1756,10 @@ bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseinde
 }
 
 template <class cond, class Callback>
-bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
-                 bool nullable_array, bool find_null) const
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                 Callback callback) const
 {
-    REALM_TEMPEX3(return find_optimized, cond, m_width, Callback,
-                         (value, start, end, baseindex, state, callback, nullable_array, find_null));
+    REALM_TEMPEX3(return find_optimized, cond, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 #ifdef REALM_COMPILER_SSE
