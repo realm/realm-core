@@ -455,18 +455,16 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
         ++path_start;
         if (path_start == path_end)
             return val;
-        if (!val.is_null()) {
-            if (val.get_type() == type_Link || val.get_type() == type_TypedLink) {
-                Obj obj;
-                if (val.get_type() == type_Link) {
-                    obj = get_target_table(col)->get_object(val.get<ObjKey>());
-                }
-                else {
-                    auto obj_link = val.get<ObjLink>();
-                    obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
-                }
-                return obj.get_any(path_start, path_end);
+        if (val.is_type(type_Link, type_TypedLink)) {
+            Obj obj;
+            if (val.get_type() == type_Link) {
+                obj = get_target_table(col)->get_object(val.get<ObjKey>());
             }
+            else {
+                auto obj_link = val.get<ObjLink>();
+                obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
+            }
+            return obj.get_any(path_start, path_end);
         }
     }
     return {};
@@ -1208,7 +1206,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;
-        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+        if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
             if (new_link == old_link)
                 return *this;

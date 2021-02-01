@@ -168,6 +168,12 @@ public:
         return DataType(m_type - 1);
     }
 
+    template <class... Tail>
+    bool is_type(DataType head, Tail... tail) const noexcept
+    {
+        return _is_type(head, tail...);
+    }
+
     static bool types_are_comparable(const Mixed& l, const Mixed& r);
     static bool data_types_are_comparable(DataType l_type, DataType r_type);
 
@@ -236,6 +242,21 @@ protected:
         ObjLink link_val;
         UUID uuid_val;
     };
+
+private:
+    static bool _is_type() noexcept
+    {
+        return false;
+    }
+    bool _is_type(DataType type) const noexcept
+    {
+        return m_type == unsigned(int(type) + 1);
+    }
+    template <class... Tail>
+    bool _is_type(DataType head, Tail... tail) const noexcept
+    {
+        return _is_type(head) || _is_type(tail...);
+    }
 };
 
 // Implementation:

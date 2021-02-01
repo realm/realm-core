@@ -709,7 +709,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     }
     if constexpr (std::is_same_v<T, ArrayMixed>) {
         Mixed value = values.get(ndx);
-        if (!value.is_null() && value.get_type() == type_TypedLink) {
+        if (value.is_type(type_TypedLink)) {
             link = value.get<ObjLink>();
         }
     }
