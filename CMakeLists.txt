@@ -173,6 +173,7 @@ endif()
 
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
+option(REALM_ENABLE_FFI "Build FFI support library." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
 option(REALM_BUILD_DOGLESS "Build server with support for emitting statsd" OFF)
 option(REALM_BUILD_INSPECTOR "Build inspector" OFF)
@@ -297,9 +298,10 @@ set(REALM_EXPORTED_TARGETS
     Storage
     QueryParser
     ObjectStore
-    RealmFFI
-    RealmFFIStatic
 )
+if (REALM_ENABLE_FFI)
+    list(APPEND REALM_EXPORTED_TARGETS RealmFFI RealmFFIStatic)
+endif()
 if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
 endif()

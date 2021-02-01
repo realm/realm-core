@@ -1,4 +1,6 @@
-add_subdirectory(c_api)
+if (REALM_ENABLE_FFI)
+    add_subdirectory(c_api)
+endif()
 
 set(SOURCES
     binding_callback_thread_observer.cpp
