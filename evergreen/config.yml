@@ -327,6 +327,16 @@ task_groups:
   - "!.disabled_on_windows .test_suite"
   - package
 
+- name: compile_test_windows
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  tasks:
+  - compile
+  - "!.disabled_on_windows .test_suite"
+
 - name: compile_test
   max_hosts: 1
   setup_group_can_fail_task: true
@@ -363,6 +373,23 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
   - name: lint
+  - name: compile_test
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-release
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Release build)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    cmake_build_type: Release
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
   - name: compile_test_and_package
     distros:
     - ubuntu2004-large
@@ -445,6 +472,20 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
   tasks:
+  - name: compile_test
+    distros:
+    - macos-1014
+
+- name: macos-1014-release
+  display_name: "MacOS 10.14 x86_64 (Release build)"
+  run_on: macos-1014-test
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    cmake_build_type: Release
+  tasks:
   - name: compile_test_and_package
     distros:
     - macos-1014
@@ -470,3 +511,21 @@ buildvariants:
     distros:
     - windows-64-vs2019-large
 
+- name: windows-64-vs2019-release
+  display_name: "Windows x86_64 (VS 2019 Release build)"
+  run_on: windows-64-vs2019-test
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
+    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A x64"
+    cmake_build_type: "Release"
+    test_flags: "-C Release"
+    package_flags: "-C Release"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    build_zlib: On
+  tasks:
+  - name: compile_test_windows
+    distros:
+    - windows-64-vs2019-large
