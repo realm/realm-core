@@ -34,6 +34,7 @@ void LinkMap::set_base_table(ConstTableRef table)
 
     for (size_t i = 0; i < m_link_column_keys.size(); i++) {
         ColKey link_column_key = m_link_column_keys[i];
+        table->report_invalid_key(link_column_key);
         // Link column can be either LinkList or single Link
         ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
@@ -43,10 +44,18 @@ void LinkMap::set_base_table(ConstTableRef table)
         }
 
         m_link_types.push_back(type);
-        REALM_ASSERT(table->valid_column(link_column_key));
         table = table.unchecked_ptr()->get_opposite_table(link_column_key);
         m_tables.push_back(table);
     }
+}
+
+void LinkMap::check_columns(ColKey target_col) const
+{
+    for (size_t i = 0; i < m_link_column_keys.size(); ++i) {
+        m_tables[i]->report_invalid_key(m_link_column_keys[i]);
+    }
+    if (target_col)
+        m_tables.back()->report_invalid_key(target_col);
 }
 
 void LinkMap::collect_dependencies(std::vector<TableKey>& tables) const
@@ -425,6 +434,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_dict.set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_dict.check_expression();
     }
 
     void set_cluster(const Cluster* cluster) override

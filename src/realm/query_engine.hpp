@@ -182,6 +182,8 @@ public:
     {
         m_dD = 100.0;
 
+        if (m_condition_column_key)
+            m_table->report_invalid_key(m_condition_column_key);
         if (m_child)
             m_child->init(will_query_ranges);
 
@@ -2447,9 +2449,14 @@ public:
                                                       ParentNode::m_table->get_column_name(m_condition_column_key1),
                                                       ParentNode::m_table->get_column_name(m_condition_column_key2)));
             }
-            ParentNode::m_table->check_column(m_condition_column_key1);
-            ParentNode::m_table->check_column(m_condition_column_key2);
         }
+    }
+
+    void init(bool will_query_ranges)
+    {
+        ParentNode::init(will_query_ranges);
+        ParentNode::m_table->report_invalid_key(m_condition_column_key1);
+        ParentNode::m_table->report_invalid_key(m_condition_column_key2);
     }
 
     static std::unique_ptr<ArrayPayload> update_cached_leaf_pointers_for_column(Allocator& alloc,
