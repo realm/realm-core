@@ -616,11 +616,11 @@ public:
 protected:
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    static int_fast64_t lbound_for_width(size_t width) noexcept;
+    static constexpr int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    static int_fast64_t ubound_for_width(size_t width) noexcept;
+    static constexpr int_fast64_t ubound_for_width(size_t width) noexcept;
 
 private:
     void update_width_cache_from_header() noexcept;
@@ -729,6 +729,59 @@ public:
 
 // Implementation:
 
+
+constexpr inline int_fast64_t Array::lbound_for_width(size_t width) noexcept
+{
+    if (width == 32) {
+        return -0x80000000LL;
+    }
+    else if (width == 16) {
+        return -0x8000LL;
+    }
+    else if (width < 8) {
+        return 0;
+    }
+    else if (width == 8) {
+        return -0x80LL;
+    }
+    else if (width == 64) {
+        return -0x8000000000000000LL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
+
+constexpr inline int_fast64_t Array::ubound_for_width(size_t width) noexcept
+{
+    if (width == 32) {
+        return 0x7FFFFFFFLL;
+    }
+    else if (width == 16) {
+        return 0x7FFFLL;
+    }
+    else if (width == 0) {
+        return 0;
+    }
+    else if (width == 1) {
+        return 1;
+    }
+    else if (width == 2) {
+        return 3;
+    }
+    else if (width == 4) {
+        return 15;
+    }
+    else if (width == 8) {
+        return 0x7FLL;
+    }
+    else if (width == 64) {
+        return 0x7FFFFFFFFFFFFFFFLL;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
 
 inline bool RefOrTagged::is_ref() const noexcept
 {
@@ -1315,13 +1368,16 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     if (end == size_t(-1))
         end = m_size;
 
+    constexpr int64_t lbound = lbound_for_width(bitwidth);
+    constexpr int64_t ubound = ubound_for_width(bitwidth);
+
     // Return immediately if no items in array can match (such as if cond == Greater && value == 100 &&
     // m_ubound == 15)
-    if (!c.can_match(value, m_lbound, m_ubound))
+    if (!c.can_match(value, lbound, ubound))
         return true;
 
     // optimization if all items are guaranteed to match (such as cond == NotEqual && value == 100 && m_ubound == 15)
-    if (c.will_match(value, m_lbound, m_ubound)) {
+    if (c.will_match(value, lbound, ubound)) {
         size_t end2;
 
         if constexpr (!std::is_same_v<Callback, std::nullptr_t>)

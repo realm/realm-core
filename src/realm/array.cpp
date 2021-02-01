@@ -1292,59 +1292,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-int_fast64_t Array::lbound_for_width(size_t width) noexcept
-{
-    if (width == 32) {
-        return -0x80000000LL;
-    }
-    else if (width == 16) {
-        return -0x8000LL;
-    }
-    else if (width < 8) {
-        return 0;
-    }
-    else if (width == 8) {
-        return -0x80LL;
-    }
-    else if (width == 64) {
-        return -0x8000000000000000LL;
-    }
-    else {
-        REALM_UNREACHABLE();
-    }
-}
-
-int_fast64_t Array::ubound_for_width(size_t width) noexcept
-{
-    if (width == 32) {
-        return 0x7FFFFFFFLL;
-    }
-    else if (width == 16) {
-        return 0x7FFFLL;
-    }
-    else if (width == 0) {
-        return 0;
-    }
-    else if (width == 1) {
-        return 1;
-    }
-    else if (width == 2) {
-        return 3;
-    }
-    else if (width == 4) {
-        return 15;
-    }
-    else if (width == 8) {
-        return 0x7FLL;
-    }
-    else if (width == 64) {
-        return 0x7FFFFFFFFFFFFFFFLL;
-    }
-    else {
-        REALM_UNREACHABLE();
-    }
-}
-
 
 template <size_t width>
 struct Array::VTableForWidth {
