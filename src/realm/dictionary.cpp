@@ -562,6 +562,12 @@ void Dictionary::erase(Mixed key)
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->get(k);
 
+        ArrayMixed values(m_obj.get_alloc());
+        ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
+        values.init_from_ref(ref);
+        auto old_value = values.get(state.index);
+        clear_backlink(old_value);
+
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->dictionary_erase(*this, state.index, key);
         }
@@ -592,17 +598,27 @@ void Dictionary::nullify(Mixed key)
     values.set(state.index, Mixed());
 }
 
+void Dictionary::remove_backlinks()
+{
+    for (auto&& elem : *this) {
+        clear_backlink(elem.second);
+    }
+}
+
+
 void Dictionary::clear()
 {
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
-        if (Replication* repl = this->m_obj.get_replication()) {
-            size_t n = 0;
-            for (auto&& elem : *this) {
+        Replication* repl = m_obj.get_replication();
+        size_t n = 0;
+        for (auto&& elem : *this) {
+            clear_backlink(elem.second);
+            if (repl)
                 repl->dictionary_erase(*this, n, elem.first);
-                n++;
-            }
+            n++;
         }
+
         // Just destroy the whole cluster
         m_clusters->destroy();
         delete m_clusters;
@@ -682,6 +698,15 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) con
 
     return std::make_pair(key, val);
 }
+
+void Dictionary::clear_backlink(Mixed value)
+{
+    if (!value.is_null() && value.get_type() == type_TypedLink) {
+        CascadeState dummy;
+        m_obj.remove_backlink(m_col_key, value.get_link(), dummy);
+    }
+}
+
 /************************* Dictionary::Iterator *************************/
 
 Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)

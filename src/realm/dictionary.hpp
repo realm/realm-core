@@ -91,6 +91,7 @@ public:
     void erase(Iterator it);
 
     void nullify(Mixed);
+    void remove_backlinks();
 
     void clear() final;
 
@@ -145,6 +146,7 @@ private:
     bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
+    void clear_backlink(Mixed value);
 
     friend struct CollectionIterator<Dictionary>;
 };
