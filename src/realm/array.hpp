@@ -1331,42 +1331,11 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     size_t start2 = start;
     cond c;
 
-    // Test first few items with no initial time overhead
-    if (start2 > 0) {
-        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
-                return false;
-        }
-
-        ++start2;
-
-        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
-                return false;
-        }
-
-        ++start2;
-
-        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
-                return false;
-        }
-
-        ++start2;
-
-        if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
-                return false;
-        }
-
-        ++start2;
-    }
+    if (end == npos)
+        end = m_size;
 
     if (!(m_size > start2 && start2 < end))
         return true;
-
-    if (end == size_t(-1))
-        end = m_size;
 
     constexpr int64_t lbound = lbound_for_width(bitwidth);
     constexpr int64_t ubound = ubound_for_width(bitwidth);
