@@ -131,22 +131,6 @@ TEST(Set_Mixed)
     CHECK(sorted2 == sorted);
 }
 
-// Validates that null values are removed correctly from a set.
-// See: https://github.com/realm/realm-core/issues/4304
-TEST(Set_Mixed_null_assertion){
-    Group g;
-
-    auto t = g.add_table("foo");
-    t->add_column_set(type_Mixed, "mixeds");
-    auto obj = t->create_object();
-
-    auto set = obj.get_set<Mixed>("mixeds");
-    set.insert(util::none);
-
-    // erase_null() should not fail assertion
-    set.erase_null();
-}
-
 TEST(Set_Links)
 {
     Group g;
