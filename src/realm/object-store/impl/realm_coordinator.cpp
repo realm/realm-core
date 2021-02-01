@@ -135,7 +135,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw InvalidEncryptionKeyException();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
-    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+    if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
+         config.schema_mode == SchemaMode::AdditiveExplicit) &&
+        config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");
@@ -1003,7 +1005,7 @@ void RealmCoordinator::run_async_notifiers()
         version = m_db->get_version_id_of_latest_snapshot();
         if (version == m_notifier_sg->get_version_of_current_transaction()) {
             // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(!skip_version.version);
             m_notifier_cv.notify_all();
             return;
         }

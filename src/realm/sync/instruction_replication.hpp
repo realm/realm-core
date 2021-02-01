@@ -91,6 +91,7 @@ public:
     void set_clear(const CollectionBase& list) override;
 
     void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) override;
+    void dictionary_set(const CollectionBase&, size_t ndx, Mixed key, Mixed val) override;
     void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) override;
 
     void remove_object(const Table*, ObjKey) override;
@@ -148,6 +149,8 @@ private:
     void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, ColKey field);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&);
     void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&, uint32_t ndx);
+
+    void dictionary_update(const CollectionBase&, const Mixed& key, const Mixed& val);
 
     // Cache information for the purpose of avoiding excessive string comparisons / interning
     // lookups.

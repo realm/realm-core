@@ -227,7 +227,7 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",

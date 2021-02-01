@@ -1916,6 +1916,10 @@ public:
     {
         return false;
     }
+    bool dictionary_set(size_t, Mixed)
+    {
+        return false;
+    }
     bool dictionary_erase(size_t, Mixed)
     {
         return false;

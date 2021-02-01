@@ -227,8 +227,11 @@ static inline SchemaMode from_capi(realm_schema_mode_e mode)
         case RLM_SCHEMA_MODE_RESET_FILE: {
             return SchemaMode::ResetFile;
         }
-        case RLM_SCHEMA_MODE_ADDITIVE: {
-            return SchemaMode::Additive;
+        case RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED: {
+            return SchemaMode::AdditiveDiscovered;
+        }
+        case RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT: {
+            return SchemaMode::AdditiveExplicit;
         }
         case RLM_SCHEMA_MODE_MANUAL: {
             return SchemaMode::Manual;

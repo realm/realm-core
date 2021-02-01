@@ -145,6 +145,7 @@ TEST(Dictionary_Links)
     auto col_dict = persons->add_column_dictionary(*dogs, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
     Obj lady = dogs->create_object_with_primary_key("lady");
     Obj garfield = cats->create_object_with_primary_key("garfield");
@@ -175,6 +176,14 @@ TEST(Dictionary_Links)
         auto invalid_link = pluto.get_link();
         pluto.remove();
         CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+
+        dict = bernie.get_dictionary(col_dict);
+        dict.insert("Pet", lady);
+        CHECK_EQUAL(lady.get_backlink_count(), 2);
+        adam.remove();
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
+        dict.erase("Pet");
+        CHECK_EQUAL(lady.get_backlink_count(), 0);
     }
 }
 
@@ -187,7 +196,7 @@ TEST(Dictionary_TypedLinks)
 
     auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
     auto persons = g.add_table_with_primary_key("person", type_String, "name");
-    auto col_dict = persons->add_column_dictionary(type_TypedLink, "dictionaries");
+    auto col_dict = persons->add_column_dictionary(type_Mixed, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
@@ -234,7 +243,11 @@ TEST(Dictionary_Clear)
     adam.get_dictionary(col_dict_typed).insert("Dog1", pluto);
     adam.get_dictionary(col_dict_implicit).insert("DOg2", lady.get_key());
 
+    CHECK_EQUAL(lady.get_backlink_count(), 1);
+    CHECK_EQUAL(pluto.get_backlink_count(), 1);
     persons->clear();
+    CHECK_EQUAL(lady.get_backlink_count(), 0);
+    CHECK_EQUAL(pluto.get_backlink_count(), 0);
     g.verify();
 }
 

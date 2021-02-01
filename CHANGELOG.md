@@ -1,6 +1,48 @@
 # NEXT RELEASE
 
 ### Enhancements
+* 
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Mixed property can now be indexed ([#4342](https://github.com/realm/realm-core/issues/4342))
+* Dictionary of Objects need to have a nullable value part, but that would lead to inconsistency in schema and cause an exception ([#4344](https://github.com/realm/realm-core/issues/4344))
+* Subscribing for notifications on Dictionaries of Objects results in access violation ([#4346](https://github.com/realm/realm-core/issues/4346))
+* AccessViolationException on removing a key from dictionary of objects  ([#4358](https://github.com/realm/realm-core/issues/4358))
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* object_store::Dictionary has now get_keys() and get_values() that will return a Results object giving access to the keys and values resp. ([#4233](https://github.com/realm/realm-core/issues/4233))
+
+----------------------------------------------
+
+# 11.0.0-beta.0 Release notes
+
+### Enhancements
+* Sync client now logs error messages received from server rather than just the size of the error message ([RCORE-425](https://jira.mongodb.org/browse/RCORE-425)).
+
+### Fixed
+* When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
+ 
+### Breaking changes
+* The SchemaMode::Additive has been replaced by two different modes: AdditiveDiscovered and AdditiveExplicit. The former should be used when the schema has been automatically discovered, and the latter should be used when the user has explicitly included the types in the schema. Different schema checks are enforced for each scenario. ([#4306](https://github.com/realm/realm-core/pull/4306))
+* Revert change in `app::Response` ([4263](https://github.com/realm/realm-core/pull/4263))
+* File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
+
+-----------
+
+### Internals
+* ThreadSafeReference for Dictionary added
+
+----------------------------------------------
+
+# 10.4.0 Release notes
+
+### Enhancements
 * Query parser supports property names containing white space. White space characters must be excapes with a '\'.
 * Query parser supports `@type` for filtering based on the stored type of a Mixed property. ([#4239](https://github.com/realm/realm-core/pull/4239))
 * Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
@@ -10,11 +52,9 @@
 * Dictionaries can be defined as nullable.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Calling max/min/sum/avg on a List or Set may give wrong results ([#4252](https://github.com/realm/realm-core/issues/4252), since v10.0.0)
 * Calling Table::clear() will in many cases not work for the data types introduced in v10.2.0. ([#4198](https://github.com/realm/realm-core/issues/4198), since v10.2.0)
 * Fix `links_to()` queries on sets of objects. ([#4264](https://github.com/realm/realm-core/pull/4264)
-* Windows `InterprocessCondVar` changes reverted.
 * Operations like Set::assign_union() can fail on StringData sets, ([#4288](https://github.com/realm/realm-core/issues/4288)
 * Windows `InterprocessCondVar` no longer crashes if destroyed on a different thread than created  ([#4174](https://github.com/realm/realm-core/issues/4174), since v10.3.3)
 * Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
@@ -24,6 +64,7 @@
 ### Breaking changes
 * Support for IncludeDescriptor has been removed.
 * The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
+* Add `status` property to `app::Response` to reflect the request result. Optional `body` or `error` property will store the corresponding value.    
 
 -----------
 

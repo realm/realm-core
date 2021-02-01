@@ -316,12 +316,14 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 11) {
-        // We are able to open file format 11 in RO mode
-        return 11;
+    if (requested_history_type == Replication::hist_None) {
+        if (current_file_format_version == 11 || current_file_format_version == 20) {
+            // We are able to open these file formats in RO mode
+            return current_file_format_version;
+        }
     }
 
-    return 20;
+    return 21;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -379,7 +381,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 20, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 21, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -547,6 +549,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
         case 11:
         case 20:
+        case 21:
             file_format_ok = true;
             break;
     }
@@ -1649,6 +1652,10 @@ public:
     }
 
     bool dictionary_insert(size_t, Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_set(size_t, Mixed)
     {
         return true; // No-op
     }

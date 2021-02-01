@@ -37,30 +37,55 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace Catch {
+template <>
+struct StringMaker<object_store::Dictionary> {
+    static std::string convert(const object_store::Dictionary& dict)
+    {
+        std::stringstream ss;
+        ss << "{";
+        for (auto [key, value] : dict) {
+            ss << '{' << key << ',' << value << "}, ";
+        }
+        auto str = ss.str();
+        str.pop_back();
+        str.back() = '}';
+        return str;
+    }
+};
+} // namespace Catch
 
 TEST_CASE("dictionary") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object", {{"value", PropertyType::Dictionary | PropertyType::String}}},
-    };
+    config.schema =
+        Schema{{"object",
+                {{"value", PropertyType::Dictionary | PropertyType::String},
+                 {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+               {"target", {{"value", PropertyType::Int}}}};
+
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
 
     auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
     auto table2 = r2->read_group().get_table("class_object");
     r->begin_transaction();
     Obj obj = table->create_object();
+    Obj another = target->create_object();
     ColKey col = table->get_column_key("value");
+    ColKey col_links = table->get_column_key("links");
 
     object_store::Dictionary dict(r, obj, col);
-    auto results = dict.as_results();
+    object_store::Dictionary links(r, obj, col_links);
+    auto keys_as_results = dict.get_keys();
+    auto values_as_results = dict.get_values();
     CppContext ctx(r);
 
     SECTION("get_realm()") {
         REQUIRE(dict.get_realm() == r);
-        REQUIRE(results.get_realm() == r);
+        REQUIRE(values_as_results.get_realm() == r);
     }
 
     std::vector<std::string> keys = {"a", "b", "c"};
@@ -70,12 +95,11 @@ TEST_CASE("dictionary") {
         dict.insert(keys[i], values[i]);
     }
 
-
     SECTION("clear()") {
         REQUIRE(dict.size() == 3);
-        results.clear();
+        values_as_results.clear();
         REQUIRE(dict.size() == 0);
-        REQUIRE(results.size() == 0);
+        REQUIRE(values_as_results.size() == 0);
     }
 
     SECTION("get()") {
@@ -104,16 +128,47 @@ TEST_CASE("dictionary") {
             Dictionary::Iterator it = dict.begin() + ndx;
             REQUIRE((*it).first.get_string() == keys[i]);
             REQUIRE((*it).second.get_string() == values[i]);
-            auto element = results.get_dictionary_element(ndx);
+            auto element = values_as_results.get_dictionary_element(ndx);
             REQUIRE(element.first == keys[i]);
             REQUIRE(element.second.get_string() == values[i]);
+            std::string key = keys_as_results.get<StringData>(ndx);
+            REQUIRE(key == keys[i]);
+            Mixed m = keys_as_results.get_any(ndx);
+            REQUIRE(m.get_string() == keys[i]);
         }
+    }
+
+    SECTION("keys sorted") {
+        auto sorted = keys_as_results.sort({{"self", true}});
+        std::string key = sorted.get<StringData>(0);
+        REQUIRE(key == "a");
+        Mixed m = sorted.get_any(0);
+        REQUIRE(m.get_string() == "a");
+        m = sorted.get_any(4);
+        REQUIRE(m.is_null());
+    }
+
+    SECTION("handover") {
+        r->commit_transaction();
+
+        auto dict2 = ThreadSafeReference(dict).resolve<object_store::Dictionary>(r);
+        REQUIRE(dict == dict2);
+        ThreadSafeReference ref(values_as_results);
+        auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(results2.get<String>(i) == values[i]);
+        }
+        r->begin_transaction();
+        obj.remove();
+        r->commit_transaction();
+        results2 = ref.resolve<Results>(r);
+        REQUIRE(!results2.is_valid());
     }
 
     SECTION("notifications") {
         r->commit_transaction();
 
-        auto sorted = results.sort({{"self", true}});
+        auto sorted = values_as_results.sort({{"self", true}});
 
         size_t calls = 0;
         CollectionChangeSet change, rchange, srchange;
@@ -121,7 +176,7 @@ TEST_CASE("dictionary") {
             change = c;
             ++calls;
         });
-        auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+        auto rtoken = values_as_results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             rchange = c;
             ++calls;
         });
@@ -144,16 +199,29 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
 
             advance_and_notify(*r);
-            auto ndx = results.index_of(StringData("dade"));
+            auto ndx = values_as_results.index_of(StringData("dade"));
             REQUIRE_INDICES(change.insertions, ndx);
             REQUIRE_INDICES(rchange.insertions, ndx);
             // "dade" ends up at the end of the sorted list
             REQUIRE_INDICES(srchange.insertions, values.size() - 1);
         }
 
+        SECTION("replace value in dictionary") {
+            advance_and_notify(*r);
+            r->begin_transaction();
+            dict.insert("b", "blueberry");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            auto ndx = values_as_results.index_of(StringData("blueberry"));
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.modifications, ndx);
+            REQUIRE_INDICES(change.deletions);
+        }
+
         SECTION("remove value from list") {
             advance_and_notify(*r);
-            auto ndx = results.index_of(StringData("apple"));
+            auto ndx = values_as_results.index_of(StringData("apple"));
             r->begin_transaction();
             dict.erase("a");
             r->commit_transaction();
@@ -203,6 +271,26 @@ TEST_CASE("dictionary") {
             r2->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
+        }
+
+        SECTION("now with links") {
+            CollectionChangeSet local_change;
+            auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
+                local_change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            links.insert("l", another.get_key());
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(local_change.insertions.count() == 1);
+
+            r->begin_transaction();
+            another.remove();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(local_change.modifications.count() == 1);
         }
     }
 }

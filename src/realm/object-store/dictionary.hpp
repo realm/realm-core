@@ -64,11 +64,11 @@ public:
         verify_valid_row(ndx);
         return m_dict->get_any(ndx);
     }
-    util::Optional<Mixed> try_get_any(StringData key)
+    util::Optional<Mixed> try_get_any(StringData key) const
     {
         return m_dict->try_get(key);
     }
-    std::pair<StringData, Mixed> get_pair(size_t ndx)
+    std::pair<StringData, Mixed> get_pair(size_t ndx) const
     {
         verify_valid_row(ndx);
         auto pair = m_dict->get_pair(ndx);
@@ -95,13 +95,15 @@ public:
 
     Results snapshot() const;
     Dictionary freeze(const std::shared_ptr<Realm>& realm) const;
+    Results get_keys() const;
+    Results get_values() const;
 
-    Iterator begin()
+    Iterator begin() const
     {
         return m_dict->begin();
     }
 
-    Iterator end()
+    Iterator end() const
     {
         return m_dict->end();
     }
@@ -118,39 +120,8 @@ private:
 template <typename Fn>
 auto Dictionary::dispatch(Fn&& fn) const
 {
-    // Similar to "switch_on_type", but without the util::Optional
-    // cases. These cases are not supported by Mixed and are not
-    // relevant for Dictionary
-    // FIXME: use switch_on_type
     verify_attached();
-    using PT = PropertyType;
-    auto type = get_type();
-    switch (type & ~PropertyType::Flags) {
-        case PT::Int:
-            return fn((int64_t*)0);
-        case PT::Bool:
-            return fn((bool*)0);
-        case PT::Float:
-            return fn((float*)0);
-        case PT::Double:
-            return fn((double*)0);
-        case PT::String:
-            return fn((StringData*)0);
-        case PT::Data:
-            return fn((BinaryData*)0);
-        case PT::Date:
-            return fn((Timestamp*)0);
-        case PT::Object:
-            return fn((Obj*)0);
-        case PT::ObjectId:
-            return fn((ObjectId*)0);
-        case PT::Decimal:
-            return fn((Decimal128*)0);
-        case PT::UUID:
-            return fn((UUID*)0);
-        default:
-            REALM_COMPILER_HINT_UNREACHABLE();
-    }
+    return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
 template <typename T>

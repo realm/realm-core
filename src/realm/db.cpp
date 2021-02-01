@@ -1071,6 +1071,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 case 10:
                 case 11:
                 case 20:
+                case 21:
                     file_format_ok = true;
                     break;
             }
@@ -1224,7 +1225,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << info->file_format_version << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }

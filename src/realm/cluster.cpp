@@ -33,6 +33,7 @@
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
+#include "realm/dictionary.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -702,26 +703,22 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     values.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(values, col_ndx);
     values.init_from_parent();
+    ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
-        ObjLink link = values.get(ndx);
-        if (link) {
-            const Table* origin_table = m_tree_top.get_owning_table();
-            auto target_obj = origin_table->get_parent_group()->get_object(link);
-
-            ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-
-            target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
-        }
+        link = values.get(ndx);
     }
     if constexpr (std::is_same_v<T, ArrayMixed>) {
         Mixed value = values.get(ndx);
         if (!value.is_null() && value.get_type() == type_TypedLink) {
-            ObjLink link = value.get<ObjLink>();
-            const Table* origin_table = m_tree_top.get_owning_table();
+            link = value.get<ObjLink>();
+        }
+    }
+    if (link) {
+        if (const Table* origin_table = m_tree_top.get_owning_table()) {
             auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-
+            REALM_ASSERT(backlink_col_key);
             target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
         }
     }
@@ -776,7 +773,15 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             ref_type ref = values.get(ndx);
 
             if (ref) {
-                if (col_type == col_type_LinkList) {
+                const Table* origin_table = m_tree_top.get_owning_table();
+                if (attr.test(col_attr_Dictionary)) {
+                    if (col_type == col_type_Mixed || col_type == col_type_Link) {
+                        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                        auto dict = obj.get_dictionary(col_key);
+                        dict.remove_backlinks();
+                    }
+                }
+                else if (col_type == col_type_LinkList) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
@@ -786,7 +791,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_TypedLink) {
                     BPlusTree<ObjLink> links(m_alloc);
                     links.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < links.size(); i++) {
                         ObjLink link = links.get(i);
                         auto target_obj = origin_table->get_parent_group()->get_object(link);
@@ -798,7 +802,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_Mixed) {
                     BPlusTree<Mixed> list(m_alloc);
                     list.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < list.size(); i++) {
                         Mixed val = list.get(i);
                         if (val.get_type() == type_TypedLink) {

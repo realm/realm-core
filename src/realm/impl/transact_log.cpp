@@ -112,6 +112,20 @@ void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict,
     m_encoder.dictionary_insert(ndx, key);
 }
 
+bool TransactLogEncoder::dictionary_set(size_t dict_ndx, Mixed key)
+{
+    REALM_ASSERT(key.get_type() == type_String);
+    append_string_instr(instr_DictionarySet, key.get_string()); // Throws
+    append_simple_instr(dict_ndx);
+    return true;
+}
+
+void TransactLogConvenientEncoder::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed)
+{
+    select_collection(dict);
+    m_encoder.dictionary_set(ndx, key);
+}
+
 bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);

@@ -1491,10 +1491,8 @@ void Connection::receive_error_message(int error_code, StringData message, bool 
         return;
     }
 
-    logger.info("Received: ERROR(error_code=%1, message_size=%2, try_again=%3, "
-                "session_ident=%4)",
-                error_code, message.size(), try_again,
-                session_ident); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", message, error_code,
+                try_again, session_ident); // Throws
 
     bool known_error_code = bool(sync::get_protocol_error_message(error_code));
     if (REALM_LIKELY(known_error_code)) {
@@ -2251,8 +2249,15 @@ void Session::send_upload_message()
                      uc.progress.client_version, uc.progress.last_integrated_server_version, uc.changeset.size(),
                      uc.origin_timestamp, uc.origin_file_ident); // Throws
         if (logger.would_log(util::Logger::Level::trace)) {
-            logger.trace("Changeset: %1",
-                         _impl::clamped_hex_dump(uc.changeset.get_first_chunk())); // Throws
+            BinaryData changeset_data = uc.changeset.get_first_chunk();
+            if (changeset_data.size() < 1024) {
+                logger.trace("Changeset: %1",
+                             _impl::clamped_hex_dump(changeset_data)); // Throws
+            }
+            else {
+                logger.trace("Changeset(comp): %1 % 2", changeset_data.size(),
+                             protocol.compressed_hex_dump(changeset_data));
+            }
         }
 
         if (!get_client().m_disable_upload_compaction) {
@@ -2760,8 +2765,7 @@ std::error_code Session::receive_unbound_message()
 // deactivated upon return.
 std::error_code Session::receive_error_message(int error_code, StringData message, bool try_again)
 {
-    logger.info("Received: ERROR(error_code=%1, message_size=%2, try_again=%3)", error_code, message.size(),
-                try_again); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3)", message, error_code, try_again); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
