@@ -29,7 +29,7 @@ namespace realm {
 namespace {
 void validate_key_value(const Mixed& key)
 {
-    if (key.get_type() == type_String) {
+    if (key.is_type(type_String)) {
         const char* str = key.get_string().data();
         if (str[0] == '$')
             throw std::runtime_error("Dictionary::insert: key must not start with '$'");
@@ -440,21 +440,19 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     update_if_needed();
 
     ObjLink new_link;
-    if (!value.is_null()) {
-        if (value.get_type() == type_TypedLink) {
-            new_link = value.get<ObjLink>();
-            m_obj.get_table()->get_parent_group()->validate(new_link);
+    if (value.is_type(type_TypedLink)) {
+        new_link = value.get<ObjLink>();
+        m_obj.get_table()->get_parent_group()->validate(new_link);
+    }
+    else if (value.is_type(type_Link)) {
+        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+        auto key = value.get<ObjKey>();
+        if (!target_table->is_valid(key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
         }
-        else if (value.get_type() == type_Link) {
-            auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
-            auto key = value.get<ObjKey>();
-            if (!target_table->is_valid(key)) {
-                throw LogicError(LogicError::target_row_index_out_of_range);
-            }
 
-            new_link = ObjLink(target_table->get_key(), key);
-            value = Mixed(new_link);
-        }
+        new_link = ObjLink(target_table->get_key(), key);
+        value = Mixed(new_link);
     }
 
     create();
@@ -493,7 +491,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.init_from_parent();
 
         Mixed old_value = values.get(state.index);
-        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+        if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
         }
         values.set(state.index, value);
@@ -659,7 +657,7 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
     Mixed val = values.get(s.index);
 
     // Filter out potential unresolved links
-    if (!val.is_null() && val.get_type() == type_TypedLink) {
+    if (val.is_type(type_TypedLink)) {
         auto link = val.get<ObjLink>();
         auto key = link.get_obj_key();
         if (key.is_unresolved()) {
@@ -701,7 +699,7 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) con
 
 void Dictionary::clear_backlink(Mixed value)
 {
-    if (!value.is_null() && value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         CascadeState dummy;
         m_obj.remove_backlink(m_col_key, value.get_link(), dummy);
     }

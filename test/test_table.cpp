@@ -5614,4 +5614,17 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 }
 
+TEST(Table_MixedNull)
+{
+    Group g;
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column_list(type_Mixed, "any", true);
+    auto obj = foos->create_object();
+    auto list = obj.get_list<Mixed>(col);
+    list.add(Mixed());
+    list.set(0, Mixed(1));
+    list.set(0, Mixed());
+    list.remove(0);
+}
+
 #endif // TEST_TABLE
