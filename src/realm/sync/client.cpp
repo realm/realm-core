@@ -7,7 +7,6 @@
 #include <realm/util/uri.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_info.hpp>
-#include <realm/sync/noinst/client_file_access_cache.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/version.hpp>
@@ -21,7 +20,6 @@ using namespace realm::util;
 
 // clang-format off
 using ClientImplBase                  = _impl::ClientImplBase;
-using ClientFileAccessCache           = _impl::ClientFileAccessCache;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -81,7 +79,6 @@ public:
     void run();
 
 private:
-    _impl::ClientFileAccessCache m_file_access_cache;
     const std::shared_ptr<ChangesetCooker> m_default_changeset_cooker;
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
@@ -525,8 +522,7 @@ inline SessionWrapperQueue::~SessionWrapperQueue()
 // ################ ClientImpl ################
 
 inline ClientImpl::ClientImpl(Client::Config config)
-    : ClientImplBase{make_client_impl_base_config(config)}                            // Throws
-    , m_file_access_cache{config.max_open_files, config.disable_sync_to_disk, logger} // Throws
+    : ClientImplBase{make_client_impl_base_config(config)} // Throws
     , m_default_changeset_cooker{std::move(config.changeset_cooker)}
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
