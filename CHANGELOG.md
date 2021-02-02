@@ -19,6 +19,7 @@
 
 ### Internals
 * On Android, the CMake build no longer sets -Oz explicitly for Release builds if `CMAKE_INTERPROCEDURAL_OPTIMIZATION` is enabled. Additionally, Android unit tests are built with LTO.
+* On Android, fixed the build to link against the dynamic `libz.so`. CMake was choosing the static library, which is both undesirable and has issues on newer NDKs.
 * ThreadSafeReference for Dictionary added
 
 ----------------------------------------------
