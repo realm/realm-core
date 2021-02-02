@@ -433,7 +433,6 @@ buildvariants:
   - name: compile_test
     distros:
     - ubuntu2004-large
-  - name: long-running-tests
 
 - name: rhel70
   display_name: "RHEL 7 x86_64"
