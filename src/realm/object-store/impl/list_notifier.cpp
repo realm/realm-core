@@ -79,6 +79,7 @@ void ListNotifier::run()
         else {
             m_change = {};
         }
+        report_collection_root_is_deleted();
         return;
     }
 
