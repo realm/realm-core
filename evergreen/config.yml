@@ -468,7 +468,7 @@ buildvariants:
 
 - name: macos-1014
   display_name: "MacOS 10.14 x86_64"
-  run_on: macos-1014-test
+  run_on: macos-1014
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
@@ -476,11 +476,7 @@ buildvariants:
     run_tests_against_baas: On
   tasks:
   - name: compile_test_and_package
-    distros:
-    - macos-1014
   - name: benchmarks
-    distros:
-    - macos-1014
   - name: long-running-tests
 
 - name: windows-64-vs2019
