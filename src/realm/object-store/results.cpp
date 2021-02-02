@@ -933,7 +933,14 @@ PropertyType Results::do_get_type() const
         case Mode::Table:
             return PropertyType::Object;
         case Mode::Collection:
-            return ObjectSchema::from_core_type(m_collection->get_col_key());
+            if (m_dictionary_keys) {
+                if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                    return ObjectSchema::from_core_type(ColumnType(dict->get_key_data_type()));
+                }
+            }
+            else {
+                return ObjectSchema::from_core_type(m_collection->get_col_key());
+            }
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }

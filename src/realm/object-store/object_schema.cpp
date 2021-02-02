@@ -66,6 +66,41 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
     }
 }
 
+PropertyType ObjectSchema::from_core_type(ColumnType type)
+{
+    switch (type) {
+        case col_type_Int:
+            return PropertyType::Int;
+        case col_type_Float:
+            return PropertyType::Float;
+        case col_type_Double:
+            return PropertyType::Double;
+        case col_type_Bool:
+            return PropertyType::Bool;
+        case col_type_String:
+            return PropertyType::String;
+        case col_type_Binary:
+            return PropertyType::Data;
+        case col_type_Timestamp:
+            return PropertyType::Date;
+        case col_type_Mixed:
+            return PropertyType::Mixed;
+        case col_type_ObjectId:
+            return PropertyType::ObjectId;
+        case col_type_Decimal:
+            return PropertyType::Decimal;
+        case col_type_UUID:
+            return PropertyType::UUID;
+        case col_type_Link:
+            return PropertyType::Object;
+        case col_type_LinkList:
+            return PropertyType::Object | PropertyType::Array;
+        default:
+            REALM_UNREACHABLE();
+    }
+    return PropertyType::Int;
+}
+
 PropertyType ObjectSchema::from_core_type(ColKey col)
 {
     auto flags = PropertyType::Required;
@@ -80,42 +115,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
     else if (attr.test(col_attr_Dictionary))
         flags |= PropertyType::Dictionary;
 
-    switch (col.get_type()) {
-        case col_type_Int:
-            return PropertyType::Int | flags;
-        case col_type_Float:
-            return PropertyType::Float | flags;
-        case col_type_Double:
-            return PropertyType::Double | flags;
-        case col_type_Bool:
-            return PropertyType::Bool | flags;
-        case col_type_String:
-            return PropertyType::String | flags;
-        case col_type_Binary:
-            return PropertyType::Data | flags;
-        case col_type_Timestamp:
-            return PropertyType::Date | flags;
-        case col_type_Mixed:
-            return PropertyType::Mixed | flags;
-        case col_type_ObjectId:
-            return PropertyType::ObjectId | flags;
-        case col_type_Decimal:
-            return PropertyType::Decimal | flags;
-        case col_type_UUID:
-            return PropertyType::UUID | flags;
-        case col_type_Link: {
-            if (attr.test(col_attr_Set) || attr.test(col_attr_Dictionary)) {
-                return PropertyType::Object | flags;
-            }
-            else {
-                return PropertyType::Object | PropertyType::Nullable;
-            }
-        }
-        case col_type_LinkList:
-            return PropertyType::Object | PropertyType::Array;
-        default:
-            REALM_UNREACHABLE();
-    }
+    PropertyType prop_type = from_core_type(col.get_type());
+    return prop_type | flags;
 }
 
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)

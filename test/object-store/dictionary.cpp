@@ -139,6 +139,7 @@ TEST_CASE("dictionary") {
     }
 
     SECTION("keys sorted") {
+        REQUIRE(keys_as_results.get_type() == PropertyType::String);
         auto sorted = keys_as_results.sort({{"self", true}});
         std::string key = sorted.get<StringData>(0);
         REQUIRE(key == "a");
