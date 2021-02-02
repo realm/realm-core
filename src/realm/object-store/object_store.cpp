@@ -234,27 +234,6 @@ uint64_t ObjectStore::get_schema_version(Group const& group)
     return table->get_object(0).get<int64_t>(c_versionColumnName);
 }
 
-StringData ObjectStore::get_primary_key_for_object(Group const& group, StringData object_type)
-{
-    if (ConstTableRef table = table_for_object_type(group, object_type)) {
-        if (auto col = table->get_primary_key_column()) {
-            return table->get_column_name(col);
-        }
-    }
-    return "";
-}
-
-void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key)
-{
-    auto t = table_for_object_type(group, object_type);
-    ColKey pk_col;
-    if (primary_key.size()) {
-        pk_col = t->get_column_key(primary_key);
-        REALM_ASSERT(pk_col);
-    }
-    t->set_primary_key_column(pk_col);
-}
-
 StringData ObjectStore::object_type_for_table_name(StringData table_name)
 {
     if (table_name.begins_with(c_object_table_prefix)) {
@@ -594,6 +573,16 @@ static void set_embedded(Table& table, ObjectSchema::IsEmbedded is_embedded)
     }
 }
 
+static void set_primary_key(Table& table, const Property* property)
+{
+    ColKey col;
+    if (property) {
+        col = table.get_column_key(property->name);
+        REALM_ASSERT(col);
+    }
+    table.set_primary_key_column(col);
+}
+
 static void create_initial_tables(Group& group, std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
@@ -643,8 +632,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         }
         void operator()(ChangePrimaryKey op)
         {
-            ObjectStore::set_primary_key_for_object(group, op.object->name,
-                                                    op.property ? StringData{op.property->name} : "");
+            set_primary_key(table(op.object), op.property);
         }
         void operator()(AddIndex op)
         {
@@ -825,15 +813,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangePrimaryKey op)
         {
-            Table& t = table(op.object);
-            if (op.property) {
-                auto col = t.get_column_key(op.property->name);
-                REALM_ASSERT(col);
-                t.set_primary_key_column(col);
-            }
-            else {
-                t.set_primary_key_column(ColKey());
-            }
+            set_primary_key(table(op.object), op.property);
         }
 
         void operator()(AddTable op)
@@ -957,25 +937,6 @@ Schema ObjectStore::schema_from_group(Group const& group)
         }
     }
     return schema;
-}
-
-util::Optional<Property> ObjectStore::property_for_column_key(ConstTableRef& table, ColKey column_key)
-{
-    StringData column_name = table->get_column_name(column_key);
-
-    Property property;
-    property.name = column_name;
-    property.type = ObjectSchema::from_core_type(column_key);
-    property.is_primary = table->get_primary_key_column() == column_key;
-    property.is_indexed = table->has_search_index(column_key);
-    property.column_key = column_key;
-
-    if (property.type == PropertyType::Object) {
-        // set link type for objects and arrays
-        ConstTableRef linkTable = table->get_link_target(column_key);
-        property.object_type = ObjectStore::object_type_for_table_name(linkTable->get_name().data());
-    }
-    return property;
 }
 
 void ObjectStore::set_schema_keys(Group const& group, Schema& schema)

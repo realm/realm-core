@@ -627,8 +627,6 @@ protected:
     /// index (as expressed through the DataType enum).
     bool compare_objects(const Table&) const;
 
-    void check_lists_are_empty(size_t row_ndx) const;
-
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
