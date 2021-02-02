@@ -152,7 +152,7 @@ functions:
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
           if [[ -n "${enable_test_result_reporter|}" ]]; then
-              export UNITTEST_EVERGREEN_TEST_RESULTS="./evergreen/abspath.sh ${task_name}_results.json"
+              export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           fi
 
           if [[ -n "${report_test_progress|}" ]]; then
