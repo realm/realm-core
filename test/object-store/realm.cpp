@@ -24,6 +24,7 @@
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
@@ -2017,5 +2018,23 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         config.cache = true;
         auto r4 = Realm::get_shared_realm(config);
         REQUIRE(r4 == r2);
+    }
+}
+
+TEST_CASE("KeyPathMapping generation") {
+    TestFile config;
+    config.cache = true;
+    realm::query_parser::KeyPathMapping mapping;
+
+    SECTION("class aliasing") {
+        Schema schema = {
+            {"PersistedName", {{"age", PropertyType::Int}}, {}, "AlternativeName"},
+        };
+        schema.validate();
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+        realm::populate_keypath_mapping(mapping, *realm);
+        REQUIRE(mapping.has_table_mapping("AlternativeName"));
+        REQUIRE("class_PersistedName" == mapping.get_table_mapping("AlternativeName"));
     }
 }

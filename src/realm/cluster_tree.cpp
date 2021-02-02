@@ -1032,9 +1032,8 @@ size_t ClusterTree::Iterator::get_position()
         return m_tree.get_ndx(m_key);
     }
     catch (...) {
-        throw std::runtime_error("Outdated iterator");
+        throw std::logic_error("Outdated iterator");
     }
-    return 0; // dummy
 }
 
 ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
@@ -1053,35 +1052,29 @@ ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
     }
 }
 
-ObjKey ClusterTree::Iterator::go(size_t n)
+void ClusterTree::Iterator::go(size_t abs_pos)
 {
-    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        // reload
-        m_position = get_position(); // Will throw if base object is deleted
-        load_leaf(m_key);
+    size_t sz = m_tree.size();
+    if (abs_pos >= sz) {
+        throw std::out_of_range("Index out of range");
     }
 
-    auto abs_pos = n + m_position;
+    m_position = abs_pos;
 
-    auto leaf_node_size = m_leaf.node_size();
-    ObjKey k;
-    if (abs_pos < m_leaf_start_pos || abs_pos >= (m_leaf_start_pos + leaf_node_size)) {
-        if (abs_pos >= m_tree.size()) {
-            throw std::out_of_range("Index out of range");
+    // If the position is within the current leaf then just set the iterator to that position
+    if (!m_leaf_invalid && m_storage_version == m_tree.get_storage_version(m_instance_version)) {
+        if (abs_pos >= m_leaf_start_pos && abs_pos < (m_leaf_start_pos + m_leaf.node_size())) {
+            m_state.m_current_index = abs_pos - m_leaf_start_pos;
+            m_key = m_leaf.get_real_key(m_state.m_current_index);
+            return;
         }
-        // Find cluster holding requested position
+    }
 
-        auto s = m_tree.get(abs_pos, k);
-        m_state.init(s, k);
-        m_leaf_start_pos = abs_pos - s.index;
-    }
-    else {
-        m_state.m_current_index = (abs_pos - m_leaf_start_pos);
-        k = m_leaf.get_real_key(m_state.m_current_index);
-    }
-    // The state no longer corresponds to m_key
-    m_leaf_invalid = true;
-    return k;
+    // Find cluster holding requested position
+    auto s = m_tree.get(abs_pos, m_key);
+    m_state.init(s, m_key);
+    m_leaf_start_pos = abs_pos - s.index;
+    m_leaf_invalid = false;
 }
 
 bool ClusterTree::Iterator::update() const
@@ -1090,7 +1083,7 @@ bool ClusterTree::Iterator::update() const
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
-            throw std::runtime_error("Outdated iterator");
+            throw std::logic_error("Outdated iterator");
         }
         return true;
     }

@@ -36,6 +36,10 @@ inline void populate_keypath_mapping(query_parser::KeyPathMapping& mapping, Real
             return table;
         };
 
+        if (!object_schema.alias.empty()) {
+            mapping.add_table_mapping(get_table(), object_schema.alias);
+        }
+
         for (auto& property : object_schema.persisted_properties) {
             if (!property.public_name.empty() && property.public_name != property.name)
                 mapping.add_mapping(get_table(), property.public_name, property.name);

@@ -1,12 +1,15 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Sync client now logs error messages received from server rather than just the size of the error message ([RCORE-425](https://jira.mongodb.org/browse/RCORE-425)).
-* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError ([RCORE-422](https://jira.mongodb.org/browse/RCORE-422))
+* Sync client now logs error messages received from server rather than just the size of the error message.
+* Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
+* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
+* Improve performance of sequential reads on a Results backed directly by a Table by 50x.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
+* Results::get() on a Results backed by a Table would give incorrect results if a new object was created at index zero in the source Table. ([Cocoa #7014](https://github.com/realm/realm-cocoa/issues/7014), since v6.0.0).
  
 ### Breaking changes
 * The SchemaMode::Additive has been replaced by two different modes: AdditiveDiscovered and AdditiveExplicit. The former should be used when the schema has been automatically discovered, and the latter should be used when the user has explicitly included the types in the schema. Different schema checks are enforced for each scenario. ([#4306](https://github.com/realm/realm-core/pull/4306))
@@ -15,6 +18,7 @@
 -----------
 
 ### Internals
+* On Android, the CMake build no longer sets -Oz explicitly for Release builds if `CMAKE_INTERPROCEDURAL_OPTIMIZATION` is enabled. Additionally, Android unit tests are built with LTO.
 * ThreadSafeReference for Dictionary added
 
 ----------------------------------------------
