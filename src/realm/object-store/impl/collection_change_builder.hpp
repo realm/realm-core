@@ -33,9 +33,9 @@ namespace _impl {
 class CollectionChangeBuilder : public CollectionChangeSet {
 public:
     CollectionChangeBuilder(CollectionChangeBuilder const&) = default;
-    CollectionChangeBuilder(CollectionChangeBuilder&&);
+    CollectionChangeBuilder(CollectionChangeBuilder&&) = default;
     CollectionChangeBuilder& operator=(CollectionChangeBuilder const&) = default;
-    CollectionChangeBuilder& operator=(CollectionChangeBuilder&&);
+    CollectionChangeBuilder& operator=(CollectionChangeBuilder&&) = default;
 
     CollectionChangeBuilder(IndexSet deletions = {}, IndexSet insertions = {}, IndexSet modification = {},
                             std::vector<Move> moves = {}, bool root_was_deleted = false);
