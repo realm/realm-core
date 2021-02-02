@@ -100,7 +100,7 @@ public:
         auto results_arr = nlohmann::json::array();
         for (const auto& [test_name, cur_result] : m_results) {
             auto to_millis = [](const auto& tp) -> double {
-                return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+                return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count());
             };
             double start_secs = to_millis(cur_result.start_time) / 1000;
             double end_secs = to_millis(cur_result.end_time) / 1000;
