@@ -588,7 +588,7 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
                                        variable_name));
     }
     LinkChain lc = prop->path->visit(drv, prop->comp_type);
-    drv->translate(lc, prop->identifier);
+    prop->identifier = drv->translate(lc, prop->identifier);
 
     if (prop->identifier.find("@links") == 0) {
         drv->backlink(lc, prop->identifier);
@@ -669,7 +669,7 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
         throw InvalidQueryError(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
                                              agg_op_type_to_str(aggr_op->type), link));
     }
-    drv->translate(link_chain, prop);
+    prop = drv->translate(link_chain, prop);
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
     std::unique_ptr<Subexpr> sub_column;
@@ -1029,7 +1029,7 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (std::string path_elem : path_elems) {
-        drv->translate(link_chain, path_elem);
+        path_elem = drv->translate(link_chain, path_elem);
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
         }
@@ -1160,7 +1160,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
 
 Subexpr* ParserDriver::column(LinkChain& link_chain, std::string identifier)
 {
-    translate(link_chain, identifier);
+    identifier = m_mapping.translate(link_chain, identifier);
 
     if (identifier.find("@links.") == 0) {
         backlink(link_chain, identifier);
@@ -1176,9 +1176,7 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
     auto dot_pos = table_column_pair.find('.');
 
     auto table_name = table_column_pair.substr(0, dot_pos);
-    if (table_name.find(m_mapping.get_backlink_class_prefix()) != 0) {
-        table_name = m_mapping.get_backlink_class_prefix() + table_name;
-    }
+    table_name = m_mapping.translate_table_name(table_name);
     auto column_name = table_column_pair.substr(dot_pos + 1);
     auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
     ColKey origin_column;
@@ -1194,21 +1192,9 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
     link_chain.backlink(*origin_table, origin_column);
 }
 
-void ParserDriver::translate(LinkChain& link_chain, std::string& identifier)
+std::string ParserDriver::translate(LinkChain& link_chain, const std::string& identifier)
 {
-    constexpr size_t max_substitutions_allowed = 50;
-    size_t substitutions = 0;
-    auto table = link_chain.get_current_table();
-    auto tk = table->get_key();
-    while (auto mapped = m_mapping.get_mapping(tk, identifier)) {
-        if (substitutions > max_substitutions_allowed) {
-            throw InvalidQueryError(
-                util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'",
-                             identifier, *mapped, get_printable_table_name(table->get_name())));
-        }
-        identifier = *mapped;
-        substitutions++;
-    }
+    return m_mapping.translate(link_chain, identifier);
 }
 
 int ParserDriver::parse(const std::string& str)

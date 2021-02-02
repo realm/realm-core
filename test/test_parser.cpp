@@ -2823,9 +2823,11 @@ TEST(Parser_Backlinks)
     query_parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
+    mapping.add_table_mapping(t, "my-custom-class-name");
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
+    verify_query(test_context, items, "@links.my-custom-class-name.items.@count > 2", 2, mapping);
 
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
@@ -2836,6 +2838,8 @@ TEST(Parser_Backlinks)
     mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
     mapping_with_prefix.add_mapping(t, "banknotes", "finances");
     mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
+    CHECK(mapping_with_prefix.add_table_mapping(t, "CustomPersonClassName"));
+    CHECK(!mapping_with_prefix.add_table_mapping(t, t->get_name()));
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
@@ -2843,6 +2847,13 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
     // double indirection is allowed
     verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
+    // verbose backlinks syntax
+    verify_query(test_context, items, "@links.Person.items.@count > 2", 2, mapping_with_prefix);
+    // verbose backlinks syntax with 'class_' prefix
+    verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix);
+    // class name substitution
+    verify_query(test_context, items, "@links.CustomPersonClassName.items.@count > 2", 2, mapping_with_prefix);
+
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(
         verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);

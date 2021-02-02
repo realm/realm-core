@@ -2721,17 +2721,6 @@ bool Table::compare_objects(const Table& t) const
 }
 
 
-void Table::check_lists_are_empty(size_t) const
-{
-    // FIXME: Due to a limitation in Sync, it is not legal to change the primary
-    // key of a row that contains lists (including linklists) after those lists
-    // have been populated. This limitation may be lifted in the future, but for
-    // now it is necessary to ensure that all lists are empty before setting a
-    // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
-
-    REALM_ASSERT(false); // FIXME: Unimplemented
-}
-
 void Table::flush_for_commit()
 {
     if (m_top.is_attached() && m_top.size() >= top_position_for_version) {

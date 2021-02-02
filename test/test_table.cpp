@@ -5246,7 +5246,6 @@ TEST(Table_IteratorRandomAccess)
 
     auto key = keys.begin();
     auto iter = t.begin();
-    auto end = t.end();
     for (size_t pos = 0; (pos + 3) < 1000; pos += 3) {
         CHECK_EQUAL(iter->get_key(), *key);
         iter += 3;
@@ -5273,19 +5272,17 @@ TEST(Table_IteratorRandomAccess)
                     i = 0;
                 }
                 else {
-                    CHECK_EQUAL(k, iter[index].get_key());
+                    iter.go(index);
+                    CHECK_EQUAL(k, iter->get_key());
                 }
                 i++;
             }
         }
     }
 
+    iter.go(0);
     auto iter200 = iter + 200;
     CHECK_EQUAL(keys[200], iter200->get_key());
-    ++iter; // Now points to element 1
-    CHECK_EQUAL(keys[201], iter[200].get_key());
-    CHECK_EQUAL(keys[201], iter200[1].get_key());
-    CHECK_EQUAL(keys[1], iter->get_key());
 }
 
 TEST(Table_EmbeddedObjects)

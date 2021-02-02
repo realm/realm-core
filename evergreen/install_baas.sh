@@ -166,12 +166,14 @@ if [[ ! -x $YARN ]]; then
     mkdir yarn && cd yarn
     $CURL -LsS https://s3.amazonaws.com/stitch-artifacts/yarn/latest.tar.gz | tar -xz --strip-components=1
     cd -
+    mkdir $WORK_PATH/yarn_cache
 fi
 
 if [[ ! -x baas_dep_binaries/transpiler ]]; then
     echo "Building transpiler"
     cd baas/etc/transpiler
-    $YARN --non-interactive --silent && $YARN build --non-interactive --silent
+    $YARN --non-interactive --silent --cache-folder $WORK_PATH/yarn_cache
+    $YARN build --cache-folder $WORK_PATH/yarn_cache --non-interactive --silent
     cd -
     ln -s $(pwd)/baas/etc/transpiler/bin/transpiler baas_dep_binaries/transpiler
 fi
