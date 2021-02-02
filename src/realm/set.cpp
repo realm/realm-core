@@ -189,7 +189,7 @@ void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Set<Mixed>::do_erase(size_t ndx)
 {
-    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+    if (Mixed old_value = get(ndx); !old_value.is_null() && old_value.get_type() == type_TypedLink) {
         auto old_link = old_value.get<ObjLink>();
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
