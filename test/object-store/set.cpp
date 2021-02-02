@@ -269,6 +269,25 @@ TEST_CASE("set") {
             });
             REQUIRE(change.empty());
         }
+
+        SECTION("deleting an empty set sends a change notification") {
+            auto token = require_change();
+            REQUIRE(link_set.size() == 0);
+            REQUIRE(!change.collection_root_was_deleted);
+
+            write([&]() {
+                obj.remove();
+            });
+            REQUIRE(change.deletions.empty());
+            REQUIRE(change.collection_root_was_deleted);
+
+            // Should not resend delete all notification after another commit
+            change = {};
+            write([&] {
+                table->create_object();
+            });
+            REQUIRE(change.empty());
+        }
     }
 
     SECTION("find(Query)") {

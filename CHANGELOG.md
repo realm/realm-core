@@ -4,6 +4,7 @@
 * Sync client now logs error messages received from server rather than just the size of the error message.
 * Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
 * Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
+* Notifications will now be triggered for empty collections whose source object has been deleted. ([#4228](https://github.com/realm/realm-core/issues/4228)).
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

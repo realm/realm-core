@@ -424,6 +424,14 @@ Transaction& CollectionNotifier::source_shared_group()
     return Realm::Internal::get_transaction(*m_realm);
 }
 
+void CollectionNotifier::report_collection_root_is_deleted()
+{
+    if (!m_has_delivered_root_deletion_event) {
+        m_change.collection_root_was_deleted = true;
+        m_has_delivered_root_deletion_event = true;
+    }
+}
+
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)
 {
     util::CheckedLockGuard lock(m_callback_mutex);

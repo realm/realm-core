@@ -25,10 +25,46 @@
 using namespace realm;
 using namespace realm::_impl;
 
+CollectionChangeBuilder::CollectionChangeBuilder(CollectionChangeBuilder&& other)
+{
+    if (&other == this) {
+        return;
+    }
+    deletions = std::move(other.deletions);
+    insertions = std::move(other.insertions);
+    modifications = std::move(other.modifications);
+    moves = std::move(other.moves);
+    collection_root_was_deleted = other.collection_root_was_deleted;
+    columns = std::move(other.columns);
+    m_track_columns = other.m_track_columns;
+
+    other.collection_root_was_deleted = false;
+}
+
+CollectionChangeBuilder& CollectionChangeBuilder::operator=(CollectionChangeBuilder&& other)
+{
+    if (&other == this) {
+        return *this;
+    }
+    deletions = std::move(other.deletions);
+    insertions = std::move(other.insertions);
+    modifications = std::move(other.modifications);
+    moves = std::move(other.moves);
+    collection_root_was_deleted = other.collection_root_was_deleted;
+    columns = std::move(other.columns);
+    m_track_columns = other.m_track_columns;
+    other.collection_root_was_deleted = false;
+    return *this;
+}
+
 CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions, IndexSet insertions, IndexSet modifications,
-                                                 std::vector<Move> moves)
-    : CollectionChangeSet(
-          {std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
+                                                 std::vector<Move> moves, bool root_was_deleted)
+    : CollectionChangeSet({std::move(deletions),
+                           std::move(insertions),
+                           std::move(modifications),
+                           {},
+                           std::move(moves),
+                           root_was_deleted})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -139,6 +175,9 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
         col.shift_for_insert_at(c.insertions);
         col.add(other);
     });
+    if (c.collection_root_was_deleted) {
+        collection_root_was_deleted = true;
+    }
 
     c = {};
     verify();
@@ -675,6 +714,12 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
     // but we don't want inserts in the final modification set
     modifications.remove(insertions);
 
+    // moving a bool will not reset it's value, so to get the move out behaviour
+    // that this method requires, manually reset the state
+    bool was_deleted = collection_root_was_deleted;
+    collection_root_was_deleted = false;
+
     return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
-            std::move(modifications), std::move(moves),      std::move(columns)};
+            std::move(modifications), std::move(moves),      was_deleted,
+            std::move(columns)};
 }

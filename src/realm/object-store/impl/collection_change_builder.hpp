@@ -33,12 +33,12 @@ namespace _impl {
 class CollectionChangeBuilder : public CollectionChangeSet {
 public:
     CollectionChangeBuilder(CollectionChangeBuilder const&) = default;
-    CollectionChangeBuilder(CollectionChangeBuilder&&) = default;
+    CollectionChangeBuilder(CollectionChangeBuilder&&);
     CollectionChangeBuilder& operator=(CollectionChangeBuilder const&) = default;
-    CollectionChangeBuilder& operator=(CollectionChangeBuilder&&) = default;
+    CollectionChangeBuilder& operator=(CollectionChangeBuilder&&);
 
     CollectionChangeBuilder(IndexSet deletions = {}, IndexSet insertions = {}, IndexSet modification = {},
-                            std::vector<Move> moves = {});
+                            std::vector<Move> moves = {}, bool root_was_deleted = false);
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
