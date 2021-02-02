@@ -151,8 +151,18 @@ functions:
           fi
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
+          if [[ -n "${enable_test_result_reporter|}" ]]; then
+              export UNITTEST_EVERGREEN_TEST_RESULTS="./evergreen/abspath.sh ${task_name}_results.json"
+          fi
+
+          if [[ -n "${report_test_progress|}" ]]; then
+              export UNITTEST_PROGRESS=${report_test_progress|}
+          fi
           cd build
           $CTEST -V $TEST_FLAGS
+    - command: attach.results
+      params:
+        file_location: realm-core/${task_name}_results.json
 
 tasks:
 - name: compile
@@ -197,6 +207,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: StorageTests
+      enable_test_result_reporter: On
 
 - name: benchmark-common-tasks
   tags: [ "benchmark" ]
@@ -219,6 +230,7 @@ tasks:
   - func: "run tests"
     vars:
       test_filter: SyncTests
+      enable_test_result_reporter: On
 
 - name: object-store-tests
   tags: [ "disabled_on_windows", "test_suite" ]
