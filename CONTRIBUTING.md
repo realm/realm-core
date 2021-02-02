@@ -26,7 +26,11 @@ Occasionally a single PR, while a complete unit of work, does not contain everyt
 ### Changelog
 
 Pull requests that touch code should always add an entry to `CHANGELOG.md` with a sentence or two describing a change and a link to the relevant issue or the PR itself. The expectation is that the entry gives a general idea about the change, and then the PR or issue describes the nature of the change in more detail. Bug fixes should also mention the version the bug was introduced in.
-Changelog entries should be high-level enough that they make sense when viewed by users of the Realm SDKs. A good example is `Fixed an issue where opening a realm from two different processes on Windows results in a deadlock (since vX.Y.Z)` instead of `Fixed a bug with signaling win32 robust mutexes`. The nature of the change should be discussed in the PR or issue whereas the changelog entry describes the visible outcome to users. For anything else please use the `Internals` section of `CHANGELOG.md`.
+Changelog entries should be high-level enough that they make sense when viewed by users of the Realm SDKs. A good example is 
+```
+ * Fixed an issue where opening a realm from two different processes on Windows results in a deadlock ([#9999](https://github.com/realm/realm-core/issues/9999), since vX.Y.Z) 
+ ```
+instead of `Fixed a bug with signaling win32 robust mutexes`. The nature of the change should be discussed in the PR or issue whereas the changelog entry describes the visible outcome to users. For anything else please use the `Internals` section of `CHANGELOG.md`.
 
 ### Commit Messages
 
