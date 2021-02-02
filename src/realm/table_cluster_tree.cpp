@@ -321,15 +321,6 @@ void TableClusterTree::remove_all_links(CascadeState& state)
 
 /***********************  TableClusterTree::Iterator  ************************/
 
-auto TableClusterTree::Iterator::operator[](size_t n) -> reference
-{
-    auto k = go(n);
-    if (m_obj.get_key() != k) {
-        new (&m_obj) Obj(m_table, m_leaf.get_mem(), k, m_state.m_current_index);
-    }
-    return m_obj;
-}
-
 TableClusterTree::Iterator::pointer TableClusterTree::Iterator::operator->() const
 {
     if (update() || m_key != m_obj.get_key()) {
