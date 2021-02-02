@@ -32,12 +32,13 @@ using namespace realm::test_util;
  *
  * This test set validate that sets and lists dont hit an assert exception
  * when operating with Mixed.
- * 
+ *
  * See: https://github.com/realm/realm-core/issues/4304
- * 
+ *
  **************************************************************************/
 
-TEST(Set_Mixed_do_erase){
+TEST(Set_Mixed_do_erase)
+{
     Group g;
 
     auto t = g.add_table("foo");
@@ -45,12 +46,13 @@ TEST(Set_Mixed_do_erase){
     auto obj = t->create_object();
 
     auto set = obj.get_set<Mixed>("mixeds");
-    
+
     set.insert(util::none);
     set.erase_null();
 }
 
-TEST(List_Mixed_do_set){
+TEST(List_Mixed_do_set)
+{
     Group g;
 
     auto t = g.add_table("foo");
@@ -63,7 +65,8 @@ TEST(List_Mixed_do_set){
     set.set(0, Mixed("hello world"));
 }
 
-TEST(List_Mixed_do_insert){
+TEST(List_Mixed_do_insert)
+{
     Group g;
 
     auto t = g.add_table("foo");
