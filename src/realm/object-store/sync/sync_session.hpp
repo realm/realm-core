@@ -25,6 +25,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
+#include <realm/db.hpp>
 
 #include <mutex>
 #include <unordered_map>
@@ -133,7 +134,7 @@ public:
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const
     {
-        return m_realm_path;
+        return m_db->get_path();
     }
 
     // Register a callback that will be called when all pending uploads have completed.
@@ -308,24 +309,24 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<realm::DB> db, SyncConfig config,
                                                bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
                               bool force_client_resync)
-                : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
+                : SyncSession(client, std::move(db), std::move(config), force_client_resync)
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
+        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config),
                                                    force_client_resync);
     }
     // }
 
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
+    SyncSession(_impl::SyncClient&, std::shared_ptr<realm::DB> db, SyncConfig, bool force_client_resync);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
@@ -363,7 +364,7 @@ private:
     SyncConfig m_config;
     bool m_force_client_resync;
 
-    std::string m_realm_path;
+    std::shared_ptr<DB> m_db;
     _impl::SyncClient& m_client;
 
     int64_t m_completion_request_counter = 0;

@@ -305,11 +305,11 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, bool force_client_resync)
     : m_state(&State::inactive)
     , m_config(std::move(config))
     , m_force_client_resync(force_client_resync)
-    , m_realm_path(std::move(realm_path))
+    , m_db(std::move(db))
     , m_client(client)
 {
 }
@@ -604,7 +604,7 @@ void SyncSession::create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_resync) {
-        std::string metadata_dir = m_realm_path + ".resync";
+        std::string metadata_dir = path() + ".resync";
         util::try_make_dir(metadata_dir);
 
         sync::Session::Config::ClientReset config;
@@ -614,7 +614,7 @@ void SyncSession::create_sync_session()
         session_config.client_reset_config = config;
     }
 
-    m_session = m_client.make_session(m_realm_path, std::move(session_config));
+    m_session = m_client.make_session(path(), m_db, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 
@@ -733,7 +733,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_config.user->sync_manager()->unregister_session(m_realm_path);
+    m_config.user->sync_manager()->unregister_session(path());
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,

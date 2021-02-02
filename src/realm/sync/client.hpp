@@ -636,9 +636,8 @@ public:
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
     ///
-    /// \param realm_path The file-system path of a local client-side Realm
-    /// file.
-    Session(Client&, std::string realm_path, Config = {});
+    /// \param db A local client-side Realm DB object (representing a realm file).
+    Session(Client&, std::shared_ptr<DB> db, Config = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().

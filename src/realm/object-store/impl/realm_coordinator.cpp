@@ -108,7 +108,7 @@ void RealmCoordinator::create_sync_session(bool force_client_resync)
             "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
     }
 
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config,
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, m_db, *m_config.sync_config,
                                                                              force_client_resync);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();

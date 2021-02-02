@@ -365,7 +365,7 @@ public:
     // The temporary files are not returned by this function.
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
-
+    std::string& get_path() { return m_db_path; }
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
