@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include "realm/util/checked_cast.hpp"
 #include <stdexcept>
 
 #ifdef REALM_DEBUG
@@ -1846,8 +1847,7 @@ StringData Table::get_name() const noexcept
     ArrayParent* parent = real_top.get_parent();
     if (!parent)
         return StringData("");
-    REALM_ASSERT(dynamic_cast<Group*>(parent));
-    return static_cast<Group*>(parent)->get_table_name(get_key());
+    return util::checked_cast<Group*>(parent)->get_table_name(get_key());
 }
 
 const char* Table::get_state() const noexcept

@@ -21,6 +21,7 @@
 ### Internals
 * On Android, the CMake build no longer sets -Oz explicitly for Release builds if `CMAKE_INTERPROCEDURAL_OPTIMIZATION` is enabled. Additionally, Android unit tests are built with LTO.
 * ThreadSafeReference for Dictionary added
+* `util::checked_cast<T>()` introduced to simplify down-casting with a validity check in debug builds.
 
 ----------------------------------------------
 
