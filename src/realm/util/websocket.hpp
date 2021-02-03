@@ -81,7 +81,7 @@ public:
     /// websocket object is destroyed during execution of the function.
     virtual bool websocket_text_message_received(const char* data, size_t size);
     virtual bool websocket_binary_message_received(const char* data, size_t size);
-    virtual bool websocket_close_message_received(const char* data, size_t size);
+    virtual bool websocket_close_message_received(std::error_code error_code, StringData message);
     virtual bool websocket_ping_message_received(const char* data, size_t size);
     virtual bool websocket_pong_message_received(const char* data, size_t size);
     //@}
@@ -215,6 +215,8 @@ enum class Error {
     bad_response_header_protocol_violation,
     bad_message
 };
+
+const std::error_category& websocket_close_status_category() noexcept;
 
 const std::error_category& error_category() noexcept;
 

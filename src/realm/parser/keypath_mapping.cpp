@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "keypath_mapping.hpp"
+#include <realm/util/serializer.hpp>
 
 #include <functional>
 
@@ -35,19 +36,14 @@ std::size_t TableAndColHash::operator()(const std::pair<TableKey, std::string>& 
 bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
 {
     auto table_key = table->get_key();
-    if (m_mapping.find({table_key, name}) == m_mapping.end()) {
-        m_mapping[{table_key, name}] = alias;
-        return true;
-    }
-    return false;
+    auto it_and_success = m_mapping.insert({{table_key, name}, alias});
+    return it_and_success.second;
 }
 
-void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
+bool KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
 {
     auto table_key = table->get_key();
-    auto it = m_mapping.find({table_key, name});
-    REALM_ASSERT_DEBUG(it != m_mapping.end());
-    m_mapping.erase(it);
+    return m_mapping.erase({table_key, name}) > 0;
 }
 
 bool KeyPathMapping::has_mapping(ConstTableRef table, const std::string& name) const
@@ -66,6 +62,73 @@ util::Optional<std::string> KeyPathMapping::get_mapping(TableKey table_key, cons
     }
     return ret;
 }
+
+bool KeyPathMapping::add_table_mapping(ConstTableRef table, std::string alias)
+{
+    std::string real_table_name = table->get_name();
+    if (alias == real_table_name) {
+        return false; // preventing an infinite mapping loop
+    }
+    auto it_and_success = m_table_mappings.insert({alias, real_table_name});
+    return it_and_success.second;
+}
+
+bool KeyPathMapping::remove_table_mapping(std::string alias_to_remove)
+{
+    return m_table_mappings.erase(alias_to_remove) > 0;
+}
+
+bool KeyPathMapping::has_table_mapping(const std::string& alias) const
+{
+    return m_table_mappings.count(alias) > 0;
+}
+
+util::Optional<std::string> KeyPathMapping::get_table_mapping(const std::string alias) const
+{
+    if (auto it = m_table_mappings.find(alias); it != m_table_mappings.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+constexpr static size_t max_substitutions_allowed = 50;
+
+std::string KeyPathMapping::translate_table_name(const std::string& identifier)
+{
+    size_t substitutions = 0;
+    std::string alias = identifier;
+    while (auto mapped = get_table_mapping(alias)) {
+        if (substitutions > max_substitutions_allowed) {
+            throw MappingError(
+                util::format("Substitution loop detected while processing class name mapping from '%1' to '%2'.",
+                             identifier, *mapped));
+        }
+        alias = *mapped;
+    }
+    if (alias.find(get_backlink_class_prefix()) != 0) {
+        alias = get_backlink_class_prefix() + alias;
+    }
+    return alias;
+}
+
+std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& identifier)
+{
+    size_t substitutions = 0;
+    auto table = link_chain.get_current_table();
+    auto tk = table->get_key();
+    std::string alias = identifier;
+    while (auto mapped = get_mapping(tk, alias)) {
+        if (substitutions > max_substitutions_allowed) {
+            throw MappingError(
+                util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'", alias,
+                             *mapped, util::serializer::get_printable_table_name(table->get_name())));
+        }
+        alias = *mapped;
+        substitutions++;
+    }
+    return alias;
+}
+
 
 // This may be premature optimisation, but it'll be super fast and it doesn't
 // bother dragging in anything locale specific for case insensitive comparisons.

@@ -18,7 +18,7 @@
 
 #include <string>
 
-namespace realm {
+namespace realm::c_api {
 
 static inline realm_string_t to_capi(StringData data)
 {
@@ -66,14 +66,20 @@ static inline Decimal128 from_capi(realm_decimal128_t dec)
     return Decimal128{Decimal128::Bid128{{dec.w[0], dec.w[1]}}};
 }
 
-static inline realm_object_id_t to_capi(ObjectId)
+static inline realm_object_id_t to_capi(ObjectId object_id)
 {
-    REALM_TERMINATE("Not implemented yet.");
+    realm_object_id_t result;
+    auto bytes = object_id.to_bytes();
+    std::copy(bytes.begin(), bytes.end(), result.bytes);
+    return result;
 }
 
-static inline ObjectId from_capi(realm_object_id_t)
+static inline ObjectId from_capi(realm_object_id_t object_id)
 {
-    REALM_TERMINATE("Not implemented yet.");
+    static_assert(ObjectId::num_bytes == 12);
+    ObjectId::ObjectIdBytes bytes;
+    std::copy(object_id.bytes, object_id.bytes + 12, bytes.begin());
+    return ObjectId(bytes);
 }
 
 static inline ObjLink from_capi(realm_link_t val)
@@ -130,7 +136,7 @@ static inline Mixed from_capi(realm_value_t val)
         case RLM_TYPE_UUID:
             return Mixed{UUID{from_capi(val.uuid)}};
     }
-    REALM_TERMINATE("Invalid realm_value_t");
+    REALM_TERMINATE("Invalid realm_value_t"); // LCOV_EXCL_LINE
 }
 
 static inline realm_value_t to_capi(Mixed value)
@@ -182,7 +188,7 @@ static inline realm_value_t to_capi(Mixed value)
                 break;
             }
             case type_Link: {
-                REALM_TERMINATE("Not implemented yet");
+                REALM_TERMINATE("Not implemented yet"); // LCOV_EXCL_LINE
             }
             case type_ObjectId: {
                 val.type = RLM_TYPE_OBJECT_ID;
@@ -205,7 +211,7 @@ static inline realm_value_t to_capi(Mixed value)
 
             case type_LinkList:
             case type_Mixed:
-                REALM_TERMINATE("Invalid Mixed value type");
+                REALM_TERMINATE("Invalid Mixed value type"); // LCOV_EXCL_LINE
         }
     }
 
@@ -215,29 +221,43 @@ static inline realm_value_t to_capi(Mixed value)
 static inline SchemaMode from_capi(realm_schema_mode_e mode)
 {
     switch (mode) {
-        case RLM_SCHEMA_MODE_AUTOMATIC: {
+        case RLM_SCHEMA_MODE_AUTOMATIC:
             return SchemaMode::Automatic;
-        }
-        case RLM_SCHEMA_MODE_IMMUTABLE: {
+        case RLM_SCHEMA_MODE_IMMUTABLE:
             return SchemaMode::Immutable;
-        }
-        case RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE: {
+        case RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE:
             return SchemaMode::ReadOnlyAlternative;
-        }
-        case RLM_SCHEMA_MODE_RESET_FILE: {
+        case RLM_SCHEMA_MODE_RESET_FILE:
             return SchemaMode::ResetFile;
-        }
-        case RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED: {
+        case RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED:
             return SchemaMode::AdditiveDiscovered;
-        }
-        case RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT: {
+        case RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT:
             return SchemaMode::AdditiveExplicit;
-        }
-        case RLM_SCHEMA_MODE_MANUAL: {
+        case RLM_SCHEMA_MODE_MANUAL:
             return SchemaMode::Manual;
-        }
     }
-    REALM_TERMINATE("Invalid schema mode.");
+    REALM_TERMINATE("Invalid schema mode."); // LCOV_EXCL_LINE
+}
+
+static inline realm_schema_mode_e to_capi(SchemaMode mode)
+{
+    switch (mode) {
+        case SchemaMode::Automatic:
+            return RLM_SCHEMA_MODE_AUTOMATIC;
+        case SchemaMode::Immutable:
+            return RLM_SCHEMA_MODE_IMMUTABLE;
+        case SchemaMode::ReadOnlyAlternative:
+            return RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE;
+        case SchemaMode::ResetFile:
+            return RLM_SCHEMA_MODE_RESET_FILE;
+        case SchemaMode::AdditiveDiscovered:
+            return RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED;
+        case SchemaMode::AdditiveExplicit:
+            return RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT;
+        case SchemaMode::Manual:
+            return RLM_SCHEMA_MODE_MANUAL;
+    }
+    REALM_TERMINATE("Invalid schema mode."); // LCOV_EXCL_LINE
 }
 
 static inline realm_property_type_e to_capi(PropertyType type) noexcept
@@ -271,6 +291,7 @@ static inline realm_property_type_e to_capi(PropertyType type) noexcept
             return RLM_PROPERTY_TYPE_OBJECT_ID;
         case PropertyType::UUID:
             return RLM_PROPERTY_TYPE_UUID;
+        // LCOV_EXCL_START
         case PropertyType::Nullable:
             [[fallthrough]];
         case PropertyType::Flags:
@@ -283,8 +304,9 @@ static inline realm_property_type_e to_capi(PropertyType type) noexcept
             [[fallthrough]];
         case PropertyType::Array:
             REALM_UNREACHABLE();
+            // LCOV_EXCL_STOP
     }
-    REALM_TERMINATE("Unsupported property type");
+    REALM_TERMINATE("Unsupported property type"); // LCOV_EXCL_LINE
 }
 
 static inline PropertyType from_capi(realm_property_type_e type) noexcept
@@ -317,7 +339,7 @@ static inline PropertyType from_capi(realm_property_type_e type) noexcept
         case RLM_PROPERTY_TYPE_UUID:
             return PropertyType::UUID;
     }
-    REALM_TERMINATE("Unsupported property type");
+    REALM_TERMINATE("Unsupported property type"); // LCOV_EXCL_LINE
 }
 
 
@@ -401,7 +423,7 @@ static inline realm_class_info_t to_capi(const ObjectSchema& o)
     return info;
 }
 
-} // namespace realm
+} // namespace realm::c_api
 
 
 #endif // REALM_OBJECT_STORE_C_API_CONVERSION_HPP

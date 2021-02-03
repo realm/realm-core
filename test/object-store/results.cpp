@@ -2951,6 +2951,68 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
     }
 }
 
+TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFromTable, ResultsFromQuery,
+                   ResultsFromTableView)
+{
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+         }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col_value = table->get_column_key("pk");
+    Results results = TestType::call(r, table);
+
+    r->begin_transaction();
+
+    SECTION("front insertion") {
+        for (int i = 0; i < 1000; ++i) {
+            table->create_object_with_primary_key(1000 - i);
+            REQUIRE(results.get<Obj>(0).get<int64_t>(col_value) == 1000 - i);
+        }
+    }
+
+    SECTION("append at end") {
+        for (int i = 0; i < 1000; ++i) {
+            table->create_object_with_primary_key(i);
+            REQUIRE(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("random order") {
+        int indexes[1000];
+        std::iota(std::begin(indexes), std::end(indexes), 0);
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
+
+        for (auto i : indexes) {
+            auto index = table->get_object_ndx(table->create_object_with_primary_key(i).get_key());
+            REQUIRE(results.get<Obj>(index).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("delete from front") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(0).remove();
+    }
+
+    SECTION("delete from back") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(table->size() - 1).remove();
+    }
+}
+
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
                    ResultsFromLinkView, ResultsFromLinkSet)
 {

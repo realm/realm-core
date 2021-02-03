@@ -408,7 +408,7 @@ public:
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
-    void translate(LinkChain&, std::string&);
+    std::string translate(LinkChain&, const std::string&);
 
 private:
     // The string being parsed.

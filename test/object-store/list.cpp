@@ -164,6 +164,37 @@ TEST_CASE("list") {
                 origin->begin()->remove();
             });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+            REQUIRE(change.collection_root_was_deleted);
+        }
+
+        SECTION("deleting an empty list triggers the notifier") {
+            size_t notifier_count = 0;
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+                ++notifier_count;
+            });
+            advance_and_notify(*r);
+            write([&] {
+                lst.delete_all();
+            });
+            REQUIRE(!change.collection_root_was_deleted);
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+            REQUIRE(notifier_count == 2);
+            REQUIRE(lst.size() == 0);
+
+            write([&] {
+                origin->begin()->remove();
+            });
+            REQUIRE(change.deletions.count() == 0);
+            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE(notifier_count == 3);
+
+            // Should not resend delete notification after another commit
+            change = {};
+            write([&] {
+                target->create_object();
+            });
+            REQUIRE(change.empty());
         }
 
         SECTION("modifying one of the target rows sends a change notification") {

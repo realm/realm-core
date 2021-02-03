@@ -418,6 +418,9 @@ std::unique_ptr<Reporter> create_xml_reporter(std::ostream&);
 /// http://llg.cubic.org/docs/junit/
 std::unique_ptr<Reporter> create_junit_reporter(std::ostream&);
 
+/// Generates output that is compatible with the evergreen test results api.
+std::unique_ptr<Reporter> create_evergreen_reporter(const std::string&);
+
 std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2);
 
 /// Run only those tests whose name is both included and not

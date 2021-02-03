@@ -1,77 +1,68 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
+namespace realm::c_api {
 namespace {
 struct ObjectNotificationsCallback {
-    void* m_userdata = nullptr;
-    realm_free_userdata_func_t m_free = nullptr;
+    UserdataPtr m_userdata;
     realm_on_object_change_func_t m_on_change = nullptr;
     realm_callback_error_func_t m_on_error = nullptr;
 
     ObjectNotificationsCallback() = default;
     ObjectNotificationsCallback(ObjectNotificationsCallback&& other)
         : m_userdata(std::exchange(other.m_userdata, nullptr))
-        , m_free(std::exchange(other.m_free, nullptr))
         , m_on_change(std::exchange(other.m_on_change, nullptr))
         , m_on_error(std::exchange(other.m_on_error, nullptr))
     {
     }
 
-    ~ObjectNotificationsCallback()
-    {
-        if (m_free) {
-            m_free(m_userdata);
-        }
-    }
-
     void operator()(const CollectionChangeSet& changes, std::exception_ptr error)
     {
+        // Note: As of Core 6, notification errors cannot happen.
+
+        // LCOV_EXCL_START
         if (error) {
             if (m_on_error) {
                 realm_async_error_t err{std::move(error)};
-                m_on_error(m_userdata, &err);
+                m_on_error(m_userdata.get(), &err);
             }
         }
+        // LCOV_EXCL_STOP
         else if (m_on_change) {
             realm_object_changes_t c{changes};
-            m_on_change(m_userdata, &c);
+            m_on_change(m_userdata.get(), &c);
         }
     }
 };
 
 struct CollectionNotificationsCallback {
-    void* m_userdata = nullptr;
-    realm_free_userdata_func_t m_free = nullptr;
+    UserdataPtr m_userdata;
     realm_on_collection_change_func_t m_on_change = nullptr;
     realm_callback_error_func_t m_on_error = nullptr;
 
     CollectionNotificationsCallback() = default;
     CollectionNotificationsCallback(CollectionNotificationsCallback&& other)
         : m_userdata(std::exchange(other.m_userdata, nullptr))
-        , m_free(std::exchange(other.m_free, nullptr))
         , m_on_change(std::exchange(other.m_on_change, nullptr))
         , m_on_error(std::exchange(other.m_on_error, nullptr))
     {
     }
 
-    ~CollectionNotificationsCallback()
-    {
-        if (m_free) {
-            m_free(m_userdata);
-        }
-    }
-
     void operator()(const CollectionChangeSet& changes, std::exception_ptr error)
     {
+        // Note: As of Core 6, notification errors cannot happen.
+
+        // LCOV_EXCL_START
         if (error) {
             if (m_on_error) {
                 realm_async_error_t err{std::move(error)};
-                m_on_error(m_userdata, &err);
+                m_on_error(m_userdata.get(), &err);
             }
         }
+        // LCOV_EXCL_STOP
         else if (m_on_change) {
             realm_collection_changes_t c{changes};
-            m_on_change(m_userdata, &c);
+            m_on_change(m_userdata.get(), &c);
         }
     }
 };
@@ -86,8 +77,7 @@ RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm
 {
     return wrap_err([&]() {
         ObjectNotificationsCallback cb;
-        cb.m_userdata = userdata;
-        cb.m_free = free;
+        cb.m_userdata = UserdataPtr{userdata, free};
         cb.m_on_change = on_change;
         cb.m_on_error = on_error;
         auto token = obj->add_notification_callback(std::move(cb));
@@ -130,8 +120,7 @@ RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_l
 {
     return wrap_err([&]() {
         CollectionNotificationsCallback cb;
-        cb.m_userdata = userdata;
-        cb.m_free = free;
+        cb.m_userdata = UserdataPtr{userdata, free};
         cb.m_on_change = on_change;
         cb.m_on_error = on_error;
         auto token = list->add_notification_callback(std::move(cb));
@@ -146,8 +135,7 @@ realm_results_add_notification_callback(realm_results_t* results, void* userdata
 {
     return wrap_err([&]() {
         CollectionNotificationsCallback cb;
-        cb.m_userdata = userdata;
-        cb.m_free = free;
+        cb.m_userdata = UserdataPtr{userdata, free};
         cb.m_on_change = on_change;
         cb.m_on_error = on_error;
         auto token = results->add_notification_callback(std::move(cb));
@@ -223,6 +211,7 @@ RLM_API void realm_collection_changes_get_ranges(
             if (i >= max_moves)
                 break;
             out_moves[i] = realm_collection_move_t{from, to};
+            ++i;
         }
     }
 }
@@ -234,6 +223,7 @@ static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, 
         if (i >= max)
             return;
         out_indices[i] = index;
+        ++i;
     }
 }
 
@@ -261,6 +251,9 @@ RLM_API void realm_collection_changes_get_changes(const realm_collection_changes
             if (i >= max_moves)
                 break;
             out_moves[i] = realm_collection_move_t{from, to};
+            ++i;
         }
     }
 }
+
+} // namespace realm::c_api

@@ -320,6 +320,7 @@ void ListResultsNotifier::run()
         m_change = {};
         m_change.deletions.set(m_previous_indices.size());
         m_previous_indices.clear();
+        report_collection_root_is_deleted();
         return;
     }
 

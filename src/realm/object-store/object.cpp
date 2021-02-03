@@ -104,7 +104,7 @@ Object::Object(SharedRealm r, Obj const& o)
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(key))
 {
     REALM_ASSERT(!m_obj.get_table() ||
                  (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
@@ -113,7 +113,7 @@ Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 Object::Object(SharedRealm r, StringData object_type, size_t index)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(index))
 {
     REALM_ASSERT(!m_obj.get_table() ||
                  (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
