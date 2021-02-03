@@ -538,7 +538,7 @@ buildvariants:
 
 - name: macos-1014-release
   display_name: "MacOS 10.14 x86_64 (Release build)"
-  run_on: macos-1014-test
+  run_on: macos-1014
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
