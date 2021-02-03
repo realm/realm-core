@@ -320,6 +320,7 @@ void CollectionNotifier::prepare_handover()
     m_sg_version = m_sg->get_version_of_current_transaction();
     do_prepare_handover(*m_sg);
     add_changes(std::move(m_change));
+    m_change = {};
     REALM_ASSERT(m_change.empty());
     m_has_run = true;
 
@@ -393,8 +394,10 @@ bool CollectionNotifier::package_for_delivery()
     if (!prepare_to_deliver())
         return false;
     util::CheckedLockGuard lock(m_callback_mutex);
-    for (auto& callback : m_callbacks)
+    for (auto& callback : m_callbacks) {
         callback.changes_to_deliver = std::move(callback.accumulated_changes).finalize();
+        callback.accumulated_changes = {};
+    }
     m_callback_count = m_callbacks.size();
     return true;
 }
@@ -422,6 +425,14 @@ void CollectionNotifier::attach_to(std::shared_ptr<Transaction> sg)
 Transaction& CollectionNotifier::source_shared_group()
 {
     return Realm::Internal::get_transaction(*m_realm);
+}
+
+void CollectionNotifier::report_collection_root_is_deleted()
+{
+    if (!m_has_delivered_root_deletion_event) {
+        m_change.collection_root_was_deleted = true;
+        m_has_delivered_root_deletion_event = true;
+    }
 }
 
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)

@@ -24,9 +24,12 @@
 #include <locale>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 
 #include <realm/util/thread.hpp>
 #include <realm/util/timestamp_logger.hpp>
+
+#include <external/json/json.hpp>
 
 #include "demangle.hpp"
 #include "timer.hpp"
@@ -62,6 +65,75 @@ std::string xml_escape(const std::string& value)
     replace_char(value_2, '\"', "&quot;");
     return value_2;
 }
+
+class EvergreenReporter final : public Reporter {
+public:
+    explicit EvergreenReporter(const std::string& output_path)
+        : m_output(output_path)
+    {
+    }
+
+    void begin(const TestContext& context) override
+    {
+        m_results.emplace(std::make_pair(context.get_test_name(), TestResult{}));
+    }
+
+    void fail(const TestContext& context, const char*, long, const std::string&) override
+    {
+        auto it = m_results.find(context.get_test_name());
+        REALM_ASSERT(it != m_results.end());
+        it->second.status = "fail";
+    }
+
+    void end(const TestContext& context, double) override
+    {
+        auto it = m_results.find(context.get_test_name());
+        REALM_ASSERT(it != m_results.end());
+        if (it->second.status == "unknown") {
+            it->second.status = "pass";
+        }
+        it->second.end_time = std::chrono::system_clock::now();
+    }
+
+    void summary(const SharedContext&, const Summary&) override
+    {
+        auto results_arr = nlohmann::json::array();
+        for (const auto& [test_name, cur_result] : m_results) {
+            auto to_millis = [](const auto& tp) -> double {
+                return static_cast<double>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count());
+            };
+            double start_secs = to_millis(cur_result.start_time) / 1000;
+            double end_secs = to_millis(cur_result.end_time) / 1000;
+            int exit_code = 0;
+            if (cur_result.status != "pass") {
+                exit_code = 1;
+            }
+
+            nlohmann::json cur_result_obj = {{"test_file", test_name}, {"status", cur_result.status},
+                                             {"exit_code", exit_code}, {"start", start_secs},
+                                             {"end", end_secs},        {"elapsed", end_secs - start_secs}};
+            results_arr.push_back(std::move(cur_result_obj));
+        }
+        auto result_file_obj = nlohmann::json{{"results", std::move(results_arr)}};
+        m_output << result_file_obj << std::endl;
+    }
+
+private:
+    struct TestResult {
+        TestResult()
+            : start_time{std::chrono::system_clock::now()}
+            , end_time{}
+            , status{"unknown"}
+        {
+        }
+        std::chrono::time_point<std::chrono::system_clock> start_time;
+        std::chrono::time_point<std::chrono::system_clock> end_time;
+        std::string status;
+    };
+    std::map<std::string, TestResult> m_results;
+    std::ofstream m_output;
+};
 
 
 class XmlReporter : public Reporter {
@@ -1027,6 +1099,11 @@ std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out)
 std::unique_ptr<Reporter> create_xml_reporter(std::ostream& out)
 {
     return std::make_unique<XmlReporter>(out);
+}
+
+std::unique_ptr<Reporter> create_evergreen_reporter(const std::string& path)
+{
+    return std::make_unique<EvergreenReporter>(path);
 }
 
 std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2)

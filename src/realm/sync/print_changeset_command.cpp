@@ -96,10 +96,7 @@ int main(int argc, char const* argv[])
             continue;
         }
 
-        std::cout << "Parsed changeset:\n";
-        parsed.print(std::cout);
-
-        std::cout << "\n";
+        std::cout << "Parsed changeset:\n" << parsed << std::endl;
     }
 
     return errors ? 1 : 0;
