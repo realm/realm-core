@@ -922,9 +922,6 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             else if (hint == type_Binary) {
                 ret = new Value<Binary>(BinaryData()); // Null string
             }
-            else if (hint == type_LinkList) {
-                throw InvalidQueryError("Cannot compare linklist with NULL");
-            }
             else {
                 ret = new Value<null>(realm::null());
             }
@@ -1092,6 +1089,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
     return ordering;
 }
 
+// If one of the expresions is constant, it should be right
 void verify_conditions(Subexpr* left, Subexpr* right)
 {
     if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
@@ -1109,6 +1107,13 @@ void verify_conditions(Subexpr* left, Subexpr* right)
         util::serializer::SerialisationState state;
         throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));
+    }
+    if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
+        if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {
+            util::serializer::SerialisationState state;
+            throw InvalidQueryError(
+                util::format("Cannot compare linklist ('%1') with NULL", left->description(state)));
+        }
     }
 }
 
@@ -1144,6 +1149,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
         // Take left first - it cannot be a constant
         left = left_prop->visit(this);
         right = right_constant->visit(this, left->get_type());
+        verify_conditions(left.get(), right.get());
     }
     else {
         right = right_prop->visit(this);
@@ -1153,8 +1159,8 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
         else {
             left = left_prop->visit(this);
         }
+        verify_conditions(right.get(), left.get());
     }
-    verify_conditions(left.get(), right.get());
     return {std::move(left), std::move(right)};
 }
 
