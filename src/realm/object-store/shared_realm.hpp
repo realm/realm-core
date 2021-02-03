@@ -139,6 +139,9 @@ enum class SchemaMode : uint8_t {
     Manual
 };
 
+// forward decl apparently required for correct interpretation of friend decl
+// inside Realm::Internal class.
+DBRef get_db_from_realm(Realm&);
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
     // A callback function to be called during a migration for Automatic and
@@ -404,6 +407,7 @@ public:
         friend class _impl::RealmCoordinator;
         friend class TestHelper;
         friend class ThreadSafeReference;
+        friend DBRef get_db_from_realm(Realm&);
 
         static Transaction& get_transaction(Realm& realm)
         {

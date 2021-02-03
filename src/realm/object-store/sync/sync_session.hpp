@@ -309,8 +309,8 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<realm::DB> db, SyncConfig config,
-                                               bool force_client_resync)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<realm::DB> db,
+                                               SyncConfig config, bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
             MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
@@ -319,8 +319,7 @@ private:
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config),
-                                                   force_client_resync);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config), force_client_resync);
     }
     // }
 

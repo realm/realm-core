@@ -556,8 +556,8 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, std::shared_ptr<DB> db, const SyncConfig& sync_config,
-                                                      bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, std::shared_ptr<DB> db,
+                                                      const SyncConfig& sync_config, bool force_client_resync)
 {
     auto& client = get_sync_client(); // Throws
 

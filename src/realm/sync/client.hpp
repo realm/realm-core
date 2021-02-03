@@ -108,12 +108,6 @@ public:
         /// in this mode.
         bool dry_run = false;
 
-        /// The default changeset cooker to be used by new sessions. Can be
-        /// overridden by Session::Config::changeset_cooker.
-        ///
-        /// \sa make_client_replication(), TrivialChangesetCooker.
-        std::shared_ptr<ChangesetCooker> changeset_cooker;
-
         /// The maximum number of milliseconds to allow for a connection to
         /// become fully established. This includes the time to resolve the
         /// network address, the TCP connect operation, the SSL handshake, and
@@ -494,22 +488,6 @@ public:
         /// signed_user_token is a cryptographically signed token describing the
         /// identity and access rights of the current user.
         std::string signed_user_token;
-
-        /// If not null, overrides whatever is specified by
-        /// Client::Config::changeset_cooker.
-        ///
-        /// The shared ownership over the cooker will be relinquished shortly
-        /// after the destruction of the session object as long as the event
-        /// loop of the client is being executed (Client::run()).
-        ///
-        /// CAUTION: ChangesetCooker::cook_changeset() of the specified cooker
-        /// may get called before the call to bind() returns, and it may get
-        /// called (or continue to execute) after the session object is
-        /// destroyed. Please see "Callback semantics" section under Client for
-        /// more on this.
-        ///
-        /// \sa make_client_replication(), TrivialChangesetCooker.
-        std::shared_ptr<ChangesetCooker> changeset_cooker;
 
         /// The encryption key the DB will be opened with.
         util::Optional<std::array<char, 64>> encryption_key;

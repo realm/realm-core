@@ -14,7 +14,6 @@ set(SYNC_SOURCES
     noinst/protocol_codec.cpp
     access_token.cpp
     auth.cpp
-    changeset_cooker.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -74,7 +73,6 @@ set(IMPL_INSTALL_HEADERS
 set(SYNC_INSTALL_HEADERS
     config.hpp
     encrypt/fingerprint.hpp
-    changeset_cooker.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
     changeset.hpp

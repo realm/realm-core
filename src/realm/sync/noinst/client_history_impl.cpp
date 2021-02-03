@@ -230,7 +230,7 @@ _impl::History* ClientHistoryImpl::_get_history_write()
 // Overriding member function in realm::Replication
 std::unique_ptr<_impl::History> ClientHistoryImpl::_create_history_read()
 {
-    auto hist_impl = std::make_unique<ClientHistoryImpl>(get_database_path(), m_owner_is_sync_client, nullptr);
+    auto hist_impl = std::make_unique<ClientHistoryImpl>(get_database_path(), m_owner_is_sync_client);
     hist_impl->initialize(*m_shared_group); // Throws
     // Transfer ownership with pointer to private base class
     return std::unique_ptr<_impl::History>{hist_impl.release()};
@@ -394,12 +394,7 @@ void ClientHistoryImpl::set_sync_progress(const SyncProgress& progress, const st
     ensure_updated(local_version); // Throws
     prepare_for_write();           // Throws
 
-    if (m_changeset_cooker) {
-        ensure_cooked_history(); // Throws
-    }
-    else {
-        ensure_no_cooked_history(); // Throws
-    }
+    ensure_no_cooked_history(); // Throws
 
     update_sync_progress(progress, downloadable_bytes); // Throws
 
@@ -505,12 +500,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     ensure_updated(local_version); // Throws
     prepare_for_write();           // Throws
 
-    if (m_changeset_cooker) {
-        ensure_cooked_history(); // Throws
-    }
-    else {
-        ensure_no_cooked_history(); // Throws
-    }
+    ensure_no_cooked_history(); // Throws
 
     REALM_ASSERT(transact->get_sync_file_id() != 0);
 
@@ -553,17 +543,6 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
         for (std::size_t i = 0; i < num_changesets; ++i) {
             util::AppendBuffer<char> transformed_changeset;
             sync::encode_changeset(changesets[i], transformed_changeset);
-
-            if (m_changeset_cooker) {
-                cooked_changeset_buffer.clear();
-                bool produced = m_changeset_cooker->cook_changeset(*transact, transformed_changeset.data(),
-                                                                   transformed_changeset.size(),
-                                                                   cooked_changeset_buffer); // Throws
-                if (produced) {
-                    BinaryData cooked_changeset(cooked_changeset_buffer.data(), cooked_changeset_buffer.size());
-                    save_cooked_changeset(cooked_changeset, changesets[i].version); // Throws
-                }
-            }
 
             sync::InstructionApplier applier{*transact};
             {

@@ -79,7 +79,6 @@ public:
     void run();
 
 private:
-    const std::shared_ptr<ChangesetCooker> m_default_changeset_cooker;
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
     util::network::DeadlineTimer m_keep_running_timer;
@@ -328,7 +327,6 @@ public:
 private:
     ClientImpl& m_client;
     DBRef m_db;
-    std::shared_ptr<ChangesetCooker> m_changeset_cooker;
 
     // ClientFileAccessCache::Slot m_file_slot;
 
@@ -523,7 +521,6 @@ inline SessionWrapperQueue::~SessionWrapperQueue()
 
 inline ClientImpl::ClientImpl(Client::Config config)
     : ClientImplBase{make_client_impl_base_config(config)} // Throws
-    , m_default_changeset_cooker{std::move(config.changeset_cooker)}
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {

@@ -68,8 +68,7 @@ public:
     };
 
     ClientHistoryImpl(const std::string& realm_path, Config config = {});
-    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-                      std::unique_ptr<ChangesetCooker> changeset_cooker);
+    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -283,8 +282,6 @@ private:
 
     const bool m_owner_is_sync_client;
 
-    const std::shared_ptr<ChangesetCooker> m_changeset_cooker;
-
     /// A cache of the `s_ch_base_index_iip` slot in the history compartment
     /// root array. When the cooked history is not empty, this is the index into
     /// the total untrimmed sequence of cooked changesets of the first cooked
@@ -348,15 +345,12 @@ private:
 inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, Config config)
     : ClientReplication{realm_path}
     , m_owner_is_sync_client{config.owner_is_sync_agent}
-    , m_changeset_cooker{std::move(config.changeset_cooker)}
 {
 }
 
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-                                            std::unique_ptr<ChangesetCooker> changeset_cooker)
+inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client)
     : ClientReplication{realm_path} // Throws
     , m_owner_is_sync_client{owner_is_sync_client}
-    , m_changeset_cooker{std::move(changeset_cooker)}
 {
 }
 

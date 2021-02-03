@@ -399,18 +399,6 @@ public:
     /// agent is created transparently by sync::Client (one history instance per
     /// sync::Session object).
     bool owner_is_sync_agent = false;
-
-    /// If a changeset cooker is specified, then the created history object will
-    /// allow for a cooked changeset to be produced for each changeset of remote
-    /// origin; that is, for each changeset that is integrated during the
-    /// execution of ClientHistory::integrate_remote_changesets(). If no
-    /// changeset cooker is specified, then no cooked changesets will be
-    /// produced on behalf of the created history object.
-    ///
-    /// ClientHistory::integrate_remote_changesets() will pass each incoming
-    /// changeset to the cooker after operational transformation; that is, when
-    /// the chageset is ready to be applied to the local Realm state.
-    std::shared_ptr<ChangesetCooker> changeset_cooker;
 };
 
 /// \brief Create a "sync history" implementation of the realm::Replication
