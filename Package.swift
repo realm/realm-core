@@ -206,31 +206,36 @@ let package = Package(
             dependencies: ["Capi"],
             path: "src/swift"),
         .target(
+            name: "ObjectStoreTestUtils",
+            dependencies: ["ObjectStore", "SyncServer"],
+            path: "test/object-store/util",
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .define("REALM_ENABLE_SYNC", to: "1"),
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .headerSearchPath(".."),
+                .headerSearchPath("../../../external/catch/single_include"),
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
             name: "ObjectStoreTests",
-            dependencies: ["ObjectStore", "SyncServer", "QueryParser"],
+            dependencies: ["ObjectStore", "SyncServer", "QueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
                 "notifications-fuzzer",
-                "c_api"
+                "c_api",
+                "util",
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
-                .headerSearchPath("../../external/catch/single_include")
+                .headerSearchPath("../../external/catch/single_include"),
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "CapiTests",
-            dependencies: ["Capi"],
+            dependencies: ["Capi", "ObjectStoreTestUtils"],
             path: "test/object-store/c_api",
-            exclude: [
-                "benchmarks",
-                "mongodb",
-                "notifications-fuzzer",
-                "sync",
-                "util"
-            ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),

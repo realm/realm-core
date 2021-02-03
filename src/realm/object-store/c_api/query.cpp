@@ -5,6 +5,7 @@
 #include <realm/parser/query_parser.hpp>
 #include <realm/parser/keypath_mapping.hpp>
 
+namespace realm::c_api {
 namespace {
 struct QueryArgumentsAdapter : query_parser::Arguments {
     const realm_value_t* m_args = nullptr;
@@ -21,7 +22,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_BOOL) {
             return m_args[i].boolean;
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     long long long_for_argument(size_t i) final
@@ -30,7 +32,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_INT) {
             return m_args[i].integer;
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     float float_for_argument(size_t i) final
@@ -39,7 +42,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_FLOAT) {
             return m_args[i].fnum;
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     double double_for_argument(size_t i) final
@@ -48,7 +52,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_DOUBLE) {
             return m_args[i].dnum;
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     StringData string_for_argument(size_t i) final
@@ -57,7 +62,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_STRING) {
             return from_capi(m_args[i].string);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     BinaryData binary_for_argument(size_t i) final
@@ -66,7 +72,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_BINARY) {
             return from_capi(m_args[i].binary);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     Timestamp timestamp_for_argument(size_t i) final
@@ -75,7 +82,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
             return from_capi(m_args[i].timestamp);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     ObjKey object_index_for_argument(size_t i) final
@@ -85,7 +93,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
             // FIXME: Somehow check the target table type?
             return from_capi(m_args[i].link).get_obj_key();
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     ObjectId objectid_for_argument(size_t i) final
@@ -94,7 +103,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
             return from_capi(m_args[i].object_id);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     Decimal128 decimal128_for_argument(size_t i) final
@@ -103,7 +113,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_DECIMAL128) {
             return from_capi(m_args[i].decimal128);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     UUID uuid_for_argument(size_t i) final
@@ -112,7 +123,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         if (m_args[i].type == RLM_TYPE_UUID) {
             return from_capi(m_args[i].uuid);
         }
-        throw LogicError{LogicError::type_mismatch};
+        // Note: Unreachable.
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
     bool is_argument_null(size_t i) final
@@ -120,43 +132,37 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         verify_ndx(i);
         return m_args[i].type == RLM_TYPE_NULL;
     }
+
     DataType type_for_argument(size_t i) override
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_INT) {
-            return type_Int;
+        switch (m_args[i].type) {
+            case RLM_TYPE_NULL:                                                  // LCOV_EXCL_LINE
+                REALM_TERMINATE("Query parser did not call is_argument_null()"); // LCOV_EXCL_LINE
+            case RLM_TYPE_INT:
+                return type_Int;
+            case RLM_TYPE_STRING:
+                return type_String;
+            case RLM_TYPE_BOOL:
+                return type_Bool;
+            case RLM_TYPE_FLOAT:
+                return type_Float;
+            case RLM_TYPE_DOUBLE:
+                return type_Double;
+            case RLM_TYPE_BINARY:
+                return type_Binary;
+            case RLM_TYPE_TIMESTAMP:
+                return type_Timestamp;
+            case RLM_TYPE_LINK:
+                return type_Link;
+            case RLM_TYPE_OBJECT_ID:
+                return type_ObjectId;
+            case RLM_TYPE_DECIMAL128:
+                return type_Decimal;
+            case RLM_TYPE_UUID:
+                return type_UUID;
         }
-        if (m_args[i].type == RLM_TYPE_STRING) {
-            return type_String;
-        }
-        if (m_args[i].type == RLM_TYPE_BOOL) {
-            return type_Bool;
-        }
-        if (m_args[i].type == RLM_TYPE_FLOAT) {
-            return type_Float;
-        }
-        if (m_args[i].type == RLM_TYPE_DOUBLE) {
-            return type_Double;
-        }
-        if (m_args[i].type == RLM_TYPE_BINARY) {
-            return type_Binary;
-        }
-        if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
-            return type_Timestamp;
-        }
-        if (m_args[i].type == RLM_TYPE_LINK) {
-            return type_Link;
-        }
-        if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
-            return type_ObjectId;
-        }
-        if (m_args[i].type == RLM_TYPE_DECIMAL128) {
-            return type_Decimal;
-        }
-        if (m_args[i].type == RLM_TYPE_UUID) {
-            return type_UUID;
-        }
-        throw LogicError{LogicError::type_mismatch};
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 };
 } // namespace
@@ -291,6 +297,9 @@ RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
+        // FIXME: This should be part of Results.
+        results->get_table()->report_invalid_key(ColKey(col));
+
         if (auto x = results->min(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -315,6 +324,9 @@ RLM_API bool realm_results_max(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
+        // FIXME: This should be part of Results.
+        results->get_table()->report_invalid_key(ColKey(col));
+
         if (auto x = results->max(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -339,21 +351,28 @@ RLM_API bool realm_results_sum(realm_results_t* results, realm_property_key_t co
                                bool* out_found)
 {
     return wrap_err([&]() {
+        // FIXME: This should be part of Results.
+        results->get_table()->report_invalid_key(ColKey(col));
+
+        if (out_found) {
+            *out_found = results->size() != 0;
+        }
+
         if (auto x = results->sum(ColKey(col))) {
-            if (out_found) {
-                *out_found = true;
-            }
             if (out_value)
                 *out_value = to_capi(*x);
         }
         else {
-            if (out_found) {
-                *out_found = false;
-            }
+            // Note: This can only be hit when the `m_table` and `m_collection`
+            // pointers in `Results` are NULL.
+            //
+            // FIXME: It is unclear when that happens.
+
+            // LCOV_EXCL_START
             if (out_value) {
-                out_value->type = RLM_TYPE_INT;
-                out_value->integer = 0;
+                out_value->type = RLM_TYPE_NULL;
             }
+            // LCOV_EXCL_STOP
         }
         return true;
     });
@@ -363,6 +382,9 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_property_key_
                                    bool* out_found)
 {
     return wrap_err([&]() {
+        // FIXME: This should be part of Results.
+        results->get_table()->report_invalid_key(ColKey(col));
+
         if (auto x = results->average(ColKey(col))) {
             if (out_found) {
                 *out_found = true;
@@ -396,3 +418,5 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
         return new realm_results_t{std::move(results)};
     });
 }
+
+} // namespace realm::c_api
