@@ -69,14 +69,6 @@ inline void spin_runloop(int count = 2)
     });
 }
 
-// helper function for convenience function and a few other uses...
-namespace realm {
-inline DBRef get_db_from_realm(Realm& realm)
-{
-    return Realm::Internal::get_db(realm);
-}
-} // namespace realm
-
 // Convenience function for creating and configuring sync sessions for test use.
 // Many of the optional arguments can be used to pass information about the
 // session back out to the test, or configure the session more precisely.

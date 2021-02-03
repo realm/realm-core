@@ -490,6 +490,12 @@ public:
           MakeSharedTag);
 };
 
+// helper function for convenience function and a few other uses...
+inline DBRef get_db_from_realm(Realm& realm)
+{
+    return Realm::Internal::get_db(realm);
+}
+
 class RealmFileException : public std::runtime_error {
 public:
     enum class Kind {
