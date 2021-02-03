@@ -86,6 +86,10 @@ functions:
               set_cmake_var realm_vars REALM_USE_SYSTEM_OPENSSL BOOL On
           fi
 
+          if [ -n "${long_running_test_duration|}" ]; then
+              set_cmake_var realm_vars REALM_TEST_DURATION STRING "${long_running_test_duration}"
+          fi
+
           set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
           set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
 
@@ -186,6 +190,7 @@ functions:
 
 tasks:
 - name: compile
+  tags: [ "for_pull_requests" ]
   commands:
   - func: "compile"
 
@@ -220,8 +225,18 @@ tasks:
       local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
       content_type: '${content_type|application/x-gzip}'
 
+- name: long-running-core-tests
+  commands:
+  - func: "run tests"
+    # The long-running tests can take a really long time on Windows, so we give the test up to 4
+    # hours to complete
+    timeout_secs: 14400
+    vars:
+      test_filter: StorageTests
+      report_test_progress: On
+
 - name: core-tests
-  tags: [ "test_suite" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
   - func: "run tests with reporter"
@@ -243,7 +258,7 @@ tasks:
       path_to_benchmark: ./build/test/benchmark-crud/realm-benchmark-crud
 
 - name: sync-tests
-  tags: [ "test_suite" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
   - func: "run tests with reporter"
@@ -251,7 +266,7 @@ tasks:
       test_filter: SyncTests
 
 - name: object-store-tests
-  tags: [ "disabled_on_windows", "test_suite" ]
+  tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
   # If we need to start a local copy of baas, do it in the background here in a separate script.
@@ -300,6 +315,7 @@ tasks:
       test_filter: ObjectStoreTests
 
 - name: lint
+  tags: [ "for_pull_requests" ]
   commands:
   - func: "fetch source"
   - func: "fetch binaries"
@@ -389,6 +405,18 @@ task_groups:
   tasks:
   - .benchmark
 
+- name: long-running-tests
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      long_running_test_duration: 2
+      target_to_build: CoreTests
+  tasks:
+  - long-running-core-tests
+
 buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04 x86_64 (Clang 11)"
@@ -426,6 +454,7 @@ buildvariants:
   - name: benchmarks
     distros:
     - ubuntu2004-large
+  - name: long-running-tests
 
 - name: ubuntu2004-asan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 ASAN)"
@@ -443,6 +472,7 @@ buildvariants:
   - name: compile_test
     distros:
     - ubuntu2004-large
+  - name: long-running-tests
 
 - name: ubuntu2004-tsan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 TSAN)"
@@ -495,7 +525,7 @@ buildvariants:
 
 - name: macos-1014
   display_name: "MacOS 10.14 x86_64"
-  run_on: macos-1014-test
+  run_on: macos-1014
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
@@ -517,11 +547,8 @@ buildvariants:
     cmake_build_type: Release
   tasks:
   - name: compile_test_and_package
-    distros:
-    - macos-1014
   - name: benchmarks
-    distros:
-    - macos-1014
+  - name: long-running-tests
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
@@ -540,6 +567,7 @@ buildvariants:
   - name: compile_test_and_package_windows
     distros:
     - windows-64-vs2019-large
+  - name: long-running-tests
 
 - name: windows-64-vs2019-release
   display_name: "Windows x86_64 (VS 2019 Release build)"
