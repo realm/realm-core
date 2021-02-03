@@ -1391,6 +1391,8 @@ TEST_CASE("C API") {
             CHECK(rlm_val_eq(value, object_id));
             CHECK(realm_get_value(obj1.get(), foo_nullable_uuid_property.key, &value));
             CHECK(rlm_val_eq(value, uuid));
+            CHECK(realm_get_value(obj1.get(), foo_link_property.key, &value));
+            CHECK(rlm_val_eq(value, link));
 
             write([&]() {
                 CHECK(realm_set_value(obj1.get(), foo_nullable_int_property.key, null, false));
@@ -1425,6 +1427,8 @@ TEST_CASE("C API") {
             CHECK(realm_get_value(obj1.get(), foo_nullable_object_id_property.key, &value));
             CHECK(rlm_val_eq(value, null));
             CHECK(realm_get_value(obj1.get(), foo_nullable_uuid_property.key, &value));
+            CHECK(rlm_val_eq(value, null));
+            CHECK(realm_get_value(obj1.get(), foo_link_property.key, &value));
             CHECK(rlm_val_eq(value, null));
         }
 

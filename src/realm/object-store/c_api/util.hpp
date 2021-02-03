@@ -92,6 +92,16 @@ inline Mixed typed_link_to_objkey(Mixed val, ColKey col_key)
     return val;
 }
 
+/// If the value is Mixed(ObjKey), convert it to Mixed(ObjLink).
+inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
+{
+    if (!val.is_null() && val.get_type() == type_Link) {
+        auto target_table = table.get_link_target(col_key);
+        return ObjLink{target_table->get_key(), val.get<ObjKey>()};
+    }
+    return val;
+}
+
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)

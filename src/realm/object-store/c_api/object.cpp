@@ -219,7 +219,8 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
 
             auto val = o.get_any(col_key);
             if (out_values) {
-                out_values[i] = to_capi(val);
+                auto converted = objkey_to_typed_link(val, col_key, *o.get_table());
+                out_values[i] = to_capi(converted);
             }
         }
 
