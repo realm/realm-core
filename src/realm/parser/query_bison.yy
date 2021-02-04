@@ -106,6 +106,7 @@ using namespace realm::query_parser;
 %token <std::string> BETWEEN "between"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
+%token <std::string> KEYS "@keys"
 %type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
@@ -287,6 +288,7 @@ id
     | CONTAINS                  { $$ = $1; }
     | LIKE                      { $$ = $1; }
     | BETWEEN                   { $$ = $1; }
+    | KEYS                      { $$ = $1; }
 %%
 
 void

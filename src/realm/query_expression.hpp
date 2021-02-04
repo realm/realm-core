@@ -3218,7 +3218,7 @@ public:
     std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key) +
-               ".keys";
+               ".@keys";
     }
 
     std::unique_ptr<Subexpr> clone() const override

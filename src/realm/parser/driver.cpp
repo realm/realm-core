@@ -1274,7 +1274,7 @@ Subexpr* LinkChain::column(const std::string& col)
         if (current_column.is_dictionary()) {
             m_link_cols.pop_back();
             Columns<Dictionary> dict(current_column, m_base_table, m_link_cols, m_comparison_type);
-            if (col == "keys") {
+            if (col == "@keys") {
                 return new ColumnDictionaryKeys(dict);
             }
             else {

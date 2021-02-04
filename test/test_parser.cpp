@@ -4407,8 +4407,9 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, foo, "dict > 50", 50);
     verify_query(test_context, foo, "dict.Value > 50", expected);
-    verify_query(test_context, foo, "ANY dict.keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.keys == 'Value'", 23);
+    // verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
     verify_query(test_context, foo, "dict.Value.@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
