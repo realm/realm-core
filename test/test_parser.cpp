@@ -1351,7 +1351,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "nuldouble == $7", args, num_args, 1);
     verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
-    verify_query_sub(test_context, t, "list == $8", args, num_args, 1);
+    verify_query_sub(test_context, t, "list == $8", args, num_args, 2);
 
     // substitutions through collection aggregates is a different code path
     verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
