@@ -19,6 +19,7 @@
 #ifndef REALM_OS_SYNC_SESSION_HPP
 #define REALM_OS_SYNC_SESSION_HPP
 
+#include <realm/sync/history.hpp>
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/sync/config.hpp>
@@ -310,22 +311,25 @@ private:
     friend class realm::SyncManager;
     // Called by SyncManager {
     static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<realm::DB> db,
-                                               SyncConfig config, bool force_client_resync)
+                                               sync::ClientReplication& replication, SyncConfig config,
+                                               bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
-                              bool force_client_resync)
-                : SyncSession(client, std::move(db), std::move(config), force_client_resync)
+            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, sync::ClientReplication& replication,
+                              SyncConfig config, bool force_client_resync)
+                : SyncSession(client, std::move(db), replication, std::move(config), force_client_resync)
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config), force_client_resync);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(db), replication, std::move(config),
+                                                   force_client_resync);
     }
     // }
 
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
-    SyncSession(_impl::SyncClient&, std::shared_ptr<realm::DB> db, SyncConfig, bool force_client_resync);
+    SyncSession(_impl::SyncClient&, std::shared_ptr<realm::DB> db, sync::ClientReplication& replication, SyncConfig,
+                bool force_client_resync);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
@@ -364,6 +368,7 @@ private:
     bool m_force_client_resync;
 
     std::shared_ptr<DB> m_db;
+    sync::ClientReplication& m_replication;
     _impl::SyncClient& m_client;
 
     int64_t m_completion_request_counter = 0;

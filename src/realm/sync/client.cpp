@@ -291,7 +291,7 @@ private:
 // in _impl::ClientImplBase::Connection.
 class SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, DBRef db, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, ClientReplication& replication, Session::Config);
 
     ClientImpl& get_client() noexcept;
 
@@ -327,6 +327,7 @@ public:
 private:
     ClientImpl& m_client;
     DBRef m_db;
+    ClientReplication& m_replication;
 
     // ClientFileAccessCache::Slot m_file_slot;
 
@@ -1057,8 +1058,7 @@ const std::string& SessionImpl::get_realm_path() const noexcept
 
 ClientReplicationBase& SessionImpl::access_realm()
 {
-    ClientReplicationBase* cb = dynamic_cast<ClientReplicationBase*>(m_wrapper.m_db->get_replication());
-    return *cb;
+    return m_wrapper.m_replication;
 }
 
 util::Optional<std::array<char, 64>> SessionImpl::get_encryption_key() const noexcept
@@ -1122,9 +1122,10 @@ void SessionImpl::on_resumed()
 
 // ################ SessionWrapper ################
 
-SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
+SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, ClientReplication& replication, Session::Config config)
     : m_client{client}
     , m_db(db)
+    , m_replication(replication)
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -1641,9 +1642,7 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Er
 
 ClientReplication& SessionWrapper::get_replication()
 {
-    ClientReplication* cr = dynamic_cast<ClientReplication*>(m_db->get_replication());
-    REALM_ASSERT(cr);
-    return *cr;
+    return m_replication;
 }
 
 void SessionWrapper::report_progress()
@@ -1855,15 +1854,16 @@ public:
 
 class Session::Impl : public SessionWrapper {
 public:
-    Impl(ClientImpl& client, std::shared_ptr<DB> db, Config config)
-        : SessionWrapper{client, std::move(db), std::move(config)} // Throws
+    Impl(ClientImpl& client, std::shared_ptr<DB> db, ClientReplication& replication, Config config)
+        : SessionWrapper{client, std::move(db), replication, std::move(config)} // Throws
     {
     }
 
-    static Impl* make_session(ClientImpl& client, std::shared_ptr<DB> db, Config config)
+    static Impl* make_session(ClientImpl& client, std::shared_ptr<DB> db, ClientReplication& replication,
+                              Config config)
     {
         util::bind_ptr<Impl> sess;
-        sess.reset(new Impl{client, std::move(db), std::move(config)}); // Throws
+        sess.reset(new Impl{client, std::move(db), replication, std::move(config)}); // Throws
         // The reference count passed back to the application is implicitly
         // owned by a naked pointer. This is done to avoid exposing
         // implementation details through the header file (that is, through the
@@ -1919,8 +1919,8 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, std::shared_ptr<DB> db, Config config)
-    : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
+Session::Session(Client& client, std::shared_ptr<DB> db, ClientReplication& replication, Config config)
+    : m_impl{Impl::make_session(*client.m_impl, std::move(db), replication, std::move(config))} // Throws
 {
 }
 

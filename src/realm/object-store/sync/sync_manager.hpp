@@ -23,7 +23,7 @@
 
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
-
+#include <realm/sync/history.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
@@ -139,7 +139,8 @@ public:
     util::Logger::Level log_level() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, std::shared_ptr<DB> db,
-                                             const SyncConfig& config, bool force_client_resync = false);
+                                             sync::ClientReplication& replication, const SyncConfig& config,
+                                             bool force_client_resync = false);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 

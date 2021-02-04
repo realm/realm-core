@@ -110,6 +110,11 @@ std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
     return realm.m_coordinator->m_db;
 }
 
+Replication& Realm::Internal::get_history(Realm& realm)
+{
+    return *realm.m_coordinator->m_history;
+}
+
 void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 {
     realm.begin_read(version_id);

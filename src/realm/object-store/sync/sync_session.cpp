@@ -305,11 +305,13 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, bool force_client_resync)
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, sync::ClientReplication& replication,
+                         SyncConfig config, bool force_client_resync)
     : m_state(&State::inactive)
     , m_config(std::move(config))
     , m_force_client_resync(force_client_resync)
     , m_db(std::move(db))
+    , m_replication(replication)
     , m_client(client)
 {
 }
@@ -613,7 +615,7 @@ void SyncSession::create_sync_session()
         session_config.client_reset_config = config;
     }
 
-    m_session = m_client.make_session(m_db, std::move(session_config));
+    m_session = m_client.make_session(m_db, m_replication, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 

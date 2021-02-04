@@ -177,7 +177,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         Realm::Config cfg;
         cfg.path = on_disk_path;
         auto realm = Realm::get_shared_realm(cfg);
-        auto session = app->sync_manager()->get_session(on_disk_path, get_db_from_realm(*realm), *config);
+        auto& hist = get_history_from_realm(*realm);
+        auto history = dynamic_cast<sync::ClientReplication*>(&hist);
+        auto session = app->sync_manager()->get_session(on_disk_path, get_db_from_realm(*realm), *history, *config);
         CHECK(session);
         session = user->session_for_on_disk_path(on_disk_path);
         CHECK(session);
@@ -477,7 +479,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             Realm::Config cfg;
             cfg.path = config.path;
             auto realm = Realm::get_shared_realm(cfg);
-            auto session2 = sync_manager->get_session(config.path, get_db_from_realm(*realm), *config.sync_config);
+            auto session2 = sync_manager->get_session(config.path, get_db_from_realm(*realm), get_sync_history(realm),
+                                                      *config.sync_config);
             REQUIRE(session->state() == SyncSession::PublicState::Active);
             REQUIRE(session2 == session);
         }
@@ -535,7 +538,8 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
             Realm::Config cfg;
             cfg.path = config.path;
             auto realm = Realm::get_shared_realm(cfg);
-            auto session = sync_manager->get_session(config.path, get_db_from_realm(*realm), *config.sync_config);
+            auto session = sync_manager->get_session(config.path, get_db_from_realm(*realm), get_sync_history(realm),
+                                                     *config.sync_config);
             EventLoop::main().run_until([&] {
                 return sessions_are_active(*session);
             });
@@ -774,8 +778,8 @@ TEST_CASE("sync: client resync") {
 
     auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
         auto realm = Realm::get_shared_realm(config);
-        auto session =
-            sync_manager->get_session(realm->config().path, get_db_from_realm(*realm), *realm->config().sync_config);
+        auto session = sync_manager->get_session(realm->config().path, get_db_from_realm(*realm),
+                                                 get_sync_history(realm), *realm->config().sync_config);
         {
             realm->begin_transaction();
 
