@@ -487,7 +487,7 @@ namespace yy {
       // "between"
       // "@size"
       // "@type"
-      // "@keys"
+      // "key or value"
       // path_elem
       // id
       char dummy17[sizeof (std::string)];
@@ -586,7 +586,7 @@ namespace yy {
     TOK_BETWEEN = 305,             // "between"
     TOK_SIZE = 306,                // "@size"
     TOK_TYPE = 307,                // "@type"
-    TOK_KEYS = 308                 // "@keys"
+    TOK_KEY_VAL = 308              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -603,7 +603,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 60, ///< Number of tokens.
+        YYNTOKENS = 62, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -658,42 +658,44 @@ namespace yy {
         SYM_BETWEEN = 50,                        // "between"
         SYM_SIZE = 51,                           // "@size"
         SYM_TYPE = 52,                           // "@type"
-        SYM_KEYS = 53,                           // "@keys"
+        SYM_KEY_VAL = 53,                        // "key or value"
         SYM_54_ = 54,                            // '('
         SYM_55_ = 55,                            // ')'
-        SYM_56_ = 56,                            // '.'
-        SYM_57_ = 57,                            // ','
-        SYM_58_ = 58,                            // '{'
-        SYM_59_ = 59,                            // '}'
-        SYM_YYACCEPT = 60,                       // $accept
-        SYM_query = 61,                          // query
-        SYM_pred = 62,                           // pred
-        SYM_and_pred = 63,                       // and_pred
-        SYM_atom_pred = 64,                      // atom_pred
-        SYM_value = 65,                          // value
-        SYM_prop = 66,                           // prop
-        SYM_simple_prop = 67,                    // simple_prop
-        SYM_subquery = 68,                       // subquery
-        SYM_pred_suffix = 69,                    // pred_suffix
-        SYM_distinct = 70,                       // distinct
-        SYM_distinct_param = 71,                 // distinct_param
-        SYM_sort = 72,                           // sort
-        SYM_sort_param = 73,                     // sort_param
-        SYM_limit = 74,                          // limit
-        SYM_direction = 75,                      // direction
-        SYM_list = 76,                           // list
-        SYM_list_content = 77,                   // list_content
-        SYM_constant = 78,                       // constant
-        SYM_boolexpr = 79,                       // boolexpr
-        SYM_comp_type = 80,                      // comp_type
-        SYM_post_op = 81,                        // post_op
-        SYM_aggr_op = 82,                        // aggr_op
-        SYM_equality = 83,                       // equality
-        SYM_relational = 84,                     // relational
-        SYM_stringop = 85,                       // stringop
-        SYM_path = 86,                           // path
-        SYM_path_elem = 87,                      // path_elem
-        SYM_id = 88                              // id
+        SYM_56_ = 56,                            // '['
+        SYM_57_ = 57,                            // ']'
+        SYM_58_ = 58,                            // '.'
+        SYM_59_ = 59,                            // ','
+        SYM_60_ = 60,                            // '{'
+        SYM_61_ = 61,                            // '}'
+        SYM_YYACCEPT = 62,                       // $accept
+        SYM_query = 63,                          // query
+        SYM_pred = 64,                           // pred
+        SYM_and_pred = 65,                       // and_pred
+        SYM_atom_pred = 66,                      // atom_pred
+        SYM_value = 67,                          // value
+        SYM_prop = 68,                           // prop
+        SYM_simple_prop = 69,                    // simple_prop
+        SYM_subquery = 70,                       // subquery
+        SYM_pred_suffix = 71,                    // pred_suffix
+        SYM_distinct = 72,                       // distinct
+        SYM_distinct_param = 73,                 // distinct_param
+        SYM_sort = 74,                           // sort
+        SYM_sort_param = 75,                     // sort_param
+        SYM_limit = 76,                          // limit
+        SYM_direction = 77,                      // direction
+        SYM_list = 78,                           // list
+        SYM_list_content = 79,                   // list_content
+        SYM_constant = 80,                       // constant
+        SYM_boolexpr = 81,                       // boolexpr
+        SYM_comp_type = 82,                      // comp_type
+        SYM_post_op = 83,                        // post_op
+        SYM_aggr_op = 84,                        // aggr_op
+        SYM_equality = 85,                       // equality
+        SYM_relational = 86,                     // relational
+        SYM_stringop = 87,                       // stringop
+        SYM_path = 88,                           // path
+        SYM_path_elem = 89,                      // path_elem
+        SYM_id = 90                              // id
       };
     };
 
@@ -819,7 +821,7 @@ namespace yy {
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
-      case symbol_kind::SYM_KEYS: // "@keys"
+      case symbol_kind::SYM_KEY_VAL: // "key or value"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (std::move (that.value));
@@ -1179,7 +1181,7 @@ switch (yykind)
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
-      case symbol_kind::SYM_KEYS: // "@keys"
+      case symbol_kind::SYM_KEY_VAL: // "key or value"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
@@ -1279,6 +1281,8 @@ switch (yykind)
         YY_ASSERT (tok == token::TOK_END
                    || (token::TOK_YYerror <= tok && tok <= token::TOK_NOT)
                    || (40 <= tok && tok <= 41)
+                   || tok == 91
+                   || tok == 93
                    || tok == 46
                    || tok == 44
                    || tok == 123
@@ -1292,7 +1296,7 @@ switch (yykind)
         : super_type(token_type (tok), v)
 #endif
       {
-        YY_ASSERT ((token::TOK_ID <= tok && tok <= token::TOK_KEYS));
+        YY_ASSERT ((token::TOK_ID <= tok && tok <= token::TOK_KEY_VAL));
       }
     };
 
@@ -2139,16 +2143,16 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_KEYS (std::string v)
+      make_KEY_VAL (std::string v)
       {
-        return symbol_type (token::TOK_KEYS, std::move (v));
+        return symbol_type (token::TOK_KEY_VAL, std::move (v));
       }
 #else
       static
       symbol_type
-      make_KEYS (const std::string& v)
+      make_KEY_VAL (const std::string& v)
       {
-        return symbol_type (token::TOK_KEYS, v);
+        return symbol_type (token::TOK_KEY_VAL, v);
       }
 #endif
 
@@ -2479,7 +2483,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 259,     ///< Last index in yytable_.
+      yylast_ = 261,     ///< Last index in yytable_.
       yynnts_ = 29,  ///< Number of nonterminal symbols.
       yyfinal_ = 38 ///< Termination state number.
     };
@@ -2505,15 +2509,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      54,    55,     2,     2,    57,     2,    56,     2,     2,     2,
+      54,    55,     2,     2,    59,     2,    58,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,    56,     2,    57,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    58,     2,    59,     2,     2,     2,     2,
+       2,     2,     2,    60,     2,    61,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2643,7 +2647,7 @@ switch (yykind)
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
-      case symbol_kind::SYM_KEYS: // "@keys"
+      case symbol_kind::SYM_KEY_VAL: // "key or value"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.copy< std::string > (YY_MOVE (that.value));
@@ -2769,7 +2773,7 @@ switch (yykind)
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
       case symbol_kind::SYM_TYPE: // "@type"
-      case symbol_kind::SYM_KEYS: // "@keys"
+      case symbol_kind::SYM_KEY_VAL: // "key or value"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (YY_MOVE (s.value));

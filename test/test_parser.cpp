@@ -4405,21 +4405,25 @@ TEST(Parser_Dictionary)
         }
     }
 
-    verify_query(test_context, foo, "dict > 50", 50);
-    verify_query(test_context, foo, "dict.Value > 50", expected);
-    // verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    util::Any args[] = {String("Value")};
+    size_t num_args = 1;
+
+    verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
-    verify_query(test_context, foo, "dict.Value.@type == 'int'", num_ints_for_value);
+    verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
 
-    verify_query(test_context, origin, "link.dict.Value > 50", 3);
-    verify_query(test_context, origin, "links.dict.Value > 50", 5);
+    verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict.Value == NULL", 10);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -4429,10 +4433,18 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, origin, "links.dict.@max == 100", 2);
     verify_query(test_context, origin, "link.dict.@max == 100", 2);
+
     auto dict = foo->begin()->get_dictionary(col_dict);
+
+    dict.insert("some extra", 42);
+    verify_query(test_context, foo, "dict['some extra'] == 42", 1);
 
     dict.insert("Value", 4.5);
     std::string message;
+
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
+    CHECK_EQUAL(message, "Expecting '@keys', '@values' or '[<key>]', found 'Value'");
+
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Cannot add int and double");
 

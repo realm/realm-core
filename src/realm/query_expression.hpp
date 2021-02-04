@@ -3155,7 +3155,9 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state) + std::string(".") + std::string(m_key.get_string());
+        std::ostringstream ostr;
+        ostr << m_key;
+        return ColumnListBase::description(state) + '[' + ostr.str() + ']';
     }
 
     std::unique_ptr<Subexpr> clone() const override

@@ -106,7 +106,7 @@ using namespace realm::query_parser;
 %token <std::string> BETWEEN "between"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
-%token <std::string> KEYS "@keys"
+%token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
@@ -177,6 +177,7 @@ value
 
 prop
     : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
+    | path id '[' constant ']' post_op { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $4, $6); }
     | comp_type path id post_op { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, $4, ExpressionComparisonType($1)); }
     | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
     | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
@@ -288,7 +289,7 @@ id
     | CONTAINS                  { $$ = $1; }
     | LIKE                      { $$ = $1; }
     | BETWEEN                   { $$ = $1; }
-    | KEYS                      { $$ = $1; }
+    | KEY_VAL                   { $$ = $1; }
 %%
 
 void
