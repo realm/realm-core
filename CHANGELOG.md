@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 6.2.2 Release notes
 
 ### Enhancements
 * None.
