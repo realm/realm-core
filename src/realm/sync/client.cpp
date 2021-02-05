@@ -232,7 +232,7 @@ public:
     const std::string& get_virt_path() const noexcept override final;
     const std::string& get_signed_access_token() const noexcept override final;
     const std::string& get_realm_path() const noexcept override final;
-    ClientHistoryBase& access_realm() override final;
+    std::shared_ptr<ClientHistoryBase> access_realm() override final;
     util::Optional<std::array<char, 64>> get_encryption_key() const noexcept override final;
     const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
     void on_state_download_progress(uint_fast64_t, uint_fast64_t) override final;
@@ -291,7 +291,7 @@ private:
 // in _impl::ClientImplBase::Connection.
 class SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, DBRef db, ClientReplication& replication, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<ClientReplication> replication, Session::Config);
 
     ClientImpl& get_client() noexcept;
 
@@ -327,7 +327,7 @@ public:
 private:
     ClientImpl& m_client;
     DBRef m_db;
-    ClientReplication& m_replication;
+    std::shared_ptr<ClientReplication> m_replication;
 
     // ClientFileAccessCache::Slot m_file_slot;
 
@@ -436,7 +436,7 @@ private:
     void on_connection_state_changed(ConnectionState, const ErrorInfo*);
 
     void report_progress();
-    ClientReplication& get_replication();
+    std::shared_ptr<ClientReplication> get_replication();
     void change_server_endpoint(ServerEndpoint);
 
     friend class SessionWrapperQueue;
@@ -1056,9 +1056,9 @@ const std::string& SessionImpl::get_realm_path() const noexcept
     return m_wrapper.m_db->get_path();
 }
 
-ClientReplicationBase& SessionImpl::access_realm()
+std::shared_ptr<ClientReplicationBase> SessionImpl::access_realm()
 {
-    return m_wrapper.m_replication;
+    return std::dynamic_pointer_cast<ClientReplicationBase>(m_wrapper.m_replication);
 }
 
 util::Optional<std::array<char, 64>> SessionImpl::get_encryption_key() const noexcept
@@ -1122,7 +1122,8 @@ void SessionImpl::on_resumed()
 
 // ################ SessionWrapper ################
 
-SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, ClientReplication& replication, Session::Config config)
+SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<ClientReplication> replication,
+                               Session::Config config)
     : m_client{client}
     , m_db(db)
     , m_replication(replication)
@@ -1640,7 +1641,7 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Er
     }
 }
 
-ClientReplication& SessionWrapper::get_replication()
+std::shared_ptr<ClientReplication> SessionWrapper::get_replication()
 {
     return m_replication;
 }
@@ -1657,9 +1658,9 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    ClientReplication& history = get_replication(); // Throws
-    history.get_upload_download_bytes(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
-                                      snapshot_version);
+    auto history = get_replication(); // Throws
+    history->get_upload_download_bytes(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
+                                       snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total
     // size of the history. From protocol version 26, downloadable_bytes
@@ -1854,13 +1855,13 @@ public:
 
 class Session::Impl : public SessionWrapper {
 public:
-    Impl(ClientImpl& client, std::shared_ptr<DB> db, ClientReplication& replication, Config config)
+    Impl(ClientImpl& client, std::shared_ptr<DB> db, std::shared_ptr<ClientReplication> replication, Config config)
         : SessionWrapper{client, std::move(db), replication, std::move(config)} // Throws
     {
     }
 
-    static Impl* make_session(ClientImpl& client, std::shared_ptr<DB> db, ClientReplication& replication,
-                              Config config)
+    static Impl* make_session(ClientImpl& client, std::shared_ptr<DB> db,
+                              std::shared_ptr<ClientReplication> replication, Config config)
     {
         util::bind_ptr<Impl> sess;
         sess.reset(new Impl{client, std::move(db), replication, std::move(config)}); // Throws
@@ -1919,7 +1920,8 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, std::shared_ptr<DB> db, ClientReplication& replication, Config config)
+Session::Session(Client& client, std::shared_ptr<DB> db, std::shared_ptr<ClientReplication> replication,
+                 Config config)
     : m_impl{Impl::make_session(*client.m_impl, std::move(db), replication, std::move(config))} // Throws
 {
 }

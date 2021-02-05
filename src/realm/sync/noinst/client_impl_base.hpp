@@ -793,7 +793,7 @@ protected:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual ClientHistoryBase& access_realm() = 0;
+    virtual std::shared_ptr<ClientHistoryBase> access_realm() = 0;
 
     /// Gets the encryption key used for Realm file encryption. The default
     /// implementation returns none.

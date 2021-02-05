@@ -139,8 +139,8 @@ public:
     util::Logger::Level log_level() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, std::shared_ptr<DB> db,
-                                             sync::ClientReplication& replication, const SyncConfig& config,
-                                             bool force_client_resync = false);
+                                             std::shared_ptr<sync::ClientReplication> replication,
+                                             const SyncConfig& config, bool force_client_resync = false);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 

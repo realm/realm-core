@@ -177,9 +177,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         Realm::Config cfg;
         cfg.path = on_disk_path;
         auto realm = Realm::get_shared_realm(cfg);
-        auto& hist = get_history_from_realm(*realm);
-        auto history = dynamic_cast<sync::ClientReplication*>(&hist);
-        auto session = app->sync_manager()->get_session(on_disk_path, get_db_from_realm(*realm), *history, *config);
+        auto hist = get_history_from_realm(*realm);
+        auto history = std::dynamic_pointer_cast<sync::ClientReplication>(hist);
+        auto session = app->sync_manager()->get_session(on_disk_path, get_db_from_realm(*realm), history, *config);
         CHECK(session);
         session = user->session_for_on_disk_path(on_disk_path);
         CHECK(session);

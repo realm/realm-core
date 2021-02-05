@@ -70,19 +70,19 @@ inline void spin_runloop(int count = 2)
 }
 
 // a little helper
-inline sync::ClientReplication& get_sync_history(const std::shared_ptr<Realm>& realm)
+inline std::shared_ptr<sync::ClientReplication> get_sync_history(const std::shared_ptr<Realm>& realm)
 {
-    Replication& repl = get_history_from_realm(*realm);
-    auto clr = dynamic_cast<sync::ClientReplication*>(&repl);
+    std::shared_ptr<Replication> repl = get_history_from_realm(*realm);
+    auto clr = std::dynamic_pointer_cast<sync::ClientReplication>(repl);
     REALM_ASSERT(clr);
-    return *clr;
+    return clr;
 }
-inline sync::ClientReplication& get_sync_history(Realm& realm)
+inline std::shared_ptr<sync::ClientReplication> get_sync_history(Realm& realm)
 {
-    Replication& repl = get_history_from_realm(realm);
-    auto clr = dynamic_cast<sync::ClientReplication*>(&repl);
+    std::shared_ptr<Replication> repl = get_history_from_realm(realm);
+    auto clr = std::dynamic_pointer_cast<sync::ClientReplication>(repl);
     REALM_ASSERT(clr);
-    return *clr;
+    return clr;
 }
 
 // Convenience function for creating and configuring sync sessions for test use.

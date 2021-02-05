@@ -305,8 +305,9 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, sync::ClientReplication& replication,
-                         SyncConfig config, bool force_client_resync)
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db,
+                         std::shared_ptr<sync::ClientReplication> replication, SyncConfig config,
+                         bool force_client_resync)
     : m_state(&State::inactive)
     , m_config(std::move(config))
     , m_force_client_resync(force_client_resync)

@@ -616,7 +616,7 @@ public:
     ///
     /// \param db A local client-side Realm DB object (representing a realm file).
     /// \param replication The replication object associated with the DB.
-    Session(Client&, std::shared_ptr<DB> db, ClientReplication& replication, Config = {});
+    Session(Client&, std::shared_ptr<DB> db, std::shared_ptr<ClientReplication> replication, Config = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().

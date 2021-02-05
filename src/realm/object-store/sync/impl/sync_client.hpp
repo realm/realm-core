@@ -107,7 +107,8 @@ struct SyncClient {
             m_thread.join();
     }
 
-    std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db, sync::ClientReplication& replication,
+    std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db,
+                                                std::shared_ptr<sync::ClientReplication> replication,
                                                 sync::Session::Config config)
     {
         return std::make_unique<sync::Session>(m_client, std::move(db), replication, std::move(config));
