@@ -4454,6 +4454,33 @@ TEST(Parser_Dictionary)
     CHECK_EQUAL(message, "Sum not defined for timestamps");
 }
 
+TEST(Parser_DictionaryObjects)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_age = dogs->add_column(type_Int, "age");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*dogs, "pets");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+
+    Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
+    Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
+    Obj lady = dogs->create_object_with_primary_key("lady", {{col_age, 5}});
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy", {{col_age, 3}});
+
+    auto adam_pets = adam.get_dictionary(col_dict);
+    adam_pets.insert("dog1", pluto);
+    adam_pets.insert("dog2", lady);
+
+    auto bernie_pets = bernie.get_dictionary(col_dict);
+    bernie_pets.insert("dog1", astro);
+    bernie_pets.insert("dog2", snoopy);
+
+    verify_query(test_context, persons, "dict['dog1'].age > 4", 1);
+}
+
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,
            Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
            Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>,
