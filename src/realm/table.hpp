@@ -369,7 +369,7 @@ public:
     size_t get_index_in_group() const noexcept;
     TableKey get_key() const noexcept;
 
-    uint64_t allocate_sequence_number();
+    uint32_t allocate_sequence_number();
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
