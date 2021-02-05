@@ -1,4 +1,4 @@
-# 6.2.2 Release notes
+# 6.2.3 Release notes
 
 ### Enhancements
 * None.
@@ -16,6 +16,12 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 6.2.2 Release notes
+
+* This version number was consumed but not released.
 
 ----------------------------------------------
 
