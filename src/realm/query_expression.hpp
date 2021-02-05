@@ -1709,7 +1709,12 @@ public:
         m_array_ptr = nullptr;
         switch (m_link_types[0]) {
             case col_type_Link:
-                m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(alloc));
+                if (m_link_column_keys[0].is_dictionary()) {
+                    m_array_ptr = LeafPtr(new (&m_storage.m_dict) ArrayInteger(alloc));
+                }
+                else {
+                    m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(alloc));
+                }
                 break;
             case col_type_LinkList:
                 m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(alloc));
@@ -1804,6 +1809,7 @@ private:
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     union Storage {
         typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;
+        typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayKey)>::type m_dict;
         typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_linklist;
         typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type m_backlink;
     };

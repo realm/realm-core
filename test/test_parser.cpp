@@ -4443,7 +4443,7 @@ TEST(Parser_Dictionary)
     std::string message;
 
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
-    CHECK_EQUAL(message, "Expecting '@keys', '@values' or '[<key>]', found 'Value'");
+    CHECK_EQUAL(message, "foo.dict is not a link column");
 
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Cannot add int and double");
@@ -4452,6 +4452,43 @@ TEST(Parser_Dictionary)
     // g.to_json(std::cout);
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Sum not defined for timestamps");
+}
+
+TEST(Parser_DictionaryObjects)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_age = dogs->add_column(type_Int, "age");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*dogs, "pets");
+    auto col_friend = persons->add_column(*persons, "friend");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+
+    Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
+    Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
+    Obj lady = dogs->create_object_with_primary_key("lady", {{col_age, 5}});
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy", {{col_age, 3}});
+
+    auto adam_pets = adam.get_dictionary(col_dict);
+    adam_pets.insert("dog1", pluto);
+    adam_pets.insert("dog2", lady);
+    adam_pets.insert("none", ObjKey());
+
+    auto bernie_pets = bernie.get_dictionary(col_dict);
+    bernie_pets.insert("dog1", astro);
+    bernie_pets.insert("dog2", snoopy);
+
+    adam.set(col_friend, bernie.get_key());
+    bernie.set(col_friend, adam.get_key());
+
+    auto q = persons->link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+    q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "pets.@values.age > 4", 1);
 }
 
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,

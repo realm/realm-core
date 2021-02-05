@@ -544,45 +544,60 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
-    if (identifier == "@links") {
-        // This is a backlink aggregate query
-        auto link_chain = path->visit(drv, comp_type);
-        auto sub = link_chain.get_backlink_count<Int>();
-        return sub.clone();
-    }
-    else {
-        try {
+    bool is_keys = false;
+    if (identifier[0] == '@') {
+        if (identifier == "@values") {
+            identifier = path->path_elems.back();
+            path->path_elems.pop_back();
+        }
+        else if (identifier == "@keys") {
+            identifier = path->path_elems.back();
+            path->path_elems.pop_back();
+            is_keys = true;
+        }
+        else if (identifier == "@links") {
+            // This is a backlink aggregate query
             auto link_chain = path->visit(drv, comp_type);
-            std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
-            if (index) {
-                if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
-                    auto t = s->get_type();
-                    auto idx = index->visit(drv, t);
-                    Mixed key = idx->get_mixed();
-                    subexpr = s->key(key).clone();
-                }
+            auto sub = link_chain.get_backlink_count<Int>();
+            return sub.clone();
+        }
+    }
+    try {
+        auto link_chain = path->visit(drv, comp_type);
+        std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
+        if (index) {
+            if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+                auto t = s->get_type();
+                auto idx = index->visit(drv, t);
+                Mixed key = idx->get_mixed();
+                subexpr = s->key(key).clone();
             }
+        }
+        if (is_keys) {
+            if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+                subexpr = std::make_unique<ColumnDictionaryKeys>(*s);
+            }
+        }
 
-            if (post_op) {
-                return post_op->visit(drv, subexpr.get());
-            }
-            return subexpr;
+        if (post_op) {
+            return post_op->visit(drv, subexpr.get());
         }
-        catch (const std::runtime_error& e) {
-            // Is 'identifier' perhaps length operator?
-            if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
-                // If 'length' is the operator, the last id in the path must be the name
-                // of a list property
-                auto prop = path->path_elems.back();
-                path->path_elems.pop_back();
-                std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
-                if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
-                    if (auto length_expr = list->get_element_length())
-                        return length_expr;
-                }
+        return subexpr;
+    }
+    catch (const std::runtime_error& e) {
+        // Is 'identifier' perhaps length operator?
+        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+            // If 'length' is the operator, the last id in the path must be the name
+            // of a list property
+            auto prop = path->path_elems.back();
+            path->path_elems.pop_back();
+            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
+            if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                if (auto length_expr = list->get_element_length())
+                    return length_expr;
             }
-            throw e;
         }
+        throw e;
     }
     REALM_UNREACHABLE();
     return {};
@@ -1041,6 +1056,12 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
         }
+        else if (path_elem == "@values") {
+            if (!link_chain.get_current_col().is_dictionary()) {
+                throw InvalidQueryError("@values only allowed on dictionaries");
+            }
+            continue;
+        }
         else if (path_elem.empty()) {
             continue; // this element has been removed, this happens in subqueries
         }
@@ -1277,24 +1298,6 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 
 Subexpr* LinkChain::column(const std::string& col)
 {
-    if (!m_link_cols.empty()) {
-        auto current_column = m_link_cols.back();
-        if (current_column.is_dictionary()) {
-            m_link_cols.pop_back();
-            auto dict =
-                std::make_unique<Columns<Dictionary>>(current_column, m_base_table, m_link_cols, m_comparison_type);
-            if (col == "@keys") {
-                return new ColumnDictionaryKeys(*dict);
-            }
-            else if (col == "@values") {
-                return dict.release();
-            }
-            else {
-                throw InvalidQueryError(util::format("Expecting '@keys', '@values' or '[<key>]', found '%1'", col));
-            }
-        }
-    }
-
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         throw InvalidQueryError(
