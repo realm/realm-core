@@ -145,8 +145,7 @@ TEST_CASE("dictionary") {
         REQUIRE(key == "a");
         Mixed m = sorted.get_any(0);
         REQUIRE(m.get_string() == "a");
-        m = sorted.get_any(4);
-        REQUIRE(m.is_null());
+        REQUIRE_THROWS_WITH(sorted.get_any(4), "Requested index 4 greater than max 2");
     }
 
     SECTION("handover") {
@@ -275,6 +274,10 @@ TEST_CASE("dictionary") {
         }
 
         SECTION("now with links") {
+            auto objectschema = &*r->schema().find("target");
+            auto res = links.get_values();
+            REQUIRE(&res.get_object_schema() == objectschema);
+
             CollectionChangeSet local_change;
             auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
                 local_change = c;
@@ -283,10 +286,15 @@ TEST_CASE("dictionary") {
 
             r->begin_transaction();
             links.insert("l", another.get_key());
+            links.insert("m", ObjKey());
             r->commit_transaction();
             advance_and_notify(*r);
-            REQUIRE(local_change.insertions.count() == 1);
-
+            REQUIRE(local_change.insertions.count() == 2);
+            auto obj = res.get(0);
+            REQUIRE(!obj);
+            obj = res.get(1);
+            REQUIRE(obj);
+            REQUIRE(obj.get_key() == another.get_key());
             r->begin_transaction();
             another.remove();
             r->commit_transaction();
