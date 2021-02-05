@@ -310,8 +310,17 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::Collection:
             break;
+        case Mode::Collection: {
+            Mixed m = get_any(row_ndx);
+            if (m.is_type(type_Link)) {
+                return m_collection->get_target_table()->get_object(m.get<ObjKey>());
+            }
+            else if (m.is_type(type_TypedLink)) {
+                return m_realm->read_group().get_object(m.get_link());
+            }
+            break;
+        }
         case Mode::Table:
             if (row_ndx < m_table->size())
                 return m_table_iterator.get(*m_table, row_ndx);

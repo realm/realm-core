@@ -275,6 +275,8 @@ TEST_CASE("dictionary") {
         }
 
         SECTION("now with links") {
+            auto res = links.get_values();
+
             CollectionChangeSet local_change;
             auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {
                 local_change = c;
@@ -286,7 +288,8 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(local_change.insertions.count() == 1);
-
+            auto obj = res.get(0);
+            REQUIRE(obj);
             r->begin_transaction();
             another.remove();
             r->commit_transaction();
