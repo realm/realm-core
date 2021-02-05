@@ -36,7 +36,7 @@ blank   [ \t\r]
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
-[,(){}\.]                     return yytext[0];
+[\[\],(){}\.]                     return yytext[0];
 ("<="|"=<")                 return yy::parser::make_LESS_EQUAL ();
 (">="|"=>")                 return yy::parser::make_GREATER_EQUAL ();
 &&|(?i:and)                 return yy::parser::make_AND    ();
@@ -65,6 +65,8 @@ blank   [ \t\r]
 "@avg"                      return yy::parser::make_AVG    ();
 "@links"                    return yy::parser::make_BACKLINK();
 "@type"                     return yy::parser::make_TYPE    (yytext);
+"@keys"                     return yy::parser::make_KEY_VAL (yytext);
+"@values"                   return yy::parser::make_KEY_VAL (yytext);
 "[c]"                       return yy::parser::make_CASE    ();
 (true|TRUE)                 return yy::parser::make_TRUE    ();
 (false|FALSE)               return yy::parser::make_FALSE    ();

@@ -3155,7 +3155,9 @@ public:
 
     std::string description(util::serializer::SerialisationState& state) const override
     {
-        return ColumnListBase::description(state) + std::string(".") + std::string(m_key.get_string());
+        std::ostringstream ostr;
+        ostr << m_key;
+        return ColumnListBase::description(state) + '[' + ostr.str() + ']';
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -3218,7 +3220,7 @@ public:
     std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key) +
-               ".keys";
+               ".@keys";
     }
 
     std::unique_ptr<Subexpr> clone() const override

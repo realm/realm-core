@@ -554,6 +554,14 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
         try {
             auto link_chain = path->visit(drv, comp_type);
             std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
+            if (index) {
+                if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
+                    auto t = s->get_type();
+                    auto idx = index->visit(drv, t);
+                    Mixed key = idx->get_mixed();
+                    subexpr = s->key(key).clone();
+                }
+            }
 
             if (post_op) {
                 return post_op->visit(drv, subexpr.get());
@@ -1273,12 +1281,16 @@ Subexpr* LinkChain::column(const std::string& col)
         auto current_column = m_link_cols.back();
         if (current_column.is_dictionary()) {
             m_link_cols.pop_back();
-            Columns<Dictionary> dict(current_column, m_base_table, m_link_cols, m_comparison_type);
-            if (col == "keys") {
-                return new ColumnDictionaryKeys(dict);
+            auto dict =
+                std::make_unique<Columns<Dictionary>>(current_column, m_base_table, m_link_cols, m_comparison_type);
+            if (col == "@keys") {
+                return new ColumnDictionaryKeys(*dict);
+            }
+            else if (col == "@values") {
+                return dict.release();
             }
             else {
-                return new ColumnDictionaryKey(Mixed(col), dict);
+                throw InvalidQueryError(util::format("Expecting '@keys', '@values' or '[<key>]', found '%1'", col));
             }
         }
     }
