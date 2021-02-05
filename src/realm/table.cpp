@@ -3964,7 +3964,10 @@ bool Table::links_to_self(ColKey col_key) const
 
 TableRef Table::get_opposite_table(ColKey col_key) const
 {
-    return get_parent_group()->get_table(get_opposite_table_key(col_key));
+    if (auto k = get_opposite_table_key(col_key)) {
+        return get_parent_group()->get_table(k);
+    }
+    return {};
 }
 
 ColKey Table::get_opposite_column(ColKey col_key) const

@@ -292,6 +292,7 @@ TEST_CASE("dictionary") {
             REQUIRE(local_change.insertions.count() == 1);
             auto obj = res.get(0);
             REQUIRE(obj);
+            REQUIRE(obj.get_key() == another.get_key());
             r->begin_transaction();
             another.remove();
             r->commit_transaction();

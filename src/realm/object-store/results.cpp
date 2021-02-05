@@ -54,6 +54,7 @@ Results::Results(SharedRealm r, ConstTableRef table)
 
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll)
     : m_realm(std::move(r))
+    , m_table(coll->get_target_table())
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
@@ -62,6 +63,7 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll)
 
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o)
     : m_realm(std::move(r))
+    , m_table(coll->get_target_table())
     , m_descriptor_ordering(std::move(o))
     , m_collection(std::move(coll))
     , m_mode(Mode::Collection)
@@ -200,14 +202,11 @@ const ObjectSchema& Results::get_object_schema() const
 
 StringData Results::get_object_type() const noexcept
 {
-    if (m_table)
-        return ObjectStore::object_type_for_table_name(m_table->get_name());
+    if (!m_table) {
+        return StringData();
+    }
 
-    if (m_collection)
-        if (auto table = m_collection->get_target_table())
-            return ObjectStore::object_type_for_table_name(table->get_name());
-
-    return StringData();
+    return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
 void Results::evaluate_sort_and_distinct_on_collection()
@@ -316,8 +315,8 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             break;
         case Mode::Collection: {
             Mixed m = get_any(row_ndx);
-            if (m.is_type(type_Link)) {
-                return m_collection->get_target_table()->get_object(m.get<ObjKey>());
+            if (m.is_type(type_Link) && m_table) {
+                return m_table->get_object(m.get<ObjKey>());
             }
             else if (m.is_type(type_TypedLink)) {
                 return m_realm->read_group().get_object(m.get_link());
