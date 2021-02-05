@@ -256,7 +256,7 @@ util::Optional<T> Results::try_get(size_t ndx)
     if (m_mode == Mode::Collection) {
         evaluate_sort_and_distinct_on_collection();
         if (m_list_indices) {
-            ndx = (*m_list_indices)[ndx];
+            ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
         }
         if (ndx < m_collection->size()) {
             using U = typename util::RemoveOptional<T>::type;
@@ -321,6 +321,9 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             else if (m.is_type(type_TypedLink)) {
                 return m_realm->read_group().get_object(m.get_link());
             }
+            else if (m.is_null()) {
+                return Obj();
+            }
             break;
         }
         case Mode::Table:
@@ -363,7 +366,12 @@ Mixed Results::get_any(size_t ndx)
         case Mode::Collection:
             evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {
-                ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
+                if (ndx < m_list_indices->size()) {
+                    ndx = (*m_list_indices)[ndx];
+                }
+                else {
+                    throw OutOfBoundsIndexException{ndx, m_list_indices->size()};
+                }
             }
             if (ndx < m_collection->size()) {
                 Mixed mixed;
@@ -377,6 +385,9 @@ Mixed Results::get_any(size_t ndx)
                     mixed = m_collection->get_any(ndx);
                 }
                 return mixed;
+            }
+            else {
+                throw OutOfBoundsIndexException{ndx, m_collection->size()};
             }
             break;
         case Mode::Table:
@@ -409,14 +420,22 @@ Mixed Results::get_any(size_t ndx)
 }
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
-    if (m_mode == Mode::Collection && ndx < m_collection->size()) {
+    if (m_mode == Mode::Collection) {
         if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
             evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {
-                ndx = (*m_list_indices)[ndx];
+                if (ndx < m_list_indices->size()) {
+                    ndx = (*m_list_indices)[ndx];
+                }
+                else {
+                    throw OutOfBoundsIndexException{ndx, m_list_indices->size()};
+                }
             }
-            auto val = dict->get_pair(ndx);
-            return {val.first.get_string(), val.second};
+            if (ndx < dict->size()) {
+                auto val = dict->get_pair(ndx);
+                return {val.first.get_string(), val.second};
+            }
+            throw OutOfBoundsIndexException{ndx, dict->size()};
         }
     }
     return {"", {}};
