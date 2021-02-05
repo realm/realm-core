@@ -275,7 +275,9 @@ TEST_CASE("dictionary") {
         }
 
         SECTION("now with links") {
+            auto objectschema = &*r->schema().find("target");
             auto res = links.get_values();
+            REQUIRE(&res.get_object_schema() == objectschema);
 
             CollectionChangeSet local_change;
             auto x = links.add_notification_callback([&local_change](CollectionChangeSet c, std::exception_ptr) {

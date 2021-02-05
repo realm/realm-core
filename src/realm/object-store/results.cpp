@@ -200,11 +200,14 @@ const ObjectSchema& Results::get_object_schema() const
 
 StringData Results::get_object_type() const noexcept
 {
-    if (!m_table) {
-        return StringData();
-    }
+    if (m_table)
+        return ObjectStore::object_type_for_table_name(m_table->get_name());
 
-    return ObjectStore::object_type_for_table_name(m_table->get_name());
+    if (m_collection)
+        if (auto table = m_collection->get_target_table())
+            return ObjectStore::object_type_for_table_name(table->get_name());
+
+    return StringData();
 }
 
 void Results::evaluate_sort_and_distinct_on_collection()
