@@ -77,9 +77,27 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
+    ColKey column_key = m_link_column_keys[column];
     const Obj obj = m_tables[column]->get_object(key);
     if (type == col_type_Link) {
-        if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
+        if (column_key.is_dictionary()) {
+            auto dict = obj.get_dictionary(column_key);
+            // Insert all values
+            dict.for_all_values([&](const Mixed& value) {
+                if (value.is_type(type_TypedLink)) {
+                    auto link = value.get_link();
+                    REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                    auto k = link.get_obj_key();
+                    if (!k.is_unresolved()) {
+                        if (last)
+                            lm.consume(k);
+                        else
+                            map_links(column + 1, k, lm);
+                    }
+                }
+            });
+        }
+        else if (ObjKey k = obj.get<ObjKey>(column_key)) {
             if (!k.is_unresolved()) {
                 if (last)
                     lm.consume(k);
@@ -89,15 +107,13 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         }
     }
     else if (type == col_type_LinkList) {
-        auto linklist = obj.get_list<ObjKey>(m_link_column_keys[column]);
+        auto linklist = obj.get_list<ObjKey>(column_key);
         size_t sz = linklist.size();
         for (size_t t = 0; t < sz; t++) {
             ObjKey k = linklist.get(t);
             if (!k.is_unresolved()) {
                 if (last) {
-                    bool continue2 = lm.consume(k);
-                    if (!continue2)
-                        return;
+                    lm.consume(k);
                 }
                 else
                     map_links(column + 1, k, lm);
@@ -105,13 +121,10 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         }
     }
     else if (type == col_type_BackLink) {
-        auto backlink_column = m_link_column_keys[column];
-        auto backlinks = obj.get_all_backlinks(backlink_column);
+        auto backlinks = obj.get_all_backlinks(column_key);
         for (auto k : backlinks) {
             if (last) {
-                bool continue2 = lm.consume(k);
-                if (!continue2)
-                    return;
+                lm.consume(k);
             }
             else
                 map_links(column + 1, k, lm);
@@ -130,13 +143,47 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
     if (type == col_type_Link && !column_key.is_set()) {
-        REALM_ASSERT(!column_key.is_collection());
-        if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
-            if (!k.is_unresolved()) {
-                if (last)
-                    lm.consume(k);
-                else
-                    map_links(column + 1, k, lm);
+        if (column_key.is_dictionary()) {
+            auto leaf = static_cast<const ArrayInteger*>(m_leaf_ptr);
+            if (leaf->get(row)) {
+                auto key_type = m_tables[column]->get_dictionary_key_type(column_key);
+                DictionaryClusterTree dict_cluster(const_cast<ArrayInteger*>(leaf), key_type,
+                                                   get_base_table()->get_alloc(), row);
+                dict_cluster.init_from_parent();
+
+                // Iterate through cluster and insert all link values
+                ArrayMixed leaf(get_base_table()->get_alloc());
+                dict_cluster.traverse([&](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                    for (size_t i = 0; i < e; i++) {
+                        auto m = leaf.get(i);
+                        if (m.is_type(type_TypedLink)) {
+                            auto link = m.get_link();
+                            REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                            auto k = link.get_obj_key();
+                            if (!k.is_unresolved()) {
+                                if (last)
+                                    lm.consume(k);
+                                else
+                                    map_links(column + 1, k, lm);
+                            }
+                        }
+                    }
+                    // Continue
+                    return false;
+                });
+            }
+        }
+        else {
+            REALM_ASSERT(!column_key.is_collection());
+            if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
+                if (!k.is_unresolved()) {
+                    if (last)
+                        lm.consume(k);
+                    else
+                        map_links(column + 1, k, lm);
+                }
             }
         }
     }
@@ -150,9 +197,9 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                 ObjKey k = links.get(t);
                 if (!k.is_unresolved()) {
                     if (last) {
-                        bool continue2 = lm.consume(k);
-                        if (!continue2)
+                        if (!lm.consume(k)) {
                             return;
+                        }
                     }
                     else
                         map_links(column + 1, k, lm);

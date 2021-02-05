@@ -939,6 +939,11 @@ public:
         return m_current_table;
     }
 
+    ColKey get_current_col() const
+    {
+        return m_link_cols.back();
+    }
+
     LinkChain& link(ColKey link_column)
     {
         add(link_column);
