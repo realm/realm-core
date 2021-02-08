@@ -4207,8 +4207,8 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin)};
-    size_t num_args = 1;
+    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key())};
+    size_t num_args = 2;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
@@ -4226,6 +4226,11 @@ TEST(Parser_Mixed)
 
     // non-uniform type cross column comparisons
     verify_query(test_context, table, "mixed == int", 71);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
+    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
+                         "type 'typedLink' which is not supported");
 }
 
 TEST(Parser_TypeOfValue)

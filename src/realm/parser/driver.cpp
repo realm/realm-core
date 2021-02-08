@@ -749,6 +749,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     Subexpr* ret = nullptr;
+    std::string explain_value_message = text;
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {
@@ -935,10 +936,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
             if (drv->m_args.is_argument_null(arg_no)) {
+                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = new Value<null>(realm::null());
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
+                explain_value_message =
+                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
                 switch (type) {
                     case type_Int:
                         ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
@@ -1008,6 +1012,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     default:
+                        explain_value_message = util::format("%1 which is not supported", explain_value_message);
                         break;
                 }
             }
@@ -1016,8 +1021,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     }
     if (!ret) {
         throw InvalidQueryError(
-            util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
-                         get_data_type_name(hint), text));
+            util::format("Unsupported comparison between property of type '%1' and constant value: %2",
+                         get_data_type_name(hint), explain_value_message));
     }
     return std::unique_ptr<Subexpr>{ret};
 }
