@@ -94,6 +94,12 @@ struct AnyContext {
         if (type == typeid(UUID)) {
             return type_UUID;
         }
+        if (type == typeid(ObjLink)) {
+            return type_TypedLink;
+        }
+        if (type == typeid(Mixed)) {
+            return type_Mixed;
+        }
         return DataType(-1);
     }
 };
