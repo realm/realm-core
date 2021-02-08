@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.5.0 Release notes
 
 ### Enhancements
 * Sync client now logs error messages received from server rather than just the size of the error message.
@@ -7,8 +7,6 @@
 * Improve performance of sequential reads on a Results backed directly by a Table by 50x.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
 * Results::get() on a Results backed by a Table would give incorrect results if a new object was created at index zero in the source Table. ([Cocoa #7014](https://github.com/realm/realm-cocoa/issues/7014), since v6.0.0).
 * New query parser breaks on argument substitution in relation to LinkList. ([#4381](https://github.com/realm/realm-core/issues/4381))
 * During synchronization you might experience crash with 'Assertion failed: ref + size <= next->first' ([#4388](https://github.com/realm/realm-core/issues/4388))
