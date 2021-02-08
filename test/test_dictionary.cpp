@@ -299,9 +299,12 @@ TEST(Dictionary_Transaction)
 
 TEST(Dictionary_Aggregate)
 {
-    Group g;
-    auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    auto tr = db->start_write();
+    auto foo = tr->add_table("foo");
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -310,7 +313,7 @@ TEST(Dictionary_Aggregate)
     std::shuffle(random_idx.begin(), random_idx.end(), std::mt19937(unit_test_random_seed));
 
     for (int i = 0; i < 100; i++) {
-        dict.insert(i, random_idx[i]);
+        dict.insert(util::to_string(i), random_idx[i]);
     }
 
     std::vector<size_t> indices;
@@ -321,15 +324,14 @@ TEST(Dictionary_Aggregate)
         CHECK_GREATER(val, last);
         last = val;
     }
+    tr->commit_and_continue_as_read();
 
     size_t ndx;
     auto max = dict.max(&ndx);
     CHECK_EQUAL(max.get_int(), 99);
-    CHECK_EQUAL(random_idx[ndx], 99);
 
     auto min = dict.min(&ndx);
     CHECK_EQUAL(min.get_int(), 0);
-    CHECK_EQUAL(random_idx[ndx], 0);
 
     size_t cnt;
     auto sum = dict.sum(&cnt);
@@ -347,7 +349,7 @@ TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", false, type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -381,7 +383,7 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
     auto foo = foos->create_object_with_primary_key(123);
     auto a = bars->create_object_with_primary_key("a");

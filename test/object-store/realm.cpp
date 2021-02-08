@@ -24,6 +24,7 @@
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
@@ -102,8 +103,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
-        SECTION("migration function for additive-only") {
-            config.schema_mode = SchemaMode::Additive;
+        SECTION("migration function for additive discovered") {
+            config.schema_mode = SchemaMode::AdditiveDiscovered;
+            config.migration_function = [](auto, auto, auto) {};
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("migration function for additive explicit") {
+            config.schema_mode = SchemaMode::AdditiveExplicit;
             config.migration_function = [](auto, auto, auto) {};
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
@@ -276,7 +283,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = util::none;
         config.cache = false;
-        config.schema_mode = SchemaMode::Additive;
+        config.schema_mode = SchemaMode::AdditiveExplicit;
         config.schema_version = 0;
 
         auto realm = Realm::get_shared_realm(config);
@@ -769,7 +776,7 @@ TEST_CASE("SharedRealm: notifications") {
 TEST_CASE("SharedRealm: schema updating from external changes") {
     TestFile config;
     config.schema_version = 0;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     config.schema = Schema{
         {"object",
          {
@@ -1583,7 +1590,7 @@ struct ModeAutomatic {
 struct ModeAdditive {
     static SchemaMode mode()
     {
-        return SchemaMode::Additive;
+        return SchemaMode::AdditiveExplicit;
     }
     static bool should_call_init_on_version_bump()
     {
@@ -2011,5 +2018,23 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         config.cache = true;
         auto r4 = Realm::get_shared_realm(config);
         REQUIRE(r4 == r2);
+    }
+}
+
+TEST_CASE("KeyPathMapping generation") {
+    TestFile config;
+    config.cache = true;
+    realm::query_parser::KeyPathMapping mapping;
+
+    SECTION("class aliasing") {
+        Schema schema = {
+            {"PersistedName", {{"age", PropertyType::Int}}, {}, "AlternativeName"},
+        };
+        schema.validate();
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+        realm::populate_keypath_mapping(mapping, *realm);
+        REQUIRE(mapping.has_table_mapping("AlternativeName"));
+        REQUIRE("class_PersistedName" == mapping.get_table_mapping("AlternativeName"));
     }
 }

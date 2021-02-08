@@ -1538,7 +1538,9 @@ public:
 
     MixedNodeBase(Mixed v, ColKey column)
         : m_value(v)
+        , m_value_is_null(v.is_null())
     {
+        get_ownership();
         m_condition_column_key = column;
     }
 
@@ -1578,9 +1580,23 @@ protected:
         , m_value(from.m_value)
         , m_value_is_null(from.m_value_is_null)
     {
+        get_ownership();
     }
 
-    Mixed m_value;
+    void get_ownership()
+    {
+        if (!m_value_is_null) {
+            if (m_value.get_type() == type_String || m_value.get_type() == type_Binary) {
+                auto bin = m_value.get_binary();
+                OwnedBinaryData tmp(bin.data(), bin.size());
+                m_buffer = std::move(tmp);
+                m_value = Mixed(m_buffer.get());
+            }
+        }
+    }
+
+    QueryValue m_value;
+    OwnedBinaryData m_buffer;
     bool m_value_is_null = false;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayMixed), alignof(ArrayMixed)>::type;
     using LeafPtr = std::unique_ptr<ArrayMixed, PlacementDelete>;
@@ -1598,15 +1614,15 @@ public:
     {
         TConditionFunction cond;
         for (size_t i = start; i < end; i++) {
-            Mixed val = m_leaf_ptr->get(i);
+            QueryValue val(m_leaf_ptr->get(i));
             if constexpr (realm::is_any_v<TConditionFunction, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Like,
                                           LikeIns, NotEqualIns, Contains, ContainsIns>) {
                 // For some strange reason the parameters are swapped for string conditions
-                if (cond(m_value, val, m_value.is_null(), val.is_null()))
+                if (cond(m_value, val))
                     return i;
             }
             else {
-                if (cond(val, m_value, val.is_null(), m_value.is_null()))
+                if (cond(val, m_value))
                     return i;
             }
         }
@@ -2483,9 +2499,9 @@ public:
     {
         size_t s = start;
         while (s < end) {
-            Mixed v1 = m_leaf_ptr1->get_any(s);
-            Mixed v2 = m_leaf_ptr2->get_any(s);
-            if (TConditionFunction()(v1, v2, v1.is_null(), v2.is_null()))
+            QueryValue v1(m_leaf_ptr1->get_any(s));
+            QueryValue v2(m_leaf_ptr2->get_any(s));
+            if (TConditionFunction()(v1, v2))
                 return s;
             else
                 s++;

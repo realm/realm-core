@@ -1164,7 +1164,7 @@ inline File::Map<T>::Map() noexcept
 }
 
 template <class T>
-inline File::Map<T>::~Map() noexcept
+inline File::Map<T>::~Map<T>() noexcept
 {
 }
 

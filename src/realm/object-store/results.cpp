@@ -285,21 +285,14 @@ Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
 {
     // Using a Table iterator is much faster for repeated access into a table
     // than indexing into it as the iterator caches the cluster the last accessed
-    // object is stored in.
-    if (!m_it && table.size() > 5) {
-        m_it = std::make_unique<Table::Iterator>(table.begin());
-    }
+    // object is stored in, but creating the iterator is somewhat expensive.
     if (!m_it) {
-        return const_cast<Table&>(table).get_object(ndx);
-    }
-    try {
-        return (*m_it)[ndx];
-    }
-    catch (...) {
-        // Iterator might be outdated
+        if (table.size() <= 5)
+            return const_cast<Table&>(table).get_object(ndx);
         m_it = std::make_unique<Table::Iterator>(table.begin());
-        return (*m_it)[ndx];
     }
+    m_it->go(ndx);
+    return **m_it;
 }
 
 template <>
@@ -532,7 +525,7 @@ size_t Results::index_of(T const& value)
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
             using U = typename util::RemoveOptional<T>::type;
             auto mixed = m_collection->get_any((*m_list_indices)[i]);
-            T val{};
+            T val = BPlusTree<T>::default_value(m_collection->get_col_key().is_nullable());
             if (!mixed.is_null()) {
                 val = mixed.get<U>();
             }

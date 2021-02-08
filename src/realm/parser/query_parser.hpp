@@ -31,6 +31,17 @@
 
 namespace realm::query_parser {
 
+/// Exception thrown when parsing fails due to invalid syntax.
+struct SyntaxError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+/// Exception thrown when binding a syntactically valid query string in a
+/// context where it does not make sense.
+struct InvalidQueryError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 struct AnyContext {
     template <typename T>
     T unbox(const util::Any& wrapper)
@@ -216,10 +227,10 @@ private:
     }
 };
 
-class NoArgsError : public std::runtime_error {
+class NoArgsError : public std::out_of_range {
 public:
     NoArgsError()
-        : std::runtime_error("Attempt to retreive an argument when no arguments were given")
+        : std::out_of_range("Attempt to retreive an argument when no arguments were given")
     {
     }
 };

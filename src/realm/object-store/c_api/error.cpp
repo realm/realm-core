@@ -1,6 +1,5 @@
-#include <realm/object-store/c_api/types.hpp>
-
-using namespace realm;
+#include <realm/object-store/c_api/util.hpp>
+#include <realm/parser/query_parser.hpp>
 
 #if REALM_PLATFORM_APPLE && !defined(RLM_NO_THREAD_LOCAL)
 #define RLM_NO_THREAD_LOCAL
@@ -9,6 +8,8 @@ using namespace realm;
 #if defined(RLM_NO_THREAD_LOCAL)
 #include <pthread.h>
 #endif
+
+namespace realm::c_api {
 
 #if !defined(RLM_NO_THREAD_LOCAL)
 
@@ -70,19 +71,62 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         err->kind.code = 0;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
-            err->error = error_number;
-            err->message = ex.what();
+            if (err) {
+                err->error = error_number;
+                err->message = ex.what();
+            }
             *ptr = std::current_exception();
         };
 
         try {
             std::rethrow_exception(*ptr);
         }
+
+        // C API exceptions:
         catch (const NotClonableException& ex) {
             populate_error(ex, RLM_ERR_NOT_CLONABLE);
         }
         catch (const InvalidatedObjectException& ex) {
             populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
+        }
+        catch (const UnexpectedPrimaryKeyException& ex) {
+            populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
+        }
+        catch (const InvalidPropertyKeyException& ex) {
+            populate_error(ex, RLM_ERR_INVALID_PROPERTY);
+        }
+        catch (const CallbackFailed& ex) {
+            populate_error(ex, RLM_ERR_CALLBACK);
+        }
+
+        // Core exceptions:
+        catch (const NoSuchTable& ex) {
+            populate_error(ex, RLM_ERR_NO_SUCH_TABLE);
+        }
+        catch (const KeyNotFound& ex) {
+            populate_error(ex, RLM_ERR_NO_SUCH_OBJECT);
+        }
+        catch (const LogicError& ex) {
+            using Kind = LogicError::ErrorKind;
+            switch (ex.kind()) {
+                case Kind::column_does_not_exist:
+                case Kind::column_index_out_of_range:
+                    populate_error(ex, RLM_ERR_INVALID_PROPERTY);
+                    break;
+                case Kind::wrong_transact_state:
+                    populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
+                    break;
+                default:
+                    populate_error(ex, RLM_ERR_LOGIC);
+            }
+        }
+
+        // Object Store exceptions:
+        catch (const InvalidTransactionException& ex) {
+            populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
+        }
+        catch (const IncorrectThreadException& ex) {
+            populate_error(ex, RLM_ERR_WRONG_THREAD);
         }
         catch (const List::InvalidatedException& ex) {
             populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
@@ -102,11 +146,22 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         catch (const List::OutOfBoundsIndexException& ex) {
             populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
         }
-        catch (const InvalidQueryException& ex) {
+        catch (const query_parser::InvalidQueryError& ex) {
             populate_error(ex, RLM_ERR_INVALID_QUERY);
         }
+        catch (const query_parser::SyntaxError& ex) {
+            populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
+        }
+
+        // Generic exceptions:
         catch (const std::invalid_argument& ex) {
             populate_error(ex, RLM_ERR_INVALID_ARGUMENT);
+        }
+        catch (const std::out_of_range& ex) {
+            populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+        }
+        catch (const std::logic_error& ex) {
+            populate_error(ex, RLM_ERR_LOGIC);
         }
         catch (const std::bad_alloc& ex) {
             populate_error(ex, RLM_ERR_OUT_OF_MEMORY);
@@ -134,14 +189,6 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
     return false;
 }
 
-RLM_EXPORT void realm_rethrow_last_error()
-{
-    std::exception_ptr* ptr = get_last_exception();
-    if (ptr && *ptr) {
-        std::rethrow_exception(*ptr);
-    }
-}
-
 RLM_API bool realm_clear_last_error()
 {
     std::exception_ptr* ptr = get_last_exception();
@@ -150,4 +197,36 @@ RLM_API bool realm_clear_last_error()
         return true;
     }
     return false;
+}
+
+RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void)
+{
+    auto p = get_last_exception();
+    if (p && *p) {
+        return new realm_async_error_t{*p};
+    }
+    return nullptr;
+}
+
+RLM_API void realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
+{
+    convert_error(&const_cast<realm_async_error_t*>(async_err)->ep, out_err);
+}
+
+} // namespace realm::c_api
+
+RLM_EXPORT void realm_rethrow_last_error()
+{
+    std::exception_ptr* ptr = realm::c_api::get_last_exception();
+    if (ptr && *ptr) {
+        std::rethrow_exception(*ptr);
+    }
+}
+
+RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
+{
+    return realm::c_api::wrap_err([=]() {
+        (func)();
+        return true;
+    });
 }

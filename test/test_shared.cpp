@@ -3767,14 +3767,12 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::runtime_error);
-    CHECK_THROW(i5[0], std::runtime_error);
+    CHECK_THROW(*i5, std::logic_error);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::runtime_error);
-    CHECK_THROW(i5[0], std::runtime_error);
+    CHECK_THROW(*i5, std::logic_error);
     CHECK(i5 == t4->end());
 }
 

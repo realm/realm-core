@@ -486,6 +486,7 @@ namespace yy {
       // "like"
       // "between"
       // "@size"
+      // "@type"
       // path_elem
       // id
       char dummy17[sizeof (std::string)];
@@ -582,7 +583,8 @@ namespace yy {
     TOK_CONTAINS = 303,            // "contains"
     TOK_LIKE = 304,                // "like"
     TOK_BETWEEN = 305,             // "between"
-    TOK_SIZE = 306                 // "@size"
+    TOK_SIZE = 306,                // "@size"
+    TOK_TYPE = 307                 // "@type"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -599,7 +601,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 58, ///< Number of tokens.
+        YYNTOKENS = 59, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -653,41 +655,42 @@ namespace yy {
         SYM_LIKE = 49,                           // "like"
         SYM_BETWEEN = 50,                        // "between"
         SYM_SIZE = 51,                           // "@size"
-        SYM_52_ = 52,                            // '('
-        SYM_53_ = 53,                            // ')'
-        SYM_54_ = 54,                            // '.'
-        SYM_55_ = 55,                            // ','
-        SYM_56_ = 56,                            // '{'
-        SYM_57_ = 57,                            // '}'
-        SYM_YYACCEPT = 58,                       // $accept
-        SYM_query = 59,                          // query
-        SYM_pred = 60,                           // pred
-        SYM_and_pred = 61,                       // and_pred
-        SYM_atom_pred = 62,                      // atom_pred
-        SYM_value = 63,                          // value
-        SYM_prop = 64,                           // prop
-        SYM_simple_prop = 65,                    // simple_prop
-        SYM_subquery = 66,                       // subquery
-        SYM_pred_suffix = 67,                    // pred_suffix
-        SYM_distinct = 68,                       // distinct
-        SYM_distinct_param = 69,                 // distinct_param
-        SYM_sort = 70,                           // sort
-        SYM_sort_param = 71,                     // sort_param
-        SYM_limit = 72,                          // limit
-        SYM_direction = 73,                      // direction
-        SYM_list = 74,                           // list
-        SYM_list_content = 75,                   // list_content
-        SYM_constant = 76,                       // constant
-        SYM_boolexpr = 77,                       // boolexpr
-        SYM_comp_type = 78,                      // comp_type
-        SYM_post_op = 79,                        // post_op
-        SYM_aggr_op = 80,                        // aggr_op
-        SYM_equality = 81,                       // equality
-        SYM_relational = 82,                     // relational
-        SYM_stringop = 83,                       // stringop
-        SYM_path = 84,                           // path
-        SYM_path_elem = 85,                      // path_elem
-        SYM_id = 86                              // id
+        SYM_TYPE = 52,                           // "@type"
+        SYM_53_ = 53,                            // '('
+        SYM_54_ = 54,                            // ')'
+        SYM_55_ = 55,                            // '.'
+        SYM_56_ = 56,                            // ','
+        SYM_57_ = 57,                            // '{'
+        SYM_58_ = 58,                            // '}'
+        SYM_YYACCEPT = 59,                       // $accept
+        SYM_query = 60,                          // query
+        SYM_pred = 61,                           // pred
+        SYM_and_pred = 62,                       // and_pred
+        SYM_atom_pred = 63,                      // atom_pred
+        SYM_value = 64,                          // value
+        SYM_prop = 65,                           // prop
+        SYM_simple_prop = 66,                    // simple_prop
+        SYM_subquery = 67,                       // subquery
+        SYM_pred_suffix = 68,                    // pred_suffix
+        SYM_distinct = 69,                       // distinct
+        SYM_distinct_param = 70,                 // distinct_param
+        SYM_sort = 71,                           // sort
+        SYM_sort_param = 72,                     // sort_param
+        SYM_limit = 73,                          // limit
+        SYM_direction = 74,                      // direction
+        SYM_list = 75,                           // list
+        SYM_list_content = 76,                   // list_content
+        SYM_constant = 77,                       // constant
+        SYM_boolexpr = 78,                       // boolexpr
+        SYM_comp_type = 79,                      // comp_type
+        SYM_post_op = 80,                        // post_op
+        SYM_aggr_op = 81,                        // aggr_op
+        SYM_equality = 82,                       // equality
+        SYM_relational = 83,                     // relational
+        SYM_stringop = 84,                       // stringop
+        SYM_path = 85,                           // path
+        SYM_path_elem = 86,                      // path_elem
+        SYM_id = 87                              // id
       };
     };
 
@@ -812,6 +815,7 @@ namespace yy {
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
+      case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (std::move (that.value));
@@ -1170,6 +1174,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
+      case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
@@ -1282,7 +1287,7 @@ switch (yykind)
         : super_type(token_type (tok), v)
 #endif
       {
-        YY_ASSERT ((token::TOK_ID <= tok && tok <= token::TOK_SIZE));
+        YY_ASSERT ((token::TOK_ID <= tok && tok <= token::TOK_TYPE));
       }
     };
 
@@ -2111,6 +2116,21 @@ switch (yykind)
         return symbol_type (token::TOK_SIZE, v);
       }
 #endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_TYPE (std::string v)
+      {
+        return symbol_type (token::TOK_TYPE, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_TYPE (const std::string& v)
+      {
+        return symbol_type (token::TOK_TYPE, v);
+      }
+#endif
 
 
     class context
@@ -2439,7 +2459,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 249,     ///< Last index in yytable_.
+      yylast_ = 255,     ///< Last index in yytable_.
       yynnts_ = 29,  ///< Number of nonterminal symbols.
       yyfinal_ = 38 ///< Termination state number.
     };
@@ -2465,7 +2485,7 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      52,    53,     2,     2,    55,     2,    54,     2,     2,     2,
+      53,    54,     2,     2,    56,     2,    55,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2473,7 +2493,7 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    56,     2,    57,     2,     2,     2,     2,
+       2,     2,     2,    57,     2,    58,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2491,10 +2511,10 @@ switch (yykind)
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
-      45,    46,    47,    48,    49,    50,    51
+      45,    46,    47,    48,    49,    50,    51,    52
     };
     // Last valid token kind.
-    const int code_max = 306;
+    const int code_max = 307;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2602,6 +2622,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
+      case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.copy< std::string > (YY_MOVE (that.value));
@@ -2726,6 +2747,7 @@ switch (yykind)
       case symbol_kind::SYM_LIKE: // "like"
       case symbol_kind::SYM_BETWEEN: // "between"
       case symbol_kind::SYM_SIZE: // "@size"
+      case symbol_kind::SYM_TYPE: // "@type"
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.move< std::string > (YY_MOVE (s.value));

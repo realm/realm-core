@@ -420,7 +420,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("type", p.type);
     }
     else {
-        m_tracer.field("type", "Mixed");
+        m_tracer.field("type", Instruction::Payload::Type::Null);
     }
     m_tracer.field("nullable", p.nullable);
     m_tracer.field("collection_type", p.collection_type);

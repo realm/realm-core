@@ -123,7 +123,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config->error_handler = [](auto, auto) {
         abort();
     };
-    schema_mode = SchemaMode::Additive;
+    schema_mode = SchemaMode::AdditiveExplicit;
 }
 
 // MARK: - SyncServer

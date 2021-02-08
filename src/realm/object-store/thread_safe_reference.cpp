@@ -20,6 +20,7 @@
 
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/set.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/results.hpp>
@@ -31,6 +32,9 @@
 #include <realm/keys.hpp>
 
 namespace realm {
+
+using OsDict = object_store::Dictionary;
+
 class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
@@ -114,6 +118,29 @@ private:
 };
 
 template <>
+class ThreadSafeReference::PayloadImpl<OsDict> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(const OsDict& dict)
+        : Payload(*dict.get_realm())
+        , m_key(dict.get_parent_object_key())
+        , m_table_key(dict.get_parent_table_key())
+        , m_col_key(dict.get_parent_column_key())
+    {
+    }
+
+    OsDict import_into(const std::shared_ptr<Realm>& r)
+    {
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
+        return OsDict(r, obj, m_col_key);
+    }
+
+private:
+    ObjKey m_key;
+    TableKey m_table_key;
+    ColKey m_col_key;
+};
+
+template <>
 class ThreadSafeReference::PayloadImpl<Object> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(Object const& object)
@@ -162,21 +189,31 @@ public:
     Results import_into(std::shared_ptr<Realm> const& r)
     {
         if (m_key) {
-            LstBasePtr list;
+            CollectionBasePtr collection;
             auto table = r->read_group().get_table(m_table_key);
             try {
-                list = table->get_object(m_key).get_listbase_ptr(m_col_key);
+                collection = table->get_object(m_key).get_collection_ptr(m_col_key);
             }
             catch (KeyNotFound const&) {
                 // Create a detached list of the appropriate type so that we
                 // return an invalid Results rather than an Empty Results, to
                 // match what happens for other types of handover where the
                 // object doesn't exist.
-                switch_on_type(ObjectSchema::from_core_type(m_col_key), [&](auto* t) -> void {
-                    list = std::make_unique<Lst<NonObjTypeT<decltype(*t)>>>();
-                });
+                if (m_col_key.is_dictionary()) {
+                    collection = std::make_unique<Dictionary>();
+                }
+                else {
+                    switch_on_type(ObjectSchema::from_core_type(m_col_key), [&](auto* t) -> void {
+                        if (m_col_key.is_list()) {
+                            collection = std::make_unique<Lst<NonObjTypeT<decltype(*t)>>>();
+                        }
+                        else if (m_col_key.is_set()) {
+                            collection = std::make_unique<Set<NonObjTypeT<decltype(*t)>>>();
+                        }
+                    });
+                }
             }
-            return Results(r, std::move(list), m_ordering);
+            return Results(r, std::move(collection), m_ordering);
         }
         auto q = r->import_copy_of(*m_query, PayloadPolicy::Stay);
         return Results(std::move(r), std::move(*q), m_ordering);
@@ -229,6 +266,7 @@ ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
 
 template ThreadSafeReference::ThreadSafeReference(List const&);
 template ThreadSafeReference::ThreadSafeReference(object_store::Set const&);
+template ThreadSafeReference::ThreadSafeReference(OsDict const&);
 template ThreadSafeReference::ThreadSafeReference(Results const&);
 template ThreadSafeReference::ThreadSafeReference(Object const&);
 
@@ -265,6 +303,7 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm> const&);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm> const&);
 template object_store::Set ThreadSafeReference::resolve<object_store::Set>(std::shared_ptr<Realm> const&);
+template OsDict ThreadSafeReference::resolve<OsDict>(std::shared_ptr<Realm> const&);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm> const&);
 
 } // namespace realm

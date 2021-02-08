@@ -4,8 +4,11 @@
 #include <iostream>
 
 #include <realm/util/load_file.hpp>
+#include <realm/util/base64.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/noinst/compression.hpp>
+#include <cstring>
 
 using namespace realm;
 
@@ -34,12 +37,47 @@ std::string changeset_hex_to_binary(const std::string& changeset_hex)
     return std::string{changeset_vec.data(), changeset_vec.size()};
 }
 
-void print_changeset(const std::string& path, bool hex)
+std::string changeset_compressed_to_binary(const std::string& changeset_compressed)
+{
+    // The size of the decompressed size data must come first
+    char* p;
+    const char* start = changeset_compressed.data();
+    size_t decompressed_size = size_t(strtol(start, &p, 10));
+    REALM_ASSERT(*p == ' ');
+    p++;
+
+    // Decode from BASE64
+    const size_t encoded_size = changeset_compressed.size() - (p - start);
+    size_t buffer_size = util::base64_decoded_size(encoded_size);
+    util::StringBuffer decode_buffer;
+    decode_buffer.resize(buffer_size);
+    StringData window(p, encoded_size);
+    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    if (!decoded_size || *decoded_size > encoded_size) {
+        throw std::runtime_error("Invalid base64 value");
+    }
+
+    // Decompress
+    std::unique_ptr<char[]> uncompressed_body_buffer(new char[decompressed_size]);
+    std::error_code ec = _impl::compression::decompress(decode_buffer.data(), *decoded_size,
+                                                        uncompressed_body_buffer.get(), decompressed_size);
+
+    if (ec) {
+        throw std::runtime_error(util::format("compression::inflate: %1", ec.message()));
+    }
+
+    return {uncompressed_body_buffer.get(), decompressed_size};
+}
+
+void print_changeset(const std::string& path, bool hex, bool compressed)
 {
     std::string file_contents = util::load_file(path);
     std::string changeset_binary;
     if (hex) {
         changeset_binary = changeset_hex_to_binary(file_contents);
+    }
+    else if (compressed) {
+        changeset_binary = changeset_compressed_to_binary(file_contents);
     }
     else {
         changeset_binary = file_contents;
@@ -52,6 +90,7 @@ int main(int argc, char* argv[])
 {
     std::string changeset_path;
     bool hex = false;
+    bool compressed = false;
 
     // Process command line
     {
@@ -84,6 +123,10 @@ int main(int argc, char* argv[])
                 hex = true;
                 continue;
             }
+            else if (std::strcmp(arg, "-C") == 0 || std::strcmp(arg, "--compressed") == 0) {
+                compressed = true;
+                continue;
+            }
             std::cerr << "ERROR: Unknown option: " << arg << "\n";
             error = true;
         }
@@ -107,7 +150,8 @@ int main(int argc, char* argv[])
                          "Options:\n"
                          "  -h, --help           Display command-line synopsis followed by the list of\n"
                          "                       available options.\n"
-                         "  -H, --hex            Interpret file contents as hex encoded.\n";
+                         "  -H, --hex            Interpret file contents as hex encoded.\n"
+                         "  -C, --compressed     Interpret file contents as Base64 encoded and compressed.\n";
             return EXIT_SUCCESS;
         }
 
@@ -119,5 +163,5 @@ int main(int argc, char* argv[])
         }
     }
 
-    print_changeset(changeset_path, hex);
+    print_changeset(changeset_path, hex, compressed);
 }

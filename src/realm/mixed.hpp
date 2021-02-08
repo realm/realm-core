@@ -219,7 +219,7 @@ public:
     }
     size_t hash() const;
 
-private:
+protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
     uint32_t m_type;

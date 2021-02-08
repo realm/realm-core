@@ -65,6 +65,7 @@ public:
     std::string format_binary(BinaryData);
     std::string format_timestamp(Timestamp);
     std::string format_object_id(ObjectId);
+    std::string format_uuid(UUID);
     std::string format_decimal(Decimal128);
     std::string format_list(CollectionBase&);
     std::string format_link(ObjKey);
@@ -151,6 +152,11 @@ std::string Formatter::format_object_id(ObjectId id)
     return id.to_string();
 }
 
+std::string Formatter::format_uuid(UUID id)
+{
+    return id.to_string();
+}
+
 std::string Formatter::format_decimal(Decimal128 id)
 {
     return id.to_string();
@@ -229,6 +235,12 @@ template <>
 inline std::string Formatter::format_cell<type_ObjectId>(const Obj& obj, ColKey col_key)
 {
     return format_object_id(obj.get<ObjectId>(col_key));
+}
+
+template <>
+inline std::string Formatter::format_cell<type_UUID>(const Obj& obj, ColKey col_key)
+{
+    return format_uuid(obj.get<UUID>(col_key));
 }
 
 template <>
@@ -519,6 +531,9 @@ int main(int argc, char* argv[])
                                 break;
                             case type_Mixed:
                                 formatter.format_column<type_Mixed>(*table, col_ndx, col);
+                                break;
+                            case type_UUID:
+                                formatter.format_column<type_UUID>(*table, col_ndx, col);
                                 break;
                             case type_TypedLink:
                                 formatter.format_column<type_TypedLink>(*table, col_ndx, col);

@@ -22,6 +22,11 @@
 
 namespace realm::object_store {
 
+Dictionary::Dictionary() noexcept
+    : m_dict(nullptr)
+{
+}
+
 Dictionary::Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : Collection(std::move(r), parent_obj, col)
     , m_dict(dynamic_cast<realm::Dictionary*>(m_coll_base.get()))

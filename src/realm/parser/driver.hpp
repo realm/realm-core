@@ -196,10 +196,12 @@ public:
 
 class PostOpNode : public ParserNode {
 public:
+    enum OpType { SIZE, TYPE } op_type;
     std::string op_name;
 
-    PostOpNode(const std::string op)
-        : op_name(op)
+    PostOpNode(std::string op_literal, OpType type)
+        : op_type(type)
+        , op_name(op_literal)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
@@ -268,15 +270,11 @@ public:
     ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
     PostOpNode* post_op = nullptr;
 
-    PropNode(PathNode* node, std::string id, ExpressionComparisonType ct)
+    PropNode(PathNode* node, std::string id, PostOpNode* po_node,
+             ExpressionComparisonType ct = ExpressionComparisonType::Any)
         : path(node)
         , identifier(id)
         , comp_type(ct)
-    {
-    }
-    PropNode(PathNode* node, std::string id, PostOpNode* po_node)
-        : path(node)
-        , identifier(id)
         , post_op(po_node)
     {
     }
@@ -410,7 +408,7 @@ public:
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
-    void translate(LinkChain&, std::string&);
+    std::string translate(LinkChain&, const std::string&);
 
 private:
     // The string being parsed.

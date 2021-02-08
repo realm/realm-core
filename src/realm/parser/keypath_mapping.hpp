@@ -21,8 +21,6 @@
 
 #include <realm/table.hpp>
 
-// #include "parser_utils.hpp"
-
 #include <unordered_map>
 #include <string>
 
@@ -31,8 +29,6 @@ namespace realm {
 namespace util {
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string& s);
-StringData get_printable_table_name(StringData name);
-StringData get_printable_table_name(const Table& table);
 } // namespace util
 
 namespace query_parser {
@@ -47,9 +43,9 @@ struct KeyPathElement {
     }
 };
 
-class BacklinksRestrictedError : public std::runtime_error {
+class MappingError : public std::runtime_error {
 public:
-    BacklinksRestrictedError(const std::string& msg)
+    MappingError(const std::string& msg)
         : std::runtime_error(msg)
     {
     }
@@ -68,20 +64,27 @@ public:
     KeyPathMapping() = default;
     // returns true if added, false if duplicate key already exists
     bool add_mapping(ConstTableRef table, std::string name, std::string alias);
-    void remove_mapping(ConstTableRef table, std::string name);
+    bool remove_mapping(ConstTableRef table, std::string name);
     bool has_mapping(ConstTableRef table, const std::string& name) const;
     util::Optional<std::string> get_mapping(TableKey table_key, const std::string& name) const;
+    // table names are only used in backlink queries with the syntax '@links.TableName.property'
+    bool add_table_mapping(ConstTableRef table, std::string alias);
+    bool remove_table_mapping(std::string alias_to_remove);
+    bool has_table_mapping(const std::string& alias) const;
+    util::Optional<std::string> get_table_mapping(const std::string name) const;
     void set_backlink_class_prefix(std::string prefix);
     const std::string& get_backlink_class_prefix() const
     {
         return m_backlink_class_prefix;
     }
+    std::string translate(LinkChain&, const std::string& identifier);
+    std::string translate_table_name(const std::string& identifier);
 
 protected:
     std::string m_backlink_class_prefix;
     std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;
+    std::unordered_map<std::string, std::string> m_table_mappings;
 };
-
 
 } // namespace query_parser
 } // namespace realm

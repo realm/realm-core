@@ -1970,6 +1970,137 @@ TEST(Query_SetOfObjects)
     CHECK_EQUAL(tv.get_key(0), keys[2]);
 }
 
+template <typename T>
+struct AggregateValues {
+    static std::vector<T> values()
+    {
+        std::vector<T> values = {std::numeric_limits<T>::lowest(), T{-1}, T{0}, T{1}, std::numeric_limits<T>::max()};
+        if (std::numeric_limits<T>::has_quiet_NaN) {
+            values.push_back(std::numeric_limits<T>::quiet_NaN());
+        }
+        return values;
+    }
+    using OptionalT = util::Optional<T>;
+    static const constexpr util::None null = util::none;
+};
+
+template <>
+struct AggregateValues<Decimal128> {
+    static std::vector<Decimal128> values()
+    {
+        return {std::numeric_limits<Decimal128>::lowest(), Decimal128{-1}, Decimal128{0}, Decimal128{1},
+                std::numeric_limits<Decimal128>::max()};
+    }
+    using OptionalT = Decimal128;
+    static const constexpr realm::null null = realm::null();
+};
+
+template <>
+struct AggregateValues<Timestamp> {
+    static std::vector<Timestamp> values()
+    {
+        return {std::numeric_limits<Timestamp>::lowest(), Timestamp{-1, 0}, Timestamp{0, 0}, Timestamp{1, 0},
+                std::numeric_limits<Timestamp>::max()};
+    }
+    using OptionalT = Timestamp;
+    static const constexpr realm::null null = realm::null();
+};
+
+template <typename T>
+ColKey generate_all_combinations(Table& table)
+{
+    using OptionalT = typename AggregateValues<T>::OptionalT;
+    auto values = AggregateValues<T>::values();
+    size_t n = values.size() + 1;
+    auto col = table.add_column_list(ColumnTypeTraits<T>::id, "col", true);
+
+    // Add a row for each permutation of k=1..n values
+    for (size_t k = 1; k <= n; ++k) {
+        // Loop over each possible selection of k different values
+        std::vector<bool> selector(n);
+        std::fill(selector.begin(), selector.begin() + k, true);
+        do {
+            std::vector<OptionalT> selected_values;
+            for (size_t i = 0; i < n; i++) {
+                if (selector[i]) {
+                    if (i == 0)
+                        selected_values.push_back(AggregateValues<T>::null);
+                    else
+                        selected_values.push_back(values[i - 1]);
+                }
+            }
+
+            // Loop over each permutation of the selected values
+            REALM_ASSERT(std::is_sorted(selected_values.begin(), selected_values.end()));
+            do {
+                auto list = table.create_object().get_list<OptionalT>(col);
+                for (auto value : selected_values)
+                    list.add(value);
+            } while (std::next_permutation(selected_values.begin(), selected_values.end()));
+        } while (std::prev_permutation(selector.begin(), selector.end()));
+    }
+    return col;
+}
+
+template <typename T, typename Value, typename Getter>
+void validate_aggregate_results(unit_test::TestContext& test_context, Table& table, ColKey col, Value value,
+                                Getter getter)
+{
+    // min() and max() return sentinel values if there's no non-null values in
+    // the list so we want to turn that into a proper null result
+    auto handle_none = [](auto&& list, auto& getter) -> decltype(getter(list)) {
+        for (size_t i = 0, size = list.size(); i < size; ++i) {
+            if constexpr (realm::is_any_v<T, float, double>) {
+                if (!list.is_null(i) && !std::isnan(*list.get(i))) {
+                    return getter(list);
+                }
+            }
+            else {
+                if (!list.is_null(i)) {
+                    return getter(list);
+                }
+            }
+        }
+        return none;
+    };
+
+    auto tv = (getter(table.column<Lst<T>>(col)) == value).find_all();
+    auto not_tv = (getter(table.column<Lst<T>>(col)) != value).find_all();
+
+    // Verify that all rows are present in one of the TVs and that each row in
+    // the TV should have matched the query
+    using OptionalT = typename AggregateValues<T>::OptionalT;
+    CHECK_EQUAL(tv.size() + not_tv.size(), table.size());
+    for (size_t i = 0; i < tv.size(); ++i) {
+        CHECK_EQUAL(handle_none(tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+    }
+    for (size_t i = 0; i < not_tv.size(); ++i) {
+        CHECK_NOT_EQUAL(handle_none(not_tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+    }
+}
+
+TEST_TYPES(Query_ListOfPrimitives_MinMax, int64_t, float, double, Decimal128, Timestamp)
+{
+    using T = TEST_TYPE;
+    auto values = AggregateValues<T>::values();
+    Table table;
+    auto col = generate_all_combinations<T>(table);
+
+    auto min = [](auto&& list) {
+        return list.min();
+    };
+    validate_aggregate_results<T>(test_context, table, col, null(), min);
+    for (auto value : values)
+        validate_aggregate_results<T>(test_context, table, col, value, min);
+
+    auto max = [](auto&& list) {
+        return list.max();
+    };
+    validate_aggregate_results<T>(test_context, table, col, null(), max);
+    for (auto value : values)
+        validate_aggregate_results<T>(test_context, table, col, value, max);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
@@ -2190,41 +2321,52 @@ TEST(Query_TwoCols0)
 
 TEST(Query_TwoSameCols)
 {
-    Table table;
+    Group g;
+    Table& table = *g.add_table("table");
     auto col_bool0 = table.add_column(type_Bool, "first1");
     auto col_bool1 = table.add_column(type_Bool, "first2");
     auto col_date2 = table.add_column(type_Timestamp, "second1");
     auto col_date3 = table.add_column(type_Timestamp, "second2");
     auto col_str4 = table.add_column(type_String, "third1");
     auto col_str5 = table.add_column(type_String, "third2");
+    auto col_obj1 = table.add_column(table, "obj1");
+    auto col_obj2 = table.add_column(table, "obj2");
 
     Timestamp d1(200, 0);
     Timestamp d2(300, 0);
-    ObjKey key0 = table.create_object().set_all(false, true, d1, d2, "a", "b").get_key();
-    ObjKey key1 = table.create_object().set_all(true, true, d2, d2, "b", "b").get_key();
-    table.create_object().set_all(false, true, d1, d2, "a", "b").get_key();
+    Obj obj0 = table.create_object();
+    ObjKey key0 = obj0.get_key();
+    obj0.set_all(false, true, d1, d2, "a", "b", key0);
+    ObjKey key1 = table.create_object().set_all(true, true, d2, d2, "b", "b", key0, key0).get_key();
+    table.create_object().set_all(false, true, d1, d2, "a", "b", key0, key1).get_key();
 
     Query q1 = table.column<Bool>(col_bool0) == table.column<Bool>(col_bool1);
     Query q2 = table.column<Timestamp>(col_date2) == table.column<Timestamp>(col_date3);
     Query q3 = table.column<String>(col_str4) == table.column<String>(col_str5);
+    Query q4 = table.column<Link>(col_obj1) == table.column<Link>(col_obj2);
 
     CHECK_EQUAL(key1, q1.find());
     CHECK_EQUAL(key1, q2.find());
     CHECK_EQUAL(key1, q3.find());
+    CHECK_EQUAL(key1, q4.find());
     CHECK_EQUAL(1, q1.count());
     CHECK_EQUAL(1, q2.count());
     CHECK_EQUAL(1, q3.count());
+    CHECK_EQUAL(1, q4.count());
 
-    Query q4 = table.column<Bool>(col_bool0) != table.column<Bool>(col_bool1);
-    Query q5 = table.column<Timestamp>(col_date2) != table.column<Timestamp>(col_date3);
-    Query q6 = table.column<String>(col_str4) != table.column<String>(col_str5);
+    Query q5 = table.column<Bool>(col_bool0) != table.column<Bool>(col_bool1);
+    Query q6 = table.column<Timestamp>(col_date2) != table.column<Timestamp>(col_date3);
+    Query q7 = table.column<String>(col_str4) != table.column<String>(col_str5);
+    Query q8 = table.column<Link>(col_obj1) != table.column<Link>(col_obj2);
 
-    CHECK_EQUAL(key0, q5.find());
     CHECK_EQUAL(key0, q5.find());
     CHECK_EQUAL(key0, q6.find());
-    CHECK_EQUAL(2, q5.count());
+    CHECK_EQUAL(key0, q7.find());
+    CHECK_EQUAL(key0, q8.find());
     CHECK_EQUAL(2, q5.count());
     CHECK_EQUAL(2, q6.count());
+    CHECK_EQUAL(2, q7.count());
+    CHECK_EQUAL(2, q8.count());
 }
 
 void construct_all_types_table(Table& table)
@@ -5444,7 +5586,8 @@ TEST(Query_StringNodeEqualBaseBug)
     CHECK_EQUAL(tv.size(), 0);
 }
 
-TEST(Query_OptimalNode)
+// Disabled because it is timing-dependent and frequently causes spurious failures on CI.
+TEST_IF(Query_OptimalNode, false)
 {
     const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
     Group g;
@@ -5496,6 +5639,55 @@ TEST(Query_OptimalNode)
     CHECK_GREATER(dur3, dur1);
     CHECK_LESS(dur3, dur2 / 5);
     // std::cout << "cnt: " << cnt << " dur3: " << dur3 << " us" << std::endl;
+}
+
+TEST(Query_IntPerformance)
+{
+    Table table;
+    auto col_1 = table.add_column(type_Int, "1");
+    auto col_2 = table.add_column(type_Int, "2");
+
+    for (int i = 0; i < 1000; i++) {
+        Obj o = table.create_object().set(col_1, i).set(col_2, i == 500 ? 500 : 2);
+    }
+
+    Query q1 = table.where().equal(col_2, 2);
+    Query q2 = table.where().not_equal(col_1, 500);
+
+    auto t1 = steady_clock::now();
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    size_t nb_reps = 1000;
+    for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q1.find_all();
+        CHECK_EQUAL(tv.size(), 999);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q2.find_all();
+        CHECK_EQUAL(tv.size(), 999);
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (size_t t = 0; t < nb_reps; t++) {
+        auto sum = q2.sum_int(col_2);
+        CHECK_EQUAL(sum, 1998);
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_reps << " repetitions in Query_IntPerformance" << std::endl;
+    std::cout << "    time equal: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep"
+              << std::endl;
+    std::cout << "    time not_equal: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/rep"
+              << std::endl;
+    std::cout << "    time sum: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep" << std::endl;
 }
 
 #endif // TEST_QUERY

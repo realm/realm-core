@@ -171,6 +171,22 @@ std::string print_value<>(realm::UUID uuid)
     return "uuid(" + uuid.to_string() + ")";
 }
 
+StringData get_printable_table_name(StringData name)
+{
+    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
+    static const std::string prefix = "class_";
+    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
+}
+
+template <>
+std::string print_value<>(realm::TypeOfValue type)
+{
+    return '"' + type.to_string() + '"';
+}
+
 // The variable name must be unique with respect to the already chosen variables at
 // this level of subquery nesting and with respect to the names of the columns in the table.
 // This assumes that columns can start with '$' and that we might one day want to support

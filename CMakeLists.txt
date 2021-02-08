@@ -92,14 +92,19 @@ endif()
 
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
-    # - Replace `-O3` with `-Oz`.
+    # - Replace `-O2` with `-Oz`.
+    # - Clang LTO does not support `-Oz` so keep using `-O2` for that.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     #
     # On some architectures char is unsigned by default. Make it signed
-    add_compile_options($<$<CONFIG:Release>:-Oz>)
+    if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+    else()
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Oz")
+    endif()
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 
@@ -241,7 +246,18 @@ endif()
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
 if(REALM_ENABLE_SYNC AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+    if(ANDROID)
+        # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
+        # (see https://github.com/android/ndk/issues/1179)
+        # We want to link against the stub library instead of statically linking anyway,
+        # so we hack find_library to only consider shared object libraries when looking for libz
+        set(_CMAKE_FIND_LIBRARY_SUFFIXES_orig ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
+    endif()
     find_package(ZLIB REQUIRED)
+    if(ANDROID)
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES_orig})
+    endif()
 endif()
 
 # Store configuration in header file

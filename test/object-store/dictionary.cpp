@@ -37,6 +37,23 @@
 using namespace realm;
 using namespace realm::util;
 
+namespace Catch {
+template <>
+struct StringMaker<object_store::Dictionary> {
+    static std::string convert(const object_store::Dictionary& dict)
+    {
+        std::stringstream ss;
+        ss << "{";
+        for (auto [key, value] : dict) {
+            ss << '{' << key << ',' << value << "}, ";
+        }
+        auto str = ss.str();
+        str.pop_back();
+        str.back() = '}';
+        return str;
+    }
+};
+} // namespace Catch
 
 TEST_CASE("dictionary") {
     InMemoryTestFile config;
@@ -110,6 +127,23 @@ TEST_CASE("dictionary") {
         }
     }
 
+    SECTION("handover") {
+        r->commit_transaction();
+
+        auto dict2 = ThreadSafeReference(dict).resolve<object_store::Dictionary>(r);
+        REQUIRE(dict == dict2);
+        ThreadSafeReference ref(results);
+        auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(results2.get<String>(i) == values[i]);
+        }
+        r->begin_transaction();
+        obj.remove();
+        r->commit_transaction();
+        results2 = ref.resolve<Results>(r);
+        REQUIRE(!results2.is_valid());
+    }
+
     SECTION("notifications") {
         r->commit_transaction();
 
@@ -151,6 +185,19 @@ TEST_CASE("dictionary") {
             REQUIRE_INDICES(srchange.insertions, values.size() - 1);
         }
 
+        SECTION("replace value in dictionary") {
+            advance_and_notify(*r);
+            r->begin_transaction();
+            dict.insert("b", "blueberry");
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            auto ndx = results.index_of(StringData("blueberry"));
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.modifications, ndx);
+            REQUIRE_INDICES(change.deletions);
+        }
+
         SECTION("remove value from list") {
             advance_and_notify(*r);
             auto ndx = results.index_of(StringData("apple"));
@@ -180,6 +227,7 @@ TEST_CASE("dictionary") {
         SECTION("delete containing row") {
             advance_and_notify(*r);
             REQUIRE(calls == 3);
+            REQUIRE(!change.collection_root_was_deleted);
 
             r->begin_transaction();
             obj.remove();
@@ -189,6 +237,7 @@ TEST_CASE("dictionary") {
             REQUIRE(change.deletions.count() == values.size());
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
+            REQUIRE(change.collection_root_was_deleted);
 
             r->begin_transaction();
             table->create_object();
@@ -203,6 +252,30 @@ TEST_CASE("dictionary") {
             r2->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(change.collection_root_was_deleted);
+        }
+
+        SECTION("deleting a row with an empty dictionary triggers notifications") {
+            advance_and_notify(*r);
+            REQUIRE(calls == 3);
+            r->begin_transaction();
+            REQUIRE(dict.size() == values.size());
+            results.clear();
+            REQUIRE(dict.size() == 0);
+            REQUIRE(results.size() == 0);
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(!change.collection_root_was_deleted);
+            REQUIRE(calls == 6);
+
+            r->begin_transaction();
+            obj.remove();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == 0);
+            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE(calls == 9);
         }
     }
 }

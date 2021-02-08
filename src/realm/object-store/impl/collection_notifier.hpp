@@ -201,6 +201,9 @@ protected:
     void set_table(ConstTableRef table);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
+    // signal that the underlying source object of the collection has been deleted
+    // but only report this to the notifiers the first time this is reported
+    void report_collection_root_is_deleted();
 
     bool all_related_tables_covered(const TableVersions& versions);
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
@@ -226,6 +229,7 @@ private:
 
     bool m_has_run = false;
     bool m_error = false;
+    bool m_has_delivered_root_deletion_event = false;
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     struct Callback {
@@ -357,23 +361,6 @@ private:
     RealmCoordinator* m_coordinator = nullptr;
     std::exception_ptr m_error;
 };
-
-// Find which column of the row in the table contains the given container.
-//
-// LinkViews and Subtables know what row of their parent they're in, but not
-// what column, so we have to just check each one.
-template <typename Table, typename T, typename U>
-size_t find_container_column(Table& table, size_t row_ndx, T const& expected, int type,
-                             U (Table::*getter)(size_t, size_t))
-{
-    for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
-        if (table.get_column_type(i) == type && (table.*getter)(i, row_ndx) == expected) {
-            return i;
-        }
-    }
-    REALM_UNREACHABLE();
-}
-
 
 } // namespace _impl
 } // namespace realm

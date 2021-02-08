@@ -80,7 +80,12 @@ const uint16_t relaxed_sync_threshold = 50;
 //  9      Fair write transactions requires an additional condition variable,
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
-const uint_fast16_t g_shared_info_version = 10;
+// 11      New impl of InterprocessCondVar on windows.
+#ifdef _WIN32
+const uint_fast16_t g_shared_info_version = 11;
+#else
+const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anything on non-windows platforms
+#endif
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -2050,7 +2055,7 @@ void DB::finish_begin_write()
 
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
-            m_work_to_do.notify();
+            m_work_to_do.notify_all();
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
             m_room_to_write.wait(m_balancemutex, 0);

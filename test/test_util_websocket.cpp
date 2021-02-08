@@ -173,7 +173,7 @@ public:
 
     std::vector<std::string> text_messages;
     std::vector<std::string> binary_messages;
-    std::vector<std::string> close_messages;
+    std::vector<std::pair<std::error_code, std::string>> close_messages;
     std::vector<std::string> ping_messages;
     std::vector<std::string> pong_messages;
 
@@ -246,9 +246,9 @@ public:
         return true;
     }
 
-    bool websocket_close_message_received(const char* data, size_t size) override
+    bool websocket_close_message_received(std::error_code error_code, StringData error_message) override
     {
-        close_messages.push_back(std::string{data, size});
+        close_messages.push_back(std::make_pair(error_code, std::string{error_message}));
         return true;
     }
 
@@ -387,9 +387,12 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_2.binary_messages.size(), 1);
     CHECK_EQUAL(config_2.binary_messages[0], "short binary example");
 
-    socket_2.async_write_close("close message", 13, handler_no_op);
+    socket_2.async_write_close("\x03\xe8"
+                               "close message",
+                               15, handler_no_op);
     CHECK_EQUAL(config_1.close_messages.size(), 1);
-    CHECK_EQUAL(config_1.close_messages[0], "close message");
+    CHECK_EQUAL(config_1.close_messages[0].first.value(), 1000);
+    CHECK_EQUAL(config_1.close_messages[0].second, "close message");
 
     std::vector<size_t> message_sizes{1, 2, 100, 125, 126, 127, 128, 200, 1000, 65000, 65535, 65536, 100000, 1000000};
     for (size_t i = 0; i < message_sizes.size(); ++i) {

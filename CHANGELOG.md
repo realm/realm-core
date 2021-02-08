@@ -6,23 +6,62 @@
   a backup, if a) an attempt is made to open a realm file whith a "future" file format and b) a backup file exist
   that fits the current file format.
   ([#4166](https://github.com/realm/realm-core/pull/4166))
-* Query parser supports property names containing white space. White space characters must be excapes with a '\'.
-* Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
+* Sync client now logs error messages received from server rather than just the size of the error message.
+* Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
+* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
+* Improve performance of sequential reads on a Results backed directly by a Table by 50x.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Calling Table::clear() will in many cases not work for the data types introduced in v10.2.0. ([#4198](https://github.com/realm/realm-core/issues/4198), since v10.2.0)
-* Fix `links_to()` queries on sets of objects. ([#4264](https://github.com/realm/realm-core/pull/4264)
-* Windows `InterprocessCondVar` changes reverted.
+* When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
+* Results::get() on a Results backed by a Table would give incorrect results if a new object was created at index zero in the source Table. ([Cocoa #7014](https://github.com/realm/realm-cocoa/issues/7014), since v6.0.0).
+* New query parser breaks on argument substitution in relation to LinkList. ([#4381](https://github.com/realm/realm-core/issues/4381))
+* During synchronization you might experience crash with 'Assertion failed: ref + size <= next->first' ([#4388](https://github.com/realm/realm-core/issues/4388))
  
 ### Breaking changes
-* Support for IncludeDescriptor has been removed.
-* The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
+* The SchemaMode::Additive has been replaced by two different modes: AdditiveDiscovered and AdditiveExplicit. The former should be used when the schema has been automatically discovered, and the latter should be used when the user has explicitly included the types in the schema. Different schema checks are enforced for each scenario. ([#4306](https://github.com/realm/realm-core/pull/4306))
+* Revert change in `app::Response` ([4263](https://github.com/realm/realm-core/pull/4263))
+* Notifications will now be triggered for empty collections whose source object has been deleted. ([#4228](https://github.com/realm/realm-core/issues/4228)).
 
 -----------
 
 ### Internals
-* None.
+* On Android, the CMake build no longer sets -Oz explicitly for Release builds if `CMAKE_INTERPROCEDURAL_OPTIMIZATION` is enabled. Additionally, Android unit tests are built with LTO.
+* On Android, fixed the build to link against the dynamic `libz.so`. CMake was choosing the static library, which is both undesirable and has issues on newer NDKs. ([#4376](https://github.com/realm/realm-core/pull/4376))
+* ThreadSafeReference for Dictionary added
+
+----------------------------------------------
+
+# 10.4.0 Release notes
+
+### Enhancements
+* Query parser supports property names containing white space. White space characters must be excapes with a '\'.
+* Query parser supports `@type` for filtering based on the stored type of a Mixed property. ([#4239](https://github.com/realm/realm-core/pull/4239))
+* Rejects dictionary inserts / erases with keys that have a “.” or start with a “$”. ([#4247](https://github.com/realm/realm-core/pull/4247))
+* Add support for @min and @max queries on Timestamp lists.
+* Add support for comparing non-list link columns to other link columns in queries.
+* Add `Set::delete_all`, `Set::is_subset_of`, `Set::is_superset_of`, `Set::intersects`, `Set::assign_intersection`, `Set::assign_union` & `Set::assign_difference` methods to `object_store::Set`.
+* Dictionaries can be defined as nullable.
+
+### Fixed
+* Calling max/min/sum/avg on a List or Set may give wrong results ([#4252](https://github.com/realm/realm-core/issues/4252), since v10.0.0)
+* Calling Table::clear() will in many cases not work for the data types introduced in v10.2.0. ([#4198](https://github.com/realm/realm-core/issues/4198), since v10.2.0)
+* Fix `links_to()` queries on sets of objects. ([#4264](https://github.com/realm/realm-core/pull/4264)
+* Operations like Set::assign_union() can fail on StringData sets, ([#4288](https://github.com/realm/realm-core/issues/4288)
+* Windows `InterprocessCondVar` no longer crashes if destroyed on a different thread than created  ([#4174](https://github.com/realm/realm-core/issues/4174), since v10.3.3)
+* Fix an issue when using `Results::freeze` across threads with different transaction versions. Previously, copying the `Results`'s tableview could result in a stale state or objects from a future version. Now there is a comparison for the source and desitnation transaction version when constructing `ConstTableView`, which will cause the tableview to reflect the correct state if needed ([#4254](https://github.com/realm/realm-core/pull/4254)).
+* `@min` and `@max` queries on a list of float, double or Decimal128 values could match the incorrect value if NaN or null was present in the list (since 5.0.0).
+* Fixed an issue where creating an object after file format upgrade may fail with assertion "Assertion failed: lo() <= std::numeric_limits<uint32_t>::max()" ([#4295](https://github.com/realm/realm-core/issues/4295), since v6.0.0)
+ 
+### Breaking changes
+* Support for IncludeDescriptor has been removed.
+* The PEGTL based query parser has been replaced with a parser based on Flex/Bison. The interface to the parser has been changed.
+* Add `status` property to `app::Response` to reflect the request result. Optional `body` or `error` property will store the corresponding value.    
+
+-----------
+
+### Internals
+* Crashes will now request to create a github issue instead of an email.
 
 ----------------------------------------------
 

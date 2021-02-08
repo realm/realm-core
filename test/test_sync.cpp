@@ -7965,6 +7965,7 @@ TEST(Sync_Dictionary)
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
+        auto col_dict_str = foos->add_column_dictionary(type_String, "str_dict", true);
 
         auto foo = foos->create_object_with_primary_key(123);
 
@@ -7972,6 +7973,10 @@ TEST(Sync_Dictionary)
         dict.insert("hello", "world");
         dict.insert("cnt", 7);
         dict.insert("when", now);
+
+        auto dict_str = foo.get_dictionary(col_dict_str);
+        dict_str.insert("some", "text");
+        dict_str.insert("nothing", null());
 
         session_1.nonsync_transact_notify(tr.commit());
     }
@@ -7992,6 +7997,12 @@ TEST(Sync_Dictionary)
         CHECK(dict.get_value_data_type() == type_Mixed);
         CHECK_EQUAL(dict.size(), 3);
 
+        auto col_dict_str = foos->get_column_key("str_dict");
+        auto dict_str = it->get_dictionary(col_dict_str);
+        CHECK(col_dict_str.is_nullable());
+        CHECK(dict_str.get_value_data_type() == type_String);
+        CHECK_EQUAL(dict_str.size(), 2);
+
         Mixed val = dict["hello"];
         CHECK_EQUAL(val.get_string(), "world");
         val = dict.get("cnt");
@@ -8000,6 +8011,7 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(val.get<Timestamp>(), now);
 
         dict.erase("cnt");
+        dict.insert("hello", "goodbye");
 
         session_2.nonsync_transact_notify(tr.commit());
     }
@@ -8019,7 +8031,7 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(dict.size(), 2);
 
         Mixed val = dict["hello"];
-        CHECK_EQUAL(val.get_string(), "world");
+        CHECK_EQUAL(val.get_string(), "goodbye");
         val = dict.get("when");
         CHECK_EQUAL(val.get<Timestamp>(), now);
 
@@ -8031,16 +8043,19 @@ TEST(Sync_Dictionary)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction tr{db_2};
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
         // tr.get_group().to_json(std::cout);
 
-        auto foos = tr.get_table("class_Foo");
+        auto foos = read_2.get_table("class_Foo");
 
         CHECK_EQUAL(foos->size(), 1);
 
         auto it = foos->begin();
         auto dict = it->get_dictionary(foos->get_column_key("dict"));
         CHECK_EQUAL(dict.size(), 0);
+
+        CHECK(compare_groups(read_1, read_2));
     }
 }
 
@@ -8073,7 +8088,7 @@ TEST(Sync_Dictionary_Links)
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-        col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+        col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
         auto foo = foos->create_object_with_primary_key(123);
         auto a = bars->create_object_with_primary_key("a");
@@ -8288,6 +8303,91 @@ TEST(Sync_Set)
         ReadTransaction read_2{db_2};
         CHECK(compare_groups(read_1, read_2));
     }
+}
+
+TEST(Sync_DanglingLinksCountInPriorSize)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    realm::DBOptions db_opts;
+    realm::_impl::ClientHistoryImpl history{path};
+    auto local_db = realm::DB::create(history, db_opts);
+    auto& logger = test_context.logger;
+
+    history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
+
+    version_type last_version, last_version_observed = 0;
+    auto dump_uploadable = [&] {
+        UploadCursor upload_cursor{last_version_observed, 0};
+        std::vector<sync::ClientReplicationBase::UploadChangeset> changesets_to_upload;
+        version_type locked_server_version = 0;
+        history.find_uploadable_changesets(upload_cursor, last_version, changesets_to_upload, locked_server_version);
+        CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));
+        realm::sync::Changeset parsed_changeset;
+        auto unparsed_changeset = changesets_to_upload[0].changeset.get_first_chunk();
+        realm::_impl::SimpleNoCopyInputStream changeset_stream(unparsed_changeset.data(), unparsed_changeset.size());
+        realm::sync::parse_changeset(changeset_stream, parsed_changeset);
+        logger.info("changeset at version %1: %2", last_version, parsed_changeset);
+        last_version_observed = last_version;
+        return parsed_changeset;
+    };
+
+    TableKey source_table_key, target_table_key;
+    {
+        auto wt = local_db->start_write();
+        auto source_table = sync::create_table_with_primary_key(*wt, "class_source", type_String, "_id");
+        auto target_table = sync::create_table_with_primary_key(*wt, "class_target", type_String, "_id");
+        source_table->add_column_list(*target_table, "links");
+
+        source_table_key = source_table->get_key();
+        target_table_key = target_table->get_key();
+
+        auto obj_to_keep = target_table->create_object_with_primary_key(std::string{"target1"});
+        auto obj_to_delete = target_table->create_object_with_primary_key(std::string{"target2"});
+        auto source_obj = source_table->create_object_with_primary_key(std::string{"source"});
+
+        auto links_list = source_obj.get_linklist("links");
+        links_list.add(obj_to_keep.get_key());
+        links_list.add(obj_to_delete.get_key());
+        last_version = wt->commit();
+    }
+
+    dump_uploadable();
+
+    {
+        // Simulate removing the object via the sync client so we get a dangling link
+        TempShortCircuitReplication disable_repl(history);
+        auto wt = local_db->start_write();
+        auto target_table = wt->get_table(target_table_key);
+        auto obj = target_table->get_object_with_primary_key(std::string{"target2"});
+        obj.invalidate();
+        last_version = wt->commit();
+    }
+
+    {
+        auto wt = local_db->start_write();
+        auto source_table = wt->get_table(source_table_key);
+        auto target_table = wt->get_table(target_table_key);
+
+        auto obj_to_add = target_table->create_object_with_primary_key(std::string{"target3"});
+
+        auto source_obj = source_table->get_object_with_primary_key(std::string{"source"});
+        auto links_list = source_obj.get_linklist("links");
+        links_list.add(obj_to_add.get_key());
+        last_version = wt->commit();
+    }
+
+    auto changeset = dump_uploadable();
+    CHECK_EQUAL(changeset.size(), static_cast<size_t>(2));
+    auto changeset_it = changeset.end();
+    --changeset_it;
+    auto last_instr = *changeset_it;
+    CHECK_EQUAL(last_instr->type(), Instruction::Type::ArrayInsert);
+    auto arr_insert_instr = last_instr->get_as<Instruction::ArrayInsert>();
+    CHECK_EQUAL(changeset.get_string(arr_insert_instr.table), StringData("source"));
+    CHECK(arr_insert_instr.value.type == sync::instr::Payload::Type::Link);
+    CHECK_EQUAL(changeset.get_string(mpark::get<InternString>(arr_insert_instr.value.data.link.target)),
+                StringData("target3"));
+    CHECK_EQUAL(arr_insert_instr.prior_size, 2);
 }
 
 } // unnamed namespace
