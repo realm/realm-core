@@ -148,6 +148,8 @@ auto Dictionary::dispatch(Fn&& fn) const
             return fn((Decimal128*)0);
         case PT::UUID:
             return fn((UUID*)0);
+        case PT::Mixed:
+            return fn((Mixed*)0);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
