@@ -4230,7 +4230,7 @@ TEST(Parser_Mixed)
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
     CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
-                         "type 'typedLink' which is not supported");
+                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
 }
 
 TEST(Parser_TypeOfValue)

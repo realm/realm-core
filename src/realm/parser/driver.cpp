@@ -62,6 +62,28 @@ static std::map<int, std::string> opstr = {
     {CompareNode::IN, "in"},
 };
 
+std::string print_pretty_objlink(const ObjLink& link, const Group* g)
+{
+    REALM_ASSERT(g);
+    if (link.is_null()) {
+        return "NULL";
+    }
+    try {
+        auto table = g->get_table(link.get_table_key());
+        if (!table) {
+            return "link to an invalid table";
+        }
+        auto obj = table->get_object(link.get_obj_key());
+        Mixed pk = obj.get_primary_key();
+        return util::format("'%1' with primary key '%2'",
+                            util::serializer::get_printable_table_name(table->get_name()),
+                            util::serializer::print_value(pk));
+    }
+    catch (...) {
+        return "invalid link";
+    }
+}
+
 bool is_length_suffix(const std::string& s)
 {
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
@@ -192,6 +214,11 @@ public:
     {
         Arguments::verify_ndx(n);
         return m_args.at(n).get<ObjKey>();
+    }
+    ObjLink objlink_for_argument(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n).get<ObjLink>();
     }
     bool is_argument_null(size_t n) final
     {
@@ -1011,8 +1038,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     case type_Link:
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
+                    case type_TypedLink:
+                        explain_value_message =
+                            util::format("%1 which links to %2", explain_value_message,
+                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
+                                                              drv->m_base_table->get_parent_group()));
+                        break;
                     default:
-                        explain_value_message = util::format("%1 which is not supported", explain_value_message);
                         break;
                 }
             }

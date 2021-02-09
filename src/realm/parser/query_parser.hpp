@@ -122,6 +122,7 @@ public:
     virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
+    virtual ObjLink objlink_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     virtual DataType type_for_argument(size_t argument_index) = 0;
     size_t get_num_args() const
@@ -206,6 +207,10 @@ public:
     {
         return get<ObjKey>(i);
     }
+    ObjLink objlink_for_argument(size_t i) override
+    {
+        return get<ObjLink>(i);
+    }
     bool is_argument_null(size_t i) override
     {
         return m_ctx.is_null(at(i));
@@ -288,6 +293,10 @@ public:
         throw NoArgsError();
     }
     ObjKey object_index_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    ObjLink objlink_for_argument(size_t)
     {
         throw NoArgsError();
     }
