@@ -99,8 +99,8 @@ struct ValueUpdater {
         if (!attr_changed) {
             auto old_val = obj.get<T>(col);
 
-            if (!attr_changed || std::is_same<T, realm::Mixed>::value) {
-                attr_changed = !Mixed(new_val).is_same_type(old_val);
+            if constexpr (std::is_same<T, realm::Mixed>::value) {
+                attr_changed = !new_val.is_same_type(old_val);
             }
 
             attr_changed = attr_changed || new_val != old_val;
