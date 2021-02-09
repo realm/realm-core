@@ -227,7 +227,7 @@ tasks:
 
 - name: long-running-core-tests
   commands:
-  - func: "run tests"
+  - func: "run tests with reporter"
     # The long-running tests can take a really long time on Windows, so we give the test up to 4
     # hours to complete
     timeout_secs: 14400
