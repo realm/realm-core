@@ -198,6 +198,7 @@ public:
 
     bool is_null() const;
     bool is_unresolved_link() const;
+    bool is_same_type(const Mixed& b) const;
     int compare(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
@@ -598,6 +599,11 @@ inline ObjLink Mixed::get_link() const
 inline bool Mixed::is_null() const
 {
     return (m_type == 0);
+}
+
+inline bool Mixed::is_same_type(const Mixed& b) const
+{
+    return (m_type == b.m_type);
 }
 
 inline bool Mixed::is_unresolved_link() const
