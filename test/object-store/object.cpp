@@ -1255,7 +1255,8 @@ TEST_CASE("object") {
     SECTION("Mixed emit notification on type change") {
         auto validate_change = [&](util::Any&& obj_dict, util::Any&& value) {
             r->begin_transaction();
-            auto obj = Object::create(d, r, *r->schema().find("all optional types"), obj_dict, CreatePolicy::UpdateModified);
+            auto obj =
+                Object::create(d, r, *r->schema().find("all optional types"), obj_dict, CreatePolicy::UpdateModified);
             r->commit_transaction();
 
             CollectionChangeSet change;
@@ -1273,22 +1274,13 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.modifications, 0);
         };
 
-        validate_change(AnyDict{
-            {"_id", util::Any()},
-            {"mixed", true}
-        }, util::Any(1));
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", true}}, util::Any(1));
 
-        validate_change(AnyDict{
-            {"_id", util::Any()},
-            {"mixed", false}
-        }, util::Any(0));
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", false}}, util::Any(0));
 
         auto object_id = ObjectId::gen();
 
-        validate_change(AnyDict{
-            {"_id", util::Any()},
-            {"mixed", object_id}
-        }, util::Any(object_id.get_timestamp()));
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", object_id}}, util::Any(object_id.get_timestamp()));
     }
 
 #if REALM_ENABLE_SYNC
