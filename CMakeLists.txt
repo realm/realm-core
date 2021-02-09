@@ -59,6 +59,7 @@ function(use_faster_linker)
         set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
         check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
         if(HAVE_LINKER_${LINKER})
+            message(STATUS Using linker ${LINKER})
             add_link_options("-fuse-ld=${LINKER}")
             return()
         endif()
@@ -92,20 +93,20 @@ endif()
 
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
-    # - Replace `-O2` with `-Oz`.
-    # - Clang LTO does not support `-Oz` so keep using `-O2` for that.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
-    #
-    # On some architectures char is unsigned by default. Make it signed
-    if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
-    else()
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Oz")
-    endif()
-    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
+    # - On some architectures char is unsigned by default. Make it signed
+    # - Compile with -Oz in Release because on Android we favor code size over performance
+    # 
+    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
+
+    # CMake hard-codes the `-fuse-ld=gold` linker flag on Android for Clang when LTO is enabled, but we want to use lld instead.
+    # Unset for now, until it's fixed upstream.
+    # see https://github.com/Kitware/CMake/blob/af695cee7346fa0eee478f71952fd02f0df989cf/Modules/Compiler/Clang.cmake#L81-L84
+    unset(CMAKE_C_LINK_OPTIONS_IPO)
+    unset(CMAKE_CXX_LINK_OPTIONS_IPO)
 endif()
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})

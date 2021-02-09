@@ -42,10 +42,8 @@ ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
 
 # Install the NDK
 RUN cd /opt \
-    && wget https://dl.google.com/android/repository/android-ndk-r21-linux-x86_64.zip \
-    && unzip android-ndk-r21-linux-x86_64.zip \
-    && rm -f android-ndk-r21-linux-x86_64.zip
-
-ENV ANDROID_NDK_ROOT "/opt/android-ndk-r21"
-ENV ANDROID_NDK_HOME "/opt/android-ndk-r21"
-ENV ANDROID_NDK "/opt/android-ndk-r21"
+    && wget https://dl.google.com/android/repository/android-ndk-r22-linux-x86_64.zip \
+    && unzip android-ndk-r22-linux-x86_64.zip \
+    && rm -f android-ndk-r22-linux-x86_64.zip
+    
+ENV ANDROID_NDK "/opt/android-ndk-r22"
