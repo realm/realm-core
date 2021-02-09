@@ -281,9 +281,9 @@ TEST_CASE("dictionary") {
             REQUIRE(calls == 3);
             r->begin_transaction();
             REQUIRE(dict.size() == values.size());
-            results.clear();
+            values_as_results.clear();
             REQUIRE(dict.size() == 0);
-            REQUIRE(results.size() == 0);
+            REQUIRE(values_as_results.size() == 0);
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
