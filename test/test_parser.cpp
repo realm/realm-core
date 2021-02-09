@@ -2835,6 +2835,7 @@ TEST(Parser_Backlinks)
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
+    mapping_with_prefix.add_mapping(t, "things", "items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
     mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
     mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
@@ -2855,6 +2856,10 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix);
     // class name substitution
     verify_query(test_context, items, "@links.CustomPersonClassName.items.@count > 2", 2, mapping_with_prefix);
+    // property translation
+    verify_query(test_context, items, "@links.class_Person.things.@count > 2", 2, mapping_with_prefix);
+    // class and property translation
+    verify_query(test_context, items, "@links.CustomPersonClassName.things.@count > 2", 2, mapping_with_prefix);
 
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(
