@@ -78,6 +78,7 @@ public:
         return m_backlink_class_prefix;
     }
     std::string translate(LinkChain&, const std::string& identifier);
+    std::string translate(ConstTableRef table, const std::string& identifier);
     std::string translate_table_name(const std::string& identifier);
 
 protected:

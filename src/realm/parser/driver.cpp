@@ -1220,10 +1220,11 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
 
     auto table_name = table_column_pair.substr(0, dot_pos);
     table_name = m_mapping.translate_table_name(table_name);
-    auto column_name = table_column_pair.substr(dot_pos + 1);
     auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    auto column_name = table_column_pair.substr(dot_pos + 1);
     ColKey origin_column;
     if (origin_table) {
+        column_name = m_mapping.translate(origin_table, column_name);
         origin_column = origin_table->get_column_key(column_name);
     }
     if (!origin_column) {
