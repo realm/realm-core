@@ -82,6 +82,18 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
     return const_cast<Schema*>(this)->find(object);
 }
 
+Schema::iterator Schema::find(TableKey table_key) noexcept
+{
+    return std::find_if(begin(), end(), [&table_key](ObjectSchema os) {
+        return os.table_key == table_key;
+    });
+}
+
+Schema::const_iterator Schema::find(TableKey table_key) const noexcept
+{
+    return const_cast<Schema*>(this)->find(table_key);
+}
+
 namespace {
 
 struct CheckObjectPath {
