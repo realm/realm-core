@@ -1,6 +1,8 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
+namespace realm::c_api {
+
 RLM_API const char* realm_get_library_version()
 {
     return REALM_VERSION_STRING;
@@ -23,9 +25,16 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
 
 RLM_API realm_t* _realm_from_native_ptr(const void* pshared_ptr, size_t n)
 {
-    REALM_ASSERT_RELEASE(n == sizeof(std::shared_ptr<Realm>));
-    auto ptr = static_cast<const std::shared_ptr<Realm>*>(pshared_ptr);
+    REALM_ASSERT_RELEASE(n == sizeof(SharedRealm));
+    auto ptr = static_cast<const SharedRealm*>(pshared_ptr);
     return new shared_realm{*ptr};
+}
+
+RLM_API void _realm_get_native_ptr(const realm_t* realm, void* pshared_ptr, size_t n)
+{
+    REALM_ASSERT_RELEASE(n == sizeof(SharedRealm));
+    auto& shared_ptr = *static_cast<SharedRealm*>(pshared_ptr);
+    shared_ptr = *realm;
 }
 
 RLM_API bool realm_is_closed(realm_t* realm)
@@ -113,3 +122,5 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
         return new shared_realm{std::move(realm)};
     });
 }
+
+} // namespace realm::c_api

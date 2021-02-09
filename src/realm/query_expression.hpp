@@ -2744,7 +2744,12 @@ public:
 
     DataType get_type() const override
     {
-        return m_is_list ? type_LinkList : type_Link;
+        return type_Link;
+    }
+
+    bool has_multiple_values() const override
+    {
+        return m_is_list || !m_link_map.only_unary_links();
     }
 
     ConstTableRef get_base_table() const override

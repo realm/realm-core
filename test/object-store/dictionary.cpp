@@ -248,6 +248,7 @@ TEST_CASE("dictionary") {
         SECTION("delete containing row") {
             advance_and_notify(*r);
             REQUIRE(calls == 3);
+            REQUIRE(!change.collection_root_was_deleted);
 
             r->begin_transaction();
             obj.remove();
@@ -257,6 +258,7 @@ TEST_CASE("dictionary") {
             REQUIRE(change.deletions.count() == values.size());
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
+            REQUIRE(change.collection_root_was_deleted);
 
             r->begin_transaction();
             table->create_object();
@@ -271,6 +273,30 @@ TEST_CASE("dictionary") {
             r2->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(change.collection_root_was_deleted);
+        }
+
+        SECTION("deleting a row with an empty dictionary triggers notifications") {
+            advance_and_notify(*r);
+            REQUIRE(calls == 3);
+            r->begin_transaction();
+            REQUIRE(dict.size() == values.size());
+            results.clear();
+            REQUIRE(dict.size() == 0);
+            REQUIRE(results.size() == 0);
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == values.size());
+            REQUIRE(!change.collection_root_was_deleted);
+            REQUIRE(calls == 6);
+
+            r->begin_transaction();
+            obj.remove();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.deletions.count() == 0);
+            REQUIRE(change.collection_root_was_deleted);
+            REQUIRE(calls == 9);
         }
 
         SECTION("now with links") {

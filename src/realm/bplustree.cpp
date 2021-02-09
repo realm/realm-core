@@ -38,6 +38,10 @@ void BPlusTreeNode::set_context_flag(bool cf) noexcept
         Array arr(m_tree->get_alloc());
         arr.init_from_mem(mem);
         arr.set_context_flag(cf);
+        if (auto new_ref = arr.get_ref(); new_ref != ref) {
+            init_from_ref(new_ref);
+            update_parent();
+        }
     }
 }
 

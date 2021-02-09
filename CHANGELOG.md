@@ -1,10 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Sync client now logs error messages received from server rather than just the size of the error message.
-* Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
-* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
-* Improve performance of sequential reads on a Results backed directly by a Table by 50x.
+* None.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -15,7 +12,8 @@
 * Mixed: crash when removing/setting a null-valued position of a Mixed list or set ([#4304](https://github.com/realm/realm-core/issues/4304))
 * Results based on dictionary keys will return wrong value from 'get_type'. ([#4365](https://github.com/realm/realm-core/issues/4365))
 * If a Dictionary contains Objects, those can not be returned by Results::get<Obj> ([#4374](https://github.com/realm/realm-core/issues/4374))
-
+* Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
+ 
 ### Breaking changes
 * None.
 
@@ -28,22 +26,37 @@
 
 # 11.0.0-beta.0 Release notes
 
-### Enhancements
-* Sync client now logs error messages received from server rather than just the size of the error message ([RCORE-425](https://jira.mongodb.org/browse/RCORE-425)).
-
 ### Fixed
 * When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
+
+### Breaking changes
+* File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
+
+----------------------------------------------
+
+# 10.5.0 Release notes
+
+### Enhancements
+* Sync client now logs error messages received from server rather than just the size of the error message.
+* Added class name substitution to KeyPathMapping for the query parser. ([#4326](https://github.com/realm/realm-core/issues/4326)).
+* Errors returned from the server when sync WebSockets get closed are now captured and surfaced as a SyncError.
+* Improve performance of sequential reads on a Results backed directly by a Table by 50x.
+
+### Fixed
 * Results::get() on a Results backed by a Table would give incorrect results if a new object was created at index zero in the source Table. ([Cocoa #7014](https://github.com/realm/realm-cocoa/issues/7014), since v6.0.0).
+* New query parser breaks on argument substitution in relation to LinkList. ([#4381](https://github.com/realm/realm-core/issues/4381))
+* During synchronization you might experience crash with 'Assertion failed: ref + size <= next->first' ([#4388](https://github.com/realm/realm-core/issues/4388))
  
 ### Breaking changes
 * The SchemaMode::Additive has been replaced by two different modes: AdditiveDiscovered and AdditiveExplicit. The former should be used when the schema has been automatically discovered, and the latter should be used when the user has explicitly included the types in the schema. Different schema checks are enforced for each scenario. ([#4306](https://github.com/realm/realm-core/pull/4306))
 * Revert change in `app::Response` ([4263](https://github.com/realm/realm-core/pull/4263))
-* File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
+* Notifications will now be triggered for empty collections whose source object has been deleted. ([#4228](https://github.com/realm/realm-core/issues/4228)).
 
 -----------
 
 ### Internals
 * On Android, the CMake build no longer sets -Oz explicitly for Release builds if `CMAKE_INTERPROCEDURAL_OPTIMIZATION` is enabled. Additionally, Android unit tests are built with LTO.
+* On Android, fixed the build to link against the dynamic `libz.so`. CMake was choosing the static library, which is both undesirable and has issues on newer NDKs. ([#4376](https://github.com/realm/realm-core/pull/4376))
 * ThreadSafeReference for Dictionary added
 
 ----------------------------------------------

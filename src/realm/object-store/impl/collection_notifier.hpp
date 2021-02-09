@@ -201,6 +201,9 @@ protected:
     void set_table(ConstTableRef table);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
+    // signal that the underlying source object of the collection has been deleted
+    // but only report this to the notifiers the first time this is reported
+    void report_collection_root_is_deleted();
 
     bool all_related_tables_covered(const TableVersions& versions);
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
@@ -226,6 +229,7 @@ private:
 
     bool m_has_run = false;
     bool m_error = false;
+    bool m_has_delivered_root_deletion_event = false;
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     struct Callback {
