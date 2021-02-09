@@ -498,6 +498,13 @@ bool run_tests(util::Logger* logger)
         reporters.push_back(std::move(reporter_1));
         reporters.push_back(std::move(reporter_2));
     }
+    else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
+        std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
+        auto evergreen_reporter = create_evergreen_reporter(str);
+        auto combined_reporter = create_twofold_reporter(*reporters.back(), *evergreen_reporter);
+        reporters.push_back(std::move(evergreen_reporter));
+        reporters.push_back(std::move(combined_reporter));
+    }
     config.reporter = reporters.back().get();
 
     // Set up filter

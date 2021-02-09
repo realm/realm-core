@@ -706,6 +706,7 @@ TEST(Parser_LinksToDifferentTable)
     // Null cannot be compared to lists
     CHECK_THROW_ANY(verify_query(test_context, t, "items == NULL", 0));
     CHECK_THROW_ANY(verify_query(test_context, t, "items != NULL", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "items.discount == NULL", 0));
 }
 
 
@@ -1331,7 +1332,7 @@ TEST(Parser_substitution)
     list_1.add(obj_keys[0]);
 
     util::Any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
-                        bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
+                        bd0,    Float(2.33),  obj_keys[0],  Int(3),        Int(4),     Bool(false)};
     size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
@@ -1350,6 +1351,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "nuldouble == $7", args, num_args, 1);
     verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "list == $8", args, num_args, 2);
 
     // substitutions through collection aggregates is a different code path
     verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
@@ -2809,10 +2811,10 @@ TEST(Parser_Backlinks)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
-    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
+    CHECK_EQUAL(message, "Cannot compare linklist ('@links.class_Person.items') with NULL");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav\\ item == NULL", 1),
                                 message);
-    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
+    CHECK_EQUAL(message, "Cannot compare linklist ('@links.class_Person.fav\\ item') with NULL");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
@@ -2833,6 +2835,7 @@ TEST(Parser_Backlinks)
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
+    mapping_with_prefix.add_mapping(t, "things", "items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
     mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
     mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
@@ -2853,6 +2856,10 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix);
     // class name substitution
     verify_query(test_context, items, "@links.CustomPersonClassName.items.@count > 2", 2, mapping_with_prefix);
+    // property translation
+    verify_query(test_context, items, "@links.class_Person.things.@count > 2", 2, mapping_with_prefix);
+    // class and property translation
+    verify_query(test_context, items, "@links.CustomPersonClassName.things.@count > 2", 2, mapping_with_prefix);
 
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(
@@ -4205,8 +4212,8 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin)};
-    size_t num_args = 1;
+    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key())};
+    size_t num_args = 2;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
@@ -4224,6 +4231,11 @@ TEST(Parser_Mixed)
 
     // non-uniform type cross column comparisons
     verify_query(test_context, table, "mixed == int", 71);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
+    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
+                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
 }
 
 TEST(Parser_TypeOfValue)

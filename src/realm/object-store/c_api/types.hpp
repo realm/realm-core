@@ -16,8 +16,7 @@
 #include <stdexcept>
 #include <string>
 
-// Note: This is OK-ish because types.hpp is not a public header.
-using namespace realm;
+namespace realm::c_api {
 
 struct NotClonableException : std::exception {
     const char* what() const noexcept
@@ -30,6 +29,21 @@ struct ImmutableException : std::exception {
     const char* what() const noexcept
     {
         return "Immutable object";
+    }
+};
+
+
+struct UnexpectedPrimaryKeyException : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
+struct InvalidPropertyKeyException : std::logic_error {
+    using std::logic_error::logic_error;
+};
+struct CallbackFailed : std::runtime_error {
+    CallbackFailed()
+        : std::runtime_error("User-provided callback failed")
+    {
     }
 };
 
@@ -92,7 +106,9 @@ struct WrapC {
     }
 };
 
-struct realm_async_error : WrapC {
+} // namespace realm::c_api
+
+struct realm_async_error : realm::c_api::WrapC {
     std::exception_ptr ep;
 
     explicit realm_async_error(std::exception_ptr ep)
@@ -114,20 +130,21 @@ struct realm_async_error : WrapC {
     }
 };
 
-struct realm_thread_safe_reference : WrapC {
+struct realm_thread_safe_reference : realm::c_api::WrapC {
     realm_thread_safe_reference(const realm_thread_safe_reference&) = delete;
 
 protected:
     realm_thread_safe_reference() {}
 };
 
-struct realm_config : WrapC, Realm::Config {
-    using Realm::Config::Config;
+struct realm_config : realm::c_api::WrapC, realm::Realm::Config {
+    using Config::Config;
 };
 
-struct realm_scheduler : WrapC, std::shared_ptr<util::Scheduler> {
-    explicit realm_scheduler(std::shared_ptr<util::Scheduler> ptr)
-        : std::shared_ptr<util::Scheduler>(std::move(ptr))
+// LCOV_EXCL_START
+struct realm_scheduler : realm::c_api::WrapC, std::shared_ptr<realm::util::Scheduler> {
+    explicit realm_scheduler(std::shared_ptr<realm::util::Scheduler> ptr)
+        : std::shared_ptr<realm::util::Scheduler>(std::move(ptr))
     {
     }
 
@@ -149,25 +166,26 @@ struct realm_scheduler : WrapC, std::shared_ptr<util::Scheduler> {
         return false;
     }
 };
+// LCOV_EXCL_STOP
 
-struct realm_schema : WrapC {
-    std::unique_ptr<Schema> owned;
-    const Schema* ptr = nullptr;
+struct realm_schema : realm::c_api::WrapC {
+    std::unique_ptr<realm::Schema> owned;
+    const realm::Schema* ptr = nullptr;
 
-    realm_schema(std::unique_ptr<Schema> o, const Schema* ptr = nullptr)
+    realm_schema(std::unique_ptr<realm::Schema> o, const realm::Schema* ptr = nullptr)
         : owned(std::move(o))
         , ptr(ptr ? ptr : owned.get())
     {
     }
 
-    explicit realm_schema(const Schema* ptr)
+    explicit realm_schema(const realm::Schema* ptr)
         : ptr(ptr)
     {
     }
 
     realm_schema_t* clone() const override
     {
-        auto o = std::make_unique<Schema>(*ptr);
+        auto o = std::make_unique<realm::Schema>(*ptr);
         return new realm_schema_t{std::move(o)};
     }
 
@@ -180,15 +198,20 @@ struct realm_schema : WrapC {
     }
 };
 
-struct shared_realm : WrapC, SharedRealm {
-    shared_realm(SharedRealm rlm)
-        : SharedRealm{std::move(rlm)}
+struct shared_realm : realm::c_api::WrapC, realm::SharedRealm {
+    shared_realm(realm::SharedRealm rlm)
+        : realm::SharedRealm{std::move(rlm)}
     {
     }
 
     shared_realm* clone() const override
     {
         return new shared_realm{*this};
+    }
+
+    bool is_frozen() const override
+    {
+        return get()->is_frozen();
     }
 
     bool equals(const WrapC& other) const noexcept final
@@ -199,9 +222,9 @@ struct shared_realm : WrapC, SharedRealm {
         return false;
     }
 
-    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
-        thread_safe_reference(const std::shared_ptr<Realm>& rlm)
-            : ThreadSafeReference(rlm)
+    struct thread_safe_reference : realm_thread_safe_reference, realm::ThreadSafeReference {
+        thread_safe_reference(const realm::SharedRealm& rlm)
+            : realm::ThreadSafeReference(rlm)
         {
         }
     };
@@ -212,9 +235,9 @@ struct shared_realm : WrapC, SharedRealm {
     }
 };
 
-struct realm_object : WrapC, Object {
-    explicit realm_object(Object obj)
-        : Object(std::move(obj))
+struct realm_object : realm::c_api::WrapC, realm::Object {
+    explicit realm_object(realm::Object obj)
+        : realm::Object(std::move(obj))
     {
     }
 
@@ -225,7 +248,7 @@ struct realm_object : WrapC, Object {
 
     bool is_frozen() const override
     {
-        return Object::is_frozen();
+        return realm::Object::is_frozen();
     }
 
     bool equals(const WrapC& other) const noexcept final
@@ -238,9 +261,9 @@ struct realm_object : WrapC, Object {
         return false;
     }
 
-    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
-        thread_safe_reference(const Object& obj)
-            : ThreadSafeReference(obj)
+    struct thread_safe_reference : realm_thread_safe_reference, realm::ThreadSafeReference {
+        thread_safe_reference(const realm::Object& obj)
+            : realm::ThreadSafeReference(obj)
         {
         }
     };
@@ -251,7 +274,7 @@ struct realm_object : WrapC, Object {
     }
 };
 
-struct realm_list : WrapC, List {
+struct realm_list : realm::c_api::WrapC, realm::List {
     explicit realm_list(List list)
         : List(std::move(list))
     {
@@ -277,9 +300,9 @@ struct realm_list : WrapC, List {
         return false;
     }
 
-    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
+    struct thread_safe_reference : realm_thread_safe_reference, realm::ThreadSafeReference {
         thread_safe_reference(const List& list)
-            : ThreadSafeReference(list)
+            : realm::ThreadSafeReference(list)
         {
         }
     };
@@ -290,43 +313,43 @@ struct realm_list : WrapC, List {
     }
 };
 
-struct realm_object_changes : WrapC, CollectionChangeSet {
-    explicit realm_object_changes(CollectionChangeSet changes)
-        : CollectionChangeSet(std::move(changes))
+struct realm_object_changes : realm::c_api::WrapC, realm::CollectionChangeSet {
+    explicit realm_object_changes(realm::CollectionChangeSet changes)
+        : realm::CollectionChangeSet(std::move(changes))
     {
     }
 
     realm_object_changes* clone() const override
     {
-        return new realm_object_changes{static_cast<const CollectionChangeSet&>(*this)};
+        return new realm_object_changes{static_cast<const realm::CollectionChangeSet&>(*this)};
     }
 };
 
-struct realm_collection_changes : WrapC, CollectionChangeSet {
-    explicit realm_collection_changes(CollectionChangeSet changes)
-        : CollectionChangeSet(std::move(changes))
+struct realm_collection_changes : realm::c_api::WrapC, realm::CollectionChangeSet {
+    explicit realm_collection_changes(realm::CollectionChangeSet changes)
+        : realm::CollectionChangeSet(std::move(changes))
     {
     }
 
     realm_collection_changes* clone() const override
     {
-        return new realm_collection_changes{static_cast<const CollectionChangeSet&>(*this)};
+        return new realm_collection_changes{static_cast<const realm::CollectionChangeSet&>(*this)};
     }
 };
 
-struct realm_notification_token : WrapC, NotificationToken {
-    explicit realm_notification_token(NotificationToken token)
-        : NotificationToken(std::move(token))
+struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken {
+    explicit realm_notification_token(realm::NotificationToken token)
+        : realm::NotificationToken(std::move(token))
     {
     }
 };
 
-struct realm_query : WrapC {
-    Query query;
-    DescriptorOrdering ordering;
-    std::weak_ptr<Realm> weak_realm;
+struct realm_query : realm::c_api::WrapC {
+    realm::Query query;
+    realm::DescriptorOrdering ordering;
+    std::weak_ptr<realm::Realm> weak_realm;
 
-    explicit realm_query(Query query, DescriptorOrdering ordering, std::weak_ptr<Realm> realm)
+    explicit realm_query(realm::Query query, realm::DescriptorOrdering ordering, std::weak_ptr<realm::Realm> realm)
         : query(std::move(query))
         , ordering(std::move(ordering))
         , weak_realm(realm)
@@ -342,25 +365,25 @@ private:
     realm_query(const realm_query&) = default;
 };
 
-struct realm_results : WrapC, Results {
-    explicit realm_results(Results results)
-        : Results(std::move(results))
+struct realm_results : realm::c_api::WrapC, realm::Results {
+    explicit realm_results(realm::Results results)
+        : realm::Results(std::move(results))
     {
     }
 
     realm_results* clone() const override
     {
-        return new realm_results{static_cast<const Results&>(*this)};
+        return new realm_results{static_cast<const realm::Results&>(*this)};
     }
 
     bool is_frozen() const override
     {
-        return Results::is_frozen();
+        return realm::Results::is_frozen();
     }
 
-    struct thread_safe_reference : realm_thread_safe_reference_t, ThreadSafeReference {
-        thread_safe_reference(const Results& results)
-            : ThreadSafeReference(results)
+    struct thread_safe_reference : realm_thread_safe_reference_t, realm::ThreadSafeReference {
+        thread_safe_reference(const realm::Results& results)
+            : realm::ThreadSafeReference(results)
         {
         }
     };

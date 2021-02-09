@@ -111,10 +111,9 @@ std::string KeyPathMapping::translate_table_name(const std::string& identifier)
     return alias;
 }
 
-std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& identifier)
+std::string KeyPathMapping::translate(ConstTableRef table, const std::string& identifier)
 {
     size_t substitutions = 0;
-    auto table = link_chain.get_current_table();
     auto tk = table->get_key();
     std::string alias = identifier;
     while (auto mapped = get_mapping(tk, alias)) {
@@ -127,6 +126,12 @@ std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& 
         substitutions++;
     }
     return alias;
+}
+
+std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& identifier)
+{
+    auto table = link_chain.get_current_table();
+    return translate(table, identifier);
 }
 
 

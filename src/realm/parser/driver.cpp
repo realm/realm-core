@@ -62,6 +62,28 @@ static std::map<int, std::string> opstr = {
     {CompareNode::IN, "in"},
 };
 
+std::string print_pretty_objlink(const ObjLink& link, const Group* g)
+{
+    REALM_ASSERT(g);
+    if (link.is_null()) {
+        return "NULL";
+    }
+    try {
+        auto table = g->get_table(link.get_table_key());
+        if (!table) {
+            return "link to an invalid table";
+        }
+        auto obj = table->get_object(link.get_obj_key());
+        Mixed pk = obj.get_primary_key();
+        return util::format("'%1' with primary key '%2'",
+                            util::serializer::get_printable_table_name(table->get_name()),
+                            util::serializer::print_value(pk));
+    }
+    catch (...) {
+        return "invalid link";
+    }
+}
+
 bool is_length_suffix(const std::string& s)
 {
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
@@ -192,6 +214,11 @@ public:
     {
         Arguments::verify_ndx(n);
         return m_args.at(n).get<ObjKey>();
+    }
+    ObjLink objlink_for_argument(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n).get<ObjLink>();
     }
     bool is_argument_null(size_t n) final
     {
@@ -772,6 +799,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     Subexpr* ret = nullptr;
+    std::string explain_value_message = text;
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {
@@ -945,9 +973,6 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             else if (hint == type_Binary) {
                 ret = new Value<Binary>(BinaryData()); // Null string
             }
-            else if (hint == type_LinkList) {
-                throw InvalidQueryError("Cannot compare linklist with NULL");
-            }
             else {
                 ret = new Value<null>(realm::null());
             }
@@ -961,10 +986,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
             if (drv->m_args.is_argument_null(arg_no)) {
+                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = new Value<null>(realm::null());
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
+                explain_value_message =
+                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
                 switch (type) {
                     case type_Int:
                         ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
@@ -1033,6 +1061,12 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     case type_Link:
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
+                    case type_TypedLink:
+                        explain_value_message =
+                            util::format("%1 which links to %2", explain_value_message,
+                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
+                                                              drv->m_base_table->get_parent_group()));
+                        break;
                     default:
                         break;
                 }
@@ -1042,8 +1076,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     }
     if (!ret) {
         throw InvalidQueryError(
-            util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
-                         get_data_type_name(hint), text));
+            util::format("Unsupported comparison between property of type '%1' and constant value: %2",
+                         get_data_type_name(hint), explain_value_message));
     }
     return std::unique_ptr<Subexpr>{ret};
 }
@@ -1121,6 +1155,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
     return ordering;
 }
 
+// If one of the expresions is constant, it should be right
 void verify_conditions(Subexpr* left, Subexpr* right)
 {
     if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
@@ -1138,6 +1173,13 @@ void verify_conditions(Subexpr* left, Subexpr* right)
         util::serializer::SerialisationState state;
         throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
                                               left->description(state), right->description(state)));
+    }
+    if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
+        if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {
+            util::serializer::SerialisationState state;
+            throw InvalidQueryError(
+                util::format("Cannot compare linklist ('%1') with NULL", left->description(state)));
+        }
     }
 }
 
@@ -1173,6 +1215,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
         // Take left first - it cannot be a constant
         left = left_prop->visit(this);
         right = right_constant->visit(this, left->get_type());
+        verify_conditions(left.get(), right.get());
     }
     else {
         right = right_prop->visit(this);
@@ -1182,8 +1225,8 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
         else {
             left = left_prop->visit(this);
         }
+        verify_conditions(right.get(), left.get());
     }
-    verify_conditions(left.get(), right.get());
     return {std::move(left), std::move(right)};
 }
 
@@ -1206,10 +1249,11 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
 
     auto table_name = table_column_pair.substr(0, dot_pos);
     table_name = m_mapping.translate_table_name(table_name);
-    auto column_name = table_column_pair.substr(dot_pos + 1);
     auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    auto column_name = table_column_pair.substr(dot_pos + 1);
     ColKey origin_column;
     if (origin_table) {
+        column_name = m_mapping.translate(origin_table, column_name);
         origin_column = origin_table->get_column_key(column_name);
     }
     if (!origin_column) {

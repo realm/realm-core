@@ -1,6 +1,8 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
+namespace realm::c_api {
+
 RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size_t num_classes,
                                          const realm_property_info** class_properties)
 {
@@ -215,8 +217,7 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
             }
         }
 
-        // FIXME: Proper exception type.
-        throw std::logic_error{"Invalid column key for this class"};
+        throw InvalidPropertyKeyException{"Invalid property key for this class"};
     });
 }
 
@@ -264,3 +265,5 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
         return true;
     });
 }
+
+} // namespace realm::c_api
