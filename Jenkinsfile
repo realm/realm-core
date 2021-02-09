@@ -486,7 +486,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
+            def buildEnv = docker.build('realm-core-android:ndk22', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
