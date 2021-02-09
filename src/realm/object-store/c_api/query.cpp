@@ -127,6 +127,15 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
         throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
     }
 
+    ObjLink objlink_for_argument(size_t i) final
+    {
+        verify_ndx(i);
+        if (m_args[i].type == RLM_TYPE_LINK) {
+            return from_capi(m_args[i].link);
+        }
+        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+    }
+
     bool is_argument_null(size_t i) final
     {
         verify_ndx(i);
