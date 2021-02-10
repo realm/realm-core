@@ -142,6 +142,8 @@ TEST_CASE("object") {
              {"object id", PropertyType::ObjectId | PropertyType::Nullable},
              {"decimal", PropertyType::Decimal | PropertyType::Nullable},
              {"uuid", PropertyType::UUID | PropertyType::Nullable},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable, Property::IsPrimary{false},
+              Property::IsIndexed{true}},
 
              {"bool array", PropertyType::Array | PropertyType::Bool | PropertyType::Nullable},
              {"int array", PropertyType::Array | PropertyType::Int | PropertyType::Nullable},
@@ -1248,6 +1250,37 @@ TEST_CASE("object") {
 
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+    }
+
+    SECTION("Mixed emit notification on type change") {
+        auto validate_change = [&](util::Any&& obj_dict, util::Any&& value) {
+            r->begin_transaction();
+            auto obj =
+                Object::create(d, r, *r->schema().find("all optional types"), obj_dict, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+
+            CollectionChangeSet change;
+            auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            obj.set_property_value(d, "mixed", value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+
+            REQUIRE_INDICES(change.modifications, 0);
+        };
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", true}}, util::Any(1));
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", false}}, util::Any(0));
+
+        auto object_id = ObjectId::gen();
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", object_id}}, util::Any(object_id.get_timestamp()));
     }
 
 #if REALM_ENABLE_SYNC
