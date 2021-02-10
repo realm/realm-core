@@ -1053,11 +1053,19 @@ bool Table::set_embedded(bool embedded)
         });
 
         if (has_backlink_columns) {
-            for (auto o : *this) {
-                // each object should be owned by one and only one parent
-                if (o.get_backlink_count() != 1) {
+            for (auto object : *this) {
+                if (object.get_backlink_count() == 0) {
+                    // If the object does not have any backlinks it can be deleted.
+                    object.remove();
+                } else if (object.get_backlink_count() > 1) {
+                    // Each object should be owned by one parent at most.
                     return false;
                 }
+            }
+        } else {
+            // If the table does not have any backlink columns the objects can be deleted.
+            for (auto object : *this) {
+                object.remove();
             }
         }
     }

@@ -737,8 +737,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(RemoveTable) {}
         void operator()(ChangeTableType op)
-        {
-            set_embedded(table(op.object), op.object->is_embedded);
+        { /* delayed until after the migration */
         }
         void operator()(AddInitialProperties op)
         {
@@ -840,7 +839,10 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
             table(op.object).remove_search_index(op.property->column_key);
         }
 
-        void operator()(ChangeTableType) {}
+        void operator()(ChangeTableType op)
+        {
+            set_embedded(table(op.object), op.object->is_embedded);
+        }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}
         void operator()(MakePropertyNullable) {}
