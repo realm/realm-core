@@ -643,6 +643,10 @@ private:
     {
         m_alloc.update_from_underlying_allocator(writable);
     }
+    void refresh_allocator_wrapper() const noexcept
+    {
+        m_alloc.refresh_ref_translation();
+    }
     Spec m_spec;                                    // 1st slot in m_top
     TableClusterTree m_clusters;                    // 3rd slot in m_top
     std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top

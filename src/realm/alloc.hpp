@@ -1,4 +1,4 @@
-﻿/*************************************************************************
+/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -346,13 +346,18 @@ public:
         m_alloc = &underlying_allocator;
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_debug_watch = 0;
-        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
+        refresh_ref_translation();
     }
 
     void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);
         set_read_only(!writable);
+    }
+
+    void refresh_ref_translation()
+    {
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
 protected:

@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
+* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
  
 ### Breaking changes
 * None.

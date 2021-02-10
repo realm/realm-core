@@ -5523,7 +5523,7 @@ TEST(Query_Performance)
     */
 }
 
-TEST(Query_AllocatorBug)
+TEST(Query_AllocatorBug_DestOlderThanSource)
 {
     // At some point this test failed when cluster node size was 4.
     Group g;
@@ -5559,6 +5559,48 @@ TEST(Query_AllocatorBug)
     // When traversion clusters in "bar" wee should use the "bar" wrapped allocator and not the
     // one in "foo" (that was the error)
     auto cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
+}
+
+TEST(Query_AllocatorBug_SourceOlderThanDest)
+{
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column_list(type_Double, "doubles");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++)
+        foo->create_object();
+
+    // foo's WrappedAllocator now points to a translation table with 2 elements
+
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // bar's WrappedAllocator now points to a translation table with 3 elements
+
+    int i = 0;
+    for (auto& obj : *foo) {
+        obj.get_list<double>(col_double).add(double(i % 19));
+        ++i;
+    }
+
+    // foo's WrappedAllocator now points to a translation table with 6 elements
+
+    // If this query uses bar's allocator to access foo it'll perform an out-of-bounds read
+    // for any of the values in slabs 3-5
+    auto cnt = (bar->link(col_link).column<Lst<double>>(col_double) > 10).count();
     CHECK_EQUAL(cnt, 421);
 }
 

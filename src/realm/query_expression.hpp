@@ -1705,6 +1705,9 @@ public:
 
     void set_cluster(const Cluster* cluster)
     {
+        for (auto& table : m_tables) {
+            table->refresh_allocator_wrapper();
+        }
         Allocator& alloc = get_base_table()->get_alloc();
         m_array_ptr = nullptr;
         switch (m_link_types[0]) {
