@@ -5602,6 +5602,8 @@ TEST(Query_AllocatorBug_SourceOlderThanDest)
     // for any of the values in slabs 3-5
     auto cnt = (bar->link(col_link).column<Lst<double>>(col_double) > 10).count();
     CHECK_EQUAL(cnt, 421);
+    cnt = (bar->link(col_link).column<Lst<double>>(col_double).size() == 1).count();
+    cnt = (bar->link(col_link).column<Lst<double>>(col_double).min() == 1).count();
 }
 
 TEST(Query_StringNodeEqualBaseBug)
