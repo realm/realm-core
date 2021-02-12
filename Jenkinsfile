@@ -282,7 +282,7 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
 
-            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
+            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/config.json\""
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {

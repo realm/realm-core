@@ -82,8 +82,8 @@ WORK_PATH=$($REALPATH $1)
 STITCH_APP=$($REALPATH $2)
 BAAS_VERSION=$3
 
-if [[ ! -f "$STITCH_APP/stitch.json" ]]; then
-    echo "Invalid app to import: $STITCH_APP/stitch.json does not exist."
+if [[ ! -f "$STITCH_APP/config.json" ]]; then
+    echo "Invalid app to import: $STITCH_APP/config.json does not exist."
     exit 1
 fi
 
@@ -178,11 +178,11 @@ if [[ ! -x baas_dep_binaries/transpiler ]]; then
     ln -s $(pwd)/baas/etc/transpiler/bin/transpiler baas_dep_binaries/transpiler
 fi
 
-if [[ ! -x baas_dep_binaries/stitch-cli ]]; then
-    mkdir stitch-cli
-    cd stitch-cli
-    $CURL -LsS https://github.com/10gen/stitch-cli/archive/v1.9.0.tar.gz | tar -xz --strip-components=1
-    go build -o $WORK_PATH/baas_dep_binaries/stitch-cli
+if [[ ! -x baas_dep_binaries/realm-cli ]]; then
+    mkdir realm-cli
+    cd realm-cli
+    $CURL -LsS https://github.com/10gen/realm-cli/archive/v1.2.0.tar.gz | tar -xz --strip-components=1
+    go build -o $WORK_PATH/baas_dep_binaries/realm-cli
     cd -
 fi
 
@@ -264,7 +264,7 @@ APP_NAME=$(jq '.name' "$STITCH_APP/stitch.json" -r)
 echo "importing app $APP_NAME from $STITCH_APP"
 
 [[ -f $WORK_PATH/stitch-state ]] && rm $WORK_PATH/stitch-state
-stitch-cli login \
+realm-cli login \
     --config-path=$WORK_PATH/stitch-state \
     --base-url=http://localhost:9090 \
     --auth-provider=local-userpass \
@@ -280,8 +280,8 @@ GROUP_ID=$($CURL \
 APP_ID_PARAM=""
 if [[ -f "$STITCH_APP/secrets.json" ]]; then
     TEMP_APP_PATH=$(mktemp -d $WORK_PATH/$(basename $STITCH_APP)_XXXX)
-    mkdir -p $TEMP_APP_PATH && echo "{ \"name\": \"$APP_NAME\" }" > "$TEMP_APP_PATH/stitch.json"
-    stitch-cli import \
+    mkdir -p $TEMP_APP_PATH && echo "{ \"name\": \"$APP_NAME\" }" > "$TEMP_APP_PATH/config.json"
+    realm-cli import \
         --config-path=$WORK_PATH/stitch-state \
         --base-url=http://localhost:9090 \
         --path="$TEMP_APP_PATH" \
@@ -289,11 +289,11 @@ if [[ -f "$STITCH_APP/secrets.json" ]]; then
         --strategy replace \
         -y
 
-    APP_ID=$(jq '.app_id' "$TEMP_APP_PATH/stitch.json" -r)
+    APP_ID=$(jq '.app_id' "$TEMP_APP_PATH/config.json" -r)
     APP_ID_PARAM="--app-id=$APP_ID"
 
     while read -r SECRET VALUE; do
-        stitch-cli secrets add \
+        realm-cli secrets add \
             --config-path=$WORK_PATH/stitch-state \
             --base-url=http://localhost:9090 \
             --app-id=$APP_ID \
@@ -303,7 +303,7 @@ if [[ -f "$STITCH_APP/secrets.json" ]]; then
     rm -r $TEMP_APP_PATH
 fi
 
-stitch-cli import \
+realm-cli import \
     --config-path=$WORK_PATH/stitch-state \
     --base-url=http://localhost:9090 \
     --path="$STITCH_APP" \
