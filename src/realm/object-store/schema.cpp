@@ -87,7 +87,7 @@ Schema::iterator Schema::find(TableKey table_key) noexcept
     if (!table_key) {
         return end();
     }
-    return std::find_if(begin(), end(), [table_key](ObjectSchema os) {
+    return std::find_if(begin(), end(), [table_key](const ObjectSchema& os) {
         return os.table_key == table_key;
     });
 }
