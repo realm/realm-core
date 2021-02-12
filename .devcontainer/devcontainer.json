@@ -13,7 +13,7 @@
         "cmake.configureSettings": {
             "REALM_ENABLE_AUTH_TESTS": "ON",
             "REALM_MONGODB_ENDPOINT": "http://mongodb-realm:9090",
-            "REALM_STITCH_CONFIG": "/realm-object-store/tests/mongodb/stitch.json",
+            "REALM_STITCH_CONFIG": "/realm-object-store/tests/mongodb/config.json",
         }
     },
 

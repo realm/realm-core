@@ -260,7 +260,7 @@ $WORK_PATH/baas_server \
 echo $! > $WORK_PATH/baas_server.pid
 $BASE_PATH/wait_for_baas.sh $WORK_PATH/baas_server.pid
 
-APP_NAME=$(jq '.name' "$STITCH_APP/stitch.json" -r)
+APP_NAME=$(jq '.name' "$STITCH_APP/config.json" -r)
 echo "importing app $APP_NAME from $STITCH_APP"
 
 [[ -f $WORK_PATH/stitch-state ]] && rm $WORK_PATH/stitch-state
