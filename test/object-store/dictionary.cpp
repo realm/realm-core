@@ -329,3 +329,52 @@ TEST_CASE("dictionary") {
         }
     }
 }
+
+TEST_CASE("embedded dictionary") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"origin", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto origin = r->read_group().get_table("class_origin");
+    auto target = r->read_group().get_table("class_target");
+
+    r->begin_transaction();
+    Obj obj = origin->create_object();
+    ColKey col_links = origin->get_column_key("links");
+    ColKey col_value = target->get_column_key("value");
+
+    object_store::Dictionary dict(r, obj, col_links);
+    for (int i = 0; i < 10; ++i)
+        dict.insert_embedded(util::to_string(i));
+
+    r->commit_transaction();
+
+    CppContext ctx(r);
+    auto initial_target_size = target->size();
+
+    SECTION("insert(Context)") {
+        CppContext ctx(r, &dict.get_object_schema());
+        r->begin_transaction();
+
+        SECTION("rejects boxed Obj and Object") {
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(target->get_object(5))),
+                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(Object(r, target->get_object(5)))),
+                              List::InvalidEmbeddedOperationException);
+        }
+
+        SECTION("creates new object for dictionary") {
+            dict.insert(ctx, "foo", util::Any(AnyDict{{"value", INT64_C(20)}}));
+            REQUIRE(dict.size() == 11);
+            REQUIRE(target->size() == initial_target_size + 1);
+            REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);
+        }
+
+        r->cancel_transaction();
+    }
+}

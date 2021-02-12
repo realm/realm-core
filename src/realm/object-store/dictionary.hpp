@@ -44,6 +44,11 @@ public:
     template <typename T>
     T get(StringData key) const;
 
+    Obj insert_embedded(StringData key)
+    {
+        return m_dict->create_and_insert_linked_object(key);
+    }
+
     void erase(StringData key)
     {
         verify_in_transaction();
@@ -55,6 +60,10 @@ public:
         m_dict->clear();
     }
 
+    Obj get_object(StringData key)
+    {
+        return m_dict->get_object(key);
+    }
     Mixed get_any(StringData key)
     {
         return m_dict->get(key);
@@ -146,6 +155,12 @@ inline Obj Dictionary::get<Obj>(StringData key) const
 template <typename T, typename Context>
 void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
+    if (m_is_embedded) {
+        validate_embedded(ctx, value, policy);
+        auto obj_key = m_dict->create_and_insert_linked_object(key).get_key();
+        ctx.template unbox<Obj>(value, policy, obj_key);
+        return;
+    }
     dispatch([&](auto t) {
         this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
     });

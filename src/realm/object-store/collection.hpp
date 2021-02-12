@@ -21,6 +21,7 @@
 
 #include <realm/collection.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/object.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
@@ -90,13 +91,21 @@ public:
 
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
+    // The object being added to the collection is already a managed embedded object
+    struct InvalidEmbeddedOperationException : public std::logic_error {
+        InvalidEmbeddedOperationException()
+            : std::logic_error("Cannot add an existing managed embedded object to a List.")
+        {
+        }
+    };
+
 protected:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
     std::shared_ptr<CollectionBase> m_coll_base;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
-
+    bool m_is_embedded = false;
 
     Collection() noexcept;
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
@@ -110,7 +119,18 @@ protected:
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(const Obj&) const;
+
+    template <typename T, typename Context>
+    void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
 };
+
+template <typename T, typename Context>
+void Collection::validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const
+{
+    if (!policy.copy && ctx.template unbox<Obj>(value, CreatePolicy::Skip).is_valid())
+        throw InvalidEmbeddedOperationException();
+}
+
 } // namespace object_store
 } // namespace realm
 

@@ -39,6 +39,8 @@ Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey c
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
     , m_coll_base(parent_obj.get_collection_ptr(col))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+
 {
 }
 
@@ -46,6 +48,7 @@ Collection::Collection(std::shared_ptr<Realm> r, const CollectionBase& coll)
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(coll.get_col_key()) & ~PropertyType::Collection)
     , m_coll_base(coll.clone_collection())
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
 {
 }
 
