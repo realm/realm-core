@@ -1100,4 +1100,89 @@ TEST_CASE("Schema") {
                                         &schema2.find("object")->persisted_properties[0]})});
         }
     }
+
+    SECTION("find in attached schema") {
+        Group g;
+        TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
+        TableRef embedded = g.add_embedded_table("class_embedded");
+        ObjectSchema os(g, "table", {});
+        REQUIRE(os.table_key == table->get_key());
+        ObjectSchema os1(g, "embedded", {});
+        REQUIRE(os1.table_key == embedded->get_key());
+        REQUIRE(os1.is_embedded);
+
+        Schema schema = {os, os1};
+        REQUIRE_NOTHROW(schema.validate());
+
+        SECTION("find by name") {
+            auto it = schema.find("table");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "table");
+            REQUIRE(it->table_key == table->get_key());
+        }
+        SECTION("find by name embedded") {
+            auto it = schema.find("embedded");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "embedded");
+            REQUIRE(it->table_key == embedded->get_key());
+        }
+        SECTION("find non existant name") {
+            auto it = schema.find("not_found");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find empty string") {
+            auto it = schema.find("");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find by key") {
+            auto it = schema.find(table->get_key());
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "table");
+            REQUIRE(it->table_key == table->get_key());
+        }
+        SECTION("find embedded by key") {
+            auto it = schema.find(embedded->get_key());
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "embedded");
+            REQUIRE(it->table_key == embedded->get_key());
+        }
+        SECTION("find null key") {
+            auto null_key = TableKey();
+            REQUIRE(!null_key);
+            auto it = schema.find(null_key);
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find missing key") {
+            auto missing_key = TableKey(42);
+            REQUIRE(missing_key);
+            auto it = schema.find(missing_key);
+            REQUIRE(it == schema.end());
+        }
+    }
+    SECTION("find in unattached schema") {
+        Schema schema = {{"object", {{"value", PropertyType::Int}}}};
+        REQUIRE_NOTHROW(schema.validate());
+
+        SECTION("find by name works") {
+            auto it = schema.find("object");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "object");
+            REQUIRE(!it->table_key);
+        }
+        SECTION("find missing name") {
+            auto it = schema.find("not_a_valid_name");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find empty name") {
+            auto it = schema.find("");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find by key") {
+            std::vector<TableKey> test_keys = {TableKey{0}, TableKey{1}, TableKey{42}, TableKey{}};
+            for (auto& key : test_keys) {
+                auto it = schema.find(key);
+                REQUIRE(it == schema.end());
+            }
+        }
+    }
 }
