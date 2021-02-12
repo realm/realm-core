@@ -20,6 +20,7 @@
 #define REALM_TABLE_TPL_HPP
 
 #include <realm/table.hpp>
+#include <realm/query_conditions_tpl.hpp>
 
 namespace realm {
 

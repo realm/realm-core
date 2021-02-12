@@ -47,13 +47,13 @@ class QueryStateBase {
 public:
     size_t m_match_count;
     size_t m_limit;
-    int64_t m_minmax_index; // used only for min/max, to save index of current min/max value
+    int64_t m_minmax_key; // used only for min/max, to save index of current min/max value
     uint64_t m_key_offset;
     const ClusterKeyArray* m_key_values;
     QueryStateBase(size_t limit)
         : m_match_count(0)
         , m_limit(limit)
-        , m_minmax_index(-1)
+        , m_minmax_key(-1)
         , m_key_offset(0)
         , m_key_values(nullptr)
     {
@@ -62,11 +62,9 @@ public:
     {
     }
 
-    virtual bool match(size_t, Mixed)
-    {
-        ++m_match_count;
-        return (m_limit > m_match_count);
-    }
+    // Called when we have a match.
+    // The return value indicates if the query should continue.
+    virtual bool match(size_t, Mixed) noexcept = 0;
 
     virtual bool match_pattern(size_t, uint64_t)
     {
@@ -77,12 +75,6 @@ protected:
 private:
     virtual void dyncast();
 };
-
-template <class>
-class QueryState;
-
-template <class>
-class QueryStateSum;
 
 template <class>
 class QueryStateMin;
@@ -96,7 +88,12 @@ public:
         : QueryStateBase(limit)
     {
     }
-    size_t get_count() const
+    bool match(size_t, Mixed) noexcept final
+    {
+        ++m_match_count;
+        return (m_limit > m_match_count);
+    }
+    size_t get_count() const noexcept
     {
         return m_match_count;
     }

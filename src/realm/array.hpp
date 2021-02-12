@@ -143,7 +143,7 @@ public:
         , m_keys(keys)
     {
     }
-    bool match(size_t index, Mixed) final;
+    bool match(size_t index, Mixed) noexcept final;
 
 private:
     T& m_keys;
@@ -156,7 +156,7 @@ public:
         : QueryStateBase(1)
     {
     }
-    bool match(size_t index, Mixed) final
+    bool match(size_t index, Mixed) noexcept final
     {
         m_match_count++;
         m_state = index;
@@ -1120,7 +1120,7 @@ int64_t Array::get_universal(const char* data, size_t ndx) const
 }
 
 /*
-find() (calls find_optimized()) may calls find_action for each search result.
+find() (calls find_optimized()) may call find_action for each search result.
 
 'index' tells the row index of a single match and 'value' tells its value. Return false to make Array-finder break
 its search or return true to let it continue until 'end' or 'limit'.

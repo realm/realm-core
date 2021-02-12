@@ -2073,15 +2073,15 @@ size_t Table::count_int(ColKey col_key, int64_t value) const
         return index->count(value);
     }
 
-    return Table::where().equal(col_key, value).count();
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_float(ColKey col_key, float value) const
 {
-    return Table::where().equal(col_key, value).count();
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_double(ColKey col_key, double value) const
 {
-    return Table::where().equal(col_key, value).count();
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
 {
@@ -2109,7 +2109,7 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     if (auto index = this->get_search_index(col_key)) {
         return index->count(value);
     }
-    return Table::where().equal(col_key, value).count();
+    return where().equal(col_key, value).count();
 }
 
 // sum ----------------------------------------------
@@ -2188,7 +2188,7 @@ int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
         aggregate<int64_t>(st, col_key);
     }
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2198,7 +2198,7 @@ float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<float> st;
     aggregate<float>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2208,7 +2208,7 @@ double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<double> st;
     aggregate<double>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2218,7 +2218,7 @@ Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<Decimal128> st;
     aggregate<Decimal128>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.get_min();
 }
@@ -2228,7 +2228,7 @@ Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<Timestamp> st;
     aggregate<Timestamp>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.get_min();
 }
@@ -2245,7 +2245,7 @@ int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
         aggregate<int64_t>(st, col_key);
     }
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2255,7 +2255,7 @@ float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<float> st;
     aggregate<float>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2265,7 +2265,7 @@ double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<double> st;
     aggregate<double>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.m_state;
 }
@@ -2301,7 +2301,7 @@ Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<Timestamp> st;
     aggregate<Timestamp>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_index;
+        *return_ndx = st.m_minmax_key;
     }
     return st.get_max();
 }

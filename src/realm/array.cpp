@@ -1642,7 +1642,7 @@ void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1
 }
 
 template <>
-bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed)
+bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
 
@@ -1654,7 +1654,7 @@ bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed)
 }
 
 template <>
-bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed)
+bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
 {
     ++m_match_count;
     m_keys.add(index);
