@@ -26,6 +26,7 @@
 #include <realm/object_id.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
+#include <realm/mixed.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/any.hpp>
 
