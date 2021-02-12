@@ -775,7 +775,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             instr.path.m_path.reserve(size * 2);
         };
 
-        auto visitor = [&](const Obj& path_obj, ColKey next_field, size_t index) {
+        auto visitor = [&](const Obj& path_obj, ColKey next_field, Mixed index) {
             auto element_table = path_obj.get_table();
             if (element_table->is_embedded()) {
                 StringData field_name = element_table->get_column_name(next_field);
@@ -788,7 +788,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             }
 
             if (next_field.is_list()) {
-                instr.path.push_back(uint32_t(index));
+                instr.path.push_back(uint32_t(index.get_int()));
             }
         };
 

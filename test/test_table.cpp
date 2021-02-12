@@ -5416,6 +5416,12 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     Obj o = parent->create_object();
     auto parent_dict = o.get_dictionary(ck);
     Obj o2 = parent_dict.create_and_insert_linked_object("one");
+
+    auto obj_path = o2.get_path();
+    CHECK_EQUAL(obj_path.path_from_top.size(), 1);
+    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
+    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
+
     Obj o3 = parent_dict.create_and_insert_linked_object("two");
     Obj o4 = parent_dict.create_and_insert_linked_object("three");
 
@@ -5426,6 +5432,13 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     o2_dict.create_and_insert_linked_object("foo1");
     o2_dict.create_and_insert_linked_object("foo2");
     o3_dict.create_and_insert_linked_object("foo3");
+
+    obj_path = o2_dict.get_object("foo1").get_path();
+    CHECK_EQUAL(obj_path.path_from_top.size(), 2);
+    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
+    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
+    CHECK_EQUAL(obj_path.path_from_top[1].index.get_string(), "foo1");
+    CHECK_EQUAL(obj_path.path_from_top[1].col_key, col_recurse);
 
     tr->commit_and_continue_as_read();
     tr->verify();
