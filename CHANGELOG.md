@@ -16,7 +16,7 @@
 * Change listeners not triggered on certain Mixed attribute changes ([#4404](https://github.com/realm/realm-core/issues/4404))
 
 ### Breaking changes
-* None.
+* Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.
 
 -----------
 
