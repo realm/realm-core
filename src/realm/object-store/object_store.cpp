@@ -563,16 +563,6 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
     verify_no_errors<SchemaMismatchException>(applier, changes);
 }
 
-static void set_embedded(Table& table, ObjectSchema::IsEmbedded is_embedded)
-{
-    if (!table.set_embedded(is_embedded) && is_embedded) {
-        auto msg =
-            util::format("Cannot convert object type '%1' to embedded because objects have multiple incoming links.",
-                         ObjectStore::object_type_for_table_name(table.get_name()));
-        throw std::logic_error(std::move(msg));
-    }
-}
-
 static void set_primary_key(Table& table, const Property* property)
 {
     ColKey col;
@@ -612,7 +602,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            set_embedded(table(op.object), op.object->is_embedded);
+            table(op.object).set_embedded(op.object->is_embedded);
         }
         void operator()(AddProperty op)
         {
@@ -841,7 +831,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            set_embedded(table(op.object), op.object->is_embedded);
+            table(op.object).set_embedded(op.object->is_embedded);
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}
