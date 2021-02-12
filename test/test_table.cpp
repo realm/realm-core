@@ -5381,6 +5381,11 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     o2_ll.create_and_insert_linked_object(0);
     o2_ll.create_and_insert_linked_object(0);
     o3_ll.create_and_insert_linked_object(0);
+
+    tr->commit_and_continue_as_read();
+    tr->verify();
+
+    tr->promote_to_write();
     CHECK(table->size() == 6);
     parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
@@ -5389,6 +5394,51 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     CHECK(table->size() == 0);
     parent_ll.create_and_insert_linked_object(0);
     parent_ll.create_and_insert_linked_object(1);
+    CHECK(table->size() == 2);
+    o.remove();
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
+TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_dictionary(*table, "theRecursiveBit");
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_dictionary(*table, "theGreatColumn");
+    Obj o = parent->create_object();
+    auto parent_dict = o.get_dictionary(ck);
+    Obj o2 = parent_dict.create_and_insert_linked_object("one");
+    Obj o3 = parent_dict.create_and_insert_linked_object("two");
+    Obj o4 = parent_dict.create_and_insert_linked_object("three");
+
+    CHECK_EQUAL(parent_dict.get_object("one").get_key(), o2.get_key());
+
+    auto o2_dict = o2.get_dictionary(col_recurse);
+    auto o3_dict = o3.get_dictionary(col_recurse);
+    o2_dict.create_and_insert_linked_object("foo1");
+    o2_dict.create_and_insert_linked_object("foo2");
+    o3_dict.create_and_insert_linked_object("foo3");
+
+    tr->commit_and_continue_as_read();
+    tr->verify();
+
+    tr->promote_to_write();
+    CHECK(table->size() == 6);
+    parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    parent_dict.clear();
+    CHECK(table->size() == 0);
+    parent_dict.create_and_insert_linked_object("four");
+    parent_dict.create_and_insert_linked_object("five");
     CHECK(table->size() == 2);
     o.remove();
     CHECK(table->size() == 0);

@@ -777,8 +777,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 if (attr.test(col_attr_Dictionary)) {
                     if (col_type == col_type_Mixed || col_type == col_type_Link) {
                         Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
-                        auto dict = obj.get_dictionary(col_key);
-                        dict.remove_backlinks();
+                        const Dictionary dict = obj.get_dictionary(col_key);
+                        dict.remove_backlinks(state);
                     }
                 }
                 else if (col_type == col_type_LinkList) {

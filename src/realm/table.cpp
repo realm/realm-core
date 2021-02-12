@@ -463,8 +463,6 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
-    if (target.is_embedded())
-        throw LogicError(LogicError::wrong_kind_of_table);
 
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
