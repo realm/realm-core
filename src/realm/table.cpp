@@ -1031,8 +1031,14 @@ void Table::do_erase_root_column(ColKey col_key)
 
 bool Table::set_embedded(bool embedded)
 {
-    if (embedded == m_is_embedded)
+    if (embedded == m_is_embedded) {
         return true;
+    }
+    
+    if (embedded == false) {
+        do_set_embedded(false);
+        return true;
+    }
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {

@@ -591,7 +591,7 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
+            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
         }
@@ -611,7 +611,27 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "object", false), 2, nullptr));
+            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
+
+            REQUIRE(realm->schema_version() == 2);
+        }
+        
+        SECTION("re-apply embedded flag to table") {
+            Schema schema = {
+                {"child_table",
+                    ObjectSchema::IsEmbedded{true},
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"parent_table",
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+
+            REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
         }
@@ -630,7 +650,7 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
             
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
+            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
         }
 
         SECTION("change table to embedded - no migration block") {
