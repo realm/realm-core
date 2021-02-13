@@ -73,7 +73,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {
-            if (table->get_column_attr(key).test(col_attr_Collection))
+            if (table->get_column_attr(key).test(col_attr_List))
                 m_lists.push_back({&observer, {}, key});
         }
     }
@@ -108,20 +108,12 @@ void KVOAdapter::before(Transaction& sg)
         auto column_modifications = table.get_columns_modified(key);
         if (column_modifications) {
             for (auto col : *column_modifications) {
-                // We do not provide change indices with sets in Cocoa.
-                if (!realm::ColKey(col).is_set()) {
-                    observer.changes[col].kind = BindingContext::ColumnInfo::Kind::Set;
-                }
+                observer.changes[col].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
 
     for (auto& list : m_lists) {
-        // We do not provide change indices with sets in Cocoa.
-        if (list.col.is_set()) {
-            continue;
-        }
-
         if (list.builder.empty()) {
             // We may have pre-emptively marked the column as modified if the
             // LinkList was selected but the actual changes made ended up being
