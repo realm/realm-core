@@ -1063,7 +1063,7 @@ void Table::set_embedded(bool embedded)
     }
     else if (size() > 0) {
         for (auto object : *this) {
-            int backlink_count = object.get_backlink_count();
+            size_t backlink_count = object.get_backlink_count();
             if (backlink_count == 0) {
                 throw std::logic_error("At least one object does not have a backlink (data would get lost).");
             }
