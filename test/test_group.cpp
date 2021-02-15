@@ -1618,7 +1618,9 @@ TEST(Group_ChangeEmbeddedness)
     p2.set(col, obj2.get_key());
 
     // obj2 has no owner, so we can't make the table embedded
-    CHECK_THROW(t->set_embedded(true));
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(t->set_embedded(true), message);
+    CHECK_EQUAL(message, "At least one object does not have a backlink (data would get lost).");
     CHECK_NOT(t->is_embedded());
 
     // Now it has owner
@@ -1632,7 +1634,8 @@ TEST(Group_ChangeEmbeddedness)
 
     // Now obj2 has 2 parents
     CHECK_EQUAL(obj2.get_backlink_count(), 2);
-    CHECK_THROW(t->set_embedded(true));
+    CHECK_THROW_ANY_GET_MESSAGE(t->set_embedded(true), message);
+    CHECK_EQUAL(message, "At least one object does have multiple backlinks.");
     CHECK_NOT(t->is_embedded());
 }
 
