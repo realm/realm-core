@@ -486,6 +486,7 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
+        options.backup_at_file_format_change = m_config.backup_at_file_format_change;
         m_db = DB::create(*m_history, options);
     }
     catch (realm::FileFormatUpgradeRequired const&) {
