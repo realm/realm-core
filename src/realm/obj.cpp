@@ -1405,33 +1405,55 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx.val + 1 < fields.size());
-    auto attr = col_key.get_attrs();
-    if (attr.test(col_attr_Nullable)) {
-        ArrayIntNull values(alloc);
+
+    if (col_key.get_type() == col_type_Mixed) {
+        ArrayMixed values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
         values.init_from_parent();
-        util::Optional<int64_t> old = values.get(m_row_ndx);
-        if (old) {
-            auto new_val = add_wrap(*old, value);
+        Mixed old = values.get(m_row_ndx);
+        if (old.is_type(type_Int)) {
+            Mixed new_val = Mixed(add_wrap(old.get_int(), value));
             if (StringIndex* index = m_table->get_search_index(col_key)) {
-                index->set<int64_t>(m_key, new_val);
+                index->set<Mixed>(m_key, new_val);
             }
-            values.set(m_row_ndx, new_val);
+            values.set(m_row_ndx, Mixed(new_val));
         }
         else {
             throw LogicError{LogicError::illegal_combination};
         }
     }
     else {
-        ArrayInteger values(alloc);
-        values.set_parent(&fields, col_ndx.val + 1);
-        values.init_from_parent();
-        int64_t old = values.get(m_row_ndx);
-        auto new_val = add_wrap(old, value);
-        if (StringIndex* index = m_table->get_search_index(col_key)) {
-            index->set<int64_t>(m_key, new_val);
+        if (col_key.get_type() != col_type_Int)
+            throw LogicError(LogicError::illegal_type);
+
+        auto attr = col_key.get_attrs();
+        if (attr.test(col_attr_Nullable)) {
+            ArrayIntNull values(alloc);
+            values.set_parent(&fields, col_ndx.val + 1);
+            values.init_from_parent();
+            util::Optional<int64_t> old = values.get(m_row_ndx);
+            if (old) {
+                auto new_val = add_wrap(*old, value);
+                if (StringIndex* index = m_table->get_search_index(col_key)) {
+                    index->set<int64_t>(m_key, new_val);
+                }
+                values.set(m_row_ndx, new_val);
+            }
+            else {
+                throw LogicError{LogicError::illegal_combination};
+            }
         }
-        values.set(m_row_ndx, new_val);
+        else {
+            ArrayInteger values(alloc);
+            values.set_parent(&fields, col_ndx.val + 1);
+            values.init_from_parent();
+            int64_t old = values.get(m_row_ndx);
+            auto new_val = add_wrap(old, value);
+            if (StringIndex* index = m_table->get_search_index(col_key)) {
+                index->set<int64_t>(m_key, new_val);
+            }
+            values.set(m_row_ndx, new_val);
+        }
     }
 
     sync(fields);

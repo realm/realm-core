@@ -389,7 +389,11 @@ TEST(InstructionReplication_AddInteger)
         WriteTransaction wt{fixture.sg_1};
         TableRef foo = sync::create_table(wt, "class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        foo->create_object().add_int(col_ndx, 123);
+        ColKey col_mixed = foo->add_column(type_Mixed, "m");
+        auto obj = foo->create_object();
+        obj.set(col_mixed, Mixed(100));
+        obj.add_int(col_ndx, 123);
+        obj.add_int(col_mixed, 42);
         wt.commit();
     }
     fixture.replay_transactions();
@@ -400,7 +404,9 @@ TEST(InstructionReplication_AddInteger)
         ConstTableRef foo = rt.get_table("class_foo");
         CHECK_EQUAL(foo->size(), 1);
         ColKey col_ndx = foo->get_column_key("i");
+        ColKey col_mixed = foo->get_column_key("m");
         CHECK_EQUAL(foo->begin()->get<Int>(col_ndx), 123);
+        CHECK_EQUAL(foo->begin()->get_any(col_mixed).get_int(), 142);
     }
 }
 
