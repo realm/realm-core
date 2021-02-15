@@ -1029,10 +1029,10 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-bool Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded)
 {
     if (embedded == m_is_embedded) {
-        return true;
+        return;
     }
 
     if (Replication* repl = get_repl()) {
@@ -1043,7 +1043,7 @@ bool Table::set_embedded(bool embedded)
 
     if (embedded == false) {
         do_set_embedded(false);
-        return true;
+        return;
     }
 
     // Embedded objects cannot have a primary key.
@@ -1063,18 +1063,17 @@ bool Table::set_embedded(bool embedded)
     }
     else if (size() > 0) {
         for (auto object : *this) {
-            if (object.get_backlink_count() == 0) {
+            int backlink_count = object.get_backlink_count();
+            if (backlink_count == 0) {
                 throw std::logic_error("At least one object does not have a backlink (data would get lost).");
             }
-            else if (object.get_backlink_count() > 1) {
+            else if (backlink_count > 1) {
                 throw std::logic_error("At least one object does have multiple backlinks.");
             }
         }
     }
 
     do_set_embedded(embedded);
-
-    return true;
 }
 
 void Table::do_set_embedded(bool embedded)
