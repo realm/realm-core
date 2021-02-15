@@ -103,7 +103,7 @@ public:
     void erase(Iterator it);
 
     void nullify(Mixed);
-    bool remove_backlinks(CascadeState& state) const;
+    void remove_backlinks(CascadeState& state) const;
 
     void clear() final;
 

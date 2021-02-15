@@ -610,14 +610,11 @@ void Dictionary::nullify(Mixed key)
     values.set(state.index, Mixed());
 }
 
-bool Dictionary::remove_backlinks(CascadeState& state) const
+void Dictionary::remove_backlinks(CascadeState& state) const
 {
-    bool recurse = false;
     for (auto&& elem : *this) {
-        if (clear_backlink(elem.second, state))
-            recurse = true;
+        clear_backlink(elem.second, state);
     }
-    return recurse;
 }
 
 
@@ -637,15 +634,15 @@ void Dictionary::clear()
             n++;
         }
 
-        if (recurse)
-            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
-
         // Just destroy the whole cluster
         m_clusters->destroy();
         delete m_clusters;
         m_clusters = nullptr;
 
         update_child_ref(0, 0);
+
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 }
 
