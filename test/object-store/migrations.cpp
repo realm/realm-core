@@ -754,13 +754,13 @@ TEST_CASE("migration: Automatic") {
         SECTION("change table to embedded - multiple incoming links - resolved in migration block") {
             Schema schema = {
                 {"child_table",
-                    {
-                        {"value", PropertyType::Int},
-                    }},
+                 {
+                     {"value", PropertyType::Int},
+                 }},
                 {"parent_table",
-                    {
-                        {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
-                    }},
+                 {
+                     {"child_property", PropertyType::Object | PropertyType::Nullable, "child_table"},
+                 }},
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
@@ -804,7 +804,7 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(value == 42);
             }
         }
-        
+
         SECTION("change table to embedded - adding more links in migration block") {
             Schema schema = {
                 {"child_table",
