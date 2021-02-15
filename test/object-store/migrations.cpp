@@ -599,7 +599,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("change empty table from embedded to top-level") {
             Schema schema = {
                 {"child_table",
-                    ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::IsEmbedded{true},
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -615,11 +615,11 @@ TEST_CASE("migration: Automatic") {
 
             REQUIRE(realm->schema_version() == 2);
         }
-        
+
         SECTION("re-apply embedded flag to table") {
             Schema schema = {
                 {"child_table",
-                    ObjectSchema::IsEmbedded{true},
+                 ObjectSchema::IsEmbedded{true},
                  {
                      {"value", PropertyType::Int},
                  }},
@@ -635,7 +635,7 @@ TEST_CASE("migration: Automatic") {
 
             REQUIRE(realm->schema_version() == 2);
         }
-        
+
         SECTION("change table to embedded - table has primary key") {
             Schema schema = {
                 {"child_table",
@@ -649,7 +649,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            
+
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
         }
 
@@ -662,7 +662,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            
+
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
         }
 
@@ -675,9 +675,9 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            
+
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2,
-                                                 [](auto old_realm, auto new_realm, auto&) {}));
+                                                [](auto old_realm, auto new_realm, auto&) {}));
         }
 
         SECTION("change table to embedded - one incoming link per object") {
@@ -775,24 +775,23 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 1);
-            
+
             REQUIRE_NOTHROW(realm->update_schema(
                 set_embedded(schema, "child_table", true), 2, [](auto old_realm, auto new_realm, auto&) {
-                
-                Object parent_object1(new_realm, "parent_table", 0);
-                CppContext context(new_realm);
-                Object child_object1 =
-                any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
-                int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
-                
-                auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
-                Obj child_object2 = child_table->create_object();
-                child_object2.set("value", value);
-                
-                Object parent_object2(new_realm, "parent_table", 1);
-                parent_object2.set_property_value(context, "child_property", util::Any(child_object2));
-            }));
-            
+                    Object parent_object1(new_realm, "parent_table", 0);
+                    CppContext context(new_realm);
+                    Object child_object1 =
+                        any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
+                    int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
+
+                    auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
+                    Obj child_object2 = child_table->create_object();
+                    child_object2.set("value", value);
+
+                    Object parent_object2(new_realm, "parent_table", 1);
+                    parent_object2.set_property_value(context, "child_property", util::Any(child_object2));
+                }));
+
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 2);
@@ -800,7 +799,7 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
                 int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42);
             }

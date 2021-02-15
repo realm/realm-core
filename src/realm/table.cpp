@@ -1034,7 +1034,7 @@ bool Table::set_embedded(bool embedded)
     if (embedded == m_is_embedded) {
         return true;
     }
-    
+
     if (embedded == false) {
         do_set_embedded(false);
         return true;
@@ -1050,7 +1050,7 @@ bool Table::set_embedded(bool embedded)
     if (get_primary_key_column()) {
         throw std::logic_error("Cannot change table to embedded when using a primary key.");
     }
-    
+
     // `has_backlink_columns` indicates if the table is embedded in any other table.
     bool has_backlink_columns = false;
     for_each_backlink_column([&has_backlink_columns](ColKey) {
@@ -1058,12 +1058,15 @@ bool Table::set_embedded(bool embedded)
         return true;
     });
     if (!has_backlink_columns) {
-        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in at least one other table.");
-    } else if (size() > 0) {
+        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in "
+                               "at least one other table.");
+    }
+    else if (size() > 0) {
         for (auto object : *this) {
             if (object.get_backlink_count() == 0) {
                 throw std::logic_error("At least one object does not have a backlink (data would get lost).");
-            } else if (object.get_backlink_count() > 1) {
+            }
+            else if (object.get_backlink_count() > 1) {
                 throw std::logic_error("At least one object does have multiple backlinks.");
             }
         }
