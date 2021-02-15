@@ -1035,15 +1035,15 @@ bool Table::set_embedded(bool embedded)
         return true;
     }
 
-    if (embedded == false) {
-        do_set_embedded(false);
-        return true;
-    }
-
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
             throw std::logic_error("Cannot change table to embedded when using Sync.");
         }
+    }
+
+    if (embedded == false) {
+        do_set_embedded(false);
+        return true;
     }
 
     // Embedded objects cannot have a primary key.
