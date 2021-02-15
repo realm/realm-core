@@ -726,7 +726,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
             create_table(group, *op.object);
         }
         void operator()(RemoveTable) {}
-        void operator()(ChangeTableType op)
+        void operator()(ChangeTableType)
         { /* delayed until after the migration */
         }
         void operator()(AddInitialProperties op)
