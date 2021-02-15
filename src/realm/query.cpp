@@ -967,7 +967,8 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
             if (node->has_search_index()) {
                 node->index_based_aggregate(size_t(-1), [&](const Obj& obj) -> bool {
                     if (eval_object(obj)) {
-                        st.match(size_t(obj.get_key().value), obj.get<T>(column_key));
+                        st.m_key_offset = obj.get_key().value;
+                        st.match(realm::npos, obj.get<T>(column_key));
                         return true;
                     }
                     else {
@@ -998,7 +999,8 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
             for (size_t t = 0; t < m_view->size(); t++) {
                 const Obj obj = m_view->get_object(t);
                 if (eval_object(obj)) {
-                    st.match(size_t(obj.get_key().value), obj.get<T>(column_key));
+                    st.m_key_offset = obj.get_key().value;
+                    st.match(realm::npos, obj.get<T>(column_key));
                 }
             }
         }

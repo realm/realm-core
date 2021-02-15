@@ -22,6 +22,7 @@
 
 #include <realm/query_conditions.hpp>
 #include <realm/column_type_traits.hpp>
+#include <cmath>
 
 namespace realm {
 
@@ -38,8 +39,11 @@ public:
     bool match(size_t, Mixed value) noexcept final
     {
         if (!value.is_null()) {
+            auto v = value.get<T>();
+            if (aggregate_operations::is_nan(v))
+                return true;
             ++m_match_count;
-            m_state += value.get<T>();
+            m_state += v;
         }
         return (m_limit > m_match_count);
     }
@@ -57,15 +61,13 @@ public:
     bool match(size_t index, Mixed value) noexcept final
     {
         if (!value.is_null()) {
+            auto v = value.get<R>();
+            if (aggregate_operations::is_nan(v))
+                return true;
             ++m_match_count;
-            if (value.get<R>() < m_state) {
-                m_state = value.get<R>();
-                if (m_key_values) {
-                    m_minmax_key = m_key_values->get(index) + m_key_offset;
-                }
-                else {
-                    m_minmax_key = int64_t(index);
-                }
+            if (v < m_state) {
+                m_state = v;
+                m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
             }
         }
         return (m_limit > m_match_count);
@@ -88,15 +90,13 @@ public:
     bool match(size_t index, Mixed value) noexcept final
     {
         if (!value.is_null()) {
+            auto v = value.get<R>();
+            if (aggregate_operations::is_nan(v))
+                return true;
             ++m_match_count;
-            if (value.get<R>() > m_state) {
-                m_state = value.get<R>();
-                if (m_key_values) {
-                    m_minmax_key = m_key_values->get(index) + m_key_offset;
-                }
-                else {
-                    m_minmax_key = int64_t(index);
-                }
+            if (v > m_state) {
+                m_state = v;
+                m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
             }
         }
         return (m_limit > m_match_count);

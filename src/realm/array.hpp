@@ -138,7 +138,7 @@ struct TreeInsertBase {
 template <class T>
 class QueryStateFindAll : public QueryStateBase {
 public:
-    QueryStateFindAll(T& keys, size_t limit = -1)
+    explicit QueryStateFindAll(T& keys, size_t limit = -1)
         : QueryStateBase(limit)
         , m_keys(keys)
     {
@@ -1131,6 +1131,7 @@ bool Array::find_action(size_t index, util::Optional<int64_t>, QueryStateBase*, 
     return callback(index);
 }
 
+// This function is used when there is no callback. Here we will just perform the action implemented in 'state'.
 template <>
 inline bool Array::find_action<std::nullptr_t>(size_t index, util::Optional<int64_t> value, QueryStateBase* state,
                                                std::nullptr_t) const
@@ -1315,7 +1316,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 bool value_is_null = (v == null_value);
                 if (c(v, value, value_is_null, find_null)) {
                     util::Optional<int64_t> v2(value_is_null ? util::none : util::make_optional(v));
-                    if (!find_action<Callback>(start2 + baseindex, v2, state, callback))
+                    if (!find_action(start2 + baseindex, v2, state, callback))
                         return false; // tell caller to stop aggregating/search
                 }
             }
@@ -1327,28 +1328,28 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
     // Test first few items with no initial time overhead
     if (start2 > 0) {
         if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action<Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
         ++start2;
 
         if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action<Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
         ++start2;
 
         if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action<Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
         ++start2;
 
         if (m_size > start2 && c(get<bitwidth>(start2), value) && start2 < end) {
-            if (!find_action<Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         }
 
@@ -1378,7 +1379,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             end2 = end - start2 > process ? start2 + process : end;
         }
         for (; start2 < end2; start2++)
-            if (!find_action<Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+            if (!find_action(start2 + baseindex, get<bitwidth>(start2), state, callback))
                 return false;
         return true;
     }
@@ -1551,7 +1552,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryStateBase* state
 
         size_t t = first_set_bit64(m) / no0(width);
         p += t;
-        if (!find_action<Callback>(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
+        if (!find_action(p + baseindex, (chunk >> (p * width)) & mask1, state, callback))
             return false;
 
         if ((t + 1) * width == 64)
@@ -1571,148 +1572,148 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryStateBase* state, size_t b
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
         for (size_t t = 0; t < 64; t++) {
-            if (gt ? static_cast<int64_t>(chunk & 0x1) > v : static_cast<int64_t>(chunk & 0x1) < v) {if (!find_action<Callback>( t + baseindex, static_cast<int64_t>(chunk & 0x1), state, callback)) return false;}
+            if (gt ? static_cast<int64_t>(chunk & 0x1) > v : static_cast<int64_t>(chunk & 0x1) < v) {if (!find_action( t + baseindex, static_cast<int64_t>(chunk & 0x1), state, callback)) return false;}
             chunk >>= 1;
         }
     }
     else if (width == 2) {
         // Alot (50% +) faster than loop/compiler-unrolled loop
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 0 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 1 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 2 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 3 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 4 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 5 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 6 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
-        chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 7 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
 
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 16 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 8 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 17 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 9 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 18 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 10 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 19 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 11 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 20 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 12 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 21 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 13 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 22 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 14 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 23 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 15 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
 
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 24 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 16 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 25 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 17 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 26 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 18 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 27 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 19 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 28 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 20 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 29 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 21 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 30 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 22 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
-        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action<Callback>( 31 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 23 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 24 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 25 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 26 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 27 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 28 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 29 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 30 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
+        chunk >>= 2;
+        if (gt ? static_cast<int64_t>(chunk & 0x3) > v : static_cast<int64_t>(chunk & 0x3) < v) {if (!find_action( 31 + baseindex, static_cast<int64_t>(chunk & 0x3), state, callback)) return false;}
         chunk >>= 2;
     }
     else if (width == 4) {
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 0 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 1 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 2 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 2 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 3 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 3 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 4 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 4 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 5 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 5 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 6 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 6 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 7 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 7 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
 
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 8 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 8 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 9 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 9 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 10 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 10 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 11 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 11 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 12 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 12 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 13 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 13 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 14 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 14 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
+        if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action( 15 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
     }
     else if (width == 8) {
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 0 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 1 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 1 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 2 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 2 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 3 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 3 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 4 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 4 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 5 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 5 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 6 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 6 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<Callback>( 7 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action( 7 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
     }
     else if (width == 16) {
 
-        if (gt ? static_cast<short int>(chunk >> 0 * 16) > v : static_cast<short int>(chunk >> 0 * 16) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<short int>(chunk >> 0 * 16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 1 * 16) > v : static_cast<short int>(chunk >> 1 * 16) < v) {if (!find_action<Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1 * 16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 2 * 16) > v : static_cast<short int>(chunk >> 2 * 16) < v) {if (!find_action<Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2 * 16), state, callback)) return false;};
-        if (gt ? static_cast<short int>(chunk >> 3 * 16) > v : static_cast<short int>(chunk >> 3 * 16) < v) {if (!find_action<Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 0 * 16) > v : static_cast<short int>(chunk >> 0 * 16) < v) {if (!find_action( 0 + baseindex, static_cast<short int>(chunk >> 0 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 1 * 16) > v : static_cast<short int>(chunk >> 1 * 16) < v) {if (!find_action( 1 + baseindex, static_cast<short int>(chunk >> 1 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 2 * 16) > v : static_cast<short int>(chunk >> 2 * 16) < v) {if (!find_action( 2 + baseindex, static_cast<short int>(chunk >> 2 * 16), state, callback)) return false;};
+        if (gt ? static_cast<short int>(chunk >> 3 * 16) > v : static_cast<short int>(chunk >> 3 * 16) < v) {if (!find_action( 3 + baseindex, static_cast<short int>(chunk >> 3 * 16), state, callback)) return false;};
     }
     else if (width == 32) {
-        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<int>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action( 0 + baseindex, static_cast<int>(chunk), state, callback)) return false;}
         chunk >>= 32;
-        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action<Callback>( 1 + baseindex, static_cast<int>(chunk), state, callback)) return false;}
+        if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action( 1 + baseindex, static_cast<int>(chunk), state, callback)) return false;}
         chunk >>= 32;
     }
     else if (width == 64) {
-        if (gt ? static_cast<int64_t>(v) > v : static_cast<int64_t>(v) < v) {if (!find_action<Callback>( 0 + baseindex, static_cast<int64_t>(v), state, callback)) return false;};
+        if (gt ? static_cast<int64_t>(v) > v : static_cast<int64_t>(v) < v) {if (!find_action( 0 + baseindex, static_cast<int64_t>(v), state, callback)) return false;};
     }
 
     return true;
@@ -1730,7 +1731,7 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
     ee = ee > end ? end : ee;
     for (; start < ee; ++start)
         if (eq ? (get<width>(start) == value) : (get<width>(start) != value)) {
-            if (!find_action<Callback>(start + baseindex, get<width>(start), state, callback))
+            if (!find_action(start + baseindex, get<width>(start), state, callback))
                 return false;
         }
 
@@ -1764,7 +1765,7 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
                 if (a >= 64 / no0(width))
                     break;
 
-                if (!find_action<Callback>(a + start + baseindex, get<width>(start + a), state, callback))
+                if (!find_action(a + start + baseindex, get<width>(start + a), state, callback))
                     return false;
                 v2 >>= (t + 1) * width;
                 a += 1;
@@ -1782,7 +1783,7 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
 
     while (start < end) {
         if (eq ? get<width>(start) == value : get<width>(start) != value) {
-            if (!find_action<Callback>(start + baseindex, get<width>(start), state, callback))
+            if (!find_action(start + baseindex, get<width>(start), state, callback))
                 return false;
         }
         ++start;
@@ -1900,8 +1901,8 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
             size_t idx = first_set_bit(resmask) * 8 / no0(width);
             s += idx;
-            if (!find_action<Callback>(s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s),
-                                       state, callback))
+            if (!find_action(s + baseindex, get_universal<width>(reinterpret_cast<char*>(action_data), s), state,
+                             callback))
                 return false;
             resmask >>= (idx + 1) * no0(width) / 8;
             ++s;
@@ -1927,7 +1928,7 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
     // We can compare first element without checking for out-of-range
     v = get(start);
     if (c(v, foreign->get(start))) {
-        if (!find_action<Callback>(start + baseindex, v, state, callback))
+        if (!find_action(start + baseindex, v, state, callback))
             return false;
     }
 
@@ -1936,17 +1937,17 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
     if (start + 3 < end) {
         v = get(start);
         if (c(v, foreign->get(start)))
-            if (!find_action<Callback>(start + baseindex, v, state, callback))
+            if (!find_action(start + baseindex, v, state, callback))
                 return false;
 
         v = get(start + 1);
         if (c(v, foreign->get(start + 1)))
-            if (!find_action<Callback>(start + 1 + baseindex, v, state, callback))
+            if (!find_action(start + 1 + baseindex, v, state, callback))
                 return false;
 
         v = get(start + 2);
         if (c(v, foreign->get(start + 2)))
-            if (!find_action<Callback>(start + 2 + baseindex, v, state, callback))
+            if (!find_action(start + 2 + baseindex, v, state, callback))
                 return false;
 
         start += 3;
@@ -1982,7 +1983,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
     if (width == 0 && foreign_width == 0) {
         if (c(0, 0)) {
             while (start < end) {
-                if (!find_action<Callback>(start + baseindex, 0, state, callback))
+                if (!find_action(start + baseindex, 0, state, callback))
                     return false;
                 start++;
             }
@@ -2002,7 +2003,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
                 int64_t v = get_universal<width>(m_data, start);
                 int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
                 if (c(v, fv)) {
-                    if (!find_action<Callback>(start + baseindex, v, state, callback))
+                    if (!find_action(start + baseindex, v, state, callback))
                         return false;
                 }
                 start++;
@@ -2035,7 +2036,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
         int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
 
         if (c(v, fv)) {
-            if (!find_action<Callback>(start + baseindex, v, state, callback))
+            if (!find_action(start + baseindex, v, state, callback))
                 return false;
         }
 
@@ -2079,7 +2080,7 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
     ee = ee > end ? end : ee;
     for (; start < ee; start++) {
         if (gt ? (get<bitwidth>(start) > value) : (get<bitwidth>(start) < value)) {
-            if (!find_action<Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+            if (!find_action(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
     }
@@ -2144,7 +2145,7 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
     // Test unaligned end and/or values of width > 16 manually
     while (start < end) {
         if (gt ? get<bitwidth>(start) > value : get<bitwidth>(start) < value) {
-            if (!find_action<Callback>(start + baseindex, get<bitwidth>(start), state, callback))
+            if (!find_action(start + baseindex, get<bitwidth>(start), state, callback))
                 return false;
         }
         ++start;
