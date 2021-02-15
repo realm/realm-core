@@ -691,8 +691,7 @@ TEST_CASE("migration: Automatic") {
             auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2,
-                                                [](auto old_realm, auto new_realm, auto&) {}));
+            REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, [](auto, auto, auto&) {}));
         }
 
         SECTION("change table to embedded - one incoming link per object") {
@@ -795,8 +794,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_NOTHROW(realm->update_schema(
-                set_embedded(schema, "child_table", true), 2, [](auto old_realm, auto new_realm, auto&) {
+            REQUIRE_NOTHROW(
+                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
                     Object parent_object1(new_realm, "parent_table", 0);
                     CppContext context(new_realm);
                     Object child_object1 =
@@ -849,8 +848,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(child_table->size() == 1);
             REQUIRE_FALSE(child_table->is_embedded());
 
-            REQUIRE_THROWS(realm->update_schema(
-                set_embedded(schema, "child_table", true), 2, [](auto old_realm, auto new_realm, auto&) {
+            REQUIRE_THROWS(
+                realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
                     Object child_object(new_realm, "child_table", 0);
                     auto parent_table = ObjectStore::table_for_object_type(new_realm->read_group(), "parent_table");
                     Obj parent_obj = parent_table->create_object();
