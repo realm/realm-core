@@ -590,10 +590,13 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
         }
 
         SECTION("change empty table from embedded to top-level") {
@@ -610,10 +613,13 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
         }
 
         SECTION("re-apply embedded flag to table") {
@@ -630,10 +636,13 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
+            REQUIRE(child_table->is_embedded());
         }
 
         SECTION("change table to embedded - table has primary key") {
@@ -649,6 +658,8 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
         }
@@ -662,6 +673,8 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
         }
@@ -675,6 +688,8 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2,
                                                 [](auto old_realm, auto new_realm, auto&) {}));
@@ -707,12 +722,14 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 2);
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
 
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
             for (int i = 0; i < 2; i++) {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
@@ -747,6 +764,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
         }
@@ -775,6 +793,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(
                 set_embedded(schema, "child_table", true), 2, [](auto old_realm, auto new_realm, auto&) {
@@ -795,6 +814,7 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(realm->schema_version() == 2);
             REQUIRE(parent_table->size() == 2);
             REQUIRE(child_table->size() == 2);
+            REQUIRE(child_table->is_embedded());
             for (int i = 0; i < 2; i++) {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
@@ -827,6 +847,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
             REQUIRE(parent_table->size() == 1);
             REQUIRE(child_table->size() == 1);
+            REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(
                 set_embedded(schema, "child_table", true), 2, [](auto old_realm, auto new_realm, auto&) {
