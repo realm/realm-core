@@ -1618,7 +1618,7 @@ TEST(Group_ChangeEmbeddedness)
     p2.set(col, obj2.get_key());
 
     // obj2 has no owner, so we can't make the table embedded
-    CHECK_THROWS(t->set_embedded(true));
+    REQUIRE_THROWS(t->set_embedded(true));
     CHECK_NOT(t->is_embedded());
 
     // Now it has owner
@@ -1632,7 +1632,7 @@ TEST(Group_ChangeEmbeddedness)
 
     // Now obj2 has 2 parents
     CHECK_EQUAL(obj2.get_backlink_count(), 2);
-    CHECK_THROWS(t->set_embedded(true));
+    REQUIRE_THROWS(t->set_embedded(true));
     CHECK_NOT(t->is_embedded());
 }
 
