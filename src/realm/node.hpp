@@ -345,6 +345,7 @@ private:
 };
 
 class Spec;
+class Mixed;
 
 /// Base class for all nodes holding user data
 class ArrayPayload {

@@ -254,14 +254,24 @@ inline Mixed::Mixed(bool v) noexcept
 
 inline Mixed::Mixed(float v) noexcept
 {
-    m_type = int(type_Float) + 1;
-    float_val = v;
+    if (null::is_null_float(v)) {
+        m_type = 0;
+    }
+    else {
+        m_type = int(type_Float) + 1;
+        float_val = v;
+    }
 }
 
 inline Mixed::Mixed(double v) noexcept
 {
-    m_type = int(type_Double) + 1;
-    double_val = v;
+    if (null::is_null_float(v)) {
+        m_type = 0;
+    }
+    else {
+        m_type = int(type_Double) + 1;
+        double_val = v;
+    }
 }
 
 inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
@@ -288,7 +298,7 @@ inline Mixed::Mixed(util::Optional<bool> v) noexcept
 
 inline Mixed::Mixed(util::Optional<float> v) noexcept
 {
-    if (v) {
+    if (v && !null::is_null_float(*v)) {
         m_type = int(type_Float) + 1;
         float_val = *v;
     }
@@ -299,7 +309,7 @@ inline Mixed::Mixed(util::Optional<float> v) noexcept
 
 inline Mixed::Mixed(util::Optional<double> v) noexcept
 {
-    if (v) {
+    if (v && !null::is_null_float(*v)) {
         m_type = int(type_Double) + 1;
         double_val = *v;
     }
