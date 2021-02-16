@@ -120,11 +120,7 @@ QueryInfo::QueryType QueryInfo::type_from_action(Action action)
             return type_Count;
         case act_FindAll:
             return type_FindAll;
-        case act_CallIdx:
         case act_CallbackIdx:
-        case act_CallbackVal:
-        case act_CallbackNone:
-        case act_CallbackBoth:
             return type_Invalid;
     };
     REALM_UNREACHABLE();

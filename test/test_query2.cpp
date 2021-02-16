@@ -5427,6 +5427,8 @@ TEST(Query_IntIndexed)
     table->add_search_index(col_id);
     Query q = table->where().equal(col_id, 1);
     CHECK_EQUAL(q.count(), 10);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 10);
 }
 
 TEST(Query_IntFindInNextLeaf)

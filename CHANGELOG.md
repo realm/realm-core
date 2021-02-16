@@ -14,7 +14,8 @@
 * If a Dictionary contains Objects, those can not be returned by Results::get<Obj> ([#4374](https://github.com/realm/realm-core/issues/4374))
 * Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
 * Change listeners not triggered on certain Mixed attribute changes ([#4404](https://github.com/realm/realm-core/issues/4404))
-
+* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
+ 
 ### Breaking changes
 * Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.
 

@@ -2903,6 +2903,11 @@ public:
         return m_link_map.get_base_table();
     }
 
+    Allocator& get_alloc() const
+    {
+        return m_link_map.get_target_table()->get_alloc();
+    }
+
     void set_base_table(ConstTableRef table) final
     {
         m_link_map.set_base_table(table);
@@ -3028,7 +3033,7 @@ private:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = get_alloc();
         Value<int64_t> list_refs;
         get_lists(index, list_refs, 1);
         const bool is_from_list = true;
@@ -3289,7 +3294,7 @@ private:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
-        Allocator& alloc = this->get_base_table()->get_alloc();
+        Allocator& alloc = ColumnsCollection<T>::get_alloc();
         Value<int64_t> list_refs;
         this->get_lists(index, list_refs, 1);
         destination.init(list_refs.m_from_link_list, list_refs.size());
@@ -3322,7 +3327,7 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = m_list.get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs, 1);
         std::vector<Int> sizes;
@@ -3443,7 +3448,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs, 1);
         size_t sz = list_refs.size();
@@ -4018,24 +4023,6 @@ private:
 };
 
 namespace aggregate_operations {
-template <typename T>
-static bool is_nan(T value)
-{
-    if constexpr (std::is_floating_point_v<T>) {
-        return std::isnan(value);
-    }
-    else {
-        // gcc considers the argument unused if it's only used in one branch of if constexpr
-        static_cast<void>(value);
-        return false;
-    }
-}
-
-template <>
-inline bool is_nan<Decimal128>(Decimal128 value)
-{
-    return value.is_nan();
-}
 
 template <typename T, typename Compare>
 class MinMaxAggregateOperator {

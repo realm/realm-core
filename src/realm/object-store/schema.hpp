@@ -29,6 +29,7 @@ namespace realm {
 class ObjectSchema;
 class SchemaChange;
 class StringData;
+struct TableKey;
 struct Property;
 
 enum SchemaValidationMode : uint64_t { Basic = 0, Sync = 1, RejectEmbeddedOrphans = 2 };
@@ -56,6 +57,10 @@ public:
     // find an ObjectSchema with the same name as the passed in one
     iterator find(ObjectSchema const& object) noexcept;
     const_iterator find(ObjectSchema const& object) const noexcept;
+
+    // find an ObjectSchema by table key
+    iterator find(TableKey table_key) noexcept;
+    const_iterator find(TableKey table_key) const noexcept;
 
     // Verify that this schema is internally consistent (i.e. all properties are
     // valid, links link to types that actually exist, etc.)
