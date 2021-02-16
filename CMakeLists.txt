@@ -75,7 +75,7 @@ else()
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation)
+        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
     endif()
 
     # This warning is too agressive. It warns about moves that are not redundant on older
