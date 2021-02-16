@@ -369,6 +369,14 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 }
 void Dictionary::distinct(std::vector<size_t>&, util::Optional<bool>) const {}
 
+Obj Dictionary::create_and_insert_linked_object(Mixed key)
+{
+    Table& t = *get_target_table();
+    auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
+    insert(key, o.get_key());
+    return o;
+}
+
 Mixed Dictionary::get(Mixed key) const
 {
     update_if_needed();
@@ -498,8 +506,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     if (new_link != old_link) {
-        CascadeState cascade_state;
-        m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        bool recurse = m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 
     return {Iterator(this, state.index), !old_entry};
@@ -564,7 +574,11 @@ void Dictionary::erase(Mixed key)
         ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
         values.init_from_ref(ref);
         auto old_value = values.get(state.index);
-        clear_backlink(old_value);
+
+        CascadeState cascade_state(CascadeState::Mode::Strong);
+        bool recurse = clear_backlink(old_value, cascade_state);
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
 
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->dictionary_erase(*this, state.index, key);
@@ -596,10 +610,10 @@ void Dictionary::nullify(Mixed key)
     values.set(state.index, Mixed());
 }
 
-void Dictionary::remove_backlinks()
+void Dictionary::remove_backlinks(CascadeState& state) const
 {
     for (auto&& elem : *this) {
-        clear_backlink(elem.second);
+        clear_backlink(elem.second, state);
     }
 }
 
@@ -610,8 +624,11 @@ void Dictionary::clear()
         // TODO: Should we have a "dictionary_clear" instruction?
         Replication* repl = m_obj.get_replication();
         size_t n = 0;
+        bool recurse = false;
+        CascadeState cascade_state(CascadeState::Mode::Strong);
         for (auto&& elem : *this) {
-            clear_backlink(elem.second);
+            if (clear_backlink(elem.second, cascade_state))
+                recurse = true;
             if (repl)
                 repl->dictionary_erase(*this, n, elem.first);
             n++;
@@ -623,6 +640,9 @@ void Dictionary::clear()
         m_clusters = nullptr;
 
         update_child_ref(0, 0);
+
+        if (recurse)
+            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
     }
 }
 
@@ -697,12 +717,12 @@ std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) con
     return std::make_pair(key, val);
 }
 
-void Dictionary::clear_backlink(Mixed value)
+bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
 {
     if (value.is_type(type_TypedLink)) {
-        CascadeState dummy;
-        m_obj.remove_backlink(m_col_key, value.get_link(), dummy);
+        return m_obj.remove_backlink(m_col_key, value.get_link(), state);
     }
+    return false;
 }
 
 /************************* Dictionary::Iterator *************************/

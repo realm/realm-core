@@ -53,14 +53,12 @@ List& List::operator=(List&&) = default;
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : Collection(std::move(r), parent_obj, col)
     , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
-    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
     : Collection(std::move(r), list)
     , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
-    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 

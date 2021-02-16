@@ -386,7 +386,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     dict.erase(key);
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
-                    bad_transaction_log("Update: Embedded objects in dictionaries not supported yet.");
+                    dict.create_and_insert_linked_object(key);
                 },
             };
 
@@ -501,6 +501,9 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
             }
             if (instr.collection_type == CollectionType::List) {
                 table->add_column_list(*target, col_name);
+            }
+            else if (instr.collection_type == CollectionType::Dictionary) {
+                table->add_column_dictionary(*target, col_name);
             }
             else {
                 REALM_ASSERT(instr.collection_type == CollectionType::Single);
@@ -1070,12 +1073,41 @@ void InstructionApplier::resolve_dictionary_element(Dictionary& dict, InternStri
                                                     Instruction::Path::const_iterator end, const char* instr_name,
                                                     F&& callback)
 {
+    StringData string_key = get_string(key);
     if (begin == end) {
-        auto string_key = get_string(key);
         return callback(dict, Mixed{string_key});
     }
 
-    bad_transaction_log("%1: Nested dictionaries are not supported yet", instr_name);
+    auto col = dict.get_col_key();
+    auto table = dict.get_table();
+    auto field_name = table->get_column_name(col);
+
+    if (col.get_type() == col_type_Link) {
+        auto target = dict.get_target_table();
+        if (!target->is_embedded()) {
+            bad_transaction_log("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name, field_name,
+                                table->get_name(), string_key);
+        }
+
+        auto embedded_object = dict.get_object(string_key);
+        if (!embedded_object) {
+            bad_transaction_log("%1: Unmatched key through dictionary at '%3.%2[%4]'", instr_name, field_name,
+                                table->get_name(), string_key);
+        }
+
+        if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+            ++begin;
+            return resolve_field(embedded_object, *pfield, begin, end, instr_name, std::forward<F>(callback));
+        }
+        else {
+            bad_transaction_log("%1: Embedded object field reference is not a string", instr_name);
+        }
+    }
+    else {
+        bad_transaction_log(
+            "%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'", instr_name,
+            field_name, table->get_name(), col.get_type());
+    }
 }
 
 

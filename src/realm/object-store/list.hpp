@@ -20,7 +20,6 @@
 #define REALM_OS_LIST_HPP
 
 #include <realm/object-store/collection.hpp>
-#include <realm/object-store/object.hpp>
 
 #include <realm/decimal128.hpp>
 #include <realm/list.hpp>
@@ -122,20 +121,8 @@ public:
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
-    // The object being added to the list is already a managed embedded object
-    struct InvalidEmbeddedOperationException : public std::logic_error {
-        InvalidEmbeddedOperationException()
-            : std::logic_error("Cannot add an existing managed embedded object to a List.")
-        {
-        }
-    };
-
 private:
     std::shared_ptr<LstBase> m_list_base;
-    bool m_is_embedded = false;
-
-    template <typename T, typename Context>
-    void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
 
     template <typename Fn>
     auto dispatch(Fn&&) const;
@@ -190,13 +177,6 @@ size_t List::find(Context& ctx, T&& value) const
     return dispatch([&](auto t) {
         return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
     });
-}
-
-template <typename T, typename Context>
-void List::validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const
-{
-    if (!policy.copy && ctx.template unbox<Obj>(value, CreatePolicy::Skip).is_valid())
-        throw InvalidEmbeddedOperationException();
 }
 
 template <typename T, typename Context>

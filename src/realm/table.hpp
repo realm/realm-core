@@ -841,6 +841,7 @@ private:
     friend class ColKeyIterator;
     friend class Obj;
     friend class LnkLst;
+    friend class Dictionary;
     friend class IncludeDescriptor;
 };
 

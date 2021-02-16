@@ -125,7 +125,11 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         REALM_ASSERT(target_table);
 
         if (target_table->is_embedded()) {
-            REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            ConstTableRef static_target_table = table.get_link_target(col_key);
+
+            if (static_target_table != target_table)
+                REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            return Instruction::Payload::ObjectValue{};
         }
 
         Instruction::Payload::Link link;
@@ -775,7 +779,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             instr.path.m_path.reserve(size * 2);
         };
 
-        auto visitor = [&](const Obj& path_obj, ColKey next_field, size_t index) {
+        auto visitor = [&](const Obj& path_obj, ColKey next_field, Mixed index) {
             auto element_table = path_obj.get_table();
             if (element_table->is_embedded()) {
                 StringData field_name = element_table->get_column_name(next_field);
@@ -788,7 +792,11 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             }
 
             if (next_field.is_list()) {
-                instr.path.push_back(uint32_t(index));
+                instr.path.push_back(uint32_t(index.get_int()));
+            }
+            else if (next_field.is_dictionary()) {
+                InternString interned_field_name = m_encoder.intern_string(index.get_string());
+                instr.path.push_back(interned_field_name);
             }
         };
 

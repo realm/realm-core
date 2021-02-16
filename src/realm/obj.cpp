@@ -687,13 +687,23 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
                 TableRef tr = m_table->get_opposite_table(col_key);
                 Obj obj = tr->get_object(backlinks[0]); // always the first (and only)
                 auto next_col_key = m_table->get_opposite_column(col_key);
-                size_t index = 0;
+                Mixed index;
                 if (next_col_key.get_attrs().test(col_attr_List)) {
                     auto ll = obj.get_linklist(next_col_key);
-                    while (ll.get(index) != get_key()) {
-                        index++;
-                        REALM_ASSERT(ll.size() > index);
+                    auto i = ll.find_first(get_key());
+                    REALM_ASSERT(i != realm::npos);
+                    index = Mixed(int64_t(i));
+                }
+                else if (next_col_key.get_attrs().test(col_attr_Dictionary)) {
+                    ObjLink link = get_link();
+                    auto dict = obj.get_dictionary(next_col_key);
+                    for (auto it : dict) {
+                        if (it.second.is_type(type_TypedLink) && it.second.get_link() == link) {
+                            index = it.first;
+                            break;
+                        }
                     }
+                    REALM_ASSERT(!index.is_null());
                 }
                 obj.traverse_path(v, ps, path_length + 1);
                 v(obj, next_col_key, index);
@@ -713,7 +723,7 @@ Obj::FatPath Obj::get_fat_path() const
     auto sizer = [&](size_t size) {
         result.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         result.push_back({o2, col, idx});
     };
     traverse_path(step, sizer);
@@ -727,7 +737,7 @@ Obj::Path Obj::get_path() const
     auto sizer = [&](size_t size) {
         result.path_from_top.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         if (!top_done) {
             top_done = true;
             result.top_table = o2.get_table()->get_key();
