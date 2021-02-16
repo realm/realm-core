@@ -98,6 +98,8 @@ if(ANDROID)
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     add_compile_options($<$<CONFIG:Release>:-Oz>)
+
+    # On some architectures char is unsigned by default. Make it signed
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 
