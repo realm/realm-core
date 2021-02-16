@@ -734,7 +734,7 @@ TEST_CASE("migration: Automatic") {
                 CppContext context(realm);
                 Object child_object =
                     any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                int value = any_cast<int>(child_object.get_property_value<util::Any>(context, "value"));
+                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42 + i);
             }
         }
@@ -800,7 +800,7 @@ TEST_CASE("migration: Automatic") {
                     CppContext context(new_realm);
                     Object child_object1 =
                         any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
-                    int value = any_cast<int>(child_object1.get_property_value<util::Any>(context, "value"));
+                    Int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
 
                     auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
                     Obj child_object2 = child_table->create_object();
@@ -819,7 +819,7 @@ TEST_CASE("migration: Automatic") {
                 CppContext context(realm);
                 Object child_object =
                     any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                int value = any_cast<int>(child_object.get_property_value<util::Any>(context, "value"));
+                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42);
             }
         }
