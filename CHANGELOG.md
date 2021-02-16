@@ -12,9 +12,7 @@
 * Mixed: crash when removing/setting a null-valued position of a Mixed list or set ([#4304](https://github.com/realm/realm-core/issues/4304))
 * Results based on dictionary keys will return wrong value from 'get_type'. ([#4365](https://github.com/realm/realm-core/issues/4365))
 * If a Dictionary contains Objects, those can not be returned by Results::get<Obj> ([#4374](https://github.com/realm/realm-core/issues/4374))
-* Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
 * Change listeners not triggered on certain Mixed attribute changes ([#4404](https://github.com/realm/realm-core/issues/4404))
-* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
  
 ### Breaking changes
 * Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.
@@ -34,6 +32,14 @@
 ### Breaking changes
 * File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
 
+----------------------------------------------
+
+# 10.5.1 Release notes
+
+### Fixed
+* Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
+* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
+ 
 ----------------------------------------------
 
 # 10.5.0 Release notes
