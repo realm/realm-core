@@ -238,4 +238,15 @@ bool LnkSet::intersects(const LnkSet& rhs) const
     return this->m_set.intersects(rhs.m_set);
 }
 
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
+{
+    indices.resize(sz);
+    if (ascending) {
+        std::iota(indices.begin(), indices.end(), 0);
+    }
+    else {
+        std::iota(indices.rbegin(), indices.rend(), 0);
+    }
+}
+
 } // namespace realm

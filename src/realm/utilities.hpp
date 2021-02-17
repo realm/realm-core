@@ -122,8 +122,8 @@ REALM_FORCEINLINE bool sseavx()
 void cpuid_init();
 void* round_up(void* p, size_t align);
 void* round_down(void* p, size_t align);
-size_t round_up(size_t p, size_t align);
-size_t round_down(size_t p, size_t align);
+constexpr size_t round_up(size_t p, size_t align);
+constexpr size_t round_down(size_t p, size_t align);
 void millisleep(unsigned long milliseconds);
 
 #ifdef _WIN32
@@ -334,6 +334,31 @@ inline char toLowerAscii(char c)
     }
     return c;
 }
+
+inline void* round_up(void* p, size_t align)
+{
+    size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
+    return static_cast<char*>(p) + r;
+}
+
+inline void* round_down(void* p, size_t align)
+{
+    size_t r = size_t(p);
+    return reinterpret_cast<void*>(r & ~(align - 1));
+}
+
+constexpr inline size_t round_up(size_t p, size_t align)
+{
+    size_t r = p % align == 0 ? 0 : align - p % align;
+    return p + r;
+}
+
+constexpr inline size_t round_down(size_t p, size_t align)
+{
+    size_t r = p;
+    return r & (~(align - 1));
+}
+
 
 template <class T>
 struct Wrap {
