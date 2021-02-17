@@ -86,6 +86,8 @@ public:
 
     template <typename T>
     void insert(StringData key, T value);
+    std::pair<size_t, bool> insert_any(StringData key, Mixed value);
+
     template <typename T>
     T get(StringData key) const;
 
