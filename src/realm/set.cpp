@@ -219,6 +219,7 @@ void LnkSet::remove_target_row(size_t link_ndx)
 void LnkSet::remove_all_target_rows()
 {
     if (is_attached()) {
+        update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
     }
 }

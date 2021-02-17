@@ -25,29 +25,13 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
 {
     return wrap_err([&]() {
         list->verify_attached();
-        realm_value_t result{};
 
-        auto getter = util::overload{
-            [&](Obj*) {
-                Obj o = list->get<Obj>(index);
-                result.type = RLM_TYPE_LINK;
-                result.link.target_table = o.get_table()->get_key().value;
-                result.link.target = o.get_key().value;
-            },
-            [&](util::Optional<Obj>*) {
-                REALM_TERMINATE("Nullable link lists not supported");
-            },
-            [&](auto p) {
-                using T = std::remove_cv_t<std::remove_pointer_t<decltype(p)>>;
-                Mixed mixed{list->get<T>(index)};
-                result = to_capi(mixed);
-            },
-        };
+        auto val = list->get_any(index);
+        if (out_value) {
+            auto converted = objkey_to_typed_link(val, *list);
+            *out_value = to_capi(converted);
+        }
 
-        switch_on_type(list->get_type(), getter);
-
-        if (out_value)
-            *out_value = result;
         return true;
     });
 }

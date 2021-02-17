@@ -69,7 +69,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
 }
 
 /// Check that a mixed value can be inserted in a list.
-inline void check_value_assignable(const List& list, Mixed val)
+inline void check_value_assignable(const realm::object_store::Collection& list, Mixed val)
 {
     auto realm = list.get_realm();
     auto table_key = list.get_parent_table_key();
@@ -100,6 +100,14 @@ inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
         return ObjLink{target_table->get_key(), val.get<ObjKey>()};
     }
     return val;
+}
+
+inline Mixed objkey_to_typed_link(Mixed val, const realm::object_store::Collection& source_collection)
+{
+    auto& realm = source_collection.get_realm();
+    auto table = realm->read_group().get_table(source_collection.get_parent_table_key());
+    auto col_key = source_collection.get_parent_column_key();
+    return objkey_to_typed_link(val, col_key, *table);
 }
 
 struct FreeUserdata {

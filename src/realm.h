@@ -1566,7 +1566,7 @@ RLM_API void realm_collection_changes_get_ranges(
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_property_key_t);
+RLM_API realm_set_t* realm_get_set(realm_object_t*, realm_property_key_t);
 
 /**
  * Create a `realm_set_t` from a pointer to a `realm::object_store::Set`,
@@ -1596,14 +1596,14 @@ RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
  * @param out_size Where to put the set size. May be NULL.
  * @return True if no exception occurred.
  */
-RLM_API size_t realm_set_size(const realm_set_t*);
+RLM_API bool realm_set_size(const realm_set_t*, size_t* out_size);
 
 /**
  * Get the property that this set came from.
  *
  * @return True if no exception occurred.
  */
-RLM_API bool realm_set_get_property(const realm_list_t*, realm_property_info_t* out_property_info);
+RLM_API bool realm_set_get_property(const realm_set_t*, realm_property_info_t* out_property_info);
 
 /**
  * Get the value at @a index.
@@ -1619,6 +1619,9 @@ RLM_API bool realm_set_get(const realm_set_t*, size_t index, realm_value_t* out_
 
 /**
  * Find an element in a set.
+ *
+ * If @a value has a type that is incompatible with the set, it will be reported
+ * as not existing in the set.
  *
  * @param value The value to look for in the set.
  * @param out_index If non-null, and the element is found, this will be
@@ -1638,9 +1641,11 @@ RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out
  * @param value The value to insert.
  * @param out_index If non-null, will be set to the index of the inserted
  *                  element, or the index of the existing element.
+ * @param out_inserted If non-null, will be set to true if the element did not
+ *                     already exist in the set. Otherwise set to false.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t* out_index);
+RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t* out_index, bool* out_inserted);
 
 /**
  * Erase an element from a set.
@@ -1687,7 +1692,7 @@ RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t 
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_object_t*, void* userdata,
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, void* userdata,
                                                                         realm_free_userdata_func_t free,
                                                                         realm_on_collection_change_func_t on_change,
                                                                         realm_callback_error_func_t on_error,

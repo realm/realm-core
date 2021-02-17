@@ -2133,6 +2133,401 @@ TEST_CASE("C API") {
             }
         }
 
+        SECTION("sets") {
+            SECTION("realm_get_set() errors") {
+                CHECK(!realm_get_set(obj1.get(), foo_properties["int"]));
+                CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
+
+                CHECK(!realm_get_set(obj1.get(), 123123123));
+                CHECK_ERR(RLM_ERR_INVALID_PROPERTY);
+            }
+
+            SECTION("nullable strings") {
+                auto strings = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+                CHECK(strings);
+                CHECK(!realm_is_frozen(strings.get()));
+
+                realm_value_t a = rlm_str_val("a");
+                realm_value_t b = rlm_str_val("b");
+                realm_value_t c = rlm_null();
+
+                SECTION("realm_equals() type check") {
+                    CHECK(!realm_equals(strings.get(), obj1.get()));
+                }
+
+                SECTION("realm_clone()") {
+                    auto set2 = clone_cptr(strings.get());
+                    CHECK(realm_equals(strings.get(), set2.get()));
+                    CHECK(strings.get() != set2.get());
+                }
+
+                SECTION("insert, then get") {
+                    write([&]() {
+                        bool inserted = false;
+                        CHECK(checked(realm_set_insert(strings.get(), a, nullptr, &inserted)));
+                        CHECK(inserted);
+                        CHECK(checked(realm_set_insert(strings.get(), b, nullptr, &inserted)));
+                        CHECK(inserted);
+                        CHECK(checked(realm_set_insert(strings.get(), c, nullptr, &inserted)));
+                        CHECK(inserted);
+
+                        size_t a_index, b_index, c_index;
+                        bool found = false;
+                        CHECK(checked(realm_set_find(strings.get(), a, &a_index, &found)));
+                        CHECK(found);
+                        CHECK(checked(realm_set_find(strings.get(), b, &b_index, &found)));
+                        CHECK(found);
+                        CHECK(checked(realm_set_find(strings.get(), c, &c_index, &found)));
+                        CHECK(found);
+
+                        realm_value_t a2, b2, c2;
+                        CHECK(checked(realm_set_get(strings.get(), a_index, &a2)));
+                        CHECK(checked(realm_set_get(strings.get(), b_index, &b2)));
+                        CHECK(checked(realm_set_get(strings.get(), c_index, &c2)));
+
+                        CHECK(rlm_stdstr(a2) == "a");
+                        CHECK(rlm_stdstr(b2) == "b");
+                        CHECK(c2.type == RLM_TYPE_NULL);
+                    });
+                }
+
+                SECTION("equality") {
+                    auto strings2 = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+                    CHECK(strings2);
+                    CHECK(realm_equals(strings.get(), strings2.get()));
+
+                    write([&]() {
+                        auto obj3 = cptr_checked(realm_object_create(realm, class_foo.key));
+                        CHECK(obj3);
+                        auto strings3 =
+                            cptr_checked(realm_get_set(obj3.get(), foo_properties["nullable_string_set"]));
+                        CHECK(!realm_equals(strings.get(), strings3.get()));
+                    });
+                }
+            }
+
+            SECTION("get/insert all property types") {
+                realm_value_t null = rlm_null();
+                realm_value_t integer = rlm_int_val(987);
+                realm_value_t boolean = rlm_bool_val(true);
+                realm_value_t string = rlm_str_val("My string");
+                const uint8_t binary_data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+                realm_value_t binary = rlm_binary_val(binary_data, sizeof(binary_data));
+                realm_value_t timestamp = rlm_timestamp_val(1000000, 123123123);
+                realm_value_t fnum = rlm_float_val(123.f);
+                realm_value_t dnum = rlm_double_val(456.0);
+                realm_value_t decimal = rlm_decimal_val(999.0);
+                realm_value_t object_id = rlm_object_id_val("abc123abc123");
+                realm_value_t uuid = rlm_uuid_val("01234567-9abc-4def-9012-3456789abcde");
+
+                auto int_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["int_set"]));
+                auto bool_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["bool_set"]));
+                auto string_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["string_set"]));
+                auto binary_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["binary_set"]));
+                auto timestamp_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["timestamp_set"]));
+                auto float_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["float_set"]));
+                auto double_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["double_set"]));
+                auto decimal_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["decimal_set"]));
+                auto object_id_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["object_id_set"]));
+                auto uuid_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["uuid_set"]));
+                auto nullable_int_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_int_set"]));
+                auto nullable_bool_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_bool_set"]));
+                auto nullable_string_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+                auto nullable_binary_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_binary_set"]));
+                auto nullable_timestamp_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_timestamp_set"]));
+                auto nullable_float_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_float_set"]));
+                auto nullable_double_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_double_set"]));
+                auto nullable_decimal_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_decimal_set"]));
+                auto nullable_object_id_set =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_object_id_set"]));
+                auto nullable_uuid_set = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_uuid_set"]));
+
+                write([&]() {
+                    CHECK(realm_set_insert(int_set.get(), integer, nullptr, nullptr));
+                    CHECK(realm_set_insert(bool_set.get(), boolean, nullptr, nullptr));
+                    CHECK(realm_set_insert(string_set.get(), string, nullptr, nullptr));
+                    CHECK(realm_set_insert(binary_set.get(), binary, nullptr, nullptr));
+                    CHECK(realm_set_insert(timestamp_set.get(), timestamp, nullptr, nullptr));
+                    CHECK(realm_set_insert(float_set.get(), fnum, nullptr, nullptr));
+                    CHECK(realm_set_insert(double_set.get(), dnum, nullptr, nullptr));
+                    CHECK(realm_set_insert(decimal_set.get(), decimal, nullptr, nullptr));
+                    CHECK(realm_set_insert(object_id_set.get(), object_id, nullptr, nullptr));
+                    CHECK(realm_set_insert(uuid_set.get(), uuid, nullptr, nullptr));
+
+                    CHECK(realm_set_insert(nullable_int_set.get(), integer, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_bool_set.get(), boolean, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_string_set.get(), string, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_binary_set.get(), binary, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_timestamp_set.get(), timestamp, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_float_set.get(), fnum, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_double_set.get(), dnum, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_decimal_set.get(), decimal, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_object_id_set.get(), object_id, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_uuid_set.get(), uuid, nullptr, nullptr));
+
+                    CHECK(realm_set_insert(nullable_int_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_bool_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_string_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_binary_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_timestamp_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_float_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_double_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_decimal_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_object_id_set.get(), null, nullptr, nullptr));
+                    CHECK(realm_set_insert(nullable_uuid_set.get(), null, nullptr, nullptr));
+                });
+
+                realm_value_t value;
+
+                CHECK(realm_set_get(int_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_set_get(bool_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_set_get(string_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_set_get(binary_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_set_get(timestamp_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_set_get(float_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_set_get(double_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_set_get(decimal_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_set_get(object_id_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_set_get(uuid_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, uuid));
+                CHECK(realm_set_get(nullable_int_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_set_get(nullable_bool_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_set_get(nullable_string_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_set_get(nullable_binary_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_set_get(nullable_timestamp_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_set_get(nullable_float_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_set_get(nullable_double_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_set_get(nullable_decimal_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_set_get(nullable_object_id_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_set_get(nullable_uuid_set.get(), 1, &value));
+                CHECK(rlm_val_eq(value, uuid));
+
+                write([&]() {
+                    size_t index;
+                    bool inserted;
+                    CHECK(realm_set_insert(nullable_int_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_bool_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_string_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_binary_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_timestamp_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_float_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_double_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_decimal_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_object_id_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                    CHECK(realm_set_insert(nullable_uuid_set.get(), null, &index, &inserted));
+                    CHECK((index == 0 && !inserted));
+                });
+
+                // Note: This relies on the fact that NULL is "less than" other
+                // values in the internal sort order.
+                CHECK(realm_set_get(nullable_int_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_bool_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_string_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_binary_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_timestamp_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_float_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_double_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_decimal_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_object_id_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_set_get(nullable_uuid_set.get(), 0, &value));
+                CHECK(rlm_val_eq(value, null));
+            }
+
+            SECTION("links") {
+                CPtr<realm_set_t> bars;
+
+                write([&]() {
+                    bars = cptr_checked(realm_get_set(obj1.get(), foo_properties["link_set"]));
+                    auto bar_link = realm_object_as_link(obj2.get());
+                    realm_value_t bar_link_val;
+                    bar_link_val.type = RLM_TYPE_LINK;
+                    bar_link_val.link = bar_link;
+                    size_t index;
+                    bool inserted;
+                    CHECK(checked(realm_set_insert(bars.get(), bar_link_val, &index, &inserted)));
+                    CHECK((index == 0 && inserted));
+                    CHECK(checked(realm_set_insert(bars.get(), bar_link_val, &index, &inserted)));
+                    CHECK((index == 0 && !inserted));
+                    size_t size;
+                    CHECK(checked(realm_set_size(bars.get(), &size)));
+                    CHECK(size == 1);
+                });
+
+                SECTION("get") {
+                    realm_value_t val;
+                    CHECK(checked(realm_set_get(bars.get(), 0, &val)));
+                    CHECK(val.type == RLM_TYPE_LINK);
+                    CHECK(val.link.target_table == class_bar.key);
+                    CHECK(val.link.target == realm_object_get_key(obj2.get()));
+
+                    auto result = realm_set_get(bars.get(), 1, &val);
+                    CHECK(!result);
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                }
+
+                SECTION("insert wrong type") {
+                    write([&]() {
+                        auto foo2 = cptr(realm_object_create(realm, class_foo.key));
+                        CHECK(foo2);
+                        realm_value_t foo2_link_val;
+                        foo2_link_val.type = RLM_TYPE_LINK;
+                        foo2_link_val.link = realm_object_as_link(foo2.get());
+
+                        CHECK(!realm_set_insert(bars.get(), foo2_link_val, nullptr, nullptr));
+                        CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
+                    });
+                }
+
+                SECTION("realm_set_clear()") {
+                    write([&]() {
+                        CHECK(realm_set_clear(bars.get()));
+                    });
+                    size_t size;
+                    CHECK(realm_set_size(bars.get(), &size));
+                    CHECK(size == 0);
+
+                    size_t num_bars;
+                    CHECK(realm_get_num_objects(realm, class_bar.key, &num_bars));
+                    CHECK(num_bars != 0);
+                }
+
+                SECTION("realm_set_remove_all()") {
+                    realm_value_t val;
+                    CHECK(checked(realm_set_get(bars.get(), 0, &val)));
+                    CHECK(val.type == RLM_TYPE_LINK);
+                    CHECK(val.link.target_table == class_bar.key);
+                    CHECK(val.link.target == realm_object_get_key(obj2.get()));
+
+                    size_t num_bars;
+                    size_t size;
+
+                    write([&]() {
+                        CHECK(checked(realm_set_remove_all(bars.get())));
+                    });
+
+                    CHECK(realm_set_size(bars.get(), &size));
+                    CHECK(size == 0);
+
+                    CHECK(realm_get_num_objects(realm, class_bar.key, &num_bars));
+                    CHECK(num_bars == 0);
+                }
+            }
+
+            SECTION("notifications") {
+                struct State {
+                    CPtr<realm_collection_changes_t> changes;
+                    CPtr<realm_async_error_t> error;
+                    bool destroyed = false;
+                };
+
+                State state;
+
+                auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->changes = clone_cptr(changes);
+                };
+
+                auto on_error = [](void* userdata, const realm_async_error_t* err) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->error = clone_cptr(err);
+                };
+
+                CPtr<realm_set_t> strings =
+                    cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+
+                auto str1 = rlm_str_val("a");
+                auto str2 = rlm_str_val("b");
+                auto null = rlm_null();
+
+                auto require_change = [&]() {
+                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
+                                                                                  on_change, on_error, nullptr));
+                    checked(realm_refresh(realm));
+                    return token;
+                };
+
+                SECTION("userdata is freed when the token is destroyed") {
+                    auto token = cptr_checked(realm_set_add_notification_callback(
+                        strings.get(), &state,
+                        [](void* p) {
+                            static_cast<State*>(p)->destroyed = true;
+                        },
+                        nullptr, nullptr, nullptr));
+                    CHECK(!state.destroyed);
+                    token.reset();
+                    CHECK(state.destroyed);
+                }
+
+                SECTION("insertion sends a change callback") {
+                    auto token = require_change();
+                    write([&]() {
+                        checked(realm_set_insert(strings.get(), str1, nullptr, nullptr));
+                        checked(realm_set_insert(strings.get(), str2, nullptr, nullptr));
+                        checked(realm_set_insert(strings.get(), null, nullptr, nullptr));
+                    });
+                    CHECK(!state.error);
+                    CHECK(state.changes);
+
+                    size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
+                    realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
+                                                            &num_insertion_ranges, &num_modification_ranges,
+                                                            &num_moves);
+                    CHECK(num_deletion_ranges == 0);
+                    CHECK(num_insertion_ranges == 1);
+                    CHECK(num_modification_ranges == 0);
+                    CHECK(num_moves == 0);
+
+                    realm_index_range_t insertion_range;
+                    realm_collection_changes_get_ranges(state.changes.get(), nullptr, 0, &insertion_range, 1, nullptr,
+                                                        0, nullptr, 0, nullptr, 0);
+                    CHECK(insertion_range.from == 0);
+                    CHECK(insertion_range.to == 3);
+                }
+            }
+        }
+
         SECTION("notifications") {
             struct State {
                 CPtr<realm_object_changes_t> changes;
