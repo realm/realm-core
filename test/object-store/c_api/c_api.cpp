@@ -468,6 +468,15 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
         "nullable_timestamp_set", "nullable_float_set", "nullable_double_set", "nullable_decimal_set",
         "nullable_object_id_set", "nullable_uuid_set",
     };
+    static const char* dict_names[] = {
+        "int_dict",   "bool_dict",   "string_dict",  "binary_dict",    "timestamp_dict",
+        "float_dict", "double_dict", "decimal_dict", "object_id_dict", "uuid_dict",
+    };
+    static const char* nullable_dict_names[] = {
+        "nullable_int_dict",       "nullable_bool_dict",  "nullable_string_dict", "nullable_binary_dict",
+        "nullable_timestamp_dict", "nullable_float_dict", "nullable_double_dict", "nullable_decimal_dict",
+        "nullable_object_id_dict", "nullable_uuid_dict",
+    };
     static const realm_property_type_e types[] = {
         RLM_PROPERTY_TYPE_INT,       RLM_PROPERTY_TYPE_BOOL,  RLM_PROPERTY_TYPE_STRING, RLM_PROPERTY_TYPE_BINARY,
         RLM_PROPERTY_TYPE_TIMESTAMP, RLM_PROPERTY_TYPE_FLOAT, RLM_PROPERTY_TYPE_DOUBLE, RLM_PROPERTY_TYPE_DECIMAL128,
@@ -480,6 +489,8 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     size_t num_nullable_list_names = std::distance(std::begin(nullable_list_names), std::end(nullable_list_names));
     size_t num_set_names = std::distance(std::begin(set_names), std::end(set_names));
     size_t num_nullable_set_names = std::distance(std::begin(nullable_set_names), std::end(nullable_set_names));
+    size_t num_dict_names = std::distance(std::begin(dict_names), std::end(dict_names));
+    size_t num_nullable_dict_names = std::distance(std::begin(nullable_dict_names), std::end(nullable_dict_names));
     size_t num_types = std::distance(std::begin(types), std::end(types));
 
     REALM_ASSERT(num_names == num_types);
@@ -488,6 +499,8 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     REALM_ASSERT(num_nullable_list_names == num_types);
     REALM_ASSERT(num_set_names == num_types);
     REALM_ASSERT(num_nullable_set_names == num_types);
+    REALM_ASSERT(num_dict_names == num_types);
+    REALM_ASSERT(num_nullable_dict_names == num_types);
 
     for (size_t i = 0; i < num_names; ++i) {
         const char* public_name = i == 0 ? "public_int" : "";
@@ -521,6 +534,14 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
             nullable_set_names[i], "", types[i], RLM_COLLECTION_TYPE_SET, "", "", RLM_INVALID_PROPERTY_KEY,
             RLM_PROPERTY_NULLABLE,
         };
+        realm_property_info_t dict{
+            dict_names[i],       "", types[i], RLM_COLLECTION_TYPE_DICTIONARY, "", "", RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NORMAL,
+        };
+        realm_property_info_t nullable_dict{
+            nullable_dict_names[i], "", types[i], RLM_COLLECTION_TYPE_DICTIONARY, "", "", RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NULLABLE,
+        };
 
         properties.push_back(normal);
         properties.push_back(nullable);
@@ -528,6 +549,8 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
         properties.push_back(nullable_list);
         properties.push_back(set);
         properties.push_back(nullable_set);
+        properties.push_back(dict);
+        properties.push_back(nullable_dict);
     }
 
     realm_property_info_t link{
@@ -542,10 +565,15 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
         "link_set",  "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_SET,
         link_target, "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
     };
+    realm_property_info_t link_dict{
+        "link_dict", "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_DICTIONARY,
+        link_target, "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
+    };
 
     properties.push_back(link);
     properties.push_back(link_list);
     properties.push_back(link_set);
+    properties.push_back(link_dict);
 
     // realm_property_info_t mixed{
     //     "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
