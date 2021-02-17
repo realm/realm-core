@@ -4,6 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
 * 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
+* Sets supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
