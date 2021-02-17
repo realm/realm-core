@@ -26,13 +26,18 @@
 namespace realm {
 namespace object_store {
 
-class Dictionary : public object_store::Collection {
+class Dictionary : public Collection {
 public:
     using Iterator = realm::Dictionary::Iterator;
     Dictionary() noexcept;
     Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict);
     ~Dictionary() override;
+
+    Dictionary(const Dictionary&);
+    Dictionary& operator=(const Dictionary&);
+    Dictionary(Dictionary&&);
+    Dictionary& operator=(Dictionary&&);
 
     bool operator==(const Dictionary& rgt) const noexcept
     {

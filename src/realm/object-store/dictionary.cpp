@@ -22,6 +22,11 @@
 
 namespace realm::object_store {
 
+Dictionary::Dictionary(const Dictionary&) = default;
+Dictionary::Dictionary(Dictionary&&) = default;
+Dictionary& Dictionary::operator=(const Dictionary&) = default;
+Dictionary& Dictionary::operator=(Dictionary&&) = default;
+
 Dictionary::Dictionary() noexcept
     : m_dict(nullptr)
 {
