@@ -110,6 +110,13 @@ public:
             bool ascending;
         };
         std::vector<SortColumn> m_columns;
+        struct ObjCache {
+            ObjKey key;
+            Mixed value;
+        };
+        using TableCache = std::vector<ObjCache>;
+        mutable std::vector<TableCache> m_cache;
+
         friend class ObjList;
     };
 
