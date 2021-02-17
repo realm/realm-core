@@ -1029,42 +1029,51 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-bool Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded)
 {
-    if (embedded == m_is_embedded)
-        return true;
+    if (embedded == m_is_embedded) {
+        return;
+    }
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error("Cannot change embedded property in sync client");
+            throw std::logic_error("Cannot change table to embedded when using Sync.");
         }
     }
 
-    if (get_primary_key_column()) {
-        return false;
+    if (embedded == false) {
+        do_set_embedded(false);
+        return;
     }
-    if (size() > 0) {
-        // Check if the table has any backlink columns. If not, it is not required
-        // to check all objects for backlinks.
-        bool has_backlink_columns = false;
-        for_each_backlink_column([&has_backlink_columns](ColKey) {
-            has_backlink_columns = true;
-            return true; // Done
-        });
 
-        if (has_backlink_columns) {
-            for (auto o : *this) {
-                // each object should be owned by one and only one parent
-                if (o.get_backlink_count() != 1) {
-                    return false;
-                }
+    // Embedded objects cannot have a primary key.
+    if (get_primary_key_column()) {
+        throw std::logic_error("Cannot change table to embedded when using a primary key.");
+    }
+
+    // `has_backlink_columns` indicates if the table is embedded in any other table.
+    bool has_backlink_columns = false;
+    for_each_backlink_column([&has_backlink_columns](ColKey) {
+        has_backlink_columns = true;
+        return true;
+    });
+    if (!has_backlink_columns) {
+        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in "
+                               "at least one other table.");
+    }
+    else if (size() > 0) {
+        for (auto object : *this) {
+            size_t backlink_count = object.get_backlink_count();
+            if (backlink_count == 0) {
+                throw std::logic_error("At least one object does not have a backlink (data would get lost).");
+            }
+            else if (backlink_count > 1) {
+                throw std::logic_error("At least one object does have multiple backlinks.");
             }
         }
     }
 
     do_set_embedded(embedded);
-
-    return true;
 }
 
 void Table::do_set_embedded(bool embedded)
