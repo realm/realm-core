@@ -1559,16 +1559,134 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
     realm_collection_move_t* out_moves, size_t max_moves);
 
-RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
-RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
+/**
+ * Get a set instance for the property of an object.
+ *
+ * Note: It is up to the caller to call `realm_release()` on the returned set.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_property_key_t);
+
+/**
+ * Create a `realm_set_t` from a pointer to a `realm::object_store::Set`,
+ * copy-constructing the internal representation.
+ *
+ * @param pset A pointer to an instance of `realm::object_store::Set`.
+ * @param n Must be equal to `sizeof(realm::object_store::Set)`.
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
+
+/**
+ * Create a `realm_set_t` from a pointer to a `realm::object_store::Set`,
+ * move-constructing the internal representation.
+ *
+ * @param pset A pointer to an instance of `realm::object_store::Set`.
+ * @param n Must be equal to `sizeof(realm::object_store::Set)`.
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
+
+/**
+ * Get the size of a set, in number of unique elements.
+ *
+ * This function may fail if the object owning the set has been deleted.
+ *
+ * @param out_size Where to put the set size. May be NULL.
+ * @return True if no exception occurred.
+ */
 RLM_API size_t realm_set_size(const realm_set_t*);
+
+/**
+ * Get the property that this set came from.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_get_property(const realm_list_t*, realm_property_info_t* out_property_info);
+
+/**
+ * Get the value at @a index.
+ *
+ * Note that elements in a set move around arbitrarily when other elements are
+ * inserted/removed.
+ *
+ * @param out_value The resulting value, if no error occurred. May be NULL,
+ *                  though nonsensical.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_get(const realm_set_t*, size_t index, realm_value_t* out_value);
-RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index);
-RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t out_index);
+
+/**
+ * Find an element in a set.
+ *
+ * @param value The value to look for in the set.
+ * @param out_index If non-null, and the element is found, this will be
+ *                  populated with the index of the found element in the set.
+ * @param out_found If non-null, will be set to true if the element was found,
+ *                  otherwise will be set to false.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index, bool* out_found);
+
+/**
+ * Insert an element in a set.
+ *
+ * If the element is already in the set, this function does nothing (and does
+ * not report an error).
+ *
+ * @param value The value to insert.
+ * @param out_index If non-null, will be set to the index of the inserted
+ *                  element, or the index of the existing element.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t* out_index);
+
+/**
+ * Erase an element from a set.
+ *
+ * If the element does not exist in the set, this function does nothing (and
+ * does not report an error).
+ *
+ * @param value The value to erase.
+ * @param out_erased If non-null, will be set to true if the element was found
+ *                   and erased, and otherwise set to false.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_erase(realm_set_t*, realm_value_t value, bool* out_erased);
+
+/**
+ * Clear a set of values.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_clear(realm_set_t*);
-RLM_API bool realm_set_assign(realm_set_t*, realm_value_t values, size_t num_values);
+
+/**
+ * In a set of objects, delete all objects in the set and clear the set. In a
+ * set of values, clear the set.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_remove_all(realm_set_t*);
+
+/**
+ * Replace the contents of a set with values.
+ *
+ * The provided values may contain duplicates, in which case the size of the set
+ * after calling this function will be less than @a num_values.
+ *
+ * @param values The list of values to insert.
+ * @param num_values The number of elements.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t num_values);
+
+/**
+ * Subscribe to notifications for this object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_object_t*, void* userdata,
                                                                         realm_free_userdata_func_t free,
                                                                         realm_on_collection_change_func_t on_change,
