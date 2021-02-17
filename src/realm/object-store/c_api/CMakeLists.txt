@@ -3,6 +3,7 @@ set(REALM_FFI_SOURCES
 
     config.cpp
     error.cpp
+    list.cpp
     notifications.cpp
     object.cpp
     query.cpp
