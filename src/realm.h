@@ -1764,7 +1764,7 @@ RLM_API bool realm_dictionary_find(const realm_dictionary_t*, realm_value_t key,
  *
  * @param index The index in the dictionary.
  * @param out_key If non-null, will be set to the key at the corresponding index.
- * @param out_Value If non-null, will be set to the value at the corresponding index.
+ * @param out_value If non-null, will be set to the value at the corresponding index.
  * @return True if no exception occurred.
  */
 RLM_API bool realm_dictionary_get(const realm_dictionary_t*, size_t index, realm_value_t* out_key,
