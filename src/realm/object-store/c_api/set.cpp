@@ -1,7 +1,5 @@
 #include <realm/object-store/c_api/util.hpp>
 
-#include <realm/util/overload.hpp>
-
 namespace realm::c_api {
 
 RLM_API bool realm_set_size(const realm_set_t* set, size_t* out_size)
