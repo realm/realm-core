@@ -307,5 +307,23 @@ RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t 
     });
 }
 
+RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_property_key_t key)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto obj = object->obj();
+        auto table = obj.get_table();
+        auto col_key = ColKey(key);
+        table->report_invalid_key(col_key);
+
+        if (!col_key.is_dictionary()) {
+            report_type_mismatch(object->get_realm(), *table, col_key);
+        }
+
+        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(obj), col_key}};
+    });
+}
+
 
 } // namespace realm::c_api

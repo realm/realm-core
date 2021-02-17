@@ -2556,6 +2556,511 @@ TEST_CASE("C API") {
             }
         }
 
+        SECTION("dictionaries") {
+            SECTION("realm_get_dictionary() errors") {
+                CHECK(!realm_get_dictionary(obj1.get(), foo_properties["int"]));
+                CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
+
+                CHECK(!realm_get_dictionary(obj1.get(), 123123123));
+                CHECK_ERR(RLM_ERR_INVALID_PROPERTY);
+            }
+
+            SECTION("nullable strings") {
+                auto strings = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+                CHECK(strings);
+                CHECK(!realm_is_frozen(strings.get()));
+
+                realm_value_t a = rlm_str_val("a");
+                realm_value_t b = rlm_str_val("b");
+                realm_value_t c = rlm_null();
+
+                SECTION("realm_equals() type check") {
+                    CHECK(!realm_equals(strings.get(), obj1.get()));
+                }
+
+                SECTION("realm_clone()") {
+                    auto set2 = clone_cptr(strings.get());
+                    CHECK(realm_equals(strings.get(), set2.get()));
+                    CHECK(strings.get() != set2.get());
+                }
+
+                SECTION("insert, then get") {
+                    write([&]() {
+                        bool inserted = false;
+                        CHECK(checked(realm_set_insert(strings.get(), a, nullptr, &inserted)));
+                        CHECK(inserted);
+                        CHECK(checked(realm_set_insert(strings.get(), b, nullptr, &inserted)));
+                        CHECK(inserted);
+                        CHECK(checked(realm_set_insert(strings.get(), c, nullptr, &inserted)));
+                        CHECK(inserted);
+
+                        size_t a_index, b_index, c_index;
+                        bool found = false;
+                        CHECK(checked(realm_set_find(strings.get(), a, &a_index, &found)));
+                        CHECK(found);
+                        CHECK(checked(realm_set_find(strings.get(), b, &b_index, &found)));
+                        CHECK(found);
+                        CHECK(checked(realm_set_find(strings.get(), c, &c_index, &found)));
+                        CHECK(found);
+
+                        realm_value_t a2, b2, c2;
+                        CHECK(checked(realm_set_get(strings.get(), a_index, &a2)));
+                        CHECK(checked(realm_set_get(strings.get(), b_index, &b2)));
+                        CHECK(checked(realm_set_get(strings.get(), c_index, &c2)));
+
+                        CHECK(rlm_stdstr(a2) == "a");
+                        CHECK(rlm_stdstr(b2) == "b");
+                        CHECK(c2.type == RLM_TYPE_NULL);
+                    });
+                }
+
+                SECTION("equality") {
+                    auto strings2 = cptr_checked(realm_get_set(obj1.get(), foo_properties["nullable_string_set"]));
+                    CHECK(strings2);
+                    CHECK(realm_equals(strings.get(), strings2.get()));
+
+                    write([&]() {
+                        auto obj3 = cptr_checked(realm_object_create(realm, class_foo.key));
+                        CHECK(obj3);
+                        auto strings3 =
+                            cptr_checked(realm_get_set(obj3.get(), foo_properties["nullable_string_set"]));
+                        CHECK(!realm_equals(strings.get(), strings3.get()));
+                    });
+                }
+            }
+
+            SECTION("get/insert all property types") {
+                realm_value_t key = rlm_str_val("k");
+                realm_value_t key2 = rlm_str_val("k2");
+
+                realm_value_t null = rlm_null();
+                realm_value_t integer = rlm_int_val(987);
+                realm_value_t boolean = rlm_bool_val(true);
+                realm_value_t string = rlm_str_val("My string");
+                const uint8_t binary_data[] = {0, 1, 2, 3, 4, 5, 6, 7};
+                realm_value_t binary = rlm_binary_val(binary_data, sizeof(binary_data));
+                realm_value_t timestamp = rlm_timestamp_val(1000000, 123123123);
+                realm_value_t fnum = rlm_float_val(123.f);
+                realm_value_t dnum = rlm_double_val(456.0);
+                realm_value_t decimal = rlm_decimal_val(999.0);
+                realm_value_t object_id = rlm_object_id_val("abc123abc123");
+                realm_value_t uuid = rlm_uuid_val("01234567-9abc-4def-9012-3456789abcde");
+
+                auto int_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["int_dict"]));
+                auto bool_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["bool_dict"]));
+                auto string_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["string_dict"]));
+                auto binary_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["binary_dict"]));
+                auto timestamp_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["timestamp_dict"]));
+                auto float_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["float_dict"]));
+                auto double_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["double_dict"]));
+                auto decimal_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["decimal_dict"]));
+                auto object_id_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["object_id_dict"]));
+                auto uuid_dict = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["uuid_dict"]));
+                auto nullable_int_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_int_dict"]));
+                auto nullable_bool_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_bool_dict"]));
+                auto nullable_string_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_string_dict"]));
+                auto nullable_binary_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_binary_dict"]));
+                auto nullable_timestamp_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_timestamp_dict"]));
+                auto nullable_float_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_float_dict"]));
+                auto nullable_double_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_double_dict"]));
+                auto nullable_decimal_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_decimal_dict"]));
+                auto nullable_object_id_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_object_id_dict"]));
+                auto nullable_uuid_dict =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_uuid_dict"]));
+
+                write([&]() {
+                    size_t index;
+                    bool inserted;
+                    CHECK(realm_dictionary_insert(int_dict.get(), key, integer, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(bool_dict.get(), key, boolean, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(string_dict.get(), key, string, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(binary_dict.get(), key, binary, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(timestamp_dict.get(), key, timestamp, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(float_dict.get(), key, fnum, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(double_dict.get(), key, dnum, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(decimal_dict.get(), key, decimal, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(object_id_dict.get(), key, object_id, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(uuid_dict.get(), key, uuid, &index, &inserted));
+                    CHECK((inserted && index == 0));
+
+                    CHECK(realm_dictionary_insert(nullable_int_dict.get(), key, integer, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_bool_dict.get(), key, boolean, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_string_dict.get(), key, string, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_binary_dict.get(), key, binary, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_timestamp_dict.get(), key, timestamp, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_float_dict.get(), key, fnum, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_double_dict.get(), key, dnum, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_decimal_dict.get(), key, decimal, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_object_id_dict.get(), key, object_id, &index, &inserted));
+                    CHECK((inserted && index == 0));
+                    CHECK(realm_dictionary_insert(nullable_uuid_dict.get(), key, uuid, &index, &inserted));
+                    CHECK((inserted && index == 0));
+
+                    CHECK(realm_dictionary_insert(nullable_int_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_bool_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_string_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_binary_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_timestamp_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_float_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_double_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_decimal_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_object_id_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                    CHECK(realm_dictionary_insert(nullable_uuid_dict.get(), key2, null, &index, &inserted));
+                    CHECK(inserted);
+                });
+
+                realm_value_t k, value;
+
+                CHECK(realm_dictionary_get(int_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_dictionary_get(bool_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_dictionary_get(string_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_dictionary_get(binary_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_dictionary_get(timestamp_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_dictionary_get(float_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_dictionary_get(double_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_dictionary_get(decimal_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_dictionary_get(object_id_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_dictionary_get(uuid_dict.get(), 0, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, uuid));
+                CHECK(realm_dictionary_get(nullable_int_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_dictionary_get(nullable_bool_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_dictionary_get(nullable_string_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_dictionary_get(nullable_binary_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_dictionary_get(nullable_timestamp_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_dictionary_get(nullable_float_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_dictionary_get(nullable_double_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_dictionary_get(nullable_decimal_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_dictionary_get(nullable_object_id_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_dictionary_get(nullable_uuid_dict.get(), 1, &k, &value));
+                CHECK(rlm_val_eq(k, key));
+                CHECK(rlm_val_eq(value, uuid));
+
+                write([&]() {
+                    size_t index;
+                    bool inserted;
+                    CHECK(realm_dictionary_insert(nullable_int_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_bool_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_string_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_binary_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_timestamp_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_float_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_double_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_decimal_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_object_id_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                    CHECK(realm_dictionary_insert(nullable_uuid_dict.get(), key2, null, &index, &inserted));
+                    CHECK(!inserted);
+                });
+
+                CHECK(realm_dictionary_find(int_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_dictionary_find(bool_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_dictionary_find(string_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_dictionary_find(binary_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_dictionary_find(timestamp_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_dictionary_find(float_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_dictionary_find(double_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_dictionary_find(decimal_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_dictionary_find(object_id_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_dictionary_find(uuid_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, uuid));
+                CHECK(realm_dictionary_find(nullable_int_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, integer));
+                CHECK(realm_dictionary_find(nullable_bool_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, boolean));
+                CHECK(realm_dictionary_find(nullable_string_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, string));
+                CHECK(realm_dictionary_find(nullable_binary_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, binary));
+                CHECK(realm_dictionary_find(nullable_timestamp_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, timestamp));
+                CHECK(realm_dictionary_find(nullable_float_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, fnum));
+                CHECK(realm_dictionary_find(nullable_double_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, dnum));
+                CHECK(realm_dictionary_find(nullable_decimal_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, decimal));
+                CHECK(realm_dictionary_find(nullable_object_id_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, object_id));
+                CHECK(realm_dictionary_find(nullable_uuid_dict.get(), key, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, uuid));
+
+                CHECK(realm_dictionary_find(nullable_int_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_bool_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_string_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_binary_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_timestamp_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_float_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_double_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_decimal_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_object_id_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+                CHECK(realm_dictionary_find(nullable_uuid_dict.get(), key2, &value, &found));
+                CHECK(found);
+                CHECK(rlm_val_eq(value, null));
+            }
+
+            SECTION("links") {
+                CPtr<realm_dictionary_t> bars;
+                realm_value_t key = rlm_str_val("k");
+
+                write([&]() {
+                    bars = cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["link_dict"]));
+                    auto bar_link = realm_object_as_link(obj2.get());
+                    realm_value_t bar_link_val;
+                    bar_link_val.type = RLM_TYPE_LINK;
+                    bar_link_val.link = bar_link;
+                    size_t index;
+                    bool inserted;
+                    CHECK(checked(realm_dictionary_insert(bars.get(), key, bar_link_val, &index, &inserted)));
+                    CHECK((index == 0 && inserted));
+                    CHECK(checked(realm_dictionary_insert(bars.get(), key, bar_link_val, &index, &inserted)));
+                    CHECK((index == 0 && !inserted));
+                    size_t size;
+                    CHECK(checked(realm_dictionary_size(bars.get(), &size)));
+                    CHECK(size == 1);
+                });
+
+                SECTION("get") {
+                    realm_value_t k, val;
+                    CHECK(checked(realm_dictionary_get(bars.get(), 0, &k, &val)));
+                    CHECK(rlm_val_eq(k, key));
+                    CHECK(val.type == RLM_TYPE_LINK);
+                    CHECK(val.link.target_table == class_bar.key);
+                    CHECK(val.link.target == realm_object_get_key(obj2.get()));
+
+                    auto result = realm_dictionary_get(bars.get(), 1, &k, &val);
+                    CHECK(!result);
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                }
+
+                SECTION("insert wrong type") {
+                    write([&]() {
+                        auto foo2 = cptr(realm_object_create(realm, class_foo.key));
+                        CHECK(foo2);
+                        realm_value_t foo2_link_val;
+                        foo2_link_val.type = RLM_TYPE_LINK;
+                        foo2_link_val.link = realm_object_as_link(foo2.get());
+
+                        CHECK(!realm_dictionary_insert(bars.get(), key, foo2_link_val, nullptr, nullptr));
+                        CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
+                    });
+                }
+
+                SECTION("realm_dictionary_clear()") {
+                    write([&]() {
+                        CHECK(realm_dictionary_clear(bars.get()));
+                    });
+                    size_t size;
+                    CHECK(realm_dictionary_size(bars.get(), &size));
+                    CHECK(size == 0);
+
+                    size_t num_bars;
+                    CHECK(realm_get_num_objects(realm, class_bar.key, &num_bars));
+                    CHECK(num_bars != 0);
+                }
+            }
+
+            SECTION("notifications") {
+                struct State {
+                    CPtr<realm_collection_changes_t> changes;
+                    CPtr<realm_async_error_t> error;
+                    bool destroyed = false;
+                };
+
+                State state;
+
+                auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->changes = clone_cptr(changes);
+                };
+
+                auto on_error = [](void* userdata, const realm_async_error_t* err) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->error = clone_cptr(err);
+                };
+
+                CPtr<realm_dictionary_t> strings =
+                    cptr_checked(realm_get_dictionary(obj1.get(), foo_properties["nullable_string_dict"]));
+
+                auto str1 = rlm_str_val("a");
+                auto str2 = rlm_str_val("b");
+                auto null = rlm_null();
+
+                auto require_change = [&]() {
+                    auto token = cptr_checked(realm_dictionary_add_notification_callback(
+                        strings.get(), &state, nullptr, on_change, on_error, nullptr));
+                    checked(realm_refresh(realm));
+                    return token;
+                };
+
+                SECTION("userdata is freed when the token is destroyed") {
+                    auto token = cptr_checked(realm_dictionary_add_notification_callback(
+                        strings.get(), &state,
+                        [](void* p) {
+                            static_cast<State*>(p)->destroyed = true;
+                        },
+                        nullptr, nullptr, nullptr));
+                    CHECK(!state.destroyed);
+                    token.reset();
+                    CHECK(state.destroyed);
+                }
+
+                SECTION("insertion sends a change callback") {
+                    auto token = require_change();
+                    write([&]() {
+                        checked(realm_dictionary_insert(strings.get(), rlm_str_val("a"), str1, nullptr, nullptr));
+                        checked(realm_dictionary_insert(strings.get(), rlm_str_val("b"), str2, nullptr, nullptr));
+                        checked(realm_dictionary_insert(strings.get(), rlm_str_val("c"), null, nullptr, nullptr));
+                    });
+                    CHECK(!state.error);
+                    CHECK(state.changes);
+
+                    size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
+                    realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
+                                                            &num_insertion_ranges, &num_modification_ranges,
+                                                            &num_moves);
+                    CHECK(num_deletion_ranges == 0);
+                    CHECK(num_insertion_ranges == 1);
+                    CHECK(num_modification_ranges == 0);
+                    CHECK(num_moves == 0);
+
+                    realm_index_range_t insertion_range;
+                    realm_collection_changes_get_ranges(state.changes.get(), nullptr, 0, &insertion_range, 1, nullptr,
+                                                        0, nullptr, 0, nullptr, 0);
+                    CHECK(insertion_range.from == 0);
+                    CHECK(insertion_range.to == 3);
+                }
+            }
+        }
+
         SECTION("notifications") {
             struct State {
                 CPtr<realm_object_changes_t> changes;

@@ -74,6 +74,11 @@ public:
         auto pair = m_dict->get_pair(ndx);
         return {pair.first.get_string(), pair.second};
     }
+    std::pair<size_t, bool> insert_any(StringData key, Mixed value)
+    {
+        auto [it, inserted] = m_dict->insert(key, value);
+        return std::make_pair(it.get_position(), inserted);
+    }
 
     size_t find_any(Mixed value) const final
     {

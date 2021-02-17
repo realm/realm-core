@@ -174,9 +174,10 @@ public:
         return ret;
     }
 
+    using ClusterTree::Iterator::get_position;
+
 private:
     friend class Dictionary;
-    using ClusterTree::Iterator::get_position;
 
     DataType m_key_type;
 
