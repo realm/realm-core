@@ -447,6 +447,15 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
         "nullable_timestamp_list", "nullable_float_list", "nullable_double_list", "nullable_decimal_list",
         "nullable_object_id_list", "nullable_uuid_list",
     };
+    static const char* set_names[] = {
+        "int_set",   "bool_set",   "string_set",  "binary_set",    "timestamp_set",
+        "float_set", "double_set", "decimal_set", "object_id_set", "uuid_set",
+    };
+    static const char* nullable_set_names[] = {
+        "nullable_int_set",       "nullable_bool_set",  "nullable_string_set", "nullable_binary_set",
+        "nullable_timestamp_set", "nullable_float_set", "nullable_double_set", "nullable_decimal_set",
+        "nullable_object_id_set", "nullable_uuid_set",
+    };
     static const realm_property_type_e types[] = {
         RLM_PROPERTY_TYPE_INT,       RLM_PROPERTY_TYPE_BOOL,  RLM_PROPERTY_TYPE_STRING, RLM_PROPERTY_TYPE_BINARY,
         RLM_PROPERTY_TYPE_TIMESTAMP, RLM_PROPERTY_TYPE_FLOAT, RLM_PROPERTY_TYPE_DOUBLE, RLM_PROPERTY_TYPE_DECIMAL128,
@@ -457,12 +466,16 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     size_t num_nullable_names = std::distance(std::begin(nullable_names), std::end(nullable_names));
     size_t num_list_names = std::distance(std::begin(list_names), std::end(list_names));
     size_t num_nullable_list_names = std::distance(std::begin(nullable_list_names), std::end(nullable_list_names));
+    size_t num_set_names = std::distance(std::begin(set_names), std::end(set_names));
+    size_t num_nullable_set_names = std::distance(std::begin(nullable_set_names), std::end(nullable_set_names));
     size_t num_types = std::distance(std::begin(types), std::end(types));
 
     REALM_ASSERT(num_names == num_types);
     REALM_ASSERT(num_nullable_names == num_types);
     REALM_ASSERT(num_list_names == num_types);
     REALM_ASSERT(num_nullable_list_names == num_types);
+    REALM_ASSERT(num_set_names == num_types);
+    REALM_ASSERT(num_nullable_set_names == num_types);
 
     for (size_t i = 0; i < num_names; ++i) {
         const char* public_name = i == 0 ? "public_int" : "";
@@ -488,11 +501,21 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
             nullable_list_names[i], "", types[i], RLM_COLLECTION_TYPE_LIST, "", "", RLM_INVALID_PROPERTY_KEY,
             RLM_PROPERTY_NULLABLE,
         };
+        realm_property_info_t set{
+            set_names[i],        "", types[i], RLM_COLLECTION_TYPE_SET, "", "", RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NORMAL,
+        };
+        realm_property_info_t nullable_set{
+            nullable_set_names[i], "", types[i], RLM_COLLECTION_TYPE_SET, "", "", RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NULLABLE,
+        };
 
         properties.push_back(normal);
         properties.push_back(nullable);
         properties.push_back(list);
         properties.push_back(nullable_list);
+        properties.push_back(set);
+        properties.push_back(nullable_set);
     }
 
     realm_property_info_t link{
@@ -503,9 +526,14 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
         "link_list", "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_LIST,
         link_target, "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
     };
+    realm_property_info_t link_set{
+        "link_set",  "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_SET,
+        link_target, "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
+    };
 
     properties.push_back(link);
     properties.push_back(link_list);
+    properties.push_back(link_set);
 
     // realm_property_info_t mixed{
     //     "mixed", "", RLM_PROPERTY_TYPE_MIXED,  RLM_COLLECTION_TYPE_NONE,
