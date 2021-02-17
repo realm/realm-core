@@ -4,10 +4,10 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a bug that prevented an ObjectSchema with incoming links from being marked as embedded during migrations. ([#4414](https://github.com/realm/realm-core/pull/4414))
 * `Results::get_dictionary_element()` on frozen Results was not thread-safe.
 * The Realm notification listener thread could sometimes hit the assertion failure "!skip_version.version" if a write transaction was committed at a very specific time (since v10.5.0).
+* Fixed parsing queries comparing a link or list to an arguments of TypedLink. ([#4429](https://github.com/realm/realm-core/issues/4429), this never previously worked)]
  
 ### Breaking changes
 * None.
