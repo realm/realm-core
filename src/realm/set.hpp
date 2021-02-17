@@ -193,14 +193,14 @@ private:
         m_valid = true;
     }
 
-    bool init_from_parent() const final
+    REALM_NOINLINE bool init_from_parent() const final
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
         return m_valid;
     }
 
-    void ensure_created()
+    REALM_NOINLINE void ensure_created()
     {
         if (!m_valid && m_obj.is_valid()) {
             create();
@@ -208,6 +208,8 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+
+    iterator find_impl(const T& value) const;
 
     friend class LnkSet;
 };
@@ -604,10 +606,8 @@ inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
 template <class T>
 size_t Set<T>::find(T value) const
 {
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    auto it = find_impl(value);
+    if (it != end() && SetElementEquals<T>{}(*it, value)) {
         return it.index();
     }
     return npos;
@@ -633,17 +633,23 @@ size_t Set<T>::find_any(Mixed value) const
 }
 
 template <class T>
+REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
+{
+    auto b = this->begin();
+    auto e = this->end();
+    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+}
+
+template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
 
     ensure_created();
     this->ensure_writeable();
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
         return {it.index(), false};
     }
 
@@ -681,11 +687,9 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     update_if_needed();
     this->ensure_writeable();
 
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it == e || !SetElementEquals<T>{}(*it, value)) {
+    if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
 
@@ -726,7 +730,7 @@ std::pair<size_t, bool> Set<T>::erase_null()
 }
 
 template <class T>
-size_t Set<T>::size() const
+REALM_NOINLINE size_t Set<T>::size() const
 {
     if (!is_attached())
         return 0;
@@ -790,17 +794,13 @@ inline Mixed Set<T>::avg(size_t* return_cnt) const
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending);
+
 template <class T>
 inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
-    indices.resize(sz);
-    if (ascending) {
-        std::iota(indices.begin(), indices.end(), 0);
-    }
-    else {
-        std::iota(indices.rbegin(), indices.rend(), 0);
-    }
+    set_sorted_indices(sz, indices, ascending);
 }
 
 template <class T>

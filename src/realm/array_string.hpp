@@ -165,38 +165,6 @@ inline StringData ArrayString::get(const char* header, size_t ndx, Allocator& al
     }
 }
 
-template <>
-class QueryState<StringData> : public QueryStateBase {
-public:
-    StringData m_state;
-
-    template <Action action>
-    bool uses_val()
-    {
-        return false;
-    }
-
-    QueryState(Action, Array* = nullptr, size_t limit = -1)
-        : QueryStateBase(limit)
-    {
-    }
-
-    template <Action action, bool pattern>
-    inline bool match(size_t, uint64_t, StringData)
-    {
-        if (pattern)
-            return false;
-
-        if (action == act_Count) {
-            ++m_match_count;
-        }
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
-
-        return (m_limit > m_match_count);
-    }
-};
 }
 
 #endif /* REALM_ARRAY_STRING_HPP */

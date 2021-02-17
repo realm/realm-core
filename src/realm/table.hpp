@@ -789,8 +789,8 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey col_key, T value = {}, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey col_key) const;
     template <typename T>
     double average(ColKey col_key, size_t* resultcount) const;
 
