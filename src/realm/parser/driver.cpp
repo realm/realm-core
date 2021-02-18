@@ -320,6 +320,33 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_constant_evaluation()) {
+        if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
+            if (right->get_mixed().is_null()) {
+                right_type = ColumnTypeTraits<realm::null>::id;
+                right = std::make_unique<Value<realm::null>>();
+            }
+            else {
+                auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
+                auto right_table_key = right->get_mixed().get_link().get_table_key();
+                auto right_obj_key = right->get_mixed().get_link().get_obj_key();
+                if (left_dest_table_key == right_table_key) {
+                    right = std::make_unique<Value<ObjKey>>(right_obj_key);
+                    right_type = type_Link;
+                }
+                else {
+                    util::serializer::SerialisationState state;
+                    const Group* g = drv->m_base_table->get_parent_group();
+                    throw std::invalid_argument(util::format(
+                        "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
+                        link_column->link_map().description(state),
+                        get_printable_table_name(link_column->link_map().get_target_table()->get_name()),
+                        print_pretty_objlink(right->get_mixed().get_link(), g)));
+                }
+            }
+        }
+    }
+
     if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
         throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
                                                  get_data_type_name(left_type), get_data_type_name(right_type)));
@@ -382,7 +409,8 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
         else if (left_type == type_Link) {
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            if (link_column && link_column->link_map().get_nb_hops() == 1) {
+            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
+                link_column->get_comparison_type() == ExpressionComparisonType::Any) {
                 // We can fall back to Query::links_to for != and == operations on links, but only
                 // for == on link lists. This is because negating query.links_to() is equivalent to
                 // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
@@ -1039,6 +1067,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     case type_TypedLink:
+                        if (hint == type_Link || hint == type_TypedLink) {
+                            ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
+                            break;
+                        }
                         explain_value_message =
                             util::format("%1 which links to %2", explain_value_message,
                                          print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),

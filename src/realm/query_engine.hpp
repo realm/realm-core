@@ -2390,13 +2390,13 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         if (m_column_type == type_LinkList || m_condition_column_key.is_set()) {
-            ArrayKeyNonNullable arr(m_table.unchecked_ptr()->get_alloc());
+            BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
-                    arr.init_from_ref(ref);
+                    links.init_from_ref(ref);
                     for (auto& key : m_target_keys) {
                         if (key) {
-                            if (arr.find_first(key, 0, arr.size()) != not_found)
+                            if (links.find_first(key) != not_found)
                                 return i;
                         }
                     }
