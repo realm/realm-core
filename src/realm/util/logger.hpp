@@ -111,7 +111,10 @@ private:
     template <class Param, class... Params>
     void log_impl(State&, Param&&, Params&&...);
     template <class Param>
+
     static void subst(State&, Param&&);
+    static std::pair<std::string, size_t> subst_prepare(State&);
+    static void subst_finish(State&, size_t j, const std::string& key);
 };
 
 template <class C, class T>
@@ -290,9 +293,7 @@ inline bool Logger::would_log(Level level) const noexcept
     return int(level) >= int(level_threshold.get());
 }
 
-inline Logger::~Logger() noexcept
-{
-}
+inline Logger::~Logger() noexcept {}
 
 inline Logger::Logger(const LevelThreshold& lt) noexcept
     : level_threshold(lt)
@@ -326,16 +327,10 @@ inline void Logger::log_impl(State& state, Param&& param, Params&&... params)
 template <class Param>
 void Logger::subst(State& state, Param&& param)
 {
-    state.m_formatter << "%" << state.m_param_num;
-    std::string key = state.m_formatter.str();
-    state.m_formatter.str(std::string());
-    std::string::size_type j = state.m_search.find(key);
+    auto [key, j] = subst_prepare(state);
     if (j != std::string::npos) {
         state.m_formatter << std::forward<Param>(param);
-        std::string str = state.m_formatter.str();
-        state.m_formatter.str(std::string());
-        state.m_message.replace(j, key.size(), str);
-        state.m_search.replace(j, key.size(), std::string(str.size(), '\0'));
+        subst_finish(state, j, key);
     }
     ++state.m_param_num;
 }

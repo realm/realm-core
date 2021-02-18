@@ -2286,62 +2286,22 @@ template <class Left, class Right>
 void merge_instructions_2(Left& left, Right& right, TransformerImpl::MajorSide& left_side,
                           TransformerImpl::MinorSide& right_side)
 {
-    // FIXME: Find a way to avoid heap-copies of the path.
-    Left left_before = left;
-    Right right_before = right;
-
     Merge<Left, Right>::merge(left, right, left_side, right_side);
-
-    // Note: `left` and/or `right` may be dangling at this point due to
-    // discard/prepend. However, if they were not discarded, their iterators are
-    // required to point to an instruction of the same type.
-
-    if (!left_side.was_discarded && !left_side.was_replaced) {
-        const auto& left_after = left_side.get().template get_as<Left>();
-        if (!(left_after == left_before)) {
-            left_side.m_changeset->set_dirty(true);
-        }
-    }
-
-    if (!right_side.was_discarded && !right_side.was_replaced) {
-        const auto& right_after = right_side.get().template get_as<Right>();
-        if (!(right_after == right_before)) {
-            right_side.m_changeset->set_dirty(true);
-        }
-    }
 }
 
 template <class Outer, class Inner, class OuterSide, class InnerSide>
 void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide& inner_side)
 {
-    // FIXME: Find a way to avoid heap-copies of the path.
-    Outer outer_before = outer;
-    Inner inner_before = inner;
-
     MergeNested<Outer>::merge(outer, inner, outer_side, inner_side);
-
-    // Note: `outer` and/or `inner` may be dangling at this point due to
-    // discard/prepend. However, if they were not discarded, their iterators are
-    // required to point to an instruction of the same type.
-
-    if (!outer_side.was_discarded && !outer_side.was_replaced) {
-        const auto& outer_after = outer_side.get().template get_as<Outer>();
-        if (!(outer_after == outer_before)) {
-            outer_side.m_changeset->set_dirty(true);
-        }
-    }
-
-    if (!inner_side.was_discarded && !inner_side.was_replaced) {
-        const auto& inner_after = inner_side.get().template get_as<Inner>();
-        if (!(inner_after == inner_before)) {
-            inner_side.m_changeset->set_dirty(true);
-        }
-    }
 }
 
 void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
     report_merge(false); // Throws
+
+    // FIXME: Find a way to avoid heap-copies of the path.
+    Instruction their_before = their_side.get();
+    Instruction our_before = our_side.get();
 
     if (their_side.get().get_if<Instruction::Update>()) {
         REALM_ASSERT(their_side.m_path_len > 2);
@@ -2370,16 +2330,35 @@ void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, Min
             return;
     }
 
-    // Even if the instructions were nested, we must still perform a regular
-    // merge, because link-related instructions contain information from higher
-    // levels (both rows, columns, and tables).
-    //
-    // FIXME: This condition goes away when dangling links are implemented.
-    their_side.get().visit([&](auto& their_instruction) {
-        our_side.get().visit([&](auto& our_instruction) {
-            merge_instructions_2(their_instruction, our_instruction, their_side, our_side);
+    if (!their_side.was_discarded && !our_side.was_discarded) {
+        // Even if the instructions were nested, we must still perform a regular
+        // merge, because link-related instructions contain information from higher
+        // levels (both rows, columns, and tables).
+        //
+        // FIXME: This condition goes away when dangling links are implemented.
+        their_side.get().visit([&](auto& their_instruction) {
+            our_side.get().visit([&](auto& our_instruction) {
+                merge_instructions_2(their_instruction, our_instruction, their_side, our_side);
+            });
         });
-    });
+    }
+
+    // Note: `left` and/or `right` may be dangling at this point due to
+    // discard/prepend. However, if they were not discarded, their iterators are
+    // required to point to an instruction of the same type.
+    if (!their_side.was_discarded && !their_side.was_replaced) {
+        const auto& their_after = their_side.get();
+        if (!(their_after == their_before)) {
+            their_side.m_changeset->set_dirty(true);
+        }
+    }
+
+    if (!our_side.was_discarded && !our_side.was_replaced) {
+        const auto& our_after = our_side.get();
+        if (!(our_after == our_before)) {
+            our_side.m_changeset->set_dirty(true);
+        }
+    }
 }
 
 

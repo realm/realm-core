@@ -87,6 +87,7 @@ Schema::iterator Schema::find(TableKey table_key) noexcept
     if (!table_key) {
         return end();
     }
+    // FIXME: Faster lookup than linear search.
     return std::find_if(begin(), end(), [table_key](const ObjectSchema& os) {
         return os.table_key == table_key;
     });
