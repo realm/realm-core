@@ -412,24 +412,23 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
-    if (col) {
-        return get_any(col);
-    }
-    else {
-        return Mixed{get_key()};
-    }
+    return col ? get_any(col) : Mixed{get_key()};
 }
+
 template <class T>
 inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
 {
     T val1 = _get<T>(col_ndx);
     T val2 = other._get<T>(col_ndx);
+
     if (val1 < val2) {
         return -1;
     }
-    else if (val1 > val2) {
+
+    if (val1 > val2) {
         return 1;
     }
+
     return 0;
 }
 
