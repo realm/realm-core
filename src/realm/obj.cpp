@@ -439,15 +439,18 @@ inline int Obj::cmp<StringData>(const Obj& other, ColKey::Idx col_ndx) const
     StringData a = _get<StringData>(col_ndx);
     StringData b = other._get<StringData>(col_ndx);
 
-    if (a.is_null() && !b.is_null())
-        return -1;
-    else if (b.is_null() && !a.is_null())
-        return 1;
-    else if (a.is_null() && b.is_null())
-        return 0;
+    if (a.is_null()) {
+        return b.is_null() ? 0 : -1;
+    }
 
-    if (a == b)
+    if (b.is_null()) {
+        return 1;
+    }
+
+    if (a == b) {
         return 0;
+    }
+
     return utf8_compare(a, b) ? -1 : 1;
 }
 
