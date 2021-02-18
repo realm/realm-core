@@ -248,7 +248,6 @@ void ClientHistoryImpl::do_initiate_transact(Group& group, version_type version,
     SyncReplication::do_initiate_transact(group, version, history_updated);
 }
 
-
 // Overriding member function in realm::TrivialReplication
 auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version_type orig_version) -> version_type
 {
@@ -280,7 +279,7 @@ auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version
             changeset = BinaryData(buffer.data(), buffer.size());
         }
 
-        entry.origin_timestamp = sync::generate_changeset_timestamp();
+        entry.origin_timestamp = m_local_origin_timestamp_source();
         entry.origin_file_ident = 0; // Of local origin
         entry.remote_version = m_progress_download.server_version;
         entry.changeset = changeset;
