@@ -961,12 +961,12 @@ void RealmCoordinator::run_async_notifiers()
     m_new_notifiers.clear();
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
 
-    lock.unlock();
-
     // Advance all of the new notifiers to the most recent version, if any
     TransactionRef new_notifier_transaction;
     util::Optional<IncrementalChangeInfo> new_notifier_change_info;
     if (!new_notifiers.empty()) {
+        lock.unlock();
+
         // Starting from the oldest notifier, incrementally advance the notifiers
         // to the latest version, attaching each new notifier as we reach its
         // source version. Suppose three new notifiers have been created:
@@ -1009,6 +1009,8 @@ void RealmCoordinator::run_async_notifiers()
             m_notifier_cv.notify_all();
             return;
         }
+
+        lock.unlock();
     }
 
     if (skip_version.version) {

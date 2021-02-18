@@ -1017,7 +1017,7 @@ inline bool Instruction::operator==(const Instruction& other) const noexcept
 }
 
 template <class T>
-inline T* Instruction::get_if() noexcept
+REALM_NOINLINE T* Instruction::get_if() noexcept
 {
     // FIXME: Is there a way to express this without giant switch statements? Note: Putting the
     // base class into a union does not seem to be allowed by the standard.

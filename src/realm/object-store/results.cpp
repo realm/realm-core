@@ -314,7 +314,7 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
         case Mode::Empty:
             break;
         case Mode::Collection: {
-            Mixed m = get_any(row_ndx);
+            Mixed m = get_from_collection(row_ndx);
             if (m.is_type(type_Link) && m_table) {
                 return m_table->get_object(m.get<ObjKey>());
             }
@@ -356,6 +356,37 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     return util::none;
 }
 
+Mixed Results::get_from_collection(size_t ndx)
+{
+    REALM_ASSERT_RELEASE(m_mode == Mode::Collection);
+    evaluate_sort_and_distinct_on_collection();
+    if (m_list_indices) {
+        if (ndx < m_list_indices->size()) {
+            ndx = (*m_list_indices)[ndx];
+        }
+        else {
+            throw OutOfBoundsIndexException{ndx, m_list_indices->size()};
+        }
+    }
+    if (ndx < m_collection->size()) {
+        Mixed mixed;
+        if (m_dictionary_keys) {
+            if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+                auto key_value = dict->get_pair(ndx);
+                mixed = key_value.first;
+            }
+        }
+        else {
+            mixed = m_collection->get_any(ndx);
+        }
+        return mixed;
+    }
+    else {
+        throw OutOfBoundsIndexException{ndx, m_collection->size()};
+    }
+    return {};
+}
+
 Mixed Results::get_any(size_t ndx)
 {
     util::CheckedUniqueLock lock(m_mutex);
@@ -364,32 +395,7 @@ Mixed Results::get_any(size_t ndx)
         case Mode::Empty:
             break;
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
-            if (m_list_indices) {
-                if (ndx < m_list_indices->size()) {
-                    ndx = (*m_list_indices)[ndx];
-                }
-                else {
-                    throw OutOfBoundsIndexException{ndx, m_list_indices->size()};
-                }
-            }
-            if (ndx < m_collection->size()) {
-                Mixed mixed;
-                if (m_dictionary_keys) {
-                    if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
-                        auto key_value = dict->get_pair(ndx);
-                        mixed = key_value.first;
-                    }
-                }
-                else {
-                    mixed = m_collection->get_any(ndx);
-                }
-                return mixed;
-            }
-            else {
-                throw OutOfBoundsIndexException{ndx, m_collection->size()};
-            }
-            break;
+            return get_from_collection(ndx);
         case Mode::Table:
             if (ndx < m_table->size())
                 return m_table_iterator.get(*m_table, ndx);
@@ -420,7 +426,8 @@ Mixed Results::get_any(size_t ndx)
 }
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
-    if (m_mode == Mode::Collection) {
+    util::CheckedUniqueLock lock(m_mutex);
+    if (m_mode == Mode::Collection && ndx < m_collection->size()) {
         if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
             evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {

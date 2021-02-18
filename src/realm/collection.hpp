@@ -303,7 +303,7 @@ protected:
     }
 
     // Overriding members of CollectionBase:
-    bool update_if_needed() const final
+    REALM_NOINLINE bool update_if_needed() const final
     {
         if (!m_obj.is_valid())
             return false;

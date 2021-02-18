@@ -91,7 +91,7 @@ void cpuid_init()
           : "=r"(cret)                     // output
           : "r"(a)                         // input
           : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
-          );
+    );
 #endif
 
     // Byte is atomic. Race can/will occur but that's fine
@@ -126,38 +126,10 @@ void cpuid_init()
         avx_support = -1; // No AVX supported
     }
 
-// 1 is reserved for AVX2
+    // 1 is reserved for AVX2
 
 #endif
 }
-
-
-// FIXME: Move all these rounding functions to the header file to
-// allow inlining.
-void* round_up(void* p, size_t align)
-{
-    size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
-    return static_cast<char*>(p) + r;
-}
-
-void* round_down(void* p, size_t align)
-{
-    size_t r = size_t(p);
-    return reinterpret_cast<void*>(r & ~(align - 1));
-}
-
-size_t round_up(size_t p, size_t align)
-{
-    size_t r = p % align == 0 ? 0 : align - p % align;
-    return p + r;
-}
-
-size_t round_down(size_t p, size_t align)
-{
-    size_t r = p;
-    return r & (~(align - 1));
-}
-
 } // namespace realm
 
 
@@ -324,7 +296,7 @@ void process_mem_usage(double& vm_usage, double& resident_set)
 #endif
 
 #ifdef _WIN32
-int gettimeofday(struct timeval * tp, struct timezone * tzp)
+int gettimeofday(struct timeval* tp, struct timezone* tzp)
 {
     FILETIME file_time;
     SYSTEMTIME system_time;

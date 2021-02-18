@@ -75,7 +75,7 @@ else()
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation)
+        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
     endif()
 
     # This warning is too agressive. It warns about moves that are not redundant on older
@@ -93,18 +93,13 @@ endif()
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
     # - Replace `-O2` with `-Oz`.
-    # - Clang LTO does not support `-Oz` so keep using `-O2` for that.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
-    #
+    add_compile_options($<$<CONFIG:Release>:-Oz>)
+
     # On some architectures char is unsigned by default. Make it signed
-    if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
-    else()
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Oz")
-    endif()
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 

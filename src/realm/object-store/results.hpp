@@ -113,7 +113,7 @@ public:
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
 
-    std::pair<StringData, Mixed> get_dictionary_element(size_t index);
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -338,6 +338,7 @@ private:
 
     template <typename T>
     util::Optional<T> try_get(size_t) REQUIRES(m_mutex);
+    Mixed get_from_collection(size_t ndx) REQUIRES(m_mutex);
 
     template <typename AggregateFunction>
     util::Optional<Mixed> aggregate(ColKey column, const char* name, AggregateFunction&& func) REQUIRES(!m_mutex);
