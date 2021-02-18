@@ -228,9 +228,19 @@ bool LnkSet::is_subset_of(const LnkSet& rhs) const
     return this->m_set.is_subset_of(rhs.m_set);
 }
 
+bool LnkSet::is_strict_subset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_strict_subset_of(rhs.m_set);
+}
+
 bool LnkSet::is_superset_of(const LnkSet& rhs) const
 {
     return this->m_set.is_superset_of(rhs.m_set);
+}
+
+bool LnkSet::is_strict_superset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_strict_superset_of(rhs.m_set);
 }
 
 bool LnkSet::intersects(const LnkSet& rhs) const

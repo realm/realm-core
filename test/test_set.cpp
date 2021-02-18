@@ -432,10 +432,25 @@ TEST(Set_Intersection)
     CHECK(!set2.is_subset_of(set1));
     CHECK(!set1.is_superset_of(set2));
     CHECK(!set2.is_superset_of(set1));
+    CHECK(!set1.is_strict_superset_of(set1));
+    CHECK(!set1.is_strict_subset_of(set1));
     std::vector<int64_t> superset{{1, 2, 3, 4, 5}};
     std::vector<int64_t> subset{{1, 2}};
+    std::vector<int64_t> same_set{{1, 2, 4, 5}};
     CHECK(set1.is_subset_of(superset));
     CHECK(set1.is_superset_of(subset));
+    CHECK(set1.is_strict_superset_of(subset));
+    CHECK(set1.is_strict_subset_of(superset));
+    CHECK(set1.is_subset_of(same_set));
+    CHECK(set1.is_superset_of(same_set));
+    CHECK(!set1.is_strict_superset_of(same_set));
+    CHECK(!set1.is_strict_subset_of(same_set));
+    CHECK(set1.set_equals(set1));
+    CHECK(set1.set_equals(same_set));
+    CHECK(!set1.set_equals(superset));
+    CHECK(!set1.set_equals(superset.begin(), superset.end()));
+    CHECK(!set1.set_equals(subset));
+    CHECK(!set1.set_equals(subset.begin(), subset.end()));
 
     set1.assign_intersection(set2);
     CHECK_EQUAL(set1.size(), 2);
