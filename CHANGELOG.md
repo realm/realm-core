@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Performance of sorting on more than one property has been improved. Especially important if many elements match on the first property. Migitagtes ([#7092](https://github.com/realm/realm-cocoa/issues/7092))
+* Performance of sorting on more than one property has been improved. Especially important if many elements match on the first property. Mitigates ([#7092](https://github.com/realm/realm-cocoa/issues/7092))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
