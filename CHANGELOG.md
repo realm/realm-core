@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Performance of sorting on more than 1 property has been improved. Especially important if many elements match on the first property. ([#4434](https://github.com/realm/realm-core/pull/4434))
 
 ----------------------------------------------
 
