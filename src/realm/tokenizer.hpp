@@ -1,0 +1,69 @@
+/*************************************************************************
+ *
+ * Copyright 2021 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#ifndef REALM_TOKENIZER_HPP
+#define REALM_TOKENIZER_HPP
+
+#include <string_view>
+#include <vector>
+#include <map>
+#include <set>
+#include <memory>
+
+namespace realm {
+
+using TokenPos = std::pair<unsigned, unsigned>;
+using TokenPositions = std::vector<TokenPos>;
+using TokenInfo = std::map<std::string, TokenPositions>;
+
+class Tokenizer {
+public:
+    virtual ~Tokenizer();
+
+    virtual void reset(std::string_view text);
+    virtual bool next() = 0;
+
+    std::string_view get_token()
+    {
+        return {m_buffer, m_size};
+    }
+
+    TokenPos get_position()
+    {
+        return {m_start, m_end};
+    }
+
+    std::set<std::string> get_all_tokens();
+    TokenInfo get_token_info();
+
+    static std::unique_ptr<Tokenizer> get_instance();
+
+protected:
+    std::string_view m_text;
+    char m_buffer[32];
+    size_t m_size = 0;
+    const char* m_start_pos = nullptr;
+    const char* m_cur_pos = nullptr;
+    const char* m_end_pos = nullptr;
+    unsigned m_start = 0;
+    unsigned m_end = 0;
+};
+
+} // namespace realm
+
+#endif /* REALM_TOKENIZER_HPP */

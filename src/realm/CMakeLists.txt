@@ -55,6 +55,7 @@ set(REALM_SOURCES
     string_data.cpp
     table.cpp
     table_ref.cpp
+    tokenizer.cpp
     obj_list.cpp
     object_id.cpp
     table_view.cpp
@@ -189,6 +190,7 @@ set(REALM_INSTALL_HEADERS
     table_cluster_tree.hpp
     table_ref.hpp
     table_view.hpp
+    tokenizer.hpp
     transaction.hpp
     timestamp.hpp
     unicode.hpp

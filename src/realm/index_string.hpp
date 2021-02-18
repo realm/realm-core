@@ -26,6 +26,7 @@
 
 #include <realm/array.hpp>
 #include <realm/table_cluster_tree.hpp>
+#include <realm/tokenizer.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
@@ -234,8 +235,6 @@ public:
     void verify_entries(const ClusterColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
-
-    static std::set<std::string> tokenize(const StringData text);
 
     typedef int32_t key_type;
 
