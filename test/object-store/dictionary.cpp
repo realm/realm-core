@@ -316,6 +316,21 @@ TEST_CASE("dictionary") {
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(local_change.insertions.count() == 2);
+
+            SECTION("with links on frozen Realm") {
+                // this could have deadlocked
+                auto frozen = r->freeze();
+                auto frozen_table = frozen->read_group().get_table("class_object");
+                ColKey col_frozen_links = frozen_table->get_column_key("links");
+                object_store::Dictionary frozen_links(frozen, *frozen_table->begin(), col_frozen_links);
+                auto frozen_results = frozen_links.get_values();
+                auto frozen_obj = frozen_results.get(0);
+                REQUIRE(!frozen_obj);
+                frozen_obj = frozen_results.get(1);
+                REQUIRE(frozen_obj);
+                REQUIRE(frozen_obj.get_key() == another.get_key());
+            }
+
             auto obj = res.get(0);
             REQUIRE(!obj);
             obj = res.get(1);

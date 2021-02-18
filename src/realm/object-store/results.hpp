@@ -338,6 +338,7 @@ private:
 
     template <typename T>
     util::Optional<T> try_get(size_t) REQUIRES(m_mutex);
+    Mixed get_from_collection(size_t ndx) REQUIRES(m_mutex);
 
     template <typename AggregateFunction>
     util::Optional<Mixed> aggregate(ColKey column, const char* name, AggregateFunction&& func) REQUIRES(!m_mutex);
