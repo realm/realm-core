@@ -13,6 +13,7 @@
 * Results based on dictionary keys will return wrong value from 'get_type'. ([#4365](https://github.com/realm/realm-core/issues/4365))
 * If a Dictionary contains Objects, those can not be returned by Results::get<Obj> ([#4374](https://github.com/realm/realm-core/issues/4374))
 * Change listeners not triggered on certain Mixed attribute changes ([#4404](https://github.com/realm/realm-core/issues/4404))
+* Calling Dictionary::find_any() on a virgin dictionary will crash (([#4438](https://github.com/realm/realm-core/issues/4438))
  
 ### Breaking changes
 * Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.

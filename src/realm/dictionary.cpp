@@ -272,7 +272,7 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
-    if (is_attached()) {
+    if (size()) {
         update_if_needed();
         ArrayMixed leaf(m_obj.get_alloc());
         size_t start_ndx = 0;
@@ -379,8 +379,7 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
 
 Mixed Dictionary::get(Mixed key) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         return do_get(m_clusters->get(k));
@@ -391,8 +390,7 @@ Mixed Dictionary::get(Mixed key) const
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -535,8 +533,7 @@ const Mixed Dictionary::operator[](Mixed key)
 
 bool Dictionary::contains(Mixed key)
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -548,7 +545,7 @@ bool Dictionary::contains(Mixed key)
 
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         try {
@@ -563,9 +560,8 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     validate_key_value(key);
-    update_if_needed();
 
-    if (m_clusters) {
+    if (size()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->get(k);
