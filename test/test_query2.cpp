@@ -6126,4 +6126,37 @@ TEST(Query_TypeOfValue)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+TEST(Query_links_to_with_bpnode_split)
+{
+    // The bug here is that LinksToNode would read a LinkList as a simple Array
+    // instead of a BPTree. So this only worked when the number of items < REALM_MAX_BPNODE_SIZE
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    constexpr size_t num_items = REALM_MAX_BPNODE_SIZE + 1;
+    for (size_t i = 0; i < num_items; ++i) {
+        table->create_object().set(col_int, int64_t(i));
+    }
+    for (size_t i = 0; i < num_items; ++i) {
+        auto obj = origin->create_object();
+        auto it_i = table->begin();
+        it_i.go(i);
+        obj.set(col_link, it_i->get_key());
+        auto list = obj.get_linklist(col_links);
+        for (auto it = table->begin(); it != table->end(); ++it) {
+            list.add(it->get_key());
+        }
+    }
+
+    for (auto it = table->begin(); it != table->end(); ++it) {
+        Query q = origin->where().links_to(col_links, it->get_key());
+        CHECK_EQUAL(q.count(), num_items);
+        Query q2 = origin->where().links_to(col_link, it->get_key());
+        CHECK_EQUAL(q2.count(), 1);
+    }
+}
+
 #endif // TEST_QUERY
