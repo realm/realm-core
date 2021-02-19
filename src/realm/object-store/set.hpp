@@ -31,7 +31,7 @@
 namespace realm {
 
 namespace _impl {
-class SetNotifier;
+class ListNotifier;
 }
 
 namespace object_store {
@@ -126,7 +126,7 @@ public:
     };
 
 private:
-    _impl::CollectionNotifier::Handle<_impl::SetNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<realm::SetBase> m_set_base;
 
     ConstTableRef get_target_table() const;
