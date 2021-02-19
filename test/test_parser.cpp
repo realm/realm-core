@@ -4161,6 +4161,7 @@ TEST(Parser_Mixed)
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
+
     size_t int_over_50 = 0;
     size_t nb_strings = 0;
     for (int64_t i = 0; i < 100; i++) {
@@ -4194,6 +4195,7 @@ TEST(Parser_Mixed)
             ++it;
         }
     }
+    origin->create_object(); // one with null links
 
     verify_query(test_context, table, "mixed > 50", int_over_50);
     verify_query(test_context, table, "mixed >= 50", int_over_50 + 1);
@@ -4212,9 +4214,19 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == oid(" + id.to_string() + ")", 1);
 
     char bin[1] = {0x34};
-    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key())};
-    size_t num_args = 2;
+    util::Any args[] = {BinaryData(bin), ObjLink(table->get_key(), table->begin()->get_key()),
+                        ObjLink(origin->get_key(), origin->begin()->get_key()),
+                        ObjLink(TableKey(), ObjKey()), // null link
+                        realm::null{}};
+    size_t num_args = 5;
     verify_query_sub(test_context, table, "mixed endswith $0", args, num_args, 5); // 4, 24, 44, 64, 84
+    verify_query_sub(test_context, origin, "link == $1", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link == $3", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link == $4", args, num_args, 1);
+    verify_query_sub(test_context, origin, "link.@links.Origin.link == $2", args, num_args, 1); // poor man's SELF
+    verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
+    verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
+    verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
     verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
@@ -4226,7 +4238,8 @@ TEST(Parser_Mixed)
     verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
     verify_query(test_context, origin, "link.mixed > 50", 2);
     verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
-    verify_query(test_context, origin, "link.mixed == NULL", 0);
+    verify_query(test_context, origin, "link == NULL", 1);
+    verify_query(test_context, origin, "link.mixed == NULL", 1);
     verify_query(test_context, origin, "links.mixed == NULL", 1);
 
     // non-uniform type cross column comparisons
@@ -4236,6 +4249,12 @@ TEST(Parser_Mixed)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
     CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
                          "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "link == $2", args, num_args, 0), message);
+    CHECK_EQUAL(message, "The relationship 'link' which links to type 'Foo' cannot be compared to an argument of "
+                         "type 'Origin' with primary key 'ObjKey(0)'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "links == $2", args, num_args, 0), message);
+    CHECK_EQUAL(message, "The relationship 'links' which links to type 'Foo' cannot be compared to an argument of "
+                         "type 'Origin' with primary key 'ObjKey(0)'");
 }
 
 TEST(Parser_TypeOfValue)

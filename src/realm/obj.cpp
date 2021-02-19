@@ -100,69 +100,6 @@ Replication* Obj::get_replication() const
     return m_table->get_repl();
 }
 
-template <class T>
-inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
-{
-    T val1 = _get<T>(col_ndx);
-    T val2 = other._get<T>(col_ndx);
-    if (val1 < val2) {
-        return -1;
-    }
-    else if (val1 > val2) {
-        return 1;
-    }
-    return 0;
-}
-
-int Obj::cmp(const Obj& other, ColKey col_key) const
-{
-    other.check_valid();
-    ColKey::Idx col_ndx = col_key.get_index();
-    ColumnAttrMask attr = col_key.get_attrs();
-    REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
-
-    switch (DataType(col_key.get_type())) {
-        case type_Int:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<Int>>(other, col_ndx);
-            else
-                return cmp<Int>(other, col_ndx);
-        case type_Bool:
-            return cmp<Bool>(other, col_ndx);
-        case type_Float:
-            return cmp<Float>(other, col_ndx);
-        case type_Double:
-            return cmp<Double>(other, col_ndx);
-        case type_String:
-            return cmp<String>(other, col_ndx);
-        case type_Binary:
-            return cmp<Binary>(other, col_ndx);
-        case type_Mixed:
-            return cmp<Mixed>(other, col_ndx);
-        case type_Timestamp:
-            return cmp<Timestamp>(other, col_ndx);
-        case type_Decimal:
-            return cmp<Decimal128>(other, col_ndx);
-        case type_ObjectId:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<ObjectId>>(other, col_ndx);
-            else
-                return cmp<ObjectId>(other, col_ndx);
-        case type_UUID:
-            if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<UUID>>(other, col_ndx);
-            else
-                return cmp<UUID>(other, col_ndx);
-        case type_Link:
-            return cmp<ObjKey>(other, col_ndx);
-        case type_TypedLink:
-            return cmp<ObjLink>(other, col_ndx);
-        case type_LinkList:
-            REALM_ASSERT(false);
-            break;
-    }
-    return 0;
-}
 
 bool Obj::operator==(const Obj& other) const
 {
@@ -473,12 +410,95 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
-    if (col) {
-        return get_any(col);
+    return col ? get_any(col) : Mixed{get_key()};
+}
+
+template <class T>
+inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
+{
+    T val1 = _get<T>(col_ndx);
+    T val2 = other._get<T>(col_ndx);
+
+    if (val1 < val2) {
+        return -1;
     }
-    else {
-        return Mixed{get_key()};
+
+    if (val1 > val2) {
+        return 1;
     }
+
+    return 0;
+}
+
+template <>
+inline int Obj::cmp<StringData>(const Obj& other, ColKey::Idx col_ndx) const
+{
+    StringData a = _get<StringData>(col_ndx);
+    StringData b = other._get<StringData>(col_ndx);
+
+    if (a.is_null()) {
+        return b.is_null() ? 0 : -1;
+    }
+
+    if (b.is_null()) {
+        return 1;
+    }
+
+    if (a == b) {
+        return 0;
+    }
+
+    return utf8_compare(a, b) ? -1 : 1;
+}
+
+int Obj::cmp(const Obj& other, ColKey col_key) const
+{
+    other.check_valid();
+    ColKey::Idx col_ndx = col_key.get_index();
+    ColumnAttrMask attr = col_key.get_attrs();
+    REALM_ASSERT(!attr.test(col_attr_List)); // TODO: implement comparison of lists
+
+    switch (DataType(col_key.get_type())) {
+        case type_Int:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<Int>>(other, col_ndx);
+            else
+                return cmp<Int>(other, col_ndx);
+        case type_Bool:
+            return cmp<Bool>(other, col_ndx);
+        case type_Float:
+            return cmp<Float>(other, col_ndx);
+        case type_Double:
+            return cmp<Double>(other, col_ndx);
+        case type_String:
+            return cmp<String>(other, col_ndx);
+        case type_Binary:
+            return cmp<Binary>(other, col_ndx);
+        case type_Mixed:
+            return cmp<Mixed>(other, col_ndx);
+        case type_Timestamp:
+            return cmp<Timestamp>(other, col_ndx);
+        case type_Decimal:
+            return cmp<Decimal128>(other, col_ndx);
+        case type_ObjectId:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<ObjectId>>(other, col_ndx);
+            else
+                return cmp<ObjectId>(other, col_ndx);
+        case type_UUID:
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<UUID>>(other, col_ndx);
+            else
+                return cmp<UUID>(other, col_ndx);
+        case type_Link:
+            return cmp<ObjKey>(other, col_ndx);
+        case type_TypedLink:
+            return cmp<ObjLink>(other, col_ndx);
+        case type_LinkList:
+            REALM_ASSERT(false);
+            break;
+    }
+    return 0;
 }
 
 /* FIXME: Make this one fast too!

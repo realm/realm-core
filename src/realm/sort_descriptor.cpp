@@ -200,6 +200,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
             translated_keys[index_in_view] = translated_key;
         }
     }
+    m_cache.resize(column_lists.size() - 1);
 }
 
 BaseDescriptor::Sorter DistinctDescriptor::sorter(Table const& table, const IndexPairs& indexes) const
@@ -307,6 +308,9 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             c = i.cached_value.compare(j.cached_value);
         }
         else {
+            if (m_cache[t - 1].empty()) {
+                m_cache[t - 1].resize(256);
+            }
             ObjKey key_i = i.key_for_object;
             ObjKey key_j = j.key_for_object;
 
@@ -314,10 +318,21 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 key_i = m_columns[t].translated_keys[i.index_in_view];
                 key_j = m_columns[t].translated_keys[j.index_in_view];
             }
-            const Obj obj_i = m_columns[t].table->get_object(key_i);
-            const Obj obj_j = m_columns[t].table->get_object(key_j);
+            ObjCache& cache_i = m_cache[t - 1][key_i.value & 0xFF];
+            ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
 
-            c = obj_i.cmp(obj_j, m_columns[t].col_key);
+            if (cache_i.key != key_i) {
+                cache_i.value = m_columns[t].table->get_object(key_i).get_any(m_columns[t].col_key);
+                cache_i.key = key_i;
+            }
+            Mixed val_i = cache_i.value;
+
+            if (cache_j.key != key_j) {
+                cache_j.value = m_columns[t].table->get_object(key_j).get_any(m_columns[t].col_key);
+                cache_j.key = key_j;
+            }
+
+            c = val_i.compare(cache_j.value);
         }
         // if c is negative i comes before j
         if (c) {
