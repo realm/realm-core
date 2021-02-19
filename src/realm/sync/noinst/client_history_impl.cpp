@@ -153,6 +153,11 @@ void ClientHistoryImpl::set_client_reset_adjustments(version_type current_versio
 }
 
 
+void ClientHistoryImpl::set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn)
+{
+    m_local_origin_timestamp_source = std::move(source_fn);
+}
+
 // Overriding member function in realm::Replication
 void ClientHistoryImpl::initialize(DB& sg)
 {
