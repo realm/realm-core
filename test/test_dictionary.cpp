@@ -87,13 +87,19 @@ TEST(Dictionary_Basics)
 
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
+
         CHECK_EQUAL(dict.size(), 0);
+        CHECK_EQUAL(dict.find_any(9), realm::npos);
+
         CHECK(dict.insert("Hello", 9).second);
         CHECK_EQUAL(dict.size(), 1);
         CHECK_EQUAL(dict.get("Hello").get_int(), 9);
         CHECK(dict.contains("Hello"));
         CHECK_NOT(dict.insert("Hello", 10).second);
         CHECK_EQUAL(dict.get("Hello").get_int(), 10);
+        CHECK_EQUAL(dict.find_any(9), realm::npos);
+        CHECK_EQUAL(dict.find_any(10), 0);
+
         dict.insert("Goodbye", "cruel world");
         CHECK_EQUAL(dict.size(), 2);
         CHECK_EQUAL(dict["Goodbye"].get_string(), "cruel world");
