@@ -311,6 +311,22 @@ typedef void (*realm_scheduler_set_notify_callback_func_t)(void* userdata, void*
                                                            realm_free_userdata_func_t, realm_scheduler_notify_func_t);
 typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(void* userdata);
 
+/* Logger types */
+typedef struct realm_logger realm_logger_t;
+typedef enum realm_log_level {
+    RLM_LOG_LEVEL_ALL,
+    RLM_LOG_LEVEL_TRACE,
+    RLM_LOG_LEVEL_DEBUG,
+    RLM_LOG_LEVEL_DETAIL,
+    RLM_LOG_LEVEL_INFO,
+    RLM_LOG_LEVEL_WARNING,
+    RLM_LOG_LEVEL_ERROR,
+    RLM_LOG_LEVEL_FATAL,
+    RLM_LOG_LEVEL_OFF,
+} realm_log_level_e;
+typedef bool (*realm_logger_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+typedef realm_log_level_e (*realm_logger_get_threshold_func_t)(void* userdata);
+
 /**
  * Get a string representing the version number of the Realm library.
  *
@@ -468,6 +484,53 @@ RLM_API bool realm_equals(const void*, const void*);
  * function always returns false.
  */
 RLM_API bool realm_is_frozen(const void*);
+
+/**
+ * Define a new logger instance.
+ *
+ * The returned object must be released manually, regardless of whether it is
+ * passed to another API function. @a free_func will not necessarily be called
+ * when `realm_release()` is called.
+ *
+ * @param log_func A function pointer that will be invoked whenever
+ *                 `realm_logger_log()` is called. The function does not need to
+ *                 be thread-safe in itself, but may be invoked (under lock)
+ *                 from multiple threads.
+ * @param threshold_func Get the current log level threshold for the logger. The
+ *                       function does not need to be thread-safe.
+ * @param free_func How to release @a userdata when the logger object is
+ *                  destroyed.
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_logger_t* realm_logger_new(void* userdata, realm_logger_log_func_t log_func,
+                                         realm_logger_get_threshold_func_t threshold_func,
+                                         realm_free_userdata_func_t free_func);
+
+/**
+ * Log a message.
+ *
+ * @param level The severity of the log message.
+ * @param message A zero-terminated string with the message.
+ * @return True if the log message was successfully emitted.
+ */
+RLM_API bool realm_logger_log(realm_logger_t*, realm_log_level_e level, const char* message);
+
+/**
+ * Determine if the logger would log a message for the given level.
+ *
+ * This is a shorthand for `level >= realm_logger_get_threshold()`.
+ *
+ * @return True if a message would be emitted at @a level.
+ */
+RLM_API bool realm_logger_would_log(const realm_logger_t*, realm_log_level_e level);
+
+/**
+ * Get the log level threshold for the logger.
+ *
+ * @return The log level threshold for this logger.
+ */
+RLM_API realm_log_level_e realm_logger_get_threshold(const realm_logger_t*);
+
 
 /**
  * Get a thread-safe reference representing the same underlying object as some
@@ -1807,11 +1870,6 @@ typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_asyn
 typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, size_t total);
-
-typedef enum realm_auth_provider_client_type {
-    RLM_AUTH_PROVIDER_CLIENT_USER_API_KEY,
-    RLM_AUTH_PROVIDER_CLIENT_USERNAME_PASSWORD,
-} realm_auth_provider_client_type_e;
 
 typedef enum realm_http_method {
     RLM_HTTP_GET,
