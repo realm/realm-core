@@ -1922,8 +1922,8 @@ typedef bool (*realm_websocket_on_message_func_t)(void* userdata, const uint8_t*
  * WebSocket implementation, which also takes ownership of @a userdata and must
  * take care to call @a free_func when the websocket handle is released.
  *
- * @param transport_userdata The userdata associated with a
- *                           `realm_async_io_interface_t` object.
+ * @param io_interface_userdata The userdata associated with a
+ *                              `realm_async_io_interface_t` object.
  * @param url Zero-terminated URL string.
  * @param protocols Comma-separated zero-terminated string of protocol names.
  * @param userdata Caller-provided handle to be associated with this websocket
