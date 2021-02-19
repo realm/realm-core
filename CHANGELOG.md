@@ -11,6 +11,7 @@
 * Fix "Assertion failed: addr >= m_addr with (addr, m_addr)" assertion failure which could occur when using sync or multiple processes writing to a single Realm file. ([Cocoa #7086](https://github.com/realm/realm-cocoa/issues/7086), since v6.0.0.
 * On 32bit devices you may get exception with "No such object" when upgrading to v10.* ([#7314](https://github.com/realm/realm-java/issues/7314), since v10.0.0)
 * Fixed `links_to` queries that searched for an object key in a list or set of objects that contained more than 1000 objects where sometimes an object might not be found. ([#4429](https://github.com/realm/realm-core/pull/4429), since v6.0.0)
+* Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
 
 ### Breaking changes
 * None.
