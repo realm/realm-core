@@ -17,7 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/set.hpp>
-#include <realm/object-store/impl/set_notifier.hpp>
+
+#include <realm/object-store/impl/list_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -202,7 +203,7 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
     if (m_notifier && !m_notifier->have_callbacks())
         m_notifier.reset();
     if (!m_notifier) {
-        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
+        m_notifier = std::make_shared<ListNotifier>(m_realm, *m_set_base, m_type);
         RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
