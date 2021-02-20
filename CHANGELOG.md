@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.5.2 Release notes
 
 ### Enhancements
 * Performance of sorting on more than one property has been improved. Especially important if many elements match on the first property. Mitigates ([#7092](https://github.com/realm/realm-cocoa/issues/7092))
@@ -11,13 +11,6 @@
 * Fixed `links_to` queries that searched for an object key in a list or set of objects that contained more than 1000 objects where sometimes an object might not be found. ([#4429](https://github.com/realm/realm-core/pull/4429), since v6.0.0)
 * Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-*
 ----------------------------------------------
 
 # 10.5.1 Release notes
