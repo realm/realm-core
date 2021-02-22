@@ -90,7 +90,7 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
     return make_uv();
 #else
 #if REALM_PLATFORM_APPLE
-    return make_runloop();
+    return make_runloop(nullptr);
 #elif REALM_PLATFORM_ANDROID
     return make_alooper();
 #else
