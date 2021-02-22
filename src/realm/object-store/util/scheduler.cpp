@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/util/terminate.hpp>
 #include <realm/version_id.hpp>
 
 #if REALM_HAVE_UV
