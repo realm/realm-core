@@ -8,6 +8,7 @@
 * Fixed a bug that prevented an ObjectSchema with incoming links from being marked as embedded during migrations. ([#4414](https://github.com/realm/realm-core/pull/4414))
 * `Results::get_dictionary_element()` on frozen Results was not thread-safe.
 * The Realm notification listener thread could sometimes hit the assertion failure "!skip_version.version" if a write transaction was committed at a very specific time (since v10.5.0).
+* Fixed a conflict resolution bug related to the ArrayMove instruction, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization (since v10.3.0).
  
 ### Breaking changes
 * None.
