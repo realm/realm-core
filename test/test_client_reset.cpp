@@ -3,6 +3,7 @@
 
 #include <realm/util/random.hpp>
 #include <realm/db.hpp>
+#include <realm/list.hpp>
 
 #include "test.hpp"
 #include "sync_fixtures.hpp"
@@ -47,7 +48,7 @@ TEST(ClientReset_NoLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
         table->add_column(type_Int, "int");
-        create_object(wt, *table).set_all(123);
+        table->create_object().set_all(123);
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -77,7 +78,7 @@ TEST(ClientReset_NoLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
-        create_object(wt, *table).set_all(456);
+        table->create_object().set_all(456);
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
 
@@ -195,7 +196,7 @@ TEST(ClientReset_InitialLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
         table->add_column(type_Int, "int");
-        create_object(wt, *table).set_all(123);
+        table->create_object().set_all(123);
         session_1.nonsync_transact_notify(wt.commit());
     }
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -208,7 +209,7 @@ TEST(ClientReset_InitialLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
         table->add_column(type_Int, "int");
-        create_object(wt, *table).set_all(456);
+        table->create_object().set_all(456);
         wt.commit();
     }
 
@@ -241,13 +242,10 @@ TEST(ClientReset_InitialLocalChanges)
         ConstTableRef table = group.get_table("class_table");
         auto col = table->get_column_key("int");
         CHECK(table);
-        CHECK_EQUAL(table->size(), 2);
+        CHECK_EQUAL(table->size(), 1);
         auto it = table->begin();
         int_fast64_t val_0 = it->get<Int>(col);
-        int_fast64_t val_1 = (++it)->get<Int>(col);
-        CHECK(val_0 == 123 || val_0 == 456);
-        CHECK(val_1 == 123 || val_1 == 456);
-        CHECK_NOT_EQUAL(val_0, val_1);
+        CHECK(val_0 == 123);
     }
 
     // Make more changes in path_1.
@@ -258,7 +256,7 @@ TEST(ClientReset_InitialLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
         auto col = table->get_column_key("int");
-        create_object(wt, *table).set(col, 1000);
+        table->create_object().set(col, 1000);
         session_1.nonsync_transact_notify(wt.commit());
     }
     // Make more changes in path_2.
@@ -269,7 +267,7 @@ TEST(ClientReset_InitialLocalChanges)
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
         auto col = table->get_column_key("int");
-        create_object(wt, *table).set(col, 2000);
+        table->create_object().set(col, 2000);
         session_2.nonsync_transact_notify(wt.commit());
     }
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -370,7 +368,8 @@ TEST(ClientReset_LocalChangesWhenOffline)
         auto table = rt.get_table("class_table");
         CHECK(table);
         if (table) {
-            CHECK_EQUAL(table->size(), 2);
+            CHECK_EQUAL(table->size(), 1);
+            CHECK_EQUAL(table->begin()->get<Int>(col_int), 123);
         }
     }
 }
@@ -435,7 +434,7 @@ TEST(ClientReset_ThreeClients)
 
             TableRef table_2 = wt.get_table("class_table_2");
             auto col = table_2->get_column_key("array_string");
-            auto list_string = create_object_with_primary_key(wt, *table_2, "aaa").get_list<String>(col);
+            auto list_string = table_2->create_object_with_primary_key("aaa").get_list<String>(col);
             list_string.add("a");
             list_string.add("b");
 
@@ -472,19 +471,17 @@ TEST(ClientReset_ThreeClients)
             std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
             DBRef sg = DB::create(*history);
             WriteTransaction wt{sg};
-            TableInfoCache table_info_cache{wt};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            create_object(wt, *table_0).set_all(111, true);
+            table_0->create_object().set_all(111, true);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
             {
                 auto col = table_2->get_column_key("array_string");
                 GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(table_info_cache, *table_2, oid);
-                Obj obj =
-                    row_ndx ? table_2->get_object(row_ndx) : create_object_with_primary_key(wt, *table_2, "aaa");
+                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
+                Obj obj = row_ndx ? table_2->get_object(row_ndx) : table_2->create_object_with_primary_key("aaa");
                 auto list_string = obj.get_list<String>(col);
                 list_string.add("c");
                 list_string.add("d");
@@ -498,7 +495,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            create_object(wt, *table).set_all(222, false);
+            table->create_object().set_all(222, false);
             wt.commit();
         }
 
@@ -523,17 +520,16 @@ TEST(ClientReset_ThreeClients)
             std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
             DBRef sg = DB::create(*history);
             WriteTransaction wt{sg};
-            TableInfoCache table_info_cache{wt};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            create_object(wt, *table_0).set_all(333);
+            table_0->create_object().set_all(333);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
             {
                 auto col = table_2->get_column_key("array_string");
                 GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(table_info_cache, *table_2, oid);
+                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
                 CHECK(row_ndx);
                 auto list_string = table_2->get_object(row_ndx).get_list<String>(col);
                 list_string.insert(0, "e");
@@ -545,16 +541,15 @@ TEST(ClientReset_ThreeClients)
             std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
             DBRef sg = DB::create(*history);
             WriteTransaction wt{sg};
-            TableInfoCache table_info_cache{wt};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            create_object(wt, *table_0).set_all(444);
+            table_0->create_object().set_all(444);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
             {
                 GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(table_info_cache, *table_2, oid);
+                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
                 CHECK(row_ndx);
                 table_2->remove_object(row_ndx);
             }
@@ -614,7 +609,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            create_object(wt, *table).set_all(555);
+            table->create_object().set_all(555);
             wt.commit();
         }
         {
@@ -623,7 +618,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            create_object(wt, *table).set_all(666);
+            table->create_object().set_all(666);
             wt.commit();
         }
 
@@ -672,74 +667,6 @@ TEST(ClientReset_ThreeClients)
     }
 }
 
-TEST(ClientReset_StateRealmCompactableServerVersion)
-{
-    TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    TEST_DIR(metadata_dir_2);
-
-    const std::string server_path = "/data";
-
-    util::Logger& logger = test_context.logger;
-
-    ClientServerFixture fixture(dir, test_context);
-    fixture.start();
-
-    version_type compactable_server_version = 0;
-
-    for (size_t i = 0; i < 2; ++i) {
-
-        if (i > 0) {
-            version_type compactable_server_version_2 =
-                fixture.get_server().get_state_realm_compactable_server_version(server_path);
-            logger.debug("compactable_server_version = %1", compactable_server_version_2);
-            CHECK_LESS_EQUAL(compactable_server_version, compactable_server_version_2);
-            compactable_server_version = compactable_server_version_2;
-        }
-
-        // Insert data in path_1 and upload.
-        {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
-            DBRef sg = DB::create(*history);
-            WriteTransaction wt{sg};
-            std::string table_name = "class_table_" + util::to_string(i);
-            TableRef table = create_table(wt, table_name);
-            auto col_key = table->add_column(type_Int, "int");
-            for (int j = 0; j < 100; ++j) {
-                create_object(wt, *table).set(col_key, j);
-            }
-            wt.commit();
-            Session session = fixture.make_session(path_1);
-            fixture.bind_session(session, server_path);
-            session.wait_for_upload_complete_or_client_stopped();
-        }
-
-        // Perform async open or client reset in path_2.
-        {
-            Session::Config session_config;
-            {
-                Session::Config::ClientReset client_reset_config;
-                client_reset_config.metadata_dir = std::string(metadata_dir_2);
-                session_config.client_reset_config = client_reset_config;
-            }
-            Session session = fixture.make_session(path_2, session_config);
-            fixture.bind_session(session, server_path);
-            session.wait_for_download_complete_or_client_stopped();
-        }
-
-        {
-            version_type compactable_server_version_2 =
-                fixture.get_server().get_state_realm_compactable_server_version(server_path);
-            logger.info("compactable_server_version = %1", compactable_server_version_2);
-            CHECK_LESS_EQUAL(compactable_server_version, compactable_server_version_2);
-            compactable_server_version = compactable_server_version_2;
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
-    }
-}
-
 TEST(ClientReset_RecoverSchema)
 {
     TEST_DIR(dir);
@@ -763,7 +690,7 @@ TEST(ClientReset_RecoverSchema)
         std::string table_name = "class_table";
         TableRef table = create_table(wt, table_name);
         auto col_key = table->add_column(type_Float, "float");
-        create_object(wt, *table).set(col_key, 123.456f);
+        table->create_object().set(col_key, 123.456f);
         wt.commit();
         Session session = fixture.make_session(path_1);
         fixture.bind_session(session, server_path_1);

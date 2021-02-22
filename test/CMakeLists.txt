@@ -244,6 +244,7 @@ if(REALM_ENABLE_SYNC)
 	    test_allocation_metrics.cpp
 	    test_array_sync.cpp
 	    test_async_open.cpp
+	    test_client_reset.cpp
 	    test_changeset_encoding.cpp
 	    test_crypto.cpp
 	    test_compact_changesets.cpp
