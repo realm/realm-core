@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a conflict resolution bug related to the ArrayMove instruction, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization (since v10.3.0).
  
 ### Breaking changes
 * None.
