@@ -110,7 +110,7 @@ std::shared_ptr<Scheduler> Scheduler::make_frozen(VersionID version)
     return std::make_shared<FrozenScheduler>(version);
 }
 
-#if REALM_PLATFOR_APPLE
+#if REALM_PLATFORM_APPLE
 std::shared_ptr<Scheduler> Scheduler::make_runloop(CFRunLoopRef run_loop)
 {
     return std::make_shared<RunLoopScheduler>(run_loop ?: CFRunLoopGetCurrent());
