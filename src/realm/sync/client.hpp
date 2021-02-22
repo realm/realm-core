@@ -590,22 +590,9 @@ public:
         /// void async_wait_for_download_completion(WaitOperCompletionHandler)
         /// or
         /// bool wait_for_download_complete_or_client_stopped().
-        ///
-        /// The option 'require_recent_state_realm' is used for async open to
-        /// request a recent state Realm. A recent state Realm is never empty
-        /// (unless there is no data), and is recent in the sense that it was
-        /// produced by the current incarnation of the server. Recent does not
-        /// mean the absolutely newest possible state Realm, since that might
-        /// lead to too excessive work on the server. Setting
-        /// 'require_recent_state_realm' to true might lead to more work
-        /// performed by the server but it ensures that more data is downloaded
-        /// using async open instead of ordinary synchronization. It is
-        /// recommended to set 'require_recent_state_realm' to true. Client
-        /// reset always downloads a recent state Realm.
         struct ClientReset {
             std::string metadata_dir;
             bool recover_local_changes = true;
-            bool require_recent_state_realm = true;
         };
         util::Optional<ClientReset> client_reset_config;
 

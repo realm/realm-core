@@ -1896,11 +1896,9 @@ void Session::activate()
                 REALM_TERMINATE("No metadata directory");
             }
             logger.info("Client reset config, metadata_dir = '%1', "
-                        "recover_local_changes = %2, "
-                        "require_recent_state_realm = %3",
+                        "recover_local_changes = %2",
                         client_reset_config->metadata_dir,
-                        client_reset_config->recover_local_changes ? "true" : "false",
-                        client_reset_config->require_recent_state_realm ? "true" : "false"); // Throws
+                        client_reset_config->recover_local_changes ? "true" : "false"); // Throws
             m_state_download_in_progress = true;
             m_client_state_download.reset(new _impl::ClientStateDownload(logger, get_realm_path(),
                                                                          client_reset_config->metadata_dir,
@@ -2176,7 +2174,7 @@ void Session::send_state_request_message()
                                                      m_client_state_download->get_server_version_salt()};
 
     uint_fast64_t end_offset = m_client_state_download->get_end_offset();
-    bool need_recent = m_client_reset || get_client_reset_config()->require_recent_state_realm;
+    bool need_recent = m_client_reset;
 
     std::int_fast32_t min_file_format_version = 0;
     std::int_fast32_t max_file_format_version = 0;
