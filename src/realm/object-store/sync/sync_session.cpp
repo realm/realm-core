@@ -393,10 +393,9 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
     : m_state(&State::inactive)
     , m_config(std::move(config))
-    , m_force_client_resync(force_client_resync)
     , m_realm_path(std::move(realm_path))
     , m_client(client)
 {
@@ -461,8 +460,6 @@ void SyncSession::handle_error(SyncError error)
                 // when the session becomes active again.
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_resync = true;
-
                     CompletionCallbacks callbacks;
                     std::swap(m_completion_callbacks, callbacks);
                     advance_state(lock, State::inactive);
@@ -698,17 +695,6 @@ void SyncSession::do_create_sync_session()
         session_config.authorization_header_name = *m_config.authorization_header_name;
     }
     session_config.custom_http_headers = m_config.custom_http_headers;
-
-    if (m_force_client_resync) {
-        std::string metadata_dir = m_realm_path + ".resync";
-        util::try_make_dir(metadata_dir);
-
-        sync::Session::Config::ClientReset config;
-        config.metadata_dir = metadata_dir;
-        if (m_config.client_resync_mode != ClientResyncMode::Recover)
-            config.recover_local_changes = false;
-        session_config.client_reset_config = config;
-    }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
 

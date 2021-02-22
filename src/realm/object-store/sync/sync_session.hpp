@@ -327,7 +327,7 @@ private:
 
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
@@ -364,7 +364,6 @@ private:
     size_t m_death_count = 0;
 
     SyncConfig m_config;
-    bool m_force_client_resync;
 
     std::string m_realm_path;
     _impl::SyncClient& m_client;
