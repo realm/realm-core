@@ -27,7 +27,6 @@ using namespace realm;
 
 ParentNode::ParentNode(const ParentNode& from)
     : m_child(from.m_child ? from.m_child->clone() : nullptr)
-    , m_condition_column_name(from.m_condition_column_name)
     , m_condition_column_key(from.m_condition_column_key)
     , m_dD(from.m_dD)
     , m_dT(from.m_dT)
