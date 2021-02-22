@@ -565,7 +565,7 @@ public:
     void end_read();
 
     // Live transactions state changes, often taking an observer functor:
-    DB::version_type commit_and_continue_as_read();
+    VersionID commit_and_continue_as_read();
     template <class O>
     void rollback_and_continue_as_read(O* observer);
     void rollback_and_continue_as_read()
