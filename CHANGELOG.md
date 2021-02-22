@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Added query parser headers to release tarballs. ([#4448](https://github.com/realm/realm-core/pull/4448))
 
 ----------------------------------------------
 
