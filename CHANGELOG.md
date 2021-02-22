@@ -5,9 +5,6 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed a bug that prevented an ObjectSchema with incoming links from being marked as embedded during migrations. ([#4414](https://github.com/realm/realm-core/pull/4414))
-* `Results::get_dictionary_element()` on frozen Results was not thread-safe.
-* The Realm notification listener thread could sometimes hit the assertion failure "!skip_version.version" if a write transaction was committed at a very specific time (since v10.5.0).
 * Fixed a conflict resolution bug related to the ArrayMove instruction, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization (since v10.3.0).
  
 ### Breaking changes
@@ -17,6 +14,21 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.5.2 Release notes
+
+### Enhancements
+* Performance of sorting on more than one property has been improved. Especially important if many elements match on the first property. Mitigates ([#7092](https://github.com/realm/realm-cocoa/issues/7092))
+
+### Fixed
+* Fixed a bug that prevented an ObjectSchema with incoming links from being marked as embedded during migrations. ([#4414](https://github.com/realm/realm-core/pull/4414))
+* `Results::get_dictionary_element()` on frozen Results was not thread-safe.
+* The Realm notification listener thread could sometimes hit the assertion failure "!skip_version.version" if a write transaction was committed at a very specific time (since v10.5.0).
+* Fixed parsing queries comparing a link or list to an arguments of TypedLink. ([#4429](https://github.com/realm/realm-core/issues/4429), this never previously worked)
+* Fixed `links_to` queries that searched for an object key in a list or set of objects that contained more than 1000 objects where sometimes an object might not be found. ([#4429](https://github.com/realm/realm-core/pull/4429), since v6.0.0)
+* Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
 
 ----------------------------------------------
 
