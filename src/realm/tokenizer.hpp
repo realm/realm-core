@@ -29,7 +29,19 @@ namespace realm {
 
 using TokenPos = std::pair<unsigned, unsigned>;
 using TokenPositions = std::vector<TokenPos>;
-using TokenInfo = std::map<std::string, TokenPositions>;
+
+struct TokenInfo {
+    TokenInfo() = default;
+    explicit TokenInfo(TokenPos pos)
+    {
+        positions.emplace_back(pos);
+    }
+    double weight = 1.;
+    double frequency = 1.;
+    TokenPositions positions;
+};
+
+using TokenInfoMap = std::map<std::string, TokenInfo>;
 
 class Tokenizer {
 public:
@@ -49,7 +61,7 @@ public:
     }
 
     std::set<std::string> get_all_tokens();
-    TokenInfo get_token_info();
+    TokenInfoMap get_token_info();
 
     static std::unique_ptr<Tokenizer> get_instance();
 

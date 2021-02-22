@@ -1190,6 +1190,8 @@ void StringIndex::erase(ObjKey key)
     }
 }
 
+// This function will just return keys for all objects that contain the words found in 'value'.
+// The ranking will be done in the query node.
 void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData value) const
 {
     InternalFindResult res;
