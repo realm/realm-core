@@ -1213,6 +1213,7 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
                 for (size_t i = res.start_ndx; i < res.end_ndx; ++i) {
                     result.emplace_back(indexes.get(i));
                 }
+                std::sort(result.begin(), result.end());
             }
             else {
                 auto r = result.begin();

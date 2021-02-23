@@ -475,6 +475,12 @@ void TableView::sync_if_needed() const
     }
 }
 
+double TableView::get_query_rank(const Obj& obj)
+{
+    auto [col, tokens] = m_query.get_fts_params();
+    return obj.get_fts_rank(col, tokens);
+}
+
 void TableView::update_query(const Query& q)
 {
     REALM_ASSERT(m_query.m_table);
@@ -639,7 +645,7 @@ void TableView::do_sort(const DescriptorOrdering& ordering)
         // Sorting can be specified by multiple columns, so that if two entries in the first column are
         // identical, then the rows are ordered according to the second column, and so forth. For the
         // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
-        predicate.cache_first_column(index_pairs);
+        predicate.cache_first_column(index_pairs, *this);
 
         base_descr->execute(index_pairs, predicate, next);
     }

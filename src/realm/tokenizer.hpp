@@ -27,18 +27,21 @@
 
 namespace realm {
 
-using TokenPos = std::pair<unsigned, unsigned>;
-using TokenPositions = std::vector<TokenPos>;
+using TokenRange = std::pair<unsigned, unsigned>;
+using TokenRanges = std::vector<TokenRange>;
+using TokenPositions = std::vector<unsigned>;
 
 struct TokenInfo {
     TokenInfo() = default;
-    explicit TokenInfo(TokenPos pos)
+    explicit TokenInfo(unsigned position, TokenRange pos)
     {
-        positions.emplace_back(pos);
+        positions.emplace_back(position);
+        ranges.emplace_back(pos);
     }
     double weight = 1.;
     double frequency = 1.;
     TokenPositions positions;
+    TokenRanges ranges;
 };
 
 using TokenInfoMap = std::map<std::string, TokenInfo>;
@@ -55,13 +58,15 @@ public:
         return {m_buffer, m_size};
     }
 
-    TokenPos get_position()
+    TokenRange get_range()
     {
         return {m_start, m_end};
     }
 
     std::set<std::string> get_all_tokens();
     TokenInfoMap get_token_info();
+
+    double get_rank(std::string_view tokens, std::string_view text);
 
     static std::unique_ptr<Tokenizer> get_instance();
 

@@ -43,7 +43,8 @@ struct ColumnType {
         BackLink = 14,
         ObjectId = 15,
         TypedLink = 16,
-        UUID = 17
+        UUID = 17,
+        // QueryRank = 18,
     };
 
     constexpr explicit ColumnType(int64_t t) noexcept
@@ -135,6 +136,8 @@ static constexpr ColumnType col_type_OldDateTime = ColumnType{7};
 static_assert(!col_type_OldStringEnum.is_valid());
 static_assert(!col_type_OldTable.is_valid());
 static_assert(!col_type_OldDateTime.is_valid());
+
+static constexpr ColumnType col_type_FTSRank = ColumnType{18};
 
 
 // Column attributes can be combined using bitwise or.

@@ -30,9 +30,12 @@ namespace realm {
 
 class SortDescriptor;
 class ConstTableRef;
+class TableView;
 class Group;
 
 enum class DescriptorType { Sort, Distinct, Limit };
+
+constexpr ColKey col_key_fts_rank(ColKey::Idx{0}, col_type_FTSRank, ColumnAttrMask{}, 0);
 
 struct LinkPathPart {
     // Constructor for forward links
@@ -94,7 +97,7 @@ public:
                 return col.is_null.empty() ? false : col.is_null[i.index_in_view];
             });
         }
-        void cache_first_column(IndexPairs& v);
+        void cache_first_column(IndexPairs& v, TableView&);
 
     private:
         struct SortColumn {

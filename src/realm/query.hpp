@@ -46,7 +46,6 @@
 
 namespace realm {
 
-
 // Pre-declarations
 class ParentNode;
 class Table;
@@ -303,6 +302,17 @@ public:
         return m_table;
     }
 
+    std::pair<ColKey, std::string> get_fts_params()
+    {
+        return {m_fts_column, m_fts_tokens};
+    }
+
+    void set_fts_params(ColKey col, StringData tokens)
+    {
+        m_fts_column = col;
+        m_fts_tokens = std::string(tokens);
+    }
+
     void get_outside_versions(TableVersions&) const;
 
     // True if matching rows are guaranteed to be returned in table order.
@@ -418,6 +428,8 @@ private:
     TableView* m_source_table_view = nullptr;      // table views are not refcounted, and not owned by the query.
     std::unique_ptr<TableView> m_owned_source_table_view; // <--- except when indicated here
     util::bind_ptr<DescriptorOrdering> m_ordering;
+    ColKey m_fts_column;
+    std::string m_fts_tokens;
 };
 
 // Implementation:

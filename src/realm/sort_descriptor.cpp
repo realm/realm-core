@@ -21,6 +21,7 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
+#include <realm/table_view.hpp>
 
 using namespace realm;
 
@@ -347,7 +348,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
 }
 
-void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
+void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v, TableView& tv)
 {
     if (m_columns.empty())
         return;
@@ -368,7 +369,13 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        index.cached_value = col.table->get_object(key).get_any(ck);
+        Obj obj = col.table->get_object(key);
+        if (ck.get_type() == col_type_FTSRank) {
+            index.cached_value = tv.get_query_rank(obj);
+        }
+        else {
+            index.cached_value = obj.get_any(ck);
+        }
     }
 }
 

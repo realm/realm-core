@@ -6026,6 +6026,9 @@ TEST(Query_FullTextMulti)
     auto col = table->add_column(type_String, "text");
     table->add_search_index(col, true);
 
+    ObjKey k2(200);
+    ObjKey k5(500);
+
     table->create_object().set(
         col,
         "An object database (also object-oriented database management system) is a database management system in "
@@ -6041,7 +6044,7 @@ TEST(Query_FullTextMulti)
         "(Microelectronics and Computer Technology Corporation or MCC), Vodak (GMD-IPSI), and Zeitgeist (Texas "
         "Instruments). The ORION project had more published papers than any of the other efforts. Won Kim of MCC "
         "compiled the best of those papers in a book published by The MIT Press.");
-    table->create_object().set(
+    table->create_object(k2).set(
         col,
         "Early commercial products included Gemstone (Servio Logic, name changed to GemStone Systems), Gbase "
         "(Graphael), and Vbase (Ontologic). The early to mid-1990s saw additional commercial products enter the "
@@ -6063,6 +6066,14 @@ TEST(Query_FullTextMulti)
         "early commercial products were integrated with various languages: GemStone (Smalltalk), Gbase (LISP), Vbase "
         "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
         "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
+
+    table->create_object(k5).set(
+        col, "Formally, a 'database' refers to a set of related data and the way it is organized. Access to this "
+             "data is usually provided by a 'database management system' (DBMS) consisting of an integrated set of "
+             "computer software that allows users to interact with one or more databases and provides access to all "
+             "of the data contained in the database (although restrictions may exist that limit access to particular "
+             "data). The DBMS provides various functions that allow entry, storage and retrieval of large quantities "
+             "of information and provides ways to manage how that information is organized.");
 
     table->create_object().set(
         col, "L’archive ouverte pluridisciplinaire HAL, est destinée au dépôt et à la diffusion de documents "
@@ -6100,6 +6111,16 @@ TEST(Query_FullTextMulti)
     // many terms
     tv = table->where().fulltext(col, "object database management brown").find_all();
     CHECK_EQUAL(1, tv.size());
+
+    tv = table->where().fulltext(col, "computer software").find_all();
+    CHECK_EQUAL(2, tv.size());
+    tv.sort(col_key_fts_rank, false);
+    CHECK_EQUAL(tv.get_key(0), k5); // Object 5 contains the exact term
+
+    tv = table->where().fulltext(col, "database").find_all();
+    CHECK_EQUAL(5, tv.size());
+    tv.sort(col_key_fts_rank, true); // Least relevant first
+    CHECK_EQUAL(tv.get_key(0), k2); // Object 2 has only one occurrence
 
     while (table->size() > 0) {
         table->begin()->remove();

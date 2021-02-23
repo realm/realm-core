@@ -45,17 +45,18 @@ TokenInfoMap Tokenizer::get_token_info()
     TokenInfoMap info;
     size_t num_tokens = 0;
     while (next()) {
-        num_tokens++;
         auto it = info.find(std::string(get_token()));
         if (it == info.end()) {
-            info.emplace(std::string(get_token()), get_position());
+            info.emplace(std::string(get_token()), TokenInfo(num_tokens, get_range()));
         }
         else {
             TokenInfo& i = it->second;
-            i.positions.push_back(get_position());
+            i.positions.emplace_back(num_tokens);
+            i.ranges.emplace_back(get_range());
             i.weight *= 2;
             i.frequency += (1 / i.weight);
         }
+        num_tokens++;
     }
     for (auto& it : info) {
         TokenInfo& i = it.second;
@@ -63,6 +64,72 @@ TokenInfoMap Tokenizer::get_token_info()
         i.weight = i.frequency * coeff;
     }
     return info;
+}
+
+namespace {
+
+template <class T>
+double get_sub_proximity(unsigned pos, T begin, T end)
+{
+    std::vector<unsigned>& positions = **begin;
+    auto next = begin + 1;
+    double proximity = 0; // The closer, the higher proximity
+    double sub_proximity = 0;
+    for (auto i : positions) {
+        if (i > pos) {
+            if (next == end) {
+                // End of line. this must be the best score we can get
+                return 1. / (i - pos);
+            }
+            auto p = get_sub_proximity(i, next, end);
+            if (p > sub_proximity) {
+                sub_proximity = p;
+                proximity = 1. / (i - pos);
+            }
+        }
+    }
+    return proximity + sub_proximity;
+}
+
+template <class T>
+double get_position_proximity(T begin, T end)
+{
+    double proximity = 0; // The closer, the higher proximity
+    std::vector<unsigned>& positions = **begin;
+    auto next = begin + 1;
+    // Iterate over the individual positions to see which of them get the best score;
+    for (auto i : positions) {
+        auto p = get_sub_proximity(i, next, end);
+        if (p > proximity) {
+            proximity = p;
+        }
+    }
+    return proximity;
+}
+
+} // namespace
+
+double Tokenizer::get_rank(std::string_view tokens, std::string_view text)
+{
+    reset(text);
+    auto info = get_token_info();
+
+    std::vector<std::vector<unsigned>*> positions;
+    double weight = 0;
+    reset(tokens);
+    while (next()) {
+        std::string tok(get_token());
+        auto& i = info[tok];
+        positions.push_back(&i.positions);
+        weight += i.weight;
+    }
+
+    // Proximity only relevant if more than one token
+    if (positions.size() > 1) {
+        weight += get_position_proximity(positions.begin(), positions.end());
+    }
+
+    return weight;
 }
 
 class DefaultTokenizer : public Tokenizer {
@@ -183,16 +250,20 @@ int main(int argc, const char* argv[])
     assert(info.size() == 4);
     realm::TokenInfo& i(info["to"]);
     assert(i.positions.size() == 2);
-    assert(i.positions[0].first == 0);
-    assert(i.positions[0].second == 2);
-    assert(i.positions[1].first == 13);
-    assert(i.positions[1].second == 15);
+    assert(i.positions[0] == 0);
+    assert(i.positions[1] == 4);
+    assert(i.ranges.size() == 2);
+    assert(i.ranges[0].first == 0);
+    assert(i.ranges[0].second == 2);
+    assert(i.ranges[1].first == 13);
+    assert(i.ranges[1].second == 15);
     tok->reset("Jeg gik mig over sø og land");
     info = tok->get_token_info();
     assert(info.size() == 7);
     realm::TokenInfo& j(info["sø"]);
-    assert(j.positions[0].first == 17);
-    assert(j.positions[0].second == 20);
+    assert(j.ranges[0].first == 17);
+    assert(j.ranges[0].second == 20);
+    tok->get_rank("gik mig over", "Du gik dig over, jeg gik mig over sø og land");
     if (argc > 1) {
         std::ifstream istr(argv[1]);
         istr.read(buffer, sizeof(buffer));

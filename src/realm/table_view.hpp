@@ -221,6 +221,8 @@ public:
         return m_table->try_get_object(key);
     }
 
+    double get_query_rank(const Obj&);
+
     // Get the query used to create this TableView
     // The query will have a null source table if this tv was not created from
     // a query
