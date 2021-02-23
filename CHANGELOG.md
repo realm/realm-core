@@ -6,6 +6,8 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a conflict resolution bug related to the ArrayMove instruction, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization (since v10.3.0).
+* Fix another bug which could lead to the assertion failures "!skip_version.version" if a write transaction was committed while the first run of a notifier with no registered observers was happening (since v10.5.0).
+* Skipping a change notification in the first write transaction after the observer was added could potentially fail to skip the notification (since v10.3.3).
  
 ### Breaking changes
 * None.

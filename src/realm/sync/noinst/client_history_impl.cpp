@@ -633,7 +633,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
 
     update_sync_progress(progress, downloadable_bytes); // Throws
 
-    version_type new_version = transact->commit_and_continue_as_read(); // Throws
+    version_type new_version = transact->commit_and_continue_as_read().version; // Throws
 #if REALM_DEBUG
     ensure_updated(new_version); // Throws
     REALM_ASSERT(m_ct_history->size() == m_ct_history_size);
