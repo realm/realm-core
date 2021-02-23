@@ -205,7 +205,7 @@ protected:
     // but only report this to the notifiers the first time this is reported
     void report_collection_root_is_deleted();
 
-    bool all_related_tables_covered(const TableVersions& versions);
+    bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
                                                                                  ConstTableRef);
 

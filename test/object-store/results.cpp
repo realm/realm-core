@@ -24,6 +24,7 @@
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/results_notifier.hpp>
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -1456,23 +1457,30 @@ TEST_CASE("notifications: results") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({{"object",
                        {{"value", PropertyType::Int},
-                        {"link", PropertyType::Object | PropertyType::Nullable, "linked to object"}}},
+                        {"link", PropertyType::Object | PropertyType::Nullable, "linked to object"},
+                        {"second link", PropertyType::Object | PropertyType::Nullable, "second linked to object"}}},
                       {"other object", {{"value", PropertyType::Int}}},
                       {"linking object", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
-                      {"linked to object", {{"value", PropertyType::Int}}}});
+                      {"linked to object", {{"value", PropertyType::Int}}},
+                      {"second linked to object", {{"value", PropertyType::Int}}}});
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
+    auto other_table = r->read_group().get_table("class_other object");
+    auto linked_to_table = r->read_group().get_table("class_linked to object");
+    auto second_linked_to_table = r->read_group().get_table("class_second linked to object");
     auto col_value = table->get_column_key("value");
     auto col_link = table->get_column_key("link");
 
     r->begin_transaction();
     std::vector<ObjKey> target_keys;
-    r->read_group().get_table("class_linked to object")->create_objects(10, target_keys);
+    linked_to_table->create_objects(10, target_keys);
+    std::vector<ObjKey> second_target_keys;
+    second_linked_to_table->create_objects(10, second_target_keys);
 
     ObjKeys object_keys({3, 4, 7, 9, 10, 21, 24, 34, 42, 50});
     for (int i = 0; i < 10; ++i) {
-        table->create_object(object_keys[i]).set_all(i * 2, target_keys[i]);
+        table->create_object(object_keys[i]).set_all(i * 2, target_keys[i], second_target_keys[i]);
     }
     r->commit_transaction();
 
@@ -1480,6 +1488,13 @@ TEST_CASE("notifications: results") {
     auto r2_table = r2->read_group().get_table("class_object");
 
     Results results(r, table->where().greater(col_value, 0).less(col_value, 10));
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
 
     SECTION("unsorted notifications") {
         int notification_calls = 0;
@@ -1492,23 +1507,16 @@ TEST_CASE("notifications: results") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
         SECTION("modifications to unrelated tables do not send notifications") {
             write([&] {
-                r->read_group().get_table("class_other object")->create_object();
+                other_table->create_object();
             });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("irrelevant modifications to linked tables do not send notifications") {
             write([&] {
-                r->read_group().get_table("class_linked to object")->create_object();
+                linked_to_table->create_object();
             });
             REQUIRE(notification_calls == 1);
         }
@@ -1653,9 +1661,8 @@ TEST_CASE("notifications: results") {
 
         SECTION("modification to related table not included in query") {
             write([&] {
-                auto table = r->read_group().get_table("class_linked to object");
-                auto col = table->get_column_key("value");
-                auto obj = table->get_object(target_keys[1]);
+                auto col = linked_to_table->get_column_key("value");
+                auto obj = linked_to_table->get_object(target_keys[1]);
                 obj.set(col, 42); // Will affect first entry in results
             });
             REQUIRE(notification_calls == 2);
@@ -1698,7 +1705,7 @@ TEST_CASE("notifications: results") {
             REQUIRE(callback.after_change.empty());
         }
 
-        auto write = [&](auto&& func) {
+        auto write_r2 = [&](auto&& func) {
             r2->begin_transaction();
             func(*r2_table);
             r2->commit_transaction();
@@ -1706,7 +1713,7 @@ TEST_CASE("notifications: results") {
         };
 
         SECTION("both are called after a write") {
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
@@ -1722,7 +1729,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE(results.get(0).is_valid());
                 REQUIRE(results.get(0).get<int64_t>(col_value) == 2);
             };
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.remove_object(results.get(0).get_key());
             });
             REQUIRE(callback.before_calls == 1);
@@ -1735,7 +1742,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(callback.after_change.insertions, 4);
                 REQUIRE(results.last()->get<int64_t>(col_value) == 5);
             };
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
@@ -1756,13 +1763,6 @@ TEST_CASE("notifications: results") {
         });
 
         advance_and_notify(*r);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
             write([&] {
@@ -1924,13 +1924,6 @@ TEST_CASE("notifications: results") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
         SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
             write([&] {
                 table->get_object(object_keys[6]).set(col_value, 13);
@@ -1998,13 +1991,6 @@ TEST_CASE("notifications: results") {
         });
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
         SECTION("insert table before observed table") {
             write([&] {
                 table->create_object(ObjKey(53)).set(col_value, 5);
@@ -2034,6 +2020,59 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 #endif
+    }
+
+    SECTION("notifier query rerunning") {
+        results = Results(r, 0 <= table->column<Link>(col_link));
+        _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+            std::make_shared<_impl::ResultsNotifier>(results);
+        _impl::RealmCoordinator::register_notifier(notifier);
+        advance_and_notify(*r);
+        TableView tv;
+        REQUIRE(notifier->get_tableview(tv));
+        REQUIRE_FALSE(notifier->get_tableview(tv));
+
+        SECTION("modifying the query's table reruns the query") {
+            write([&] {
+                table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table used in the query reruns the query") {
+            write([&] {
+                linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table used for sorting reruns the query") {
+            results = Results(r, table).sort({{"link.value", false}});
+            _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+                std::make_shared<_impl::ResultsNotifier>(results);
+            _impl::RealmCoordinator::register_notifier(notifier);
+            advance_and_notify(*r);
+            REQUIRE(notifier->get_tableview(tv));
+
+            write([&] {
+                linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table not used by the query does not rerun the query") {
+            write([&] {
+                second_linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying an unrelated table does not rerun the query") {
+            write([&] {
+                other_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
     }
 }
 

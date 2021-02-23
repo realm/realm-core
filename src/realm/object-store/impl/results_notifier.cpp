@@ -102,27 +102,6 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     return m_query->get_table() && has_run() && have_callbacks();
 }
 
-bool ResultsNotifier::need_to_run()
-{
-    REALM_ASSERT(m_info);
-
-    {
-        auto lock = lock_target();
-        // Don't run the query if the results aren't actually going to be used
-        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
-            return false;
-    }
-
-    // If we've run previously, check if we need to rerun
-    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
-        // Does m_last_seen_version match m_related_tables
-        if (all_related_tables_covered(m_last_seen_version)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void ResultsNotifier::calculate_changes()
 {
     if (has_run() && have_callbacks()) {
@@ -156,6 +135,8 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
+    REALM_ASSERT(m_info);
+
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()) {
         m_change = {};
@@ -164,8 +145,27 @@ void ResultsNotifier::run()
         return;
     }
 
-    if (!need_to_run())
+    {
+        auto lock = lock_target();
+        // Don't run the query if the results aren't actually going to be used
+        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
+            return;
+    }
+
+    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
+        // We've run previously and none of the tables involved in the query
+        // changed so we don't need to rerun the query, but we still need to
+        // check each object in the results to see if it was modified
+        if (!any_related_table_was_modified(*m_info))
+            return;
+        auto checker = get_modification_checker(*m_info, m_query->get_table());
+        for (size_t i = 0; i < m_previous_rows.size(); ++i) {
+            if (checker(m_previous_rows[i])) {
+                m_change.modifications.add(i);
+            }
+        }
         return;
+    }
 
     m_query->sync_view_if_needed();
     m_run_tv = m_query->find_all();

@@ -27,24 +27,16 @@
 using namespace realm;
 using namespace realm::_impl;
 
-bool CollectionNotifier::all_related_tables_covered(const TableVersions& versions)
+bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo const& info) const noexcept
 {
-    if (m_related_tables.size() > versions.size()) {
-        return false;
-    }
-    auto first = versions.begin();
-    auto last = versions.end();
-    for (auto& it : m_related_tables) {
-        TableKey tk{it.table_key};
-        auto match = std::find_if(first, last, [tk](auto& elem) {
-            return elem.first == tk;
-        });
-        if (match == last) {
-            // tk not found in versions
-            return false;
-        }
-    }
-    return true;
+    // Check if any of the tables accessible from the root table were
+    // actually modified. This can be false if there were only insertions, or
+    // deletions which were not linked to by any row in the linking table
+    auto table_modified = [&](auto& tbl) {
+        auto it = info.tables.find(tbl.table_key.value);
+        return it != info.tables.end() && !it->second.modifications_empty();
+    };
+    return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
 }
 
 std::function<bool(ObjectChangeSet::ObjectKeyType)>
@@ -53,18 +45,12 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     if (info.schema_changed)
         set_table(root_table);
 
-    // First check if any of the tables accessible from the root table were
-    // actually modified. This can be false if there were only insertions, or
-    // deletions which were not linked to by any row in the linking table
-    auto table_modified = [&](auto& tbl) {
-        auto it = info.tables.find(tbl.table_key.value);
-        return it != info.tables.end() && !it->second.modifications_empty();
-    };
-    if (!any_of(begin(m_related_tables), end(m_related_tables), table_modified)) {
+    if (!any_related_table_was_modified(info)) {
         return [](ObjectChangeSet::ObjectKeyType) {
             return false;
         };
     }
+
     if (m_related_tables.size() == 1) {
         auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
