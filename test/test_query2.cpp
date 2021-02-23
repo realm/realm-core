@@ -5967,6 +5967,8 @@ TEST(Query_FullTextMulti)
 {
     Group g;
     auto table = g.add_table("table");
+    auto origin = g.add_table_with_primary_key("origin", type_Int, "id");
+    auto col_link = origin->add_column_list(*table, "link");
     auto col = table->add_column(type_String, "text");
     table->add_search_index(col, true);
 
@@ -6008,9 +6010,25 @@ TEST(Query_FullTextMulti)
         "(COP) and VOSS (Virtual Object Storage System for Smalltalk). For much of the 1990s, C++ dominated the "
         "commercial object database management market. Vendors added Java in the late 1990s and more recently, C#.");
 
+    int64_t id = 1000;
+    for (auto& o : *table) {
+        auto ll = origin->create_object_with_primary_key(id++).get_linklist(col_link);
+        ll.add(o.get_key());
+    }
+
     // search with multiple terms
     auto tv = table->where().fulltext(col, "object gemstone").find_all();
     CHECK_EQUAL(2, tv.size());
+
+    // over links
+    tv = origin->link(col_link).column<String>(col).fulltext("object gemstone").find_all();
+    CHECK_EQUAL(2, tv.size());
+
+    // through LnkLst
+    auto obj = tv.get_object(0);
+    auto ll = obj.get_linklist(col_link);
+    tv = table->where(ll).fulltext(col, "object gemstone").find_all();
+    CHECK_EQUAL(1, tv.size());
 
     // search for combination that is not present
     tv = table->where().fulltext(col, "object data").find_all();

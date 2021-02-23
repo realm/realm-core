@@ -1972,15 +1972,13 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
 };
 
+
+class LinkMap;
 class StringNodeFulltext : public StringNodeEqualBase {
 public:
-    using StringNodeEqualBase::StringNodeEqualBase;
+    StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm = {});
 
-    void table_changed() override
-    {
-        StringNodeBase::table_changed();
-        m_has_search_index = true;
-    }
+    void table_changed() override;
 
     void _search_index_init() override;
 
@@ -1994,8 +1992,6 @@ public:
         return "FULLTEXT";
     }
 
-    StringNodeFulltext(const StringNodeFulltext& from) = default;
-
     const std::vector<ObjKey>& index_based_keys() override
     {
         return m_index_matches;
@@ -2003,6 +1999,9 @@ public:
 
 private:
     std::vector<ObjKey> m_index_matches;
+    std::unique_ptr<LinkMap> m_link_map;
+
+    StringNodeFulltext(const StringNodeFulltext&);
 
     ObjKey get_key(size_t ndx) override
     {
