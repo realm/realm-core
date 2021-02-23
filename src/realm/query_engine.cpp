@@ -456,12 +456,44 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+StringNodeFulltext::StringNodeFulltext(StringData v, ColKey column, std::unique_ptr<LinkMap> lm)
+    : StringNodeEqualBase(v, column)
+    , m_link_map(std::move(lm))
+{
+    m_has_search_index = true;
+    if (!m_link_map)
+        m_link_map = std::make_unique<LinkMap>();
+}
+
+void StringNodeFulltext::table_changed()
+{
+    m_link_map->set_base_table(m_table);
+}
+
+StringNodeFulltext::StringNodeFulltext(const StringNodeFulltext& other)
+    : StringNodeEqualBase(other)
+    , m_index_matches(other.m_index_matches)
+{
+    m_link_map = std::make_unique<LinkMap>(*other.m_link_map);
+}
+
 void StringNodeFulltext::_search_index_init()
 {
-    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    auto index = m_link_map->get_target_table()->get_search_index(ParentNode::m_condition_column_key);
     m_index_matches.clear();
     REALM_ASSERT(index && index->is_fulltext_index());
     index->find_all_fulltext(m_index_matches, StringData(StringNodeBase::m_value));
+
+    // If links exists, use backlinks to find the original objects
+    if (m_link_map->links_exist()) {
+        std::set<ObjKey> tmp;
+        for (auto k : m_index_matches) {
+            auto ndxs = m_link_map->get_origin_ndxs(k);
+            tmp.insert(ndxs.begin(), ndxs.end());
+        }
+        m_index_matches.assign(tmp.begin(), tmp.end());
+    }
+
     m_results_start = 0;
     m_results_ndx = 0;
     m_results_end = m_index_matches.size();
@@ -469,7 +501,6 @@ void StringNodeFulltext::_search_index_init()
         m_actual_key = m_index_matches[0];
     }
 }
-
 
 std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
                                                                                          const ColKey& col_key)
