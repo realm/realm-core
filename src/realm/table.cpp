@@ -1387,8 +1387,15 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-        case col_type_String:
-            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
+        case col_type_String: {
+            auto str = static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx);
+            // This is a workaround for a bug where the length could be -1
+            // Seen when upgrading very old file.
+            if (str.size() == size_t(-1)) {
+                return Mixed("");
+            }
+            return Mixed{str};
+        }
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
         default:

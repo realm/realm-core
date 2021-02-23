@@ -2098,7 +2098,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-DB::version_type Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read()
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2130,7 +2130,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 
-    return version;
+    return VersionID{version, new_read_lock.m_reader_idx};
 }
 
 // Caller must lock m_mutex.
