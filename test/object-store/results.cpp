@@ -2073,6 +2073,20 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE_FALSE(notifier->get_tableview(tv));
         }
+
+        SECTION("modifying a linked table not used for sorting does not rerun the query") {
+            results = Results(r, table).sort({{"link.value", false}});
+            _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+                std::make_shared<_impl::ResultsNotifier>(results);
+            _impl::RealmCoordinator::register_notifier(notifier);
+            advance_and_notify(*r);
+            REQUIRE(notifier->get_tableview(tv));
+
+            write([&] {
+                second_linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
     }
 }
 
