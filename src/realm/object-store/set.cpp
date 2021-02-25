@@ -392,7 +392,8 @@ void Set::assign_difference(const Set& rhs)
 void Set::assign_symmetric_difference(const Set& rhs)
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(
+            rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
