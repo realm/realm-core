@@ -295,6 +295,23 @@ size_t Dictionary::find_any(Mixed value) const
     return ret;
 }
 
+size_t Dictionary::find_any_key(Mixed key) const
+{
+    size_t ret = realm::not_found;
+    if (size()) {
+        update_if_needed();
+        try {
+            auto hash = key.hash();
+            ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+            ret = m_clusters->get_ndx(k);
+        }
+        catch (...) {
+            // ignored
+        }
+    }
+    return ret;
+}
+
 Mixed Dictionary::min(size_t* return_ndx) const
 {
     update_if_needed();

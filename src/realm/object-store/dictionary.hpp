@@ -88,6 +88,12 @@ public:
     {
         return m_dict->find_any(value);
     }
+
+    size_t find_any_key(Mixed key) const
+    {
+        return m_dict->find_any_key(key);
+    }
+
     bool contains(StringData key)
     {
         return m_dict->contains(key);

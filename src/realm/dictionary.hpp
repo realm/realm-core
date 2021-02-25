@@ -61,6 +61,7 @@ public:
     Mixed get_any(size_t ndx) const final;
     std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
     size_t find_any(Mixed value) const final;
+    size_t find_any_key(Mixed value) const;
 
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;
