@@ -361,6 +361,13 @@ bool Set::intersects(const Set& rhs) const
     });
 }
 
+bool Set::set_equals(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().set_equals(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
 void Set::assign_intersection(const Set& rhs)
 {
     return dispatch([&](auto t) {
@@ -379,6 +386,13 @@ void Set::assign_difference(const Set& rhs)
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+void Set::assign_symmetric_difference(const Set& rhs)
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
