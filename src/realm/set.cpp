@@ -248,6 +248,11 @@ bool LnkSet::intersects(const LnkSet& rhs) const
     return this->m_set.intersects(rhs.m_set);
 }
 
+bool LnkSet::set_equals(const LnkSet& rhs) const
+{
+    return this->m_set.set_equals(rhs.m_set);
+}
+
 void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
 {
     indices.resize(sz);
