@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Support upgrading from file format 5. ([#7089](https://github.com/realm/realm-cocoa/issues/7089), since v6.0.0)
+* On 32bit devices you may get exception with "No such object" when upgrading to v10.* ([#7314](https://github.com/realm/realm-java/issues/7314), since v10.0.0)
  
 ### Breaking changes
 * None.
