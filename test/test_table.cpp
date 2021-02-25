@@ -5644,4 +5644,15 @@ TEST(Table_SortEncrypted)
     // std::cout << "time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
 }
 
+TEST(Table_RebuildTable)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    auto id = t->add_column(type_Int, "id");
+    for (int64_t i = 1; i < 8; i++) {
+        t->create_object().set(id, i);
+    }
+    t->set_primary_key_column(id);
+}
+
 #endif // TEST_TABLE
