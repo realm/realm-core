@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed queries for constant null across links to an indexed property not returning matches when the link was null. ([#4460]https://github.com/realm/realm-core/pull/4460), since 5.23.6).
+
 ### Breaking changes
 * None.
 
