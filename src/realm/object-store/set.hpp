@@ -113,6 +113,7 @@ public:
     void assign_intersection(const Set& rhs);
     void assign_union(const Set& rhs);
     void assign_difference(const Set& rhs);
+    void assign_symmetric_difference(const Set& rhs);
 
     bool operator==(const Set& rhs) const noexcept;
 

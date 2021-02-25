@@ -287,6 +287,7 @@ public:
     bool is_superset_of(const LnkSet& rhs) const;
     bool is_strict_superset_of(const LnkSet& rhs) const;
     bool intersects(const LnkSet& rhs) const;
+    bool set_equals(const LnkSet& rhs) const;
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_key;
