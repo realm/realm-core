@@ -586,6 +586,12 @@ size_t Results::index_of(T const& value)
         }
         return not_found;
     }
+    if (m_dictionary_keys) {
+        if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
+            return dict->find_any_key(value);
+        }
+    }
+
     return m_collection->find_any(value);
 }
 
