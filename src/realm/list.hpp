@@ -263,7 +263,7 @@ public:
     }
 
     // Overriding members of CollectionBase:
-    using CollectionBase::get_key;
+    using CollectionBase::get_owner_key;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;

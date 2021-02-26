@@ -31,7 +31,7 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_type(type)
     , m_table(list.get_table()->get_key())
     , m_col(list.get_col_key())
-    , m_obj(list.get_key())
+    , m_obj(list.get_owner_key())
     , m_prev_size(list.size())
 {
     if (m_type == PropertyType::Object) {

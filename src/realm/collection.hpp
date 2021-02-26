@@ -88,7 +88,7 @@ public:
     // Note: virtual..final prevents static override.
 
     /// Get the key of the object that owns this collection.
-    virtual ObjKey get_key() const noexcept final
+    virtual ObjKey get_owner_key() const noexcept final
     {
         return get_obj().get_key();
     }
@@ -266,7 +266,7 @@ public:
         return false;
     }
 
-    using Interface::get_key;
+    using Interface::get_owner_key;
     using Interface::get_target_table;
 
 protected:
@@ -294,7 +294,7 @@ protected:
 
     bool operator==(const CollectionBaseImpl& other) const noexcept
     {
-        return get_key() == other.get_key() && get_col_key() == other.get_col_key();
+        return get_owner_key() == other.get_owner_key() && get_col_key() == other.get_col_key();
     }
 
     bool operator!=(const CollectionBaseImpl& other) const noexcept

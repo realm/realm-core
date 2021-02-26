@@ -31,7 +31,7 @@ SetNotifier::SetNotifier(std::shared_ptr<Realm> realm, SetBase const& set, Prope
     , m_type(type)
     , m_table(set.get_table()->get_key())
     , m_col(set.get_col_key())
-    , m_obj(set.get_key())
+    , m_obj(set.get_owner_key())
     , m_prev_size(set.size())
 {
     if (m_type == PropertyType::Object) {

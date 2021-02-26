@@ -715,7 +715,7 @@ bool SyncReplication::select_table(const Table& table)
 
 bool SyncReplication::select_collection(const CollectionBase& view)
 {
-    if (view.get_key().is_unresolved()) {
+    if (view.get_owner_key().is_unresolved()) {
         return false;
     }
 
@@ -836,7 +836,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
 {
     ConstTableRef source_table = list.get_table();
-    ObjKey source_obj = list.get_key();
+    ObjKey source_obj = list.get_owner_key();
     ColKey source_field = list.get_col_key();
     populate_path_instr(instr, *source_table, source_obj, source_field);
 }
