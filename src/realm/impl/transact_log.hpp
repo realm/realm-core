@@ -425,7 +425,7 @@ private:
         CollectionId() = default;
         CollectionId(const CollectionBase& list)
             : table_key(list.get_table()->get_key())
-            , object_key(list.get_key())
+            , object_key(list.get_owner_key())
             , col_id(list.get_col_key())
         {
         }

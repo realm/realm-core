@@ -290,7 +290,7 @@ public:
     bool set_equals(const LnkSet& rhs) const;
 
     // Overriding members of CollectionBase:
-    using CollectionBase::get_key;
+    using CollectionBase::get_owner_key;
     CollectionBasePtr clone_collection() const
     {
         return clone_linkset();

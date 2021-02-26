@@ -72,7 +72,7 @@ bool Collection::is_valid() const
 ObjKey Collection::get_parent_object_key() const
 {
     verify_attached();
-    return m_coll_base->get_key();
+    return m_coll_base->get_owner_key();
 }
 
 ColKey Collection::get_parent_column_key() const

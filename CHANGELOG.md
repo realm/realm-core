@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 11.0.0-beta.1 Release notes
 
 ### Enhancements
 * Dictionary can now contain embedded objects
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Mixed property can now be indexed ([#4342](https://github.com/realm/realm-core/issues/4342))
 * Dictionary of Objects need to have a nullable value part, but that would lead to inconsistency in schema and cause an exception ([#4344](https://github.com/realm/realm-core/issues/4344))
 * Subscribing for notifications on Dictionaries of Objects results in access violation ([#4346](https://github.com/realm/realm-core/issues/4346))

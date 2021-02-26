@@ -415,7 +415,7 @@ util::Optional<Mixed> List::average(ColKey col) const
 bool List::operator==(List const& rgt) const noexcept
 {
     return m_list_base->get_table() == rgt.m_list_base->get_table() &&
-           m_list_base->get_key() == rgt.m_list_base->get_key() &&
+           m_list_base->get_owner_key() == rgt.m_list_base->get_owner_key() &&
            m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
 }
 
@@ -471,6 +471,6 @@ namespace std {
 size_t hash<List>::operator()(List const& list) const
 {
     auto& impl = *list.m_list_base;
-    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+    return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
 }
 } // namespace std

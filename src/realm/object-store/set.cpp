@@ -160,7 +160,7 @@ util::Optional<Mixed> Set::average(ColKey col) const
 bool Set::operator==(const Set& rgt) const noexcept
 {
     return m_set_base->get_table() == rgt.m_set_base->get_table() &&
-           m_set_base->get_key() == rgt.m_set_base->get_key() &&
+           m_set_base->get_owner_key() == rgt.m_set_base->get_owner_key() &&
            m_set_base->get_col_key() == rgt.m_set_base->get_col_key();
 }
 
@@ -418,6 +418,6 @@ namespace std {
 size_t hash<realm::object_store::Set>::operator()(realm::object_store::Set const& set) const
 {
     auto& impl = *set.m_set_base;
-    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+    return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
 }
 } // namespace std
