@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_DICTIONARY_HPP_
-#define REALM_OS_DICTIONARY_HPP_
+#ifndef REALM_OS_DICTIONARY_HPP
+#define REALM_OS_DICTIONARY_HPP
 
 #include <realm/object-store/collection.hpp>
 #include <realm/object-store/object.hpp>
@@ -41,75 +41,25 @@ namespace object_store {
 class Dictionary : public object_store::Collection {
 public:
     using Iterator = realm::Dictionary::Iterator;
-    Dictionary() noexcept;
-    Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
-    Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict);
-    ~Dictionary() override;
+    using Collection::Collection;
 
-    bool operator==(const Dictionary& rgt) const noexcept
-    {
-        return *m_dict == *rgt.m_dict;
-    }
+    bool operator==(const Dictionary& rgt) const noexcept;
 
     template <typename T>
     void insert(StringData key, T value);
     template <typename T>
     T get(StringData key) const;
 
-    Obj insert_embedded(StringData key)
-    {
-        return m_dict->create_and_insert_linked_object(key);
-    }
-
-    void erase(StringData key)
-    {
-        verify_in_transaction();
-        m_dict->erase(key);
-    }
-    void remove_all()
-    {
-        verify_in_transaction();
-        m_dict->clear();
-    }
-
-    Obj get_object(StringData key)
-    {
-        return m_dict->get_object(key);
-    }
-    Mixed get_any(StringData key)
-    {
-        return m_dict->get(key);
-    }
-    Mixed get_any(size_t ndx) const final
-    {
-        verify_valid_row(ndx);
-        return m_dict->get_any(ndx);
-    }
-    util::Optional<Mixed> try_get_any(StringData key) const
-    {
-        return m_dict->try_get(key);
-    }
-    std::pair<StringData, Mixed> get_pair(size_t ndx) const
-    {
-        verify_valid_row(ndx);
-        auto pair = m_dict->get_pair(ndx);
-        return {pair.first.get_string(), pair.second};
-    }
-
-    size_t find_any(Mixed value) const final
-    {
-        return m_dict->find_any(value);
-    }
-
-    size_t find_any_key(Mixed key) const
-    {
-        return m_dict->find_any_key(key);
-    }
-
-    bool contains(StringData key)
-    {
-        return m_dict->contains(key);
-    }
+    Obj insert_embedded(StringData key);
+    void erase(StringData key);
+    void remove_all();
+    Obj get_object(StringData key);
+    Mixed get_any(StringData key);
+    Mixed get_any(size_t ndx) const final;
+    util::Optional<Mixed> try_get_any(StringData key) const;
+    std::pair<StringData, Mixed> get_pair(size_t ndx) const;
+    size_t find_any(Mixed value) const final;
+    bool contains(StringData key);
 
     template <typename T, typename Context>
     void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);
@@ -128,18 +78,15 @@ public:
     using CBFunc = std::function<void(DictionaryChangeSet, std::exception_ptr)>;
     NotificationToken add_key_based_notification_callback(CBFunc cb) &;
 
-    Iterator begin() const
-    {
-        return m_dict->begin();
-    }
-
-    Iterator end() const
-    {
-        return m_dict->end();
-    }
+    Iterator begin() const;
+    Iterator end() const;
 
 private:
-    realm::Dictionary* m_dict;
+    realm::Dictionary& dict() const noexcept
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<realm::Dictionary*>(m_coll_base.get()));
+        return static_cast<realm::Dictionary&>(*m_coll_base);
+    }
 
     template <typename Fn>
     auto dispatch(Fn&&) const;
@@ -158,13 +105,13 @@ template <typename T>
 void Dictionary::insert(StringData key, T value)
 {
     verify_in_transaction();
-    m_dict->insert(key, value);
+    dict().insert(key, value);
 }
 
 template <typename T>
 T Dictionary::get(StringData key) const
 {
-    return m_dict->get(key).get<T>();
+    return dict().get(key).get<T>();
 }
 
 template <>
@@ -178,7 +125,7 @@ void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy po
 {
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
-        auto obj_key = m_dict->create_and_insert_linked_object(key).get_key();
+        auto obj_key = dict().create_and_insert_linked_object(key).get_key();
         ctx.template unbox<Obj>(value, policy, obj_key);
         return;
     }
@@ -211,10 +158,10 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
 
     ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
         if (policy.diff) {
-            util::Optional<Mixed> old_value = m_dict->try_get(key);
+            util::Optional<Mixed> old_value = dict().try_get(key);
             auto new_value = ctx.template unbox<Mixed>(value);
             if (!old_value || *old_value != new_value) {
-                m_dict->insert(key, new_value);
+                dict().insert(key, new_value);
             }
         }
         else {
@@ -228,4 +175,4 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
 } // namespace realm
 
 
-#endif /* REALM_OS_DICTIONARY_HPP_ */
+#endif /* REALM_OS_DICTIONARY_HPP */

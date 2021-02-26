@@ -584,6 +584,8 @@ inline UUID Mixed::get_uuid() const
 template <>
 inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
+    if (get_type() == type_TypedLink)
+        return link_val.get_obj_key();
     REALM_ASSERT(get_type() == type_Link);
     return ObjKey(int_val);
 }

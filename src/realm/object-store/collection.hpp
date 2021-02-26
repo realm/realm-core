@@ -38,6 +38,10 @@ class ListNotifier;
 namespace object_store {
 class Collection {
 public:
+    Collection() noexcept;
+    Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
+    Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
+
     // The Collection object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)
     // All non-noexcept functions can throw this
@@ -89,6 +93,12 @@ public:
     // Return a Results representing a live view of this Collection.
     Results as_results() const;
 
+    // Return a Results representing a snapshot of this Collection.
+    Results snapshot() const;
+
+    Results sort(SortDescriptor order) const;
+    Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
+
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     // The object being added to the collection is already a managed embedded object
@@ -107,11 +117,6 @@ protected:
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     bool m_is_embedded = false;
 
-    Collection() noexcept;
-    Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
-
-    Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
-
     Collection(const Collection&);
     Collection& operator=(const Collection&);
     Collection(Collection&&);
@@ -122,6 +127,8 @@ protected:
 
     template <typename T, typename Context>
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
+
+    size_t hash() const noexcept;
 };
 
 template <typename T, typename Context>

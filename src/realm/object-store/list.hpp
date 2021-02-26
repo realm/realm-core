@@ -39,10 +39,7 @@ struct ObjKey;
 
 class List : public object_store::Collection {
 public:
-    List() noexcept;
-    List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
-    List(std::shared_ptr<Realm> r, const LstBase& list);
-    ~List() override;
+    using object_store::Collection::Collection;
 
     List(const List&);
     List& operator=(const List&);
@@ -79,12 +76,7 @@ public:
     Mixed get_any(size_t list_ndx) const final;
     size_t find_any(Mixed value) const final;
 
-    Results sort(SortDescriptor order) const;
-    Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
     Results filter(Query q) const;
-
-    // Return a Results representing a snapshot of this List.
-    Results snapshot() const;
 
     // Returns a frozen copy of this result
     List freeze(std::shared_ptr<Realm> const& realm) const;
@@ -122,7 +114,11 @@ public:
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
 private:
-    std::shared_ptr<LstBase> m_list_base;
+    LstBase& list_base() const noexcept
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<LstBase*>(m_coll_base.get()));
+        return static_cast<LstBase&>(*m_coll_base);
+    }
 
     template <typename Fn>
     auto dispatch(Fn&&) const;
@@ -138,22 +134,22 @@ private:
 template <typename T>
 auto& List::as() const
 {
-    REALM_ASSERT(dynamic_cast<Lst<T>*>(&*m_list_base));
-    return static_cast<Lst<T>&>(*m_list_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<Lst<T>*>(m_coll_base.get()));
+    return static_cast<Lst<T>&>(*m_coll_base);
 }
 
 template <>
 inline auto& List::as<Obj>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkLst*>(&*m_list_base));
-    return static_cast<LnkLst&>(*m_list_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<LnkLst*>(m_coll_base.get()));
+    return static_cast<LnkLst&>(*m_coll_base);
 }
 
 template <>
 inline auto& List::as<ObjKey>() const
 {
-    REALM_ASSERT(dynamic_cast<LnkLst*>(&*m_list_base));
-    return static_cast<LnkLst&>(*m_list_base);
+    REALM_ASSERT_DEBUG(dynamic_cast<LnkLst*>(m_coll_base.get()));
+    return static_cast<LnkLst&>(*m_coll_base);
 }
 
 template <typename Fn>
