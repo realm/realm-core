@@ -2246,35 +2246,33 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_EQUAL(message, "table.values is not a link column");
 }
 
-TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
-           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
+TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>, Nullable<Bool>, Prop<Float>,
+           Nullable<Float>, Prop<Double>, Nullable<Double>, Prop<Decimal128>, Nullable<Decimal128>, Prop<ObjectId>,
+           Nullable<ObjectId>, Prop<UUID>, Nullable<UUID>, Prop<Timestamp>, Nullable<Timestamp>)
 {
     Group g;
     TableRef t = g.add_table("class_table");
     TestValueGenerator gen;
 
-    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
-    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    using type = typename TEST_TYPE::type;
+    constexpr bool is_nullable = TEST_TYPE::is_nullable;
+    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", is_nullable);
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<TEST_TYPE> values = gen.values_from_int<TEST_TYPE>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     auto obj2 = t->create_object(); // empty list
     auto obj3 = t->create_object(); // {1}
     underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
-    obj3.get_list<TEST_TYPE>(col).add(value_1);
+    obj3.get_list<type>(col).add(value_1);
     auto obj4 = t->create_object(); // {1, 1}
-    obj4.get_list<TEST_TYPE>(col).add(value_1);
-    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    obj4.get_list<type>(col).add(value_1);
+    obj4.get_list<type>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
-    if constexpr (is_optional) {
-        obj5.get_list<TEST_TYPE>(col).add(none);
-    }
-    else {
-        obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
-    }
+    obj5.get_list<type>(col).add(TEST_TYPE::default_value());
+
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
     }
@@ -2288,23 +2286,40 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);  // obj4
         verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);   // obj1, obj3, obj4, obj5
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
-        verify_query(test_context, t, util::format("%1values == NULL", path), (is_optional ? 1 : 0)); // obj5
+        verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
         util::Any args[] = {value_1};
         size_t num_args = 1;
-        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args,
-                         3); // obj1, obj3, obj4
-        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args, 2); // obj1, obj5
+        size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
+        size_t num_not_matching_value_1 = 2;                   // obj1, obj5
+        size_t num_all_matching_value_1 = 3;                   // obj2, obj3, obj4
+        size_t num_all_not_matching_value_1 = 2;               // obj2, obj5
+        size_t num_none_matching_value_1 = 2;                  // obj2, obj5
+        size_t num_none_not_matching_value_1 = 3;              // obj2, obj3, obj4
+        if constexpr (std::is_same_v<underlying_type, bool>) { // bool reuses values
+            num_matching_value_1 = is_nullable ? 3 : 4;
+            num_not_matching_value_1 = is_nullable ? 2 : 1;
+            num_all_matching_value_1 = is_nullable ? 3 : 4;
+            num_all_not_matching_value_1 = is_nullable ? 2 : 1;
+            num_none_matching_value_1 = is_nullable ? 2 : 1;
+            num_none_not_matching_value_1 = is_nullable ? 3 : 4;
+        }
+        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
+        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
+                         num_not_matching_value_1);
         verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args,
-                         3); // obj1, obj3, obj4
-        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args, 2); // obj1, obj5
+                         num_matching_value_1);
+        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args,
+                         num_not_matching_value_1);
 
         verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args,
-                         3); // obj2, obj3, obj4
-        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2);  // obj2, obj5
-        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
+                         num_all_matching_value_1);
+        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args,
+                         num_all_not_matching_value_1);
+        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args,
+                         num_none_matching_value_1);
         verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
-                         3); // obj2, obj3, obj4
+                         num_none_not_matching_value_1);
     }
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing.length == 2", 0), message);
@@ -2316,6 +2331,81 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
         CHECK_EQUAL(message, "table.values is not a link column");
     }
+}
+
+TEST(Parser_list_of_primitive_mixed)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    constexpr bool nullable = true;
+    auto col_list = t->add_column_list(type_Mixed, "values", nullable);
+    CHECK_THROW_ANY(t->add_search_index(col_list));
+
+    Obj obj_empty_list = t->create_object();
+    Obj obj_with_null = t->create_object();
+    obj_with_null.get_list<Mixed>(col_list).add(Mixed{});
+    Obj obj_with_empty_string = t->create_object();
+    obj_with_empty_string.get_list<Mixed>(col_list).add(Mixed{""});
+    Obj obj_with_ints = t->create_object();
+    auto ints_list = obj_with_ints.get_list<Mixed>(col_list);
+    ints_list.add(Mixed{0});
+    ints_list.add(Mixed{1});
+    ints_list.add(Mixed{2});
+    Obj obj_with_numerics = t->create_object();
+    auto numeric_list = obj_with_numerics.get_list<Mixed>(col_list);
+    numeric_list.add(Mixed{1});
+    numeric_list.add(Mixed{Decimal128(2.2)});
+    numeric_list.add(Mixed{float(3.3f)});
+    numeric_list.add(Mixed{double(4.4)});
+    Obj obj_with_strings = t->create_object();
+    auto strings_list = obj_with_strings.get_list<Mixed>(col_list);
+    strings_list.add(Mixed{"one"});
+    strings_list.add(Mixed{"two"});
+    strings_list.add(Mixed{"three"});
+    strings_list.add(Mixed{""});
+    strings_list.add(Mixed{StringData{}});
+    Obj obj_with_mixed_types = t->create_object();
+    auto mixed_list = obj_with_mixed_types.get_list<Mixed>(col_list);
+    mixed_list.add(Mixed{"foo"});
+    mixed_list.add(Mixed{1});
+    mixed_list.add(Mixed{Timestamp(1, 0)});
+    mixed_list.add(Mixed{Decimal128(2.5)});
+    mixed_list.add(Mixed{float(3.7)});
+    mixed_list.add(Mixed{ObjectId::gen()});
+    mixed_list.add(Mixed{UUID()});
+    mixed_list.add(Mixed{});
+    mixed_list.add(Mixed{false});
+    mixed_list.add(Mixed{true});
+
+    verify_query(test_context, t, "values.@count == 0", 1);
+    verify_query(test_context, t, "values.@size == 1", 2);
+    verify_query(test_context, t, "ANY values == NULL", 3);
+    verify_query(test_context, t, "ALL values == NULL", 2);
+    verify_query(test_context, t, "ALL values == NULL && values.@size > 0", 1);
+    verify_query(test_context, t, "NONE values == NULL", 4);
+    verify_query(test_context, t, "NONE values == NULL && values.@size > 0", 3);
+    verify_query(test_context, t, "ANY values == 'one'", 1);
+    verify_query(test_context, t, "ANY values CONTAINS[c] 'O'", 2);
+    verify_query(test_context, t, "values.length == 3", 2);  // string lengths
+    verify_query(test_context, t, "ANY values == false", 2); // 0 also matching
+    verify_query(test_context, t, "ANY values == true", 3);  // 1 also matching
+    verify_query(test_context, t, "ANY values == false && ANY values.@type == 'bool'", 1);
+    verify_query(test_context, t, "ANY values == true && ANY values.@type == 'bool'", 1);
+    verify_query(test_context, t, "values.@type == 'string'", 3);
+    verify_query(test_context, t, "values == T1:0", 1);
+    verify_query(test_context, t, "values.@sum > 0", 3);
+    verify_query(test_context, t, "values.@sum == 3", 1);
+    verify_query(test_context, t, "values.@sum == 10.9", 1);
+    verify_query(test_context, t, "values.@sum == 7.2", 1);
+    verify_query(test_context, t, "values.@avg == 1", 1);
+    verify_query(test_context, t, "values.@avg == 2.725", 1);
+    verify_query(test_context, t, "values.@avg == 2.4", 1);
+    verify_query(test_context, t, "values.@min == 0", 2);
+    verify_query(test_context, t, "values.@min == 1", 1);
+    verify_query(test_context, t, "values.@max == 2", 1);
+    verify_query(test_context, t, "values.@max == 4.4", 1);
+    verify_query(test_context, t, "values.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)

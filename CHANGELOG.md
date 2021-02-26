@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed queries of min/max/sum/avg on list of primitive mixed. ([#4472](https://github.com/realm/realm-core/pull/4472), never before working)
+
 ### Breaking changes
 * None.
 

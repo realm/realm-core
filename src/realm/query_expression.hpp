@@ -2978,7 +2978,7 @@ public:
 
     std::unique_ptr<Subexpr> max_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return max().clone();
         }
         else {
@@ -2987,7 +2987,7 @@ public:
     }
     std::unique_ptr<Subexpr> min_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return min().clone();
         }
         else {
@@ -2996,7 +2996,7 @@ public:
     }
     std::unique_ptr<Subexpr> sum_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return sum().clone();
         }
         else {
@@ -3005,7 +3005,7 @@ public:
     }
     std::unique_ptr<Subexpr> avg_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return average().clone();
         }
         else {
@@ -4029,8 +4029,15 @@ class MinMaxAggregateOperator {
 public:
     void accumulate(T value)
     {
-        if (!is_nan(value) && (!m_result || Compare()(value, *m_result))) {
-            m_result = value;
+        if constexpr (std::is_same_v<T, Mixed>) {
+            if (!value.is_null() && (!m_result || Compare()(value, *m_result))) {
+                m_result = value;
+            }
+        }
+        else {
+            if (!is_nan(value) && (!m_result || Compare()(value, *m_result))) {
+                m_result = value;
+            }
         }
     }
 
@@ -4068,10 +4075,16 @@ public:
 template <typename T>
 class Sum {
 public:
+    using ResultType = typename std::conditional<std::is_same_v<T, Mixed>, Decimal128, T>::type;
     void accumulate(T value)
     {
-        if (!is_nan(value)) {
-            m_result += value;
+        if constexpr (std::is_same_v<T, Mixed>) {
+            value.accumulate_numeric_to(m_result);
+        }
+        else {
+            if (!is_nan(value)) {
+                m_result += value;
+            }
         }
     }
 
@@ -4079,7 +4092,7 @@ public:
     {
         return false;
     }
-    T result() const
+    ResultType result() const
     {
         return m_result;
     }
@@ -4089,18 +4102,25 @@ public:
     }
 
 private:
-    T m_result = {};
+    ResultType m_result = {};
 };
 
 template <typename T>
 class Average {
 public:
-    using ResultType = typename std::conditional<std::is_same_v<T, Decimal128>, Decimal128, double>::type;
+    using ResultType = typename std::conditional<realm::is_any_v<T, Decimal128, Mixed>, Decimal128, double>::type;
     void accumulate(T value)
     {
-        if (!is_nan(value)) {
-            m_count++;
-            m_result += value;
+        if constexpr (std::is_same_v<T, Mixed>) {
+            if (value.accumulate_numeric_to(m_result)) {
+                m_count++;
+            }
+        }
+        else {
+            if (!is_nan(value)) {
+                m_count++;
+                m_result += value;
+            }
         }
     }
 

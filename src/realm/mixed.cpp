@@ -206,6 +206,34 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     return false;
 }
 
+bool Mixed::accumulate_numeric_to(Decimal128& destination) const
+{
+    bool did_accumulate = false;
+    if (!is_null()) {
+        switch (get_type()) {
+            case type_Int:
+                destination += Decimal128(get_int());
+                did_accumulate = true;
+                break;
+            case type_Double:
+                destination += Decimal128(get_double());
+                did_accumulate = true;
+                break;
+            case type_Float:
+                destination += Decimal128(get_float());
+                did_accumulate = true;
+                break;
+            case type_Decimal:
+                destination += get_decimal();
+                did_accumulate = true;
+                break;
+            default:
+                break;
+        }
+    }
+    return did_accumulate;
+}
+
 int Mixed::compare(const Mixed& b) const
 {
     if (is_null()) {
