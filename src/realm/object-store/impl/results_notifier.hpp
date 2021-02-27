@@ -70,7 +70,6 @@ private:
     TransactionChangeInfo* m_info = nullptr;
     bool m_results_were_used = true;
 
-    bool need_to_run();
     void calculate_changes();
 
     void run() override;
