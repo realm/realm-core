@@ -292,6 +292,13 @@ void ExternalCommitHelper::DaemonThread::listen()
             std::lock_guard<std::mutex> lock(m_mutex);
             for (auto helper : m_helpers) {
                 if (ev.data.u32 == (uint32_t)helper->m_notify_fd) {
+                    // On Android 12 (S) epoll_wait does not return on subsequent writes to file
+                    // descriptors registered with edge triggered flags unless all data is consumed.
+                    // Actually this looks like it should always have been the behavior but at least
+                    // from Android 12 it seems to now honored. So, just consuming the byte we write
+                    // when signaling.
+                    char c = 0;
+                    auto actual = read(helper->m_notify_fd, &c, 1);
                     helper->m_parent.on_change();
                 }
             }
