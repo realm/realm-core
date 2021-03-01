@@ -236,7 +236,18 @@ void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper*
     m_helpers.push_back(helper);
 
     epoll_event event{};
-    event.events = EPOLLIN | EPOLLET;
+    // FIXME Seems like most async calls from realm-java tests are never signaled on the
+    //  android-12-dp1 x86_64 emulator image. I traced down that it is the epoll_wait in `listen`
+    //  that is only returning for the first write to the helpers file descriptor.
+    //  I am not sure whether it is an issue with the image or an actual misconfiguration of epoll,
+    //  as the man page for epoll's section on "Level-triggered and edge-triggered" is not clear on
+    //  subsequent writes.
+    //  Removing the EPOLLET flag from registration seems to perform better (more
+    //  realm-java test passing) than consuming the actual bytes written to the descriptor in
+    //  `listen()`. Both modifications lets the epoll_wait return on subsequent writes, but there
+    //  might be other issues as not all realm-java tests runs.
+//    event.events = EPOLLIN | EPOLLET;
+    event.events = EPOLLIN;
     event.data.fd = helper->m_notify_fd;
     int ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
     if (ret != 0) {
@@ -292,13 +303,13 @@ void ExternalCommitHelper::DaemonThread::listen()
             std::lock_guard<std::mutex> lock(m_mutex);
             for (auto helper : m_helpers) {
                 if (ev.data.u32 == (uint32_t)helper->m_notify_fd) {
-                    // On Android 12 (S) epoll_wait does not return on subsequent writes to file
-                    // descriptors registered with edge triggered flags unless all data is consumed.
-                    // Actually this looks like it should always have been the behavior but at least
-                    // from Android 12 it seems to now honored. So, just consuming the byte we write
-                    // when signaling.
-                    char c = 0;
-                    auto actual = read(helper->m_notify_fd, &c, 1);
+                    // on android 12 dp1 x86_64 emulator the epoll_wait does not return on
+                    // §subsequent writes to file descriptors registered with edge triggered flags
+                    // unless all data is consumed, so consuming the byte we write when signaling.
+//                    if (ev.events == EPOLLIN) {
+//                        char c = 0;
+//                        read(helper->m_notify_fd, &c, 1);
+//                    }
                     helper->m_parent.on_change();
                 }
             }
