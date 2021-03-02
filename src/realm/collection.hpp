@@ -173,7 +173,11 @@ struct MinHelper<T, std::void_t<ColumnMinMaxType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_ndx)
     {
-        return Mixed(bptree_minimum<T>(tree, return_ndx));
+        auto optional_min = bptree_minimum<T>(tree, return_ndx);
+        if (optional_min) {
+            return Mixed{*optional_min};
+        }
+        return Mixed{};
     }
 };
 
@@ -191,7 +195,11 @@ struct MaxHelper<T, std::void_t<ColumnMinMaxType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_ndx)
     {
-        return Mixed(bptree_maximum<T>(tree, return_ndx));
+        auto optional_max = bptree_maximum<T>(tree, return_ndx);
+        if (optional_max) {
+            return Mixed{*optional_max};
+        }
+        return Mixed{};
     }
 };
 
@@ -213,7 +221,7 @@ public:
     template <class U>
     static Mixed eval(U& tree, size_t* return_cnt)
     {
-        return Mixed(bptree_sum<T>(tree, return_cnt));
+        return Mixed{bptree_sum<T>(tree, return_cnt)};
     }
 };
 
@@ -233,7 +241,7 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     template <class U>
     static Mixed eval(U& tree, size_t* return_cnt)
     {
-        return Mixed(bptree_average<T>(tree, return_cnt));
+        return Mixed{bptree_average<T>(tree, return_cnt)};
     }
 };
 

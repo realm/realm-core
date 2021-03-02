@@ -40,7 +40,7 @@ public:
     {
         if (!value.is_null()) {
             auto v = value.get<T>();
-            if (aggregate_operations::is_nan(v))
+            if (!aggregate_operations::valid_for_agg(v))
                 return true;
             ++m_match_count;
             m_state += v;
@@ -62,7 +62,7 @@ public:
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (aggregate_operations::is_nan(v))
+            if (!aggregate_operations::valid_for_agg(v))
                 return true;
             ++m_match_count;
             if (v < m_state) {
@@ -91,7 +91,7 @@ public:
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (aggregate_operations::is_nan(v))
+            if (!aggregate_operations::valid_for_agg(v))
                 return true;
             ++m_match_count;
             if (v > m_state) {

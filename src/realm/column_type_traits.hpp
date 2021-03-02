@@ -152,6 +152,9 @@ struct ColumnTypeTraits<ObjKey> {
 template <>
 struct ColumnTypeTraits<Mixed> {
     using cluster_leaf_type = ArrayMixed;
+    using sum_type = Decimal128;
+    using minmax_type = Mixed;
+    using average_type = Decimal128;
     static constexpr const DataType id = type_Mixed;
     static constexpr const ColumnType column_id = col_type_Mixed;
 };

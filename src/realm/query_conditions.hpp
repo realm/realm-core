@@ -99,30 +99,6 @@ public:
     }
 };
 
-namespace aggregate_operations {
-
-template <typename T>
-static bool is_nan(T value)
-{
-    if constexpr (std::is_floating_point_v<T>) {
-        return std::isnan(value);
-    }
-    else {
-        // gcc considers the argument unused if it's only used in one branch of if constexpr
-        static_cast<void>(value);
-        return false;
-    }
-}
-
-template <>
-inline bool is_nan<Decimal128>(Decimal128 value)
-{
-    return value.is_nan();
-}
-
-} // namespace aggregate_operations
-
-
 // Array::VTable only uses the first 4 conditions (enums) in an array of function pointers
 enum { cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_VTABLE_FINDER_COUNT, cond_None, cond_LeftNotNull };
 

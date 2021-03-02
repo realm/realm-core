@@ -2343,21 +2343,44 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_THROW_ANY(t->add_search_index(col_list));
 
     Obj obj_empty_list = t->create_object();
+    auto empty_list = obj_empty_list.get_list<Mixed>(col_list);
+    CHECK_EQUAL(empty_list.min(), Mixed{});
+    CHECK_EQUAL(empty_list.max(), Mixed{});
+    CHECK_EQUAL(empty_list.sum(), Mixed{0});
+    CHECK_EQUAL(empty_list.avg(), Mixed{0});
     Obj obj_with_null = t->create_object();
-    obj_with_null.get_list<Mixed>(col_list).add(Mixed{});
+    auto list_with_null = obj_with_null.get_list<Mixed>(col_list);
+    list_with_null.add(Mixed{});
+    CHECK_EQUAL(list_with_null.min(), Mixed{});
+    CHECK_EQUAL(list_with_null.max(), Mixed{});
+    CHECK_EQUAL(list_with_null.sum(), Mixed{0});
+    CHECK_EQUAL(list_with_null.avg(), Mixed{0});
     Obj obj_with_empty_string = t->create_object();
-    obj_with_empty_string.get_list<Mixed>(col_list).add(Mixed{""});
+    auto empty_string_list = obj_with_empty_string.get_list<Mixed>(col_list);
+    empty_string_list.add(Mixed{""});
+    CHECK_EQUAL(empty_string_list.min(), Mixed{""});
+    CHECK_EQUAL(empty_string_list.max(), Mixed{""});
+    CHECK_EQUAL(empty_string_list.sum(), Mixed{0});
+    CHECK_EQUAL(empty_string_list.avg(), Mixed{0});
     Obj obj_with_ints = t->create_object();
     auto ints_list = obj_with_ints.get_list<Mixed>(col_list);
     ints_list.add(Mixed{0});
     ints_list.add(Mixed{1});
     ints_list.add(Mixed{2});
+    CHECK_EQUAL(ints_list.min(), Mixed{0});
+    CHECK_EQUAL(ints_list.max(), Mixed{2});
+    CHECK_EQUAL(ints_list.sum(), Mixed{3});
+    CHECK_EQUAL(ints_list.avg(), Mixed{1});
     Obj obj_with_numerics = t->create_object();
     auto numeric_list = obj_with_numerics.get_list<Mixed>(col_list);
     numeric_list.add(Mixed{1});
     numeric_list.add(Mixed{Decimal128(2.2)});
     numeric_list.add(Mixed{float(3.3f)});
     numeric_list.add(Mixed{double(4.4)});
+    CHECK_EQUAL(numeric_list.min(), Mixed{1});
+    CHECK_EQUAL(numeric_list.max(), Mixed{4.4});
+    CHECK_EQUAL(numeric_list.sum(), Mixed{10.9});
+    CHECK_EQUAL(numeric_list.avg(), Mixed{2.725});
     Obj obj_with_strings = t->create_object();
     auto strings_list = obj_with_strings.get_list<Mixed>(col_list);
     strings_list.add(Mixed{"one"});
@@ -2365,6 +2388,10 @@ TEST(Parser_list_of_primitive_mixed)
     strings_list.add(Mixed{"three"});
     strings_list.add(Mixed{""});
     strings_list.add(Mixed{StringData{}});
+    CHECK_EQUAL(strings_list.min(), Mixed{""});
+    CHECK_EQUAL(strings_list.max(), Mixed{"two"});
+    CHECK_EQUAL(strings_list.sum(), Mixed(0));
+    CHECK_EQUAL(strings_list.avg(), Mixed(0));
     Obj obj_with_mixed_types = t->create_object();
     auto mixed_list = obj_with_mixed_types.get_list<Mixed>(col_list);
     mixed_list.add(Mixed{"foo"});
@@ -2377,6 +2404,14 @@ TEST(Parser_list_of_primitive_mixed)
     mixed_list.add(Mixed{});
     mixed_list.add(Mixed{false});
     mixed_list.add(Mixed{true});
+    mixed_list.add(Mixed{null::get_null_float<float>()});
+    mixed_list.add(Mixed{null::get_null_float<double>()});
+    mixed_list.add(Mixed{Decimal128{realm::null()}});
+    mixed_list.add(Mixed{Decimal128{StringData{}}}); // NaN
+    CHECK_EQUAL(mixed_list.min(), Mixed(false));
+    CHECK_EQUAL(mixed_list.max(), Mixed(UUID()));
+    CHECK_EQUAL(mixed_list.sum(), Mixed(7.2));
+    CHECK_EQUAL(mixed_list.avg(), Mixed(2.4));
 
     verify_query(test_context, t, "values.@count == 0", 1);
     verify_query(test_context, t, "values.@size == 1", 2);
@@ -4716,7 +4751,7 @@ TEST(Parser_SetMixed)
     auto col_set = table->add_column_set(type_Mixed, "set", is_nullable);
     auto col_prop = table->add_column(type_Mixed, "value", is_nullable);
     std::vector<ObjKey> keys;
-    table->create_objects(4, keys);
+    table->create_objects(5, keys);
     auto set_values = [](Set<Mixed> set, const std::vector<Mixed>& value_list) {
         for (auto val : value_list)
             set.insert(val);
@@ -4732,19 +4767,68 @@ TEST(Parser_SetMixed)
                {{3.5f}, {"world"}, {data}, {ObjectId::gen()}, {UUID()}, {}});
     set_values(table->get_object(keys[2]).get_set<Mixed>(col_set), {same_value});
     // the fourth set is empty
+    set_values(table->get_object(keys[4]).get_set<Mixed>(col_set),
+               {int64_t(-1), Decimal128(StringData(/*NaN*/)), 4.4f, 7.6, 0, realm::null()});
+    auto list0 = table->get_object(keys[0]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list0.min(), 3);
+    CHECK_EQUAL(list0.max(), StringData("hello"));
+    CHECK_EQUAL(list0.sum(), 303);
+    CHECK_EQUAL(list0.avg(), 151.5);
+    auto list1 = table->get_object(keys[1]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list1.min(), 3.5);
+    CHECK_EQUAL(list1.max(), UUID());
+    CHECK_EQUAL(list1.sum(), 3.5);
+    CHECK_EQUAL(list1.avg(), 3.5);
+    auto list2 = table->get_object(keys[2]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list2.min(), 300);
+    CHECK_EQUAL(list2.max(), 300);
+    CHECK_EQUAL(list2.sum(), 300);
+    CHECK_EQUAL(list2.avg(), 300);
+    auto list3 = table->get_object(keys[3]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list3.min(), Mixed{});
+    CHECK_EQUAL(list3.max(), Mixed{});
+    CHECK_EQUAL(list3.sum(), 0);
+    CHECK_EQUAL(list3.avg(), 0);
+    auto list4 = table->get_object(keys[4]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list4.min(), -1);
+    CHECK_EQUAL(list4.max(), 7.6);
+    CHECK_EQUAL(list4.sum(), 11);
+    CHECK_EQUAL(list4.avg(), 2.75);
+
+    verify_query(test_context, table, "set.@min == 3", 1);
+    verify_query(test_context, table, "set.@min == 3.5", 1);
+    verify_query(test_context, table, "set.@min == 300", 1);
+    verify_query(test_context, table, "set.@min == NULL", 1);
+    verify_query(test_context, table, "set.@min == -1", 1);
+    verify_query(test_context, table, "set.@max == 'hello'", 1);
+    verify_query(test_context, table, "set.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
+    verify_query(test_context, table, "set.@max == 7.6", 1);
+    verify_query(test_context, table, "set.@max == 300", 1);
+    verify_query(test_context, table, "set.@max == NULL", 1);
+    verify_query(test_context, table, "set.@max == 7.6", 1);
+    verify_query(test_context, table, "set.@sum == 303", 1);
+    verify_query(test_context, table, "set.@sum == 3.5", 1);
+    verify_query(test_context, table, "set.@sum == 300", 1);
+    verify_query(test_context, table, "set.@sum == 0", 1);
+    verify_query(test_context, table, "set.@sum == 11", 1);
+    verify_query(test_context, table, "set.@avg == 151.5", 1);
+    verify_query(test_context, table, "set.@avg == 3.5", 1);
+    verify_query(test_context, table, "set.@avg == 300", 1);
+    verify_query(test_context, table, "set.@avg == NULL", 1);
+    verify_query(test_context, table, "set.@avg == 2.75", 1);
 
     verify_query(test_context, table, "set.@count == 0", 1);
-    verify_query(test_context, table, "set.@size >= 1", 3);
-    verify_query(test_context, table, "set.@size == 6", 1);
+    verify_query(test_context, table, "set.@size >= 1", 4);
+    verify_query(test_context, table, "set.@size == 6", 2);
     verify_query(test_context, table, "3.5 IN set", 1);
     verify_query(test_context, table, "'WorLD' IN[c] set", 1);
     verify_query(test_context, table, "set == value", 2);
-    verify_query(test_context, table, "set < value", 2);
+    verify_query(test_context, table, "set < value", 3);
     verify_query(test_context, table, "ALL set < value", 1); // 3
     verify_query(test_context, table, "ALL set < value && set.@size > 0", 0);
     verify_query(test_context, table, "ALL set == value", 2);  // 2, 3
-    verify_query(test_context, table, "NONE set == value", 2); // 1, 3
-    verify_query(test_context, table, "set == NULL", 1);
+    verify_query(test_context, table, "NONE set == value", 3); // 1, 3, 5
+    verify_query(test_context, table, "set == NULL", 2);
     verify_query(test_context, table, "set beginswith[c] 'HE'", 1);
     verify_query(test_context, table, "set endswith[c] 'D'", 1);
     verify_query(test_context, table, "set LIKE[c] '*O*'", 2);

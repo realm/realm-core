@@ -3724,7 +3724,7 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
                 size_t n = from_list.size();
                 for (size_t j = 0; j < n; j++) {
                     auto v = from_list.get(j);
-                    if (!from_nullability || bptree_aggregate_not_null(v)) {
+                    if (!from_nullability || aggregate_operations::valid_for_agg(v)) {
                         to_list.add(remove_optional(v));
                     }
                     else {

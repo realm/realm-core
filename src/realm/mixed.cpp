@@ -223,10 +223,14 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const
                 destination += Decimal128(get_float());
                 did_accumulate = true;
                 break;
-            case type_Decimal:
-                destination += get_decimal();
-                did_accumulate = true;
+            case type_Decimal: {
+                auto val = get_decimal();
+                if (!val.is_nan()) {
+                    destination += val;
+                    did_accumulate = true;
+                }
                 break;
+            }
             default:
                 break;
         }
