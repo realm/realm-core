@@ -466,7 +466,7 @@ public:
             if (tmp1.is_type(type_String, type_Binary)) {
                 tmp1.use_buffer(buf1);
             }
-            if (tmp2.is_type(type_String)) {
+            if (tmp2.is_type(type_String, type_Binary)) {
                 tmp2.use_buffer(buf2);
             }
             set(ndx1, tmp2);

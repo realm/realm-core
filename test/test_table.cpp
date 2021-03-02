@@ -3258,23 +3258,24 @@ TEST(Table_ListOfMixedSwap)
     Group g;
     TableRef t = g.add_table("table");
     ColKey col = t->add_column_list(type_Mixed, "values");
+    BinaryData bin("foo", 3);
 
     auto obj = t->create_object();
     auto list = obj.get_list<Mixed>(col);
     list.add("a");
     list.add("b");
     list.add("c");
-    list.add("d");
+    list.add(bin);
     list.move(2, 0);
     CHECK_EQUAL(list.get(0).get_string(), "c");
     CHECK_EQUAL(list.get(1).get_string(), "a");
     CHECK_EQUAL(list.get(2).get_string(), "b");
-    CHECK_EQUAL(list.get(3).get_string(), "d");
-    list.swap(1, 2);
+    CHECK_EQUAL(list.get(3).get_binary(), bin);
+    list.swap(3, 2);
     CHECK_EQUAL(list.get(0).get_string(), "c");
-    CHECK_EQUAL(list.get(1).get_string(), "b");
-    CHECK_EQUAL(list.get(2).get_string(), "a");
-    CHECK_EQUAL(list.get(3).get_string(), "d");
+    CHECK_EQUAL(list.get(1).get_string(), "a");
+    CHECK_EQUAL(list.get(2).get_binary(), bin);
+    CHECK_EQUAL(list.get(3).get_string(), "b");
 }
 
 TEST(Table_object_merge_nodes)
