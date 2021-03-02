@@ -3253,6 +3253,30 @@ TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<doub
     cmp();
 }
 
+TEST(Table_ListOfMixedSwap)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col = t->add_column_list(type_Mixed, "values");
+
+    auto obj = t->create_object();
+    auto list = obj.get_list<Mixed>(col);
+    list.add("a");
+    list.add("b");
+    list.add("c");
+    list.add("d");
+    list.move(2, 0);
+    CHECK_EQUAL(list.get(0).get_string(), "c");
+    CHECK_EQUAL(list.get(1).get_string(), "a");
+    CHECK_EQUAL(list.get(2).get_string(), "b");
+    CHECK_EQUAL(list.get(3).get_string(), "d");
+    list.swap(1, 2);
+    CHECK_EQUAL(list.get(0).get_string(), "c");
+    CHECK_EQUAL(list.get(1).get_string(), "b");
+    CHECK_EQUAL(list.get(2).get_string(), "a");
+    CHECK_EQUAL(list.get(3).get_string(), "d");
+}
+
 TEST(Table_object_merge_nodes)
 {
     // This test works best for REALM_MAX_BPNODE_SIZE == 8.

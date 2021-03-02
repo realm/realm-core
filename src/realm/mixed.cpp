@@ -493,6 +493,22 @@ size_t Mixed::hash() const
     return hash;
 }
 
+void Mixed::use_buffer(std::string& buf)
+{
+    switch (get_type()) {
+        case type_String:
+            buf = std::string(string_val);
+            string_val = StringData(buf);
+            break;
+        case type_Binary:
+            buf = std::string(binary_val);
+            binary_val = BinaryData(buf);
+            break;
+        default:
+            break;
+    }
+}
+
 // LCOV_EXCL_START
 std::ostream& operator<<(std::ostream& out, const Mixed& m)
 {

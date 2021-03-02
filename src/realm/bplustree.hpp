@@ -458,6 +458,20 @@ public:
             set(ndx1, tmp2.get());
             set(ndx2, tmp1.get());
         }
+        else if constexpr (std::is_same_v<T, Mixed>) {
+            std::string buf1;
+            std::string buf2;
+            Mixed tmp1 = get(ndx1);
+            Mixed tmp2 = get(ndx2);
+            if (tmp1.is_type(type_String, type_Binary)) {
+                tmp1.use_buffer(buf1);
+            }
+            if (tmp2.is_type(type_String)) {
+                tmp2.use_buffer(buf2);
+            }
+            set(ndx1, tmp2);
+            set(ndx2, tmp1);
+        }
         else {
             T tmp = get(ndx1);
             set(ndx1, get(ndx2));

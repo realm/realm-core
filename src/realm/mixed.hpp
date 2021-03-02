@@ -225,6 +225,7 @@ public:
         return compare(other) >= 0;
     }
     size_t hash() const;
+    void use_buffer(std::string& buf);
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
