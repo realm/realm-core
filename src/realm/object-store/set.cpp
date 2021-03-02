@@ -148,7 +148,7 @@ Results Set::filter(Query q) const
 
 Set Set::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    return Set(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
+    return Set(frozen_realm, frozen_realm->import_copy_of(*m_coll_base));
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
