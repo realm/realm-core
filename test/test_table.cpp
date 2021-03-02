@@ -3125,7 +3125,7 @@ TEST(Table_ListOfPrimitives)
 
     auto string_list = obj.get_list<StringData>(string_col);
     auto str_min = string_list.min();
-    CHECK(str_min.is_null());
+    CHECK(!str_min);
     CHECK_EQUAL(string_list.begin()->size(), string_vector.begin()->size());
     CHECK_EQUAL(string_vector.size(), string_list.size());
     for (unsigned i = 0; i < string_list.size(); i++) {
@@ -4878,62 +4878,75 @@ void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::Da
     }
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
-        CHECK(!min.is_null());
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
+        CHECK(!min->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
-        Mixed max = lst.max(&ret_ndx);
-        CHECK(!max.is_null());
+        CHECK_EQUAL(min->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
+        CHECK(!max->is_null());
         CHECK_EQUAL(ret_ndx, 1999);
-        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
+        CHECK_EQUAL(max->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
         size_t ret_count = 0;
-        Mixed sum = lst.sum(&ret_count);
-        CHECK(!sum.is_null());
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
+        CHECK(!sum->is_null());
         CHECK_EQUAL(ret_count, 2000);
-        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
-        Mixed avg = lst.avg(&ret_count);
-        CHECK(!avg.is_null());
+        CHECK_EQUAL(sum->template get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
+        CHECK(!avg->is_null());
         CHECK_EQUAL(ret_count, 2000);
-        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
+        CHECK_EQUAL(avg->template get<ColumnAverageType<T>>(),
+                    (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
     }
 
     lst.clear();
     CHECK_EQUAL(lst.size(), 0);
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
         CHECK_EQUAL(ret_ndx, realm::npos);
         ret_ndx = realm::npos;
-        Mixed max = lst.max(&ret_ndx);
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
         CHECK_EQUAL(ret_ndx, realm::npos);
         size_t ret_count = realm::npos;
-        Mixed sum = lst.sum(&ret_count);
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
         CHECK_EQUAL(ret_count, 0);
         ret_count = realm::npos;
-        Mixed avg = lst.avg(&ret_count);
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
         CHECK_EQUAL(ret_count, 0);
     }
 
     lst.add(T(1));
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
-        CHECK(!min.is_null());
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
+        CHECK(!min->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
-        Mixed max = lst.max(&ret_ndx);
-        CHECK(!max.is_null());
+        CHECK_EQUAL(min->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
+        CHECK(!max->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        CHECK_EQUAL(max->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
         size_t ret_count = 0;
-        Mixed sum = lst.sum(&ret_count);
-        CHECK(!sum.is_null());
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
+        CHECK(!sum->is_null());
         CHECK_EQUAL(ret_count, 1);
-        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(1));
-        Mixed avg = lst.avg(&ret_count);
-        CHECK(!avg.is_null());
+        CHECK_EQUAL(sum->template get<ColumnSumType<T>>(), ColumnSumType<T>(1));
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
+        CHECK(!avg->is_null());
         CHECK_EQUAL(ret_count, 1);
-        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
+        CHECK_EQUAL(avg->template get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
     }
 
     t->rollback();
@@ -4972,9 +4985,10 @@ TEST(List_DecimalMinMax)
     CHECK_EQUAL(lst.size(), 1);
     CHECK_EQUAL(lst.get(0), Decimal128(larger_than_max_int64_t));
     size_t min_ndx = realm::npos;
-    Mixed min = lst.min(&min_ndx);
+    auto min = lst.min(&min_ndx);
+    CHECK(min);
     CHECK_EQUAL(min_ndx, 0);
-    CHECK_EQUAL(min.get<Decimal128>(), Decimal128(larger_than_max_int64_t));
+    CHECK_EQUAL(min->get<Decimal128>(), Decimal128(larger_than_max_int64_t));
     lst.clear();
     CHECK_EQUAL(lst.size(), 0);
     std::string smaller_than_min_int64_t = "-123.45e99";
@@ -4982,9 +4996,10 @@ TEST(List_DecimalMinMax)
     CHECK_EQUAL(lst.size(), 1);
     CHECK_EQUAL(lst.get(0), Decimal128(smaller_than_min_int64_t));
     size_t max_ndx = realm::npos;
-    Mixed max = lst.max(&max_ndx);
+    auto max = lst.max(&max_ndx);
+    CHECK(max);
     CHECK_EQUAL(max_ndx, 0);
-    CHECK_EQUAL(max.get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
+    CHECK_EQUAL(max->get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
 }
 
 template <typename T>

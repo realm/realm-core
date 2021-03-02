@@ -653,19 +653,19 @@ struct AggregateHelper<Decimal128, Table> {
 
 struct ListAggregateHelper {
     CollectionBase& list;
-    Mixed min(ColKey, size_t* ndx)
+    util::Optional<Mixed> min(ColKey, size_t* ndx)
     {
         return list.min(ndx);
     }
-    Mixed max(ColKey, size_t* ndx)
+    util::Optional<Mixed> max(ColKey, size_t* ndx)
     {
         return list.max(ndx);
     }
-    Mixed sum(ColKey)
+    util::Optional<Mixed> sum(ColKey)
     {
         return list.sum();
     }
-    Mixed avg(ColKey, size_t* count)
+    util::Optional<Mixed> avg(ColKey, size_t* count)
     {
         return list.avg(count);
     }
@@ -717,7 +717,7 @@ struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
 };
 
 template <typename Table, typename Func>
-Mixed call_with_helper(Func&& func, Table&& table, DataType type)
+util::Optional<Mixed> call_with_helper(Func&& func, Table&& table, DataType type)
 {
     switch (type) {
         case type_Timestamp:

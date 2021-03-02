@@ -90,10 +90,10 @@ util::Optional<Mixed> Set::max(ColKey col) const
         return as_results().max(col);
     size_t out_ndx = not_found;
     auto result = set_base().max(&out_ndx);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "max");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 util::Optional<Mixed> Set::min(ColKey col) const
@@ -103,10 +103,10 @@ util::Optional<Mixed> Set::min(ColKey col) const
 
     size_t out_ndx = not_found;
     auto result = set_base().min(&out_ndx);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "min");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 Mixed Set::sum(ColKey col) const
@@ -115,10 +115,10 @@ Mixed Set::sum(ColKey col) const
         return *as_results().sum(col);
 
     auto result = set_base().sum();
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "sum");
     }
-    return result;
+    return *result;
 }
 
 util::Optional<Mixed> Set::average(ColKey col) const
@@ -127,10 +127,10 @@ util::Optional<Mixed> Set::average(ColKey col) const
         return as_results().average(col);
     size_t count = 0;
     auto result = set_base().avg(&count);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "average");
     }
-    return count == 0 ? none : util::make_optional(result);
+    return count == 0 ? none : result;
 }
 
 bool Set::operator==(const Set& rgt) const noexcept

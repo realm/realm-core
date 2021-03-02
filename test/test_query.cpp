@@ -2046,24 +2046,6 @@ template <typename T, typename Value, typename Getter>
 void validate_aggregate_results(unit_test::TestContext& test_context, Table& table, ColKey col, Value value,
                                 Getter getter)
 {
-    // min() and max() return sentinel values if there's no non-null values in
-    // the list so we want to turn that into a proper null result
-    auto handle_none = [](auto&& list, auto& getter) -> decltype(getter(list)) {
-        for (size_t i = 0, size = list.size(); i < size; ++i) {
-            if constexpr (realm::is_any_v<T, float, double>) {
-                if (!list.is_null(i) && !std::isnan(*list.get(i))) {
-                    return getter(list);
-                }
-            }
-            else {
-                if (!list.is_null(i)) {
-                    return getter(list);
-                }
-            }
-        }
-        return none;
-    };
-
     auto tv = (getter(table.column<Lst<T>>(col)) == value).find_all();
     auto not_tv = (getter(table.column<Lst<T>>(col)) != value).find_all();
 
@@ -2072,10 +2054,14 @@ void validate_aggregate_results(unit_test::TestContext& test_context, Table& tab
     using OptionalT = typename AggregateValues<T>::OptionalT;
     CHECK_EQUAL(tv.size() + not_tv.size(), table.size());
     for (size_t i = 0; i < tv.size(); ++i) {
-        CHECK_EQUAL(handle_none(tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+        auto result = getter(tv.get_object(i).template get_list<OptionalT>(col));
+        CHECK(result);
+        CHECK_EQUAL(*result, Mixed(value));
     }
     for (size_t i = 0; i < not_tv.size(); ++i) {
-        CHECK_NOT_EQUAL(handle_none(not_tv.get_object(i).template get_list<OptionalT>(col), getter), Mixed(value));
+        auto result = getter(not_tv.get_object(i).template get_list<OptionalT>(col));
+        CHECK(result);
+        CHECK_NOT_EQUAL(*result, Mixed(value));
     }
 }
 

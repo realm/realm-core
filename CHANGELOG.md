@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Collection aggregates min/max/sum/avg have changed to return an optional Mixed value. This is to distinguish between returning a valid Mixed null value, and none indicating unsupported for this type. ([#4472](https://github.com/realm/realm-core/pull/4472))
 
 ----------------------------------------------
 
