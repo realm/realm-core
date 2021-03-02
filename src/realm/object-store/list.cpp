@@ -379,7 +379,7 @@ bool List::operator==(List const& rgt) const noexcept
 
 List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
 {
-    return List(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
+    return List(frozen_realm, frozen_realm->import_copy_of(*m_coll_base));
 }
 
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \

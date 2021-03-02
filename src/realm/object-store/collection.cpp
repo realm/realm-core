@@ -52,6 +52,14 @@ Collection::Collection(std::shared_ptr<Realm> r, const CollectionBase& coll)
 {
 }
 
+Collection::Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll)
+    : m_realm(std::move(r))
+    , m_type(ObjectSchema::from_core_type(coll->get_col_key()) & ~PropertyType::Collection)
+    , m_coll_base(std::move(coll))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+{
+}
+
 Collection::~Collection() {}
 
 Collection::Collection(const Collection&) = default;

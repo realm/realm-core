@@ -256,7 +256,7 @@ NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb) &
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    return Dictionary(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
+    return Dictionary(frozen_realm, frozen_realm->import_copy_of(*m_coll_base));
 }
 
 } // namespace object_store

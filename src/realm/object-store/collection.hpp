@@ -41,6 +41,7 @@ public:
     Collection() noexcept;
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
+    Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll);
 
     // The Collection object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)
