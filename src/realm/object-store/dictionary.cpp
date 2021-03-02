@@ -20,33 +20,174 @@
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
 
-namespace realm::object_store {
+namespace realm {
+namespace {
+class DictionaryKeyAdapter : public CollectionBase {
+public:
+    DictionaryKeyAdapter(std::shared_ptr<Dictionary> dictionary)
+        : m_dictionary(std::move(dictionary))
+    {
+    }
 
-Dictionary::Dictionary() noexcept
-    : m_dict(nullptr)
+    // -------------------------------------------------------------------------
+    // Things which this adapter does something different from Dictionary for
+
+    Mixed get_any(size_t ndx) const override
+    {
+        return m_dictionary->get_key(ndx);
+    }
+
+    size_t find_any(Mixed value) const override
+    {
+        return m_dictionary->find_any_key(value);
+    }
+
+    ColKey get_col_key() const noexcept override
+    {
+        auto col_key = m_dictionary->get_col_key();
+        auto type = ColumnType(m_dictionary->get_key_data_type());
+        return ColKey(col_key.get_index(), type, col_key.get_attrs(), col_key.get_tag());
+    }
+
+    std::unique_ptr<CollectionBase> clone_collection() const override
+    {
+        return std::make_unique<DictionaryKeyAdapter>(*this);
+    }
+
+    // -------------------------------------------------------------------------
+    // Things which this just forwards on to Dictionary
+
+    size_t size() const override
+    {
+        return m_dictionary->size();
+    }
+    bool is_null(size_t ndx) const override
+    {
+        return m_dictionary->is_null(ndx);
+    }
+    void clear() override
+    {
+        m_dictionary->clear();
+    }
+    void sort(std::vector<size_t>& indices, bool ascending = true) const override
+    {
+        m_dictionary->sort(indices, ascending);
+    }
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const override
+    {
+        m_dictionary->distinct(indices, sort_order);
+    }
+    const Obj& get_obj() const noexcept override
+    {
+        return m_dictionary->get_obj();
+    }
+    bool has_changed() const override
+    {
+        return m_dictionary->has_changed();
+    }
+
+    // -------------------------------------------------------------------------
+    // Things not applicable to the adapter
+
+    bool init_from_parent() const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+    bool update_if_needed() const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+
+    // We currently only support string keys which means these aren't reachable
+    // as Results will handle the type-checks
+    Mixed min(size_t* = nullptr) const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+    Mixed max(size_t* = nullptr) const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+    Mixed sum(size_t* = nullptr) const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+    Mixed avg(size_t* = nullptr) const override
+    {
+        REALM_TERMINATE("not implemented");
+    }
+
+private:
+    std::shared_ptr<Dictionary> m_dictionary;
+};
+} // anonymous namespace
+
+namespace object_store {
+
+bool Dictionary::operator==(const Dictionary& rgt) const noexcept
 {
+    return dict() == rgt.dict();
 }
 
-Dictionary::Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-    : Collection(std::move(r), parent_obj, col)
-    , m_dict(dynamic_cast<realm::Dictionary*>(m_coll_base.get()))
+Obj Dictionary::insert_embedded(StringData key)
 {
-    REALM_ASSERT(m_dict);
+    return dict().create_and_insert_linked_object(key);
 }
 
-Dictionary::Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict)
-    : Collection(std::move(r), dict)
-    , m_dict(dynamic_cast<realm::Dictionary*>(m_coll_base.get()))
+void Dictionary::erase(StringData key)
 {
-    REALM_ASSERT(m_dict);
+    verify_in_transaction();
+    dict().erase(key);
 }
 
-Dictionary::~Dictionary() {}
+void Dictionary::remove_all()
+{
+    verify_in_transaction();
+    dict().clear();
+}
+
+Obj Dictionary::get_object(StringData key)
+{
+    return dict().get_object(key);
+}
+
+Mixed Dictionary::get_any(StringData key)
+{
+    return dict().get(key);
+}
+
+Mixed Dictionary::get_any(size_t ndx) const
+{
+    verify_valid_row(ndx);
+    return dict().get_any(ndx);
+}
+
+util::Optional<Mixed> Dictionary::try_get_any(StringData key) const
+{
+    return dict().try_get(key);
+}
+
+std::pair<StringData, Mixed> Dictionary::get_pair(size_t ndx) const
+{
+    verify_valid_row(ndx);
+    auto pair = dict().get_pair(ndx);
+    return {pair.first.get_string(), pair.second};
+}
+
+size_t Dictionary::find_any(Mixed value) const
+{
+    return dict().find_any(value);
+}
+
+bool Dictionary::contains(StringData key)
+{
+    return dict().contains(key);
+}
 
 Obj Dictionary::get_object(StringData key) const
 {
-    auto k = m_dict->get(key).get<ObjKey>();
-    return m_dict->get_target_table()->get_object(k);
+    auto k = dict().get(key).get<ObjKey>();
+    return dict().get_target_table()->get_object(k);
 }
 
 Results Dictionary::snapshot() const
@@ -57,14 +198,23 @@ Results Dictionary::snapshot() const
 Results Dictionary::get_keys() const
 {
     verify_attached();
-    Results ret(m_realm, m_coll_base);
-    ret.as_keys(true);
-    return ret;
+    return Results(m_realm,
+                   std::make_shared<DictionaryKeyAdapter>(std::dynamic_pointer_cast<realm::Dictionary>(m_coll_base)));
 }
 
 Results Dictionary::get_values() const
 {
     return as_results();
+}
+
+Dictionary::Iterator Dictionary::begin() const
+{
+    return dict().begin();
+}
+
+Dictionary::Iterator Dictionary::end() const
+{
+    return dict().end();
 }
 
 class NotificationHandler {
@@ -99,19 +249,15 @@ private:
     Dictionary::CBFunc m_cb;
 };
 
-
 NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb) &
 {
-    return add_notification_callback(NotificationHandler(*this->m_dict, cb));
+    return add_notification_callback(NotificationHandler(dict(), cb));
 }
-
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    auto frozen_collection = frozen_realm->import_copy_of(*m_dict);
-    REALM_ASSERT(dynamic_cast<realm::Dictionary*>(frozen_collection.get()));
-    realm::Dictionary* frozen_dict = static_cast<realm::Dictionary*>(frozen_collection.get());
-    return Dictionary(frozen_realm, *frozen_dict);
+    return Dictionary(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
 }
 
-} // namespace realm::object_store
+} // namespace object_store
+} // namespace realm

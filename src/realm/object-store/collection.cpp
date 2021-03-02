@@ -92,7 +92,6 @@ static StringData object_name(Table const& table)
     return ObjectStore::object_type_for_table_name(table.get_name());
 }
 
-
 void Collection::validate(const Obj& obj) const
 {
     if (!obj.is_valid())
@@ -154,14 +153,25 @@ bool Collection::is_frozen() const noexcept
 Results Collection::as_results() const
 {
     verify_attached();
-    if (auto link_list = std::dynamic_pointer_cast<LnkLst>(m_coll_base)) {
-        return Results(m_realm, link_list);
-    }
-    if (auto link_set = std::dynamic_pointer_cast<LnkSet>(m_coll_base)) {
-        return Results(m_realm, link_set);
-    }
     return Results(m_realm, m_coll_base);
 }
+
+Results Collection::sort(SortDescriptor order) const
+{
+    verify_attached();
+    return Results(m_realm, m_coll_base, util::none, std::move(order));
+}
+
+Results Collection::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
+{
+    return as_results().sort(keypaths);
+}
+
+Results Collection::snapshot() const
+{
+    return as_results().snapshot();
+}
+
 
 NotificationToken Collection::add_notification_callback(CollectionChangeCallback cb) &
 {
@@ -182,5 +192,24 @@ NotificationToken Collection::add_notification_callback(CollectionChangeCallback
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
+namespace {
+size_t hash_combine()
+{
+    return 0;
+}
+template <typename T, typename... Rest>
+size_t hash_combine(const T& v, Rest... rest)
+{
+    size_t h = hash_combine(rest...);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    return h;
+}
+} // namespace
+
+size_t Collection::hash() const noexcept
+{
+    auto& impl = *m_coll_base;
+    return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+}
 
 } // namespace realm::object_store

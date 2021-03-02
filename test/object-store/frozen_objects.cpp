@@ -189,7 +189,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            REQUIRE(frozen_res.get_any(0).is_null());
+            REQUIRE_THROWS(frozen_res.get_any(0));
         });
     }
 

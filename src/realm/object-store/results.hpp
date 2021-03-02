@@ -49,13 +49,10 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
-            SortDescriptor s = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkSet> list, util::Optional<Query> q = {},
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> collection, util::Optional<Query> q = {},
             SortDescriptor s = {});
     ~Results();
 
@@ -196,10 +193,8 @@ public:
     enum class Mode {
         Empty,      // Backed by nothing (for missing tables)
         Table,      // Backed directly by a Table
-        Collection, // Backed by a list-of-primitives, set-of-primitives or dictionary
+        Collection, // Backed by a collection of links or primitives
         Query,      // Backed by a query that has not yet been turned into a TableView
-        LinkList,   // Backed directly by a LinkList
-        LinkSet,    // Backed directly by a LnkSet
         TableView,  // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -300,11 +295,6 @@ public:
         m_update_policy = policy;
     }
 
-    void as_keys(bool dictionary_keys)
-    {
-        m_dictionary_keys = dictionary_keys;
-    }
-
 private:
     std::shared_ptr<Realm> m_realm;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
@@ -312,8 +302,6 @@ private:
     TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
-    std::shared_ptr<LnkLst> m_link_list;
-    std::shared_ptr<LnkSet> m_link_set;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
@@ -321,8 +309,6 @@ private:
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
-
-    bool update_link_collection() REQUIRES(m_mutex);
 
     void validate_read() const;
     void validate_write() const;
@@ -338,7 +324,6 @@ private:
 
     template <typename T>
     util::Optional<T> try_get(size_t) REQUIRES(m_mutex);
-    Mixed get_from_collection(size_t ndx) REQUIRES(m_mutex);
 
     template <typename AggregateFunction>
     util::Optional<Mixed> aggregate(ColKey column, const char* name, AggregateFunction&& func) REQUIRES(!m_mutex);
@@ -365,7 +350,6 @@ private:
     } m_table_iterator;
 
     util::CheckedOptionalMutex m_mutex;
-    bool m_dictionary_keys = false;
 
     // A work around for what appears to be a false positive in clang's thread
     // analysis when constructing a different object of the same type within a

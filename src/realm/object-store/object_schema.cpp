@@ -92,6 +92,7 @@ PropertyType ObjectSchema::from_core_type(ColumnType type)
         case col_type_UUID:
             return PropertyType::UUID;
         case col_type_Link:
+        case col_type_TypedLink:
             return PropertyType::Object;
         case col_type_LinkList:
             return PropertyType::Object | PropertyType::Array;
@@ -103,20 +104,19 @@ PropertyType ObjectSchema::from_core_type(ColumnType type)
 
 PropertyType ObjectSchema::from_core_type(ColKey col)
 {
-    auto flags = PropertyType::Required;
-    auto attr = col.get_attrs();
-
-    if (attr.test(col_attr_Nullable))
-        flags |= PropertyType::Nullable;
-    if (attr.test(col_attr_List))
-        flags |= PropertyType::Array;
-    else if (attr.test(col_attr_Set))
-        flags |= PropertyType::Set;
-    else if (attr.test(col_attr_Dictionary))
-        flags |= PropertyType::Dictionary;
-
     PropertyType prop_type = from_core_type(col.get_type());
-    return prop_type | flags;
+
+    auto attr = col.get_attrs();
+    if (attr.test(col_attr_Nullable))
+        prop_type |= PropertyType::Nullable;
+    if (attr.test(col_attr_List))
+        prop_type |= PropertyType::Array;
+    else if (attr.test(col_attr_Set))
+        prop_type |= PropertyType::Set;
+    else if (attr.test(col_attr_Dictionary))
+        prop_type |= PropertyType::Dictionary;
+
+    return prop_type;
 }
 
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)

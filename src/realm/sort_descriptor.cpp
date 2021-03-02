@@ -421,6 +421,12 @@ void DescriptorOrdering::append(const DescriptorOrdering& other)
     }
 }
 
+void DescriptorOrdering::append(DescriptorOrdering&& other)
+{
+    std::move(other.m_descriptors.begin(), other.m_descriptors.end(), std::back_inserter(m_descriptors));
+    other.m_descriptors.clear();
+}
+
 DescriptorType DescriptorOrdering::get_type(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());

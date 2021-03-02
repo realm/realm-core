@@ -54,13 +54,14 @@ public:
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
 
+    std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
+    Mixed get_key(size_t ndx) const;
+
     // Overriding members of CollectionBase:
-    std::unique_ptr<CollectionBase> clone_collection() const;
+    std::unique_ptr<CollectionBase> clone_collection() const final;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
-    std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
-    Mixed get_key(size_t ndx) const;
     size_t find_any(Mixed value) const final;
     size_t find_any_key(Mixed value) const;
 
