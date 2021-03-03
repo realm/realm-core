@@ -1181,28 +1181,28 @@ TEST_CASE("object") {
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "mixed", util::Any(25));
-        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
         obj.set_property_value(d, "mixed", util::Any("Hello"s));
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
         obj.set_property_value(d, "mixed", util::Any(1.23));
-        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
         obj.set_property_value(d, "mixed", util::Any(123.45f));
-        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
         obj.set_property_value(d, "mixed", util::Any(Timestamp(30, 40)));
-        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
         obj.set_property_value(d, "mixed", util::Any(ObjectId("111111111111111111111111")));
-        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 ObjectId("111111111111111111111111"));
         obj.set_property_value(d, "mixed", util::Any(Decimal128("42.4242e42")));
-        REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
         obj.set_property_value(d, "mixed", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
-        REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "dictionary", util::Any(AnyDict({{"k1", "v1"s}, {"k2", "v2"s}})));
         auto dict = any_cast<AnyDict&&>(obj.get_property_value<util::Any>(d, "dictionary"));
-        REQUIRE(util::any_cast<std::string>(dict["k1"]) == "v1");
-        REQUIRE(util::any_cast<std::string>(dict["k2"]) == "v2");
+        REQUIRE(util::any_cast<Mixed>(dict["k1"]) == "v1");
+        REQUIRE(util::any_cast<Mixed>(dict["k2"]) == "v2");
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));

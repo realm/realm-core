@@ -229,6 +229,53 @@ struct Date : Base<PropertyType::Date, Timestamp> {
     }
 };
 
+struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
+    using AvgType = Decimal128;
+    static std::vector<realm::Mixed> values()
+    {
+        return {Mixed{},
+                Mixed{"hello world"},
+                Mixed{Timestamp(1, 1)},
+                Mixed{realm::UUID()},
+                Mixed{Decimal128("300")},
+                Mixed{int64_t(1)},
+                Mixed{double(2.2)},
+                Mixed{float(3.3)}};
+    }
+    static PropertyType property_type()
+    {
+        return PropertyType::Mixed | PropertyType::Nullable;
+    }
+    static Mixed min()
+    {
+        return Mixed{int64_t(1)};
+    }
+    static Mixed max()
+    {
+        return Mixed{UUID()};
+    }
+    static Decimal128 sum()
+    {
+        return Decimal128("300") + Decimal128(int64_t(1)) + Decimal128(double(2.2)) + Decimal128(float(3.3));
+    }
+    static Decimal128 average()
+    {
+        return (sum() / Decimal128(4));
+    }
+    static bool can_sum()
+    {
+        return true;
+    }
+    static bool can_average()
+    {
+        return true;
+    }
+    static bool can_minmax()
+    {
+        return true;
+    }
+};
+
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
     static std::vector<ObjectId> values()
     {
@@ -323,7 +370,13 @@ struct UnboxedOptional : BaseT {
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();
-        ret.push_back(typename BaseT::Type());
+        if constexpr (std::is_same_v<BaseT, ::Decimal>) {
+            // The default Decimal128 ctr is 0, but we want a null value
+            ret.push_back(Decimal128(realm::null()));
+        }
+        else {
+            ret.push_back(typename BaseT::Type());
+        }
         return ret;
     }
 };
@@ -332,6 +385,12 @@ template <typename T>
 T get(Mixed)
 {
     abort();
+}
+
+template <>
+Mixed get(Mixed m)
+{
+    return m;
 }
 
 template <>
@@ -490,10 +549,11 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
     return a > b;
 }
 
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
-                   ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>,
-                   BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>, UnboxedOptional<::String>,
-                   UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", /* MixedVal,*/ ::Int, ::Bool, ::Float, ::Double, ::String,
+                   ::Binary, ::Date, ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>,
+                   BoxedOptional<::Float>, BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>,
+                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>,
+                   UnboxedOptional<::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;

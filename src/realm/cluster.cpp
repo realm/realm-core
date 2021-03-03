@@ -804,7 +804,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                     list.init_from_ref(ref);
                     for (size_t i = 0; i < list.size(); i++) {
                         Mixed val = list.get(i);
-                        if (val.get_type() == type_TypedLink) {
+                        if (!val.is_null() && val.get_type() == type_TypedLink) {
                             ObjLink link = val.get<ObjLink>();
                             auto target_obj = origin_table->get_parent_group()->get_object(link);
                             ColKey backlink_col_key =
