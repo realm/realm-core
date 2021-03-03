@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Changed some query parser exceptions types around to be more consistent. ([#4474](https://github.com/realm/realm-core/pull/4474)).
 
 ----------------------------------------------
 
