@@ -4306,9 +4306,10 @@ TEST(Shared_MultipleDBInstances)
     auto frozen = db2->start_frozen(); // version=3
     auto table = frozen->get_table("foo");
 
+    tr = db2->start_write();
     // creates a new mapping and incorrectly marks the old one as being for
     // version 2 rather than 3
-    tr = db2->start_write();
+    tr->get_table("foo")->create_object();
     // deletes the old mapping even though version 3 still needs it
     tr->commit();
 

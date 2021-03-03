@@ -2075,7 +2075,6 @@ Replication::version_type DB::do_commit(Transaction& transaction)
         current_version = r_info->get_current_version_unchecked();
     }
     version_type new_version = current_version + 1;
-    m_alloc.init_mapping_management(current_version);
 
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
@@ -2600,8 +2599,9 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockGuard g(*this, read_lock);
         tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
+        version_type current_version = read_lock.m_version;
+        m_alloc.init_mapping_management(current_version);
         if (Replication* repl = get_replication()) {
-            version_type current_version = read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(*tr, current_version, history_updated); // Throws
         }
