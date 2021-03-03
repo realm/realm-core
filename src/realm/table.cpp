@@ -2128,6 +2128,8 @@ size_t Table::count_string(ColKey col_key, StringData value) const
 
 // sum ----------------------------------------------
 
+
+// FIXME: Change all these to use aggregate_ops
 int64_t Table::sum_int(ColKey col_key) const
 {
     QueryStateSum<int64_t> st;
@@ -2137,25 +2139,31 @@ int64_t Table::sum_int(ColKey col_key) const
     else {
         aggregate<int64_t>(st, col_key);
     }
-    return st.m_state;
+    return st.result_sum();
 }
 double Table::sum_float(ColKey col_key) const
 {
     QueryStateSum<float> st;
     aggregate<float>(st, col_key);
-    return st.m_state;
+    return st.result_sum();
 }
 double Table::sum_double(ColKey col_key) const
 {
     QueryStateSum<double> st;
     aggregate<double>(st, col_key);
-    return st.m_state;
+    return st.result_sum();
 }
 Decimal128 Table::sum_decimal(ColKey col_key) const
 {
     QueryStateSum<Decimal128> st;
     aggregate<Decimal128>(st, col_key);
-    return st.m_state;
+    return st.result_sum();
+}
+Decimal128 Table::sum_mixed(ColKey col_key) const
+{
+    QueryStateSum<Mixed> st;
+    aggregate<Mixed>(st, col_key);
+    return st.result_sum();
 }
 
 // average ----------------------------------------------
@@ -2179,12 +2187,27 @@ Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 {
     QueryStateSum<Decimal128> st;
     aggregate<Decimal128>(st, col_key);
-    auto sum = st.m_state;
+    auto sum = st.result_sum();
     Decimal128 avg(0);
-    if (st.m_match_count != 0)
-        avg = sum / st.m_match_count;
+    size_t items_counted = st.result_count();
+    if (items_counted != 0)
+        avg = sum / items_counted;
     if (value_count)
-        *value_count = st.m_match_count;
+        *value_count = items_counted;
+    return avg;
+}
+
+Decimal128 Table::average_mixed(ColKey col_key, size_t* value_count) const
+{
+    QueryStateSum<Mixed> st;
+    aggregate<Mixed>(st, col_key);
+    auto sum = st.result_sum();
+    Decimal128 avg(0);
+    size_t items_counted = st.result_count();
+    if (items_counted != 0)
+        avg = sum / items_counted;
+    if (value_count)
+        *value_count = items_counted;
     return avg;
 }
 
@@ -2246,6 +2269,17 @@ Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     }
     return st.get_min();
 }
+
+Mixed Table::minimum_mixed(ColKey col_key, ObjKey* return_ndx) const
+{
+    QueryStateMin<Mixed> st;
+    aggregate<Mixed>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_min();
+}
+
 
 // maximum ----------------------------------------------
 
@@ -2319,6 +2353,17 @@ Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     }
     return st.get_max();
 }
+
+Mixed Table::maximum_mixed(ColKey col_key, ObjKey* return_ndx) const
+{
+    QueryStateMax<Mixed> st;
+    aggregate<Mixed>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_max();
+}
+
 
 template <class T>
 ObjKey Table::find_first(ColKey col_key, T value) const

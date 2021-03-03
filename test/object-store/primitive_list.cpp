@@ -549,8 +549,8 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
     return a > b;
 }
 
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", /* MixedVal,*/ ::Int, ::Bool, ::Float, ::Double, ::String,
-                   ::Binary, ::Date, ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>,
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary,
+                   ::Date, ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>,
                    BoxedOptional<::Float>, BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>,
                    UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>,
                    UnboxedOptional<::Decimal>)

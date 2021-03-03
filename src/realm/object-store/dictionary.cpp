@@ -100,19 +100,19 @@ public:
 
     // We currently only support string keys which means these aren't reachable
     // as Results will handle the type-checks
-    Mixed min(size_t* = nullptr) const override
+    util::Optional<Mixed> min(size_t* = nullptr) const override
     {
         REALM_TERMINATE("not implemented");
     }
-    Mixed max(size_t* = nullptr) const override
+    util::Optional<Mixed> max(size_t* = nullptr) const override
     {
         REALM_TERMINATE("not implemented");
     }
-    Mixed sum(size_t* = nullptr) const override
+    util::Optional<Mixed> sum(size_t* = nullptr) const override
     {
         REALM_TERMINATE("not implemented");
     }
-    Mixed avg(size_t* = nullptr) const override
+    util::Optional<Mixed> avg(size_t* = nullptr) const override
     {
         REALM_TERMINATE("not implemented");
     }

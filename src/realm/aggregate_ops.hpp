@@ -130,26 +130,30 @@ class Sum {
 public:
     using ResultType = typename realm::ColumnSumType<T>;
 
-    void accumulate(T value)
+    bool accumulate(T value)
     {
         if constexpr (std::is_same_v<T, Mixed>) {
             if (value.accumulate_numeric_to(m_result)) {
                 ++m_count;
+                return true;
             }
         }
         else {
             if (valid_for_agg(value)) {
                 m_result += value;
                 ++m_count;
+                return true;
             }
         }
+        return false;
     }
 
-    void accumulate(const util::Optional<T>& value)
+    bool accumulate(const util::Optional<T>& value)
     {
         if (value) {
-            accumulate(*value);
+            return accumulate(*value);
         }
+        return false;
     }
 
     bool is_null() const
@@ -178,19 +182,29 @@ template <typename T>
 class Average {
 public:
     using ResultType = typename std::conditional<realm::is_any_v<T, Decimal128, Mixed>, Decimal128, double>::type;
-    void accumulate(T value)
+    bool accumulate(T value)
     {
         if constexpr (std::is_same_v<T, Mixed>) {
             if (value.accumulate_numeric_to(m_result)) {
                 m_count++;
+                return true;
             }
         }
         else {
             if (valid_for_agg(value)) {
                 m_count++;
                 m_result += value;
+                return true;
             }
         }
+        return false;
+    }
+    bool accumulate(const util::Optional<T>& value)
+    {
+        if (value) {
+            return accumulate(*value);
+        }
+        return false;
     }
 
     bool is_null() const

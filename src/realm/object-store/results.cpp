@@ -535,6 +535,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
         case type_Float:
         case type_Int:
         case type_Decimal:
+        case type_Mixed:
             break;
         default:
             throw UnsupportedColumnTypeException{column, *m_table, name};
@@ -651,6 +652,28 @@ struct AggregateHelper<Decimal128, Table> {
     }
 };
 
+template <typename Table>
+struct AggregateHelper<Mixed, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)
+    {
+        return table.minimum_mixed(col, obj);
+    }
+    Mixed max(ColKey col, ObjKey* obj)
+    {
+        return table.maximum_mixed(col, obj);
+    }
+    Mixed sum(ColKey col)
+    {
+        return table.sum_mixed(col);
+    }
+    Mixed avg(ColKey col, size_t* count)
+    {
+        return table.average_mixed(col, count);
+    }
+};
+
+
 struct ListAggregateHelper {
     CollectionBase& list;
     util::Optional<Mixed> min(ColKey, size_t* ndx)
@@ -716,6 +739,14 @@ struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
     }
 };
 
+template <>
+struct AggregateHelper<Mixed, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
+        : ListAggregateHelper{l}
+    {
+    }
+};
+
 template <typename Table, typename Func>
 util::Optional<Mixed> call_with_helper(Func&& func, Table&& table, DataType type)
 {
@@ -730,6 +761,8 @@ util::Optional<Mixed> call_with_helper(Func&& func, Table&& table, DataType type
             return func(AggregateHelper<Int, Table>{table});
         case type_Decimal:
             return func(AggregateHelper<Decimal128, Table>{table});
+        case type_Mixed:
+            return func(AggregateHelper<Mixed, Table>{table});
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
