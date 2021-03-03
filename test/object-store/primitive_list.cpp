@@ -83,7 +83,10 @@ struct Base {
     {
         abort();
     }
-
+    static T empty_sum_value()
+    {
+        return T{};
+    }
     static bool can_sum()
     {
         return std::is_arithmetic<T>::value;
@@ -231,16 +234,12 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 
 struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
     using AvgType = Decimal128;
+    enum { is_optional = true };
     static std::vector<realm::Mixed> values()
     {
-        return {Mixed{},
-                Mixed{"hello world"},
-                Mixed{Timestamp(1, 1)},
-                Mixed{realm::UUID()},
-                Mixed{Decimal128("300")},
-                Mixed{int64_t(1)},
-                Mixed{double(2.2)},
-                Mixed{float(3.3)}};
+        return {Mixed{realm::UUID()}, Mixed{int64_t(1)},      Mixed{},
+                Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{Decimal128("300")},
+                Mixed{double(2.2)},   Mixed{float(3.3)}};
     }
     static PropertyType property_type()
     {
@@ -261,6 +260,10 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
     static Decimal128 average()
     {
         return (sum() / Decimal128(4));
+    }
+    static Mixed empty_sum_value()
+    {
+        return Mixed{0};
     }
     static bool can_sum()
     {
@@ -716,13 +719,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
     }
 
     SECTION("remove()") {
-        if (list.size() < 3)
-            return;
-
-        list.remove(1);
-        values.erase(values.begin() + 1);
-        REQUIRE(list == values);
-        REQUIRE(results == values);
+        size_t pos = 1;
+        while (list.size()) {
+            size_t ndx = pos % list.size();
+            list.remove(ndx);
+            values.erase(values.begin() + ndx);
+            REQUIRE(list == values);
+            REQUIRE(results == values);
+            ++pos;
+        }
     }
 
     SECTION("remove_all()") {
@@ -737,6 +742,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
 
         list.swap(0, 2);
         std::swap(values[0], values[2]);
+        REQUIRE(list == values);
+        REQUIRE(results == values);
+
+        if (list.size() < 4)
+            return;
+
+        list.swap(1, 3);
+        std::swap(values[1], values[3]);
         REQUIRE(list == values);
         REQUIRE(results == values);
     }
@@ -903,17 +916,16 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
                             util::format("Cannot sort array of '%1' on more than one key path",
                                          string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
     }
-
 #if 0
     SECTION("filter()") {
         T v = values.front();
         values.erase(values.begin());
 
-        auto q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
+        auto q = TestType::unwrap(v, [&] (auto v) { return table->column<Lst<W>>(col) != v; });
         Results filtered = list.filter(std::move(q));
         REQUIRE(filtered == values);
 
-        q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+        q = TestType::unwrap(v, [&] (auto v) { return table->column<Lst<W>>(col) == v; });
         filtered = list.filter(std::move(q));
         REQUIRE(filtered.size() == 1);
         REQUIRE(*filtered.first<T>() == v);
@@ -957,8 +969,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
         REQUIRE(get<W>(list.sum()) == TestType::sum());
         REQUIRE(get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
-        REQUIRE(get<W>(list.sum()) == W{});
-        REQUIRE(get<W>(*results.sum()) == W{});
+        REQUIRE(get<W>(list.sum()) == TestType::empty_sum_value());
+        REQUIRE(get<W>(*results.sum()) == TestType::empty_sum_value());
     }
 
     SECTION("average()") {
