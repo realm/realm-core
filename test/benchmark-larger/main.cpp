@@ -47,7 +47,8 @@ std::vector<std::string> step_names{"Direct", "Idx_bst", "Idx_wst", "PK"};
 
 int main()
 {
-    auto run_steps = [&](int num_steps, int step_size, step_type st, const char* step_layout, bool test_rw = false) {
+    auto run_steps = [&](int num_steps, int step_size, step_type st, const char* step_layout, std::vector<int> rw_probes = {}) {
+                         bool test_rw = rw_probes.size() != 0;
                          TestPathGuard guard("benchmark-insertion.realm");
                          std::string path(guard);
                          auto history = make_in_realm_history(path);
@@ -111,15 +112,23 @@ int main()
                                  }
                              }
                              wt.commit();
-                             if (test_rw) {
-                                 {
-                                     int probe_size = 90000; // fixed number of probes - not varied with step size
+                             if (!test_rw) {
+                                 auto end = std::chrono::steady_clock::now();
+                                 auto diff = end - start;
+                                 auto print_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+                                 std::cout << "Insert " << step_names[st] << " " << step_layout << " ";
+                                 std::cout << j << " _ " << print_diff.count() / step_size  << std::endl;
+                             }
+                             else {
+                                 // doing r/w tests:
+                                 for (int probe_index = 0; probe_index < rw_probes.size(); ++probe_index) {
+                                     int probe_size = rw_probes[probe_index]; // fixed number of probes - not varied with step size
                                      // cannot be a full step size, has to have room for the worst case deleted objects
                                      // from here use access to the last step_size elements of 'keys' for evaluations
                                      std::vector<Obj> objects;
                                      objects.reserve(probe_size);
-                                     start = std::chrono::steady_clock::now();
                                      auto trans = db->start_write();
+                                     start = std::chrono::steady_clock::now();
                                      auto t = trans->get_table("table");
                                      volatile int64_t sum = 0; // prevent optimization
                                      auto start_idx = keys.size();
@@ -136,39 +145,36 @@ int main()
                                      }
                                      auto end = std::chrono::steady_clock::now();
                                      auto diff = end - start;
-                                     auto print_diff = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
-                                     std::cout << step_names[st] << " " << step_layout << " ";
-                                     std::cout << j + step_size << " " << print_diff.count();
-                                     //std::cout << "Reading " << step_size << " properties from objects" << std::endl;
+                                     auto print_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+                                     std::cout << "Obj " << step_names[st] << " " << step_layout << " ";
+                                     std::cout << j + step_size << " _ " << probe_size << " " << print_diff.count() / probe_size << std::endl;
                                      start = end;
                                      for (int i = 0; i <  probe_size; ++i) {
                                          sum += objects[i].get<Int>(col2);
                                      }
                                      end = std::chrono::steady_clock::now();
                                      diff = end - start;
-                                     print_diff = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
-                                     std::cout << " " << print_diff.count();
+                                     print_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+                                     std::cout << "Prop_rd " << step_names[st] << " " << step_layout << " ";
+                                     std::cout << j + step_size << " _ " << probe_size << " " << print_diff.count() / probe_size << std::endl;
+
+                                     //std::cout << " " << print_diff.count() / probe_size;
                                      start = end;
-                                     //std::cout << "Changing " << step_size << " properties from objects" << std::endl;
                                      for (int i = 0; i < probe_size; ++i) {
                                          objects[i].set<Int>(col2, i + j + 3);
                                      }
                                      trans->commit();
                                      end = std::chrono::steady_clock::now();
                                      diff = end - start;
-                                     print_diff = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
-                                     std::cout << " " << print_diff.count()  << std::endl;
+                                     print_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+                                     std::cout << "Prop_wr " << step_names[st] << " " << step_layout << " ";
+                                     std::cout << j + step_size << " _ " << probe_size << " " << print_diff.count() / probe_size << std::endl;
+
+                                     //std::cout << " " << print_diff.count() / probe_size << std::endl;
                                  }
                                  {
                                      WriteTransaction wt(db);
                                  }
-                             }
-                             else {
-                                 auto end = std::chrono::steady_clock::now();
-                                 auto diff = end - start;
-                                 auto print_diff = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
-                                 std::cout << step_names[st] << " " << step_layout << " ";
-                                 std::cout << j << " " << print_diff.count()  << std::endl;
                              }
                          }
                      };
@@ -184,10 +190,8 @@ int main()
                             //run_steps(10000, 1000, st, "10000x1000");
                         }
                         else {
-                            std::cout << "R/W run for type " << step_names[st] << " with 100000 accesses" << std::endl;
-                            std::cout << "DB size - Object Read - Property Read - Property Change" << std::endl;
-                            //run_steps(100, 100000, st, "100x100000", true);
-                            run_steps(10, 1000000, st, "10x1000000", true);
+                            std::cout << "R/W run for type " << step_names[st] << std::endl;
+                            run_steps(10, 1000000, st, "10x1000000", {900, 3000, 9000, 30000, 90000});
                         }
                     };
     // insertion tests
@@ -195,8 +199,8 @@ int main()
     run_type(INDEXED_BEST);
     run_type(INDEXED_WORST);
     run_type(PK);
-    // access tests
-    // no access test for DIRECT
+    // r/w tests
+    // no r/w test for DIRECT, bitte!
     run_type(INDEXED_BEST, true);
     run_type(INDEXED_WORST, true);
     run_type(PK, true);
