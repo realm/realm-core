@@ -4281,4 +4281,39 @@ TEST(Shared_ManyColumns)
     foo->create_object().set("Prop0", 500);
 }
 
+TEST(Shared_MultipleDBInstances)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        auto hist = make_in_realm_history(path);
+        DBRef db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto t = tr->add_table("foo");
+        t->create_object();
+        t->add_column(type_Int, "value");
+        tr->commit();
+    }
+
+    auto hist1 = make_in_realm_history(path);
+    DBRef db1 = DB::create(*hist1);
+    auto hist2 = make_in_realm_history(path);
+    DBRef db2 = DB::create(*hist2);
+
+    auto tr = db1->start_write();
+    tr->commit();
+    // db1 now has m_youngest_live_version=3, db2 has m_youngest_live_version=2
+
+    auto frozen = db2->start_frozen(); // version=3
+    auto table = frozen->get_table("foo");
+
+    // creates a new mapping and incorrectly marks the old one as being for
+    // version 2 rather than 3
+    tr = db2->start_write();
+    // deletes the old mapping even though version 3 still needs it
+    tr->commit();
+
+    // tries to use deleted mapping
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("value"), 0);
+}
+
 #endif // TEST_SHARED

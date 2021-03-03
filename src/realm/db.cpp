@@ -2075,6 +2075,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
         current_version = r_info->get_current_version_unchecked();
     }
     version_type new_version = current_version + 1;
+    m_alloc.init_mapping_management(current_version);
 
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
