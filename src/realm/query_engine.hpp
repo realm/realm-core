@@ -199,9 +199,6 @@ public:
             return;
 
         m_table = table;
-        if (m_condition_column_key != ColKey()) {
-            m_condition_column_name = m_table->get_column_name(m_condition_column_key);
-        }
         if (m_child)
             m_child->set_table(table);
         table_changed();
@@ -307,7 +304,6 @@ public:
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
-    std::string m_condition_column_name;
     mutable ColKey m_condition_column_key = ColKey(); // Column of search criteria
     ArrayPayload* m_source_column = nullptr;
 
