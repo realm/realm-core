@@ -949,7 +949,7 @@ void out_mixed_xjson_plus(std::ostream& out, const Mixed& val)
     }
 
     // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
-    if (val.get_type() == type_TypedLink) {
+    if (val.is_type(type_TypedLink)) {
         auto link = val.get<ObjLink>();
         out << "{ \"$link\": { \"table\": \"" << link.get_table_key() << "\", \"key\": ";
         out_mixed_xjson(out, link.get_obj_key());
@@ -1101,7 +1101,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 if (it.second.is_null()) {
                     out << "null";
                 }
-                else if (it.second.get_type() == type_TypedLink) {
+                else if (it.second.is_type(type_TypedLink)) {
                     auto obj_link = it.second.get<ObjLink>();
                     auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
 
@@ -1232,7 +1232,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         return set_null(col_key, is_default);
     }
 
-    if (value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;

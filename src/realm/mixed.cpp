@@ -361,7 +361,7 @@ int Mixed::compare(const Mixed& b) const
             }
             break;
         case type_TypedLink:
-            if (b.get_type() == type_TypedLink) {
+            if (b.is_type(type_TypedLink)) {
                 return _impl::compare_generic(link_val, b.link_val);
             }
             break;
