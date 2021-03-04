@@ -122,6 +122,10 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 
     typename Aggregator<T, action>::AggType agg;
     ObjKey last_accumulated_key = null_key;
+    if constexpr (!(action == act_Min || action == act_Max)) {
+        static_cast<void>(last_accumulated_key);
+    }
+
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
 
         ObjKey key(get_key(tv_index));
