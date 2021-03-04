@@ -140,9 +140,9 @@ ColKey add_column(Group& group, Table& table, Property const& property)
                                            is_nullable(property.type));
     }
     else {
-        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
-        if (property.requires_index())
-            table.add_search_index(key);
+        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type), property.is_text_searchable);
+        if (property.requires_index() || property.is_text_searchable)
+            table.add_search_index(key, property.is_text_searchable);
         return key;
     }
 }

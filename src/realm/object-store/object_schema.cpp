@@ -148,6 +148,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(col_key);
         property.is_indexed = table->has_search_index(col_key) || pk_col == col_key;
+        property.is_text_searchable = table->has_search_index(col_key);
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {

@@ -98,6 +98,7 @@ struct Property {
     std::string link_origin_property_name;
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
+    bool is_text_searchable = false;
 
     ColKey column_key;
 
@@ -116,7 +117,7 @@ struct Property {
 
     bool requires_index() const
     {
-        return is_indexed && !is_primary;
+        return (is_indexed || is_text_searchable) && !is_primary;
     }
 
     bool type_is_indexable() const noexcept;
