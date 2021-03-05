@@ -147,7 +147,7 @@ inline T string_to(const std::string& s)
     iss >> value;
     if (iss.fail()) {
         if (!try_parse_specials(s, value)) {
-            throw std::invalid_argument(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
+            throw InvalidQueryArgError(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
         }
     }
     return value;
@@ -348,12 +348,12 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
 
     if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
-        throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                                 get_data_type_name(left_type), get_data_type_name(right_type)));
+        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                             get_data_type_name(left_type), get_data_type_name(right_type)));
     }
     if (left_type == type_TypeOfValue || right_type == type_TypeOfValue) {
         if (left_type != right_type) {
-            throw std::invalid_argument(
+            throw InvalidQueryArgError(
                 util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
                              get_data_type_name(left_type), get_data_type_name(right_type)));
         }
@@ -362,7 +362,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
-            throw std::invalid_argument("The keypath following 'IN' must contain a list");
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list");
         }
     }
 
@@ -652,7 +652,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
                     return length_expr;
             }
         }
-        throw e;
+        throw InvalidQueryError(e.what());
     }
     REALM_UNREACHABLE();
     return {};
@@ -909,7 +909,12 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     break;
                 default:
                     if (hint == type_TypeOfValue) {
-                        ret = new Value<TypeOfValue>(TypeOfValue(str));
+                        try {
+                            ret = new Value<TypeOfValue>(TypeOfValue(str));
+                        }
+                        catch (const std::runtime_error& e) {
+                            throw InvalidQueryArgError(e.what());
+                        }
                     }
                     else {
                         ret = new ConstantStringValue(str);
@@ -1203,8 +1208,8 @@ void verify_conditions(Subexpr* left, Subexpr* right)
     }
     if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
         util::serializer::SerialisationState state;
-        throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
-                                              left->description(state), right->description(state)));
+        throw InvalidQueryError(util::format("Comparison between two constants is not supported ('%1' and '%2')",
+                                             left->description(state), right->description(state)));
     }
     if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
         if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {

@@ -43,6 +43,11 @@ struct InvalidQueryError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+/// Exception thrown when there is a problem accessing the arguments in a query string
+struct InvalidQueryArgError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 struct AnyContext {
     template <typename T>
     T unbox(const util::Any& wrapper)
