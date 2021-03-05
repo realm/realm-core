@@ -935,6 +935,18 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 }
 
 
+Query& Query::fulltext(ColKey column_key, StringData value)
+{
+    auto index = m_table->get_search_index(column_key);
+    if (!(index && index->is_fulltext_index())) {
+        util::runtime_error("Column has no fulltext index");
+    }
+
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
+    add_node(std::move(node));
+    return *this;
+}
+
 // Aggregates =================================================================================
 
 bool Query::eval_object(const Obj& obj) const

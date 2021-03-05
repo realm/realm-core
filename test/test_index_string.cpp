@@ -81,6 +81,11 @@ public:
             m_owner->m_table.add_search_index(m_owner->m_col_key);
             return m_owner->m_table.get_search_index(m_owner->m_col_key);
         }
+        const StringIndex* create_fulltext_index()
+        {
+            m_owner->m_table.add_search_index(m_owner->m_col_key, true);
+            return m_owner->m_table.get_search_index(m_owner->m_col_key);
+        }
         ObjKey key(size_t ndx) const
         {
             return m_keys[ndx];
