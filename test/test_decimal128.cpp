@@ -269,6 +269,7 @@ TEST(Decimal_Query)
         col = table->get_column_key("dummy");
         CHECK_EQUAL(table->where().average_decimal128(col, &actual), Decimal128(0));
         CHECK_EQUAL(actual, 0);
+        CHECK_EQUAL(table->where().sum_decimal128(col), Decimal128(0));
         ObjKey k;
         CHECK_EQUAL(table->where().maximum_decimal128(col, &k), Decimal128(0));
         CHECK_NOT(k);

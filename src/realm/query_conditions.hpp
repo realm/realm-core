@@ -45,17 +45,15 @@ class ClusterKeyArray;
 
 class QueryStateBase {
 public:
-    size_t m_match_count;
-    size_t m_limit;
     int64_t m_minmax_key; // used only for min/max, to save index of current min/max value
     uint64_t m_key_offset;
     const ClusterKeyArray* m_key_values;
     QueryStateBase(size_t limit)
-        : m_match_count(0)
-        , m_limit(limit)
-        , m_minmax_key(-1)
+        : m_minmax_key(-1)
         , m_key_offset(0)
         , m_key_values(nullptr)
+        , m_match_count(0)
+        , m_limit(limit)
     {
     }
     virtual ~QueryStateBase()
@@ -71,7 +69,20 @@ public:
         return false;
     }
 
+    inline size_t match_count() const noexcept
+    {
+        return m_match_count;
+    }
+
+    inline size_t limit() const noexcept
+    {
+        return m_limit;
+    }
+
 protected:
+    size_t m_match_count;
+    size_t m_limit;
+
 private:
     virtual void dyncast();
 };

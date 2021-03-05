@@ -1007,7 +1007,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
     }
 
     if (resultcount) {
-        *resultcount = st.m_match_count;
+        *resultcount = st.match_count();
     }
 
     if (return_ndx) {
@@ -1486,7 +1486,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 }
                 end -= e;
                 // Stop if limit or end is reached
-                return end == 0 || st.m_match_count == st.m_limit;
+                return end == 0 || st.match_count() == st.limit();
             };
 
             m_table->traverse_clusters(f);
@@ -1563,7 +1563,7 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
-            return st.m_match_count == st.m_limit;
+            return st.match_count() == st.limit();
         };
 
         m_table->traverse_clusters(f);

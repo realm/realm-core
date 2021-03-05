@@ -22,6 +22,7 @@
 #include <realm/aggregate_ops.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_type_traits.hpp>
+
 #include <cmath>
 
 namespace realm {
@@ -39,7 +40,7 @@ public:
         if (!value.is_null()) {
             auto v = value.get<T>();
             if (!m_state.accumulate(v))
-                return true;
+                return true; // no match, continue searching
             ++m_match_count;
         }
         return (m_limit > m_match_count);
@@ -54,7 +55,7 @@ public:
     }
 
 private:
-    aggregate_operations::Sum<T> m_state;
+    aggregate_operations::Sum<typename util::RemoveOptional<T>::type> m_state;
 };
 
 template <class R>
@@ -85,7 +86,6 @@ public:
         return m_match_count ? m_state : R{};
     }
 };
-
 template <class R>
 class QueryStateMax : public QueryStateBase {
 public:

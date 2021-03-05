@@ -2129,7 +2129,6 @@ size_t Table::count_string(ColKey col_key, StringData value) const
 // sum ----------------------------------------------
 
 
-// FIXME: Change all these to use aggregate_ops
 int64_t Table::sum_int(ColKey col_key) const
 {
     QueryStateSum<int64_t> st;

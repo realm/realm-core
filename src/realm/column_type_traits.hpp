@@ -67,36 +67,6 @@ struct SizeOfList;
 template <class T>
 struct ColumnTypeTraits;
 
-template <class T, Action action>
-struct AggregateResultType {
-    using result_type = T;
-};
-
-template <class T, Action action>
-struct AggregateResultType<util::Optional<T>, action> {
-    using result_type = T;
-};
-
-template <class T>
-struct AggregateResultType<T, act_Average> {
-    using result_type = double;
-};
-
-template <class T>
-struct AggregateResultType<util::Optional<T>, act_Average> {
-    using result_type = double;
-};
-
-template <>
-struct AggregateResultType<Decimal128, act_Average> {
-    using result_type = Decimal128;
-};
-
-template <>
-struct AggregateResultType<float, act_Sum> {
-    using result_type = double;
-};
-
 template <>
 struct ColumnTypeTraits<int64_t> {
     using leaf_type = ArrayInteger;
