@@ -497,6 +497,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "buddy == nil", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "buddy <> NULL", 1);
+    verify_query(test_context, t, "buddy.name == NULL", 4); // matches null links
+    verify_query(test_context, t, "buddy.age == NULL", 4);
     verify_query(test_context, t, "age > 2", 2);
     verify_query(test_context, t, "!(age >= 2)", 2);
     verify_query(test_context, t, "!(age => 2)", 2);
@@ -566,17 +568,17 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !FALSEPREDICATE", 2);
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
-    CHECK_THROW(verify_query(test_context, t, "buddy.age > $0", 0),
-                std::out_of_range); // no external parameters provided
-    CHECK_THROW(verify_query(test_context, t, "age == infinity", 0),
-                query_parser::InvalidQueryError); // integer vs infinity is not supported
-    CHECK_THROW(verify_query(test_context, t, "name == infinity", 0),
-                query_parser::InvalidQueryError); // string vs infinity is an invalid query
-
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
-    CHECK(message.find(table_name) != std::string::npos); // no prefix modification for names without "class_"
-    CHECK(message.find("missing_property") != std::string::npos);
+    CHECK_THROW_EX(
+        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
+    CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
+    CHECK_THROW_EX(verify_query(test_context, t, "name == infinity", 0), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Infinity not supported for string"));
+    CHECK_THROW_EX(verify_query(test_context, t, "missing_property > 2", 0), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(table_name) !=
+                         std::string::npos) && // no prefix modification for names without "class_"
+                       CHECK(std::string(e.what()).find("missing_property") != std::string::npos));
 }
 
 
@@ -605,10 +607,10 @@ TEST(Parser_LinksToSameTable)
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.age > 0", 1);
     verify_query(test_context, t, "buddy.buddy.buddy.buddy.buddy.age > 0", 0);
 
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "buddy.buddy.missing_property > 2", 0), message);
-    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
-    CHECK(message.find("missing_property") != std::string::npos);
+    CHECK_THROW_EX(verify_query(test_context, t, "buddy.buddy.missing_property > 2", 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Person") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("missing_property") != std::string::npos));
 }
 
 TEST(Parser_LinksToDifferentTable)
@@ -676,37 +678,37 @@ TEST(Parser_LinksToDifferentTable)
     verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
     verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
-    verify_query(test_context, t, "items.discount.active == true",
-                 3); // how many people bought items with an active sale?
-    verify_query(test_context, t, "items.discount.reduced_by > 2.0",
-                 2); // how many people bought an item marked down by more than $2.0?
-    verify_query(test_context, t, "items.@sum.price > 50",
-                 1); // how many people would spend more than $50 without sales applied?
-    verify_query(test_context, t, "items.@avg.price > 7",
-                 1); // how manay people like to buy items more expensive on average than $7?
+    // how many people bought items with an active sale?
+    verify_query(test_context, t, "items.discount.active == true", 3);
+    // how many people bought an item marked down by more than $2.0?
+    verify_query(test_context, t, "items.discount.reduced_by > 2.0", 2);
+    // how many people would spend more than $50 without sales applied?
+    verify_query(test_context, t, "items.@sum.price > 50", 1);
+    // how manay people like to buy items more expensive on average than $7?
+    verify_query(test_context, t, "items.@avg.price > 7", 1);
 
-    std::string message;
     // missing property
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
-    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
-    CHECK(message.find("missing_property") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.absent_property > 2", 0), message);
-    CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
-    CHECK(message.find("absent_property") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.discount.nonexistent_property > 2", 0), message);
-    CHECK(message.find("Discounts") != std::string::npos); // without the "class_" prefix
-    CHECK(message.find("nonexistent_property") != std::string::npos);
+    CHECK_THROW_EX(verify_query(test_context, t, "missing_property > 2", 0), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Person") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("missing_property") != std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, t, "items.absent_property > 2", 0), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Items") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("absent_property") != std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, t, "items.discount.nonexistent_property > 2", 0),
+                   query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Discounts") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("nonexistent_property") != std::string::npos));
     // property is not a link
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "customer_id.property > 2", 0), message);
-    CHECK(message.find("Person") != std::string::npos);      // without the "class_" prefix
-    CHECK(message.find("customer_id") != std::string::npos); // is not a link
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price.property > 2", 0), message);
-    CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
-    CHECK(message.find("price") != std::string::npos); // is not a link
+    CHECK_THROW_EX(verify_query(test_context, t, "customer_id.property > 2", 0), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Person") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("customer_id") != std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, t, "items.price.property > 2", 0), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find("Items") != std::string::npos) &&
+                       CHECK(std::string(e.what()).find("price") != std::string::npos));
     // Null cannot be compared to lists
-    CHECK_THROW_ANY(verify_query(test_context, t, "items == NULL", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items != NULL", 0));
-    CHECK_THROW_ANY(verify_query(test_context, t, "items.discount == NULL", 0));
+    CHECK_THROW(verify_query(test_context, t, "items == NULL", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items != NULL", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "items.discount == NULL", 0), query_parser::InvalidQueryError);
 }
 
 
@@ -857,35 +859,43 @@ TEST(Parser_Timestamps)
         verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
 
         // dates pre 1900 are not supported by functions like timegm
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0),
+                    query_parser::InvalidQueryError);
+        CHECK_THROW(
+            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4),
+            query_parser::InvalidQueryError);
 
         // negative nanoseconds are not allowed
-        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
+        CHECK_THROW(verify_query(test_context, t, "birthday == T-1:1", 0), query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, "birthday == T1:-1", 0), query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(
+            verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1),
+            query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1),
+                    query_parser::SyntaxError);
 
         // Invalid predicate
-        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T:1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator, 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:", 0));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
-        CHECK_THROW_ANY(
-            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
+        CHECK_THROW(verify_query(test_context, t, "birthday == T1:", 0), query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, "birthday == T:1", 0), query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, "birthday == 1970-1-1", 0), query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator, 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0),
+                    query_parser::SyntaxError);
+        CHECK_THROW(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0),
+                    query_parser::SyntaxError);
     };
 
     // both versions are allowed
@@ -893,10 +903,10 @@ TEST(Parser_Timestamps)
     verify_with_format("T");
 
     // using both separators at the same time is an error
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1T@0:0:0:0", 3));
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-1@T0:0:0:0", 3));
+    CHECK_THROW(verify_query(test_context, t, "birthday == 1970-1-1T@0:0:0:0", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "birthday == 1970-1-1@T0:0:0:0", 3), query_parser::SyntaxError);
     // omitting the separator is an error
-    CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-10:0:0:0:0", 0));
+    CHECK_THROW(verify_query(test_context, t, "birthday == 1970-1-10:0:0:0:0", 0), query_parser::SyntaxError);
 }
 
 
@@ -1072,9 +1082,9 @@ TEST(Parser_TwoColumnExpressionBasics)
     verify_query(test_context, table, "ints == decimals", 3);
 
     // type mismatch
-    CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
-    CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
-    CHECK_THROW_ANY(verify_query(test_context, table, "objectids == ints", 0));
+    CHECK_THROW(verify_query(test_context, table, "doubles == strings", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, table, "strings == doubles", 0), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, table, "objectids == ints", 0), query_parser::InvalidQueryError);
 }
 
 TEST(Parser_TwoColumnAggregates)
@@ -3476,20 +3486,20 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
 
     // aggregate modifiers must operate on a list
-    CHECK_THROW_ANY(verify_query(test_context, t, "ANY 5.5 IN items.price", 2));
-    CHECK_THROW_ANY(verify_query(test_context, t, "SOME 5.5 IN items.price", 2));
-    CHECK_THROW_ANY(verify_query(test_context, t, "ALL 5.5 IN items.price", 1));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NONE 5.5 IN items.price", 1));
+    CHECK_THROW(verify_query(test_context, t, "ANY 5.5 IN items.price", 2), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "SOME 5.5 IN items.price", 2), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "ALL 5.5 IN items.price", 1), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "NONE 5.5 IN items.price", 1), query_parser::SyntaxError);
 
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "5.5 in fav_item.price", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
+    CHECK_THROW_EX(verify_query(test_context, t, "items.price IN 5.5", 1), query_parser::InvalidQueryArgError,
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
+    CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
     verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
     // list property vs list property is not supported by core yet
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
-    CHECK_EQUAL(message, "Comparison between two lists is not supported ('items.price' and 'items.price')");
+    CHECK_THROW_EX(
+        verify_query(test_context, t, "items.price IN items.price", 0), query_parser::InvalidQueryError,
+        CHECK_EQUAL(e.what(), "Comparison between two lists is not supported ('items.price' and 'items.price')"));
 }
 
 TEST(Parser_Object)
@@ -4353,30 +4363,40 @@ TEST(Parser_TypeOfValue)
                  "SUBQUERY(links, $x, $x.mixed.@type == 'double' && $x.mixed == $x.int).@count > 0", 1);
 
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'asdf'", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string 'asdf'") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == ''", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string ''") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 'string|double|'", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == '|'", 1), message);
-    CHECK(message.find("Unable to parse the type attribute string '") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 23", 1), message);
-    CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'int'") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == 2.5", 1), message);
-    CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'double'") !=
-          std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type == int", 1), message);
-    CHECK(message.find("Unsupported comparison between @type and raw value: '@type' and 'int'") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "int.@type == 'int'", 1), message);
-    CHECK(message.find("Comparison between two constants is not supported") != std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.@type == 'object'", 1), message);
-    CHECK(message.find("Comparison between two constants is not supported ('\"object\"' and '\"object\"')") !=
-          std::string::npos);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), message);
-    CHECK_EQUAL(
-        message,
-        "Unsupported comparison operator '=[c]' against type '@type', right side must be a string or binary type");
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == 'asdf'", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string 'asdf'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == ''", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string ''") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == 'string|double|'", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == '|'", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string '") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == 23", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unsupported comparison between @type and raw value: '@type' and 'int'") !=
+              std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == 2.5", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find(
+                  "Unsupported comparison between @type and raw value: '@type' and 'double'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, table, "mixed.@type == int", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unsupported comparison between @type and raw value: '@type' and 'int'") !=
+              std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "int.@type == 'int'", 1), query_parser::InvalidQueryError,
+                   std::string(e.what()).find("Comparison between two constants is not supported") !=
+                       std::string::npos);
+    CHECK_THROW_EX(verify_query(test_context, origin, "link.@type == 'object'", 1), query_parser::InvalidQueryError,
+                   CHECK(std::string(e.what()).find(
+                             "Comparison between two constants is not supported ('\"object\"' and '\"object\"')") !=
+                         std::string::npos));
+    CHECK_THROW_EX(verify_query(test_context, table, "mixed.@type =[c] 'string'", 1), query_parser::InvalidQueryError,
+                   CHECK_EQUAL(std::string(e.what()), "Unsupported comparison operator '=[c]' against type '@type', "
+                                                      "right side must be a string or binary type"));
 }
 
 TEST(Parser_Dictionary)

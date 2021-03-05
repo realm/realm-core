@@ -4327,7 +4327,15 @@ public:
         if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
             m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.is_null()) {
-                m_matches = m_right->find_all(Mixed());
+                const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
+                // when checking for null across links, null links are considered matches,
+                // so we must compute the slow matching even if there is an index.
+                if (!prop || prop->links_exist()) {
+                    return dT;
+                }
+                else {
+                    m_matches = m_right->find_all(Mixed());
+                }
             }
             else {
                 if (m_right->get_type() != m_left_value.get_type()) {
