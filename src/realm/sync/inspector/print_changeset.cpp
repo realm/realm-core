@@ -16,7 +16,12 @@ sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_
 {
     _impl::SimpleInputStream input_stream{changeset_binary.data(), changeset_binary.size()};
     sync::Changeset changeset;
-    sync::parse_changeset(input_stream, changeset);
+    try {
+        sync::parse_changeset(input_stream, changeset);
+    }
+    catch (const sync::BadChangesetError& e) {
+        std::cerr << "*** Decode error: " << e.what() << std::endl;
+    }
 
     return changeset;
 }
