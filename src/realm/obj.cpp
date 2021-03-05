@@ -198,7 +198,7 @@ inline bool Obj::_update_if_needed() const
 template <class T>
 T Obj::get(ColKey col_key) const
 {
-    m_table->report_invalid_key(col_key);
+    m_table->check_column(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == ColumnTypeTraits<T>::column_id);
 
@@ -232,7 +232,7 @@ ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 
 bool Obj::is_unresolved(ColKey col_key) const
 {
-    m_table->report_invalid_key(col_key);
+    m_table->check_column(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == col_type_Link);
 
@@ -270,7 +270,7 @@ int64_t Obj::_get<int64_t>(ColKey::Idx col_ndx) const
 template <>
 int64_t Obj::get<int64_t>(ColKey col_key) const
 {
-    m_table->report_invalid_key(col_key);
+    m_table->check_column(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == col_type_Int);
 
@@ -289,7 +289,7 @@ int64_t Obj::get<int64_t>(ColKey col_key) const
 template <>
 bool Obj::get<bool>(ColKey col_key) const
 {
-    m_table->report_invalid_key(col_key);
+    m_table->check_column(col_key);
     ColumnType type = col_key.get_type();
     REALM_ASSERT(type == col_type_Bool);
 
@@ -346,7 +346,7 @@ BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 
 Mixed Obj::get_any(ColKey col_key) const
 {
-    m_table->report_invalid_key(col_key);
+    m_table->check_column(col_key);
     auto col_ndx = col_key.get_index();
     switch (col_key.get_type()) {
         case col_type_Int:
@@ -653,7 +653,7 @@ TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
 
 ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 {
-    get_table()->report_invalid_key(backlink_col);
+    get_table()->check_column(backlink_col);
     Allocator& alloc = get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -666,7 +666,7 @@ ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 
 std::vector<ObjKey> Obj::get_all_backlinks(ColKey backlink_col) const
 {
-    get_table()->report_invalid_key(backlink_col);
+    get_table()->check_column(backlink_col);
     Allocator& alloc = get_alloc();
     Array fields(alloc);
     fields.init_from_mem(m_mem);
@@ -1216,7 +1216,7 @@ template <>
 Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     auto type = col_key.get_type();
     auto attrs = col_key.get_attrs();
     auto col_ndx = col_key.get_index();
@@ -1337,7 +1337,7 @@ template <>
 Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     auto col_ndx = col_key.get_index();
 
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
@@ -1381,7 +1381,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
 Obj& Obj::add_int(ColKey col_key, int64_t value)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     auto col_ndx = col_key.get_index();
 
     ensure_writeable();
@@ -1439,7 +1439,7 @@ template <>
 Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != ColumnTypeTraits<ObjKey>::column_id)
@@ -1490,7 +1490,7 @@ template <>
 Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != ColumnTypeTraits<ObjLink>::column_id)
@@ -1532,7 +1532,7 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
 Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != col_type_Link)
@@ -1613,7 +1613,7 @@ template <class T>
 Obj& Obj::set(ColKey col_key, T value, bool is_default)
 {
     update_if_needed();
-    get_table()->report_invalid_key(col_key);
+    get_table()->check_column(col_key);
     auto type = col_key.get_type();
     auto attrs = col_key.get_attrs();
     auto col_ndx = col_key.get_index();

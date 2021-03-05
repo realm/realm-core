@@ -280,7 +280,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
-        table->report_invalid_key(col_key);
+        table->check_column(col_key);
 
         if (!col_key.is_list()) {
             auto table = obj.get_table();

@@ -635,6 +635,8 @@ public:
     // instead of the old one from the old thread.
     virtual void set_base_table(ConstTableRef) {}
 
+    virtual void check_expression() const = 0;
+
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
     virtual void set_cluster(const Cluster*) {}
@@ -702,11 +704,11 @@ class Value;
 class ConstantStringValue;
 template <class T>
 class Subexpr2;
-template <class oper, class TLeft = Subexpr, class TRight = Subexpr>
+template <class oper>
 class Operator;
-template <class oper, class TLeft = Subexpr>
+template <class oper>
 class UnaryOperator;
-template <class oper, class TLeft = Subexpr>
+template <class oper>
 class SizeOperator;
 template <class oper>
 class TypeOfValueOperator;
@@ -1185,6 +1187,8 @@ public:
     {
         return make_subexpr<Value<T>>(*this);
     }
+
+    void check_expression() const override {}
 };
 
 class ConstantStringValue : public Value<StringData> {
@@ -1702,6 +1706,7 @@ public:
     }
 
     void set_base_table(ConstTableRef table);
+    void check_columns(ColKey target_col = ColKey()) const;
 
     void set_cluster(const Cluster* cluster)
     {
@@ -1725,7 +1730,7 @@ public:
             default:
                 break;
         }
-        // m_tables[0]->report_invalid_key(m_link_column_keys[0]);
+        // m_tables[0]->check_column(m_link_column_keys[0]);
         cluster->init_leaf(m_link_column_keys[0], m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1912,6 +1917,11 @@ public:
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
         }
+    }
+
+    void check_expression() const override
+    {
+        m_link_map.check_columns(m_column_key);
     }
 
     bool has_search_index() const final
@@ -2313,6 +2323,12 @@ public:
     {
     }
 
+    double init()
+    {
+        m_link_map.check_columns();
+        return Expression::init();
+    }
+
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
@@ -2396,6 +2412,10 @@ public:
         m_link_map.set_base_table(table);
     }
 
+    void check_expression() const
+    {
+        m_link_map.check_columns();
+    }
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
@@ -2459,6 +2479,11 @@ public:
         m_link_map.set_base_table(table);
     }
 
+    void check_expression() const override
+    {
+        m_link_map.check_columns();
+    }
+
     void set_cluster(const Cluster* cluster) override
     {
         if (m_link_map.has_links()) {
@@ -2505,10 +2530,10 @@ private:
     LinkMap m_link_map;
 };
 
-template <class T, class TExpr>
+template <class T>
 class SizeOperator : public Subexpr2<Int> {
 public:
-    SizeOperator(std::unique_ptr<TExpr> left)
+    SizeOperator(std::unique_ptr<Subexpr> left)
         : m_expr(std::move(left))
     {
     }
@@ -2522,6 +2547,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_expr->set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_expr->check_expression();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2576,7 +2606,7 @@ public:
     }
 
 private:
-    std::unique_ptr<TExpr> m_expr;
+    std::unique_ptr<Subexpr> m_expr;
 };
 
 template <class T>
@@ -2601,6 +2631,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_expr->set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_expr->check_expression();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2660,6 +2695,8 @@ public:
     {
         return nullptr;
     }
+
+    void check_expression() const override {}
 
     void evaluate(size_t, ValueBase& destination) override
     {
@@ -2760,6 +2797,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_link_map.check_columns();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -2911,6 +2953,11 @@ public:
     void set_base_table(ConstTableRef table) final
     {
         m_link_map.set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_link_map.check_columns(m_column_key);
     }
 
     void set_cluster(const Cluster* cluster) final
@@ -3220,6 +3267,11 @@ public:
         m_link_map.set_base_table(table);
     }
 
+    void check_expression() const override
+    {
+        m_link_map.check_columns(m_column_key);
+    }
+
     void collect_dependencies(std::vector<TableKey>& tables) const final
     {
         m_link_map.collect_dependencies(tables);
@@ -3370,6 +3422,11 @@ public:
         m_list.set_base_table(table);
     }
 
+    void check_expression() const override
+    {
+        m_list.check_expression();
+    }
+
     void set_cluster(const Cluster* cluster) override
     {
         m_list.set_cluster(cluster);
@@ -3434,6 +3491,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_list.set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_list.check_expression();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -3782,6 +3844,12 @@ public:
         m_column.set_base_table(m_link_map.get_target_table());
     }
 
+    void check_expression() const override
+    {
+        m_column.check_expression();
+        m_link_map.check_columns();
+    }
+
     void collect_dependencies(std::vector<TableKey>& tables) const override
     {
         m_link_map.collect_dependencies(tables);
@@ -3890,6 +3958,11 @@ public:
         m_column.set_base_table(m_link_map.get_target_table());
     }
 
+    void check_expression() const override
+    {
+        m_column.check_expression();
+    }
+
     void set_cluster(const Cluster* cluster) override
     {
         m_link_map.set_cluster(cluster);
@@ -3953,6 +4026,11 @@ public:
     {
         m_link_map.set_base_table(table);
         m_query.set_table(m_link_map.get_target_table().cast_away_const());
+    }
+
+    void check_expression() const override
+    {
+        m_link_map.check_columns();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -4123,10 +4201,10 @@ private:
 };
 } // namespace aggregate_operations
 
-template <class oper, class TLeft>
+template <class oper>
 class UnaryOperator : public Subexpr2<typename oper::type> {
 public:
-    UnaryOperator(std::unique_ptr<TLeft> left)
+    UnaryOperator(std::unique_ptr<Subexpr> left)
         : m_left(std::move(left))
     {
     }
@@ -4151,6 +4229,11 @@ public:
     void set_base_table(ConstTableRef table) override
     {
         m_left->set_base_table(table);
+    }
+
+    void check_expression() const override
+    {
+        m_left->check_expression();
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -4195,14 +4278,14 @@ public:
 
 private:
     typedef typename oper::type T;
-    std::unique_ptr<TLeft> m_left;
+    std::unique_ptr<Subexpr> m_left;
 };
 
 
-template <class oper, class TLeft, class TRight>
+template <class oper>
 class Operator : public Subexpr2<typename oper::type> {
 public:
-    Operator(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right)
+    Operator(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
@@ -4237,6 +4320,12 @@ public:
     {
         m_left->set_cluster(cluster);
         m_right->set_cluster(cluster);
+    }
+
+    void check_expression() const override
+    {
+        m_left->check_expression();
+        m_right->check_expression();
     }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
@@ -4286,8 +4375,8 @@ public:
 
 private:
     typedef typename oper::type T;
-    std::unique_ptr<TLeft> m_left;
-    std::unique_ptr<TRight> m_right;
+    std::unique_ptr<Subexpr> m_left;
+    std::unique_ptr<Subexpr> m_right;
 };
 
 template <class TCond>
@@ -4323,6 +4412,8 @@ public:
 
     double init() override
     {
+        m_left->check_expression();
+        m_right->check_expression();
         double dT = m_left_is_const ? 10.0 : 50.0;
         if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
             m_right->get_comparison_type() == ExpressionComparisonType::Any) {

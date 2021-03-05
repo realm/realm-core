@@ -100,8 +100,6 @@ const char* LogicError::message() const noexcept
                    "to the DB constructor) was not consistent across the session";
         case table_has_no_columns:
             return "Table has no columns";
-        case column_does_not_exist:
-            return "Column does not exist";
         case subtable_of_subtable_index:
             return "Search index on a subtable of a subtable is not yet supported";
         case collection_type_mismatch:
