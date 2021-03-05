@@ -1007,7 +1007,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
     }
 
     if (resultcount) {
-        *resultcount = st.m_match_count;
+        *resultcount = st.match_count();
     }
 
     if (return_ndx) {
@@ -1077,7 +1077,7 @@ int64_t Query::sum_int(ColKey column_key) const
     else {
         aggregate<int64_t>(st, column_key);
     }
-    return st.m_state;
+    return st.result_sum();
 }
 double Query::sum_float(ColKey column_key) const
 {
@@ -1087,7 +1087,7 @@ double Query::sum_float(ColKey column_key) const
 
     QueryStateSum<float> st;
     aggregate<float>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
 }
 double Query::sum_double(ColKey column_key) const
 {
@@ -1096,7 +1096,7 @@ double Query::sum_double(ColKey column_key) const
 #endif
     QueryStateSum<double> st;
     aggregate<double>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
 }
 
 Decimal128 Query::sum_decimal128(ColKey column_key) const
@@ -1107,7 +1107,7 @@ Decimal128 Query::sum_decimal128(ColKey column_key) const
 
     QueryStateSum<Decimal128> st;
     aggregate<Decimal128>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
 }
 
 // Maximum
@@ -1244,7 +1244,7 @@ R Query::average(ColKey column_key, size_t* resultcount) const
     size_t resultcount2 = 0;
     QueryStateSum<typename util::RemoveOptional<T>::type> st;
     aggregate<T>(st, column_key, &resultcount2);
-    R sum1 = R(st.m_state);
+    R sum1 = R(st.result_sum());
     R avg1{};
     if (resultcount2 != 0)
         avg1 = sum1 / resultcount2;
@@ -1486,7 +1486,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 }
                 end -= e;
                 // Stop if limit or end is reached
-                return end == 0 || st.m_match_count == st.m_limit;
+                return end == 0 || st.match_count() == st.limit();
             };
 
             m_table->traverse_clusters(f);
@@ -1563,7 +1563,7 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
-            return st.m_match_count == st.m_limit;
+            return st.match_count() == st.limit();
         };
 
         m_table->traverse_clusters(f);

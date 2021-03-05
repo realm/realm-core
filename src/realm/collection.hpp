@@ -31,18 +31,20 @@ public:
     virtual void clear() = 0;
 
     /// Get the min element, according to whatever comparison function is
-    /// meaningful for the collection.
-    virtual Mixed min(size_t* return_ndx = nullptr) const = 0;
+    /// meaningful for the collection, or none if min is not supported for this type.
+    virtual util::Optional<Mixed> min(size_t* return_ndx = nullptr) const = 0;
 
     /// Get the max element, according to whatever comparison function is
-    /// meaningful for the collection.
-    virtual Mixed max(size_t* return_ndx = nullptr) const = 0;
+    /// meaningful for the collection, or none if max is not supported for this type.
+    virtual util::Optional<Mixed> max(size_t* return_ndx = nullptr) const = 0;
 
     /// For collections of arithmetic types, return the sum of all elements.
-    virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
+    /// For non arithmetic types, returns none.
+    virtual util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const = 0;
 
     /// For collections of arithmetic types, return the average of all elements.
-    virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
+    /// For non arithmetic types, returns none.
+    virtual util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const = 0;
 
     /// Produce a clone of the collection accessor referring to the same
     /// underlying memory.
@@ -162,36 +164,44 @@ inline void check_column_type<ObjKey>(ColKey col)
 template <class T, class = void>
 struct MinHelper {
     template <class U>
-    static Mixed eval(U&, size_t*) noexcept
+    static util::Optional<Mixed> eval(U&, size_t*) noexcept
     {
-        return Mixed{};
+        return util::none;
     }
 };
 
 template <class T>
 struct MinHelper<T, std::void_t<ColumnMinMaxType<T>>> {
     template <class U>
-    static Mixed eval(U& tree, size_t* return_ndx)
+    static util::Optional<Mixed> eval(U& tree, size_t* return_ndx)
     {
-        return Mixed(bptree_minimum<T>(tree, return_ndx));
+        auto optional_min = bptree_minimum<T>(tree, return_ndx);
+        if (optional_min) {
+            return Mixed{*optional_min};
+        }
+        return Mixed{};
     }
 };
 
 template <class T, class Enable = void>
 struct MaxHelper {
     template <class U>
-    static Mixed eval(U&, size_t*) noexcept
+    static util::Optional<Mixed> eval(U&, size_t*) noexcept
     {
-        return Mixed{};
+        return util::none;
     }
 };
 
 template <class T>
 struct MaxHelper<T, std::void_t<ColumnMinMaxType<T>>> {
     template <class U>
-    static Mixed eval(U& tree, size_t* return_ndx)
+    static util::Optional<Mixed> eval(U& tree, size_t* return_ndx)
     {
-        return Mixed(bptree_maximum<T>(tree, return_ndx));
+        auto optional_max = bptree_maximum<T>(tree, return_ndx);
+        if (optional_max) {
+            return Mixed{*optional_max};
+        }
+        return Mixed{};
     }
 };
 
@@ -199,11 +209,11 @@ template <class T, class Enable = void>
 class SumHelper {
 public:
     template <class U>
-    static Mixed eval(U&, size_t* return_cnt) noexcept
+    static util::Optional<Mixed> eval(U&, size_t* return_cnt) noexcept
     {
         if (return_cnt)
             *return_cnt = 0;
-        return Mixed{};
+        return util::none;
     }
 };
 
@@ -211,29 +221,29 @@ template <class T>
 class SumHelper<T, std::void_t<ColumnSumType<T>>> {
 public:
     template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
+    static util::Optional<Mixed> eval(U& tree, size_t* return_cnt)
     {
-        return Mixed(bptree_sum<T>(tree, return_cnt));
+        return Mixed{bptree_sum<T>(tree, return_cnt)};
     }
 };
 
 template <class T, class = void>
 struct AverageHelper {
     template <class U>
-    static Mixed eval(U&, size_t* return_cnt) noexcept
+    static util::Optional<Mixed> eval(U&, size_t* return_cnt) noexcept
     {
         if (return_cnt)
             *return_cnt = 0;
-        return Mixed{};
+        return util::none;
     }
 };
 
 template <class T>
 struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
+    static util::Optional<Mixed> eval(U& tree, size_t* return_cnt)
     {
-        return Mixed(bptree_average<T>(tree, return_cnt));
+        return Mixed{bptree_average<T>(tree, return_cnt)};
     }
 };
 

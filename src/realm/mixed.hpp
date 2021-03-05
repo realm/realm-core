@@ -197,6 +197,7 @@ public:
     ObjLink get_link() const;
 
     bool is_null() const;
+    bool accumulate_numeric_to(Decimal128& destination) const;
     bool is_unresolved_link() const;
     bool is_same_type(const Mixed& b) const;
     int compare(const Mixed& b) const;

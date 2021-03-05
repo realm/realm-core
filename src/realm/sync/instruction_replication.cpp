@@ -107,7 +107,7 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         return Instruction::Payload{};
     }
 
-    if (value.get_type() == type_Link) {
+    if (value.is_type(type_Link)) {
         ConstTableRef target_table = table.get_link_target(col_key);
         if (target_table->is_embedded()) {
             // FIXME: Include target table name to support Mixed of Embedded Objects.
@@ -119,7 +119,7 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         link.target = primary_key_for_object(*target_table, value.get<ObjKey>());
         return Instruction::Payload{link};
     }
-    else if (value.get_type() == type_TypedLink) {
+    else if (value.is_type(type_TypedLink)) {
         auto obj_link = value.get<ObjLink>();
         ConstTableRef target_table = m_transaction->get_table(obj_link.get_table_key());
         REALM_ASSERT(target_table);
@@ -415,10 +415,10 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -439,10 +439,10 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -485,10 +485,10 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -611,10 +611,10 @@ void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed&
 {
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }

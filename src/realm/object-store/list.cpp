@@ -327,10 +327,10 @@ util::Optional<Mixed> List::max(ColKey col) const
         return as_results().max(col);
     size_t out_ndx = not_found;
     auto result = list_base().max(&out_ndx);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "max");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 util::Optional<Mixed> List::min(ColKey col) const
@@ -340,10 +340,10 @@ util::Optional<Mixed> List::min(ColKey col) const
 
     size_t out_ndx = not_found;
     auto result = list_base().min(&out_ndx);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "min");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 Mixed List::sum(ColKey col) const
@@ -352,10 +352,10 @@ Mixed List::sum(ColKey col) const
         return *as_results().sum(col);
 
     auto result = list_base().sum();
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "sum");
     }
-    return result;
+    return *result;
 }
 
 util::Optional<Mixed> List::average(ColKey col) const
@@ -364,10 +364,10 @@ util::Optional<Mixed> List::average(ColKey col) const
         return as_results().average(col);
     size_t count = 0;
     auto result = list_base().avg(&count);
-    if (result.is_null()) {
+    if (!result) {
         throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "average");
     }
-    return count == 0 ? none : util::make_optional(result);
+    return count == 0 ? none : result;
 }
 
 bool List::operator==(List const& rgt) const noexcept

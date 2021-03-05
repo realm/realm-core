@@ -347,19 +347,23 @@ TEST(Dictionary_Aggregate)
 
     size_t ndx;
     auto max = dict.max(&ndx);
-    CHECK_EQUAL(max.get_int(), 99);
+    CHECK(max);
+    CHECK_EQUAL(max->get_int(), 99);
 
     auto min = dict.min(&ndx);
-    CHECK_EQUAL(min.get_int(), 0);
+    CHECK(min);
+    CHECK_EQUAL(min->get_int(), 0);
 
     size_t cnt;
     auto sum = dict.sum(&cnt);
+    CHECK(sum);
     CHECK_EQUAL(cnt, 100);
-    CHECK_EQUAL(sum.get_int(), 50 * 99);
+    CHECK_EQUAL(sum->get_int(), 50 * 99);
 
     auto avg = dict.avg(&cnt);
+    CHECK(avg);
     CHECK_EQUAL(cnt, 100);
-    CHECK_EQUAL(avg.get_double(), double(50 * 99) / 100);
+    CHECK_EQUAL(avg->get_double(), double(50 * 99) / 100);
 }
 
 TEST(Dictionary_Performance)

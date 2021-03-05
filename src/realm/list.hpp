@@ -110,10 +110,10 @@ public:
     Mixed get_any(size_t ndx) const final;
     bool is_null(size_t ndx) const final;
     CollectionBasePtr clone_collection() const final;
-    Mixed min(size_t* return_ndx = nullptr) const final;
-    Mixed max(size_t* return_ndx = nullptr) const final;
-    Mixed sum(size_t* return_cnt = nullptr) const final;
-    Mixed avg(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
@@ -268,10 +268,10 @@ public:
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
     void clear() final;
-    Mixed min(size_t* return_ndx = nullptr) const final;
-    Mixed max(size_t* return_ndx = nullptr) const final;
-    Mixed sum(size_t* return_cnt = nullptr) const final;
-    Mixed avg(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
     std::unique_ptr<CollectionBase> clone_collection() const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
@@ -616,28 +616,28 @@ inline size_t Lst<T>::find_first(const T& value) const
 }
 
 template <class T>
-inline Mixed Lst<T>::min(size_t* return_ndx) const
+inline util::Optional<Mixed> Lst<T>::min(size_t* return_ndx) const
 {
     update_if_needed();
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
-inline Mixed Lst<T>::max(size_t* return_ndx) const
+inline util::Optional<Mixed> Lst<T>::max(size_t* return_ndx) const
 {
     update_if_needed();
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
-inline Mixed Lst<T>::sum(size_t* return_cnt) const
+inline util::Optional<Mixed> Lst<T>::sum(size_t* return_cnt) const
 {
     update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
-inline Mixed Lst<T>::avg(size_t* return_cnt) const
+inline util::Optional<Mixed> Lst<T>::avg(size_t* return_cnt) const
 {
     update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
@@ -864,25 +864,25 @@ inline void LnkLst::clear()
     clear_unresolved();
 }
 
-inline Mixed LnkLst::min(size_t* return_ndx) const
+inline util::Optional<Mixed> LnkLst::min(size_t* return_ndx) const
 {
     static_cast<void>(return_ndx);
     REALM_TERMINATE("Not implemented yet");
 }
 
-inline Mixed LnkLst::max(size_t* return_ndx) const
+inline util::Optional<Mixed> LnkLst::max(size_t* return_ndx) const
 {
     static_cast<void>(return_ndx);
     REALM_TERMINATE("Not implemented yet");
 }
 
-inline Mixed LnkLst::sum(size_t* return_cnt) const
+inline util::Optional<Mixed> LnkLst::sum(size_t* return_cnt) const
 {
     static_cast<void>(return_cnt);
     REALM_TERMINATE("Not implemented yet");
 }
 
-inline Mixed LnkLst::avg(size_t* return_cnt) const
+inline util::Optional<Mixed> LnkLst::avg(size_t* return_cnt) const
 {
     static_cast<void>(return_cnt);
     REALM_TERMINATE("Not implemented yet");

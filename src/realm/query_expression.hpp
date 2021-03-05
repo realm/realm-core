@@ -127,6 +127,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #ifndef REALM_QUERY_EXPRESSION_HPP
 #define REALM_QUERY_EXPRESSION_HPP
 
+#include <realm/aggregate_ops.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
@@ -2978,7 +2979,7 @@ public:
 
     std::unique_ptr<Subexpr> max_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return max().clone();
         }
         else {
@@ -2987,7 +2988,7 @@ public:
     }
     std::unique_ptr<Subexpr> min_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return min().clone();
         }
         else {
@@ -2996,7 +2997,7 @@ public:
     }
     std::unique_ptr<Subexpr> sum_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return sum().clone();
         }
         else {
@@ -3005,7 +3006,7 @@ public:
     }
     std::unique_ptr<Subexpr> avg_of() override
     {
-        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
+        if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128, Mixed>) {
             return average().clone();
         }
         else {
@@ -4021,107 +4022,6 @@ private:
     Query m_query;
     LinkMap m_link_map;
 };
-
-namespace aggregate_operations {
-
-template <typename T, typename Compare>
-class MinMaxAggregateOperator {
-public:
-    void accumulate(T value)
-    {
-        if (!is_nan(value) && (!m_result || Compare()(value, *m_result))) {
-            m_result = value;
-        }
-    }
-
-    bool is_null() const
-    {
-        return !m_result;
-    }
-    T result() const
-    {
-        return *m_result;
-    }
-
-private:
-    util::Optional<T> m_result;
-};
-
-template <typename T>
-class Minimum : public MinMaxAggregateOperator<T, std::less<>> {
-public:
-    static const char* description()
-    {
-        return "@min";
-    }
-};
-
-template <typename T>
-class Maximum : public MinMaxAggregateOperator<T, std::greater<>> {
-public:
-    static const char* description()
-    {
-        return "@max";
-    }
-};
-
-template <typename T>
-class Sum {
-public:
-    void accumulate(T value)
-    {
-        if (!is_nan(value)) {
-            m_result += value;
-        }
-    }
-
-    bool is_null() const
-    {
-        return false;
-    }
-    T result() const
-    {
-        return m_result;
-    }
-    static const char* description()
-    {
-        return "@sum";
-    }
-
-private:
-    T m_result = {};
-};
-
-template <typename T>
-class Average {
-public:
-    using ResultType = typename std::conditional<std::is_same_v<T, Decimal128>, Decimal128, double>::type;
-    void accumulate(T value)
-    {
-        if (!is_nan(value)) {
-            m_count++;
-            m_result += value;
-        }
-    }
-
-    bool is_null() const
-    {
-        return m_count == 0;
-    }
-    ResultType result() const
-    {
-        return m_result / m_count;
-    }
-    static const char* description()
-    {
-        return "@avg";
-    }
-
-private:
-    size_t m_count = 0;
-    ResultType m_result = {};
-};
-} // namespace aggregate_operations
 
 template <class oper, class TLeft>
 class UnaryOperator : public Subexpr2<typename oper::type> {

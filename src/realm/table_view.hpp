@@ -284,6 +284,12 @@ public:
     Decimal128 average_decimal(ColKey column_key, size_t* value_count = nullptr) const;
     size_t count_decimal(ColKey column_key, Decimal128 target) const;
 
+    Decimal128 sum_mixed(ColKey column_key) const;
+    Mixed maximum_mixed(ColKey column_key, ObjKey* return_key = nullptr) const;
+    Mixed minimum_mixed(ColKey column_key, ObjKey* return_key = nullptr) const;
+    Decimal128 average_mixed(ColKey column_key, size_t* value_count = nullptr) const;
+    size_t count_mixed(ColKey column_key, Mixed target) const;
+
     /// Search this view for the specified key. If found, the index of that row
     /// within this view is returned, otherwise `realm::not_found` is returned.
     size_t find_by_source_ndx(ObjKey key) const noexcept

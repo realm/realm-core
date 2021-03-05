@@ -65,10 +65,10 @@ public:
     size_t find_any(Mixed value) const final;
     size_t find_any_key(Mixed value) const;
 
-    Mixed min(size_t* return_ndx = nullptr) const final;
-    Mixed max(size_t* return_ndx = nullptr) const final;
-    Mixed sum(size_t* return_cnt = nullptr) const final;
-    Mixed avg(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final;
+    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final;
+    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final;
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;

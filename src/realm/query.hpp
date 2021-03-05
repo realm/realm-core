@@ -34,6 +34,7 @@
 #include <pthread.h>
 #endif
 
+#include <realm/aggregate_ops.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/binary_data.hpp>
@@ -341,7 +342,8 @@ private:
     template <typename TConditionFunction>
     Query& add_size_condition(ColKey column_key, int64_t value);
 
-    template <typename T, typename R = typename AggregateResultType<T, act_Average>::result_type>
+    template <typename T,
+              typename R = typename aggregate_operations::Average<typename util::RemoveOptional<T>::type>::ResultType>
     R average(ColKey column_key, size_t* resultcount = nullptr) const;
 
     template <typename T>

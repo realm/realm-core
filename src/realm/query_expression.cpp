@@ -379,7 +379,7 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
             if (auto opt_val = dict.try_get(m_key)) {
                 val = *opt_val;
                 if (m_prop_list.size()) {
-                    if (val.get_type() == type_TypedLink) {
+                    if (val.is_type(type_TypedLink)) {
                         auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
                         val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
                     }
@@ -408,7 +408,7 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
                 values.init_from_ref(ref);
                 val = values.get(state.index);
                 if (m_prop_list.size()) {
-                    if (val.get_type() == type_TypedLink) {
+                    if (val.is_type(type_TypedLink)) {
                         auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
                         val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
                     }

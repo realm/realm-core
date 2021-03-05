@@ -19,9 +19,10 @@
 #ifndef REALM_QUERY_CONDITIONS_TPL_HPP
 #define REALM_QUERY_CONDITIONS_TPL_HPP
 
-
+#include <realm/aggregate_ops.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_type_traits.hpp>
+
 #include <cmath>
 
 namespace realm {
@@ -29,24 +30,32 @@ namespace realm {
 template <class T>
 class QueryStateSum : public QueryStateBase {
 public:
-    using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
-    ResultType m_state;
+    using ResultType = typename aggregate_operations::Sum<T>::ResultType;
     explicit QueryStateSum(size_t limit = -1)
         : QueryStateBase(limit)
     {
-        m_state = ResultType{};
     }
     bool match(size_t, Mixed value) noexcept final
     {
         if (!value.is_null()) {
             auto v = value.get<T>();
-            if (aggregate_operations::is_nan(v))
-                return true;
+            if (!m_state.accumulate(v))
+                return true; // no match, continue searching
             ++m_match_count;
-            m_state += v;
         }
         return (m_limit > m_match_count);
     }
+    ResultType result_sum() const
+    {
+        return m_state.result();
+    }
+    size_t result_count() const
+    {
+        return m_state.items_counted();
+    }
+
+private:
+    aggregate_operations::Sum<typename util::RemoveOptional<T>::type> m_state;
 };
 
 template <class R>
@@ -62,7 +71,7 @@ public:
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (aggregate_operations::is_nan(v))
+            if (!aggregate_operations::valid_for_agg(v))
                 return true;
             ++m_match_count;
             if (v < m_state) {
@@ -77,7 +86,6 @@ public:
         return m_match_count ? m_state : R{};
     }
 };
-
 template <class R>
 class QueryStateMax : public QueryStateBase {
 public:
@@ -91,7 +99,7 @@ public:
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (aggregate_operations::is_nan(v))
+            if (!aggregate_operations::valid_for_agg(v))
                 return true;
             ++m_match_count;
             if (v > m_state) {
