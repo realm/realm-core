@@ -274,6 +274,20 @@ TEST_CASE("thread safe reference") {
     }
 
     SECTION("passing over") {
+
+        SECTION("read only") {
+            TestFile configuration;
+            SharedRealm realm = Realm::get_shared_realm(configuration);
+            realm->update_schema(schema);
+            realm->close();
+
+            configuration.schema_mode = SchemaMode::Immutable;
+            SharedRealm readOnlyRealm = Realm::get_shared_realm(configuration);
+            auto table = readOnlyRealm->read_group().get_table("class_int object");
+            Results results(readOnlyRealm, table);
+            auto threadSafeReference = ThreadSafeReference(results);
+        }
+
         SECTION("objects") {
             r->begin_transaction();
             auto str = create_object(r, "string object", {});
