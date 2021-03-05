@@ -162,6 +162,10 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         auto sz = columns.size();
         REALM_ASSERT_EX(!columns.empty(), i);
 
+        if (columns.empty() || columns.back().is_collection()) {
+            throw LogicError(LogicError::type_mismatch);
+        }
+
         if (sz == 1) { // no link chain
             m_columns.emplace_back(&root_table, columns[0], ascending[i]);
             continue;
