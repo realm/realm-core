@@ -21,8 +21,9 @@
 #include <realm/array_mixed.hpp>
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
-#include <algorithm>
 
+#include <algorithm>
+#include <unordered_set>
 
 namespace realm {
 
@@ -366,11 +367,10 @@ util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
     return {};
 }
 
-void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
+void Dictionary::align_indices(std::vector<size_t>& indices) const
 {
     auto sz = size();
     auto sz2 = indices.size();
-
     indices.reserve(sz);
     if (sz < sz2) {
         // If list size has decreased, we have to start all over
@@ -381,6 +381,11 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
         // If list size has increased, just add the missing indices
         indices.push_back(i);
     }
+}
+
+void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
     if (ascending) {
@@ -394,7 +399,53 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
         });
     }
 }
-void Dictionary::distinct(std::vector<size_t>&, util::Optional<bool>) const {}
+
+void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
+{
+    align_indices(indices);
+    if (ascending) {
+        sort(indices, *ascending);
+        std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
+            return get_any(i1) == get_any(i2);
+        });
+    }
+    else {
+        // need to return indices in original ordering
+        std::unordered_set<Mixed> set;
+        for (auto it = indices.begin(); it != indices.end();) {
+            if (set.insert(get_any(*it)).second) {
+                ++it;
+            }
+            else {
+                it = indices.erase(it);
+            }
+        }
+    }
+}
+
+void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
+{
+    align_indices(indices);
+    auto b = indices.begin();
+    auto e = indices.end();
+    if (ascending) {
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return get_key(i1) < get_key(i2);
+        });
+    }
+    else {
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return get_key(i1) > get_key(i2);
+        });
+    }
+}
+
+void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
+{
+    // we rely on the design of dictionary to assume that the keys are unique
+    align_indices(indices);
+}
+
 
 Obj Dictionary::create_and_insert_linked_object(Mixed key)
 {

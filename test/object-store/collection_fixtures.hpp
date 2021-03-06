@@ -32,6 +32,21 @@
 
 namespace realm::collection_fixtures {
 
+struct less {
+    template <class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept
+    {
+        return Mixed(a).compare(Mixed(b)) < 0;
+    }
+};
+struct greater {
+    template <class T, class U>
+    auto operator()(T&& a, U&& b) const noexcept
+    {
+        return Mixed(a).compare(Mixed(b)) > 0;
+    }
+};
+
 template <PropertyType prop_type, typename T>
 struct Base {
     using Type = T;

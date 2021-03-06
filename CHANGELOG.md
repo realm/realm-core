@@ -6,6 +6,8 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed queries of min/max/sum/avg on list of primitive mixed. ([#4472](https://github.com/realm/realm-core/pull/4472), never before working)
+* Fixed sort and distinct on dictionary keys, and distinct on dictionary values.
+* Fixed getting a dictionary value which is null.
 
 ### Breaking changes
 * None.

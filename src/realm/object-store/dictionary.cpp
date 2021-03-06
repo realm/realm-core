@@ -71,11 +71,11 @@ public:
     }
     void sort(std::vector<size_t>& indices, bool ascending = true) const override
     {
-        m_dictionary->sort(indices, ascending);
+        m_dictionary->sort_keys(indices, ascending);
     }
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const override
     {
-        m_dictionary->distinct(indices, sort_order);
+        m_dictionary->distinct_keys(indices, sort_order);
     }
     const Obj& get_obj() const noexcept override
     {

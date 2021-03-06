@@ -111,7 +111,16 @@ void Dictionary::insert(StringData key, T value)
 template <typename T>
 T Dictionary::get(StringData key) const
 {
-    return dict().get(key).get<T>();
+    auto res = dict().get(key);
+    if (res.is_null()) {
+        if constexpr (std::is_same_v<T, Decimal128>) {
+            return Decimal128{realm::null()};
+        }
+        else {
+            return T{};
+        }
+    }
+    return res.get<T>();
 }
 
 template <>

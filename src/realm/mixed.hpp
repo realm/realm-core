@@ -638,4 +638,15 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
 } // namespace realm
 
+namespace std {
+template <>
+struct hash<::realm::Mixed> {
+    inline size_t operator()(const ::realm::Mixed& m) const noexcept
+    {
+        return m.hash();
+    }
+};
+} // namespace std
+
+
 #endif // REALM_MIXED_HPP

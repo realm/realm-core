@@ -60,41 +60,6 @@ struct StringifyingContext {
     }
 };
 
-struct less {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a < b;
-    }
-};
-struct greater {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a > b;
-    }
-};
-
-template <>
-auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (b.is_null())
-        return false;
-    if (a.is_null())
-        return true;
-    return a < b;
-}
-
-template <>
-auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (a.is_null())
-        return false;
-    if (b.is_null())
-        return true;
-    return a > b;
-}
-
 namespace Catch {
 template <>
 struct StringMaker<List> {
@@ -476,14 +441,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
     }
     SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
@@ -507,13 +472,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
         auto sorted = list.sort(SortDescriptor({{col}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         sorted = list.sort(SortDescriptor({{col}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
