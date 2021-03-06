@@ -1135,8 +1135,9 @@ Results Results::snapshot() &&
         case Mode::Table:
         case Mode::Collection:
             m_query = do_get_query();
-            m_mode = Mode::Query;
-
+            if (m_query.get_table()) {
+                m_mode = Mode::Query;
+            }
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
