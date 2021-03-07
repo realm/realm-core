@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* During integration of a large amount of data from the server, you may get "Assertion failed: !fields.has_missing_parent_update()" ([#4497](https://github.com/realm/realm-core/issues/4497), since v6.0.0)
  
 ### Breaking changes
 * None.

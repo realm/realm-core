@@ -53,6 +53,7 @@ public:
     void init(MemRef mem) override;
     void update_from_parent() noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
+    void update_ref_in_parent(ObjKey, ref_type) override;
 
     bool is_leaf() const override
     {
@@ -260,6 +261,13 @@ MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
 {
     return recurse<MemRef>(key, [](ClusterNode* node, ChildInfo& child_info) {
         return node->ensure_writeable(child_info.key);
+    });
+}
+
+void ClusterNodeInner::update_ref_in_parent(ObjKey key, ref_type ref)
+{
+    recurse<void>(key, [ref](ClusterNode* node, ChildInfo& child_info) {
+        node->update_ref_in_parent(child_info.key, ref);
     });
 }
 
