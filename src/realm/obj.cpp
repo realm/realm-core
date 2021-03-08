@@ -1204,6 +1204,18 @@ bool Obj::ensure_writeable()
     return false;
 }
 
+REALM_FORCEINLINE void Obj::sync(Array& arr)
+{
+    auto ref = arr.get_ref();
+    if (arr.has_missing_parent_update()) {
+        const_cast<TableClusterTree*>(get_tree_top())->update_ref_in_parent(m_key, ref);
+    }
+    if (m_mem.get_ref() != ref) {
+        m_mem = arr.get_mem();
+        m_storage_version = arr.get_alloc().get_storage_version();
+    }
+}
+
 template <>
 Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 {
@@ -1242,8 +1254,6 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         index->set<Mixed>(m_key, value);
     }
 
-    ensure_writeable();
-
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
     Array fallback(alloc);
@@ -1253,6 +1263,8 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     values.set_parent(&fields, col_ndx.val + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
+
+    sync(fields);
 
     if (Replication* repl = get_replication())
         repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
@@ -1335,8 +1347,6 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
         throw LogicError(LogicError::illegal_type);
 
-    ensure_writeable();
-
     if (StringIndex* index = m_table->get_search_index(col_key)) {
         index->set<int64_t>(m_key, value);
     }
@@ -1360,7 +1370,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
         values.set(m_row_ndx, value);
     }
 
-    REALM_ASSERT(!fields.has_missing_parent_update());
+    sync(fields);
 
     if (Replication* repl = get_replication()) {
         repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
@@ -1375,8 +1385,6 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
     update_if_needed();
     get_table()->report_invalid_key(col_key);
     auto col_ndx = col_key.get_index();
-
-    ensure_writeable();
 
     auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
         uint64_t ua = uint64_t(a);
@@ -1418,7 +1426,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         values.set(m_row_ndx, new_val);
     }
 
-    REALM_ASSERT(!fields.has_missing_parent_update());
+    sync(fields);
 
     if (Replication* repl = get_replication()) {
         repl->add_int(m_table.unchecked_ptr(), col_key, m_key, value); // Throws
@@ -1452,8 +1460,8 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (target_key != old_key) {
         CascadeState state(CascadeState::Mode::Strong);
 
-        ensure_writeable();
         bool recurse = replace_backlink(col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
+        _update_if_needed();
 
         Allocator& alloc = get_alloc();
         alloc.bump_content_version();
@@ -1465,6 +1473,8 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
         values.init_from_parent();
 
         values.set(m_row_ndx, target_key);
+
+        sync(fields);
 
         if (Replication* repl = get_replication()) {
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
@@ -1495,8 +1505,8 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
                                                                   : CascadeState::Mode::Strong);
 
-        ensure_writeable();
         bool recurse = replace_backlink(col_key, old_link, target_link, state);
+        _update_if_needed();
 
         Allocator& alloc = get_alloc();
         alloc.bump_content_version();
@@ -1508,6 +1518,8 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
         values.init_from_parent();
 
         values.set(m_row_ndx, target_link);
+
+        sync(fields);
 
         if (Replication* repl = get_replication()) {
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_link,
@@ -1541,8 +1553,8 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     if (target_key != old_key) {
         CascadeState state;
 
-        ensure_writeable();
         bool recurse = replace_backlink(col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
+        _update_if_needed();
 
         Allocator& alloc = get_alloc();
         alloc.bump_content_version();
@@ -1555,7 +1567,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 
         values.set(m_row_ndx, target_key);
 
-        REALM_ASSERT(!fields.has_missing_parent_update());
+        sync(fields);
 
         if (Replication* repl = get_replication()) {
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
@@ -1617,8 +1629,6 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     check_range(value);
 
-    ensure_writeable();
-
     if (StringIndex* index = m_table->get_search_index(col_key)) {
         index->set<T>(m_key, value);
     }
@@ -1635,7 +1645,7 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
-    REALM_ASSERT(!fields.has_missing_parent_update());
+    sync(fields);
 
     if (Replication* repl = get_replication())
         repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
@@ -1647,7 +1657,6 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 void Obj::set_int(ColKey col_key, int64_t value)
 {
     update_if_needed();
-    ensure_writeable();
 
     ColKey::Idx col_ndx = col_key.get_index();
     Allocator& alloc = get_alloc();
@@ -1660,13 +1669,11 @@ void Obj::set_int(ColKey col_key, int64_t value)
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
-    REALM_ASSERT(!fields.has_missing_parent_update());
+    sync(fields);
 }
 
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
-    ensure_writeable();
-
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1679,13 +1686,11 @@ void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 
     backlinks.add(m_row_ndx, origin_key);
 
-    REALM_ASSERT(!fields.has_missing_parent_update());
+    sync(fields);
 }
 
 bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
-    ensure_writeable();
-
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1696,7 +1701,11 @@ bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
     backlinks.set_parent(&fields, backlink_col_ndx.val + 1);
     backlinks.init_from_parent();
 
-    return backlinks.remove(m_row_ndx, origin_key);
+    bool ret = backlinks.remove(m_row_ndx, origin_key);
+
+    sync(fields);
+
+    return ret;
 }
 
 namespace {
@@ -1748,10 +1757,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
     ensure_writeable();
 
     ColKey::Idx origin_col_ndx = origin_col_key.get_index();
-
     Allocator& alloc = get_alloc();
-    Array fallback(alloc);
-    Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
 
     ColumnAttrMask attr = origin_col_key.get_attrs();
     if (attr.test(col_attr_List)) {
@@ -1792,6 +1798,9 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
         }
     }
     else {
+        Array fallback(alloc);
+        Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
+
         if (origin_col_key.get_type() == col_type_Link) {
             ArrayKey links(alloc);
             links.set_parent(&fields, origin_col_ndx.val + 1);
@@ -1822,6 +1831,8 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 
             mixed.set(m_row_ndx, Mixed{});
         }
+
+        sync(fields);
 
         if (Replication* repl = get_replication())
             repl->nullify_link(m_table.unchecked_ptr(), origin_col_key, m_key); // Throws
