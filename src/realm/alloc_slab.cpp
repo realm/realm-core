@@ -490,8 +490,21 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
 
 void SlabAlloc::do_free(ref_type ref, char* addr)
 {
+    if (ref == 2100149248) {
+        auto x = 123;
+    }
+
     REALM_ASSERT_EX(translate(ref) == addr, translate(ref), addr, get_file_path_for_assertions());
+
+    if (ref == 2100149248) {
+        auto x = 123;
+    }
+
     CriticalSection cs(changes);
+
+    if (ref == 2100149248) {
+        auto x = 123;
+    }
 
     bool read_only = is_read_only(ref);
 #ifdef REALM_SLAB_ALLOC_DEBUG
