@@ -202,9 +202,9 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
-void Cluster::update_ref_in_parent(ObjKey, ref_type ref)
+void Cluster::update_ref_in_parent(ObjKey, ref_type)
 {
-    get_parent()->update_child_ref(get_ndx_in_parent(), ref);
+    REALM_UNREACHABLE();
 }
 
 size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
