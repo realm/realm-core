@@ -232,6 +232,7 @@ bool Spec::convert_column_attributes()
                 size_t subspec_ndx = get_subspec_ndx(column_ndx);
                 ref_type ref = to_ref(m_oldsubspecs.get(subspec_ndx)); // Throws
                 sub_spec.init(ref);
+                REALM_ASSERT(sub_spec.get_column_count() == 1);
                 m_types.set(column_ndx, sub_spec.get_column_type(0));
                 m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
                 sub_spec.destroy();

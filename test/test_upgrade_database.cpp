@@ -914,11 +914,11 @@ TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
+#endif
 
 // Open an existing database-file-format-version 5 file and
 // check that it automatically upgrades to version 6.
-TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";
@@ -947,21 +947,21 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 
         // Constructing this SharedGroup will trigger an upgrade
         // for all tables because the file is in version 4
-        DB sg(temp_copy);
+        auto sg = DB::create(temp_copy);
 
         WriteTransaction wt(sg);
         TableRef t = wt.get_table("t1");
         TableRef t2 = wt.get_table("t2");
 
-        size_t int_ndx = 0;
-        size_t bool_ndx = 1;
-        size_t str_ndx = 4;
-        size_t ts_ndx = 6;
+        auto int_ndx = t->get_column_key("int");
+        auto bool_ndx = t->get_column_key("bool");
+        auto str_ndx = t->get_column_key("string");
+        auto ts_ndx = t->get_column_key("timestamp");
 
-        size_t null_int_ndx = 0;
-        size_t null_bool_ndx = 1;
-        size_t null_str_ndx = 4;
-        size_t null_ts_ndx = 6;
+        auto null_int_ndx = t->get_column_key("nullable int");
+        auto null_bool_ndx = t->get_column_key("nullable bool");
+        auto null_str_ndx = t->get_column_key("nullable string");
+        auto null_ts_ndx = t->get_column_key("nullable timestamp");
 
         size_t num_rows = 6;
 
@@ -976,26 +976,25 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
         CHECK(t->has_search_index(null_str_ndx));
         CHECK(t->has_search_index(null_ts_ndx));
 
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), 0);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), 1);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2), 4);
-        CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), ObjKey(0));
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), ObjKey(1));
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2), ObjKey(4));
+        // CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
         CHECK_EQUAL(t->size(), 6);
 
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_b), 0);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_c), 1);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2), 4);
-        CHECK_EQUAL(t->get_distinct_view(null_str_ndx).size(), 4);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_b), ObjKey(0));
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_c), ObjKey(1));
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2), ObjKey(4));
+        // CHECK_EQUAL(t->get_distinct_view(null_str_ndx).size(), 4);
 
         // If the StringIndexes were not updated we couldn't do this
         // on a format 5 file and find it again.
         std::string std_base2_d = std_base2 + "d";
         StringData base2_d(std_base2_d);
-        t->add_empty_row();
-        t->set_string(str_ndx, 6, base2_d);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), 6);
-        t->set_string(null_str_ndx, 6, base2_d);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_d), 6);
+        auto obj = t->create_object().set(str_ndx, base2_d);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), ObjKey(6));
+        obj.set(null_str_ndx, base2_d);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_d), ObjKey(6));
 
         // And if the indexes were using the old format, adding a long
         // prefix string would cause a stack overflow.
@@ -1004,11 +1003,8 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
         std::string big_base_c = big_base + "c";
         StringData b(big_base_b);
         StringData c(big_base_c);
-        t->add_empty_row(2);
-        t->set_string(str_ndx, 7, b);
-        t->set_string(str_ndx, 8, c);
-        t->set_string(null_str_ndx, 7, b);
-        t->set_string(null_str_ndx, 8, c);
+        t->create_object().set(str_ndx, b).set(null_str_ndx, b);
+        t->create_object().set(str_ndx, c).set(null_str_ndx, c);
 
         t->verify();
         t2->verify();
@@ -1069,7 +1065,6 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif
 
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
