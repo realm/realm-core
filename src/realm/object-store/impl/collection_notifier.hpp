@@ -63,19 +63,15 @@ struct TransactionChangeInfo {
 
 class DeepChangeChecker {
 public:
-    struct OutgoingLink {
-        int64_t col_key;
-        bool is_list;
-    };
     struct RelatedTable {
         TableKey table_key;
-        std::vector<OutgoingLink> links;
+        std::vector<ColKey> outgoing_links;
     };
 
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                       std::vector<RelatedTable> const& related_tables);
 
-    bool operator()(int64_t obj_key);
+    bool operator()(ObjKeyType obj_key);
 
     // Recursively add `table` and all tables it links to to `out`, along with
     // information about the links from them
@@ -90,14 +86,14 @@ private:
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {
-        int64_t obj_key;
-        int64_t col_key;
+        ObjKey obj_key;
+        ColKey col_key;
         bool depth_exceeded;
     };
     std::array<Path, 4> m_current_path;
 
     bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
-    bool check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth = 0);
+    bool check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth = 0);
 };
 
 // A base class for a notifier that keeps a collection up to date and/or

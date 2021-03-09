@@ -79,7 +79,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     for (auto col_key : table.get_column_keys()) {
         auto type = table.get_column_type(col_key);
         if (type == type_Link || type == type_LinkList) {
-            out[out_index].links.push_back({col_key.value, type == type_LinkList});
+            out[out_index].outgoing_links.push_back(col_key);
             find_related_tables(out, *table.get_link_target(col_key));
         }
     }
@@ -98,19 +98,19 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 {
 }
 
-bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth)
+bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth)
 {
     auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
         return tbl.table_key == table_key;
     });
     if (it == m_related_tables.end())
         return false;
-    if (it->links.empty())
+    if (it->outgoing_links.empty())
         return false;
 
     // Check if we're already checking if the destination of the link is
     // modified, and if not add it to the stack
-    auto already_checking = [&](int64_t col) {
+    auto already_checking = [&](ColKey col) {
         auto end = m_current_path.begin() + depth;
         auto match = std::find_if(m_current_path.begin(), end, [&](auto& p) {
             return p.obj_key == obj_key && p.col_key == col;
@@ -125,24 +125,66 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     };
 
     const Obj obj = table.get_object(ObjKey(obj_key));
-    auto linked_object_changed = [&](OutgoingLink const& link) {
-        if (already_checking(link.col_key))
+    auto linked_object_changed = [&](ColKey const& outgoing_link_column) {
+        if (already_checking(outgoing_link_column))
             return false;
-        if (!link.is_list) {
-            if (obj.is_null(ColKey(link.col_key)))
+        if (!outgoing_link_column.is_collection()) {
+            if (obj.is_null(outgoing_link_column))
                 return false;
-            auto dst = obj.get<ObjKey>(ColKey(link.col_key)).value;
-            return check_row(*table.get_link_target(ColKey(link.col_key)), dst, depth + 1);
+            ObjKey dst = obj.get<ObjKey>(outgoing_link_column);
+            REALM_ASSERT(dst);
+            return check_row(*table.get_link_target(outgoing_link_column), dst.value, depth + 1);
         }
 
-        auto& target = *table.get_link_target(ColKey(link.col_key));
-        auto lvr = obj.get_linklist(ColKey(link.col_key));
-        return std::any_of(lvr.begin(), lvr.end(), [&, this](auto key) {
-            return this->check_row(target, key.value, depth + 1);
-        });
+        if (outgoing_link_column.is_list()) {
+            auto& target = *table.get_link_target(outgoing_link_column);
+            auto lvr = obj.get_linklist(outgoing_link_column);
+            return std::any_of(lvr.begin(), lvr.end(), [&, this](auto key) {
+                return this->check_row(target, key.value, depth + 1);
+            });
+        }
+        REALM_ASSERT_EX(outgoing_link_column.is_dictionary() || outgoing_link_column.is_set(),
+                        outgoing_link_column.get_type());
+
+        auto collection_ptr = obj.get_collection_ptr(outgoing_link_column);
+        REALM_ASSERT(collection_ptr);
+        const size_t coll_size = collection_ptr->size();
+        if (outgoing_link_column.get_type() == col_type_Link) {
+            TableRef linked_table = collection_ptr->get_target_table();
+            REALM_ASSERT(linked_table);
+            for (size_t i = 0; i < coll_size; ++i) {
+                auto val = collection_ptr->get_any(i);
+                if (val.is_type(type_Link)) {
+                    auto obj_link = val.get<ObjKey>();
+                    REALM_ASSERT(obj_link);
+                    if (this->check_row(*linked_table, obj_link.value, depth + 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        else if (outgoing_link_column.get_type() == col_type_Mixed) {
+            TableRef cached_linked_table;
+            for (size_t i = 0; i < coll_size; ++i) {
+                auto val = collection_ptr->get_any(i);
+                if (val.is_type(type_TypedLink)) {
+                    auto obj_link = val.get_link();
+                    if (!obj_link)
+                        continue;
+                    if (!cached_linked_table || cached_linked_table->get_key() != obj_link.get_table_key()) {
+                        cached_linked_table = table.get_parent_group()->get_table(obj_link.get_table_key());
+                        REALM_ASSERT_EX(cached_linked_table, obj_link.get_table_key().value);
+                    }
+                    if (this->check_row(*cached_linked_table, obj_link.get_obj_key().value, depth + 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     };
 
-    return std::any_of(begin(it->links), end(it->links), linked_object_changed);
+    return std::any_of(begin(it->outgoing_links), end(it->outgoing_links), linked_object_changed);
 }
 
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, size_t depth)
@@ -167,7 +209,7 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, size_t dep
     if (it != not_modified.end())
         return false;
 
-    bool ret = check_outgoing_links(table_key, table, key, depth);
+    bool ret = check_outgoing_links(table_key, table, ObjKey(key), depth);
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
         not_modified.insert(key);
     return ret;
