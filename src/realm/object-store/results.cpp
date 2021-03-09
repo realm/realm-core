@@ -121,7 +121,7 @@ Results::Mode Results::get_mode() const noexcept
 bool Results::is_valid() const
 {
     if (m_realm) {
-        m_realm->verify_thread();
+        m_realm->verify_is_on_thread();
     }
 
     // Here we cannot just use if (m_table) as it combines a check if the
@@ -146,7 +146,7 @@ void Results::validate_read() const
 void Results::validate_write() const
 {
     validate_read();
-    if (!m_realm || !m_realm->is_in_transaction())
+    if (!m_realm || !m_realm->is_in_write_transaction())
         throw InvalidTransactionException("Must be in a write transaction");
 }
 
@@ -214,7 +214,7 @@ void Results::evaluate_sort_and_distinct_on_collection()
 
     // We can't use the sorted list from the notifier if we're in a write
     // transaction as we only check the transaction version to see if the data matches
-    if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
+    if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_write_transaction())
         return;
 
     bool needs_update = m_collection->has_changed();
@@ -474,7 +474,7 @@ void Results::do_evaluate_query_if_needed(bool wants_notifications)
             if (m_update_policy == UpdatePolicy::Auto)
                 m_table_view.sync_if_needed();
             if (auto audit = m_realm->audit_context())
-                audit->record_query(m_realm->read_transaction_version(), m_table_view);
+                audit->record_query(m_realm->get_version_of_current_transaction(), m_table_view);
             break;
     }
 }

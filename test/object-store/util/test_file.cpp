@@ -91,13 +91,13 @@ TestFile::~TestFile()
 DBOptions TestFile::options() const
 {
     DBOptions options;
-    options.durability = in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
+    options.durability = is_in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
     return options;
 }
 
 InMemoryTestFile::InMemoryTestFile()
 {
-    in_memory = true;
+    is_in_memory = true;
 }
 
 #if REALM_ENABLE_SYNC

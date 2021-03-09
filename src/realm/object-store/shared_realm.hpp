@@ -179,7 +179,7 @@ public:
         // In order to work around this, a separate path can be specified for these files.
         std::string fifo_files_fallback_path;
 
-        bool in_memory = false;
+        bool is_in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
 
         // Optional schema for the file.
@@ -204,12 +204,12 @@ public:
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
         // WARNING: The original read_only() has been renamed to immutable().
-        bool immutable() const
+        bool is_immutable() const
         {
             return schema_mode == SchemaMode::Immutable;
         }
         // FIXME: Rename this to read_only().
-        bool read_only_alternative() const
+        bool is_read_only_alternative() const
         {
             return schema_mode == SchemaMode::ReadOnlyAlternative;
         }
@@ -298,10 +298,10 @@ public:
         return m_schema_version;
     }
 
-    void begin_transaction();
+    void begin_write_transaction();
     void commit_transaction();
     void cancel_transaction();
-    bool is_in_transaction() const noexcept;
+    bool is_in_write_transaction() const noexcept;
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -322,8 +322,8 @@ public:
     // Returns the number of versions in the Realm file.
     uint_fast64_t get_number_of_versions() const;
 
-    VersionID read_transaction_version() const;
-    Group& read_group();
+    VersionID get_version_of_current_transaction() const;
+    Group& get_group();
     // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
@@ -331,12 +331,12 @@ public:
     TransactionRef duplicate() const;
 
     void enable_wait_for_change();
-    bool wait_for_change();
+    bool should_wait_for_change();
     void wait_for_change_release();
 
     bool is_in_migration() const noexcept
     {
-        return m_in_migration;
+        return m_is_in_migration;
     }
 
     bool refresh();
@@ -355,9 +355,9 @@ public:
     void write_copy(StringData path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
-    void verify_thread() const;
-    void verify_in_write() const;
-    void verify_open() const;
+    void verify_is_on_thread() const;
+    void verify_is_in_write_transaction() const;
+    void verify_is_open() const;
     bool verify_notifications_available(bool throw_on_error = true) const;
 
     bool can_deliver_notifications() const noexcept;
@@ -387,7 +387,7 @@ public:
     template <typename... Args>
     auto import_copy_of(Args&&... args)
     {
-        return transaction().import_copy_of(std::forward<Args>(args)...);
+        return get_transaction().import_copy_of(std::forward<Args>(args)...);
     }
 
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,
@@ -407,7 +407,7 @@ public:
 
         static Transaction& get_transaction(Realm& realm)
         {
-            return realm.transaction();
+            return realm.get_transaction();
         }
         static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm)
         {
@@ -446,7 +446,7 @@ private:
 
     // FIXME: this should be a Dynamic schema mode instead, but only once
     // that's actually fully working
-    bool m_dynamic_schema = true;
+    bool m_has_dynamic_schema = true;
 
     // True while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
@@ -455,7 +455,7 @@ private:
     // True while we're performing a schema migration via this Realm instance
     // to allow for different behavior (such as allowing modifications to
     // primary key values)
-    bool m_in_migration = false;
+    bool m_is_in_migration = false;
 
     void begin_read(VersionID);
     bool do_refresh();
@@ -474,8 +474,8 @@ private:
     void translate_schema_error();
     void notify_schema_changed();
 
-    Transaction& transaction();
-    Transaction& transaction() const;
+    Transaction& get_transaction();
+    Transaction& get_transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
 
 public:

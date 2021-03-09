@@ -54,16 +54,16 @@ TEST_CASE("list") {
 
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    auto origin = r->read_group().get_table("class_origin");
-    auto target = r->read_group().get_table("class_target");
-    auto other_origin = r->read_group().get_table("class_other_origin");
-    auto other_target = r->read_group().get_table("class_other_target");
+    auto origin = r->get_group().get_table("class_origin");
+    auto target = r->get_group().get_table("class_target");
+    auto other_origin = r->get_group().get_table("class_other_origin");
+    auto other_target = r->get_group().get_table("class_other_target");
     ColKey col_link = origin->get_column_key("array");
     ColKey col_value = target->get_column_key("value");
     ColKey other_col_link = other_origin->get_column_key("array");
     ColKey other_col_value = other_target->get_column_key("value");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
 
     std::vector<ObjKey> target_keys;
     target->create_objects(10, target_keys);
@@ -91,14 +91,14 @@ TEST_CASE("list") {
     r->commit_transaction();
 
     auto r2 = coordinator.get_realm();
-    auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
+    auto r2_lv = r2->get_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -237,7 +237,7 @@ TEST_CASE("list") {
         }
 
         SECTION("modifying a row which appears multiple times in a list marks them all as modified") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             lst.add(target_keys[5]);
             r->commit_transaction();
 
@@ -249,7 +249,7 @@ TEST_CASE("list") {
         }
 
         SECTION("deleting a row which appears multiple times in a list marks them all as modified") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             lst.add(target_keys[5]);
             r->commit_transaction();
 
@@ -270,7 +270,7 @@ TEST_CASE("list") {
 
         SECTION("moving a target row does not send a change notification") {
             // Remove a row from the LV so that we have one to delete that's not in the list
-            r->begin_transaction();
+            r->begin_write_transaction();
             if (lv->size() > 2)
                 lv->remove(2);
             r->commit_transaction();
@@ -282,7 +282,7 @@ TEST_CASE("list") {
         }
 
         SECTION("multiple LinkViews for the same LinkList can get notifications") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             target->clear();
             std::vector<ObjKey> keys;
             target->create_objects(5, keys);
@@ -290,11 +290,11 @@ TEST_CASE("list") {
 
             auto get_list = [&] {
                 auto r = Realm::get_shared_realm(config);
-                auto obj = r->read_group().get_table("class_origin")->get_object(0);
+                auto obj = r->get_group().get_table("class_origin")->get_object(0);
                 return List(r, obj, col_link);
             };
             auto change_list = [&] {
-                r->begin_transaction();
+                r->begin_write_transaction();
                 if (lv->size()) {
                     target->get_object(lv->size() - 1).set(col_value, int64_t(lv->size()));
                 }
@@ -345,7 +345,7 @@ TEST_CASE("list") {
             auto token = require_no_change();
             auto token2 = require_change();
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             lv->add(target_keys[0]);
             token.suppress_next();
             r->commit_transaction();
@@ -363,7 +363,7 @@ TEST_CASE("list") {
             });
             advance_and_notify(*r);
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             lv->add(target_keys[0]);
             token.suppress_next();
             r->commit_transaction();
@@ -376,14 +376,14 @@ TEST_CASE("list") {
             auto token = require_change();
 
             // would not produce a notification even if it wasn't skipped because no changes were made
-            r->begin_transaction();
+            r->begin_write_transaction();
             token.suppress_next();
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE(change.empty());
 
             // should now produce a notification
-            r->begin_transaction();
+            r->begin_write_transaction();
             lv->add(target_keys[0]);
             r->commit_transaction();
             advance_and_notify(*r);
@@ -442,23 +442,23 @@ TEST_CASE("list") {
                 changes1 = std::move(c);
             });
 
-            r2->begin_transaction();
-            r2->read_group().get_table("class_target")->get_object(target_keys[0]).set(col_value, 10);
-            r2->read_group()
+            r2->begin_write_transaction();
+            r2->get_group().get_table("class_target")->get_object(target_keys[0]).set(col_value, 10);
+            r2->get_group()
                 .get_table("class_other_target")
                 ->get_object(other_target_keys[1])
                 .set(other_col_value, 10);
             r2->commit_transaction();
 
-            List list2(r2, r2->read_group().get_table("class_other_origin")->get_object(0), other_col_link);
+            List list2(r2, r2->get_group().get_table("class_other_origin")->get_object(0), other_col_link);
             auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes2 = std::move(c);
             });
 
             auto r3 = coordinator.get_realm();
-            r3->begin_transaction();
-            r3->read_group().get_table("class_target")->get_object(target_keys[2]).set(col_value, 10);
-            r3->read_group()
+            r3->begin_write_transaction();
+            r3->get_group().get_table("class_target")->get_object(target_keys[2]).set(col_value, 10);
+            r3->get_group()
                 .get_table("class_other_target")
                 ->get_object(other_target_keys[3])
                 .set(other_col_value, 10);
@@ -474,7 +474,7 @@ TEST_CASE("list") {
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_lv->get_object(5).set(col_value, 10);
             r2_lv->get_object(1).set(col_value, 10);
             r2_lv->move(5, 8);
@@ -483,7 +483,7 @@ TEST_CASE("list") {
 
             coordinator.on_change();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             if (r2_lv->size() > 8)
                 r2_lv->move(8, 5);
             r2->commit_transaction();
@@ -499,7 +499,7 @@ TEST_CASE("list") {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
             });
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_lv->remove(5);
             r2->commit_transaction();
             advance_and_notify(*r);
@@ -513,7 +513,7 @@ TEST_CASE("list") {
             token = {};
 
             auto write = [&] {
-                r2->begin_transaction();
+                r2->begin_write_transaction();
                 r2_lv->remove(5);
                 r2->commit_transaction();
             };
@@ -569,7 +569,7 @@ TEST_CASE("list") {
         advance_and_notify(*r);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -624,7 +624,7 @@ TEST_CASE("list") {
         advance_and_notify(*r);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -725,7 +725,7 @@ TEST_CASE("list") {
         REQUIRE(snapshot.get_mode() == Results::Mode::TableView);
         REQUIRE(snapshot.size() == 10);
 
-        r->begin_transaction();
+        r->begin_write_transaction();
         for (size_t i = 0; i < 5; ++i) {
             list.remove(0);
         }
@@ -753,7 +753,7 @@ TEST_CASE("list") {
         auto snapshot = list.snapshot();
 
         for (size_t i = 0; i < snapshot.size(); ++i) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             Obj obj = snapshot.get<Obj>(i);
             obj.remove();
             r->commit_transaction();
@@ -772,7 +772,7 @@ TEST_CASE("list") {
 
     SECTION("delete_at()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         auto initial_view_size = lv->size();
         auto initial_target_size = target->size();
         list.delete_at(1);
@@ -783,7 +783,7 @@ TEST_CASE("list") {
 
     SECTION("delete_all()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         list.delete_all();
         REQUIRE(lv->size() == 0);
         REQUIRE(target->size() == 0);
@@ -792,7 +792,7 @@ TEST_CASE("list") {
 
     SECTION("as_results().clear()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         list.as_results().clear();
         REQUIRE(lv->size() == 0);
         REQUIRE(target->size() == 0);
@@ -801,7 +801,7 @@ TEST_CASE("list") {
 
     SECTION("snapshot().clear()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         auto snapshot = list.snapshot();
         snapshot.clear();
         REQUIRE(snapshot.size() == 10);
@@ -813,7 +813,7 @@ TEST_CASE("list") {
 
     SECTION("add(RowExpr)") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         SECTION("adds rows from the correct table") {
             list.add(target_keys[5]);
             REQUIRE(list.size() == 11);
@@ -828,7 +828,7 @@ TEST_CASE("list") {
 
     SECTION("insert(RowExpr)") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
 
         SECTION("insert rows from the correct table") {
             list.insert(0, target_keys[5]);
@@ -849,7 +849,7 @@ TEST_CASE("list") {
 
     SECTION("set(RowExpr)") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
 
         SECTION("assigns for rows from the correct table") {
             list.set(0, target_keys[5]);
@@ -877,7 +877,7 @@ TEST_CASE("list") {
         }
 
         SECTION("returns index in list and not index in table") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(obj5) == 4);
             REQUIRE(list.as_results().index_of(obj5) == 4);
@@ -885,7 +885,7 @@ TEST_CASE("list") {
         }
 
         SECTION("returns npos for values not in the list") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
             REQUIRE(list.as_results().index_of(obj1) == npos);
@@ -906,7 +906,7 @@ TEST_CASE("list") {
         }
 
         SECTION("returns index in list and not index in table") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
             r->cancel_transaction();
@@ -920,7 +920,7 @@ TEST_CASE("list") {
     SECTION("add(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
-        r->begin_transaction();
+        r->begin_write_transaction();
 
         SECTION("adds boxed RowExpr") {
             list.add(ctx, util::Any(target->get_object(target_keys[5])));
@@ -1000,14 +1000,14 @@ TEST_CASE("embedded List") {
 
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    auto origin = r->read_group().get_table("class_origin");
-    auto target = r->read_group().get_table("class_target");
-    auto other_origin = r->read_group().get_table("class_other_origin");
+    auto origin = r->get_group().get_table("class_origin");
+    auto target = r->get_group().get_table("class_target");
+    auto other_origin = r->get_group().get_table("class_other_origin");
     ColKey col_link = origin->get_column_key("array");
     ColKey col_value = target->get_column_key("value");
     ColKey other_col_link = other_origin->get_column_key("array");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
 
     Obj obj = origin->create_object_with_primary_key(0);
     auto lv = obj.get_linklist_ptr(col_link);
@@ -1029,14 +1029,14 @@ TEST_CASE("embedded List") {
     other_lv->size();
 
     auto r2 = coordinator.get_realm();
-    auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
+    auto r2_lv = r2->get_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -1155,7 +1155,7 @@ TEST_CASE("embedded List") {
         advance_and_notify(*r);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -1201,7 +1201,7 @@ TEST_CASE("embedded List") {
         advance_and_notify(*r);
 
         auto write = [&](auto&& f) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             f();
             r->commit_transaction();
 
@@ -1245,7 +1245,7 @@ TEST_CASE("embedded List") {
     auto initial_target_size = target->size();
     SECTION("delete_at()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         list.delete_at(1);
         REQUIRE(lv->size() == initial_view_size - 1);
         REQUIRE(target->size() == initial_target_size - 1);
@@ -1254,7 +1254,7 @@ TEST_CASE("embedded List") {
 
     SECTION("delete_all()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         list.delete_all();
         REQUIRE(lv->size() == 0);
         REQUIRE(target->size() == initial_target_size - 10);
@@ -1263,7 +1263,7 @@ TEST_CASE("embedded List") {
 
     SECTION("as_results().clear()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         list.as_results().clear();
         REQUIRE(lv->size() == 0);
         REQUIRE(target->size() == initial_target_size - 10);
@@ -1272,7 +1272,7 @@ TEST_CASE("embedded List") {
 
     SECTION("snapshot().clear()") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         auto snapshot = list.snapshot();
         snapshot.clear();
         REQUIRE(snapshot.size() == 10);
@@ -1284,7 +1284,7 @@ TEST_CASE("embedded List") {
 
     SECTION("add(), insert(), and set() to existing object is not allowed") {
         List list(r, *lv);
-        r->begin_transaction();
+        r->begin_write_transaction();
         REQUIRE_THROWS_AS(list.add(target->get_object(0)), List::InvalidEmbeddedOperationException);
         REQUIRE_THROWS_AS(list.insert(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
         REQUIRE_THROWS_AS(list.set(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
@@ -1301,7 +1301,7 @@ TEST_CASE("embedded List") {
         }
 
         SECTION("returns index in list and not index in table") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(obj5) == 4);
             REQUIRE(list.as_results().index_of(obj5) == 4);
@@ -1309,7 +1309,7 @@ TEST_CASE("embedded List") {
         }
 
         SECTION("returns npos for values not in the list") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
             REQUIRE_THROWS_AS(list.as_results().index_of(obj1), Results::DetatchedAccessorException);
@@ -1330,7 +1330,7 @@ TEST_CASE("embedded List") {
         }
 
         SECTION("returns index in list and not index in table") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             list.remove(1);
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
             r->cancel_transaction();
@@ -1344,7 +1344,7 @@ TEST_CASE("embedded List") {
     SECTION("add(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
-        r->begin_transaction();
+        r->begin_write_transaction();
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
@@ -1367,7 +1367,7 @@ TEST_CASE("embedded List") {
     SECTION("set(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
-        r->begin_transaction();
+        r->begin_write_transaction();
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
@@ -1453,11 +1453,11 @@ TEST_CASE("list of embedded objects") {
     config.schema_mode = SchemaMode::Automatic;
     config.schema = schema;
     auto realm = Realm::get_shared_realm(config);
-    auto parent_table = realm->read_group().get_table("class_parent");
+    auto parent_table = realm->get_group().get_table("class_parent");
     ColKey col_array = parent_table->get_column_key("array");
-    auto embedded_table = realm->read_group().get_table("class_embedded");
+    auto embedded_table = realm->get_group().get_table("class_embedded");
     ColKey col_value = embedded_table->get_column_key("value");
-    realm->begin_transaction();
+    realm->begin_write_transaction();
     auto parent = parent_table->create_object();
     realm->commit_transaction();
 
@@ -1486,7 +1486,7 @@ TEST_CASE("list of embedded objects") {
     };
 
     SECTION("add to list") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         add_two_elements();
         realm->commit_transaction();
 
@@ -1496,7 +1496,7 @@ TEST_CASE("list of embedded objects") {
     }
 
     SECTION("insert in list") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         add_two_elements();
         insert_three_elements();
         realm->commit_transaction();
@@ -1510,7 +1510,7 @@ TEST_CASE("list of embedded objects") {
     }
 
     SECTION("set in list") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
 
         add_two_elements();
         insert_three_elements();

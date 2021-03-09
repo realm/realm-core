@@ -39,10 +39,10 @@ TEST_CASE("set") {
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
     static_cast<void>(coordinator);
 
-    auto table = r->read_group().get_table("class_table");
-    auto table2 = r->read_group().get_table("class_table2");
-    auto other_table = r->read_group().get_table("class_table");
-    auto other_table2 = r->read_group().get_table("class_table2");
+    auto table = r->get_group().get_table("class_table");
+    auto table2 = r->get_group().get_table("class_table2");
+    auto other_table = r->get_group().get_table("class_table");
+    auto other_table2 = r->get_group().get_table("class_table2");
 
     ColKey col_int_set = table->get_column_key("int_set");
     ColKey col_decimal_set = table->get_column_key("decimal_set");
@@ -52,7 +52,7 @@ TEST_CASE("set") {
     ColKey other_col_link_set = table->get_column_key("link_set");
 
     auto write = [&](auto&& f) {
-        r->begin_transaction();
+        r->begin_write_transaction();
         if constexpr (std::is_void_v<decltype(f())>) {
             f();
             r->commit_transaction();

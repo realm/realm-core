@@ -153,7 +153,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         SECTION("durability") {
             auto realm = Realm::get_shared_realm(config);
-            config.in_memory = true;
+            config.is_in_memory = true;
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
 
@@ -235,8 +235,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
             migration_called = true;
-            REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
-            REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
+            REQUIRE(ObjectStore::table_for_object_type(old_realm->get_group(), "object")->get_column_count() == 1);
+            REQUIRE(ObjectStore::table_for_object_type(new_realm->get_group(), "object")->get_column_count() == 2);
         };
         Realm::get_shared_realm(config);
         REQUIRE(migration_called);
@@ -251,8 +251,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         };
         bool migration_called = false;
         config.migration_function = [&](SharedRealm old_realm, SharedRealm new_realm, Schema&) {
-            REQUIRE(ObjectStore::table_for_object_type(old_realm->read_group(), "object")->get_column_count() == 1);
-            REQUIRE(ObjectStore::table_for_object_type(new_realm->read_group(), "object")->get_column_count() == 2);
+            REQUIRE(ObjectStore::table_for_object_type(old_realm->get_group(), "object")->get_column_count() == 1);
+            REQUIRE(ObjectStore::table_for_object_type(new_realm->get_group(), "object")->get_column_count() == 2);
             if (!migration_called) {
                 migration_called = true;
                 throw "error";
@@ -270,7 +270,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
-        auto table = realm->read_group().get_table("class_object");
+        auto table = realm->get_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
@@ -341,7 +341,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_mode = SchemaMode::Immutable;
         auto realm = Realm::get_shared_realm(config);
         auto it = realm->schema().find("object");
-        auto table = realm->read_group().get_table("class_object");
+        auto table = realm->get_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
@@ -405,7 +405,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     SECTION("should detect use of Realm on incorrect thread") {
         auto realm = Realm::get_shared_realm(config);
         std::thread([&] {
-            REQUIRE_THROWS_AS(realm->verify_thread(), IncorrectThreadException);
+            REQUIRE_THROWS_AS(realm->verify_is_on_thread(), IncorrectThreadException);
         }).join();
     }
 
@@ -455,7 +455,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm = Realm::get_shared_realm(config);
         std::thread([&] {
-            REQUIRE_NOTHROW(realm->verify_thread());
+            REQUIRE_NOTHROW(realm->verify_is_on_thread());
         }).join();
     }
 
@@ -477,27 +477,27 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
     SECTION("should not use cached frozen Realm if versions don't match") {
         auto realm = Realm::get_shared_realm(config);
-        realm->read_group();
+        realm->get_group();
         auto frozen1 = realm->freeze();
-        frozen1->read_group();
+        frozen1->get_group();
 
         REQUIRE(frozen1 != realm);
-        REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
+        REQUIRE(realm->get_version_of_current_transaction() == frozen1->get_version_of_current_transaction());
 
-        auto table = realm->read_group().get_table("class_object");
-        realm->begin_transaction();
+        auto table = realm->get_group().get_table("class_object");
+        realm->begin_write_transaction();
         Obj obj = table->create_object();
         realm->commit_transaction();
 
-        REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
+        REQUIRE(realm->get_version_of_current_transaction() > frozen1->get_version_of_current_transaction());
 
         auto frozen2 = realm->freeze();
-        frozen2->read_group();
+        frozen2->get_group();
 
         REQUIRE(frozen2 != frozen1);
         REQUIRE(frozen2 != realm);
-        REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
-        REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
+        REQUIRE(realm->get_version_of_current_transaction() == frozen2->get_version_of_current_transaction());
+        REQUIRE(frozen2->get_version_of_current_transaction() > frozen1->get_version_of_current_transaction());
     }
 }
 
@@ -539,7 +539,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->get_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&] {
             return called.load();
@@ -551,8 +551,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("downloads Realms which exist on the server") {
         {
             auto realm = Realm::get_shared_realm(config2);
-            realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+            realm->begin_write_transaction();
+            realm->get_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
@@ -564,7 +564,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->get_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&] {
             return called.load();
@@ -578,8 +578,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         {
             auto realm = Realm::get_shared_realm(config2);
-            realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+            realm->begin_write_transaction();
+            realm->get_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
@@ -591,7 +591,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(!error);
             called = true;
 
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
+            REQUIRE(Realm::get_shared_realm(std::move(ref))->get_group().get_table("class_object")->size() == 1);
         });
         util::EventLoop::main().run_until([&] {
             return called.load();
@@ -652,12 +652,12 @@ TEST_CASE("SharedRealm: notifications") {
 
     size_t change_count = 0;
     auto realm = Realm::get_shared_realm(config);
-    realm->read_group();
+    realm->get_group();
     realm->m_binding_context.reset(new Context{&change_count});
     realm->m_binding_context->realm = realm;
 
     SECTION("local notifications are sent synchronously") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         REQUIRE(change_count == 0);
         realm->commit_transaction();
         REQUIRE(change_count == 1);
@@ -665,7 +665,7 @@ TEST_CASE("SharedRealm: notifications") {
 
     SECTION("remote notifications are sent asynchronously") {
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         r2->commit_transaction();
         REQUIRE(change_count == 0);
         util::EventLoop::main().run_until([&] {
@@ -691,7 +691,7 @@ TEST_CASE("SharedRealm: notifications") {
         realm->set_auto_refresh(false);
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         r2->commit_transaction();
         realm->notify();
         // Should return false as the realm was already advanced
@@ -710,7 +710,7 @@ TEST_CASE("SharedRealm: notifications") {
             {
                 // Create another version so that refresh() could do something
                 auto r2 = Realm::get_shared_realm(realm.config());
-                r2->begin_transaction();
+                r2->begin_write_transaction();
                 r2->commit_transaction();
 
                 // Should be a no-op
@@ -720,7 +720,7 @@ TEST_CASE("SharedRealm: notifications") {
         realm->m_binding_context.reset(new Context{*realm});
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         r2->commit_transaction();
         REQUIRE(realm->refresh());
 
@@ -746,15 +746,15 @@ TEST_CASE("SharedRealm: notifications") {
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
             {
                 ++calls;
-                if (realm.is_in_transaction())
+                if (realm.is_in_write_transaction())
                     return;
 
                 // Create another version so that begin_write() advances the version
                 auto r2 = Realm::get_shared_realm(realm.config());
-                r2->begin_transaction();
+                r2->begin_write_transaction();
                 r2->commit_transaction();
 
-                realm.begin_transaction();
+                realm.begin_write_transaction();
                 realm.cancel_transaction();
             }
         };
@@ -762,7 +762,7 @@ TEST_CASE("SharedRealm: notifications") {
         realm->m_binding_context.reset(context);
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         r2->commit_transaction();
         REQUIRE(realm->refresh());
         REQUIRE(context->calls == 2);
@@ -790,8 +790,8 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         auto r1 = Realm::get_shared_realm(config);
         auto r2 = Realm::get_shared_realm(config);
         auto test = [&] {
-            r2->begin_transaction();
-            r2->read_group().get_table("class_object")->add_column(type_String, "new col");
+            r2->begin_write_transaction();
+            r2->get_group().get_table("class_object")->add_column(type_String, "new col");
             r2->commit_transaction();
 
             auto& object_schema = *r1->schema().find("object");
@@ -801,7 +801,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
             REQUIRE(object_schema.persisted_properties[0].column_key == col);
         };
         SECTION("with an active read transaction") {
-            r1->read_group();
+            r1->get_group();
             test();
         }
         SECTION("without an active read transaction") {
@@ -871,9 +871,9 @@ TEST_CASE("SharedRealm: close()") {
 
         REQUIRE(realm->is_closed());
 
-        REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
-        REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
-        REQUIRE(!realm->is_in_transaction());
+        REQUIRE_THROWS_AS(realm->get_group(), ClosedRealmException);
+        REQUIRE_THROWS_AS(realm->begin_write_transaction(), ClosedRealmException);
+        REQUIRE(!realm->is_in_write_transaction());
         REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
         REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
 
@@ -883,8 +883,8 @@ TEST_CASE("SharedRealm: close()") {
     }
 
     SECTION("fully closes database file even with live notifiers") {
-        auto& group = realm->read_group();
-        realm->begin_transaction();
+        auto& group = realm->get_group();
+        realm->begin_write_transaction();
         auto obj = ObjectStore::table_for_object_type(group, "list")->create_object();
         realm->commit_transaction();
 
@@ -898,7 +898,7 @@ TEST_CASE("SharedRealm: close()") {
 
         // Perform a dummy transaction to ensure the notifiers actually acquire
         // resources that need to be closed
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         realm->commit_transaction();
 
         realm->close();
@@ -922,7 +922,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
 
         // Open the buffer as a new (immutable in-memory) Realm
         realm::Realm::Config config2;
-        config2.in_memory = true;
+        config2.is_in_memory = true;
         config2.schema_mode = SchemaMode::Immutable;
         config2.realm_data = realm_buffer.get();
 
@@ -931,7 +931,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         // Verify that it can read the schema and that it is the same
         REQUIRE(realm->schema().size() == 1);
         auto it = realm->schema().find("object");
-        auto table = realm->read_group().get_table("class_object");
+        auto table = realm->get_group().get_table("class_object");
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->table_key == table->get_key());
         REQUIRE(it->persisted_properties.size() == 1);
@@ -943,7 +943,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         config3.realm_data = realm_buffer.get();
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // missing in_memory and immutable
 
-        config3.in_memory = true;
+        config3.is_in_memory = true;
         config3.schema_mode = SchemaMode::Immutable;
         config3.path = "path";
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and path
@@ -964,8 +964,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     config.automatic_change_notifications = false;
     auto r1 = Realm::get_shared_realm(config);
 
-    r1->begin_transaction();
-    auto table = r1->read_group().get_table("class_object");
+    r1->begin_write_transaction();
+    auto table = r1->get_group().get_table("class_object");
     table->create_object();
     r1->commit_transaction();
 
@@ -985,8 +985,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         r1->invalidate();
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
         r2.reset();
 
@@ -1002,8 +1002,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         });
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
         r2.reset();
 
@@ -1017,8 +1017,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         r1->m_binding_context.reset(new Context());
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
         r2.reset();
 
@@ -1198,7 +1198,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
 
     SECTION("transaction version is bumped after a local write") {
         auto tv = cache_tv;
-        r->begin_transaction();
+        r->begin_write_transaction();
         r->commit_transaction();
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_tv == tv + 1);
@@ -1225,7 +1225,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("notify() with a read transaction bumps transaction version") {
-        r->read_group();
+        r->get_group();
         external_write(config, [](auto& wt) {
             wt.get_table("class_object")->create_object();
         });
@@ -1237,7 +1237,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("notify() with a read transaction updates schema folloing external schema change") {
-        r->read_group();
+        r->get_group();
         external_write(config, [](auto& wt) {
             wt.add_table("class_object 2");
         });
@@ -1275,7 +1275,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("update_schema() to version already on disk updates cache") {
-        r->read_group();
+        r->get_group();
         external_write(config, [](auto& wt) {
             auto table = wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
@@ -1291,7 +1291,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("update_schema() to version already on disk updates cache") {
-        r->read_group();
+        r->get_group();
         external_write(config, [](auto& wt) {
             auto table = wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
@@ -1307,7 +1307,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 
     SECTION("update_schema() to version populated on disk while waiting for the write lock updates cache") {
-        r->read_group();
+        r->get_group();
 
         // We want to commit the write while we're waiting on the write lock on
         // this thread, which can't really be done in a properly synchronized manner
@@ -1369,11 +1369,11 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     auto* object_schema = &*r2->schema().find("object");
 
     // Perform an empty write to create a new version, resulting in the other Realm needing to re-read the schema.
-    r1->begin_transaction();
+    r1->begin_write_transaction();
     r1->commit_transaction();
 
     // Advance to the latest version, and verify the object schema is at the same location in memory.
-    r2->read_group();
+    r2->get_group();
     REQUIRE(object_schema == &*r2->schema().find("object"));
 }
 
@@ -1392,7 +1392,7 @@ TEST_CASE("SharedRealm: declaring an object as embedded results in creating an e
                             }}};
     auto r1 = Realm::get_shared_realm(config);
 
-    Group& g = r1->read_group();
+    Group& g = r1->get_group();
     auto t = g.get_table("class_object1");
     REQUIRE(t->is_embedded());
 }
@@ -1430,7 +1430,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
                             }}};
     config.schema_version = 1;
     auto r1 = Realm::get_shared_realm(config);
-    r1->read_group();
+    r1->get_group();
     r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
 
     SECTION("Fixed schema") {
@@ -1451,7 +1451,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
 
         SECTION("Non schema related transaction doesn't trigger") {
             auto r2 = Realm::get_shared_realm(config);
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2->commit_transaction();
             r1->refresh();
             REQUIRE(schema_changed_called == 0);
@@ -1459,8 +1459,8 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
 
         SECTION("Schema is changed by another Realm") {
             auto r2 = Realm::get_shared_realm(config);
-            r2->begin_transaction();
-            r2->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r2->begin_write_transaction();
+            r2->get_group().get_table("class_object1")->add_column(type_String, "new col");
             r2->commit_transaction();
             r1->refresh();
             REQUIRE(schema_changed_called == 1);
@@ -1469,8 +1469,8 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
 
         // This is not a valid use case. m_schema won't be refreshed.
         SECTION("Schema is changed by this Realm won't trigger") {
-            r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r1->begin_write_transaction();
+            r1->get_group().get_table("class_object1")->add_column(type_String, "new col");
             r1->commit_transaction();
             REQUIRE(schema_changed_called == 0);
         }
@@ -1496,7 +1496,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
         SECTION("Non schema related transaction will always trigger in dynamic mode") {
             auto r1 = Realm::get_shared_realm(config);
             // An empty transaction will trigger the schema changes always in dynamic mode.
-            r1->begin_transaction();
+            r1->begin_write_transaction();
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
@@ -1504,8 +1504,8 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
         }
 
         SECTION("Schema is changed by another Realm") {
-            r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r1->begin_write_transaction();
+            r1->get_group().get_table("class_object1")->add_column(type_String, "new col");
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);
@@ -1531,8 +1531,8 @@ TEST_CASE("SharedRealm: compact on launch") {
     REQUIRE(num_opens == 0);
     auto r = Realm::get_shared_realm(config);
     REQUIRE(num_opens == 1);
-    r->begin_transaction();
-    auto table = r->read_group().get_table("class_object");
+    r->begin_write_transaction();
+    auto table = r->get_group().get_table("class_object");
     size_t count = 1000;
     for (size_t i = 0; i < count; ++i)
         table->create_object().set_all(util::format("Foo_%1", i % 10).c_str());
@@ -1552,10 +1552,10 @@ TEST_CASE("SharedRealm: compact on launch") {
         REQUIRE(size_t(util::File(config.path).get_size()) < size_before); // File size after returning true
 
         // Validate that the file still contains what it should
-        REQUIRE(r->read_group().get_table("class_object")->size() == count);
+        REQUIRE(r->get_group().get_table("class_object")->size() == count);
 
         // Registering for a collection notification shouldn't crash when compact on launch is used.
-        Results results(r, r->read_group().get_table("class_object"));
+        Results results(r, r->get_group().get_table("class_object"));
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
         r->close();
     }
@@ -1628,7 +1628,7 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
     Schema schema_in_callback;
     auto initialization_function = [&initialization_function_called, &schema_version_in_callback,
                                     &schema_in_callback](auto shared_realm) {
-        REQUIRE(shared_realm->is_in_transaction());
+        REQUIRE(shared_realm->is_in_write_transaction());
         initialization_function_called = true;
         schema_version_in_callback = shared_realm->schema_version();
         schema_in_callback = shared_realm->schema();
@@ -1687,7 +1687,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
 
     SECTION("BindingContext notified even if no callbacks are registered") {
         static int binding_context_start_notify_calls = 0;
@@ -1709,7 +1709,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             coordinator->on_change();
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(binding_context_start_notify_calls == 1);
             REQUIRE(binding_context_end_notify_calls == 1);
             r->cancel_transaction();
@@ -1720,8 +1720,8 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             JoiningThread([&] {
                 auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-                r2->begin_transaction();
-                auto table2 = r2->read_group().get_table("class_object");
+                r2->begin_write_transaction();
+                auto table2 = r2->get_group().get_table("class_object");
                 table2->create_object();
                 r2->commit_transaction();
             });
@@ -1772,7 +1772,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
             coordinator->on_change();
-            r->begin_transaction();
+            r->begin_write_transaction();
             table->create_object();
             r->commit_transaction();
             REQUIRE(binding_context_start_notify_calls == 1);
@@ -1785,8 +1785,8 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             notification_calls = 0;
             JoiningThread([&] {
                 auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-                r2->begin_transaction();
-                auto table2 = r2->read_group().get_table("class_object");
+                r2->begin_write_transaction();
+                auto table2 = r2->get_group().get_table("class_object");
                 table2->create_object();
                 r2->commit_transaction();
             });
@@ -1837,8 +1837,8 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
 
             JoiningThread([&] {
                 auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-                r->begin_transaction();
-                r->read_group().get_table("class_object")->create_object();
+                r->begin_write_transaction();
+                r->get_group().get_table("class_object")->create_object();
                 r->commit_transaction();
             });
 
@@ -1861,8 +1861,8 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
 
             JoiningThread([&] {
                 auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-                r->begin_transaction();
-                r->read_group().get_table("class_object")->create_object();
+                r->begin_write_transaction();
+                r->get_group().get_table("class_object")->create_object();
                 r->commit_transaction();
             });
 
@@ -1886,7 +1886,7 @@ TEST_CASE("Statistics on Realms") {
     });
 
     SECTION("compute_size") {
-        auto s = r->read_group().compute_aggregated_byte_size();
+        auto s = r->get_group().compute_aggregated_byte_size();
         REQUIRE(s > 0);
     }
 }
@@ -1924,8 +1924,8 @@ TEST_CASE("BindingContext is notified in case of notifier errors") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
-    Results results(r, *r->read_group().get_table("class_object"));
+    auto table = r->get_group().get_table("class_object");
+    Results results(r, *r->get_group().get_table("class_object"));
     static int binding_context_start_notify_calls = 0;
     static int binding_context_end_notify_calls = 0;
     static bool error_called = false;
@@ -1974,9 +1974,9 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
 
     SECTION("checks thread after being resolved") {
         auto realm = Realm::get_shared_realm(std::move(ref));
-        REQUIRE_NOTHROW(realm->verify_thread());
+        REQUIRE_NOTHROW(realm->verify_is_on_thread());
         std::thread([&] {
-            REQUIRE_THROWS(realm->verify_thread());
+            REQUIRE_THROWS(realm->verify_is_on_thread());
         }).join();
     }
 
@@ -1984,7 +1984,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         if (!util::EventLoop::has_implementation())
             return;
         auto realm = Realm::get_shared_realm(std::move(ref));
-        Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
+        Results results(realm, ObjectStore::table_for_object_type(realm->get_group(), "object")->where());
         bool called = false;
         auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             called = true;

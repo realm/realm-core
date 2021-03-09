@@ -200,7 +200,7 @@ void CollectionNotifier::release_data() noexcept
 
 uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 {
-    m_realm->verify_thread();
+    m_realm->verify_is_on_thread();
 
     util::CheckedLockGuard lock(m_callback_mutex);
     auto token = m_next_token++;
@@ -243,8 +243,8 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
     {
         std::lock_guard<std::mutex> lock(m_realm_mutex);
         REALM_ASSERT(m_realm);
-        m_realm->verify_thread();
-        m_realm->verify_in_write();
+        m_realm->verify_is_on_thread();
+        m_realm->verify_is_in_write_transaction();
     }
 
     util::CheckedLockGuard lock(m_callback_mutex);

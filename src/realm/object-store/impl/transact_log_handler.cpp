@@ -69,7 +69,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     tables_needed.erase(std::unique(begin(tables_needed), end(tables_needed)), end(tables_needed));
 
     auto realm = context->realm.lock();
-    auto& group = realm->read_group();
+    auto& group = realm->get_group();
     for (auto& observer : observers) {
         auto table = group.get_table(TableKey(observer.table_key));
         for (auto key : table->get_column_keys()) {

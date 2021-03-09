@@ -65,9 +65,9 @@ TEST_CASE("dictionary") {
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
 
-    auto table = r->read_group().get_table("class_object");
-    auto table2 = r2->read_group().get_table("class_object");
-    r->begin_transaction();
+    auto table = r->get_group().get_table("class_object");
+    auto table2 = r2->get_group().get_table("class_object");
+    r->begin_write_transaction();
     Obj obj = table->create_object();
     ColKey col = table->get_column_key("value");
 
@@ -137,7 +137,7 @@ TEST_CASE("dictionary") {
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(results2.get<String>(i) == values[i]);
         }
-        r->begin_transaction();
+        r->begin_write_transaction();
         obj.remove();
         r->commit_transaction();
         results2 = ref.resolve<Results>(r);
@@ -168,12 +168,12 @@ TEST_CASE("dictionary") {
             // Remove the existing copy of this value so that the sorted list
             // doesn't have dupes resulting in an unstable order
             advance_and_notify(*r);
-            r->begin_transaction();
+            r->begin_write_transaction();
             dict.erase("b");
             r->commit_transaction();
 
             advance_and_notify(*r);
-            r->begin_transaction();
+            r->begin_write_transaction();
             dict.insert("d", "dade");
             r->commit_transaction();
 
@@ -187,7 +187,7 @@ TEST_CASE("dictionary") {
 
         SECTION("replace value in dictionary") {
             advance_and_notify(*r);
-            r->begin_transaction();
+            r->begin_write_transaction();
             dict.insert("b", "blueberry");
             r->commit_transaction();
 
@@ -201,7 +201,7 @@ TEST_CASE("dictionary") {
         SECTION("remove value from list") {
             advance_and_notify(*r);
             auto ndx = results.index_of(StringData("apple"));
-            r->begin_transaction();
+            r->begin_write_transaction();
             dict.erase("a");
             r->commit_transaction();
 
@@ -215,7 +215,7 @@ TEST_CASE("dictionary") {
         SECTION("clear list") {
             advance_and_notify(*r);
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             dict.remove_all();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -229,7 +229,7 @@ TEST_CASE("dictionary") {
             REQUIRE(calls == 3);
             REQUIRE(!change.collection_root_was_deleted);
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -239,7 +239,7 @@ TEST_CASE("dictionary") {
             REQUIRE(srchange.deletions.count() == values.size());
             REQUIRE(change.collection_root_was_deleted);
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             table->create_object();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -247,7 +247,7 @@ TEST_CASE("dictionary") {
         }
 
         SECTION("deleting containing row before first run of notifier") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             table2->begin()->remove();
             r2->commit_transaction();
             advance_and_notify(*r);
@@ -258,7 +258,7 @@ TEST_CASE("dictionary") {
         SECTION("deleting a row with an empty dictionary triggers notifications") {
             advance_and_notify(*r);
             REQUIRE(calls == 3);
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(dict.size() == values.size());
             results.clear();
             REQUIRE(dict.size() == 0);
@@ -269,7 +269,7 @@ TEST_CASE("dictionary") {
             REQUIRE(!change.collection_root_was_deleted);
             REQUIRE(calls == 6);
 
-            r->begin_transaction();
+            r->begin_write_transaction();
             obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);

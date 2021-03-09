@@ -207,8 +207,8 @@ bool ResultsNotifier::prepare_to_deliver()
     if (!m_handover_tv) {
         bool transaction_is_stale =
             m_delivered_transaction &&
-            (!realm->is_in_read_transaction() ||
-             realm->read_transaction_version() > m_delivered_transaction->get_version_of_current_transaction());
+            (!realm->is_in_read_transaction() || realm->get_version_of_current_transaction() >
+                                                     m_delivered_transaction->get_version_of_current_transaction());
         if (transaction_is_stale) {
             m_delivered_tv.reset();
             m_delivered_transaction.reset();

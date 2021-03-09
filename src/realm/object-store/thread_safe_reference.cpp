@@ -41,7 +41,7 @@ public:
     Payload(Realm& realm)
         : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
         , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
-        , m_created_in_write_transaction(realm.is_in_transaction())
+        , m_created_in_write_transaction(realm.is_in_write_transaction())
     {
     }
 
@@ -59,12 +59,12 @@ void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
     if (!realm.is_in_read_transaction()) {
         if (m_created_in_write_transaction)
-            realm.read_group();
+            realm.get_group();
         else
             Realm::Internal::begin_read(realm, m_transaction->get_version_of_current_transaction());
     }
     else {
-        auto version = realm.read_transaction_version();
+        auto version = realm.get_version_of_current_transaction();
         auto target_version = m_transaction->get_version_of_current_transaction();
         if (version < target_version || (version == target_version && m_created_in_write_transaction))
             realm.refresh();
@@ -84,7 +84,7 @@ public:
 
     List import_into(std::shared_ptr<Realm> const& r)
     {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
         return List(r, obj, m_col_key);
     }
 
@@ -107,7 +107,7 @@ public:
 
     object_store::Set import_into(std::shared_ptr<Realm> const& r)
     {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
         return object_store::Set(r, obj, m_col_key);
     }
 
@@ -130,7 +130,7 @@ public:
 
     OsDict import_into(const std::shared_ptr<Realm>& r)
     {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
         return OsDict(r, obj, m_col_key);
     }
 
@@ -174,7 +174,7 @@ public:
         }
         else {
             Query q(r.get_query());
-            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_transaction()) {
+            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_write_transaction()) {
                 // FIXME: This is overly restrictive. It's only a problem if
                 // the parent of the List or LinkingObjects was created in this
                 // write transaction, but Query doesn't expose a way to check
@@ -190,7 +190,7 @@ public:
     {
         if (m_key) {
             CollectionBasePtr collection;
-            auto table = r->read_group().get_table(m_table_key);
+            auto table = r->get_group().get_table(m_table_key);
             try {
                 collection = table->get_object(m_key).get_collection_ptr(m_col_key);
             }
@@ -254,7 +254,7 @@ template <typename T>
 ThreadSafeReference::ThreadSafeReference(T const& value)
 {
     auto realm = value.get_realm();
-    realm->verify_thread();
+    realm->verify_is_on_thread();
     m_payload.reset(new PayloadImpl<T>(value));
 }
 
@@ -274,7 +274,7 @@ template <typename T>
 T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
 {
     REALM_ASSERT(realm);
-    realm->verify_thread();
+    realm->verify_is_on_thread();
 
     REALM_ASSERT(m_payload);
     auto& payload = static_cast<PayloadImpl<T>&>(*m_payload);

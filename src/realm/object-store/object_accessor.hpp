@@ -215,7 +215,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
-            auto table = m_realm->read_group().get_table(target_object_schema->table_key);
+            auto table = m_realm->get_group().get_table(target_object_schema->table_key);
             auto tv = const_cast<Obj&>(m_obj).get_backlink_view(table, ColKey(link_property->column_key));
             return ctx.box(Results(m_realm, std::move(tv)));
         }
@@ -247,7 +247,7 @@ template <typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, ObjectSchema const& object_schema,
                       ValueType value, CreatePolicy policy, ObjKey current_obj, Obj* out_row)
 {
-    realm->verify_in_write();
+    realm->verify_is_in_write_transaction();
 
     // When setting each property, we normally want to skip over the primary key
     // as that's set as part of object creation. However, during migrations the
@@ -260,7 +260,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     bool created = false;
 
     Obj obj;
-    auto table = realm->read_group().get_table(object_schema.table_key);
+    auto table = realm->get_group().get_table(object_schema.table_key);
 
     // If there's a primary key, we need to first check if an object with the
     // same primary key already exists. If it does, we either update that object
@@ -369,7 +369,7 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
 
     TableRef table;
     if (object_schema.table_key)
-        table = realm->read_group().get_table(object_schema.table_key);
+        table = realm->get_group().get_table(object_schema.table_key);
     if (!table)
         return Object(realm, object_schema, Obj());
     if (ctx.is_null(primary_value) && !is_nullable(primary_prop->type))

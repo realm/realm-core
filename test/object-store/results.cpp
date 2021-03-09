@@ -114,10 +114,10 @@ TEST_CASE("notifications: async delivery") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     auto col = table->get_column_key("value");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     for (int i = 0; i < 10; ++i)
         table->create_object().set_all(i * 2);
     r->commit_transaction();
@@ -131,15 +131,15 @@ TEST_CASE("notifications: async delivery") {
     });
 
     auto make_local_change = [&] {
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->begin()->set(col, 4);
         r->commit_transaction();
     };
 
     auto make_remote_change = [&] {
         auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->begin()->set(col, 5);
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
     };
 
@@ -160,7 +160,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("is delivered on begin_transaction()") {
             coordinator->on_change();
             REQUIRE(notification_calls == 0);
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 1);
             r->cancel_transaction();
         }
@@ -188,7 +188,7 @@ TEST_CASE("notifications: async delivery") {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 1);
             r->cancel_transaction();
         }
@@ -227,7 +227,7 @@ TEST_CASE("notifications: async delivery") {
             SECTION("begin_transaction()") {
                 coordinator->on_change();
                 REQUIRE_FALSE(r->is_in_read_transaction());
-                r->begin_transaction();
+                r->begin_write_transaction();
                 REQUIRE(notification_calls == 1);
                 r->cancel_transaction();
             }
@@ -266,7 +266,7 @@ TEST_CASE("notifications: async delivery") {
         }
 
         SECTION("begin_transaction()") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
         }
@@ -296,7 +296,7 @@ TEST_CASE("notifications: async delivery") {
         }
 
         SECTION("begin_transaction()") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
         }
@@ -438,7 +438,7 @@ TEST_CASE("notifications: async delivery") {
     }
 
     SECTION("the first call of a notification can include changes if it previously ran for a different callback") {
-        r->begin_transaction();
+        r->begin_write_transaction();
         auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             REQUIRE(!c.empty());
         });
@@ -497,7 +497,7 @@ TEST_CASE("notifications: async delivery") {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
         }
@@ -511,7 +511,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("begin_transaction() does not block for results without callbacks") {
             token = {};
             // this would deadlock if it waits for the notifier to be ready
-            r->begin_transaction();
+            r->begin_write_transaction();
             r->cancel_transaction();
         }
 
@@ -557,7 +557,7 @@ TEST_CASE("notifications: async delivery") {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
         }
@@ -594,7 +594,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("begin_transaction()") {
             coordinator->on_change();
             REQUIRE_FALSE(r->is_in_read_transaction());
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
         }
@@ -651,7 +651,7 @@ TEST_CASE("notifications: async delivery") {
                 first = false;
             else {
                 // would deadlock if it tried to send notifications as they aren't ready yet
-                r->begin_transaction();
+                r->begin_write_transaction();
                 r->cancel_transaction();
             }
         });
@@ -675,7 +675,7 @@ TEST_CASE("notifications: async delivery") {
                 return;
 
             // force the read version to advance by beginning a transaction
-            r->begin_transaction();
+            r->begin_write_transaction();
             r->cancel_transaction();
         });
 
@@ -710,9 +710,9 @@ TEST_CASE("notifications: async delivery") {
 
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
             {
-                if (!realm.is_in_transaction()) {
+                if (!realm.is_in_write_transaction()) {
                     // advances to version from 2 (and recursively calls this, hence the check above)
-                    realm.begin_transaction();
+                    realm.begin_write_transaction();
                     realm.cancel_transaction();
                 }
             }
@@ -731,18 +731,18 @@ TEST_CASE("notifications: async delivery") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             if (first) {
-                REQUIRE_FALSE(r->is_in_transaction());
+                REQUIRE_FALSE(r->is_in_write_transaction());
                 first = false;
             }
             else {
-                REQUIRE(r->is_in_transaction());
+                REQUIRE(r->is_in_write_transaction());
                 table->begin()->set(col, 100);
             }
         });
         advance_and_notify(*r);
         make_remote_change();
         coordinator->on_change();
-        r->begin_transaction();
+        r->begin_write_transaction();
         REQUIRE(table->begin()->get<int64_t>(col) == 100);
         r->cancel_transaction();
         REQUIRE(table->begin()->get<int64_t>(col) != 100);
@@ -758,8 +758,8 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(r->is_in_read_transaction());
         make_remote_change();
         coordinator->on_change();
-        r->begin_transaction();
-        REQUIRE(r->is_in_transaction());
+        r->begin_write_transaction();
+        REQUIRE(r->is_in_write_transaction());
         r->cancel_transaction();
     }
 
@@ -767,14 +767,14 @@ TEST_CASE("notifications: async delivery") {
         "cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
-            if (r->is_in_transaction())
+            if (r->is_in_write_transaction())
                 r->cancel_transaction();
         });
         advance_and_notify(*r);
         make_remote_change();
         coordinator->on_change();
-        r->begin_transaction();
-        REQUIRE_FALSE(r->is_in_transaction());
+        r->begin_write_transaction();
+        REQUIRE_FALSE(r->is_in_write_transaction());
     }
 }
 
@@ -791,10 +791,10 @@ TEST_CASE("notifications: skip") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     auto col = table->get_column_key("value");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     for (int i = 0; i < 10; ++i)
         table->create_object().set(col, i * 2);
     r->commit_transaction();
@@ -810,7 +810,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_local_change = [&](auto& token) {
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         token.suppress_next();
         r->commit_transaction();
@@ -818,8 +818,8 @@ TEST_CASE("notifications: skip") {
 
     auto make_remote_change = [&] {
         auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
     };
 
@@ -920,7 +920,7 @@ TEST_CASE("notifications: skip") {
 
     SECTION("skipping must be done from the Realm's thread") {
         advance_and_notify(*r);
-        r->begin_transaction();
+        r->begin_write_transaction();
         std::thread([&] {
             REQUIRE_THROWS(token1.suppress_next());
         }).join();
@@ -935,7 +935,7 @@ TEST_CASE("notifications: skip") {
 
         // new notifier at a version before the skipped one
         auto r2 = coordinator->get_realm();
-        Results results2(r2, r2->read_group().get_table("class_object")->where());
+        Results results2(r2, r2->get_group().get_table("class_object")->where());
         int calls2 = 0;
         auto token2 = add_callback(results2, calls2, changes);
 
@@ -943,7 +943,7 @@ TEST_CASE("notifications: skip") {
 
         // new notifier at the skipped version
         auto r3 = coordinator->get_realm();
-        Results results3(r3, r3->read_group().get_table("class_object")->where());
+        Results results3(r3, r3->get_group().get_table("class_object")->where());
         int calls3 = 0;
         auto token3 = add_callback(results3, calls3, changes);
 
@@ -951,7 +951,7 @@ TEST_CASE("notifications: skip") {
 
         // new notifier at version after the skipped one
         auto r4 = coordinator->get_realm();
-        Results results4(r4, r4->read_group().get_table("class_object")->where());
+        Results results4(r4, r4->get_group().get_table("class_object")->where());
         int calls4 = 0;
         auto token4 = add_callback(results4, calls4, changes);
 
@@ -972,14 +972,14 @@ TEST_CASE("notifications: skip") {
         REQUIRE(calls1 == 1);
 
         // would not produce a notification even if it wasn't skipped because no changes were made
-        r->begin_transaction();
+        r->begin_write_transaction();
         token1.suppress_next();
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(calls1 == 1);
 
         // should now produce a notification
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         r->commit_transaction();
         advance_and_notify(*r);
@@ -1018,7 +1018,7 @@ TEST_CASE("notifications: skip") {
         });
 
         for (int i = 0; i < 10; ++i) {
-            r->begin_transaction();
+            r->begin_write_transaction();
             table->create_object();
             token1.suppress_next();
             r->commit_transaction();
@@ -1042,10 +1042,10 @@ TEST_CASE("notifications: TableView delivery") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     auto col = table->get_column_key("value");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     for (int i = 0; i < 10; ++i)
         table->create_object().set(col, i * 2);
     r->commit_transaction();
@@ -1066,15 +1066,15 @@ TEST_CASE("notifications: TableView delivery") {
     REQUIRE(results.size() == 0);
 
     auto make_local_change = [&] {
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         r->commit_transaction();
     };
 
     auto make_remote_change = [&] {
         auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
     };
 
@@ -1142,7 +1142,7 @@ TEST_CASE("notifications: TableView delivery") {
         SECTION("no changes") {
             make_remote_change();
             advance_and_notify(*r);
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(results.size() == 0);
             r->cancel_transaction();
         }
@@ -1153,8 +1153,8 @@ TEST_CASE("notifications: TableView delivery") {
             make_remote_change();
             advance_and_notify(*r);
 
-            r->begin_transaction();
-            r->read_group().get_table("class_object")->create_object();
+            r->begin_write_transaction();
+            r->get_group().get_table("class_object")->create_object();
             REQUIRE(results.size() == 10);
             r->cancel_transaction();
         }
@@ -1170,8 +1170,8 @@ TEST_CASE("notifications: TableView delivery") {
             make_remote_change();
             advance_and_notify(*r);
 
-            r->begin_transaction();
-            r->read_group().get_table("class_object")->create_object();
+            r->begin_write_transaction();
+            r->get_group().get_table("class_object")->create_object();
             REQUIRE(results.size() == 12);
             r->cancel_transaction();
         }
@@ -1205,7 +1205,7 @@ TEST_CASE("notifications: async error handling") {
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    Results results(r, *r->read_group().get_table("class_object"));
+    Results results(r, *r->get_group().get_table("class_object"));
 
     auto r2 = Realm::get_shared_realm(config);
 
@@ -1248,7 +1248,7 @@ TEST_CASE("notifications: async error handling") {
         }
 
         SECTION("error is delivered on notify() with changes") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2->commit_transaction();
             REQUIRE(!called);
             coordinator->on_change();
@@ -1265,7 +1265,7 @@ TEST_CASE("notifications: async error handling") {
         }
 
         SECTION("error is delivered on refresh() with changes") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2->commit_transaction();
             REQUIRE(!called);
             coordinator->on_change();
@@ -1277,18 +1277,18 @@ TEST_CASE("notifications: async error handling") {
         SECTION("error is delivered on begin_transaction() without changes") {
             coordinator->on_change();
             REQUIRE(!called);
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(called);
             r->cancel_transaction();
         }
 
         SECTION("error is delivered on begin_transaction() with changes") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2->commit_transaction();
             REQUIRE(!called);
             coordinator->on_change();
             REQUIRE(!called);
-            r->begin_transaction();
+            r->begin_write_transaction();
             REQUIRE(called);
             r->cancel_transaction();
         }
@@ -1418,16 +1418,16 @@ TEST_CASE("notifications: sync") {
         auto r = Realm::get_shared_realm(config);
         auto wait_realm = Realm::get_shared_realm(config);
 
-        Results results(r, r->read_group().get_table("class_object"));
-        Results wait_results(wait_realm, wait_realm->read_group().get_table("class_object"));
+        Results results(r, r->get_group().get_table("class_object"));
+        Results wait_results(wait_realm, wait_realm->get_group().get_table("class_object"));
         auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
         auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
 
         // Add an object to the Realm so that notifications are needed
         {
             auto write_realm = Realm::get_shared_realm(config);
-            write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+            write_realm->begin_write_transaction();
+            write_realm->get_group().get_table("class_object")->create_object_with_primary_key(0);
             write_realm->commit_transaction();
         }
 
@@ -1465,14 +1465,14 @@ TEST_CASE("notifications: results") {
                       {"second linked to object", {{"value", PropertyType::Int}}}});
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
-    auto table = r->read_group().get_table("class_object");
-    auto other_table = r->read_group().get_table("class_other object");
-    auto linked_to_table = r->read_group().get_table("class_linked to object");
-    auto second_linked_to_table = r->read_group().get_table("class_second linked to object");
+    auto table = r->get_group().get_table("class_object");
+    auto other_table = r->get_group().get_table("class_other object");
+    auto linked_to_table = r->get_group().get_table("class_linked to object");
+    auto second_linked_to_table = r->get_group().get_table("class_second linked to object");
     auto col_value = table->get_column_key("value");
     auto col_link = table->get_column_key("link");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     std::vector<ObjKey> target_keys;
     linked_to_table->create_objects(10, target_keys);
     std::vector<ObjKey> second_target_keys;
@@ -1485,12 +1485,12 @@ TEST_CASE("notifications: results") {
     r->commit_transaction();
 
     auto r2 = coordinator->get_realm();
-    auto r2_table = r2->read_group().get_table("class_object");
+    auto r2_table = r2->get_group().get_table("class_object");
 
     Results results(r, table->where().greater(col_value, 0).less(col_value, 10));
 
     auto write = [&](auto&& f) {
-        r->begin_transaction();
+        r->begin_write_transaction();
         f();
         r->commit_transaction();
         advance_and_notify(*r);
@@ -1523,7 +1523,7 @@ TEST_CASE("notifications: results") {
 
         SECTION("irrelevant modifications to linking tables do not send notifications") {
             write([&] {
-                r->read_group().get_table("class_linking object")->create_object();
+                r->get_group().get_table("class_linking object")->create_object();
             });
             REQUIRE(notification_calls == 1);
         }
@@ -1579,13 +1579,13 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("modifications from multiple transactions are collapsed") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->get_object(object_keys[0]).set(col_value, 6);
             r2->commit_transaction();
 
             coordinator->on_change();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->get_object(object_keys[1]).set(col_value, 03);
             r2->commit_transaction();
 
@@ -1596,13 +1596,13 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("inserting a row then modifying it in a second transaction does not report it as modified") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             ObjKey k = r2_table->create_object(ObjKey(53)).set(col_value, 6).get_key();
             r2->commit_transaction();
 
             coordinator->on_change();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->get_object(k).set(col_value, 7);
             r2->commit_transaction();
 
@@ -1615,7 +1615,7 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("modification indices are pre-insert/delete") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             table->get_object(object_keys[2]).set(col_value, 0);
             table->get_object(object_keys[3]).set(col_value, 6);
             r->commit_transaction();
@@ -1628,13 +1628,13 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("notifications are not delivered when collapsing transactions results in no net change") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             ObjKey k = r2_table->create_object().set(col_value, 5).get_key();
             r2->commit_transaction();
 
             coordinator->on_change();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->remove_object(k);
             r2->commit_transaction();
 
@@ -1706,7 +1706,7 @@ TEST_CASE("notifications: results") {
         }
 
         auto write_r2 = [&](auto&& func) {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             func(*r2_table);
             r2->commit_transaction();
             advance_and_notify(*r);
@@ -1879,11 +1879,11 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("modifications from multiple transactions are collapsed") {
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->get_object(object_keys[0]).set(col_value, 5);
             r2->commit_transaction();
 
-            r2->begin_transaction();
+            r2->begin_write_transaction();
             r2_table->get_object(object_keys[1]).set(col_value, 0);
             r2->commit_transaction();
 
@@ -1893,7 +1893,7 @@ TEST_CASE("notifications: results") {
         }
 
         SECTION("moving a matching row by deleting all other rows") {
-            r->begin_transaction();
+            r->begin_write_transaction();
             table->clear();
             ObjKey k0 = table->create_object().set(col_value, 15).get_key();
             table->create_object().set(col_value, 5);
@@ -1994,7 +1994,7 @@ TEST_CASE("notifications: results") {
         SECTION("insert table before observed table") {
             write([&] {
                 table->create_object(ObjKey(53)).set(col_value, 5);
-                r->read_group().add_table("new table");
+                r->get_group().add_table("new table");
                 table->create_object(ObjKey(0)).set(col_value, 5);
             });
             REQUIRE_INDICES(change.insertions, 0, 5);
@@ -2014,7 +2014,7 @@ TEST_CASE("notifications: results") {
         SECTION("insert table before link target") {
             write([&] {
                 linked_table->get_object(target_keys[1]).set(col, 5);
-                r->read_group().add_table("new table");
+                r->get_group().add_table("new table");
                 linked_table->get_object(target_keys[2]).set(col, 5);
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
@@ -2102,7 +2102,7 @@ TEST_CASE("results: notifications after move") {
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     auto results = std::make_unique<Results>(r, table);
 
     int notification_calls = 0;
@@ -2114,7 +2114,7 @@ TEST_CASE("results: notifications after move") {
     advance_and_notify(*r);
 
     auto write = [&](auto&& f) {
-        r->begin_transaction();
+        r->begin_write_transaction();
         f();
         r->commit_transaction();
         advance_and_notify(*r);
@@ -2158,7 +2158,7 @@ TEST_CASE("results: notifier with no callbacks") {
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     Results results(r, table->where());
     results.last(); // force evaluation and creation of TableView
 
@@ -2169,8 +2169,8 @@ TEST_CASE("results: notifier with no callbacks") {
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
         auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->create_object();
+        r2->begin_write_transaction();
+        r2->get_group().get_table("class_object")->create_object();
         r2->commit_transaction();
 
         r->refresh(); // would deadlock if there was a callback
@@ -2180,11 +2180,11 @@ TEST_CASE("results: notifier with no callbacks") {
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
         // Create version 1
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         r->commit_transaction();
 
-        r->begin_transaction();
+        r->begin_write_transaction();
         // Run async query for version 1
         coordinator->on_change();
         // Create version 2 without ever letting 1 be delivered
@@ -2206,12 +2206,12 @@ TEST_CASE("results: notifier with no callbacks") {
         // isn't clean up until the *next* commit
         REQUIRE(shared_group->get_number_of_versions() == 2);
 
-        auto table = r2->read_group().get_table("class_object");
+        auto table = r2->get_group().get_table("class_object");
 
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         table->create_object();
         r2->commit_transaction();
-        r2->begin_transaction();
+        r2->begin_write_transaction();
         table->create_object();
         r2->commit_transaction();
 
@@ -2230,10 +2230,10 @@ TEST_CASE("results: error messages") {
     };
 
     auto r = Realm::get_shared_realm(config);
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     Results results(r, table);
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     table->create_object();
     r->commit_transaction();
 
@@ -2265,14 +2265,14 @@ TEST_CASE("results: snapshots") {
     }
 
     auto write = [&](auto&& f) {
-        r->begin_transaction();
+        r->begin_write_transaction();
         f();
         r->commit_transaction();
         advance_and_notify(*r);
     };
 
     SECTION("snapshot of Results based on Table") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         Results results(r, table);
 
         {
@@ -2311,9 +2311,9 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("snapshot of Results based on LinkView") {
-        auto object = r->read_group().get_table("class_object");
+        auto object = r->get_group().get_table("class_object");
         auto col_link = object->get_column_key("array");
-        auto linked_to = r->read_group().get_table("class_linked to object");
+        auto linked_to = r->get_group().get_table("class_linked to object");
 
         write([=] {
             object->create_object();
@@ -2364,7 +2364,7 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("snapshot of Results based on Query") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         auto col_value = table->get_column_key("value");
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, std::move(q));
@@ -2411,7 +2411,7 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("snapshot of Results based on TableView from query") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         auto col_value = table->get_column_key("value");
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
@@ -2458,9 +2458,9 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("snapshot of Results based on TableView from backlinks") {
-        auto object = r->read_group().get_table("class_object");
+        auto object = r->get_group().get_table("class_object");
         auto col_link = object->get_column_key("array");
-        auto linked_to = r->read_group().get_table("class_linked to object");
+        auto linked_to = r->get_group().get_table("class_linked to object");
 
         write([=] {
             linked_to->create_object();
@@ -2516,7 +2516,7 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("snapshot of Results with notification callback registered") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         auto col_value = table->get_column_key("value");
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
@@ -2544,7 +2544,7 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("adding notification callback to snapshot throws") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         auto col_value = table->get_column_key("value");
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
@@ -2553,7 +2553,7 @@ TEST_CASE("results: snapshots") {
     }
 
     SECTION("accessors should return none for detached row") {
-        auto table = r->read_group().get_table("class_object");
+        auto table = r->get_group().get_table("class_object");
         write([=] {
             table->create_object();
         });
@@ -2585,9 +2585,9 @@ TEST_CASE("results: distinct") {
           {"num3", PropertyType::Int}}},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     for (int i = 0; i < N; ++i) {
         table->create_object().set_all(i % 3, util::format("Foo_%1", i % 3).c_str(), N - i, i % 2);
     }
@@ -2802,8 +2802,8 @@ TEST_CASE("results: sort") {
     };
 
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    auto table2 = realm->read_group().get_table("class_object 2");
+    auto table = realm->get_group().get_table("class_object");
+    auto table2 = realm->get_group().get_table("class_object 2");
     Results r(realm, table);
 
     SECTION("invalid keypaths") {
@@ -2853,7 +2853,7 @@ TEST_CASE("results: sort") {
         }
     }
 
-    realm->begin_transaction();
+    realm->begin_write_transaction();
     ObjKeys table_keys;
     ObjKeys table2_keys;
     table->create_objects(4, table_keys);
@@ -2925,8 +2925,8 @@ struct ResultsFromTableView {
 struct ResultsFromLinkView {
     static Results call(std::shared_ptr<Realm> r, ConstTableRef table)
     {
-        r->begin_transaction();
-        auto link_table = r->read_group().get_table("class_linking_object");
+        r->begin_write_transaction();
+        auto link_table = r->get_group().get_table("class_linking_object");
         std::shared_ptr<LnkLst> link_view =
             link_table->create_object().get_linklist_ptr(link_table->get_column_key("link"));
         for (auto& o : *table)
@@ -2939,8 +2939,8 @@ struct ResultsFromLinkView {
 struct ResultsFromLinkSet {
     static Results call(std::shared_ptr<Realm> r, ConstTableRef table)
     {
-        r->begin_transaction();
-        auto link_table = r->read_group().get_table("class_linking_object");
+        r->begin_write_transaction();
+        auto link_table = r->get_group().get_table("class_linking_object");
         std::shared_ptr<LnkSet> link_set =
             link_table->create_object().get_linkset_ptr(link_table->get_column_key("linkset"));
         for (auto& o : *table) {
@@ -2970,10 +2970,10 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     ColKey col_value = table->get_column_key("value");
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     for (int i = 0; i < 10; ++i)
         table->create_object().set_all(i);
     r->commit_transaction();
@@ -3018,11 +3018,11 @@ TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFrom
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     ColKey col_value = table->get_column_key("pk");
     Results results = TestType::call(r, table);
 
-    r->begin_transaction();
+    r->begin_write_transaction();
 
     SECTION("front insertion") {
         for (int i = 0; i < 1000; ++i) {
@@ -3089,7 +3089,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
 
     Results empty_results = TestType::call(r, table);
     CppContext ctx(r, &empty_results.get_object_schema());
@@ -3106,8 +3106,8 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
         }
     }
 
-    r->begin_transaction();
-    auto other_obj = r->read_group().get_table("class_different type")->create_object();
+    r->begin_write_transaction();
+    auto other_obj = r->get_group().get_table("class_different type")->create_object();
     for (int i = 0; i < 10; ++i)
         table->create_object().set_all(i);
     r->commit_transaction();
@@ -3139,7 +3139,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
                               "Object of type 'different type' does not match Results type 'object'");
         }
         SECTION("wrong realm") {
-            auto obj = r2->read_group().get_table("class_object")->get_object(0);
+            auto obj = r2->get_group().get_table("class_object")->get_object(0);
             CHECK_THROWS_WITH(results.index_of(ctx, util::Any(obj)),
                               "Object of type 'object' does not match Results type 'object'");
         }
@@ -3173,14 +3173,14 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
          }},
     });
 
-    auto table = r->read_group().get_table("class_object");
+    auto table = r->get_group().get_table("class_object");
     ColKey col_int = table->get_column_key("int");
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
 
     SECTION("one row with null values") {
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         table->create_object().set_all(0, 0.f, 0.0, Timestamp(0, 0));
         table->create_object().set_all(2, 2.f, 2.0, Timestamp(2, 0));
@@ -3222,7 +3222,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
     }
 
     SECTION("rows with all null values") {
-        r->begin_transaction();
+        r->begin_write_transaction();
         table->create_object();
         table->create_object();
         table->create_object();
@@ -3332,8 +3332,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
                             }}};
     config.schema_version = 0;
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_AllTypes");
-    realm->begin_transaction();
+    auto table = realm->get_group().get_table("class_AllTypes");
+    realm->begin_write_transaction();
     table->create_object_with_primary_key(1);
     table->create_object_with_primary_key(2);
     realm->commit_transaction();
@@ -3342,26 +3342,26 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     TestContext ctx(realm);
 
     SECTION("non-existing property name") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)),
                           Results::InvalidPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("readonly property") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), ReadOnlyPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("primarykey property") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), std::logic_error);
         realm->cancel_transaction();
     }
 
     SECTION("set property values removes object from Results") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         Results results(realm, table->where().equal(table->get_column_key("int"), 0));
         CHECK(results.size() == 2);
         r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
@@ -3370,7 +3370,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 
     SECTION("set property value") {
-        realm->begin_transaction();
+        realm->begin_write_transaction();
 
         r.set_property_value<util::Any>(ctx, "bool", util::Any(true));
         for (size_t i = 0; i < r.size(); i++) {
@@ -3514,12 +3514,12 @@ TEST_CASE("results: nullable list of primitives") {
                 }}};
     config.schema_version = 0;
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_ListTypes");
+    auto table = realm->get_group().get_table("class_ListTypes");
     auto nullable_decimal_col = table->get_column_key("nullable decimal list");
     auto non_nullable_decimal_col = table->get_column_key("non nullable decimal list");
     auto nullable_oid_col = table->get_column_key("nullable objectid list");
     auto non_nullable_oid_col = table->get_column_key("non nullable objectid list");
-    realm->begin_transaction();
+    realm->begin_write_transaction();
     auto obj = table->create_object_with_primary_key(1);
     List nullable_decimal_list(realm, obj, nullable_decimal_col);
     List non_nullable_decimal_list(realm, obj, non_nullable_decimal_col);
@@ -3563,10 +3563,10 @@ TEST_CASE("results: limit", "[limit]") {
     };
 
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
+    auto table = realm->get_group().get_table("class_object");
     auto col = table->get_column_key("value");
 
-    realm->begin_transaction();
+    realm->begin_write_transaction();
     for (int i = 0; i < 8; ++i) {
         table->create_object().set(col, (i + 2) % 4);
     }
@@ -3637,7 +3637,7 @@ TEST_CASE("results: limit", "[limit]") {
         });
         advance_and_notify(*realm);
         REQUIRE(notification_calls == 1);
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         table->create_object().set(col, 5);
         realm->commit_transaction();
         advance_and_notify(*realm);
@@ -3665,7 +3665,7 @@ TEST_CASE("results: limit", "[limit]") {
         });
         advance_and_notify(*realm);
         REQUIRE(notification_calls == 1);
-        realm->begin_transaction();
+        realm->begin_write_transaction();
         table->get_object(1).set(col, 5);
         realm->commit_transaction();
         advance_and_notify(*realm);
@@ -3713,16 +3713,16 @@ TEST_CASE("notifications: objects with PK recreated") {
     };
 
     auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
-    auto table1 = r->read_group().get_table("class_no_pk");
-    auto table2 = r->read_group().get_table("class_int_pk");
-    auto table3 = r->read_group().get_table("class_string_pk");
+    auto table1 = r->get_group().get_table("class_no_pk");
+    auto table2 = r->get_group().get_table("class_int_pk");
+    auto table3 = r->get_group().get_table("class_string_pk");
 
     TestContext d(r);
     auto create = [&](StringData type, util::Any&& value) {
         return Object::create(d, r, *r->schema().find(type), value);
     };
 
-    r->begin_transaction();
+    r->begin_write_transaction();
     auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).obj().get_key();
     auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).obj().get_key();
     auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).obj().get_key();
@@ -3749,10 +3749,10 @@ TEST_CASE("notifications: objects with PK recreated") {
     REQUIRE(calls3 == 1);
 
     SECTION("objects removed") {
-        r->begin_transaction();
-        r->read_group().get_table("class_no_pk")->remove_object(k1);
-        r->read_group().get_table("class_int_pk")->remove_object(k2);
-        r->read_group().get_table("class_string_pk")->remove_object(k3);
+        r->begin_write_transaction();
+        r->get_group().get_table("class_no_pk")->remove_object(k1);
+        r->get_group().get_table("class_int_pk")->remove_object(k2);
+        r->get_group().get_table("class_string_pk")->remove_object(k3);
         create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
         create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
         create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
@@ -3771,10 +3771,10 @@ TEST_CASE("notifications: objects with PK recreated") {
     }
 
     SECTION("table cleared") {
-        r->begin_transaction();
-        r->read_group().get_table("class_no_pk")->clear();
-        r->read_group().get_table("class_int_pk")->clear();
-        r->read_group().get_table("class_string_pk")->clear();
+        r->begin_write_transaction();
+        r->get_group().get_table("class_no_pk")->clear();
+        r->get_group().get_table("class_int_pk")->clear();
+        r->get_group().get_table("class_string_pk")->clear();
         create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
         create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
         create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
