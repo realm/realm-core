@@ -2750,6 +2750,11 @@ TEST(Parser_Backlinks)
     ColKey account_col = t->add_column(type_Double, "account_balance");
     ColKey items_col = t->add_column_list(*items, "items");
     ColKey fav_col = t->add_column(*items, "fav item");
+
+    TableRef things = g.add_table("class_class_with_policy");
+    auto int_col = things->add_column(type_Int, "pascal_case");
+    auto link_col = things->add_column(*things, "with_underscores");
+
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -2781,6 +2786,12 @@ TEST(Parser_Backlinks)
         }
     }
 
+    {
+        auto obj1 = things->create_object().set(int_col, 1);
+        auto obj2 = things->create_object().set(int_col, 2);
+        auto obj3 = things->create_object().set(int_col, 3);
+        obj3.set(link_col, obj2.get_key());
+    }
     Query q = items->backlink(*t, fav_col).column<Double>(account_col) > 20;
     CHECK_EQUAL(q.count(), 1);
     std::string desc = q.get_description();
@@ -2840,6 +2851,12 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
     verify_query(test_context, items, "@links.my-custom-class-name.items.@count > 2", 2, mapping);
+
+    // Check that mapping works for tables named "class_class..."
+    query_parser::KeyPathMapping another_mapping;
+    another_mapping.add_mapping(things, "parents", "@links.ClassWithPolicy.with_underscores");
+    another_mapping.add_table_mapping(things, "ClassWithPolicy");
+    verify_query(test_context, things, "parents.pascal_case == 3", 1, another_mapping);
 
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
