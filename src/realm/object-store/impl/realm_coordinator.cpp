@@ -1087,7 +1087,7 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
     notifiers.package_and_wait(util::none);
 
     // FIXME: we probably won't actually want a strong pointer here
-    auto sg = Realm::Internal::get_transaction_ref(realm);
+    auto sg = Realm::Internal::get_transaction_reference(realm);
     if (notifiers) {
         auto version = notifiers.version();
         if (version) {
@@ -1131,7 +1131,7 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
 {
     // FIXME: we probably won't actually want a strong pointer here
     auto self = shared_from_this();
-    auto sg = Realm::Internal::get_transaction_ref(realm);
+    auto sg = Realm::Internal::get_transaction_reference(realm);
     util::CheckedUniqueLock lock(m_notifier_mutex);
     _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
     lock.unlock();
@@ -1156,7 +1156,7 @@ void RealmCoordinator::promote_to_write(Realm& realm)
     lock.unlock();
 
     // FIXME: we probably won't actually want a strong pointer here
-    auto tr = Realm::Internal::get_transaction_ref(realm);
+    auto tr = Realm::Internal::get_transaction_reference(realm);
     transaction::begin(tr, realm.m_binding_context.get(), notifiers);
 }
 
@@ -1180,7 +1180,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
         return;
     }
 
-    bool in_read = realm.is_in_read_transaction();
+    bool in_read = realm.is_in_read_or_frozen_transaction();
     auto& sg = Realm::Internal::get_transaction(realm);
     auto version = sg.get_version_of_current_transaction();
     auto package = [&](auto& notifier) {

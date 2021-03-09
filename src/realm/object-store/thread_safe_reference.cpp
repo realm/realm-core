@@ -39,7 +39,7 @@ class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-        : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
+        : m_transaction(realm.is_in_read_or_frozen_transaction() ? realm.duplicate() : nullptr)
         , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
         , m_created_in_write_transaction(realm.is_in_write_transaction())
     {
@@ -57,7 +57,7 @@ private:
 
 void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
-    if (!realm.is_in_read_transaction()) {
+    if (!realm.is_in_read_or_frozen_transaction()) {
         if (m_created_in_write_transaction)
             realm.get_group();
         else

@@ -95,7 +95,7 @@ Transaction& Realm::get_transaction() const
     return static_cast<Transaction&>(const_cast<Realm*>(this)->get_group());
 }
 
-std::shared_ptr<Transaction> Realm::transaction_ref()
+std::shared_ptr<Transaction> Realm::get_transaction_reference()
 {
     return std::static_pointer_cast<Transaction>(m_group);
 }
@@ -340,7 +340,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     schema.validate(validation_mode);
 
-    bool was_in_read_transaction = is_in_read_transaction();
+    bool was_in_read_transaction = is_in_read_or_frozen_transaction();
     Schema actual_schema = get_full_schema();
     std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
 
@@ -595,7 +595,7 @@ bool Realm::should_wait_for_change()
     if (m_frozen_version) {
         return false;
     }
-    return m_group ? m_coordinator->wait_for_change(transaction_ref()) : false;
+    return m_group ? m_coordinator->wait_for_change(get_transaction_reference()) : false;
 }
 
 void Realm::wait_for_change_release()
@@ -622,7 +622,7 @@ void Realm::begin_write_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(transaction_ref(), m_binding_context.get(), notifiers);
+        transaction::begin(get_transaction_reference(), m_binding_context.get(), notifiers);
         return;
     }
 

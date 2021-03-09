@@ -46,7 +46,9 @@ class TransactLogParser;
 }
 
 
-/// A group is a collection of named tables.
+/// A group is a collection of named tables and meta data for them.
+/// It is the topmost object in the tree and keeps track of and caches (parts of) the top of the tree with all the
+/// data.
 ///
 class Group : public ArrayParent {
 public:

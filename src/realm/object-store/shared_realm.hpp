@@ -302,6 +302,10 @@ public:
     void commit_transaction();
     void cancel_transaction();
     bool is_in_write_transaction() const noexcept;
+    bool is_in_read_or_frozen_transaction() const
+    {
+        return m_group != nullptr;
+    }
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -309,11 +313,6 @@ public:
     // Returns `true` if the Realm is frozen, `false` otherwise.
     bool is_frozen() const;
 
-    // Returns true if the Realm is either in a read or frozen transaction
-    bool is_in_read_transaction() const
-    {
-        return m_group != nullptr;
-    }
     uint64_t last_seen_transaction_version()
     {
         return m_schema_transaction_version;
@@ -409,9 +408,9 @@ public:
         {
             return realm.get_transaction();
         }
-        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm)
+        static std::shared_ptr<Transaction> get_transaction_reference(Realm& realm)
         {
-            return realm.transaction_ref();
+            return realm.get_transaction_reference();
         }
 
         // CollectionNotifier needs to be able to access the owning
@@ -476,7 +475,7 @@ private:
 
     Transaction& get_transaction();
     Transaction& get_transaction() const;
-    std::shared_ptr<Transaction> transaction_ref();
+    std::shared_ptr<Transaction> get_transaction_reference();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
