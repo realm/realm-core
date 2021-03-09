@@ -491,6 +491,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "buddy == nil", 4);
     verify_query(test_context, t, "buddy != NULL", 1);
     verify_query(test_context, t, "buddy <> NULL", 1);
+    verify_query(test_context, t, "buddy.name == NULL", 4); // matches null links
+    verify_query(test_context, t, "buddy.age == NULL", 4);
     verify_query(test_context, t, "age > 2", 2);
     verify_query(test_context, t, "!(age >= 2)", 2);
     verify_query(test_context, t, "!(age => 2)", 2);
