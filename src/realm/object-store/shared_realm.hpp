@@ -323,10 +323,10 @@ public:
     uint_fast64_t get_number_of_versions() const;
 
     VersionID get_version_of_current_transaction() const;
-    Group& get_group();
     // Get the version of the current read or frozen transaction, or `none` if the Realm
-    // is not in a read transaction
-    util::Optional<VersionID> current_transaction_version() const;
+    // is not in a read transaction (this is only used in tests).
+    util::Optional<VersionID> get_version_of_current_or_frozen_transaction() const;
+    Group& get_group();
 
     TransactionRef duplicate() const;
 

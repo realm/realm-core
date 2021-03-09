@@ -724,11 +724,11 @@ TEST_CASE("SharedRealm: notifications") {
         r2->commit_transaction();
         REQUIRE(realm->refresh());
 
-        auto ver = realm->current_transaction_version();
+        auto ver = realm->get_version_of_current_or_frozen_transaction();
         realm->m_binding_context.reset();
         // Should advance to the version created in the previous did_change()
         REQUIRE(realm->refresh());
-        auto new_ver = realm->current_transaction_version();
+        auto new_ver = realm->get_version_of_current_or_frozen_transaction();
         REQUIRE(*new_ver > *ver);
         // No more versions, so returns false
         REQUIRE_FALSE(realm->refresh());

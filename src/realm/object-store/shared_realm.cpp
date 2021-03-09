@@ -560,6 +560,18 @@ VersionID Realm::get_version_of_current_transaction() const
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
 }
 
+util::Optional<VersionID> Realm::get_version_of_current_or_frozen_transaction() const
+{
+    util::Optional<VersionID> current_transaction_version;
+    if (m_group) {
+        current_transaction_version = get_version_of_current_transaction();
+    }
+    else if (m_frozen_version) {
+        current_transaction_version = m_frozen_version;
+    }
+    return current_transaction_version;
+}
+
 uint_fast64_t Realm::get_number_of_versions() const
 {
     verify_is_open();
@@ -571,18 +583,6 @@ bool Realm::is_in_write_transaction() const noexcept
 {
     return !m_config.is_immutable() && !is_closed() && m_group &&
            get_transaction().get_transact_stage() == DB::transact_Writing;
-}
-
-util::Optional<VersionID> Realm::current_transaction_version() const
-{
-    util::Optional<VersionID> current_transaction_version;
-    if (m_group) {
-        current_transaction_version = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
-    }
-    else if (m_frozen_version) {
-        current_transaction_version = m_frozen_version;
-    }
-    return current_transaction_version;
 }
 
 void Realm::enable_wait_for_change()

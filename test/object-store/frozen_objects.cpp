@@ -73,7 +73,8 @@ TEST_CASE("Construct frozen Realm") {
         realm->get_group();
         auto frozen_realm = Realm::get_frozen_realm(config, realm->get_version_of_current_transaction());
         REQUIRE(frozen_realm->is_frozen());
-        REQUIRE(realm->get_version_of_current_transaction() == *frozen_realm->current_transaction_version());
+        REQUIRE(realm->get_version_of_current_transaction() ==
+                *frozen_realm->get_version_of_current_or_frozen_transaction());
     }
 }
 
