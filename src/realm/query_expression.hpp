@@ -1844,9 +1844,6 @@ public:
 
     void set_cluster(const Cluster* cluster)
     {
-        for (auto& table : m_tables) {
-            table->refresh_allocator_wrapper();
-        }
         Allocator& alloc = get_base_table()->get_alloc();
         m_array_ptr = nullptr;
         switch (m_link_types[0]) {
@@ -2777,7 +2774,10 @@ public:
     {
         return m_link_map.get_base_table();
     }
-
+    Allocator& get_alloc() const
+    {
+        return m_link_map.get_target_table()->get_alloc();
+    }
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
@@ -2795,7 +2795,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = get_alloc();
         Value<ref_type> list_refs;
         get_lists(index, list_refs, 1);
         size_t sz = 0;
@@ -2872,7 +2872,7 @@ public:
         REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
         Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
 
-        Allocator& alloc = this->get_base_table()->get_alloc();
+        Allocator& alloc = Columns<Lst<T>>::get_alloc();
         Value<ref_type> list_refs;
         this->get_lists(index, list_refs, 1);
         d->init(list_refs.m_from_link_list, list_refs.m_values);
@@ -2947,7 +2947,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<ref_type> list_refs;
         m_list.get_lists(index, list_refs, 1);
         REALM_ASSERT_DEBUG(list_refs.m_values > 0 || list_refs.m_from_link_list);
