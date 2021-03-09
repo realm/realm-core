@@ -77,6 +77,10 @@ public:
     {
         return m_root->ensure_writeable(k);
     }
+    void update_ref_in_parent(ObjKey k, ref_type ref)
+    {
+        m_root->update_ref_in_parent(k, ref);
+    }
     Array& get_fields_accessor(Array& fallback, MemRef mem) const
     {
         if (m_root->is_leaf()) {

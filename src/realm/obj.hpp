@@ -297,6 +297,7 @@ private:
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey spec_ndx2colkey(size_t col_ndx);
     bool ensure_writeable();
+    void sync(Array& arr);
     void bump_content_version();
     void bump_both_versions();
     template <class T>
