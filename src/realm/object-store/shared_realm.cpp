@@ -556,7 +556,9 @@ VersionID Realm::get_version_of_current_transaction() const
 {
     verify_is_on_thread();
     verify_is_open();
-    verify_can_create_any_transaction(this);
+    if (!is_in_read_or_frozen_transaction()) {
+        throw InvalidTransactionException("Cannot retrieve a transaction version without a transaction.");
+    }
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
 }
 
