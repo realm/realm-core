@@ -995,7 +995,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
@@ -1018,7 +1018,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
@@ -1041,7 +1041,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
@@ -1063,13 +1063,13 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            realm->begin_write_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
             Obj child_object1 = child_table->create_object();
             child_object1.set("value", 42);
             Obj child_object2 = child_table->create_object();
             child_object2.set("value", 43);
-            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
             auto child_object_key1 = child_object1.get_key();
             auto child_object_key2 = child_object2.get_key();
             parent_table->create_object().set_all(child_object_key1);
@@ -1108,11 +1108,11 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
+            realm->begin_write_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
             Obj child_object = child_table->create_object();
             child_object.set("value", 42);
-            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
             auto child_object_key = child_object.get_key();
             parent_table->create_object().set_all(child_object_key);
             parent_table->create_object().set_all(child_object_key);
@@ -1129,7 +1129,7 @@ TEST_CASE("migration: Automatic") {
                         any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
                     Int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
 
-                    auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
+                    auto child_table = ObjectStore::table_for_object_type(new_realm->get_group(), "child_table");
                     Obj child_object2 = child_table->create_object();
                     child_object2.set("value", value);
 
