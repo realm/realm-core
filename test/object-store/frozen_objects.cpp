@@ -107,7 +107,7 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
         REQUIRE(!frozen_realm->auto_refresh());
     }
 
-    SECTION("begin_transaction() throws") {
+    SECTION("begin_write_transaction() throws") {
         REQUIRE_THROWS(frozen_realm->begin_write_transaction());
     }
 

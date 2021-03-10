@@ -1926,7 +1926,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
-        return realm::Results(r, r->read_group().get_table("class_Dog"));
+        return realm::Results(r, r->get_group().get_table("class_Dog"));
     };
 
     // MARK: Add Objects -
@@ -1941,13 +1941,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // clear state from previous runs
             {
                 Results dogs = get_dogs(r, session);
-                r->begin_transaction();
+                r->begin_write_transaction();
                 dogs.clear();
                 r->commit_transaction();
             }
 
             REQUIRE(get_dogs(r, session).size() == 0);
-            r->begin_transaction();
+            r->begin_write_transaction();
             CppContext c;
             Object::create(c, r, "Dog",
                            util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
@@ -1990,13 +1990,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // clear state from previous runs
             {
                 Results dogs = get_dogs(r, session);
-                r->begin_transaction();
+                r->begin_write_transaction();
                 dogs.clear();
                 r->commit_transaction();
             }
 
             REQUIRE(get_dogs(r, session).size() == 0);
-            r->begin_transaction();
+            r->begin_write_transaction();
             CppContext c;
             Object::create(c, r, "Dog",
                            util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
@@ -2098,7 +2098,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
         // and get uploaded at once, which for now is an error on the server.
-        r->begin_transaction();
+        r->begin_write_transaction();
         CppContext c;
         for (auto i = 'a'; i < 'z'; ++i) {
             Object::create(c, r, "Dog",

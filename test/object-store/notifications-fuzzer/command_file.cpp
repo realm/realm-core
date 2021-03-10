@@ -81,7 +81,7 @@ static void run_commit(RealmState& state)
     log("commit\n");
     state.realm.commit_transaction();
     state.coordinator.on_change();
-    state.realm.begin_transaction();
+    state.realm.begin_write_transaction();
 }
 
 static void run_lv_insert(RealmState& state, size_t pos, size_t target)
@@ -224,7 +224,7 @@ void CommandFile::import(RealmState& state)
 {
     auto& table = state.table;
 
-    state.realm.begin_transaction();
+    state.realm.begin_write_transaction();
 
     table.clear();
     size_t ndx = table.add_empty_row(initial_values.size());
@@ -244,7 +244,7 @@ void CommandFile::import(RealmState& state)
 
 void CommandFile::run(RealmState& state)
 {
-    state.realm.begin_transaction();
+    state.realm.begin_write_transaction();
     for (auto& command : commands) {
         command(state);
     }

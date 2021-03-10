@@ -157,7 +157,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 1);
         }
 
-        SECTION("is delivered on begin_transaction()") {
+        SECTION("is delivered on begin_write_transaction()") {
             coordinator->on_change();
             REQUIRE(notification_calls == 0);
             r->begin_write_transaction();
@@ -182,7 +182,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 1);
         }
 
-        SECTION("begin_transaction() blocks due to initial results not being ready") {
+        SECTION("begin_write_transaction() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
             JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
@@ -224,7 +224,7 @@ TEST_CASE("notifications: async delivery") {
                 REQUIRE(notification_calls == 1);
             }
 
-            SECTION("begin_transaction()") {
+            SECTION("begin_write_transaction()") {
                 coordinator->on_change();
                 REQUIRE_FALSE(r->is_in_any_transaction());
                 r->begin_write_transaction();
@@ -265,7 +265,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 2);
         }
 
-        SECTION("begin_transaction()") {
+        SECTION("begin_write_transaction()") {
             r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
@@ -295,7 +295,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 2);
         }
 
-        SECTION("begin_transaction()") {
+        SECTION("begin_write_transaction()") {
             r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
@@ -491,7 +491,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 3);
         }
 
-        SECTION("begin_transaction() blocks") {
+        SECTION("begin_write_transaction() blocks") {
             REQUIRE(notification_calls == 1);
             JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
@@ -508,14 +508,14 @@ TEST_CASE("notifications: async delivery") {
             r->refresh();
         }
 
-        SECTION("begin_transaction() does not block for results without callbacks") {
+        SECTION("begin_write_transaction() does not block for results without callbacks") {
             token = {};
             // this would deadlock if it waits for the notifier to be ready
             r->begin_write_transaction();
             r->cancel_transaction();
         }
 
-        SECTION("begin_transaction() does not block for Results for different Realms") {
+        SECTION("begin_write_transaction() does not block for Results for different Realms") {
             // this would deadlock if beginning the write on the secondary Realm
             // waited for the primary Realm to be ready
             make_remote_change();
@@ -551,7 +551,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 2);
         }
 
-        SECTION("begin_transaction() blocks") {
+        SECTION("begin_write_transaction() blocks") {
             REQUIRE(notification_calls == 1);
             JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
@@ -591,7 +591,7 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 2);
         }
 
-        SECTION("begin_transaction()") {
+        SECTION("begin_write_transaction()") {
             coordinator->on_change();
             REQUIRE_FALSE(r->is_in_any_transaction());
             r->begin_write_transaction();
@@ -643,7 +643,7 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE_FALSE(r->refresh()); // does not advance since it's now up-to-date
     }
 
-    SECTION("begin_transaction() from within a notification does not send notifications immediately") {
+    SECTION("begin_write_transaction() from within a notification does not send notifications immediately") {
         bool first = true;
         auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
@@ -667,7 +667,8 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 3);
     }
 
-    SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
+    SECTION(
+        "begin_write_transaction() from within a notification does not break delivering additional notifications") {
         size_t calls = 0;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
@@ -700,7 +701,7 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(calls2 == 2);
     }
 
-    SECTION("begin_transaction() from within did_change() does not break delivering collection notification") {
+    SECTION("begin_write_transaction() from within did_change() does not break delivering collection notification") {
         struct Context : BindingContext {
             Realm& realm;
             Context(Realm& realm)
@@ -725,7 +726,8 @@ TEST_CASE("notifications: async delivery") {
         r->notify();          // advances to version from 1
     }
 
-    SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes "
+    SECTION("is_in_write_transaction() is reported correctly within a notification from begin_write_transaction() "
+            "and changes "
             "can be made") {
         bool first = true;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
@@ -763,8 +765,8 @@ TEST_CASE("notifications: async delivery") {
         r->cancel_transaction();
     }
 
-    SECTION(
-        "cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
+    SECTION("cancel_transaction() from within notification ends the write transaction started by "
+            "begin_write_transaction()") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             if (r->is_in_write_transaction())
@@ -1274,7 +1276,7 @@ TEST_CASE("notifications: async error handling") {
             REQUIRE(called);
         }
 
-        SECTION("error is delivered on begin_transaction() without changes") {
+        SECTION("error is delivered on begin_write_transaction() without changes") {
             coordinator->on_change();
             REQUIRE(!called);
             r->begin_write_transaction();
@@ -1282,7 +1284,7 @@ TEST_CASE("notifications: async error handling") {
             r->cancel_transaction();
         }
 
-        SECTION("error is delivered on begin_transaction() with changes") {
+        SECTION("error is delivered on begin_write_transaction() with changes") {
             r2->begin_write_transaction();
             r2->commit_transaction();
             REQUIRE(!called);

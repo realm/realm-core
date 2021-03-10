@@ -722,7 +722,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // The skip version must always be the notifier transaction's current
         // version plus one, as we can only skip a prefix and not intermediate
         // transactions. If we have a notifier for the current Realm, then we
-        // waited until it finished running in begin_transaction() and this
+        // waited until it finished running in begin_write_transaction() and this
         // invarient holds. If we don't have any notifiers then we don't need
         // to set the skip version, but more importantly *can't* because we
         // didn't block when starting the write and the notifier transaction

@@ -44,7 +44,7 @@ RLM_API bool realm_is_closed(realm_t* realm)
 
 RLM_API bool realm_is_writable(const realm_t* realm)
 {
-    return (*realm)->is_in_transaction();
+    return (*realm)->is_in_write_transaction();
 }
 
 RLM_API bool realm_close(realm_t* realm)
@@ -58,7 +58,7 @@ RLM_API bool realm_close(realm_t* realm)
 RLM_API bool realm_begin_write(realm_t* realm)
 {
     return wrap_err([&]() {
-        (*realm)->begin_transaction();
+        (*realm)->begin_write_transaction();
         return true;
     });
 }

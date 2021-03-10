@@ -193,7 +193,7 @@ RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_class_key_t
                                          const char* query_string, size_t num_args, const realm_value_t* args)
 {
     return wrap_err([&]() {
-        auto table = (*realm)->read_group().get_table(TableKey(target_table_key));
+        auto table = (*realm)->get_group().get_table(TableKey(target_table_key));
         DescriptorOrdering ordering;
         Query query = parse_and_apply_query(*realm, table, ordering, query_string, num_args, args);
         return new realm_query_t{std::move(query), std::move(ordering), *realm};
