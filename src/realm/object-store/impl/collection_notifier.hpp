@@ -61,21 +61,24 @@ struct TransactionChangeInfo {
     bool schema_changed;
 };
 
+struct TableKeyHasher {
+    std::size_t operator()(const TableKey& key) const
+    {
+        return std::hash<TableKeyType>{}(key.value);
+    }
+};
+
 class DeepChangeChecker {
 public:
-    struct RelatedTable {
-        TableKey table_key;
-        std::vector<ColKey> outgoing_links;
-    };
-
+    typedef std::unordered_map<TableKey, std::vector<ColKey>, TableKeyHasher> RelatedTables;
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                      std::vector<RelatedTable> const& related_tables);
+                      RelatedTables const& related_tables);
 
     bool operator()(ObjKeyType obj_key);
 
     // Recursively add `table` and all tables it links to to `out`, along with
     // information about the links from them
-    static void find_related_tables(std::vector<RelatedTable>& out, Table const& table);
+    static void find_related_tables(RelatedTables& out, Table const& table);
 
 private:
     TransactionChangeInfo const& m_info;
@@ -83,7 +86,7 @@ private:
     const TableKey m_root_table_key;
     ObjectChangeSet const* const m_root_object_changes;
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
-    std::vector<RelatedTable> const& m_related_tables;
+    RelatedTables const& m_related_tables;
 
     struct Path {
         ObjKey obj_key;
@@ -226,7 +229,7 @@ private:
     bool m_has_run = false;
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
-    std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
+    DeepChangeChecker::RelatedTables m_related_tables;
 
     struct Callback {
         CollectionChangeCallback fn;

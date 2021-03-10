@@ -24,6 +24,8 @@
 #include <realm/db.hpp>
 #include <realm/list.hpp>
 
+#include <unordered_set>
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -32,8 +34,8 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     // Check if any of the tables accessible from the root table were
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table
-    auto table_modified = [&](auto& tbl) {
-        auto it = info.tables.find(tbl.table_key.value);
+    auto table_modified = [&](auto& outgoing_linkset) {
+        auto it = info.tables.find(outgoing_linkset.first.value);
         return it != info.tables.end() && !it->second.modifications_empty();
     };
     return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
@@ -52,7 +54,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
+        auto& object_set = info.tables.find(m_related_tables.begin()->first.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             return object_set.modifications_contains(object_key);
         };
@@ -61,32 +63,64 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     return DeepChangeChecker(info, *root_table, m_related_tables);
 }
 
-void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
+void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& out, Table const& table)
 {
-    auto table_key = table.get_key();
-    if (any_of(begin(out), end(out), [=](auto& tbl) {
-            return tbl.table_key == table_key;
-        }))
-        return;
+    struct ColKeyHasher {
+        std::size_t operator()(const ColKey& key) const
+        {
+            return std::hash<decltype(ColKey::value)>{}(key.value);
+        }
+    };
+    struct LinkInfo {
+        std::unordered_set<ColKey, ColKeyHasher> link_columns;
+        std::unordered_set<TableKey, TableKeyHasher> connected_tables;
+    };
 
-    // We need to add this table to `out` before recurring so that the check
-    // above works, but we can't store a pointer to the thing being populated
-    // because the recursive calls may resize `out`, so instead look it up by
-    // index every time
-    size_t out_index = out.size();
-    out.push_back({table_key, {}});
+    // Build up the complete forward mapping from the back links.
+    // Following forward link columns does not account for TypedLink
+    // values as part of Dictionary<String, Mixed> for example. But
+    // we do not want to assume that all Mixed columns contain links,
+    // so we rely on the fact that if there are any TypedLinks from a
+    // Mixed value, there will be a corresponding backlink column
+    // created at the destination table.
+    std::unordered_map<TableKey, LinkInfo, TableKeyHasher> complete_mapping;
+    Group* group = table.get_parent_group();
+    REALM_ASSERT(group);
+    auto all_table_keys = group->get_table_keys();
+    for (auto it : all_table_keys) {
+        auto it_table = group->get_table(it);
+        REALM_ASSERT(it_table);
+        auto incoming_link_columns = it_table->get_incoming_link_columns();
+        for (auto incoming_link : incoming_link_columns) {
+            REALM_ASSERT(incoming_link->first);
+            auto& links = complete_mapping[incoming_link->first->get_key()];
+            links.link_columns.insert(incoming_link->second);
+            links.connected_tables.insert(it_table->get_key());
+        }
+    }
 
-    for (auto col_key : table.get_column_keys()) {
-        auto type = table.get_column_type(col_key);
-        if (type == type_Link || type == type_LinkList) {
-            out[out_index].outgoing_links.push_back(col_key);
-            find_related_tables(out, *table.get_link_target(col_key));
+    std::unordered_set<TableKey, TableKeyHasher> tables_to_check = {table.get_key()};
+    std::unordered_set<TableKey, TableKeyHasher> checked_tables;
+
+    while (tables_to_check.size()) {
+        auto table_key_to_check = *tables_to_check.begin();
+        tables_to_check.erase(tables_to_check.begin());
+        checked_tables.insert(table_key_to_check);
+        auto outgoing_links = complete_mapping[table_key_to_check];
+        auto& out_relations = out[table_key_to_check];
+        for (auto outgoing_link_col : complete_mapping[table_key_to_check].link_columns) {
+            out_relations.push_back(outgoing_link_col);
+        }
+        for (auto linked_table_key : outgoing_links.connected_tables) {
+            if (checked_tables.find(linked_table_key) == checked_tables.end()) {
+                tables_to_check.insert(linked_table_key);
+            }
         }
     }
 }
 
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                     std::vector<RelatedTable> const& related_tables)
+                                     DeepChangeChecker::RelatedTables const& related_tables)
     : m_info(info)
     , m_root_table(root_table)
     , m_root_table_key(root_table.get_key().value)
@@ -100,12 +134,10 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 
 bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth)
 {
-    auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
-        return tbl.table_key == table_key;
-    });
+    auto it = m_related_tables.find(table_key);
     if (it == m_related_tables.end())
         return false;
-    if (it->outgoing_links.empty())
+    if (it->second.empty())
         return false;
 
     // Check if we're already checking if the destination of the link is
@@ -184,7 +216,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
         return false;
     };
 
-    return std::any_of(begin(it->outgoing_links), end(it->outgoing_links), linked_object_changed);
+    return std::any_of(begin(it->second), end(it->second), linked_object_changed);
 }
 
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, size_t depth)
@@ -339,7 +371,7 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
 
     info.tables.reserve(m_related_tables.size());
     for (auto& tbl : m_related_tables)
-        info.tables[tbl.table_key.value];
+        info.tables[tbl.first.value];
 }
 
 void CollectionNotifier::prepare_handover()

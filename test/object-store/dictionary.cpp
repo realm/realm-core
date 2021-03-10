@@ -486,9 +486,9 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     config.schema = Schema{
         {"object", {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
         {"target1",
-         {{"value1", PropertyType::Int}, {"self_link1", PropertyType::Object | PropertyType::Nullable, "target1"}}},
+         {{"value1", PropertyType::Int}, {"link1", PropertyType::Object | PropertyType::Nullable, "target1"}}},
         {"target2",
-         {{"value2", PropertyType::Int}, {"self_link2", PropertyType::Object | PropertyType::Nullable, "target2"}}}};
+         {{"value2", PropertyType::Int}, {"link2", PropertyType::Object | PropertyType::Nullable, "target2"}}}};
 
     auto r = Realm::get_shared_realm(config);
 
@@ -497,6 +497,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     auto target2 = r->read_group().get_table("class_target2");
     ColKey col_value1 = target1->get_column_key("value1");
     ColKey col_value2 = target2->get_column_key("value2");
+    ColKey col_link1 = target1->get_column_key("link1");
     r->begin_transaction();
     Obj obj = table->create_object();
     Obj obj1 = table->create_object(); // empty dictionary
@@ -505,17 +506,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     ColKey col = table->get_column_key("value");
 
     object_store::Dictionary dict(r, obj, col);
-    auto keys_as_results = dict.get_keys();
-    auto values_as_results = dict.get_values();
     CppContext ctx(r);
-
-    SECTION("get_realm()") {
-        REQUIRE(dict.get_realm() == r);
-        REQUIRE(values_as_results.get_realm() == r);
-    }
-
-    std::vector<std::string> keys = {"a", "b", "c"};
-    std::vector<std::string> values = {"apple", "banana", "clementine"};
 
     dict.insert("key_a", Mixed{ObjLink(target1->get_key(), target1_obj.get_key())});
     dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
@@ -558,11 +549,23 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
         REQUIRE(local_changes.modifications.count() == 1);
         REQUIRE(local_changes.deletions.count() == 0);
     }
-    // FIXME: no change is detected because the m_related_tables of the notifier
-    // does not account for Mixed{TypedLink} which can point to any table.
     SECTION("modify a linked object is a modification") {
         r->begin_transaction();
         target1_obj.set(col_value1, 1000);
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object once removed is a modification") {
+        r->begin_transaction();
+        auto target1_obj2 = target1->create_object().set(col_value1, 1000);
+        target1_obj.set(col_link1, target1_obj2.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        r->begin_transaction();
+        target1_obj2.set(col_value1, 2000);
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(local_changes.insertions.count() == 0);
