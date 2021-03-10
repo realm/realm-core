@@ -59,6 +59,34 @@ public:
 
 using namespace realm;
 
+TEST_CASE("Automated backup") {
+    TestFile config;
+    std::string copy_from_file_name = "test_backup-olden-and-golden.realm";
+    config.path = "test_backup.realm";
+    REQUIRE(util::File::exists(copy_from_file_name));
+    util::File::copy(copy_from_file_name, config.path);
+    REQUIRE(util::File::exists(config.path));
+    // backup name must reflect version of old realm file (which is v6)
+    std::string backup_path = "test_backup.v6.backup.realm";
+    std::string backup_log = "test_backup.realm.backup-log";
+    util::File::try_remove(backup_path);
+    util::File::try_remove(backup_log);
+
+    SECTION("Backup enabled will produce correctly named backup") {
+        config.backup_at_file_format_change = true;
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(util::File::exists(backup_path));
+        REQUIRE(util::File::exists(backup_log));
+    }
+
+    SECTION("Backup disabled produces no backup") {
+        config.backup_at_file_format_change = false;
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(!util::File::exists(backup_path));
+        REQUIRE(!util::File::exists(backup_log));
+    }
+}
+
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
     config.cache = true;

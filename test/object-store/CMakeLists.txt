@@ -100,8 +100,15 @@ if(VSCODE_TEST_RUNNER)
     target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 endif()
 
+# Resources required for running the tests
+file(GLOB REQUIRED_TEST_FILES
+     "*.json"
+     "*.realm"
+     "expect_string.txt")
+
+
 add_custom_command(TARGET ObjectStoreTests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:ObjectStoreTests>)
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${REQUIRED_TEST_FILES} $<TARGET_FILE_DIR:ObjectStoreTests>)
 
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
