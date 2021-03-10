@@ -102,8 +102,16 @@ std::shared_ptr<Transaction> Realm::get_transaction_reference()
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return std::static_pointer_cast<Transaction>(
-        m_coordinator->begin_read(get_version_of_current_transaction(), is_frozen()));
+    VersionID version;
+    if (m_config.is_immutable()) {
+        version = get_current_version();
+    }
+    else {
+        version = get_version_of_current_transaction();
+    }
+    std::shared_ptr<Group> group = m_coordinator->begin_read(version, is_frozen());
+    std::shared_ptr<Transaction> transaction = std::static_pointer_cast<Transaction>(group);
+    return transaction;
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
@@ -552,6 +560,16 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
     return true;
 }
 
+VersionID Realm::get_current_version() const
+{
+    verify_is_on_thread();
+    verify_is_open();
+    if (!m_group) {
+        throw InvalidTransactionException("Cannot retrieve a version without a group.");
+    }
+    return m_group->get_current_version();
+}
+
 VersionID Realm::get_version_of_current_transaction() const
 {
     verify_is_on_thread();
@@ -581,10 +599,19 @@ uint_fast64_t Realm::get_number_of_versions() const
     return m_coordinator->get_number_of_versions();
 }
 
+bool Realm::is_in_any_transaction() const noexcept
+{
+    return !m_config.is_immutable() && !is_closed() && m_group;
+}
+
 bool Realm::is_in_write_transaction() const noexcept
 {
-    return !m_config.is_immutable() && !is_closed() && m_group &&
-           get_transaction().get_transact_stage() == DB::transact_Writing;
+    return is_in_any_transaction() && get_transaction().get_transact_stage() == DB::transact_Writing;
+}
+
+bool Realm::has_group() const noexcept
+{
+    return m_group != nullptr;
 }
 
 void Realm::enable_wait_for_change()

@@ -301,11 +301,10 @@ public:
     void begin_write_transaction();
     void commit_transaction();
     void cancel_transaction();
+    // Returns `true`, if `m_group` is set and mutable (which means it is actually a transaction).
+    bool is_in_any_transaction() const noexcept;
+    // Returns `true` if `m_group` is set, mutable and in the `DB::transact_Writing` stage.
     bool is_in_write_transaction() const noexcept;
-    bool is_in_any_transaction() const
-    {
-        return m_group != nullptr;
-    }
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -321,11 +320,21 @@ public:
     // Returns the number of versions in the Realm file.
     uint_fast64_t get_number_of_versions() const;
 
+    // Returns the current version for `m_group`.
+    // This is only relevant for read-only realms since they cannot `use get_version_of_current_transaction()`
+    // or `get_version_of_current_or_frozen_transaction()` for which a transaction is required.
+    VersionID get_current_version() const;
+    // Returns the current version of `m_group` (if it is a transaction).
+    // Caution: crashes for read-only realms since they don't have a transaction.
     VersionID get_version_of_current_transaction() const;
-    // Get the version of the current read or frozen transaction, or `none` if the Realm
-    // is not in a read transaction (this is only used in tests).
+    // Returns the version of the current read or frozen transaction, `null` otherwise.
+    // This is only used in tests.
     util::Optional<VersionID> get_version_of_current_or_frozen_transaction() const;
+
+    // Returns `m_group`.
     Group& get_group();
+    // Returns `true` if `m_group` is set, `false` otherwise.
+    bool has_group() const noexcept;
 
     TransactionRef duplicate() const;
 
@@ -386,7 +395,18 @@ public:
     template <typename... Args>
     auto import_copy_of(Args&&... args)
     {
-        return get_transaction().import_copy_of(std::forward<Args>(args)...);
+        // Read-only realms only have a group but no transaction. The group still supports `import_copy_of(..)`
+        // though.
+        if (m_config.is_immutable()) {
+            Transaction& transaction = static_cast<Transaction&>(const_cast<Realm*>(this)->get_group());
+            auto copy = transaction.import_copy_of(std::forward<Args>(args)...);
+            return copy;
+        }
+        else {
+            Transaction& transaction = get_transaction();
+            auto copy = transaction.import_copy_of(std::forward<Args>(args)...);
+            return copy;
+        }
     }
 
     static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version,

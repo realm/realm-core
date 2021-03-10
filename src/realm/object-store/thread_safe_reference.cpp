@@ -39,7 +39,12 @@ class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-        : m_transaction(realm.is_in_any_transaction() ? realm.duplicate() : nullptr)
+        // A read-only realm (which means that the configuration's schema mode `is_immutable()`) does not have a
+        // transaction. For this special case we instead need to check if a group was created, which is sufficient to
+        // create a duplicate of the realm.
+        : m_transaction(realm.is_in_any_transaction() || (realm.config().is_immutable() && realm.has_group())
+                            ? realm.duplicate()
+                            : nullptr)
         , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
         , m_created_in_write_transaction(realm.is_in_write_transaction())
     {

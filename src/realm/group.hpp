@@ -33,6 +33,7 @@
 #include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -244,6 +245,9 @@ public:
 
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;
+
+    // Returns a new `VersionID` using the `m_read_lock_info`.
+    VersionID get_current_version() const;
 
     /// \defgroup group_table_access Table Accessors
     ///
@@ -561,6 +565,14 @@ public:
     }
 #endif
 
+    struct ReadLockInfo {
+        uint_fast64_t m_version = std::numeric_limits<VersionID::version_type>::max();
+        uint_fast32_t m_reader_idx = 0;
+        ref_type m_top_ref = 0;
+        size_t m_file_size = 0;
+    };
+    ReadLockInfo m_read_lock_info;
+
 protected:
     virtual Replication* const* get_repl() const
     {
@@ -678,6 +690,7 @@ private:
     Group(shared_tag) noexcept;
 
     Group(SlabAlloc* alloc) noexcept;
+    Group(SlabAlloc* alloc, ReadLockInfo read_lock_info) noexcept;
     void init_array_parents() noexcept;
 
     void open(ref_type top_ref, const std::string& file_path);
@@ -938,6 +951,11 @@ private:
 inline TableKeys Group::get_table_keys() const
 {
     return TableKeys(this);
+}
+
+inline VersionID Group::get_current_version() const
+{
+    return VersionID(m_read_lock_info.m_version, m_read_lock_info.m_reader_idx);
 }
 
 inline bool Group::is_attached() const noexcept

@@ -141,6 +141,18 @@ Group::Group(SlabAlloc* alloc) noexcept
     init_array_parents();
 }
 
+Group::Group(SlabAlloc* alloc, ReadLockInfo read_lock_info) noexcept
+    : m_read_lock_info(read_lock_info)
+    , m_alloc(*alloc) // Throws
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
+    , m_total_rows(0)
+{
+    init_array_parents();
+}
+
 
 Group::TableRecycler Group::g_table_recycler_1;
 Group::TableRecycler Group::g_table_recycler_2;

@@ -279,6 +279,9 @@ TEST_CASE("thread safe reference") {
             TestFile configuration;
             SharedRealm realm = Realm::get_shared_realm(configuration);
             realm->update_schema(schema);
+            realm->begin_write_transaction();
+            create_object(realm, "int object", {{"value", INT64_C(42)}});
+            realm->commit_transaction();
             realm->close();
 
             configuration.schema_mode = SchemaMode::Immutable;
@@ -286,6 +289,13 @@ TEST_CASE("thread safe reference") {
             auto table = readOnlyRealm->get_group().get_table("class_int object");
             Results results(readOnlyRealm, table);
             auto threadSafeReference = ThreadSafeReference(results);
+            std::thread([threadSafeReference = std::move(threadSafeReference), configuration, int_obj_col]() mutable {
+                configuration.scheduler = util::Scheduler::get_frozen(VersionID());
+                SharedRealm readOnlyRealm2 = Realm::get_shared_realm(configuration);
+                Results results = threadSafeReference.resolve<Results>(readOnlyRealm2);
+                REQUIRE(results.size() == 1);
+                REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 42);
+            }).join();
         }
 
         SECTION("objects") {

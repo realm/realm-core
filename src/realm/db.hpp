@@ -376,12 +376,6 @@ private:
     Replication* m_replication = nullptr;
     struct SharedInfo;
     struct ReadCount;
-    struct ReadLockInfo {
-        uint_fast64_t m_version = std::numeric_limits<version_type>::max();
-        uint_fast32_t m_reader_idx = 0;
-        ref_type m_top_ref = 0;
-        size_t m_file_size = 0;
-    };
     class ReadLockGuard;
 
     // Member variables
@@ -389,7 +383,7 @@ private:
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
     uint_fast32_t m_local_max_entry = 0; // highest version observed by this DB
-    std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
+    std::vector<Group::ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
     util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
@@ -481,11 +475,11 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    void grab_read_lock(ReadLockInfo&, VersionID);
+    void grab_read_lock(Group::ReadLockInfo&, VersionID);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
-    void release_read_lock(ReadLockInfo&) noexcept;
+    void release_read_lock(Group::ReadLockInfo&) noexcept;
 
     // Release all read locks held by this DB object. After release, further calls to
     // release_read_lock for locks already released must be avoided.
@@ -536,13 +530,13 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space, util::Optional
 
 class Transaction : public Group {
 public:
-    Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage);
+    Transaction(DBRef _db, SlabAlloc* alloc, Group::ReadLockInfo& rli, DB::TransactStage stage);
     // convenience, so you don't need to carry a reference to the DB around
     ~Transaction();
 
     DB::version_type get_version() const noexcept
     {
-        return m_read_lock.m_version;
+        return m_read_lock_info.m_version;
     }
     DB::version_type get_version_of_latest_snapshot()
     {
@@ -640,7 +634,6 @@ private:
     mutable std::unique_ptr<_impl::History> m_history_read;
     mutable _impl::History* m_history = nullptr;
 
-    DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
     friend class DB;
@@ -817,24 +810,24 @@ inline DB::TransactStage Transaction::get_transact_stage() const noexcept
 
 class DB::ReadLockGuard {
 public:
-    ReadLockGuard(DB& shared_group, ReadLockInfo& read_lock) noexcept
+    ReadLockGuard(DB& shared_group, Group::ReadLockInfo& read_lock) noexcept
         : m_shared_group(shared_group)
-        , m_read_lock(&read_lock)
+        , m_read_lock_info(&read_lock)
     {
     }
     ~ReadLockGuard() noexcept
     {
-        if (m_read_lock)
-            m_shared_group.release_read_lock(*m_read_lock);
+        if (m_read_lock_info)
+            m_shared_group.release_read_lock(*m_read_lock_info);
     }
     void release() noexcept
     {
-        m_read_lock = 0;
+        m_read_lock_info = 0;
     }
 
 private:
     DB& m_shared_group;
-    ReadLockInfo* m_read_lock;
+    Group::ReadLockInfo* m_read_lock_info;
 };
 
 template <class O>
@@ -844,7 +837,7 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     // It is an error if the new version precedes the currently bound one.
-    if (version_id.version < m_read_lock.m_version)
+    if (version_id.version < m_read_lock_info.m_version)
         throw LogicError(LogicError::bad_version);
 
     auto hist = get_history(); // Throws
@@ -879,7 +872,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
-        DB::version_type current_version = m_read_lock.m_version;
+        DB::version_type current_version = m_read_lock_info.m_version;
         m_alloc.init_mapping_management(current_version);
         repl->initiate_transact(*this, current_version, history_updated); // Throws
 
@@ -928,8 +921,8 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Mark all managed space (beyond the attached file) as free.
     db->reset_free_space_tracking(); // Throws
 
-    ref_type top_ref = m_read_lock.m_top_ref;
-    size_t file_size = m_read_lock.m_file_size;
+    ref_type top_ref = m_read_lock_info.m_top_ref;
+    size_t file_size = m_read_lock_info.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
@@ -946,10 +939,10 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 template <class O>
 inline bool Transaction::internal_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
-    DB::ReadLockInfo new_read_lock;
+    Group::ReadLockInfo new_read_lock;
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
-    if (new_read_lock.m_version == m_read_lock.m_version) {
+    REALM_ASSERT(new_read_lock.m_version >= m_read_lock_info.m_version);
+    if (new_read_lock.m_version == m_read_lock_info.m_version) {
         db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
         // update allocator wrappers merely to update write protection
@@ -957,7 +950,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         return false;
     }
 
-    DB::version_type old_version = m_read_lock.m_version;
+    DB::version_type old_version = m_read_lock_info.m_version;
     DB::ReadLockGuard g(*db, new_read_lock);
     DB::version_type new_version = new_read_lock.m_version;
     size_t new_file_size = new_read_lock.m_file_size;
@@ -992,8 +985,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     _impl::ChangesetInputStream in(hist, old_version, new_version);
     advance_transact(new_top_ref, in, writable); // Throws
     g.release();
-    db->release_read_lock(m_read_lock);
-    m_read_lock = new_read_lock;
+    db->release_read_lock(m_read_lock_info);
+    m_read_lock_info = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
 }
