@@ -691,6 +691,10 @@ private:
     {
         m_alloc.update_from_underlying_allocator(writable);
     }
+    void refresh_allocator_wrapper() const noexcept
+    {
+        m_alloc.refresh_ref_translation();
+    }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
     TableKey m_key;     // 4th slot in m_top

@@ -2774,7 +2774,10 @@ public:
     {
         return m_link_map.get_base_table();
     }
-
+    Allocator& get_alloc() const
+    {
+        return m_link_map.get_target_table()->get_alloc();
+    }
     void set_base_table(ConstTableRef table) override
     {
         m_link_map.set_base_table(table);
@@ -2792,7 +2795,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = get_alloc();
         Value<ref_type> list_refs;
         get_lists(index, list_refs, 1);
         size_t sz = 0;
@@ -2869,7 +2872,7 @@ public:
         REALM_ASSERT_DEBUG(dynamic_cast<Value<SizeOfList>*>(&destination) != nullptr);
         Value<SizeOfList>* d = static_cast<Value<SizeOfList>*>(&destination);
 
-        Allocator& alloc = this->get_base_table()->get_alloc();
+        Allocator& alloc = Columns<Lst<T>>::get_alloc();
         Value<ref_type> list_refs;
         this->get_lists(index, list_refs, 1);
         d->init(list_refs.m_from_link_list, list_refs.m_values);
@@ -2944,7 +2947,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<ref_type> list_refs;
         m_list.get_lists(index, list_refs, 1);
         REALM_ASSERT_DEBUG(list_refs.m_values > 0 || list_refs.m_from_link_list);
@@ -3056,23 +3059,62 @@ inline Query operator!=(null, const Subexpr2<Link>& right)
     return compare<NotEqual>(right, null());
 }
 
+class ObjPropertyBase {
+public:
+    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links)
+        : m_link_map(table, std::move(links))
+        , m_column_key(column)
+    {
+    }
+    ObjPropertyBase(const ObjPropertyBase& other)
+        : m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
+    {
+    }
+
+    bool links_exist() const
+    {
+        return m_link_map.has_links();
+    }
+
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
+    bool is_nullable() const
+    {
+        return m_column_key.get_attrs().test(col_attr_Nullable);
+    }
+
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
+    }
+
+    ColKey column_key() const noexcept
+    {
+        return m_column_key;
+    }
+
+protected:
+    LinkMap m_link_map;
+    // Column index of payload column of m_table
+    mutable ColKey m_column_key;
+};
 
 template <class T>
-class Columns : public Subexpr2<T> {
+class Columns : public Subexpr2<T>, public ObjPropertyBase {
 public:
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 
     Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {})
-        : m_link_map(table, std::move(links))
-        , m_column_key(column)
-        , m_nullable(m_link_map.get_target_table()->is_nullable(m_column_key))
+        : ObjPropertyBase(column, table, links)
     {
     }
 
     Columns(const Columns& other)
-        : m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-        , m_nullable(other.m_nullable)
+        : ObjPropertyBase(other)
     {
     }
 
@@ -3081,7 +3123,6 @@ public:
         if (this != &other) {
             m_link_map = other.m_link_map;
             m_column_key = other.m_column_key;
-            m_nullable = other.m_nullable;
         }
         return *this;
     }
@@ -3098,7 +3139,6 @@ public:
             return;
 
         m_link_map.set_base_table(table);
-        m_nullable = m_link_map.get_target_table()->is_nullable(m_column_key);
     }
 
     void set_cluster(const Cluster* cluster) override
@@ -3126,11 +3166,11 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        if (value.is_null() && !m_nullable) {
+        if (value.is_null() && !is_nullable()) {
             return ret;
         }
 
-        if (m_nullable && std::is_same<T, int64_t>::value) {
+        if (is_nullable() && std::is_same<T, int64_t>::value) {
             util::Optional<int64_t> val;
             if (!value.is_null()) {
                 val = value.get_int();
@@ -3230,10 +3270,10 @@ public:
     // Load values from Column into destination
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
+        if (is_nullable() && std::is_same<typename LeafType::value_type, int64_t>::value) {
             evaluate_internal<ArrayIntNull>(index, destination);
         }
-        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+        else if (is_nullable() && std::is_same<typename LeafType::value_type, bool>::value) {
             evaluate_internal<ArrayBoolNull>(index, destination);
         }
         else {
@@ -3245,12 +3285,12 @@ public:
     {
         auto table = m_link_map.get_target_table();
         auto obj = table.unchecked_ptr()->get_object(key);
-        if (m_nullable && std::is_same<typename LeafType::value_type, int64_t>::value) {
+        if (is_nullable() && std::is_same<typename LeafType::value_type, int64_t>::value) {
             Value<int64_t> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
             destination.import(v);
         }
-        else if (m_nullable && std::is_same<typename LeafType::value_type, bool>::value) {
+        else if (is_nullable() && std::is_same<typename LeafType::value_type, bool>::value) {
             Value<bool> v(false, 1);
             v.m_storage.set(0, obj.template get<util::Optional<bool>>(m_column_key));
             destination.import(v);
@@ -3263,47 +3303,13 @@ public:
         }
     }
 
-    bool links_exist() const
-    {
-        return m_link_map.has_links();
-    }
-
-    bool only_unary_links() const
-    {
-        return m_link_map.only_unary_links();
-    }
-
-    bool is_nullable() const
-    {
-        return m_nullable;
-    }
-
-    LinkMap get_link_map() const
-    {
-        return m_link_map;
-    }
-
-    ColKey column_key() const noexcept
-    {
-        return m_column_key;
-    }
-
 private:
-    LinkMap m_link_map;
-
     // Leaf cache
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     const ArrayPayload* m_leaf_ptr = nullptr;
-
-    // Column index of payload column of m_table
-    mutable ColKey m_column_key;
-
-    // set to false by default for stand-alone Columns declaration that are not yet associated with any table
-    // or column. Call init() to update it or use a constructor that takes table + column index as argument.
-    bool m_nullable = false;
 };
 
 template <typename T, typename Operation>
@@ -3863,7 +3869,15 @@ public:
         double dT = m_left_is_const ? 10.0 : 50.0;
         if (std::is_same<TCond, Equal>::value && m_left_is_const && m_right->has_search_index()) {
             if (m_left_value.m_storage.is_null(0)) {
-                m_matches = m_right->find_all(Mixed());
+                const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
+                // when checking for null across links, null links are considered matches,
+                // so we must compute the slow matching even if there is an index.
+                if (!prop || prop->links_exist()) {
+                    return dT;
+                }
+                else {
+                    m_matches = m_right->find_all(Mixed());
+                }
             }
             else {
                 m_matches = m_right->find_all(get_mixed(m_left_value));

@@ -73,6 +73,7 @@ public:
     void init(MemRef mem) override;
     void update_from_parent() noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
+    void update_ref_in_parent(ObjKey, ref_type) override;
 
     bool is_leaf() const override
     {
@@ -307,6 +308,24 @@ MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
         key, [](ClusterNode* node, ChildInfo& child_info) { return node->ensure_writeable(child_info.key); });
 }
 
+void ClusterNodeInner::update_ref_in_parent(ObjKey key, ref_type ref)
+{
+    ChildInfo child_info;
+    if (!find_child(key, child_info)) {
+        throw InvalidKey("Child not found in update_ref_in_parent");
+    }
+    if (this->m_sub_tree_depth == 1) {
+        set(child_info.ndx + s_first_node_index, ref);
+    }
+    else {
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.set_parent(this, child_info.ndx + s_first_node_index);
+        node.init(child_info.mem);
+        node.set_offset(child_info.offset + m_offset);
+        node.update_ref_in_parent(child_info.key, ref);
+    }
+}
+
 ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, ClusterNode::State& state)
 {
     return recurse<ref_type>(key, [this, &state, &init_values](ClusterNode* node, ChildInfo& child_info) {
@@ -321,13 +340,13 @@ ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, Cl
         size_t new_ref_ndx = child_info.ndx + 1;
 
         int64_t split_key_value = state.split_key + child_info.offset;
-        size_t sz = node_size();
+        uint64_t sz = node_size();
         if (sz < cluster_node_size) {
             if (m_keys.is_attached()) {
                 m_keys.insert(new_ref_ndx, split_key_value);
             }
             else {
-                if (size_t(split_key_value) != sz << m_shift_factor) {
+                if (uint64_t(split_key_value) != sz << m_shift_factor) {
                     ensure_general_form();
                     m_keys.insert(new_ref_ndx, split_key_value);
                 }
@@ -573,7 +592,7 @@ void ClusterNodeInner::add(ref_type ref, int64_t key_value)
         m_keys.add(key_value);
     }
     else {
-        if (size_t(key_value) != (node_size() << m_shift_factor)) {
+        if (uint64_t(key_value) != (uint64_t(node_size()) << m_shift_factor)) {
             ensure_general_form();
             m_keys.add(key_value);
         }
@@ -872,6 +891,11 @@ MemRef Cluster::ensure_writeable(ObjKey)
     copy_on_write(8 * m_size);
 
     return get_mem();
+}
+
+void Cluster::update_ref_in_parent(ObjKey, ref_type)
+{
+    REALM_UNREACHABLE();
 }
 
 size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)

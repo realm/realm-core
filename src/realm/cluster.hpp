@@ -111,6 +111,9 @@ public:
     /// Descend the tree from the root and copy-on-write the leaf
     /// This will update all parents accordingly
     virtual MemRef ensure_writeable(ObjKey k) = 0;
+    /// A leaf cluster has got a new ref. Descend the tree from the root,
+    /// find the leaf and update the ref in the parent node
+    virtual void update_ref_in_parent(ObjKey k, ref_type ref) = 0;
 
     /// Init and potentially Insert a column
     virtual void insert_column(ColKey col) = 0;
@@ -186,6 +189,7 @@ public:
         return !Array::is_read_only();
     }
     MemRef ensure_writeable(ObjKey k) override;
+    void update_ref_in_parent(ObjKey, ref_type ref) override;
 
     bool is_leaf() const override
     {

@@ -5,7 +5,16 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* During integration of a large amount of data from the server, you may get "Assertion failed: !fields.has_missing_parent_update()" ([#4497](https://github.com/realm/realm-core/issues/4497), since v6.0.0)
+* Fixed queries for constant null across links to an indexed property not returning matches when the link was null. ([#4460]https://github.com/realm/realm-core/pull/4460), since 5.23.6).
+* Support upgrading from file format 5. ([#7089](https://github.com/realm/realm-cocoa/issues/7089), since v6.0.0)
+* Fix "Assertion failed: addr >= m_addr with (addr, m_addr)" assertion failure which could occur when using sync or multiple processes writing to a single Realm file. ([Cocoa #7086](https://github.com/realm/realm-cocoa/issues/7086), since v6.0.0.
+* On 32bit devices you may get exception with "No such object" when upgrading to v10.* ([#7314](https://github.com/realm/realm-java/issues/7314), since v10.0.0)
+* Fixed `links_to` queries that searched for an object key in a list or set of objects that contained more than 1000 objects where sometimes an object might not be found. ([#4429](https://github.com/realm/realm-core/pull/4429), since v6.0.0)
+* Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
+* Fix segmentation fault which could occur when querying over a link after creating objects in the destination table.
+* Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
+* `Obj::set_list_values` inappropriately resizes list for LinkList causing LogicError to be thrown. ([#4028](https://github.com/realm/realm-core/issues/4028), since v6.0.0)
  
 ### Breaking changes
 * None.

@@ -297,6 +297,7 @@ private:
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey spec_ndx2colkey(size_t col_ndx);
     bool ensure_writeable();
+    void sync(Array& arr);
     void bump_content_version();
     void bump_both_versions();
     template <class T>
@@ -397,9 +398,20 @@ Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {
     size_t sz = values.size();
     auto list = get_list<U>(col_key);
-    list.resize(sz);
-    for (size_t i = 0; i < sz; i++)
+    size_t list_sz = list.size();
+    if (sz < list_sz) {
+        list.resize(sz);
+        list_sz = sz;
+    }
+    size_t i = 0;
+    while (i < list_sz) {
         list.set(i, values[i]);
+        i++;
+    }
+    while (i < sz) {
+        list.add(values[i]);
+        i++;
+    }
 
     return *this;
 }

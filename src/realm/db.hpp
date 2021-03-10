@@ -875,6 +875,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
         DB::version_type current_version = m_read_lock.m_version;
+        m_alloc.init_mapping_management(current_version);
         repl->initiate_transact(*this, current_version, history_updated); // Throws
 
         // If the group has no top array (top_ref == 0), create a new node
