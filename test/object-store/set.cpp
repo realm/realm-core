@@ -19,7 +19,7 @@
 
 using namespace realm;
 
-TEST_CASE("set") {
+TEST_CASE("set", "[set]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);

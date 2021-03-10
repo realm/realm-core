@@ -3555,6 +3555,21 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
     return {};
 }
 
+std::vector<std::pair<ColKey, TableKey>> Table::get_outgoing_links() const noexcept
+{
+    std::vector<std::pair<ColKey, TableKey>> ret;
+
+    for_each_public_column([&](ColKey col_key) {
+        if (auto k = get_opposite_table_key(col_key)) {
+            ret.emplace_back(col_key, k);
+        }
+        return false;
+    });
+
+    return ret;
+}
+
+
 ColKey Table::get_primary_key_column() const
 {
     return m_primary_key_col;
