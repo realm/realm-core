@@ -73,7 +73,7 @@ void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& ou
     };
     struct LinkInfo {
         std::unordered_set<ColKey, ColKeyHasher> link_columns;
-        std::unordered_set<TableKey, TableKeyHasher> connected_tables;
+        std::unordered_set<TableKey> connected_tables;
     };
 
     // Build up the complete forward mapping from the back links.
@@ -83,7 +83,7 @@ void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& ou
     // so we rely on the fact that if there are any TypedLinks from a
     // Mixed value, there will be a corresponding backlink column
     // created at the destination table.
-    std::unordered_map<TableKey, LinkInfo, TableKeyHasher> complete_mapping;
+    std::unordered_map<TableKey, LinkInfo> complete_mapping;
     Group* group = table.get_parent_group();
     REALM_ASSERT(group);
     auto all_table_keys = group->get_table_keys();
@@ -91,16 +91,16 @@ void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& ou
         auto it_table = group->get_table(it);
         REALM_ASSERT(it_table);
         auto incoming_link_columns = it_table->get_incoming_link_columns();
-        for (auto incoming_link : incoming_link_columns) {
-            REALM_ASSERT(incoming_link->first);
-            auto& links = complete_mapping[incoming_link->first->get_key()];
-            links.link_columns.insert(incoming_link->second);
+        for (auto& incoming_link : incoming_link_columns) {
+            REALM_ASSERT(incoming_link.first);
+            auto& links = complete_mapping[incoming_link.first];
+            links.link_columns.insert(incoming_link.second);
             links.connected_tables.insert(it_table->get_key());
         }
     }
 
-    std::unordered_set<TableKey, TableKeyHasher> tables_to_check = {table.get_key()};
-    std::unordered_set<TableKey, TableKeyHasher> checked_tables;
+    std::unordered_set<TableKey> tables_to_check = {table.get_key()};
+    std::unordered_set<TableKey> checked_tables;
 
     while (tables_to_check.size()) {
         auto table_key_to_check = *tables_to_check.begin();

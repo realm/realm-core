@@ -50,10 +50,6 @@ struct ListChangeInfo {
     CollectionChangeBuilder* changes;
 };
 
-// FIXME: this should be in core
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
-
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
     std::unordered_map<TableKeyType, ObjectChangeSet> tables;
@@ -61,16 +57,9 @@ struct TransactionChangeInfo {
     bool schema_changed;
 };
 
-struct TableKeyHasher {
-    std::size_t operator()(const TableKey& key) const
-    {
-        return std::hash<TableKeyType>{}(key.value);
-    }
-};
-
 class DeepChangeChecker {
 public:
-    typedef std::unordered_map<TableKey, std::vector<ColKey>, TableKeyHasher> RelatedTables;
+    typedef std::unordered_map<TableKey, std::vector<ColKey>> RelatedTables;
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                       RelatedTables const& related_tables);
 
