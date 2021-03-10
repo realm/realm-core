@@ -202,6 +202,11 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
+void Cluster::update_ref_in_parent(ObjKey, ref_type)
+{
+    REALM_UNREACHABLE();
+}
+
 size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 {
     auto rot = Array::get_as_ref_or_tagged(header, s_key_ref_or_size_index);

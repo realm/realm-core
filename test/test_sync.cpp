@@ -1955,7 +1955,7 @@ TEST(Sync_Randomized)
                 }
                 int value = random.draw_int(-32767, 32767);
                 size_t row_ndx = random.draw_int_mod(table->size());
-                (table->begin() + row_ndx)->set("i", value);
+                table->get_object(row_ndx).set("i", value);
             }
             version_type new_version = wt.commit();
             session.nonsync_transact_notify(new_version);
