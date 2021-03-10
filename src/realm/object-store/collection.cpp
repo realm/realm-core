@@ -61,7 +61,7 @@ bool Collection::is_valid() const
     if (!m_realm)
         return false;
     m_realm->verify_is_on_thread();
-    if (!m_realm->is_in_read_or_frozen_transaction())
+    if (!m_realm->is_in_any_transaction())
         return false;
     return m_coll_base->is_attached();
 }

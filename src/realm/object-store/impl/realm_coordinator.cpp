@@ -1180,7 +1180,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
         return;
     }
 
-    bool in_read = realm.is_in_read_or_frozen_transaction();
+    bool in_read = realm.is_in_any_transaction();
     auto& sg = Realm::Internal::get_transaction(realm);
     auto version = sg.get_version_of_current_transaction();
     auto package = [&](auto& notifier) {

@@ -340,7 +340,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     schema.validate(validation_mode);
 
-    bool was_in_read_transaction = is_in_read_or_frozen_transaction();
+    bool was_in_read_transaction = is_in_any_transaction();
     Schema actual_schema = get_full_schema();
     std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
 
@@ -556,7 +556,7 @@ VersionID Realm::get_version_of_current_transaction() const
 {
     verify_is_on_thread();
     verify_is_open();
-    if (!is_in_read_or_frozen_transaction()) {
+    if (!is_in_any_transaction()) {
         throw InvalidTransactionException("Cannot retrieve a transaction version without a transaction.");
     }
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();

@@ -204,7 +204,7 @@ TEST_CASE("notifications: async delivery") {
 
             SECTION("notify()") {
                 coordinator->on_change();
-                REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+                REQUIRE_FALSE(r->is_in_any_transaction());
                 r->notify();
                 REQUIRE(notification_calls == 1);
             }
@@ -212,21 +212,21 @@ TEST_CASE("notifications: async delivery") {
             SECTION("notify() without autorefresh") {
                 r->set_auto_refresh(false);
                 coordinator->on_change();
-                REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+                REQUIRE_FALSE(r->is_in_any_transaction());
                 r->notify();
                 REQUIRE(notification_calls == 1);
             }
 
             SECTION("refresh()") {
                 coordinator->on_change();
-                REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+                REQUIRE_FALSE(r->is_in_any_transaction());
                 r->refresh();
                 REQUIRE(notification_calls == 1);
             }
 
             SECTION("begin_transaction()") {
                 coordinator->on_change();
-                REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+                REQUIRE_FALSE(r->is_in_any_transaction());
                 r->begin_write_transaction();
                 REQUIRE(notification_calls == 1);
                 r->cancel_transaction();
@@ -569,7 +569,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("notify()") {
             coordinator->on_change();
-            REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+            REQUIRE_FALSE(r->is_in_any_transaction());
             r->notify();
             REQUIRE(notification_calls == 2);
         }
@@ -577,7 +577,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("notify() without autorefresh") {
             r->set_auto_refresh(false);
             coordinator->on_change();
-            REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+            REQUIRE_FALSE(r->is_in_any_transaction());
             r->notify();
             REQUIRE(notification_calls == 1);
             r->refresh();
@@ -586,14 +586,14 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh()") {
             coordinator->on_change();
-            REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+            REQUIRE_FALSE(r->is_in_any_transaction());
             r->refresh();
             REQUIRE(notification_calls == 2);
         }
 
         SECTION("begin_transaction()") {
             coordinator->on_change();
-            REQUIRE_FALSE(r->is_in_read_or_frozen_transaction());
+            REQUIRE_FALSE(r->is_in_any_transaction());
             r->begin_write_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
@@ -752,10 +752,10 @@ TEST_CASE("notifications: async delivery") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             r->invalidate();
-            REQUIRE(r->is_in_read_or_frozen_transaction());
+            REQUIRE(r->is_in_any_transaction());
         });
         advance_and_notify(*r);
-        REQUIRE(r->is_in_read_or_frozen_transaction());
+        REQUIRE(r->is_in_any_transaction());
         make_remote_change();
         coordinator->on_change();
         r->begin_write_transaction();

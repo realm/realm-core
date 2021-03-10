@@ -302,7 +302,7 @@ public:
     void commit_transaction();
     void cancel_transaction();
     bool is_in_write_transaction() const noexcept;
-    bool is_in_read_or_frozen_transaction() const
+    bool is_in_any_transaction() const
     {
         return m_group != nullptr;
     }
