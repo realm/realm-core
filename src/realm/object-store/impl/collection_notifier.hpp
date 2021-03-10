@@ -59,7 +59,11 @@ struct TransactionChangeInfo {
 
 class DeepChangeChecker {
 public:
-    typedef std::unordered_map<TableKey, std::vector<ColKey>> RelatedTables;
+    struct RelatedTable {
+        TableKey table_key;
+        std::vector<ColKey> links;
+    };
+    typedef std::vector<RelatedTable> RelatedTables;
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                       RelatedTables const& related_tables);
 

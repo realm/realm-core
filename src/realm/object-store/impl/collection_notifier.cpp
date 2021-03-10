@@ -24,8 +24,6 @@
 #include <realm/db.hpp>
 #include <realm/list.hpp>
 
-#include <unordered_set>
-
 using namespace realm;
 using namespace realm::_impl;
 
@@ -35,7 +33,7 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table
     auto table_modified = [&](auto& outgoing_linkset) {
-        auto it = info.tables.find(outgoing_linkset.first.value);
+        auto it = info.tables.find(outgoing_linkset.table_key.value);
         return it != info.tables.end() && !it->second.modifications_empty();
     };
     return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
@@ -54,7 +52,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables.begin()->first.value)->second;
+        auto& object_set = info.tables.find(m_related_tables.begin()->table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             return object_set.modifications_contains(object_key);
         };
@@ -65,15 +63,9 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 
 void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& out, Table const& table)
 {
-    struct ColKeyHasher {
-        std::size_t operator()(const ColKey& key) const
-        {
-            return std::hash<decltype(ColKey::value)>{}(key.value);
-        }
-    };
     struct LinkInfo {
-        std::unordered_set<ColKey, ColKeyHasher> link_columns;
-        std::unordered_set<TableKey> connected_tables;
+        std::vector<ColKey> link_columns;
+        std::vector<TableKey> connected_tables;
     };
 
     // Build up the complete forward mapping from the back links.
@@ -94,26 +86,47 @@ void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& ou
         for (auto& incoming_link : incoming_link_columns) {
             REALM_ASSERT(incoming_link.first);
             auto& links = complete_mapping[incoming_link.first];
-            links.link_columns.insert(incoming_link.second);
-            links.connected_tables.insert(it_table->get_key());
+            links.link_columns.push_back(incoming_link.second);
+            links.connected_tables.push_back(it_table->get_key());
         }
     }
 
-    std::unordered_set<TableKey> tables_to_check = {table.get_key()};
-    std::unordered_set<TableKey> checked_tables;
+    // Remove duplicates:
+    // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
+    // duplicates in connected_tables can occur when there are different link paths to the same table
+    for (auto& it : complete_mapping) {
+        LinkInfo& it_link = it.second;
+        std::sort(it_link.link_columns.begin(), it_link.link_columns.end());
+        auto last_cols = std::unique(it_link.link_columns.begin(), it_link.link_columns.end());
+        it_link.link_columns.erase(last_cols, it_link.link_columns.end());
+        std::sort(it_link.connected_tables.begin(), it_link.connected_tables.end());
+        auto last_tables = std::unique(it_link.connected_tables.begin(), it_link.connected_tables.end());
+        it_link.connected_tables.erase(last_tables, it_link.connected_tables.end());
+    }
+
+    std::vector<TableKey> tables_to_check = {table.get_key()};
+    auto get_out_relationships_for = [&out](TableKey key) -> std::vector<ColKey>& {
+        auto it = find_if(begin(out), end(out), [&](auto&& tbl) {
+            return tbl.table_key == key;
+        });
+        if (it == out.end()) {
+            it = out.insert(out.end(), {key, {}});
+        }
+        return it->links;
+    };
 
     while (tables_to_check.size()) {
         auto table_key_to_check = *tables_to_check.begin();
         tables_to_check.erase(tables_to_check.begin());
-        checked_tables.insert(table_key_to_check);
         auto outgoing_links = complete_mapping[table_key_to_check];
-        auto& out_relations = out[table_key_to_check];
-        for (auto outgoing_link_col : complete_mapping[table_key_to_check].link_columns) {
-            out_relations.push_back(outgoing_link_col);
-        }
+        auto& out_relations = get_out_relationships_for(table_key_to_check);
+        auto& link_columns = complete_mapping[table_key_to_check].link_columns;
+        out_relations.insert(out_relations.end(), link_columns.begin(), link_columns.end());
         for (auto linked_table_key : outgoing_links.connected_tables) {
-            if (checked_tables.find(linked_table_key) == checked_tables.end()) {
-                tables_to_check.insert(linked_table_key);
+            if (std::find_if(begin(out), end(out), [&](auto&& relation) {
+                    return relation.table_key == linked_table_key;
+                }) == out.end()) {
+                tables_to_check.push_back(linked_table_key);
             }
         }
     }
@@ -134,10 +147,13 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 
 bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth)
 {
-    auto it = m_related_tables.find(table_key);
+    auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
+        return tbl.table_key == table_key;
+    });
+
     if (it == m_related_tables.end())
         return false;
-    if (it->second.empty())
+    if (it->links.empty())
         return false;
 
     // Check if we're already checking if the destination of the link is
@@ -186,10 +202,10 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
             REALM_ASSERT(linked_table);
             for (size_t i = 0; i < coll_size; ++i) {
                 auto val = collection_ptr->get_any(i);
-                if (val.is_type(type_Link)) {
+                if (!val.is_null()) {
                     auto obj_link = val.get<ObjKey>();
                     REALM_ASSERT(obj_link);
-                    if (this->check_row(*linked_table, obj_link.value, depth + 1)) {
+                    if (check_row(*linked_table, obj_link.value, depth + 1)) {
                         return true;
                     }
                 }
@@ -207,7 +223,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
                         cached_linked_table = table.get_parent_group()->get_table(obj_link.get_table_key());
                         REALM_ASSERT_EX(cached_linked_table, obj_link.get_table_key().value);
                     }
-                    if (this->check_row(*cached_linked_table, obj_link.get_obj_key().value, depth + 1)) {
+                    if (check_row(*cached_linked_table, obj_link.get_obj_key().value, depth + 1)) {
                         return true;
                     }
                 }
@@ -216,7 +232,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
         return false;
     };
 
-    return std::any_of(begin(it->second), end(it->second), linked_object_changed);
+    return std::any_of(begin(it->links), end(it->links), linked_object_changed);
 }
 
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, size_t depth)
@@ -371,7 +387,7 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
 
     info.tables.reserve(m_related_tables.size());
     for (auto& tbl : m_related_tables)
-        info.tables[tbl.first.value];
+        info.tables[tbl.table_key.value];
 }
 
 void CollectionNotifier::prepare_handover()
