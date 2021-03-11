@@ -311,6 +311,10 @@ public:
     {
         return true;
     }
+    bool typed_link_initialize(ColKey, TableKey)
+    {
+        return true;
+    }
 };
 
 
@@ -518,6 +522,12 @@ public:
     }
 
     bool insert_group_level_table(TableKey)
+    {
+        m_info.schema_changed = true;
+        return true;
+    }
+
+    bool typed_link_initialize(ColKey, TableKey)
     {
         m_info.schema_changed = true;
         return true;

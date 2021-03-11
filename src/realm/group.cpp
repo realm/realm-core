@@ -1680,6 +1680,10 @@ public:
     {
         return true; // No-op
     }
+    bool typed_link_initialize(ColKey, TableKey)
+    {
+        return true; // No-op
+    }
 
 private:
     bool& m_schema_changed;
