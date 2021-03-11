@@ -594,4 +594,24 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
             REQUIRE(local_changes.deletions.count() == 0);
         }
     }
+    SECTION("adding a link to a new table and rolling back is not a modification") {
+        r->begin_transaction();
+        dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->cancel_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from rollback linked table is not a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 0);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
+    }
 }

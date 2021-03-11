@@ -81,29 +81,28 @@ void DeepChangeChecker::find_related_tables(DeepChangeChecker::RelatedTables& ou
     Group* group = table.get_parent_group();
     REALM_ASSERT(group);
     auto all_table_keys = group->get_table_keys();
-    for (auto it : all_table_keys) {
-        auto it_table = group->get_table(it);
-        REALM_ASSERT(it_table);
-        auto incoming_link_columns = it_table->get_incoming_link_columns();
+    for (auto key : all_table_keys) {
+        auto cur_table = group->get_table(key);
+        REALM_ASSERT(cur_table);
+        auto incoming_link_columns = cur_table->get_incoming_link_columns();
         for (auto& incoming_link : incoming_link_columns) {
             REALM_ASSERT(incoming_link.first);
             auto& links = complete_mapping[incoming_link.first];
             links.link_columns.push_back(incoming_link.second);
-            links.connected_tables.push_back(it_table->get_key());
+            links.connected_tables.push_back(cur_table->get_key());
         }
     }
 
     // Remove duplicates:
     // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
     // duplicates in connected_tables can occur when there are different link paths to the same table
-    for (auto& it : complete_mapping) {
-        LinkInfo& it_link = it.second;
-        std::sort(it_link.link_columns.begin(), it_link.link_columns.end());
-        auto last_cols = std::unique(it_link.link_columns.begin(), it_link.link_columns.end());
-        it_link.link_columns.erase(last_cols, it_link.link_columns.end());
-        std::sort(it_link.connected_tables.begin(), it_link.connected_tables.end());
-        auto last_tables = std::unique(it_link.connected_tables.begin(), it_link.connected_tables.end());
-        it_link.connected_tables.erase(last_tables, it_link.connected_tables.end());
+    for (auto& kv_pair : complete_mapping) {
+        auto& cols = kv_pair.second.link_columns;
+        std::sort(cols.begin(), cols.end());
+        cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
+        auto& tables = kv_pair.second.connected_tables;
+        std::sort(tables.begin(), tables.end());
+        tables.erase(std::unique(tables.begin(), tables.end()), tables.end());
     }
 
     std::vector<TableKey> tables_to_check = {table.get_key()};
@@ -150,7 +149,6 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth)
 {
     REALM_ASSERT(coll);
-    bool supported_collection_type = false;
     if (auto lst = dynamic_cast<LnkLst*>(coll.get())) {
         TableRef target = lst->get_target_table();
         return std::any_of(lst->begin(), lst->end(), [&, this](auto key) {
@@ -160,8 +158,8 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
     else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
         auto target = dict->get_target_table();
         TableRef cached_linked_table;
-        for (auto it = dict->begin(); it != dict->end(); ++it) {
-            Mixed value = (*it).second;
+        return std::any_of(dict->begin(), dict->end(), [&, this](auto key_value_pair) {
+            Mixed value = key_value_pair.second;
             if (value.is_type(type_TypedLink)) {
                 auto link = value.get_link();
                 REALM_ASSERT(link);
@@ -169,34 +167,25 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
                     cached_linked_table = dict->get_table()->get_parent_group()->get_table(link.get_table_key());
                     REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
                 }
-                if (check_row(*cached_linked_table, link.get_obj_key().value, depth + 1)) {
-                    return true;
-                }
+                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
             }
             else if (value.is_type(type_Link)) {
                 REALM_ASSERT(target);
-                if (check_row(*target, value.get<ObjKey>().value, depth + 1)) {
-                    return true;
-                }
+                return this->check_row(*target, value.get<ObjKey>().value, depth + 1);
             }
-        }
-        supported_collection_type = true;
+            return false;
+        });
     }
     else if (auto set = dynamic_cast<LnkSet*>(coll.get())) {
         auto target = set->get_target_table();
         REALM_ASSERT(target);
-        for (auto it = set->begin(); it != set->end(); ++it) {
-            ObjKey obj_key = *it;
-            if (obj_key && check_row(*target, obj_key.value)) {
-                return true;
-            }
-        }
-        supported_collection_type = true;
+        return std::any_of(set->begin(), set->end(), [&, this](auto obj_key) {
+            return obj_key && this->check_row(*target, obj_key.value);
+        });
     }
     else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
         TableRef cached_linked_table;
-        for (auto it = set->begin(); it != set->end(); ++it) {
-            Mixed value = *it;
+        return std::any_of(set->begin(), set->end(), [&, this](auto value) {
             if (value.is_type(type_TypedLink)) {
                 auto link = value.get_link();
                 REALM_ASSERT(link);
@@ -204,14 +193,13 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
                     cached_linked_table = set->get_table()->get_parent_group()->get_table(link.get_table_key());
                     REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
                 }
-                if (check_row(*cached_linked_table, link.get_obj_key().value, depth + 1)) {
-                    return true;
-                }
+                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
             }
-        }
-        supported_collection_type = true;
+            return false;
+        });
     }
-    REALM_ASSERT(supported_collection_type);
+    // at this point, we have not handled all datatypes
+    REALM_UNREACHABLE();
     return false;
 }
 

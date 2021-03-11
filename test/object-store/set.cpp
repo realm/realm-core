@@ -223,14 +223,15 @@ TEST_CASE("set", "[set]") {
                 CHECK(!link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
                 CHECK(link_set.insert(target3).second);
+                CHECK(link_set.insert(ObjKey{}).second);
             });
 
             write([&] {
-                CHECK(link_set.size() == 3);
+                CHECK(link_set.size() == 4);
                 REQUIRE(link_set.remove(target2).second);
             });
-            CHECK(link_set.size() == 2);
-            REQUIRE_INDICES(change.deletions, 1);
+            CHECK(link_set.size() == 3);
+            REQUIRE_INDICES(change.deletions, 2);
         }
 
         SECTION("modifying a different set doesn't send a change notification") {
