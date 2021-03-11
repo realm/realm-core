@@ -22,7 +22,9 @@
 #include <realm/object-store/shared_realm.hpp>
 
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -145,6 +147,74 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 {
 }
 
+bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth)
+{
+    REALM_ASSERT(coll);
+    bool supported_collection_type = false;
+    if (auto lst = dynamic_cast<LnkLst*>(coll.get())) {
+        TableRef target = lst->get_target_table();
+        return std::any_of(lst->begin(), lst->end(), [&, this](auto key) {
+            return this->check_row(*target, key.value, depth + 1);
+        });
+    }
+    else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
+        auto target = dict->get_target_table();
+        TableRef cached_linked_table;
+        for (auto it = dict->begin(); it != dict->end(); ++it) {
+            Mixed value = (*it).second;
+            if (value.is_type(type_TypedLink)) {
+                auto link = value.get_link();
+                REALM_ASSERT(link);
+                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                    cached_linked_table = dict->get_table()->get_parent_group()->get_table(link.get_table_key());
+                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+                }
+                if (check_row(*cached_linked_table, link.get_obj_key().value, depth + 1)) {
+                    return true;
+                }
+            }
+            else if (value.is_type(type_Link)) {
+                REALM_ASSERT(target);
+                if (check_row(*target, value.get<ObjKey>().value, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        supported_collection_type = true;
+    }
+    else if (auto set = dynamic_cast<LnkSet*>(coll.get())) {
+        auto target = set->get_target_table();
+        REALM_ASSERT(target);
+        for (auto it = set->begin(); it != set->end(); ++it) {
+            ObjKey obj_key = *it;
+            if (obj_key && check_row(*target, obj_key.value)) {
+                return true;
+            }
+        }
+        supported_collection_type = true;
+    }
+    else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
+        TableRef cached_linked_table;
+        for (auto it = set->begin(); it != set->end(); ++it) {
+            Mixed value = *it;
+            if (value.is_type(type_TypedLink)) {
+                auto link = value.get_link();
+                REALM_ASSERT(link);
+                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                    cached_linked_table = set->get_table()->get_parent_group()->get_table(link.get_table_key());
+                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+                }
+                if (check_row(*cached_linked_table, link.get_obj_key().value, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        supported_collection_type = true;
+    }
+    REALM_ASSERT(supported_collection_type);
+    return false;
+}
+
 bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth)
 {
     auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
@@ -183,53 +253,8 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
             REALM_ASSERT(dst);
             return check_row(*table.get_link_target(outgoing_link_column), dst.value, depth + 1);
         }
-
-        if (outgoing_link_column.is_list()) {
-            auto& target = *table.get_link_target(outgoing_link_column);
-            auto lvr = obj.get_linklist(outgoing_link_column);
-            return std::any_of(lvr.begin(), lvr.end(), [&, this](auto key) {
-                return this->check_row(target, key.value, depth + 1);
-            });
-        }
-        REALM_ASSERT_EX(outgoing_link_column.is_dictionary() || outgoing_link_column.is_set(),
-                        outgoing_link_column.get_type());
-
         auto collection_ptr = obj.get_collection_ptr(outgoing_link_column);
-        REALM_ASSERT(collection_ptr);
-        const size_t coll_size = collection_ptr->size();
-        if (outgoing_link_column.get_type() == col_type_Link) {
-            TableRef linked_table = collection_ptr->get_target_table();
-            REALM_ASSERT(linked_table);
-            for (size_t i = 0; i < coll_size; ++i) {
-                auto val = collection_ptr->get_any(i);
-                if (!val.is_null()) {
-                    auto obj_link = val.get<ObjKey>();
-                    REALM_ASSERT(obj_link);
-                    if (check_row(*linked_table, obj_link.value, depth + 1)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        else if (outgoing_link_column.get_type() == col_type_Mixed) {
-            TableRef cached_linked_table;
-            for (size_t i = 0; i < coll_size; ++i) {
-                auto val = collection_ptr->get_any(i);
-                if (val.is_type(type_TypedLink)) {
-                    auto obj_link = val.get_link();
-                    if (!obj_link)
-                        continue;
-                    if (!cached_linked_table || cached_linked_table->get_key() != obj_link.get_table_key()) {
-                        cached_linked_table = table.get_parent_group()->get_table(obj_link.get_table_key());
-                        REALM_ASSERT_EX(cached_linked_table, obj_link.get_table_key().value);
-                    }
-                    if (check_row(*cached_linked_table, obj_link.get_obj_key().value, depth + 1)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return do_check_for_collection_modifications(std::move(collection_ptr), depth);
     };
 
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);

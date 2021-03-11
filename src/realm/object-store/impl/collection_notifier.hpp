@@ -37,6 +37,7 @@
 #include <unordered_set>
 
 namespace realm {
+class CollectionBase;
 class Realm;
 class Transaction;
 
@@ -90,6 +91,7 @@ private:
 
     bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
     bool check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth = 0);
+    bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth);
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
