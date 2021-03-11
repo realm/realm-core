@@ -509,7 +509,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     CppContext ctx(r);
 
     dict.insert("key_a", Mixed{ObjLink(target1->get_key(), target1_obj.get_key())});
-    dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+    dict.insert("key_b", Mixed{});
     dict.insert("key_c", Mixed{});
     dict.insert("key_d", Mixed{int64_t{42}});
     r->commit_transaction();
@@ -521,6 +521,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
         local_changes = c;
     });
     advance_and_notify(*r);
+    local_changes = {};
 
     SECTION("insertion") {
         r->begin_transaction();
@@ -567,9 +568,30 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
         r->begin_transaction();
         target1_obj2.set(col_value1, 2000);
         r->commit_transaction();
+        local_changes = {};
         advance_and_notify(*r);
         REQUIRE(local_changes.insertions.count() == 0);
         REQUIRE(local_changes.modifications.count() == 1);
         REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("adding a link to a new table is a modification") {
+        r->begin_transaction();
+        dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from the newly linked table is a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 1);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
     }
 }
