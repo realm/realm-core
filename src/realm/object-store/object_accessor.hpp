@@ -94,7 +94,7 @@ struct ValueUpdater {
     void operator()(T*)
     {
         bool attr_changed = !policy.diff;
-        auto new_val = ctx.template unbox<T>(value);
+        auto new_val = ctx.template unbox<T>(value, policy);
 
         if (!attr_changed) {
             auto old_val = obj.get<T>(col);
