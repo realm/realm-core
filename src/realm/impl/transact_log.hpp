@@ -74,7 +74,10 @@ enum Instruction {
     instr_SetErase = 41,  // Erase value from set
     instr_SetClear = 42,  // Remove all values in a set
 
-    instr_TypedLinkInitialize = 43, // A link between two tables has been created for the first time
+    // An action involving TypedLinks has occured which caused
+    // the number of backlink columns to change. This can happen
+    // when a TypedLink is created for the first time to a Table.
+    instr_TypedLinkChange = 43,
 };
 
 class TransactLogStream {
@@ -230,7 +233,7 @@ public:
         return true;
     }
 
-    bool typed_link_initialize(ColKey, TableKey)
+    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -290,7 +293,7 @@ public:
     bool dictionary_set(size_t dict_ndx, Mixed key);
     bool dictionary_erase(size_t dict_ndx, Mixed key);
 
-    bool typed_link_initialize(ColKey col, TableKey dest);
+    bool typed_link_change(ColKey col, TableKey dest);
 
 
     /// End of methods expected by parser.
@@ -399,7 +402,7 @@ public:
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
 
-    virtual void typed_link_initialize(const Table*, ColKey, TableKey);
+    virtual void typed_link_change(const Table*, ColKey, TableKey);
 
     //@{
 
@@ -965,16 +968,16 @@ inline bool TransactLogEncoder::list_clear(size_t old_list_size)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::typed_link_initialize(const Table* source_table, ColKey col,
-                                                                TableKey dest_table)
+inline void TransactLogConvenientEncoder::typed_link_change(const Table* source_table, ColKey col,
+                                                            TableKey dest_table)
 {
     select_table(source_table);
-    m_encoder.typed_link_initialize(col, dest_table);
+    m_encoder.typed_link_change(col, dest_table);
 }
 
-inline bool TransactLogEncoder::typed_link_initialize(ColKey col, TableKey dest)
+inline bool TransactLogEncoder::typed_link_change(ColKey col, TableKey dest)
 {
-    append_simple_instr(instr_TypedLinkInitialize, col, dest);
+    append_simple_instr(instr_TypedLinkChange, col, dest);
     return true;
 }
 
@@ -1167,10 +1170,10 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_TypedLinkInitialize: {
+        case instr_TypedLinkChange: {
             ColKey col_key = ColKey(read_int<int64_t>());         // Throws
             TableKey dest_table = TableKey(read_int<uint32_t>()); // Throws
-            if (!handler.typed_link_initialize(col_key, dest_table))
+            if (!handler.typed_link_change(col_key, dest_table))
                 parser_error();
             return;
         }
@@ -1447,10 +1450,9 @@ public:
         return true;
     }
 
-    bool typed_link_initialize(ColKey col, TableKey dest)
+    bool typed_link_change(ColKey col, TableKey dest)
     {
-        // FIXME: this is not the reverse, but does it matter?
-        m_encoder.typed_link_initialize(col, dest);
+        m_encoder.typed_link_change(col, dest);
         append_instruction();
         return true;
     }

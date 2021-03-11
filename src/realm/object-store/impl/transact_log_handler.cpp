@@ -311,7 +311,7 @@ public:
     {
         return true;
     }
-    bool typed_link_initialize(ColKey, TableKey)
+    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -527,7 +527,7 @@ public:
         return true;
     }
 
-    bool typed_link_initialize(ColKey, TableKey)
+    bool typed_link_change(ColKey, TableKey)
     {
         m_info.schema_changed = true;
         return true;

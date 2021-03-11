@@ -4015,8 +4015,8 @@ ColKey Table::find_or_add_backlink_column(ColKey origin_col_key, TableKey origin
         set_opposite_column(backlink_col_key, origin_table, origin_col_key);
 
         if (Replication* repl = get_repl())
-            repl->typed_link_initialize(get_parent_group()->get_table(origin_table).unchecked_ptr(), origin_col_key,
-                                        m_key); // Throws
+            repl->typed_link_change(get_parent_group()->get_table(origin_table).unchecked_ptr(), origin_col_key,
+                                    m_key); // Throws
     }
 
     return backlink_col_key;

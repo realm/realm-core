@@ -1680,7 +1680,7 @@ public:
     {
         return true; // No-op
     }
-    bool typed_link_initialize(ColKey, TableKey)
+    bool typed_link_change(ColKey, TableKey)
     {
         return true; // No-op
     }

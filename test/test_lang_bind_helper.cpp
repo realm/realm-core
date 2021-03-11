@@ -2000,7 +2000,7 @@ public:
     {
         return false;
     }
-    bool typed_link_initialize(ColKey, TableKey)
+    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
