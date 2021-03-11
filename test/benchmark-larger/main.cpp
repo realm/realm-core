@@ -70,16 +70,21 @@ int main()
                          }
                          //std::cout << "Building DB for type " << st << " format " << num_steps << " x " << step_size << std::endl;
                          auto total_size = num_steps * step_size;
+                         std::vector<std::string> key_supply;
+                         key_supply.reserve(total_size);
+                         for (int i = 0; i < total_size; ++i) {
+                             key_supply.push_back(std::to_string(i));
+                         }
+                         if (st == INDEXED_WORST /* || st == PK */) {
+                             std::random_shuffle(key_supply.begin(), key_supply.end());
+                         }
                          std::vector<std::string> keys;
                          keys.reserve(total_size);
-                         for (int j = 0; j < num_steps * step_size; j += step_size) {
-                             // generate keys used in this step:
+                         for (int j = 0; j < total_size; j += step_size) {
+                             // get keys used in this step:
                              auto shuffle_start = keys.size();
                              for (int i = j; i < j + step_size; ++i) {
-                                 keys.push_back(std::to_string(i));
-                             }
-                             if (st == INDEXED_WORST /* || st == PK */) {
-                                 std::random_shuffle(keys.begin() + shuffle_start, keys.end());
+                                 keys.push_back(key_supply[i] );
                              }
                              auto start = std::chrono::steady_clock::now();
                              WriteTransaction wt(db);
@@ -100,7 +105,7 @@ int main()
                                  }
                              }
                              if (st == INDEXED_WORST && test_rw) {
-                                 // worst case spreads keys all over key space
+                                 // worst case spreads deletions all over currently used key space
                                  std::random_shuffle(keys.begin(), keys.end());
                                  // delete random 5% of step_size objects - and their keys
                                  auto limit = step_size / 20;
