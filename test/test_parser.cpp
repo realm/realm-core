@@ -386,6 +386,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    mapping.set_backlink_class_prefix("");
     Query q2 = t->query(description, args, mapping);
 
     size_t q2_count = q2.count();
@@ -2852,12 +2853,6 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
     verify_query(test_context, items, "@links.my-custom-class-name.items.@count > 2", 2, mapping);
 
-    // Check that mapping works for tables named "class_class..."
-    query_parser::KeyPathMapping another_mapping;
-    another_mapping.add_mapping(things, "parents", "@links.ClassWithPolicy.with_underscores");
-    another_mapping.add_table_mapping(things, "ClassWithPolicy");
-    verify_query(test_context, things, "parents.pascal_case == 3", 1, another_mapping);
-
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
@@ -2868,6 +2863,7 @@ TEST(Parser_Backlinks)
     mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
     mapping_with_prefix.add_mapping(t, "banknotes", "finances");
     mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
+    mapping_with_prefix.add_mapping(things, "parents", "@links.class_with_policy.with_underscores");
     CHECK(mapping_with_prefix.add_table_mapping(t, "CustomPersonClassName"));
     CHECK(!mapping_with_prefix.add_table_mapping(t, t->get_name()));
 
@@ -2879,14 +2875,18 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
     // verbose backlinks syntax
     verify_query(test_context, items, "@links.Person.items.@count > 2", 2, mapping_with_prefix);
-    // verbose backlinks syntax with 'class_' prefix
-    verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix);
     // class name substitution
     verify_query(test_context, items, "@links.CustomPersonClassName.items.@count > 2", 2, mapping_with_prefix);
     // property translation
-    verify_query(test_context, items, "@links.class_Person.things.@count > 2", 2, mapping_with_prefix);
+    verify_query(test_context, items, "@links.Person.things.@count > 2", 2, mapping_with_prefix);
     // class and property translation
     verify_query(test_context, items, "@links.CustomPersonClassName.things.@count > 2", 2, mapping_with_prefix);
+    // Check that mapping works for tables named "class_class..."
+    verify_query(test_context, things, "parents.pascal_case == 3", 1, mapping_with_prefix);
+
+    // verbose backlinks syntax with 'class_' prefix not allowed
+    CHECK_THROW_ANY(
+        verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2, mapping_with_prefix));
 
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(

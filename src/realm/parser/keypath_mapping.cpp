@@ -104,8 +104,9 @@ std::string KeyPathMapping::translate_table_name(const std::string& identifier)
                              identifier, *mapped));
         }
         alias = *mapped;
+        substitutions++;
     }
-    if (alias.find(get_backlink_class_prefix()) != 0) {
+    if (substitutions == 0 && m_backlink_class_prefix.size()) {
         alias = get_backlink_class_prefix() + alias;
     }
     return alias;
