@@ -527,7 +527,9 @@ inline void DB::get_stats(size_t& free_space, size_t& used_space, util::Optional
     }
 }
 
-
+// A `Transaction` is used when reading from and writing to a realm.
+// One important thing to keep in mind about the difference between `Group` and `Transaction` is that read-only realms
+// do not and cannot use a `Transaction`. Read-only realms just use a `Group` to access data from a realm.
 class Transaction : public Group {
 public:
     Transaction(DBRef _db, SlabAlloc* alloc, Group::ReadLockInfo& rli, DB::TransactStage stage);
