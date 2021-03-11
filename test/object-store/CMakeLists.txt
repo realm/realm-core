@@ -102,9 +102,7 @@ endif()
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
-     "*.json"
-     "*.realm"
-     "expect_string.txt")
+     "*.realm")
 
 
 add_custom_command(TARGET ObjectStoreTests POST_BUILD

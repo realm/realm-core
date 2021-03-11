@@ -300,18 +300,18 @@ int Group::get_committed_file_format_version() const noexcept
     return m_alloc.get_committed_file_format_version();
 }
 
-std::optional<int> fake_target_file_format;
+std::optional<int> Group::fake_target_file_format;
 
 void _impl::GroupFriend::fake_target_file_format(const std::optional<int> format) noexcept
 {
-    ::fake_target_file_format = format;
+    Group::fake_target_file_format = format;
 }
 
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-    if (fake_target_file_format) {
-        return *fake_target_file_format;
+    if (Group::fake_target_file_format) {
+        return *Group::fake_target_file_format;
     }
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
