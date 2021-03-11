@@ -217,6 +217,15 @@ zero for both the version and the salt.
 
 All version numbers are non-negative integers strictly less than 2^63.
 
+It is an error if the client specifies the same client file identifier for two
+different sessions that overlap in time. More specifically, it is an error if
+the client sends two IDENT messages with the same client file identifier in the
+same network connection unless the second one is sent after the termination of
+the session associated with the first one. For this purpose, the session is
+considered terminated from the client's point of view when an [UNBIND](#unbind)
+message has been sent, or an [UNBOUND](#unbound) message has been received from
+the server, whichever comes first.
+
 When the server receives an IDENT message, it will start to accept
 [UPLOAD](#upload) message and it will start sending [DOWNLOAD](#download)
 messages to the client, and continue to do so until an [UNBIND](#unbind) message

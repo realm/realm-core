@@ -2897,6 +2897,11 @@ public:
         return m_link_map.get_base_table();
     }
 
+    Allocator& get_alloc() const
+    {
+        return m_link_map.get_target_table()->get_alloc();
+    }
+
     void set_base_table(ConstTableRef table) final
     {
         m_link_map.set_base_table(table);
@@ -3022,7 +3027,7 @@ private:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = get_alloc();
         Value<int64_t> list_refs;
         get_lists(index, list_refs, 1);
         const bool is_from_list = true;
@@ -3281,7 +3286,7 @@ private:
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
-        Allocator& alloc = this->get_base_table()->get_alloc();
+        Allocator& alloc = ColumnsCollection<T>::get_alloc();
         Value<int64_t> list_refs;
         this->get_lists(index, list_refs, 1);
         destination.init(list_refs.m_from_link_list, list_refs.size());
@@ -3314,7 +3319,7 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = m_list.get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs, 1);
         std::vector<Int> sizes;
@@ -3435,7 +3440,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = get_base_table()->get_alloc();
+        Allocator& alloc = m_list.get_alloc();
         Value<int64_t> list_refs;
         m_list.get_lists(index, list_refs, 1);
         size_t sz = list_refs.size();
@@ -4010,24 +4015,6 @@ private:
 };
 
 namespace aggregate_operations {
-template <typename T>
-static bool is_nan(T value)
-{
-    if constexpr (std::is_floating_point_v<T>) {
-        return std::isnan(value);
-    }
-    else {
-        // gcc considers the argument unused if it's only used in one branch of if constexpr
-        static_cast<void>(value);
-        return false;
-    }
-}
-
-template <>
-inline bool is_nan<Decimal128>(Decimal128 value)
-{
-    return value.is_nan();
-}
 
 template <typename T, typename Compare>
 class MinMaxAggregateOperator {
@@ -4332,7 +4319,15 @@ public:
         if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
             m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.is_null()) {
-                m_matches = m_right->find_all(Mixed());
+                const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
+                // when checking for null across links, null links are considered matches,
+                // so we must compute the slow matching even if there is an index.
+                if (!prop || prop->links_exist()) {
+                    return dT;
+                }
+                else {
+                    m_matches = m_right->find_all(Mixed());
+                }
             }
             else {
                 if (m_right->get_type() != m_left_value.get_type()) {

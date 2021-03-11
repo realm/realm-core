@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 #include "test_types_helper.hpp"
 
-// #include <valgrind/callgrind.h>
+//#include <valgrind/callgrind.h>
 //#define PERFORMACE_TESTING
 
 using namespace realm;
@@ -5609,6 +5609,50 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
     CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
+}
+
+TEST(Table_SortEncrypted)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    Random random(random_int<unsigned long>());
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
+
+    auto wt = sg->start_write();
+    auto foos = wt->add_table("foo");
+    auto col_id = foos->add_column(type_String, "id");
+    auto col_b = foos->add_column(type_Bool, "b");
+
+    for (int i = 0; i < 10000; i++) {
+        auto n = random.draw_int_max(10000);
+        foos->create_object().set(col_id, util::to_string(n));
+    }
+    wt->commit_and_continue_as_read();
+    auto q = foos->where();
+    DescriptorOrdering ordering;
+    ordering.append_sort(SortDescriptor({{col_b}, {col_id}}));
+
+    // auto t1 = steady_clock::now();
+
+    CALLGRIND_START_INSTRUMENTATION;
+    auto tv = q.find_all(ordering);
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    // auto t2 = steady_clock::now();
+
+    // std::cout << "time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+}
+
+TEST(Table_RebuildTable)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    auto id = t->add_column(type_Int, "id");
+    for (int64_t i = 1; i < 8; i++) {
+        t->create_object().set(id, i);
+    }
+    t->set_primary_key_column(id);
 }
 
 #endif // TEST_TABLE

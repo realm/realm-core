@@ -140,7 +140,8 @@ jobWrapper {
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+            // FIXME: disabled due to issues with CI
+	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [

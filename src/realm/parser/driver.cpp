@@ -62,6 +62,28 @@ static std::map<int, std::string> opstr = {
     {CompareNode::IN, "in"},
 };
 
+std::string print_pretty_objlink(const ObjLink& link, const Group* g)
+{
+    REALM_ASSERT(g);
+    if (link.is_null()) {
+        return "NULL";
+    }
+    try {
+        auto table = g->get_table(link.get_table_key());
+        if (!table) {
+            return "link to an invalid table";
+        }
+        auto obj = table->get_object(link.get_obj_key());
+        Mixed pk = obj.get_primary_key();
+        return util::format("'%1' with primary key '%2'",
+                            util::serializer::get_printable_table_name(table->get_name()),
+                            util::serializer::print_value(pk));
+    }
+    catch (...) {
+        return "invalid link";
+    }
+}
+
 bool is_length_suffix(const std::string& s)
 {
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
@@ -125,7 +147,7 @@ inline T string_to(const std::string& s)
     iss >> value;
     if (iss.fail()) {
         if (!try_parse_specials(s, value)) {
-            throw std::invalid_argument(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
+            throw InvalidQueryArgError(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
         }
     }
     return value;
@@ -192,6 +214,11 @@ public:
     {
         Arguments::verify_ndx(n);
         return m_args.at(n).get<ObjKey>();
+    }
+    ObjLink objlink_for_argument(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n).get<ObjLink>();
     }
     bool is_argument_null(size_t n) final
     {
@@ -293,13 +320,40 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_constant_evaluation()) {
+        if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
+            if (right->get_mixed().is_null()) {
+                right_type = ColumnTypeTraits<realm::null>::id;
+                right = std::make_unique<Value<realm::null>>();
+            }
+            else {
+                auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
+                auto right_table_key = right->get_mixed().get_link().get_table_key();
+                auto right_obj_key = right->get_mixed().get_link().get_obj_key();
+                if (left_dest_table_key == right_table_key) {
+                    right = std::make_unique<Value<ObjKey>>(right_obj_key);
+                    right_type = type_Link;
+                }
+                else {
+                    util::serializer::SerialisationState state;
+                    const Group* g = drv->m_base_table->get_parent_group();
+                    throw std::invalid_argument(util::format(
+                        "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
+                        link_column->link_map().description(state),
+                        get_printable_table_name(link_column->link_map().get_target_table()->get_name()),
+                        print_pretty_objlink(right->get_mixed().get_link(), g)));
+                }
+            }
+        }
+    }
+
     if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
-        throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                                 get_data_type_name(left_type), get_data_type_name(right_type)));
+        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                             get_data_type_name(left_type), get_data_type_name(right_type)));
     }
     if (left_type == type_TypeOfValue || right_type == type_TypeOfValue) {
         if (left_type != right_type) {
-            throw std::invalid_argument(
+            throw InvalidQueryArgError(
                 util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
                              get_data_type_name(left_type), get_data_type_name(right_type)));
         }
@@ -308,7 +362,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
-            throw std::invalid_argument("The keypath following 'IN' must contain a list");
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list");
         }
     }
 
@@ -355,7 +409,8 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
         else if (left_type == type_Link) {
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            if (link_column && link_column->link_map().get_nb_hops() == 1) {
+            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
+                link_column->get_comparison_type() == ExpressionComparisonType::Any) {
                 // We can fall back to Query::links_to for != and == operations on links, but only
                 // for == on link lists. This is because negating query.links_to() is equivalent to
                 // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
@@ -573,7 +628,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
                         return length_expr;
                 }
             }
-            throw e;
+            throw InvalidQueryError(e.what());
         }
     }
     REALM_UNREACHABLE();
@@ -749,6 +804,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     Subexpr* ret = nullptr;
+    std::string explain_value_message = text;
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {
@@ -830,7 +886,12 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     break;
                 default:
                     if (hint == type_TypeOfValue) {
-                        ret = new Value<TypeOfValue>(TypeOfValue(str));
+                        try {
+                            ret = new Value<TypeOfValue>(TypeOfValue(str));
+                        }
+                        catch (const std::runtime_error& e) {
+                            throw InvalidQueryArgError(e.what());
+                        }
                     }
                     else {
                         ret = new ConstantStringValue(str);
@@ -935,10 +996,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
             if (drv->m_args.is_argument_null(arg_no)) {
+                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = new Value<null>(realm::null());
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
+                explain_value_message =
+                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
                 switch (type) {
                     case type_Int:
                         ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
@@ -1007,6 +1071,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     case type_Link:
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
+                    case type_TypedLink:
+                        if (hint == type_Link || hint == type_TypedLink) {
+                            ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
+                            break;
+                        }
+                        explain_value_message =
+                            util::format("%1 which links to %2", explain_value_message,
+                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
+                                                              drv->m_base_table->get_parent_group()));
+                        break;
                     default:
                         break;
                 }
@@ -1016,8 +1090,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     }
     if (!ret) {
         throw InvalidQueryError(
-            util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
-                         get_data_type_name(hint), text));
+            util::format("Unsupported comparison between property of type '%1' and constant value: %2",
+                         get_data_type_name(hint), explain_value_message));
     }
     return std::unique_ptr<Subexpr>{ret};
 }
@@ -1105,8 +1179,8 @@ void verify_conditions(Subexpr* left, Subexpr* right)
     }
     if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
         util::serializer::SerialisationState state;
-        throw std::runtime_error(util::format("Comparison between two constants is not supported ('%1' and '%2')",
-                                              left->description(state), right->description(state)));
+        throw InvalidQueryError(util::format("Comparison between two constants is not supported ('%1' and '%2')",
+                                             left->description(state), right->description(state)));
     }
     if (auto link_column = dynamic_cast<Columns<Link>*>(left)) {
         if (link_column->has_multiple_values() && right->has_constant_evaluation() && right->get_mixed().is_null()) {
@@ -1183,10 +1257,11 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
 
     auto table_name = table_column_pair.substr(0, dot_pos);
     table_name = m_mapping.translate_table_name(table_name);
-    auto column_name = table_column_pair.substr(dot_pos + 1);
     auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    auto column_name = table_column_pair.substr(dot_pos + 1);
     ColKey origin_column;
     if (origin_table) {
+        column_name = m_mapping.translate(origin_table, column_name);
         origin_column = origin_table->get_column_key(column_name);
     }
     if (!origin_column) {
