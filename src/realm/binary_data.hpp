@@ -230,7 +230,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
         out << "null";
     }
     else {
-        out << "BinaryData(" << static_cast<const void*>(d.m_data) << ", " << d.m_size << ")";
+        out << "BinaryData(" << static_cast<const char*>(d.m_data) << ", " << d.m_size << ")";
     }
     return out;
 }

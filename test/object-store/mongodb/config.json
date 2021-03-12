@@ -1,6 +1,6 @@
 {
-    "app_id": "auth-integration-tests-jlloa",
-    "config_version": 20180301,
+    "app_id": "auth-integration-tests-kzdoa",
+    "config_version": 20200603,
     "name": "auth-integration-tests",
     "location": "US-VA",
     "deployment_model": "GLOBAL",
@@ -9,6 +9,6 @@
         "enabled": false
     },
     "sync": {
-        "development_mode_enabled": false
+        "development_mode_enabled": true
     }
 }

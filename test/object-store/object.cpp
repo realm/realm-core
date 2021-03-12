@@ -83,6 +83,13 @@ struct TestContext : CppContext {
     }
 };
 
+TEST_CASE("ReadTableNames") {
+    auto group = Group("/Users/jason.flax/Documents/sc2/Tests/CoreTests/Resources/demo-v20.realm");
+    auto keys = group.get_table_keys();
+    for (auto key : keys) {
+        group.get_table_name(key);
+    }
+}
 TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
