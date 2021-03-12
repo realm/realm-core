@@ -1,10 +1,6 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.2.4 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * During integration of a large amount of data from the server, you may get "Assertion failed: !fields.has_missing_parent_update()" ([#4497](https://github.com/realm/realm-core/issues/4497), since v6.0.0)
 * Fixed queries for constant null across links to an indexed property not returning matches when the link was null. ([#4460]https://github.com/realm/realm-core/pull/4460), since 5.23.6).
 * Support upgrading from file format 5. ([#7089](https://github.com/realm/realm-cocoa/issues/7089), since v6.0.0)
@@ -16,14 +12,6 @@
 * Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
 * `Obj::set_list_values` inappropriately resizes list for LinkList causing LogicError to be thrown. ([#4028](https://github.com/realm/realm-core/issues/4028), since v6.0.0)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.2.3 Release notes
