@@ -384,9 +384,8 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
 
     size_t q_count = q.count();
     CHECK_EQUAL(q_count, num_results);
-    std::string description = q.get_description();
+    std::string description = q.get_description(mapping.get_backlink_class_prefix());
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
-    mapping.set_backlink_class_prefix("");
     Query q2 = t->query(description, args, mapping);
 
     size_t q2_count = q2.count();
@@ -2254,14 +2253,14 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
-    CHECK_EQUAL(message, "table.values is not a link column");
+    CHECK_EQUAL(message, "Property 'values' in 'table' is not an Object");
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
            Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
 {
     Group g;
-    TableRef t = g.add_table("class_table");
+    TableRef t = g.add_table("table");
     TestValueGenerator gen;
 
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
@@ -2325,7 +2324,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     }
     else {
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
-        CHECK_EQUAL(message, "table.values is not a link column");
+        CHECK_EQUAL(message, "Property 'values' in 'table' is not an Object");
     }
 }
 
@@ -2838,10 +2837,6 @@ TEST(Parser_Backlinks)
                                 message);
     CHECK_EQUAL(message, "Cannot compare linklist ('@links.class_Person.fav\\ item') with NULL");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
-    CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.artifacts > 0", 1), message);
-    CHECK_EQUAL(message, "No property 'artifacts' found in type 'Person' which links to type 'Items'");
 
     // check that arbitrary aliasing for named backlinks works
     query_parser::KeyPathMapping mapping;
@@ -2883,6 +2878,13 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "@links.CustomPersonClassName.things.@count > 2", 2, mapping_with_prefix);
     // Check that mapping works for tables named "class_class..."
     verify_query(test_context, things, "parents.pascal_case == 3", 1, mapping_with_prefix);
+
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.Factory.items > 0", 1, mapping_with_prefix),
+                                message);
+    CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "@links.Person.artifacts > 0", 1, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "No property 'artifacts' found in type 'Person' which links to type 'Items'");
 
     // verbose backlinks syntax with 'class_' prefix not allowed
     CHECK_THROW_ANY(
@@ -3027,7 +3029,7 @@ TEST(Parser_BacklinkCount)
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;
-    util::serializer::SerialisationState test_state;
+    util::serializer::SerialisationState test_state("");
 
     TableRef test_table = g.add_table("test");
 
@@ -3159,7 +3161,7 @@ TEST(Parser_Subquery)
                 items->column<Link>(item_contains_col).count() > 1;
     Query q = t->column<Link>(items_col, sub).count() > 1;
 
-    std::string subquery_description = q.get_description();
+    std::string subquery_description = q.get_description("class_");
     CHECK(subquery_description.find("SUBQUERY(items, $x,") != std::string::npos);
     CHECK(subquery_description.find(" $x.name ") != std::string::npos);
     CHECK(subquery_description.find(" $x.price ") != std::string::npos);
@@ -4692,6 +4694,29 @@ TEST(Parser_Threads)
         });
     for (auto& w : workers)
         w.join();
+}
+
+TEST(Parser_ClassPrefix)
+{
+    for (const char* prefix : {"class_", "cl#"}) {
+        Group g;
+        std::string table_name = std::string(prefix) + "foo";
+        auto table = g.add_table(table_name);
+        auto col = table->add_column(type_Int, "val");
+        auto col_link = table->add_column(*table, "parent");
+        auto top = table->create_object();
+        for (int64_t i : {1, 2, 3, 4, 5}) {
+            table->create_object().set(col, i).set(col_link, top.get_key());
+        }
+        query_parser::KeyPathMapping mapping_with_prefix;
+        mapping_with_prefix.set_backlink_class_prefix(prefix);
+
+        verify_query(test_context, table, "val > 3", 2, mapping_with_prefix);
+        verify_query(test_context, table, "@links.foo.parent.val > 0", 1, mapping_with_prefix);
+        std::string message;
+        CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "id > 5", 0, mapping_with_prefix), message);
+        CHECK_EQUAL(message, "'foo' has no property: 'id'");
+    }
 }
 
 #endif // TEST_PARSER

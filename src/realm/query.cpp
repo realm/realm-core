@@ -1827,9 +1827,9 @@ std::shared_ptr<DescriptorOrdering> Query::get_ordering()
     return std::move(m_ordering);
 }
 
-std::string Query::get_description() const
+std::string Query::get_description(const std::string& class_prefix) const
 {
-    util::serializer::SerialisationState state;
+    util::serializer::SerialisationState state(class_prefix);
     return get_description(state);
 }
 
