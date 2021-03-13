@@ -718,14 +718,14 @@ TEST_CASE("canonical_sync_corpus", "[sync][app]") {
     // MARK: Mixed Round Trip
     SECTION("Mixed Round Trip") {
         test_round_trip<PT::Mixed << PT::Int>();
-        test_round_trip<PT::Mixed << PT::Bool>(/*Corpus<PT::Mixed << PT::Int>::new_value*/);
-        test_round_trip<PT::Mixed << PT::String>(/*Corpus<PT::Mixed << PT::Bool>::new_value*/);
-        test_round_trip<PT::Mixed << PT::Data>(/*Corpus<PT::Mixed << PT::String>::new_value*/);
-        test_round_trip<PT::Mixed << PT::Date>(/*Corpus<PT::Mixed << PT::Data>::new_value*/);
-        test_round_trip<PT::Mixed << PT::Double>(/*Corpus<PT::Mixed << PT::Date>::new_value*/);
-        test_round_trip<PT::Mixed << PT::ObjectId>(/*Corpus<PT::Mixed << PT::Double>::new_value*/);
-        test_round_trip<PT::Mixed << PT::Decimal>(/*Corpus<PT::Mixed << PT::ObjectId>::new_value*/);
-        test_round_trip<PT::Mixed << PT::UUID>(/*Corpus<PT::Mixed << PT::Decimal>::new_value*/);
+        test_round_trip<PT::Mixed << PT::Bool>();
+        test_round_trip<PT::Mixed << PT::String>();
+        test_round_trip<PT::Mixed << PT::Data>();
+        test_round_trip<PT::Mixed << PT::Date>();
+        test_round_trip<PT::Mixed << PT::Double>();
+        test_round_trip<PT::Mixed << PT::ObjectId>();
+        test_round_trip<PT::Mixed << PT::Decimal>();
+        test_round_trip<PT::Mixed << PT::UUID>();
         // TODO: Not supported yet: test_round_trip<PT::Mixed | PT::Array | PT::Nullable>();
     }
 }
