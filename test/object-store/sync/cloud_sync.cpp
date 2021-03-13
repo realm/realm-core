@@ -145,6 +145,11 @@ struct BaseLstCorpus: std::true_type {
     }
 };
 
+/// A Corpus is a specialized type use in test.
+/// Each contains a `default_value`, which is the value we set the test column to initially.
+/// It also contains a `new_value`, which is the value we set it to while testing.
+/// The goal is to assert that values can be read, written to, and round tripped
+/// to and from the sync server.
 template <PropertyType PT>
 struct Corpus: std::false_type {
 };
@@ -343,7 +348,6 @@ inline constexpr PropertyType operator<<(PropertyType a, PropertyType b)
 }
 }
 
-// TODO: This will stop compiling once we are testing 18 different data types
 template <>
 struct Corpus<PT::Mixed << PT::Int>: BaseMixedCorpus<Int> {
     static const auto inline default_value = none;
@@ -360,14 +364,34 @@ struct Corpus<PT::Mixed << PT::String>: BaseMixedCorpus<String> {
     static const inline auto new_value = Mixed("bar");
 };
 template <>
-struct Corpus<PT::Mixed << PT::Data>: BaseMixedCorpus<String> {
+struct Corpus<PT::Mixed << PT::Data>: BaseMixedCorpus<BinaryData> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(BinaryData("def"));
 };
 template <>
-struct Corpus<PT::Mixed << PT::Date>: BaseMixedCorpus<String> {
+struct Corpus<PT::Mixed << PT::Date>: BaseMixedCorpus<Timestamp> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(Timestamp(84, 0));
+};
+template <>
+struct Corpus<PT::Mixed << PT::Double>: BaseMixedCorpus<Double> {
+    static const auto inline default_value = none;
+    static const inline auto new_value = Mixed(42.42);
+};
+template <>
+struct Corpus<PT::Mixed << PT::ObjectId>: BaseMixedCorpus<ObjectId> {
+    static const auto inline default_value = none;
+    static const inline auto new_value = Mixed(ObjectId::gen());
+};
+template <>
+struct Corpus<PT::Mixed << PT::Decimal>: BaseMixedCorpus<Decimal> {
+    static const auto inline default_value = none;
+    static const inline auto new_value = Mixed(Decimal("42.42"));
+};
+template <>
+struct Corpus<PT::Mixed << PT::UUID>: BaseMixedCorpus<UUID> {
+    static const auto inline default_value = none;
+    static const inline auto new_value = Mixed(UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
 };
 template <>
 struct Corpus<PT::Mixed | PT::Nullable>: BaseMixedCorpus<Int> {
@@ -391,6 +415,7 @@ struct Corpus<PT::Array | PT::Mixed | PT::Nullable>: BaseLstCorpus<Mixed, PT::Ar
 };
 
 // MARK: Full Corpus
+/// Returns a tuple of all type combinations we are testing.
 static constexpr auto corpus_types(){
     return std::tuple<
         Corpus<PT::Int>, Corpus<PT::Int | PT::Nullable>, Corpus<PT::Array | PT::Int>,
@@ -442,6 +467,10 @@ AllTypesSyncObject::AllTypesSyncObject(SharedRealm realm)
 }
 
 // MARK: Test Harness
+/// A contained context for sync tests. Instantiating a new harness
+/// will remove all state from the previous harness, giving a clean
+/// slate to test sync on. The purpose of this is to emulate and control
+/// the flow of syncing, forcing downloads and uploads of data.
 struct Harness {
     Harness(std::function<void(Realm::Config&)> set_up = [](auto&){})
     : factory([] { return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport); })
@@ -513,7 +542,6 @@ struct Harness {
     void run(std::function<void(SharedRealm)> block) {
         auto realm = set_up();
         block(realm);
-        wait_for_upload(*realm);
         tear_down(realm);
     }
 private:
@@ -523,7 +551,6 @@ private:
         opt_set_up(config);
 
         auto realm = realm::Realm::get_shared_realm(config);
-        wait_for_download(*realm);
         return realm;
     }
 
@@ -534,9 +561,26 @@ private:
 };
 
 template <PropertyType PT>
-void test_round_trip(Any default_value = Any()) {
+void test_round_trip() {
     static_assert(Corpus<PT>::value, "PropertyType must be added to corpus before testing");
-    Harness().run([&default_value](auto realm) {
+    // Add a new `AllTypesSyncObject` to the Realm
+    Harness().run([](auto realm) {
+        wait_for_download(*realm);
+        auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
+        realm->begin_transaction();
+        results.clear();
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+
+        REQUIRE(results.size() == 0);
+        realm->begin_transaction();
+        const auto obj = AllTypesSyncObject(realm);
+        realm->commit_transaction();
+        REQUIRE(results.size() == 1);
+        wait_for_upload(*realm);
+    });
+    Harness().run([&](auto realm) {
+        wait_for_download(*realm);
         // assert realm has at least one `AllTypesSyncObject`
         auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
         REQUIRE(results.size() == 1);
@@ -545,11 +589,7 @@ void test_round_trip(Any default_value = Any()) {
         auto obj = AllTypesSyncObject(results.get(0));
         auto corpus = Corpus<PT>();
         // assert the stored value is equal to the expected default value
-        if (default_value.has_value()) {
-            REQUIRE(corpus.get(obj) == any_cast<typename Corpus<PT>::value_type>(default_value));
-        } else {
-            REQUIRE(corpus.get(obj) == corpus.default_value);
-        }
+        REQUIRE(corpus.get(obj) == corpus.default_value);
         corpus.set(obj, corpus.new_value);
 
         // commit the changes
@@ -557,6 +597,7 @@ void test_round_trip(Any default_value = Any()) {
         wait_for_upload(*realm);
     });
     Harness().run([](auto realm) {
+        wait_for_download(*realm);
         auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
         REQUIRE(results.size() == 1);
         auto obj = AllTypesSyncObject(results.get(0));
@@ -565,211 +606,250 @@ void test_round_trip(Any default_value = Any()) {
     });
 }
 
-TEST_CASE("app: sync integration", "[sync][app]") {
-    // MARK: Add Objects -
-    SECTION("Add Objects") {
+TEST_CASE("canonical_sync_corpus", "[sync][app]") {
+    // MARK: Int Round Trip
+    SECTION("Int Round Trip") {
+        test_round_trip<PT::Int>();
+    }
+    // MARK: Int Nullable Round Trip
+    SECTION("Int Nullable Round Trip") {
+        test_round_trip<PT::Int | PT::Nullable>();
+    }
+    // MARK: Int List Round Trip
+    SECTION("Int List Round Trip") {
+        test_round_trip<PT::Array | PT::Int>();
+    }
+    // MARK: Bool Round Trip
+    SECTION("Bool Round Trip") {
+        test_round_trip<PT::Bool>();
+    }
+    // MARK: Bool Nullable Round Trip
+    SECTION("Bool Nullable Round Trip") {
+        test_round_trip<PT::Bool | PT::Nullable>();
+    }
+    // MARK: Bool List Round Trip
+    SECTION("Bool List Round Trip") {
+        test_round_trip<PT::Array | PT::Bool>();
+    }
+    // MARK: String Round Trip
+    SECTION("String Round Trip") {
+        test_round_trip<PT::String>();
+    }
+    // MARK: String Nullable Round Trip
+    SECTION("Optional String Round Trip") {
+        test_round_trip<PT::String | PT::Nullable>();
+    }
+    // MARK: String List Round Trip
+    SECTION("String List Round Trip") {
+        test_round_trip<PT::String | PT::Array>();
+    }
+    // MARK: Data Round Trip
+    SECTION("Data Round Trip") {
+        test_round_trip<PT::Data>();
+    }
+    // MARK: Data Nullable Round Trip
+    SECTION("Data Nullable Round Trip") {
+        test_round_trip<PT::Data | PT::Nullable>();
+    }
+    // MARK: Data List Round Trip
+    SECTION("Data List Round Trip") {
+        test_round_trip<PT::Data | PT::Array>();
+    }
+    // MARK: Date Round Trip
+    SECTION("Date Round Trip") {
+        test_round_trip<PT::Date>();
+    }
+    // MARK: Date Nullable Round Trip
+    SECTION("Date Nullable Round Trip") {
+        test_round_trip<PT::Date | PT::Nullable>();
+    }
+    // MARK: Date Round Trip
+    SECTION("Date Round Trip") {
+        test_round_trip<PT::Date | PT::Array>();
+    }
+    // MARK: Double Round Trip
+    SECTION("Double Round Trip") {
+        test_round_trip<PT::Double>();
+    }
+    // MARK: Double Nullable Round Trip
+    SECTION("Double Nullable Round Trip") {
+        test_round_trip<PT::Double | PT::Nullable>();
+    }
+    // MARK: Double List Round Trip
+    SECTION("Double List Round Trip") {
+        test_round_trip<PT::Double | PT::Array>();
+    }
+    // MARK: ObjectId Round Trip
+    SECTION("ObjectId Round Trip") {
+        test_round_trip<PT::ObjectId>();
+    }
+    // MARK: ObjectId Nullable Round Trip
+    SECTION("ObjectId Nullable Round Trip") {
+        test_round_trip<PT::ObjectId | PT::Nullable>();
+    }
+    // MARK: ObjectId List Round Trip
+    SECTION("ObjectId List Round Trip") {
+        test_round_trip<PT::ObjectId | PT::Array>();
+    }
+    // MARK: Decimal Round Trip
+    SECTION("Decimal Round Trip") {
+        test_round_trip<PT::Decimal>();
+    }
+    // MARK: Decimal Nullable Round Trip
+    SECTION("Decimal Nullable Round Trip") {
+        test_round_trip<PT::Decimal | PT::Nullable>();
+    }
+    // MARK: Decimal List Round Trip
+    SECTION("Decimal List Round Trip") {
+        test_round_trip<PT::Decimal | PT::Array>();
+    }
+    // MARK: UUID Round Trip
+    SECTION("UUID Round Trip") {
+        test_round_trip<PT::UUID>();
+    }
+    // MARK: UUID Nullable Round Trip
+    SECTION("UUID Nullable Round Trip") {
+        test_round_trip<PT::UUID | PT::Nullable>();
+    }
+    // MARK: UUID List Round Trip
+    SECTION("UUID List Round Trip") {
+        test_round_trip<PT::UUID| PT::Array>();
+    }
+    // MARK: Mixed Round Trip
+    SECTION("Mixed Round Trip") {
+        test_round_trip<PT::Mixed << PT::Int>();
+        test_round_trip<PT::Mixed << PT::Bool>(/*Corpus<PT::Mixed << PT::Int>::new_value*/);
+        test_round_trip<PT::Mixed << PT::String>(/*Corpus<PT::Mixed << PT::Bool>::new_value*/);
+        test_round_trip<PT::Mixed << PT::Data>(/*Corpus<PT::Mixed << PT::String>::new_value*/);
+        test_round_trip<PT::Mixed << PT::Date>(/*Corpus<PT::Mixed << PT::Data>::new_value*/);
+        test_round_trip<PT::Mixed << PT::Double>(/*Corpus<PT::Mixed << PT::Date>::new_value*/);
+        test_round_trip<PT::Mixed << PT::ObjectId>(/*Corpus<PT::Mixed << PT::Double>::new_value*/);
+        test_round_trip<PT::Mixed << PT::Decimal>(/*Corpus<PT::Mixed << PT::ObjectId>::new_value*/);
+        test_round_trip<PT::Mixed << PT::UUID>(/*Corpus<PT::Mixed << PT::Decimal>::new_value*/);
+        // TODO: Not supported yet: test_round_trip<PT::Mixed | PT::Array | PT::Nullable>();
+    }
+}
+
+TEST_CASE("sync_unhappy_paths", "[sync][app]") {
+    // MARK: Expired Session Refresh -
+    SECTION("Expired Session Refresh") {
         Harness().run([](auto realm) {
+            wait_for_download(*realm);
             auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
             realm->begin_transaction();
             results.clear();
             realm->commit_transaction();
             wait_for_upload(*realm);
 
-            REQUIRE(results.size() == 0);
             realm->begin_transaction();
-            const auto obj = AllTypesSyncObject(realm);
+            auto _ = AllTypesSyncObject(realm);
             realm->commit_transaction();
-            REQUIRE(results.size() == 1);
+            wait_for_upload(*realm);
         });
+        auto harness = Harness();
+        auto app = harness.get_app_and_login(harness.sync_manager.app());
+        // set a bad access token. this will trigger a refresh when the sync session opens
+        app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
-        // MARK: Int Round Trip
-        SECTION("Int Round Trip") {
-            test_round_trip<PT::Int>();
-        }
-        // MARK: Int Nullable Round Trip
-        SECTION("Int Nullable Round Trip") {
-            test_round_trip<PT::Int | PT::Nullable>();
-        }
-        // MARK: Int List Round Trip
-        SECTION("Int List Round Trip") {
-            test_round_trip<PT::Array | PT::Int>();
-        }
-        // MARK: Bool Round Trip
-        SECTION("Bool Round Trip") {
-            test_round_trip<PT::Bool>();
-        }
-        // MARK: Bool Round Trip
-        SECTION("Bool Nullable Round Trip") {
-            test_round_trip<PT::Bool | PT::Nullable>();
-        }
-        // MARK: Bool List Round Trip
-        SECTION("Bool Round Trip") {
-            test_round_trip<PT::Array | PT::Bool>();
-        }
-        // MARK: String Round Trip
-        SECTION("String Round Trip") {
-            test_round_trip<PT::String>();
-        }
-        // MARK: String Round Trip
-        SECTION("Optional String Round Trip") {
-            test_round_trip<PT::String | PT::Nullable>();
-        }
-        // MARK: Data Round Trip
-        SECTION("Data Round Trip") {
-            test_round_trip<PT::Data>();
-        }
-        // MARK: Optional Data Round Trip
-        SECTION("Optional Data Round Trip") {
-            test_round_trip<PT::Data | PT::Nullable>();
-        }
-        // MARK: Date Round Trip
-        SECTION("Date Round Trip") {
-            test_round_trip<PT::Date>();
-        }
-        // MARK: Date Round Trip
-        SECTION("Double Round Trip") {
-            test_round_trip<PT::Double>();
-        }
-        // MARK: ObjectId Round Trip
-        SECTION("ObjectId Round Trip") {
-            test_round_trip<PT::ObjectId>();
-        }
-        // MARK: Decimal Round Trip
-        SECTION("Decimal Round Trip") {
-            test_round_trip<PT::Decimal>();
-        }
-        // MARK: UUID Round Trip
-        SECTION("UUID Round Trip") {
-            test_round_trip<PT::UUID>();
-        }
-        // MARK: Mixed Round Trip
-        SECTION("Mixed Round Trip") {
-            test_round_trip<PT::Mixed << PT::Int>();
-            test_round_trip<PT::Mixed << PT::Bool>(Corpus<PT::Mixed << PT::Int>::new_value);
-//            test_round_trip<PT::Mixed << PT::String>();
-//            test_round_trip<PT::Mixed << PT::Data>();
-//            test_round_trip<PT::Mixed << PT::Date>();
-            // TODO: Not supported yet: test_round_trip<PT::Mixed | PT::Array | PT::Nullable>();
-        }
+        auto config = harness.setup_and_get_config(app);
+        auto r = realm::Realm::get_shared_realm(config);
+        wait_for_download(*r);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+        Results results = Results(r, r->read_group().get_table("class_AllTypesSyncObject"));
+        REQUIRE(results.size() == 1);
+        REQUIRE(AllTypesSyncObject(results.get(0)).get<Int>(PT::Int) == Corpus<PT::Int>::default_value);
     }
 
-    // MARK: Expired Session Refresh -
-//    SECTION("Expired Session Refresh") {
-//        Harness().run([](auto realm) {
-//            auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
-//            realm->begin_transaction();
-//            results.clear();
-//            realm->commit_transaction();
-//            wait_for_upload(*realm);
-//
-//            realm->begin_transaction();
-//            auto _ = AllTypesSyncObject(realm);
-//            realm->commit_transaction();
-//        });
-//        auto harness = Harness();
-//        auto app = harness.get_app_and_login(harness.sync_manager.app());
-//        // set a bad access token. this will trigger a refresh when the sync session opens
-//        app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
-//
-//        auto config = harness.setup_and_get_config(app);
-//        auto r = realm::Realm::get_shared_realm(config);
-//        wait_for_download(*r);
-//        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
-//        Results results = Results(r, r->read_group().get_table("class_AllTypesSyncObject"));
-//        REQUIRE(results.size() == 1);
-//        REQUIRE(AllTypesSyncObject(results.get(0)).get<Int>(PT::Int) == AllTypesSyncObject::default_value<PT::Int>());
-//    }
+    SECTION("invalid partition error handling") {
+        std::atomic<bool> error_did_occur = false;
+        auto harness = Harness([&error_did_occur](auto& config) {
+            config.sync_config->partition_value = "not a bson serialized string";
+            config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
+                CHECK(error.message ==
+                      "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+                error_did_occur.store(true);
+            };
+        });
+        harness.run([&error_did_occur, &harness](SharedRealm realm) {
+            auto session = harness.sync_manager.app()->current_user()->session_for_on_disk_path(realm->config().path); // needed to keep session alive
+            util::EventLoop::main().run_until([&] {
+                return error_did_occur.load();
+            });
+            REQUIRE(error_did_occur.load());
+        });
+    }
 
-//    SECTION("invalid partition error handling") {
-//        std::atomic<bool> error_did_occur = false;
-//        auto harness = Harness([&error_did_occur](auto& config) {
-//            config.sync_config->partition_value = "not a bson serialized string";
-//            config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-//                CHECK(error.message ==
-//                      "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
-//                error_did_occur.store(true);
-//            };
-//        });
-//        harness.run([&error_did_occur, &harness](SharedRealm realm) {
-//            auto session = harness.sync_manager.app()->current_user()->session_for_on_disk_path(realm->config().path); // needed to keep session alive
-//            util::EventLoop::main().run_until([&] {
-//                return error_did_occur.load();
-//            });
-//            REQUIRE(error_did_occur.load());
-//        });
-//    }
+    SECTION("invalid pk schema error handling") {
+        const std::string invalid_pk_name = "my_primary_key";
+        Harness([&invalid_pk_name](auto& config) {
+            auto it = config.schema->find("Dog");
+            REQUIRE(it != config.schema->end());
+            REQUIRE(it->primary_key_property());
+            REQUIRE(it->primary_key_property()->name == "_id");
+            it->primary_key_property()->name = invalid_pk_name;
+            it->primary_key = invalid_pk_name;
+            realm::Realm::get_shared_realm(config),
+            util::format(
+                "The primary key property on a synchronized Realm must be named '%1' but found '%2' for type 'Dog'",
+                "_id", invalid_pk_name);
+        });
+    }
 
-//    SECTION("invalid pk schema error handling") {
-//        const std::string invalid_pk_name = "my_primary_key";
-//        Harness([&invalid_pk_name](auto& config) {
-//            auto it = config.schema->find("Dog");
-//            REQUIRE(it != config.schema->end());
-//            REQUIRE(it->primary_key_property());
-//            REQUIRE(it->primary_key_property()->name == "_id");
-//            it->primary_key_property()->name = invalid_pk_name;
-//            it->primary_key = invalid_pk_name;
-//            realm::Realm::get_shared_realm(config),
-//            util::format(
-//                "The primary key property on a synchronized Realm must be named '%1' but found '%2' for type 'Dog'",
-//                "_id", invalid_pk_name);
-//        });
-//    }
-//
-//    SECTION("missing pk schema error handling") {
-//        Harness([](auto& config) {
-//            auto it = config.schema->find("Dog");
-//            REQUIRE(it != config.schema->end());
-//            REQUIRE(it->primary_key_property());
-//            it->primary_key_property()->is_primary = false;
-//            it->primary_key = "";
-//            REQUIRE(!it->primary_key_property());
-//            REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
-//                                      util::format("There must be a primary key property named '%1' on a synchronized "
-//                                                   "Realm but none was found for type 'Dog'",
-//                                                   "_id"));
-//        });
-//    }
+    SECTION("missing pk schema error handling") {
+        Harness([](auto& config) {
+            auto it = config.schema->find("Dog");
+            REQUIRE(it != config.schema->end());
+            REQUIRE(it->primary_key_property());
+            it->primary_key_property()->is_primary = false;
+            it->primary_key = "";
+            REQUIRE(!it->primary_key_property());
+            REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
+                                      util::format("There must be a primary key property named '%1' on a synchronized "
+                                                   "Realm but none was found for type 'Dog'",
+                                                   "_id"));
+        });
+    }
 
-//    SECTION("too large sync message error handling") {
-//        std::vector<SyncError> sync_errors;
-//        std::mutex sync_error_mutex;
-//        Harness([&sync_errors, &sync_error_mutex](auto& config) {
-//            config.sync_config->error_handler = [&](auto, SyncError error) {
-//                std::lock_guard<std::mutex> lk(sync_error_mutex);
-//                sync_errors.push_back(std::move(error));
-//            };
-//        }).run([&sync_errors, &sync_error_mutex](SharedRealm realm) {
-//            realm->begin_transaction();
-//            for (auto i = 'a'; i < 'z'; i++) {
-//                auto obj = AllTypesSyncObject(realm);
-//                obj.set(PT::String, random_string(1024 * 1024));
-//            }
-//            realm->commit_transaction();
-//
-//            const auto wait_start = std::chrono::steady_clock::now();
-//            auto pred = [](const SyncError& error) {
-//                return error.error_code.category() == util::websocket::websocket_close_status_category();
-//            };
-//            util::EventLoop::main().run_until([&]() -> bool {
-//                std::lock_guard<std::mutex> lk(sync_error_mutex);
-//                // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
-//                // and we should fail the test.
-//                if (std::chrono::steady_clock::now() - wait_start > std::chrono::minutes(2)) {
-//                    return false;
-//                }
-//                return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
-//            });
-//
-//            auto captured_error = [&] {
-//                std::lock_guard<std::mutex> lk(sync_error_mutex);
-//                const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
-//                REQUIRE(it != sync_errors.end());
-//                return *it;
-//            }();
-//
-//            REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
-//            REQUIRE(captured_error.error_code.value() == 1009);
-//            REQUIRE(captured_error.message == "read limited at 16777217 bytes");
-//        });
-//    }
+    SECTION("too large sync message error handling") {
+        std::vector<SyncError> sync_errors;
+        std::mutex sync_error_mutex;
+        Harness([&sync_errors, &sync_error_mutex](auto& config) {
+            config.sync_config->error_handler = [&](auto, SyncError error) {
+                std::lock_guard<std::mutex> lk(sync_error_mutex);
+                sync_errors.push_back(std::move(error));
+            };
+        }).run([&sync_errors, &sync_error_mutex](SharedRealm realm) {
+            realm->begin_transaction();
+            for (auto i = 'a'; i < 'z'; i++) {
+                auto obj = AllTypesSyncObject(realm);
+                obj.set(PT::String, random_string(1024 * 1024));
+            }
+            realm->commit_transaction();
+
+            const auto wait_start = std::chrono::steady_clock::now();
+            auto pred = [](const SyncError& error) {
+                return error.error_code.category() == util::websocket::websocket_close_status_category();
+            };
+            util::EventLoop::main().run_until([&]() -> bool {
+                std::lock_guard<std::mutex> lk(sync_error_mutex);
+                // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+                // and we should fail the test.
+                if (std::chrono::steady_clock::now() - wait_start > std::chrono::minutes(2)) {
+                    return false;
+                }
+                return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
+            });
+
+            auto captured_error = [&] {
+                std::lock_guard<std::mutex> lk(sync_error_mutex);
+                const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
+                REQUIRE(it != sync_errors.end());
+                return *it;
+            }();
+
+            REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
+            REQUIRE(captured_error.error_code.value() == 1009);
+            REQUIRE(captured_error.message == "read limited at 16777217 bytes");
+        });
+    }
 }
