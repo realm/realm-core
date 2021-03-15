@@ -79,9 +79,9 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-// Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
-// it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
-// even read using Get()) without upgrading the database first.
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -379,7 +379,8 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
-TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction,
+        REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -669,7 +670,9 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { DB sg(temp_copy); });
+        tt.start([&]() {
+            DB sg(temp_copy);
+        });
     }
 
     for (auto& tt : t)
@@ -776,7 +779,9 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int) { throw std::exception(); };
+    auto exception_callback = [&](int, int) {
+        throw std::exception();
+    };
     auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
@@ -1822,13 +1827,13 @@ TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // downgrade/restore backup of format 200, but simulate that no downgrade
     // is actually shipped. Instead directly move forward to version 203,
-    // bypassing the outlawed 201 and 202. Set an age limit of 10 for any backuo
+    // bypassing the outlawed 201 and 202. Set an age limit of 100 for any backuo
     // of version 201 to prevent it from being deleted
     _impl::GroupFriend::fake_target_file_format(203);
     {
         DBOptions options;
         options.accepted_versions = {203, 200};
-        options.to_be_deleted = {{201, 10}};
+        options.to_be_deleted = {{201, 100}};
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist, options);
         auto tr = db->start_write();
