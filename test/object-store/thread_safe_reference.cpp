@@ -274,7 +274,6 @@ TEST_CASE("thread safe reference") {
     }
 
     SECTION("passing over") {
-
         SECTION("read-only `ThreadSafeReference`") {
             // We need to create a new `configuration` for the read-only tests since the `InMemoryTestFile` will be
             // gone as soon as we `close()` it which we need to do so we can re-open it in read-only after preparing /
