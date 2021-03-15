@@ -225,6 +225,7 @@ let package = Package(
                 "notifications-fuzzer",
                 "c_api",
                 "util",
+                "backup.cpp",
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),

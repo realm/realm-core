@@ -24,6 +24,7 @@ set(SOURCES
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
+    backup.cpp
     c_api/c_api.cpp
     c_api/c_api.c
 
