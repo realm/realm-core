@@ -5937,10 +5937,11 @@ TEST(Table_FullTextIndex)
 TEST(Table_FullTextIndexPerf)
 {
     auto db = DB::create(get_test_resource_path() + "books.realm");
+    ColKey col;
     {
         auto wt = db->start_write();
         auto t = wt->get_table("uro");
-        auto col = t->get_column_key("text");
+        col = t->get_column_key("text");
         t->remove_search_index(col);
         auto t1 = steady_clock::now();
         t->add_search_index(col, true);
@@ -5952,6 +5953,22 @@ TEST(Table_FullTextIndexPerf)
         size_t used_space;
         db->get_stats(free_space, used_space);
         std::cout << "used space: " << used_space << std::endl;
+    }
+    auto rt = db->start_read();
+    auto t = rt->get_table("uro");
+    TableView res = t->find_all_fulltext(col, "Nørrebrogade");
+    for (size_t i = 0; i < res.size(); i++) {
+        auto obj = res.get_object(i);
+        std::cout << "Chapter: " << obj.get<Int>("chapter") << std::endl;
+        std::string text = obj.get<String>(col);
+        auto ranges = obj.get_token_ranges(col, "Nørrebrogade");
+        for (auto it : ranges) {
+            std::cout << "Token: " << it.first << std::endl;
+            for (auto r : it.second) {
+                std::string frag = text.substr(r.first - 10, r.second - r.first + 20);
+                std::cout << "   " << frag << std::endl;
+            }
+        }
     }
 }
 #endif // TEST_TABLE

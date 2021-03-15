@@ -45,6 +45,7 @@ struct TokenInfo {
 };
 
 using TokenInfoMap = std::map<std::string, TokenInfo>;
+using TokenRangesMap = std::map<std::string, TokenRanges>;
 
 class Tokenizer {
 public:
@@ -68,6 +69,7 @@ public:
     TokenInfoMap get_token_info();
 
     double get_rank(std::string_view tokens, std::string_view text);
+    TokenRangesMap get_ranges(std::string_view tokens, std::string_view text);
 
     static std::unique_ptr<Tokenizer> get_instance();
 

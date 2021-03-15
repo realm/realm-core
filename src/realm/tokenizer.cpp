@@ -145,6 +145,22 @@ double Tokenizer::get_rank(std::string_view tokens, std::string_view text)
     return weight;
 }
 
+TokenRangesMap Tokenizer::get_ranges(std::string_view tokens, std::string_view text)
+{
+    TokenRangesMap ret;
+    reset(text);
+    auto info = get_token_info();
+
+    reset(tokens);
+    while (next()) {
+        std::string tok(get_token());
+        auto& i = info[tok];
+        ret.emplace(tok, i.ranges);
+    }
+
+    return ret;
+}
+
 class DefaultTokenizer : public Tokenizer {
 public:
     DefaultTokenizer()
@@ -220,6 +236,10 @@ bool DefaultTokenizer::next()
                             }
                         }
                     }
+                }
+                else if (u == 0xad) {
+                    // Soft hyphen - just ignore
+                    alnum = true;
                 }
             }
             else if ((i & 0xF0) == 0xE0) {

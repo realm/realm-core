@@ -546,6 +546,13 @@ double Obj::get_fts_rank(ColKey col_key, const std::string& tokens) const
     return tokenizer->get_rank(tokens, std::string_view(val.data(), val.size()));
 }
 
+TokenRangesMap Obj::get_token_ranges(ColKey col_key, const std::string& tokens) const
+{
+    auto val = get<String>(col_key);
+    auto tokenizer = Tokenizer::get_instance();
+    return tokenizer->get_ranges(tokens, std::string_view(val.data(), val.size()));
+}
+
 bool Obj::is_null(ColKey col_key) const
 {
     update_if_needed();

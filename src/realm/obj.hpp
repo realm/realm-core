@@ -23,6 +23,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
 #include <realm/mixed.hpp>
+#include <realm/tokenizer.hpp>
 #include <map>
 
 #define REALM_CLUSTER_IF
@@ -162,6 +163,7 @@ public:
     TableRef get_target_table(ColKey col_key) const;
 
     double get_fts_rank(ColKey col_key, const std::string& tokens) const;
+    TokenRangesMap get_token_ranges(ColKey col_key, const std::string& tokens) const;
 
     bool is_null(ColKey col_key) const;
     bool is_null(StringData col_name) const
