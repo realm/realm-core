@@ -44,7 +44,6 @@
 
 namespace realm {
 
-
 // Pre-declarations
 class ParentNode;
 class Table;
@@ -54,6 +53,7 @@ class Array;
 class Expression;
 class Group;
 class Transaction;
+class LinkMap;
 
 namespace metrics {
 class QueryInfo;
@@ -208,6 +208,8 @@ public:
     Query& ends_with(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& contains(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& like(ColKey column_key, StringData value, bool case_sensitive = true);
+    Query& fulltext(ColKey column_key, StringData value);
+    Query& fulltext(ColKey column_key, StringData value, const LinkMap&);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
@@ -287,6 +289,17 @@ public:
     ConstTableRef& get_table()
     {
         return m_table;
+    }
+
+    std::pair<ColKey, std::string> get_fts_params()
+    {
+        return {m_fts_column, m_fts_tokens};
+    }
+
+    void set_fts_params(ColKey col, StringData tokens)
+    {
+        m_fts_column = col;
+        m_fts_tokens = std::string(tokens);
     }
 
     void get_outside_versions(TableVersions&) const;
@@ -392,6 +405,8 @@ private:
     ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
     std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
     std::shared_ptr<DescriptorOrdering> m_ordering;
+    ColKey m_fts_column;
+    std::string m_fts_tokens;
 };
 
 // Implementation:

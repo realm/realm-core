@@ -356,11 +356,10 @@ return true;
 util::Optional<std::string> case_map(StringData source, bool upper)
 {
     std::string result;
-    result.resize(source.size());
-
-#if defined(_WIN32)
     const char* begin = source.data();
     const char* end = begin + source.size();
+#if defined(_WIN32)
+    result.resize(source.size());
     auto output = result.begin();
     while (begin != end) {
         int n = static_cast<int>(sequence_length(*begin));
@@ -411,21 +410,39 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     // For now we handle just the ASCII subset
     typedef std::char_traits<char> traits;
     if (upper) {
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x60, c) && traits::lt(c, 0x7B))
+        for (auto it = begin; it < end; ++it) {
+            char c = *it;
+            if (traits::lt(0x60, c) && traits::lt(c, 0x7B)) {
                 c = traits::to_char_type(traits::to_int_type(c) - 0x20);
-            result[i] = c;
+            }
+            else if (traits::lt(0xc0, c)) {
+                if ((traits::to_int_type(c) & 0x1f) == 3) {
+                    result.push_back(c);
+                    it++;
+                    c = *it;
+                    if ((c & 0x3F) >= 0x20 && (c & 0x17) != 0x17)
+                        c = traits::to_char_type(traits::to_int_type(c) - 0x20);
+                }
+            }
+            result.push_back(c);
         }
     }
     else { // lower
-        size_t n = source.size();
-        for (size_t i = 0; i < n; ++i) {
-            char c = source[i];
-            if (traits::lt(0x40, c) && traits::lt(c, 0x5B))
+        for (auto it = begin; it < end; ++it) {
+            char c = *it;
+            if (traits::lt(0x40, c) && traits::lt(c, 0x5B)) {
                 c = traits::to_char_type(traits::to_int_type(c) + 0x20);
-            result[i] = c;
+            }
+            else if (traits::lt(0xc0, c)) {
+                if ((traits::to_int_type(c) & 0x1f) == 3) {
+                    result.push_back(c);
+                    it++;
+                    c = *it;
+                    if ((c & 0x3F) < 0x20 && (c & 0x17) != 0x17)
+                        c = traits::to_char_type(traits::to_int_type(c) + 0x20);
+                }
+            }
+            result.push_back(c);
         }
     }
 

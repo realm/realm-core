@@ -1873,7 +1873,7 @@ public:
         return m_column_key.get_attrs().test(col_attr_Nullable);
     }
 
-    LinkMap get_link_map() const
+    const LinkMap& get_link_map() const
     {
         return m_link_map;
     }
@@ -2150,6 +2150,9 @@ public:
         : SimpleQuerySupport(other)
     {
     }
+    Query fulltext(StringData sd);
+
+
     using SimpleQuerySupport::size;
 };
 

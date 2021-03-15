@@ -225,6 +225,8 @@ public:
         return m_table.cast_away_const()->get_object(get_key(ndx));
     }
 
+    double get_query_rank(const Obj&);
+
     // Get the query used to create this TableView
     // The query will have a null source table if this tv was not created from
     // a query

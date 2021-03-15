@@ -43,7 +43,8 @@ struct ColumnType {
         BackLink = 14,
         ObjectId = 15,
         TypedLink = 16,
-        UUID = 17
+        UUID = 17,
+        // QueryRank = 18,
     };
 
     constexpr explicit ColumnType(int t) noexcept
@@ -136,6 +137,8 @@ static_assert(!col_type_OldStringEnum.is_valid());
 static_assert(!col_type_OldTable.is_valid());
 static_assert(!col_type_OldDateTime.is_valid());
 
+static constexpr ColumnType col_type_FTSRank = ColumnType{18};
+
 
 // Column attributes can be combined using bitwise or.
 enum ColumnAttr {
@@ -164,6 +167,10 @@ enum ColumnAttr {
 
     /// Each element is a set of values
     col_attr_Set = 128,
+
+    /// Specifies that elements in the column are full-text indexed
+    col_attr_FullText_Indexed = 256,
+
 
     /// Either list, dictionary, or set
     col_attr_Collection = 128 + 64 + 32

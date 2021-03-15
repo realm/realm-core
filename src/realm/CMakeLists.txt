@@ -52,6 +52,7 @@ set(REALM_SOURCES
     string_data.cpp
     table.cpp
     table_ref.cpp
+    tokenizer.cpp
     obj_list.cpp
     object_id.cpp
     table_view.cpp

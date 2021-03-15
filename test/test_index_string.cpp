@@ -81,6 +81,11 @@ public:
             m_owner->m_table.add_search_index(m_owner->m_col_key);
             return m_owner->m_table.get_search_index(m_owner->m_col_key);
         }
+        const StringIndex* create_fulltext_index()
+        {
+            m_owner->m_table.add_search_index(m_owner->m_col_key, true);
+            return m_owner->m_table.get_search_index(m_owner->m_col_key);
+        }
         ObjKey key(size_t ndx) const
         {
             return m_keys[ndx];
@@ -1788,6 +1793,19 @@ TEST(StringIndex_QuerySingleObject)
     CHECK_EQUAL(q.count(), 1);
     q = table->where().equal(table->get_column_key("name"), "Bar", true);
     CHECK_EQUAL(q.count(), 0);
+}
+
+TEST(StringIndex_CaseMap)
+{
+    StringData chars("±ÀÁÂÃÄÅÆÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝß×÷");
+    auto lower = case_map(chars, false);
+    if (CHECK(lower)) {
+        CHECK_EQUAL(*lower, "±àáâãäåæèéêëìíîïñòóôõöøùúûüýß×÷");
+    }
+    auto upper = case_map(*lower, true);
+    if (CHECK(upper)) {
+        CHECK_EQUAL(*upper, chars);
+    }
 }
 
 #endif // TEST_INDEX_STRING

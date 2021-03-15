@@ -101,6 +101,8 @@ Query::Query(const Query& source)
     , m_groups(source.m_groups)
     , m_table(source.m_table)
     , m_ordering(source.m_ordering)
+    , m_fts_column(source.m_fts_column)
+    , m_fts_tokens(source.m_fts_tokens)
 {
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
@@ -162,6 +164,10 @@ Query& Query::operator=(const Query& source)
         }
         m_ordering = source.m_ordering;
     }
+
+    m_fts_column = source.m_fts_column;
+    m_fts_tokens = source.m_fts_tokens;
+
     return *this;
 }
 
@@ -934,6 +940,33 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
     return *this;
 }
 
+
+Query& Query::fulltext(ColKey column_key, StringData value)
+{
+    auto index = m_table->get_search_index(column_key);
+    if (!(index && index->is_fulltext_index())) {
+        util::runtime_error("Column has no fulltext index");
+    }
+
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key)};
+    add_node(std::move(node));
+    set_fts_params(column_key, value);
+    return *this;
+}
+
+Query& Query::fulltext(ColKey column_key, StringData value, const LinkMap& link_map)
+{
+    auto index = link_map.get_target_table()->get_search_index(column_key);
+    if (!(index && index->is_fulltext_index())) {
+        util::runtime_error("Column has no fulltext index");
+    }
+
+    auto lm = std::make_unique<LinkMap>(link_map);
+    auto node = std::unique_ptr<ParentNode>{new StringNodeFulltext(std::move(value), column_key, std::move(lm))};
+    add_node(std::move(node));
+    set_fts_params(column_key, value);
+    return *this;
+}
 
 // Aggregates =================================================================================
 
