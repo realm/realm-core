@@ -1700,7 +1700,7 @@ TEST(Upgrade_FixColumnKeys)
     DB::create(*hist)->start_read()->verify();
 }
 
-TEST(Upgrade_BackupAtoBtoAtoC)
+NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
@@ -1774,7 +1774,7 @@ TEST(Upgrade_BackupAtoBtoAtoC)
     _impl::GroupFriend::fake_target_file_format({});
 }
 
-TEST(Upgrade_BackupAtoBbypassAtoC)
+NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
