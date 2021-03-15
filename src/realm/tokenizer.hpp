@@ -52,6 +52,7 @@ public:
 
     virtual void reset(std::string_view text);
     virtual bool next() = 0;
+    virtual bool is_stop_word(std::string_view token) = 0;
 
     std::string_view get_token()
     {

@@ -5934,4 +5934,24 @@ TEST(Table_FullTextIndex)
     CHECK_EQUAL(2, res.size());
 }
 
+TEST(Table_FullTextIndexPerf)
+{
+    auto db = DB::create(get_test_resource_path() + "books.realm");
+    {
+        auto wt = db->start_write();
+        auto t = wt->get_table("uro");
+        auto col = t->get_column_key("text");
+        t->remove_search_index(col);
+        auto t1 = steady_clock::now();
+        t->add_search_index(col, true);
+        auto t2 = steady_clock::now();
+
+        wt->commit();
+        std::cout << "time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+        size_t free_space;
+        size_t used_space;
+        db->get_stats(free_space, used_space);
+        std::cout << "used space: " << used_space << std::endl;
+    }
+}
 #endif // TEST_TABLE

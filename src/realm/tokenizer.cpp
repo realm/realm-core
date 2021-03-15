@@ -18,8 +18,19 @@
 
 #include <realm/tokenizer.hpp>
 #include <string>
+#include <atomic>
 
 namespace realm {
+
+const char* stop_words[] = {
+    "ad",    "af",    "alle",   "alt",   "anden", "at",    "blev",  "blive", "bliver", "da",   "de",    "dem",
+    "den",   "denne", "der",    "deres", "det",   "dette", "dig",   "din",   "disse",  "dog",  "du",    "efter",
+    "eller", "en",    "end",    "er",    "et",    "for",   "fra",   "ham",   "han",    "hans", "har",   "havde",
+    "have",  "hende", "hendes", "her",   "hos",   "hun",   "hvad",  "hvis",  "hvor",   "i",    "ikke",  "ind",
+    "jeg",   "jer",   "jo",     "kunne", "man",   "mange", "med",   "meget", "men",    "mig",  "min",   "mine",
+    "mit",   "mod",   "ned",    "noget", "nogle", "nu",    "når",   "og",    "også",   "om",   "op",    "os",
+    "over",  "på",    "selv",   "sig",   "sin",   "sine",  "sit",   "skal",  "skulle", "som",  "sådan", "thi",
+    "til",   "ud",    "under",  "var",   "vi",    "vil",   "ville", "vor",   "være",   "været"};
 
 Tokenizer::~Tokenizer() {}
 
@@ -35,7 +46,9 @@ std::set<std::string> Tokenizer::get_all_tokens()
 {
     std::set<std::string> tokens;
     while (next()) {
-        tokens.emplace(get_token());
+        auto token = get_token();
+        if (!is_stop_word(token))
+            tokens.emplace(get_token());
     }
     return tokens;
 }
@@ -134,8 +147,27 @@ double Tokenizer::get_rank(std::string_view tokens, std::string_view text)
 
 class DefaultTokenizer : public Tokenizer {
 public:
+    DefaultTokenizer()
+    {
+        if (!s_stop_words_has_been_built.test_and_set()) {
+            for (auto s : stop_words) {
+                s_stop_words.insert(s);
+            }
+        }
+    }
     bool next() override;
+    bool is_stop_word(std::string_view token)
+    {
+        return s_stop_words.find(token) != s_stop_words.end();
+    }
+
+private:
+    static std::set<std::string_view> s_stop_words;
+    static std::atomic_flag s_stop_words_has_been_built;
 };
+
+std::atomic_flag DefaultTokenizer::s_stop_words_has_been_built = ATOMIC_FLAG_INIT;
+std::set<std::string_view> DefaultTokenizer::s_stop_words;
 
 static const uint8_t utf8_map[32] = {0x61, 0x61, 0x61, 0x61, 0x61, 0xe5, 0xe6, 0x63, 0x65, 0x65, 0x65,
                                      0x65, 0x69, 0x69, 0x69, 0x69, 0xf0, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f,
