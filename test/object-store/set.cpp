@@ -19,7 +19,7 @@
 
 using namespace realm;
 
-TEST_CASE("set") {
+TEST_CASE("set", "[set]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -223,14 +223,15 @@ TEST_CASE("set") {
                 CHECK(!link_set.insert(target1).second);
                 CHECK(link_set.insert(target2).second);
                 CHECK(link_set.insert(target3).second);
+                CHECK(link_set.insert(ObjKey{}).second);
             });
 
             write([&] {
-                CHECK(link_set.size() == 3);
+                CHECK(link_set.size() == 4);
                 REQUIRE(link_set.remove(target2).second);
             });
-            CHECK(link_set.size() == 2);
-            REQUIRE_INDICES(change.deletions, 1);
+            CHECK(link_set.size() == 3);
+            REQUIRE_INDICES(change.deletions, 2);
         }
 
         SECTION("modifying a different set doesn't send a change notification") {
@@ -543,5 +544,93 @@ TEST_CASE("set") {
             });
             CHECK(set2.size() == 3);
         }
+    }
+}
+
+
+TEST_CASE("set with mixed links", "[set]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable}}},
+        {"target1",
+         {{"value1", PropertyType::Int}, {"link1", PropertyType::Object | PropertyType::Nullable, "target1"}}},
+        {"target2",
+         {{"value2", PropertyType::Int}, {"link2", PropertyType::Object | PropertyType::Nullable, "target2"}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target1 = r->read_group().get_table("class_target1");
+    auto target2 = r->read_group().get_table("class_target2");
+    ColKey col_value1 = target1->get_column_key("value1");
+    ColKey col_value2 = target2->get_column_key("value2");
+    ColKey col_link1 = target1->get_column_key("link1");
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    Obj obj1 = table->create_object(); // empty set
+    Obj target1_obj = target1->create_object().set(col_value1, 100);
+    Obj target2_obj = target2->create_object().set(col_value2, 200);
+    ColKey col = table->get_column_key("value");
+
+    object_store::Set set(r, obj, col);
+    CppContext ctx(r);
+
+    set.insert(Mixed{ObjLink(target1->get_key(), target1_obj.get_key())});
+    set.insert(Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+    set.insert(Mixed{});
+    set.insert(Mixed{int64_t{42}});
+    r->commit_transaction();
+
+    Results all_objects(r, table->where());
+    REQUIRE(all_objects.size() == 2);
+    CollectionChangeSet local_changes;
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+        local_changes = c;
+    });
+    advance_and_notify(*r);
+
+    SECTION("insertion") {
+        r->begin_transaction();
+        table->create_object();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 1);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("insert to set is a modification") {
+        r->begin_transaction();
+        set.insert(Mixed{"hello"});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object is a modification") {
+        r->begin_transaction();
+        target1_obj.set(col_value1, 1000);
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object once removed is a modification") {
+        r->begin_transaction();
+        auto target1_obj2 = target1->create_object().set(col_value1, 1000);
+        target1_obj.set(col_link1, target1_obj2.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        local_changes = {};
+        r->begin_transaction();
+        target1_obj2.set(col_value1, 2000);
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
     }
 }

@@ -37,6 +37,7 @@
 #include <unordered_set>
 
 namespace realm {
+class CollectionBase;
 class Realm;
 class Transaction;
 
@@ -50,10 +51,6 @@ struct ListChangeInfo {
     CollectionChangeBuilder* changes;
 };
 
-// FIXME: this should be in core
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
-
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
     std::unordered_map<TableKeyType, ObjectChangeSet> tables;
@@ -63,23 +60,19 @@ struct TransactionChangeInfo {
 
 class DeepChangeChecker {
 public:
-    struct OutgoingLink {
-        int64_t col_key;
-        bool is_list;
-    };
     struct RelatedTable {
         TableKey table_key;
-        std::vector<OutgoingLink> links;
+        std::vector<ColKey> links;
     };
-
+    typedef std::vector<RelatedTable> RelatedTables;
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                      std::vector<RelatedTable> const& related_tables);
+                      RelatedTables const& related_tables);
 
-    bool operator()(int64_t obj_key);
+    bool operator()(ObjKeyType obj_key);
 
     // Recursively add `table` and all tables it links to to `out`, along with
     // information about the links from them
-    static void find_related_tables(std::vector<RelatedTable>& out, Table const& table);
+    static void find_related_tables(RelatedTables& out, Table const& table);
 
 private:
     TransactionChangeInfo const& m_info;
@@ -87,17 +80,18 @@ private:
     const TableKey m_root_table_key;
     ObjectChangeSet const* const m_root_object_changes;
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
-    std::vector<RelatedTable> const& m_related_tables;
+    RelatedTables const& m_related_tables;
 
     struct Path {
-        int64_t obj_key;
-        int64_t col_key;
+        ObjKey obj_key;
+        ColKey col_key;
         bool depth_exceeded;
     };
     std::array<Path, 4> m_current_path;
 
     bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
-    bool check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth = 0);
+    bool check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth = 0);
+    bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth);
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
@@ -230,7 +224,7 @@ private:
     bool m_has_run = false;
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
-    std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
+    DeepChangeChecker::RelatedTables m_related_tables;
 
     struct Callback {
         CollectionChangeCallback fn;

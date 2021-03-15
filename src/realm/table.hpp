@@ -130,6 +130,7 @@ public:
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
     BacklinkOrigin find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const noexcept;
     BacklinkOrigin find_backlink_origin(ColKey backlink_col) const noexcept;
+    std::vector<std::pair<TableKey, ColKey>> get_incoming_link_columns() const noexcept;
     //@}
 
     // Primary key columns

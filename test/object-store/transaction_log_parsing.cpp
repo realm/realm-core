@@ -1610,7 +1610,7 @@ TEST_CASE("DeepChangeChecker") {
         return info;
     };
 
-    std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
+    _impl::DeepChangeChecker::RelatedTables tables;
     _impl::DeepChangeChecker::find_related_tables(tables, *table);
 
     auto cols = table->get_column_keys();

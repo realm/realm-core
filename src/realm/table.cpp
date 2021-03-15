@@ -3555,6 +3555,19 @@ Table::BacklinkOrigin Table::find_backlink_origin(ColKey backlink_col) const noe
     return {};
 }
 
+std::vector<std::pair<TableKey, ColKey>> Table::get_incoming_link_columns() const noexcept
+{
+    std::vector<std::pair<TableKey, ColKey>> origins;
+    auto f = [&](ColKey backlink_col_key) {
+        auto origin_table_key = get_opposite_table_key(backlink_col_key);
+        auto origin_link_col = get_opposite_column(backlink_col_key);
+        origins.emplace_back(origin_table_key, origin_link_col);
+        return false;
+    };
+    this->for_each_backlink_column(f);
+    return origins;
+}
+
 ColKey Table::get_primary_key_column() const
 {
     return m_primary_key_col;
@@ -4000,6 +4013,10 @@ ColKey Table::find_or_add_backlink_column(ColKey origin_col_key, TableKey origin
     if (!backlink_col_key) {
         backlink_col_key = do_insert_root_column(ColKey{}, col_type_BackLink, "");
         set_opposite_column(backlink_col_key, origin_table, origin_col_key);
+
+        if (Replication* repl = get_repl())
+            repl->typed_link_change(get_parent_group()->get_table(origin_table).unchecked_ptr(), origin_col_key,
+                                    m_key); // Throws
     }
 
     return backlink_col_key;
