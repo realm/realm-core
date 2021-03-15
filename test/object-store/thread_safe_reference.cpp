@@ -275,7 +275,10 @@ TEST_CASE("thread safe reference") {
 
     SECTION("passing over") {
 
-        SECTION("read only") {
+        SECTION("read-only `ThreadSafeReference`") {
+            // We need to create a new `configuration` for the read-only tests since the `InMemoryTestFile` will be
+            // gone as soon as we `close()` it which we need to do so we can re-open it in read-only after preparing /
+            // writing data to it.
             TestFile configuration;
             SharedRealm realm = Realm::get_shared_realm(configuration);
             realm->update_schema(schema);
@@ -283,19 +286,35 @@ TEST_CASE("thread safe reference") {
             create_object(realm, "int object", {{"value", INT64_C(42)}});
             realm->commit_transaction();
             realm->close();
-
             configuration.schema_mode = SchemaMode::Immutable;
-            SharedRealm readOnlyRealm = Realm::get_shared_realm(configuration);
-            auto table = readOnlyRealm->get_group().get_table("class_int object");
-            Results results(readOnlyRealm, table);
-            auto threadSafeReference = ThreadSafeReference(results);
-            std::thread([threadSafeReference = std::move(threadSafeReference), configuration, int_obj_col]() mutable {
-                configuration.scheduler = util::Scheduler::get_frozen(VersionID());
-                SharedRealm readOnlyRealm2 = Realm::get_shared_realm(configuration);
-                Results results = threadSafeReference.resolve<Results>(readOnlyRealm2);
-                REQUIRE(results.size() == 1);
-                REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 42);
-            }).join();
+            SharedRealm read_only_realm = Realm::get_shared_realm(configuration);
+            auto table = read_only_realm->get_group().get_table("class_int object");
+            Results results(read_only_realm, table);
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.get(0).get<int64_t>(int_column_key) == 42);
+
+            SECTION("read-only `ThreadSafeReference` to `Results`") {
+                auto thread_safe_results = ThreadSafeReference(results);
+                std::thread([thread_safe_results = std::move(thread_safe_results), configuration,
+                             int_column_key]() mutable {
+                    SharedRealm realm_in_thread = Realm::get_shared_realm(configuration);
+                    Results resolved_results = thread_safe_results.resolve<Results>(realm_in_thread);
+                    REQUIRE(resolved_results.size() == 1);
+                    REQUIRE(resolved_results.get(0).get<int64_t>(int_column_key) == 42);
+                }).join();
+            }
+
+            SECTION("read-only `ThreadSafeReference` to an `Object`") {
+                Object object(read_only_realm, results.get(0));
+                auto thread_safe_object = ThreadSafeReference(object);
+                std::thread([thread_safe_object = std::move(thread_safe_object), configuration,
+                             int_column_key]() mutable {
+                    SharedRealm realm_in_thread = Realm::get_shared_realm(configuration);
+                    auto resolved_object = thread_safe_object.resolve<Object>(realm_in_thread);
+                    REQUIRE(resolved_object.is_valid());
+                    REQUIRE(resolved_object.obj().get<int64_t>(int_column_key) == 42);
+                }).join();
+            }
         }
 
         SECTION("objects") {
@@ -500,8 +519,8 @@ TEST_CASE("thread safe reference") {
             REQUIRE(list.get<int64_t>(0) == 1);
             REQUIRE(list.get<int64_t>(1) == 2);
         }
-        ` SECTION("sorted int results")
-        {
+
+        SECTION("sorted int results") {
             realm->begin_write_transaction();
             auto obj = create_object(realm, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
             auto col = get_table(*realm, "int array")->get_column_key("value");
