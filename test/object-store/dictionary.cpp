@@ -71,23 +71,34 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema =
-        Schema{{"object",
-                {{"value", PropertyType::Dictionary | TestType::property_type()},
-                 {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-               {"target", {{"value", PropertyType::Int}}}};
+    config.schema = Schema{
+        {"object",
+         {{"value", PropertyType::Dictionary | TestType::property_type()},
+          {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target",
+         {{"value", PropertyType::Int}, {"self_link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"source", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}}};
 
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
 
     auto table = r->read_group().get_table("class_object");
     auto target = r->read_group().get_table("class_target");
+    auto source = r->read_group().get_table("class_source");
     auto table2 = r2->read_group().get_table("class_object");
     r->begin_transaction();
     Obj obj = table->create_object();
+    Obj obj1 = table->create_object(); // empty dictionary
     Obj another = target->create_object();
+    Obj source_obj0 = source->create_object();
+    Obj source_obj1 = source->create_object();
     ColKey col = table->get_column_key("value");
     ColKey col_links = table->get_column_key("links");
+    ColKey col_source_link = source->get_column_key("link");
+    ColKey col_target_value = target->get_column_key("value");
+
+    source_obj0.set(col_source_link, obj.get_key());
+    source_obj1.set(col_source_link, obj1.get_key());
 
     object_store::Dictionary dict(r, obj, col);
     object_store::Dictionary links(r, obj, col_links);
@@ -442,6 +453,64 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             advance_and_notify(*r);
             REQUIRE(local_change.modifications.count() == 1);
         }
+
+        SECTION("source links") {
+            Results all_sources(r, source->where());
+            REQUIRE(all_sources.size() == 2);
+            CollectionChangeSet local_changes;
+            auto x =
+                all_sources.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+                    local_changes = c;
+                });
+            advance_and_notify(*r);
+
+            SECTION("direct insertion") {
+                r->begin_transaction();
+                source->create_object();
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE(local_changes.insertions.count() == 1);
+                REQUIRE(local_changes.modifications.count() == 0);
+                REQUIRE(local_changes.deletions.count() == 0);
+            }
+            SECTION("indirect insertion to dictionary link") {
+                r->begin_transaction();
+                links.insert("new key", ObjKey());
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE(local_changes.insertions.count() == 0);
+                REQUIRE(local_changes.modifications.count() == 1);
+                REQUIRE(local_changes.deletions.count() == 0);
+            }
+            SECTION("no change for non linked insertion") {
+                r->begin_transaction();
+                table->create_object();
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE(local_changes.insertions.count() == 0);
+                REQUIRE(local_changes.modifications.count() == 0);
+                REQUIRE(local_changes.deletions.count() == 0);
+            }
+            SECTION("modification marked for change to linked object through dictionary") {
+                r->begin_transaction();
+                links.insert("l", another.get_key());
+                links.insert("m", ObjKey());
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE(local_changes.insertions.count() == 0);
+                REQUIRE(local_changes.modifications.count() == 1);
+                REQUIRE(local_changes.deletions.count() == 0);
+                local_changes = {};
+
+                r->begin_transaction();
+                another.set_any(col_target_value, {42});
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE(local_changes.insertions.count() == 0);
+                REQUIRE(local_changes.modifications.count() == 1);
+                REQUIRE(local_changes.deletions.count() == 0);
+            }
+        }
     }
     SECTION("snapshot") {
         SECTION("keys") {
@@ -499,5 +568,142 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
         }
 
         r->cancel_transaction();
+    }
+}
+
+TEST_CASE("dictionary with mixed links", "[dictionary]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable}}},
+        {"target1",
+         {{"value1", PropertyType::Int}, {"link1", PropertyType::Object | PropertyType::Nullable, "target1"}}},
+        {"target2",
+         {{"value2", PropertyType::Int}, {"link2", PropertyType::Object | PropertyType::Nullable, "target2"}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target1 = r->read_group().get_table("class_target1");
+    auto target2 = r->read_group().get_table("class_target2");
+    ColKey col_value1 = target1->get_column_key("value1");
+    ColKey col_value2 = target2->get_column_key("value2");
+    ColKey col_link1 = target1->get_column_key("link1");
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    Obj obj1 = table->create_object(); // empty dictionary
+    Obj target1_obj = target1->create_object().set(col_value1, 100);
+    Obj target2_obj = target2->create_object().set(col_value2, 200);
+    ColKey col = table->get_column_key("value");
+
+    object_store::Dictionary dict(r, obj, col);
+    CppContext ctx(r);
+
+    dict.insert("key_a", Mixed{ObjLink(target1->get_key(), target1_obj.get_key())});
+    dict.insert("key_b", Mixed{});
+    dict.insert("key_c", Mixed{});
+    dict.insert("key_d", Mixed{int64_t{42}});
+    r->commit_transaction();
+
+    Results all_objects(r, table->where());
+    REQUIRE(all_objects.size() == 2);
+    CollectionChangeSet local_changes;
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+        local_changes = c;
+    });
+    advance_and_notify(*r);
+    local_changes = {};
+
+    SECTION("insertion") {
+        r->begin_transaction();
+        table->create_object();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 1);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("insert to dictionary is a modification") {
+        r->begin_transaction();
+        dict.insert("key_e", Mixed{"hello"});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify an existing key is a modification") {
+        r->begin_transaction();
+        dict.insert("key_a", Mixed{});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object is a modification") {
+        r->begin_transaction();
+        target1_obj.set(col_value1, 1000);
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object once removed is a modification") {
+        r->begin_transaction();
+        auto target1_obj2 = target1->create_object().set(col_value1, 1000);
+        target1_obj.set(col_link1, target1_obj2.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        r->begin_transaction();
+        target1_obj2.set(col_value1, 2000);
+        r->commit_transaction();
+        local_changes = {};
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("adding a link to a new table is a modification") {
+        r->begin_transaction();
+        dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from the newly linked table is a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 1);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
+    }
+    SECTION("adding a link to a new table and rolling back is not a modification") {
+        r->begin_transaction();
+        dict.insert("key_b", Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->cancel_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from rollback linked table is not a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 0);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
     }
 }
