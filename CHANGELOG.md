@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
+* Avoid race condition leading to possible hangs on windows. ([realm-dotnet#2245](https://github.com/realm/realm-dotnet/issues/2245))
  
 ### Breaking changes
 * None.

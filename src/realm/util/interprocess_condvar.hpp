@@ -106,10 +106,11 @@ public:
     /// wakeups, and avoids some condvar anti-patterns, by pushing callers into
     /// the correct pattern.
     template <typename Cond>
-    void wait(InterprocessMutex& m, const struct timespec* tp, Cond&& cond)
+    void wait(InterprocessMutex& m, Cond&& cond)
     {
+
         while (!cond()) {
-            wait(m, tp);
+            wait(m, nullptr);
         }
     }
 
