@@ -473,6 +473,8 @@ static std::string string_from_partition(const std::string& partition)
                 return util::format("s_%1", static_cast<std::string>(partition_value));
             case bson::Bson::Type::ObjectId:
                 return util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
+            case bson::Bson::Type::Uuid:
+                return util::format("o_%1", static_cast<UUID>(partition_value).to_string());
             case bson::Bson::Type::Null:
                 return "null";
             default:
