@@ -106,11 +106,16 @@ public:
     /// wakeups, and avoids some condvar anti-patterns, by pushing callers into
     /// the correct pattern.
     template <typename Cond>
-    void wait(InterprocessMutex& m, Cond&& cond)
+    void wait(InterprocessMutex& m, const struct timespec* tp, Cond&& cond)
     {
-
+        using clock = std::chrono::system_clock;
+        const auto deadline =
+            tp ? clock::time_point(std::chrono::seconds(tp->tv_sec) + std::chrono::nanoseconds(tp->tv_nsec))
+               : clock::time_point();
         while (!cond()) {
-            wait(m, nullptr);
+            wait(m, tp);
+            if (tp && clock::now() >= deadline)
+                return;
         }
     }
 
