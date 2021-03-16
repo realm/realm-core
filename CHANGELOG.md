@@ -6,8 +6,8 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed queries of min/max/sum/avg on list of primitive mixed. ([#4472](https://github.com/realm/realm-core/pull/4472), never before working)
-* Fixed sort and distinct on dictionary keys, and distinct on dictionary values.
-* Fixed getting a dictionary value which is null.
+* Fixed sort and distinct on dictionary keys, and distinct on dictionary values. ([#4496](https://github.com/realm/realm-core/pull/4496))
+* Fixed getting a dictionary value which is null via `object_store::Dictionary::get<T>(key)` for any type other than Mixed. ([#4496](https://github.com/realm/realm-core/pull/4496))
 * Fixed notifications tracking modifications across links in a dictionary or set containing Mixed(TypedLink) values. ([#4505](https://github.com/realm/realm-core/pull/4505)).
 * Fixed the notifiers causing an exception `KeyNotFound("No such object");` if a dictionary or set of links of a single type also had a link column in the linked table. ([#4465](https://github.com/realm/realm-core/issues/4465)).
 

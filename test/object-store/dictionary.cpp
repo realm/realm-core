@@ -65,7 +65,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
                    cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
 {
     using T = typename TestType::Type;
-    using W = typename TestType::Wrapped;
     using Boxed = typename TestType::Boxed;
 
     InMemoryTestFile config;
@@ -106,11 +105,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     auto values_as_results = dict.get_values();
     CppContext ctx(r);
 
-    SECTION("get_realm()") {
-        REQUIRE(dict.get_realm() == r);
-        REQUIRE(values_as_results.get_realm() == r);
-    }
-
     auto values = TestType::values();
     std::vector<std::string> keys;
     for (size_t i = 0; i < values.size(); ++i) {
@@ -136,6 +130,19 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(r.get_any(i) == Mixed(values[i]));
         }
     };
+
+    SECTION("get_realm()") {
+        REQUIRE(dict.get_realm() == r);
+        REQUIRE(values_as_results.get_realm() == r);
+    }
+
+    SECTION("key type") {
+        REQUIRE(keys_as_results.get_type() == PropertyType::String);
+    }
+
+    SECTION("value type") {
+        REQUIRE(values_as_results.get_type() == TestType::property_type());
+    }
 
     SECTION("clear()") {
         REQUIRE(dict.size() == keys.size());
@@ -183,7 +190,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("keys sorted") {
-        REQUIRE(keys_as_results.get_type() == PropertyType::String);
         SECTION("ascending") {
             auto sorted = keys_as_results.sort({{"self", true}});
             std::sort(begin(keys), end(keys), cf::less());
@@ -196,7 +202,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
     }
     SECTION("values sorted") {
-        REQUIRE(values_as_results.get_type() == TestType::property_type());
         SECTION("ascending") {
             auto sorted = values_as_results.sort({{"self", true}});
             std::sort(begin(values), end(values), cf::less());
@@ -210,7 +215,6 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("keys distinct") {
-        REQUIRE(keys_as_results.get_type() == PropertyType::String);
         keys.clear();
         // set keys up in dictionary order
         for (size_t i = 0; i < keys_as_results.size(); ++i) {
@@ -221,15 +225,40 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("values distinct") {
-        REQUIRE(values_as_results.get_type() == TestType::property_type());
-        SECTION("original") {
-            auto distinct = values_as_results.distinct({{"self"}});
-            values.clear();
-            // set values up in dictionary order
-            for (size_t i = 0; i < values_as_results.size(); ++i) {
-                values.push_back(values_as_results.get<T>(i));
+        // make some duplicate values
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i == 0) {
+                dict.insert(keys[i], T(values[0]));
             }
-            verify_values_ordered(distinct);
+            else {
+                dict.insert(keys[i], T(values[1]));
+            }
+        }
+        auto distinct = values_as_results.distinct({{"self"}});
+        REQUIRE(distinct.size() == 2);
+    }
+
+    SECTION("values sort and distinct") {
+        // make some duplicate values
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i == 0) {
+                dict.insert(keys[i], T(values[0]));
+            }
+            else {
+                dict.insert(keys[i], T(values[1]));
+            }
+        }
+        SECTION("ascending") {
+            auto sorted_and_distinct = values_as_results.distinct({{"self"}}).sort({{"self", true}});
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[1]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[0]));
+        }
+        SECTION("descending") {
+            auto sorted_and_distinct = values_as_results.distinct({{"self"}}).sort({{"self", false}});
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[0]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[1]));
         }
     }
 

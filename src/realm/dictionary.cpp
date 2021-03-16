@@ -23,7 +23,6 @@
 #include <realm/replication.hpp>
 
 #include <algorithm>
-#include <unordered_set>
 
 namespace realm {
 
@@ -403,23 +402,18 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
 {
     align_indices(indices);
-    if (ascending) {
-        sort(indices, *ascending);
-        std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
-            return get_any(i1) == get_any(i2);
-        });
-    }
-    else {
+
+    bool sort_ascending = ascending ? *ascending : true;
+    sort(indices, sort_ascending);
+    indices.erase(std::unique(indices.begin(), indices.end(),
+                              [this](size_t i1, size_t i2) {
+                                  return get_any(i1) == get_any(i2);
+                              }),
+                  indices.end());
+
+    if (!ascending) {
         // need to return indices in original ordering
-        std::unordered_set<Mixed> set;
-        for (auto it = indices.begin(); it != indices.end();) {
-            if (set.insert(get_any(*it)).second) {
-                ++it;
-            }
-            else {
-                it = indices.erase(it);
-            }
-        }
+        std::sort(indices.begin(), indices.end(), std::less<size_t>());
     }
 }
 
