@@ -240,7 +240,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("values sort and distinct") {
         // make some duplicate values
-        for (size_t i = 0; i < keys.size(); ++i) {
+        size_t num_keys = keys.size();
+        for (size_t i = 0; i < num_keys; ++i) {
             if (i == 0) {
                 dict.insert(keys[i], T(values[0]));
             }
@@ -259,6 +260,31 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(sorted_and_distinct.size() == 2);
             REQUIRE(sorted_and_distinct.get<T>(0) == T(values[0]));
             REQUIRE(sorted_and_distinct.get<T>(1) == T(values[1]));
+        }
+    }
+
+    SECTION("first") {
+        SECTION("key") {
+            REQUIRE(keys_as_results.first<String>() == keys_as_results.get<String>(0));
+            keys_as_results.clear();
+            REQUIRE(!keys_as_results.first<String>());
+        }
+        SECTION("value") {
+            REQUIRE(*values_as_results.first<T>() == values_as_results.get<T>(0));
+            values_as_results.clear();
+            REQUIRE(!values_as_results.first<T>());
+        }
+    }
+    SECTION("last") {
+        SECTION("key") {
+            REQUIRE(keys_as_results.last<String>() == keys_as_results.get<String>(keys_as_results.size() - 1));
+            keys_as_results.clear();
+            REQUIRE(!keys_as_results.last<String>());
+        }
+        SECTION("value") {
+            REQUIRE(*values_as_results.last<T>() == values_as_results.get<T>(values_as_results.size() - 1));
+            values_as_results.clear();
+            REQUIRE(!values_as_results.last<T>());
         }
     }
 
