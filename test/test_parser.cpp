@@ -4638,7 +4638,7 @@ TEST(Parser_Dictionary)
     std::string message;
 
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
-    CHECK_EQUAL(message, "foo.dict is not a link column");
+    CHECK_EQUAL(message, "Property 'dict' in 'foo' is not an Object");
 
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
     CHECK_EQUAL(message, "Cannot add int and double");
