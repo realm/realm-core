@@ -2951,6 +2951,20 @@ struct ResultsFromLinkSet {
     }
 };
 
+struct ResultsFromNothing {
+    static Results call(std::shared_ptr<Realm>, ConstTableRef)
+    {
+        return Results();
+    }
+};
+
+struct ResultsFromInvalidTable {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef)
+    {
+        return Results(std::move(r), ConstTableRef{});
+    }
+};
+
 TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
                    ResultsFromLinkView, ResultsFromLinkSet)
 {
@@ -3364,6 +3378,36 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
             REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
         }
+    }
+}
+
+TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalidTable, ResultsFromNothing)
+{
+    InMemoryTestFile config;
+    auto realm = Realm::get_shared_realm(config);
+    Results results = TestType::call(realm, TableRef());
+    TestContext ctx(realm);
+
+    ColKey invalid_col;
+    SECTION("max") {
+        REQUIRE(!results.max(invalid_col));
+    }
+    SECTION("min") {
+        REQUIRE(!results.min(invalid_col));
+    }
+    SECTION("average") {
+        REQUIRE(!results.average(invalid_col));
+    }
+    SECTION("sum") {
+        REQUIRE(!results.sum(invalid_col));
+    }
+    SECTION("first") {
+        REQUIRE(!results.first());
+        REQUIRE(!results.first(ctx));
+    }
+    SECTION("last") {
+        REQUIRE(!results.last());
+        REQUIRE(!results.last(ctx));
     }
 }
 

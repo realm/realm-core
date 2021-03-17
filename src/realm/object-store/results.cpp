@@ -143,7 +143,7 @@ size_t Results::do_size()
         case Mode::Empty:
             return 0;
         case Mode::Table:
-            return m_table->size();
+            return m_table ? m_table->size() : 0;
         case Mode::Collection:
             evaluate_sort_and_distinct_on_collection();
             return m_list_indices ? m_list_indices->size() : m_collection->size();
@@ -287,8 +287,9 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
+            break;
         case Mode::Table:
-            if (row_ndx < m_table->size())
+            if (m_table && row_ndx < m_table->size())
                 return m_table_iterator.get(*m_table, row_ndx);
             break;
         case Mode::Collection:
@@ -1135,8 +1136,9 @@ Results Results::snapshot() &&
         case Mode::Table:
         case Mode::Collection:
             m_query = do_get_query();
-            m_mode = Mode::Query;
-
+            if (m_query.get_table()) {
+                m_mode = Mode::Query;
+            }
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:

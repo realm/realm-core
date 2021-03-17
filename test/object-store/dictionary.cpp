@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
 #include "util/index_helpers.hpp"
 
@@ -55,13 +56,23 @@ struct StringMaker<object_store::Dictionary> {
 };
 } // namespace Catch
 
-TEST_CASE("dictionary", "[dictionary]") {
+namespace cf = realm::collection_fixtures;
+
+TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
+                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
+                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+{
+    using T = typename TestType::Type;
+    using Boxed = typename TestType::Boxed;
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
-         {{"value", PropertyType::Dictionary | PropertyType::String},
+         {{"value", PropertyType::Dictionary | TestType::property_type()},
           {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
         {"target",
          {{"value", PropertyType::Int}, {"self_link", PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -94,20 +105,47 @@ TEST_CASE("dictionary", "[dictionary]") {
     auto values_as_results = dict.get_values();
     CppContext ctx(r);
 
+    auto values = TestType::values();
+    std::vector<std::string> keys;
+    for (size_t i = 0; i < values.size(); ++i) {
+        keys.push_back(util::format("key_%1", i));
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        dict.insert(keys[i], T(values[i]));
+    }
+
+    auto verify_keys_ordered = [&keys](Results& r) {
+        REQUIRE(r.size() == keys.size());
+        for (size_t i = 0; i < r.size(); ++i) {
+            REQUIRE(r.get<StringData>(i) == keys[i]);
+            REQUIRE(r.get_any(i) == keys[i]);
+        }
+    };
+
+    auto verify_values_ordered = [&values](Results& r) {
+        REQUIRE(r.size() == values.size());
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(r.get<T>(i) == values[i]);
+            REQUIRE(r.get_any(i) == Mixed(values[i]));
+        }
+    };
+
     SECTION("get_realm()") {
         REQUIRE(dict.get_realm() == r);
         REQUIRE(values_as_results.get_realm() == r);
     }
 
-    std::vector<std::string> keys = {"a", "b", "c"};
-    std::vector<std::string> values = {"apple", "banana", "clementine"};
+    SECTION("key type") {
+        REQUIRE(keys_as_results.get_type() == PropertyType::String);
+    }
 
-    for (size_t i = 0; i < values.size(); ++i) {
-        dict.insert(keys[i], values[i]);
+    SECTION("value type") {
+        REQUIRE(values_as_results.get_type() == TestType::property_type());
     }
 
     SECTION("clear()") {
-        REQUIRE(dict.size() == 3);
+        REQUIRE(dict.size() == keys.size());
         values_as_results.clear();
         REQUIRE(dict.size() == 0);
         REQUIRE(values_as_results.size() == 0);
@@ -115,33 +153,35 @@ TEST_CASE("dictionary", "[dictionary]") {
 
     SECTION("get()") {
         for (size_t i = 0; i < values.size(); ++i) {
-            REQUIRE(dict.get<String>(keys[i]) == values[i]);
+            REQUIRE(dict.get<T>(keys[i]) == values[i]);
             auto val = dict.get(ctx, keys[i]);
-            REQUIRE(any_cast<std::string>(val) == values[i]);
+            REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
         }
     }
 
     SECTION("insert()") {
         for (size_t i = 0; i < values.size(); ++i) {
             auto rev = values.size() - i - 1;
-            dict.insert(keys[i], values[rev]);
-            REQUIRE(dict.get<StringData>(keys[i]) == values[rev]);
+            dict.insert(keys[i], T(values[rev]));
+            REQUIRE(dict.get<T>(keys[i]) == values[rev]);
         }
         for (size_t i = 0; i < values.size(); ++i) {
-            dict.insert(ctx, keys[i], util::Any(values[i]));
-            REQUIRE(dict.get<StringData>(keys[i]) == values[i]);
+            dict.insert(ctx, keys[i], TestType::to_any(values[i]));
+            REQUIRE(dict.get<T>(keys[i]) == values[i]);
         }
     }
 
     SECTION("iteration") {
         for (size_t i = 0; i < values.size(); ++i) {
-            auto ndx = dict.find_any(values[i]);
+            auto ndx = dict.find_any(T(values[i]));
+            REQUIRE(ndx != realm::not_found);
             Dictionary::Iterator it = dict.begin() + ndx;
             REQUIRE((*it).first.get_string() == keys[i]);
-            REQUIRE((*it).second.get_string() == values[i]);
+            Mixed val_i{values[i]};
+            REQUIRE((*it).second == val_i);
             auto element = values_as_results.get_dictionary_element(ndx);
+            REQUIRE(element.second == val_i);
             REQUIRE(element.first == keys[i]);
-            REQUIRE(element.second.get_string() == values[i]);
             std::string key = keys_as_results.get<StringData>(ndx);
             REQUIRE(key == keys[i]);
             Mixed m = keys_as_results.get_any(ndx);
@@ -150,13 +190,115 @@ TEST_CASE("dictionary", "[dictionary]") {
     }
 
     SECTION("keys sorted") {
-        REQUIRE(keys_as_results.get_type() == PropertyType::String);
-        auto sorted = keys_as_results.sort({{"self", true}});
-        std::string key = sorted.get<StringData>(0);
-        REQUIRE(key == "a");
-        Mixed m = sorted.get_any(0);
-        REQUIRE(m.get_string() == "a");
-        REQUIRE_THROWS_WITH(sorted.get_any(4), "Requested index 4 greater than max 2");
+        SECTION("ascending") {
+            auto sorted = keys_as_results.sort({{"self", true}});
+            std::sort(begin(keys), end(keys), cf::less());
+            verify_keys_ordered(sorted);
+        }
+        SECTION("descending") {
+            auto sorted = keys_as_results.sort({{"self", false}});
+            std::sort(begin(keys), end(keys), cf::greater());
+            verify_keys_ordered(sorted);
+        }
+    }
+    SECTION("values sorted") {
+        SECTION("ascending") {
+            auto sorted = values_as_results.sort({{"self", true}});
+            std::sort(begin(values), end(values), cf::less());
+            verify_values_ordered(sorted);
+        }
+        SECTION("descending") {
+            auto sorted = values_as_results.sort({{"self", false}});
+            std::sort(begin(values), end(values), cf::greater());
+            verify_values_ordered(sorted);
+        }
+    }
+
+    SECTION("keys distinct") {
+        keys.clear();
+        // set keys up in dictionary order
+        for (size_t i = 0; i < keys_as_results.size(); ++i) {
+            keys.push_back(std::string(keys_as_results.get<StringData>(i)));
+        }
+        auto distinct = keys_as_results.distinct({{"self"}});
+        verify_keys_ordered(distinct);
+    }
+
+    SECTION("values distinct") {
+        // make some duplicate values
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i == 0) {
+                dict.insert(keys[i], T(values[0]));
+            }
+            else {
+                dict.insert(keys[i], T(values[1]));
+            }
+        }
+        auto distinct = values_as_results.distinct({{"self"}});
+        REQUIRE(distinct.size() == 2);
+    }
+
+    SECTION("values sort and distinct") {
+        // make some duplicate values
+        size_t num_keys = keys.size();
+        for (size_t i = 0; i < num_keys; ++i) {
+            if (i == 0) {
+                dict.insert(keys[i], T(values[0]));
+            }
+            else {
+                dict.insert(keys[i], T(values[1]));
+            }
+        }
+        SECTION("ascending") {
+            auto sorted_and_distinct = values_as_results.distinct({{"self"}}).sort({{"self", true}});
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[1]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[0]));
+        }
+        SECTION("descending") {
+            auto sorted_and_distinct = values_as_results.distinct({{"self"}}).sort({{"self", false}});
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[0]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[1]));
+        }
+    }
+
+    SECTION("first") {
+        SECTION("key") {
+            auto expected = keys_as_results.get<String>(0);
+            REQUIRE(keys_as_results.first<String>() == expected);
+            REQUIRE(any_cast<std::string>(*keys_as_results.first(ctx)) == expected);
+            keys_as_results.clear();
+            REQUIRE(!keys_as_results.first<String>());
+            REQUIRE(!keys_as_results.first(ctx));
+        }
+        SECTION("value") {
+            auto expected = values_as_results.get<T>(0);
+            REQUIRE(*values_as_results.first<T>() == expected);
+            REQUIRE(any_cast<Boxed>(*values_as_results.first(ctx)) == Boxed(expected));
+            values_as_results.clear();
+            REQUIRE(!values_as_results.first<T>());
+            REQUIRE(!values_as_results.first(ctx));
+        }
+    }
+
+    SECTION("last") {
+        SECTION("key") {
+            auto expected = keys_as_results.get<String>(keys_as_results.size() - 1);
+            REQUIRE(keys_as_results.last<String>() == expected);
+            REQUIRE(any_cast<std::string>(*keys_as_results.last(ctx)) == expected);
+            keys_as_results.clear();
+            REQUIRE(!keys_as_results.last<String>());
+            REQUIRE(!keys_as_results.last(ctx));
+        }
+        SECTION("value") {
+            auto expected = values_as_results.get<T>(values_as_results.size() - 1);
+            REQUIRE(*values_as_results.last<T>() == expected);
+            REQUIRE(any_cast<Boxed>(*values_as_results.last(ctx)) == Boxed(expected));
+            values_as_results.clear();
+            REQUIRE(!values_as_results.last<T>());
+            REQUIRE(!values_as_results.last(ctx));
+        }
     }
 
     SECTION("handover") {
@@ -166,8 +308,9 @@ TEST_CASE("dictionary", "[dictionary]") {
         REQUIRE(dict == dict2);
         ThreadSafeReference ref(values_as_results);
         auto results2 = ref.resolve<Results>(r).sort({{"self", true}});
+        std::sort(begin(values), end(values), cf::less());
         for (size_t i = 0; i < values.size(); ++i) {
-            REQUIRE(results2.get<String>(i) == values[i]);
+            REQUIRE(results2.get<T>(i) == values[i]);
         }
         r->begin_transaction();
         obj.remove();
@@ -201,47 +344,54 @@ TEST_CASE("dictionary", "[dictionary]") {
             // doesn't have dupes resulting in an unstable order
             advance_and_notify(*r);
             r->begin_transaction();
-            dict.erase("b");
+            dict.erase(keys[0]);
             r->commit_transaction();
 
             advance_and_notify(*r);
             r->begin_transaction();
-            dict.insert("d", "dade");
+            dict.insert(keys[0], T(values[0]));
             r->commit_transaction();
 
             advance_and_notify(*r);
-            auto ndx = values_as_results.index_of(StringData("dade"));
+            auto ndx = values_as_results.index_of(T(values[0]));
             REQUIRE_INDICES(change.insertions, ndx);
             REQUIRE_INDICES(rchange.insertions, ndx);
-            // "dade" ends up at the end of the sorted list
+            // values[0] is max(), so it ends up at the end of the sorted list
             REQUIRE_INDICES(srchange.insertions, values.size() - 1);
         }
 
         SECTION("replace value in dictionary") {
+            // Remove the existing copy of this value so that the sorted list
+            // doesn't have dupes resulting in an unstable order
             advance_and_notify(*r);
             r->begin_transaction();
-            dict.insert("b", "blueberry");
+            dict.erase(keys[0]);
             r->commit_transaction();
 
             advance_and_notify(*r);
-            auto ndx = values_as_results.index_of(StringData("blueberry"));
+            r->begin_transaction();
+            dict.insert(keys[1], T(values[0]));
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            auto ndx = values_as_results.index_of(T(values[0]));
             REQUIRE_INDICES(change.insertions);
             REQUIRE_INDICES(change.modifications, ndx);
             REQUIRE_INDICES(change.deletions);
         }
 
-        SECTION("remove value from list") {
+        SECTION("remove value from dictionary") {
             advance_and_notify(*r);
-            auto ndx = values_as_results.index_of(StringData("apple"));
+            auto ndx = values_as_results.index_of(T(values[0]));
+            auto ndx_sorted = sorted.index_of(T(values[0]));
             r->begin_transaction();
-            dict.erase("a");
+            dict.erase(keys[0]);
             r->commit_transaction();
 
             advance_and_notify(*r);
             REQUIRE_INDICES(change.deletions, ndx);
             REQUIRE_INDICES(rchange.deletions, ndx);
-            // apple comes first in the sorted result.
-            REQUIRE_INDICES(srchange.deletions, 0);
+            REQUIRE_INDICES(srchange.deletions, ndx_sorted);
         }
 
         SECTION("key based notification") {
@@ -253,11 +403,13 @@ TEST_CASE("dictionary", "[dictionary]") {
             advance_and_notify(*r);
 
             r->begin_transaction();
-            dict.insert("a", "apricot");
+            dict.insert(keys[0], T(values[1]));
             r->commit_transaction();
 
             advance_and_notify(*r);
-            REQUIRE(key_change.modifications[0].get_string() == "a");
+            REQUIRE(key_change.insertions.size() == 0);
+            REQUIRE(key_change.deletions.size() == 0);
+            REQUIRE(key_change.modifications[0].get_string() == keys[0]);
         }
 
         SECTION("clear list") {
@@ -428,9 +580,18 @@ TEST_CASE("dictionary", "[dictionary]") {
             }
         }
     }
+
+    SECTION("snapshot") {
+        SECTION("keys") {
+            auto new_keys = keys_as_results.snapshot();
+        }
+        SECTION("values") {
+            auto new_values = values_as_results.snapshot();
+        }
+    }
 }
 
-TEST_CASE("embedded dictionary") {
+TEST_CASE("embedded dictionary", "[dictionary]") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;

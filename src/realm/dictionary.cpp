@@ -21,8 +21,8 @@
 #include <realm/array_mixed.hpp>
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
-#include <algorithm>
 
+#include <algorithm>
 
 namespace realm {
 
@@ -366,11 +366,10 @@ util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
     return {};
 }
 
-void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
+void Dictionary::align_indices(std::vector<size_t>& indices) const
 {
     auto sz = size();
     auto sz2 = indices.size();
-
     indices.reserve(sz);
     if (sz < sz2) {
         // If list size has decreased, we have to start all over
@@ -381,6 +380,11 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
         // If list size has increased, just add the missing indices
         indices.push_back(i);
     }
+}
+
+void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
     if (ascending) {
@@ -394,7 +398,48 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
         });
     }
 }
-void Dictionary::distinct(std::vector<size_t>&, util::Optional<bool>) const {}
+
+void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
+{
+    align_indices(indices);
+
+    bool sort_ascending = ascending ? *ascending : true;
+    sort(indices, sort_ascending);
+    indices.erase(std::unique(indices.begin(), indices.end(),
+                              [this](size_t i1, size_t i2) {
+                                  return get_any(i1) == get_any(i2);
+                              }),
+                  indices.end());
+
+    if (!ascending) {
+        // need to return indices in original ordering
+        std::sort(indices.begin(), indices.end(), std::less<size_t>());
+    }
+}
+
+void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
+{
+    align_indices(indices);
+    auto b = indices.begin();
+    auto e = indices.end();
+    if (ascending) {
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return get_key(i1) < get_key(i2);
+        });
+    }
+    else {
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return get_key(i1) > get_key(i2);
+        });
+    }
+}
+
+void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
+{
+    // we rely on the design of dictionary to assume that the keys are unique
+    align_indices(indices);
+}
+
 
 Obj Dictionary::create_and_insert_linked_object(Mixed key)
 {
@@ -504,11 +549,12 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     if (Replication* repl = this->m_obj.get_replication()) {
+        auto ndx = m_clusters->get_ndx(k);
         if (old_entry) {
-            repl->dictionary_set(*this, state.index, key, value);
+            repl->dictionary_set(*this, ndx, key, value);
         }
         else {
-            repl->dictionary_insert(*this, state.index, key, value);
+            repl->dictionary_insert(*this, ndx, key, value);
         }
     }
 
@@ -528,6 +574,9 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             old_link = old_value.get<ObjLink>();
         }
         values.set(state.index, value);
+        if (fields.has_missing_parent_update()) {
+            m_clusters->update_ref_in_parent(k, fields.get_ref());
+        }
     }
 
     if (new_link != old_link) {
@@ -604,7 +653,8 @@ void Dictionary::erase(Mixed key)
             _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
 
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, state.index, key);
+            auto ndx = m_clusters->get_ndx(k);
+            repl->dictionary_erase(*this, ndx, key);
         }
         CascadeState dummy;
         m_clusters->erase(k, dummy);
@@ -624,7 +674,8 @@ void Dictionary::nullify(Mixed key)
     auto state = m_clusters->get(k);
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_set(*this, state.index, key, Mixed());
+        auto ndx = m_clusters->get_ndx(k);
+        repl->dictionary_set(*this, ndx, key, Mixed());
     }
 
     ArrayMixed values(m_obj.get_alloc());

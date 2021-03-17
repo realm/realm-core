@@ -72,6 +72,8 @@ public:
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    void sort_keys(std::vector<size_t>& indices, bool ascending = true) const;
+    void distinct_keys(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const;
 
     void create();
 
@@ -163,6 +165,7 @@ private:
     Mixed do_get_key(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
     bool clear_backlink(Mixed value, CascadeState& state) const;
+    void align_indices(std::vector<size_t>& indices) const;
 
     friend struct CollectionIterator<Dictionary>;
 };

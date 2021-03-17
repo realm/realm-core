@@ -466,7 +466,8 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
 
 size_t Mixed::hash() const
 {
-    REALM_ASSERT(!is_null());
+    if (is_null())
+        return 0;
 
     size_t hash = 0;
     switch (get_type()) {

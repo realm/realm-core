@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "collection_fixtures.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -42,414 +43,7 @@
 
 using namespace realm;
 using namespace realm::util;
-
-
-template <PropertyType prop_type, typename T>
-struct Base {
-    using Type = T;
-    using Wrapped = T;
-    using Boxed = T;
-    using AvgType = double;
-    enum { is_optional = false };
-
-    static PropertyType property_type()
-    {
-        return prop_type;
-    }
-    static util::Any to_any(T value)
-    {
-        return value;
-    }
-
-    template <typename Fn>
-    static auto unwrap(T value, Fn&& fn)
-    {
-        return fn(value);
-    }
-
-    static T min()
-    {
-        abort();
-    }
-    static T max()
-    {
-        abort();
-    }
-    static T sum()
-    {
-        abort();
-    }
-    static AvgType average()
-    {
-        abort();
-    }
-    static T empty_sum_value()
-    {
-        return T{};
-    }
-    static bool can_sum()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_average()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_minmax()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-};
-
-struct Int : Base<PropertyType::Int, int64_t> {
-    static std::vector<int64_t> values()
-    {
-        return {3, 1, 2};
-    }
-    static int64_t min()
-    {
-        return 1;
-    }
-    static int64_t max()
-    {
-        return 3;
-    }
-    static int64_t sum()
-    {
-        return 6;
-    }
-    static double average()
-    {
-        return 2.0;
-    }
-};
-
-struct Bool : Base<PropertyType::Bool, bool> {
-    static std::vector<bool> values()
-    {
-        return {true, false};
-    }
-    static bool can_sum()
-    {
-        return false;
-    }
-    static bool can_average()
-    {
-        return false;
-    }
-    static bool can_minmax()
-    {
-        return false;
-    }
-};
-
-struct Float : Base<PropertyType::Float, float> {
-    static std::vector<float> values()
-    {
-        return {3.3f, 1.1f, 2.2f};
-    }
-    static float min()
-    {
-        return 1.1f;
-    }
-    static float max()
-    {
-        return 3.3f;
-    }
-    static auto sum()
-    {
-        return Approx(6.6f);
-    }
-    static auto average()
-    {
-        return Approx(2.2f);
-    }
-};
-
-struct Double : Base<PropertyType::Double, double> {
-    static std::vector<double> values()
-    {
-        return {3.3, 1.1, 2.2};
-    }
-    static double min()
-    {
-        return 1.1;
-    }
-    static double max()
-    {
-        return 3.3;
-    }
-    static auto sum()
-    {
-        return Approx(6.6);
-    }
-    static auto average()
-    {
-        return Approx(2.2);
-    }
-};
-
-struct String : Base<PropertyType::String, StringData> {
-    using Boxed = std::string;
-    static std::vector<StringData> values()
-    {
-        return {"c", "a", "b"};
-    }
-    static util::Any to_any(StringData value)
-    {
-        return value ? std::string(value) : util::Any();
-    }
-};
-
-struct Binary : Base<PropertyType::Data, BinaryData> {
-    using Boxed = std::string;
-    static util::Any to_any(BinaryData value)
-    {
-        return value ? std::string(value) : util::Any();
-    }
-    static std::vector<BinaryData> values()
-    {
-        return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
-    }
-};
-
-struct Date : Base<PropertyType::Date, Timestamp> {
-    static std::vector<Timestamp> values()
-    {
-        return {Timestamp(3, 3), Timestamp(1, 1), Timestamp(2, 2)};
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
-    static Timestamp min()
-    {
-        return Timestamp(1, 1);
-    }
-    static Timestamp max()
-    {
-        return Timestamp(3, 3);
-    }
-};
-
-struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
-    using AvgType = Decimal128;
-    enum { is_optional = true };
-    static std::vector<realm::Mixed> values()
-    {
-        return {Mixed{realm::UUID()}, Mixed{int64_t(1)},      Mixed{},
-                Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{Decimal128("300")},
-                Mixed{double(2.2)},   Mixed{float(3.3)}};
-    }
-    static PropertyType property_type()
-    {
-        return PropertyType::Mixed | PropertyType::Nullable;
-    }
-    static Mixed min()
-    {
-        return Mixed{int64_t(1)};
-    }
-    static Mixed max()
-    {
-        return Mixed{UUID()};
-    }
-    static Decimal128 sum()
-    {
-        return Decimal128("300") + Decimal128(int64_t(1)) + Decimal128(double(2.2)) + Decimal128(float(3.3));
-    }
-    static Decimal128 average()
-    {
-        return (sum() / Decimal128(4));
-    }
-    static Mixed empty_sum_value()
-    {
-        return Mixed{0};
-    }
-    static bool can_sum()
-    {
-        return true;
-    }
-    static bool can_average()
-    {
-        return true;
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
-};
-
-struct OID : Base<PropertyType::ObjectId, ObjectId> {
-    static std::vector<ObjectId> values()
-    {
-        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
-    }
-};
-
-struct UUID : Base<PropertyType::UUID, realm::UUID> {
-    static std::vector<realm::UUID> values()
-    {
-        return {realm::UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
-                realm::UUID("3b241101-a2b3-4255-8caf-4136c566a999")};
-    }
-};
-
-struct Decimal : Base<PropertyType::Decimal, Decimal128> {
-    using AvgType = Decimal128;
-    static std::vector<Decimal128> values()
-    {
-        return {Decimal128("876.54e32"), Decimal128("123.45e6")};
-    }
-    static Decimal128 min()
-    {
-        return Decimal128("123.45e6");
-    }
-    static Decimal128 max()
-    {
-        return Decimal128("876.54e32");
-    }
-    static Decimal128 sum()
-    {
-        return Decimal128("123.45e6") + Decimal128("876.54e32");
-    }
-    static Decimal128 average()
-    {
-        return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2));
-    }
-    static bool can_sum()
-    {
-        return true;
-    }
-    static bool can_average()
-    {
-        return true;
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
-};
-
-template <typename BaseT>
-struct BoxedOptional : BaseT {
-    using Type = util::Optional<typename BaseT::Type>;
-    using Boxed = Type;
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
-    static std::vector<Type> values()
-    {
-        std::vector<Type> ret;
-        for (auto v : BaseT::values())
-            ret.push_back(Type(v));
-        ret.push_back(util::none);
-        return ret;
-    }
-    static auto unwrap(Type value)
-    {
-        return *value;
-    }
-    static util::Any to_any(Type value)
-    {
-        return value ? util::Any(*value) : util::Any();
-    }
-
-    template <typename Fn>
-    static auto unwrap(Type value, Fn&& fn)
-    {
-        return value ? fn(*value) : fn(null());
-    }
-};
-
-template <typename BaseT>
-struct UnboxedOptional : BaseT {
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
-    static auto values() -> decltype(BaseT::values())
-    {
-        auto ret = BaseT::values();
-        if constexpr (std::is_same_v<BaseT, ::Decimal>) {
-            // The default Decimal128 ctr is 0, but we want a null value
-            ret.push_back(Decimal128(realm::null()));
-        }
-        else {
-            ret.push_back(typename BaseT::Type());
-        }
-        return ret;
-    }
-};
-
-template <typename T>
-T get(Mixed)
-{
-    abort();
-}
-
-template <>
-Mixed get(Mixed m)
-{
-    return m;
-}
-
-template <>
-int64_t get(Mixed m)
-{
-    return m.get_int();
-}
-template <>
-float get(Mixed m)
-{
-    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
-}
-template <>
-double get(Mixed m)
-{
-    return m.get_double();
-}
-template <>
-Timestamp get(Mixed m)
-{
-    return m.get_timestamp();
-}
-template <>
-Decimal128 get(Mixed m)
-{
-    return m.get<Decimal128>();
-}
-
-namespace realm {
-template <typename T>
-bool operator==(List const& list, std::vector<T> const& values)
-{
-    if (list.size() != values.size())
-        return false;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (list.get<T>(i) != values[i])
-            return false;
-    }
-    return true;
-}
-
-template <typename T>
-bool operator==(Results const& results, std::vector<T> const& values)
-{
-    // FIXME: this is only necessary because Results::size() and ::get() are not const
-    Results copy{results};
-    if (copy.size() != values.size())
-        return false;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (copy.get<T>(i) != values[i])
-            return false;
-    }
-    return true;
-}
-
-} // namespace realm
+namespace cf = realm::collection_fixtures;
 
 struct StringifyingContext {
     template <typename T>
@@ -517,46 +111,49 @@ struct StringMaker<util::None> {
 };
 } // namespace Catch
 
-struct less {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a < b;
-    }
-};
-struct greater {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a > b;
-    }
-};
-
-template <>
-auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
+template <typename T>
+T get(Mixed)
 {
-    if (b.is_null())
-        return false;
-    if (a.is_null())
-        return true;
-    return a < b;
+    abort();
 }
 
 template <>
-auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
+Mixed get(Mixed m)
 {
-    if (a.is_null())
-        return false;
-    if (b.is_null())
-        return true;
-    return a > b;
+    return m;
 }
 
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary,
-                   ::Date, ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>,
-                   BoxedOptional<::Float>, BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>,
-                   UnboxedOptional<::String>, UnboxedOptional<::Binary>, UnboxedOptional<::Date>,
-                   UnboxedOptional<::Decimal>)
+template <>
+int64_t get(Mixed m)
+{
+    return m.get_int();
+}
+template <>
+float get(Mixed m)
+{
+    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
+}
+template <>
+double get(Mixed m)
+{
+    return m.get_double();
+}
+template <>
+Timestamp get(Mixed m)
+{
+    return m.get_timestamp();
+}
+template <>
+Decimal128 get(Mixed m)
+{
+    return m.get<Decimal128>();
+}
+
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
+                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
+                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -844,14 +441,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
     }
     SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
@@ -875,13 +472,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", MixedVal, ::Int, ::Bool, ::
 
         auto sorted = list.sort(SortDescriptor({{col}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         sorted = list.sort(SortDescriptor({{col}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
