@@ -549,11 +549,12 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     if (Replication* repl = this->m_obj.get_replication()) {
+        auto ndx = m_clusters->get_ndx(k);
         if (old_entry) {
-            repl->dictionary_set(*this, state.index, key, value);
+            repl->dictionary_set(*this, ndx, key, value);
         }
         else {
-            repl->dictionary_insert(*this, state.index, key, value);
+            repl->dictionary_insert(*this, ndx, key, value);
         }
     }
 
@@ -573,6 +574,9 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             old_link = old_value.get<ObjLink>();
         }
         values.set(state.index, value);
+        if (fields.has_missing_parent_update()) {
+            m_clusters->update_ref_in_parent(k, fields.get_ref());
+        }
     }
 
     if (new_link != old_link) {
@@ -649,7 +653,8 @@ void Dictionary::erase(Mixed key)
             _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
 
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, state.index, key);
+            auto ndx = m_clusters->get_ndx(k);
+            repl->dictionary_erase(*this, ndx, key);
         }
         CascadeState dummy;
         m_clusters->erase(k, dummy);
@@ -669,7 +674,8 @@ void Dictionary::nullify(Mixed key)
     auto state = m_clusters->get(k);
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_set(*this, state.index, key, Mixed());
+        auto ndx = m_clusters->get_ndx(k);
+        repl->dictionary_set(*this, ndx, key, Mixed());
     }
 
     ArrayMixed values(m_obj.get_alloc());
