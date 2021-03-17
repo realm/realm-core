@@ -474,12 +474,12 @@ static std::string string_from_partition(const std::string& partition)
             case bson::Bson::Type::ObjectId:
                 return util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
             case bson::Bson::Type::Uuid:
-                return util::format("o_%1", static_cast<UUID>(partition_value).to_string());
+                return util::format("u_%1", static_cast<UUID>(partition_value).to_string());
             case bson::Bson::Type::Null:
                 return "null";
             default:
                 throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string "
-                                                            "and ObjectId types are currently supported.",
+                                                            "UUID and ObjectId types are currently supported.",
                                                             partition_value.to_string()));
         }
     }
