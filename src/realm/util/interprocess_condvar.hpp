@@ -108,14 +108,14 @@ public:
     template <typename Cond>
     void wait(InterprocessMutex& m, const struct timespec* tp, Cond&& cond)
     {
-        using clock = std::chrono::system_clock;
-        const auto deadline =
-            tp ? clock::time_point::ceil(clock::from_time_t(tp->tv_sec) + std::chrono::nanoseconds(tp->tv_nsec))
-               : clock::time_point();
         while (!cond()) {
             wait(m, tp);
-            if (tp && clock::now() >= deadline)
-                return;
+            if (tp) {
+                struct timespec now;
+                timespec_get(&now, TIME_UTC);
+                if (std::tie(now.tv_sec, now.tv_nsec) >= std::tie(tp->tv_sec, tp->tv_nsec))
+                    return;
+            }
         }
     }
 
