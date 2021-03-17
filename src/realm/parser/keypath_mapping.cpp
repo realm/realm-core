@@ -104,8 +104,9 @@ std::string KeyPathMapping::translate_table_name(const std::string& identifier)
                              identifier, *mapped));
         }
         alias = *mapped;
+        substitutions++;
     }
-    if (alias.find(get_backlink_class_prefix()) != 0) {
+    if (substitutions == 0 && m_backlink_class_prefix.size()) {
         alias = get_backlink_class_prefix() + alias;
     }
     return alias;
@@ -118,9 +119,9 @@ std::string KeyPathMapping::translate(ConstTableRef table, const std::string& id
     std::string alias = identifier;
     while (auto mapped = get_mapping(tk, alias)) {
         if (substitutions > max_substitutions_allowed) {
-            throw MappingError(
-                util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'", alias,
-                             *mapped, util::serializer::get_printable_table_name(table->get_name())));
+            throw MappingError(util::format(
+                "Substitution loop detected while processing '%1' -> '%2' found in type '%3'", alias, *mapped,
+                util::serializer::get_printable_table_name(table->get_name(), m_backlink_class_prefix)));
         }
         alias = *mapped;
         substitutions++;

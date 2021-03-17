@@ -336,6 +336,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
+    void sync(Array& arr);
     int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>
