@@ -274,6 +274,10 @@ public:
     Decimal128 maximum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Decimal128 minimum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
     Decimal128 average_decimal128(ColKey column_key, size_t* resultcount = nullptr) const;
+    Decimal128 sum_mixed(ColKey column_key) const;
+    Mixed maximum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Mixed minimum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 average_mixed(ColKey column_key, size_t* resultcount = nullptr) const;
 
     // Deletion
     size_t remove();
