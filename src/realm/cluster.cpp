@@ -1249,7 +1249,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     if (!m_keys.is_attached()) {
         std::cout << lead << "compact form" << std::endl;
     }
-    auto col_keys = get_owning_table()->get_column_keys();
 
     for (unsigned i = 0; i < node_size(); i++) {
         int64_t key_value;
@@ -1260,11 +1259,11 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        for (auto col : col_keys) {
+        m_tree_top.for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
                 std::cout << ", list";
-                continue;
+                return false;
             }
 
             switch (col.get_type()) {
@@ -1402,7 +1401,8 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", Error";
                     break;
             }
-        }
+            return false;
+        });
         std::cout << std::endl;
     }
 }
