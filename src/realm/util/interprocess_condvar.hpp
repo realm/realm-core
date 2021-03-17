@@ -110,7 +110,7 @@ public:
     {
         using clock = std::chrono::system_clock;
         const auto deadline =
-            tp ? clock::time_point(std::chrono::seconds(tp->tv_sec) + std::chrono::nanoseconds(tp->tv_nsec))
+            tp ? clock::time_point::ceil(clock::from_time_t(tp->tv_sec) + std::chrono::nanoseconds(tp->tv_nsec))
                : clock::time_point();
         while (!cond()) {
             wait(m, tp);
