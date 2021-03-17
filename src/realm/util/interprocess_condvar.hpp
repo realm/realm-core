@@ -112,7 +112,11 @@ public:
             wait(m, tp);
             if (tp) {
                 struct timespec now;
+#ifdef _WIN32
                 timespec_get(&now, TIME_UTC);
+#else
+                clock_gettime(CLOCK_REAL, &now);
+#endif
                 if (std::tie(now.tv_sec, now.tv_nsec) >= std::tie(tp->tv_sec, tp->tv_nsec))
                     return;
             }
