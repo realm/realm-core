@@ -383,7 +383,7 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = this->get_base_table()->get_alloc();
+        Allocator& alloc = this->m_link_map.get_target_table()->get_alloc();
         Value<int64_t> list_refs;
         this->get_lists(index, list_refs, 1);
         destination.init(list_refs.m_from_link_list, list_refs.size());

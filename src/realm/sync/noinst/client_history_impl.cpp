@@ -153,6 +153,11 @@ void ClientHistoryImpl::set_client_reset_adjustments(version_type current_versio
 }
 
 
+void ClientHistoryImpl::set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn)
+{
+    m_local_origin_timestamp_source = std::move(source_fn);
+}
+
 // Overriding member function in realm::Replication
 void ClientHistoryImpl::initialize(DB& sg)
 {
@@ -248,7 +253,6 @@ void ClientHistoryImpl::do_initiate_transact(Group& group, version_type version,
     SyncReplication::do_initiate_transact(group, version, history_updated);
 }
 
-
 // Overriding member function in realm::TrivialReplication
 auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version_type orig_version) -> version_type
 {
@@ -280,7 +284,7 @@ auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version
             changeset = BinaryData(buffer.data(), buffer.size());
         }
 
-        entry.origin_timestamp = sync::generate_changeset_timestamp();
+        entry.origin_timestamp = m_local_origin_timestamp_source();
         entry.origin_file_ident = 0; // Of local origin
         entry.remote_version = m_progress_download.server_version;
         entry.changeset = changeset;
@@ -629,7 +633,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
 
     update_sync_progress(progress, downloadable_bytes); // Throws
 
-    version_type new_version = transact->commit_and_continue_as_read(); // Throws
+    version_type new_version = transact->commit_and_continue_as_read().version; // Throws
 #if REALM_DEBUG
     ensure_updated(new_version); // Throws
     REALM_ASSERT(m_ct_history->size() == m_ct_history_size);

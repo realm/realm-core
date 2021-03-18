@@ -33,9 +33,15 @@ set(REALM_PARSER_SOURCES
 
 set(REALM_PARSER_HEADERS
     driver.hpp
+    keypath_mapping.hpp
     query_parser.hpp
     generated/query_bison.hpp
     generated/query_flex.hpp
+)
+
+set(REALM_PARSER_INSTALL_HEADERS
+    keypath_mapping.hpp
+    query_parser.hpp
 )
 
 # Add these files so that they appear in cmake generated projects for IDE
@@ -56,4 +62,8 @@ set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
 
 install(TARGETS QueryParser EXPORT realm
         ARCHIVE DESTINATION lib
+        COMPONENT devel)
+
+INSTALL(FILES ${REALM_PARSER_INSTALL_HEADERS}
+        DESTINATION include/realm/parser
         COMPONENT devel)

@@ -104,8 +104,11 @@ public:
     Mixed sum(ColKey column = {}) const;
 
     bool is_subset_of(const Set& rhs) const;
+    bool is_strict_subset_of(const Set& rhs) const;
     bool is_superset_of(const Set& rhs) const;
+    bool is_strict_superset_of(const Set& rhs) const;
     bool intersects(const Set& rhs) const;
+    bool set_equals(const Set& rhs) const;
 
     void assign_intersection(const Set& rhs);
     void assign_union(const Set& rhs);

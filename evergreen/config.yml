@@ -141,32 +141,6 @@ functions:
       params:
         file: './realm-core/benchmark_results/results.latest.json'
 
-  "run tests with reporter":
-    - command: shell.exec
-      params:
-        working_dir: realm-core
-        shell: bash
-        script: |-
-          set -o errexit
-          set -o verbose
-          CTEST=$(pwd)/${cmake_bindir}/ctest
-
-          if [[ -n "${test_filter}" ]]; then
-              TEST_FLAGS="-R ${test_filter}"
-          fi
-          TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
-
-          export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
-
-          if [[ -n "${report_test_progress|}" ]]; then
-              export UNITTEST_PROGRESS=${report_test_progress|}
-          fi
-          cd build
-          $CTEST -V $TEST_FLAGS
-    - command: attach.results
-      params:
-        file_location: realm-core/${task_name}_results.json
-
   "run tests":
     - command: shell.exec
       params:
@@ -182,11 +156,17 @@ functions:
           fi
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
+          export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           if [[ -n "${report_test_progress|}" ]]; then
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
           cd build
           $CTEST -V $TEST_FLAGS
+
+  "upload test results":
+  - command: attach.results
+    params:
+      file_location: realm-core/${task_name}_results.json
 
 tasks:
 - name: compile
@@ -239,7 +219,7 @@ tasks:
   tags: [ "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
-  - func: "run tests with reporter"
+  - func: "run tests"
     vars:
       test_filter: StorageTests
 
@@ -261,7 +241,7 @@ tasks:
   tags: [ "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
-  - func: "run tests with reporter"
+  - func: "run tests"
     vars:
       test_filter: SyncTests
 
@@ -355,6 +335,8 @@ task_groups:
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
   tasks:
   - compile
   - .test_suite
@@ -368,6 +350,8 @@ task_groups:
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -379,6 +363,8 @@ task_groups:
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -389,6 +375,8 @@ task_groups:
   setup_group:
   - func: "fetch source"
   - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
   tasks:
   - compile
   - .test_suite
@@ -414,6 +402,8 @@ task_groups:
     vars:
       long_running_test_duration: 2
       target_to_build: CoreTests
+  teardown_task:
+  - func: "upload test results"
   tasks:
   - long-running-core-tests
 

@@ -25,11 +25,9 @@ inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm,
     realm->read_group().get_table(table_key);
     const auto& schema = realm->schema();
 
-    // FIXME: Faster lookup than linear search.
-    for (auto& os : schema) {
-        if (os.table_key == table_key) {
-            return os;
-        }
+    auto it = schema.find(table_key);
+    if (it != schema.end()) {
+        return *it;
     }
 
     throw NoSuchTable{};

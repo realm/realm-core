@@ -333,10 +333,24 @@ bool Set::is_subset_of(const Set& rhs) const
     });
 }
 
+bool Set::is_strict_subset_of(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_strict_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
 bool Set::is_superset_of(const Set& rhs) const
 {
     return dispatch([&](auto t) {
         return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
+    });
+}
+
+bool Set::is_strict_superset_of(const Set& rhs) const
+{
+    return dispatch([&](auto t) {
+        return this->as<std::decay_t<decltype(*t)>>().is_strict_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
     });
 }
 
