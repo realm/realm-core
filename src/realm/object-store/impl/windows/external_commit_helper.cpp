@@ -61,7 +61,12 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
         "ExternalCommitHelper_CommitCondVar",
         normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().u8string()));
 
-    m_thread = std::async(std::launch::async, [this]() {
+    {
+        auto lock = std::unique_lock(m_mutex);
+        m_last_count = m_shared_part->num_signals;
+    }
+
+    m_thread = std::thread([this]() {
         listen();
     });
 }
@@ -73,7 +78,7 @@ ExternalCommitHelper::~ExternalCommitHelper()
         m_keep_listening = false;
         m_commit_available.notify_all();
     }
-    m_thread.wait();
+    m_thread.join();
 
     m_commit_available.release_shared_part();
 }
@@ -88,12 +93,11 @@ void ExternalCommitHelper::notify_others()
 void ExternalCommitHelper::listen()
 {
     auto lock = std::unique_lock(m_mutex);
-    auto last_count = m_shared_part->num_signals;
     while (true) {
         m_commit_available.wait(m_mutex, nullptr, [&] {
-            return !m_keep_listening || m_shared_part->num_signals != last_count;
+            return !m_keep_listening || m_shared_part->num_signals != m_last_count;
         });
-        last_count = m_shared_part->num_signals;
+        m_last_count = m_shared_part->num_signals;
 
         if (!m_keep_listening)
             return;
