@@ -78,6 +78,7 @@ struct AllTypesSyncObject {
 template <typename T, PropertyType PT>
 struct BaseCorpus : std::true_type {
     using value_type = T;
+    static constexpr auto property_type = PT;
 
     static_assert(!is_nullable(PT), "PropertyType cannot be nullable");
 
@@ -98,6 +99,7 @@ struct BaseCorpus : std::true_type {
 template <typename T, PropertyType PT>
 struct BaseOptCorpus : std::true_type {
     using value_type = T;
+    static constexpr auto property_type = PT;
 
     static_assert(is_nullable(PT), "PropertyType is not nullable");
 
@@ -126,6 +128,7 @@ struct BaseOptCorpus : std::true_type {
 template <typename T, PropertyType PT>
 struct BaseLstCorpus: std::true_type {
     using value_type = std::vector<T>;
+    static constexpr auto property_type = PT;
 
     static realm::Property property()
     {
@@ -323,6 +326,9 @@ struct Corpus<PT::Array | PT::UUID>: BaseLstCorpus<UUID, PT::Array | PT::UUID> {
 template <typename T>
 struct BaseMixedCorpus : std::true_type {
     using value_type = T;
+    using mixed_type = T;
+
+    static constexpr auto property_type = PT::Mixed | PT::Nullable;
 
     static realm::Property property()
     {
@@ -339,7 +345,22 @@ struct BaseMixedCorpus : std::true_type {
     }
 };
 
+
 namespace {
+template <typename T>
+inline constexpr PropertyType property_type_from_type()
+{
+    if constexpr(std::is_same_v<T, Int>) { return PT::Int; }
+    else if constexpr(std::is_same_v<T, Bool>) { return PT::Bool; }
+    else if constexpr(std::is_same_v<T, String>) { return PT::String; }
+    else if constexpr(std::is_same_v<T, BinaryData>) { return PT::Data; }
+    else if constexpr(std::is_same_v<T, Timestamp>) { return PT::Date; }
+    else if constexpr(std::is_same_v<T, Double>) { return PT::Double; }
+    else if constexpr(std::is_same_v<T, ObjectId>) { return PT::ObjectId; }
+    else if constexpr(std::is_same_v<T, Decimal>) { return PT::Decimal; }
+    else if constexpr(std::is_same_v<T, UUID>) { return PT::UUID; }
+    else { return PT::Flags; }
+}
 inline constexpr PropertyType operator<<(PropertyType a, PropertyType b)
 {
     // give us a negative unique value simply for the mixed case and having
@@ -396,7 +417,7 @@ struct Corpus<PT::Mixed << PT::UUID>: BaseMixedCorpus<UUID> {
 template <>
 struct Corpus<PT::Mixed | PT::Nullable>: BaseMixedCorpus<Int> {
     static const auto inline default_value = none;
-    static const auto inline new_value = Optional<Mixed>(Mixed(42));
+    static const auto inline new_value = Mixed(42);
 };
 template <>
 struct Corpus<PT::Array | PT::Mixed | PT::Nullable>: BaseLstCorpus<Mixed, PT::Array | PT::Mixed | PT::Nullable> {
@@ -416,7 +437,7 @@ struct Corpus<PT::Array | PT::Mixed | PT::Nullable>: BaseLstCorpus<Mixed, PT::Ar
 
 // MARK: Full Corpus
 /// Returns a tuple of all type combinations we are testing.
-static constexpr auto corpus_types(){
+static constexpr auto corpus_types() {
     return std::tuple<
         Corpus<PT::Int>, Corpus<PT::Int | PT::Nullable>, Corpus<PT::Array | PT::Int>,
         Corpus<PT::Bool>, Corpus<PT::Bool | PT::Nullable>, Corpus<PT::Array | PT::Bool>,
@@ -560,8 +581,9 @@ private:
     }
 };
 
+
 template <PropertyType PT>
-void test_round_trip() {
+void test_round_trip(Corpus<PT> corpus) {
     static_assert(Corpus<PT>::value, "PropertyType must be added to corpus before testing");
     // Add a new `AllTypesSyncObject` to the Realm
     Harness().run([](auto realm) {
@@ -587,7 +609,6 @@ void test_round_trip() {
 
         realm->begin_transaction();
         auto obj = AllTypesSyncObject(results.get(0));
-        auto corpus = Corpus<PT>();
         // assert the stored value is equal to the expected default value
         REQUIRE(corpus.get(obj) == corpus.default_value);
         corpus.set(obj, corpus.new_value);
@@ -596,138 +617,53 @@ void test_round_trip() {
         realm->commit_transaction();
         wait_for_upload(*realm);
     });
-    Harness().run([](auto realm) {
+    Harness().run([&corpus](auto realm) {
         wait_for_download(*realm);
         auto results = realm::Results(realm, realm->read_group().get_table("class_AllTypesSyncObject"));
         REQUIRE(results.size() == 1);
         auto obj = AllTypesSyncObject(results.get(0));
-        auto corpus = Corpus<PT>();
         REQUIRE(corpus.get(obj) == corpus.new_value);
     });
 }
 
 TEST_CASE("canonical_sync_corpus", "[sync][app]") {
     // MARK: Int Round Trip
-    SECTION("Int Round Trip") {
-        test_round_trip<PT::Int>();
-    }
-    // MARK: Int Nullable Round Trip
-    SECTION("Int Nullable Round Trip") {
-        test_round_trip<PT::Int | PT::Nullable>();
-    }
-    // MARK: Int List Round Trip
-    SECTION("Int List Round Trip") {
-        test_round_trip<PT::Array | PT::Int>();
-    }
-    // MARK: Bool Round Trip
-    SECTION("Bool Round Trip") {
-        test_round_trip<PT::Bool>();
-    }
-    // MARK: Bool Nullable Round Trip
-    SECTION("Bool Nullable Round Trip") {
-        test_round_trip<PT::Bool | PT::Nullable>();
-    }
-    // MARK: Bool List Round Trip
-    SECTION("Bool List Round Trip") {
-        test_round_trip<PT::Array | PT::Bool>();
-    }
-    // MARK: String Round Trip
-    SECTION("String Round Trip") {
-        test_round_trip<PT::String>();
-    }
-    // MARK: String Nullable Round Trip
-    SECTION("Optional String Round Trip") {
-        test_round_trip<PT::String | PT::Nullable>();
-    }
-    // MARK: String List Round Trip
-    SECTION("String List Round Trip") {
-        test_round_trip<PT::String | PT::Array>();
-    }
-    // MARK: Data Round Trip
-    SECTION("Data Round Trip") {
-        test_round_trip<PT::Data>();
-    }
-    // MARK: Data Nullable Round Trip
-    SECTION("Data Nullable Round Trip") {
-        test_round_trip<PT::Data | PT::Nullable>();
-    }
-    // MARK: Data List Round Trip
-    SECTION("Data List Round Trip") {
-        test_round_trip<PT::Data | PT::Array>();
-    }
-    // MARK: Date Round Trip
-    SECTION("Date Round Trip") {
-        test_round_trip<PT::Date>();
-    }
-    // MARK: Date Nullable Round Trip
-    SECTION("Date Nullable Round Trip") {
-        test_round_trip<PT::Date | PT::Nullable>();
-    }
-    // MARK: Date Round Trip
-    SECTION("Date Round Trip") {
-        test_round_trip<PT::Date | PT::Array>();
-    }
-    // MARK: Double Round Trip
-    SECTION("Double Round Trip") {
-        test_round_trip<PT::Double>();
-    }
-    // MARK: Double Nullable Round Trip
-    SECTION("Double Nullable Round Trip") {
-        test_round_trip<PT::Double | PT::Nullable>();
-    }
-    // MARK: Double List Round Trip
-    SECTION("Double List Round Trip") {
-        test_round_trip<PT::Double | PT::Array>();
-    }
-    // MARK: ObjectId Round Trip
-    SECTION("ObjectId Round Trip") {
-        test_round_trip<PT::ObjectId>();
-    }
-    // MARK: ObjectId Nullable Round Trip
-    SECTION("ObjectId Nullable Round Trip") {
-        test_round_trip<PT::ObjectId | PT::Nullable>();
-    }
-    // MARK: ObjectId List Round Trip
-    SECTION("ObjectId List Round Trip") {
-        test_round_trip<PT::ObjectId | PT::Array>();
-    }
-    // MARK: Decimal Round Trip
-    SECTION("Decimal Round Trip") {
-        test_round_trip<PT::Decimal>();
-    }
-    // MARK: Decimal Nullable Round Trip
-    SECTION("Decimal Nullable Round Trip") {
-        test_round_trip<PT::Decimal | PT::Nullable>();
-    }
-    // MARK: Decimal List Round Trip
-    SECTION("Decimal List Round Trip") {
-        test_round_trip<PT::Decimal | PT::Array>();
-    }
-    // MARK: UUID Round Trip
-    SECTION("UUID Round Trip") {
-        test_round_trip<PT::UUID>();
-    }
-    // MARK: UUID Nullable Round Trip
-    SECTION("UUID Nullable Round Trip") {
-        test_round_trip<PT::UUID | PT::Nullable>();
-    }
-    // MARK: UUID List Round Trip
-    SECTION("UUID List Round Trip") {
-        test_round_trip<PT::UUID| PT::Array>();
-    }
-    // MARK: Mixed Round Trip
-    SECTION("Mixed Round Trip") {
-        test_round_trip<PT::Mixed << PT::Int>();
-        test_round_trip<PT::Mixed << PT::Bool>();
-        test_round_trip<PT::Mixed << PT::String>();
-        test_round_trip<PT::Mixed << PT::Data>();
-        test_round_trip<PT::Mixed << PT::Date>();
-        test_round_trip<PT::Mixed << PT::Double>();
-        test_round_trip<PT::Mixed << PT::ObjectId>();
-        test_round_trip<PT::Mixed << PT::Decimal>();
-        test_round_trip<PT::Mixed << PT::UUID>();
-        // TODO: Not supported yet: test_round_trip<PT::Mixed | PT::Array | PT::Nullable>();
-    }
+    std::apply([](auto... corpus) {
+        auto test = [](auto corpus) {
+            auto PT = std::decay_t<decltype(corpus)>::property_type;
+            DYNAMIC_SECTION(util::format("%1 %2 %3", {
+                string_for_property_type(PT & ~PropertyType::Flags),
+                is_array(PT) ? "(array)" : is_nullable(PT) ? "(nullable)" : "-",
+                "round trip"
+            })) {
+                test_round_trip(corpus);
+            };
+        };
+        (test(corpus), ...);
+    }, corpus_types());
+
+    auto mixed_corpus_types = std::tuple<
+        Corpus<PT::Mixed << PT::Int>,
+        Corpus<PT::Mixed << PT::Bool>,
+        Corpus<PT::Mixed << PT::String>,
+        Corpus<PT::Mixed << PT::Data>,
+        Corpus<PT::Mixed << PT::Date>,
+        Corpus<PT::Mixed << PT::Double>,
+        Corpus<PT::Mixed << PT::ObjectId>,
+        Corpus<PT::Mixed << PT::Decimal>,
+        Corpus<PT::Mixed << PT::UUID>
+    >{};
+    std::apply([](auto... corpus) {
+        auto test = [](auto corpus) {
+            DYNAMIC_SECTION(util::format("mixed of type %1 %2", {
+                string_for_property_type(property_type_from_type<typename decltype(corpus)::mixed_type>()),
+                "round trip"
+            })) {
+                test_round_trip(corpus);
+            };
+        };
+        (test(corpus), ...);
+    }, mixed_corpus_types);
 }
 
 TEST_CASE("sync_unhappy_paths", "[sync][app]") {
