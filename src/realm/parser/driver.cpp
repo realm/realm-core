@@ -448,14 +448,18 @@ Query RelationalNode::visit(ParserDriver* drv)
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
+    const bool right_type_is_null = right->has_constant_evaluation() && right->get_mixed().is_null();
+    const bool left_type_is_null = left->has_constant_evaluation() && left->get_mixed().is_null();
+    REALM_ASSERT(!(left_type_is_null && right_type_is_null));
 
-    if (left_type == type_UUID || left_type == type_Link || left_type == type_TypeOfValue) {
+    if (left_type == type_Link || left_type == type_TypeOfValue) {
         throw InvalidQueryError(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
             opstr[op]));
     }
 
-    if (!left_type.is_valid() || !right_type.is_valid() || !Mixed::data_types_are_comparable(left_type, right_type)) {
+    if (!(left_type_is_null || right_type_is_null) && (!left_type.is_valid() || !right_type.is_valid() ||
+                                                       !Mixed::data_types_are_comparable(left_type, right_type))) {
         throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
                                              get_data_type_name(left_type), get_data_type_name(right_type)));
     }
