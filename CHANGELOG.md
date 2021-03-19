@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Adding overloads of the set methods that operate on collections ([#4226](https://github.com/realm/realm-core/issues/4226))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

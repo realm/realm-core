@@ -28,6 +28,7 @@ TEST_CASE("set", "[set]") {
         {"table",
          {{"int_set", PropertyType::Set | PropertyType::Int},
           {"decimal_set", PropertyType::Set | PropertyType::Decimal | PropertyType::Nullable},
+          {"decimal_list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
           {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
         {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
         {"other_table",
@@ -46,6 +47,7 @@ TEST_CASE("set", "[set]") {
 
     ColKey col_int_set = table->get_column_key("int_set");
     ColKey col_decimal_set = table->get_column_key("decimal_set");
+    ColKey col_decimal_list = table->get_column_key("decimal_list");
 
     ColKey col_link_set = table->get_column_key("link_set");
     ColKey col_link_obj_id = table2->get_column_key("id");
@@ -544,6 +546,48 @@ TEST_CASE("set", "[set]") {
             });
             CHECK(set2.size() == 3);
         }
+    }
+
+    SECTION("set operations against list") {
+        object_store::Set set{r, obj, col_decimal_set};
+        List list{r, obj, col_decimal_list};
+
+        write([&]() {
+            CHECK(set.insert(Decimal128(5)).second);
+            CHECK(set.insert(Decimal128(realm::null())).second);
+            CHECK(set.insert(Decimal128(7)).second);
+        });
+
+        write([&]() {
+            list.add(Decimal128(4));
+            list.add(Decimal128(realm::null()));
+            list.add(Decimal128(7));
+            list.add(Decimal128(4));
+        });
+        REQUIRE(set.intersects(list));
+        write([&]() {
+            set.assign_union(list); // set == { null, 4, 5, 7 }
+        });
+        REQUIRE(set.size() == 4);
+        REQUIRE(set.is_strict_superset_of(list));
+        write([&]() {
+            set.assign_difference(list); // set == { 5 }
+        });
+        REQUIRE(set.size() == 1);
+        write([&]() {
+            CHECK(set.insert(Decimal128(4)).second); // set == { 4, 5 }
+            set.assign_symmetric_difference(list);   // set == { null, 5, 7 }
+        });
+        REQUIRE(set.size() == 3);
+        write([&]() {
+            set.assign_intersection(list); // set == { null, 7 }
+        });
+        REQUIRE(set.size() == 2);
+        REQUIRE(set.is_strict_subset_of(list));
+        write([&]() {
+            CHECK(set.insert(Decimal128(4)).second); // set == { null, 4, 7 }
+        });
+        REQUIRE(set.set_equals(list));
     }
 }
 
