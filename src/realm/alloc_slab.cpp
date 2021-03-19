@@ -818,10 +818,14 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_end(this);
         throw InvalidDatabase("Realm file decryption failed", path);
     }
-    catch (...) {
+    catch (const std::exception& e) {
         note_reader_end(this);
         // we end up here if any of the file or mapping operations fail.
-        throw InvalidDatabase("Realm file initial open failed", path);
+        throw InvalidDatabase(util::format("Realm file initial open failed: %1", e.what()), path);
+    }
+    catch (...) {
+        note_reader_end(this);
+        throw InvalidDatabase("Realm file initial open failed: unknown error", path);
     }
     m_baseline = 0;
     auto handler = [this]() noexcept { note_reader_end(this); };
