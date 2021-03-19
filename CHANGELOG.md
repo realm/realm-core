@@ -13,7 +13,8 @@
 * Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
 * Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
 * Fixed the query parser rejecting <,>,<=,>= queries on UUID types. ([#4475](https://github.com/realm/realm-core/issues/4475), since v10.0.0)
- 
+* Fixed the object builder to dictionaries of objects with null values. ([#4537](https://github.com/realm/realm-core/issues/4537))
+
 ### Breaking changes
 * None.
 
