@@ -50,7 +50,7 @@ struct AllTypesSyncObject {
     AllTypesSyncObject(SharedRealm realm);
 
     AllTypesSyncObject(Obj obj)
-    : m_obj(obj)
+        : m_obj(obj)
     {
     }
 
@@ -62,7 +62,8 @@ struct AllTypesSyncObject {
         return m_obj.get<T>(std::to_string(static_cast<unsigned int>(pt)));
     }
     template <typename T>
-    void set(PropertyType pt, T value) {
+    void set(PropertyType pt, T value)
+    {
         m_obj.set(std::to_string(static_cast<unsigned int>(pt)), value);
     }
 
@@ -112,7 +113,8 @@ struct BaseOptCorpus : std::true_type {
     {
         if (all_types_sync_object.m_obj.is_null(property().name)) {
             return none;
-        } else {
+        }
+        else {
             return all_types_sync_object.get<T>(PT);
         }
     }
@@ -120,13 +122,14 @@ struct BaseOptCorpus : std::true_type {
     {
         if (value) {
             return all_types_sync_object.set(PT, *value);
-        } else {
+        }
+        else {
             all_types_sync_object.m_obj.set_null(property().name);
         }
     }
 };
 template <typename T, PropertyType PT>
-struct BaseLstCorpus: std::true_type {
+struct BaseLstCorpus : std::true_type {
     using value_type = std::vector<T>;
     static constexpr auto property_type = PT;
 
@@ -154,166 +157,164 @@ struct BaseLstCorpus: std::true_type {
 /// The goal is to assert that values can be read, written to, and round tripped
 /// to and from the sync server.
 template <PropertyType PT>
-struct Corpus: std::false_type {
+struct Corpus : std::false_type {
 };
 
 // MARK: Int Corpus
 template <>
-struct Corpus<PT::Int>: BaseCorpus<Int, PT::Int> {
+struct Corpus<PT::Int> : BaseCorpus<Int, PT::Int> {
     static constexpr Int default_value = 42;
     static constexpr Int new_value = 84;
 };
 template <>
-struct Corpus<PT::Int | PT::Nullable>: BaseOptCorpus<Int, PT::Int | PT::Nullable> {
+struct Corpus<PT::Int | PT::Nullable> : BaseOptCorpus<Int, PT::Int | PT::Nullable> {
     static constexpr Optional<Int> default_value = none;
     static constexpr Optional<Int> new_value = 84;
 };
 template <>
-struct Corpus<PT::Array | PT::Int>: BaseLstCorpus<Int, PT::Array | PT::Int> {
+struct Corpus<PT::Array | PT::Int> : BaseLstCorpus<Int, PT::Array | PT::Int> {
     static inline const auto default_value = std::vector<Int>();
     static inline const auto new_value = std::vector<Int>{1, 2, 3};
 };
 
 // MARK: Bool Corpus
 template <>
-struct Corpus<PT::Bool>: BaseCorpus<Bool, PT::Bool> {
+struct Corpus<PT::Bool> : BaseCorpus<Bool, PT::Bool> {
     static constexpr Bool default_value = false;
     static constexpr Bool new_value = true;
 };
 template <>
-struct Corpus<PT::Bool | PT::Nullable>: BaseOptCorpus<Bool, PT::Bool | PT::Nullable> {
+struct Corpus<PT::Bool | PT::Nullable> : BaseOptCorpus<Bool, PT::Bool | PT::Nullable> {
     static constexpr Optional<Bool> default_value = none;
     static constexpr Optional<Bool> new_value = true;
 };
 template <>
-struct Corpus<PT::Array | PT::Bool>: BaseLstCorpus<Bool, PT::Array | PT::Bool> {
+struct Corpus<PT::Array | PT::Bool> : BaseLstCorpus<Bool, PT::Array | PT::Bool> {
     static inline const auto default_value = std::vector<Bool>();
     static inline const auto new_value = std::vector<Bool>{true, false, true};
 };
 
 // MARK: String Corpus
 template <>
-struct Corpus<PT::String>: BaseCorpus<StringData, PT::String> {
+struct Corpus<PT::String> : BaseCorpus<StringData, PT::String> {
     static inline const String default_value = String("foo");
     static inline const String new_value = String("bar");
 };
 template <>
-struct Corpus<PT::String | PT::Nullable>: BaseOptCorpus<StringData, PT::String | PT::Nullable> {
+struct Corpus<PT::String | PT::Nullable> : BaseOptCorpus<StringData, PT::String | PT::Nullable> {
     static inline const Optional<String> default_value = none;
     static inline const Optional<String> new_value = String("bar");
 };
 template <>
-struct Corpus<PT::Array | PT::String>: BaseLstCorpus<StringData, PT::Array | PT::String> {
+struct Corpus<PT::Array | PT::String> : BaseLstCorpus<StringData, PT::Array | PT::String> {
     static inline const auto default_value = std::vector<String>();
     static inline const auto new_value = std::vector<String>{"foo", "bar", "baz"};
 };
 
 // MARK: Data Corpus
 template <>
-struct Corpus<PT::Data>: BaseCorpus<BinaryData, PT::Data> {
+struct Corpus<PT::Data> : BaseCorpus<BinaryData, PT::Data> {
     static const inline auto default_value = BinaryData("abc");
     static const inline auto new_value = BinaryData("def");
 };
 template <>
-struct Corpus<PT::Data | PT::Nullable>: BaseOptCorpus<BinaryData, PT::Data | PT::Nullable> {
+struct Corpus<PT::Data | PT::Nullable> : BaseOptCorpus<BinaryData, PT::Data | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Optional<BinaryData>(BinaryData("BBBBB", 5));
 };
 template <>
-struct Corpus<PT::Array | PT::Data>: BaseLstCorpus<BinaryData, PT::Array | PT::Data> {
+struct Corpus<PT::Array | PT::Data> : BaseLstCorpus<BinaryData, PT::Array | PT::Data> {
     static inline const auto default_value = std::vector<BinaryData>();
-    static inline const auto new_value = std::vector<BinaryData>{
-        BinaryData("AAAAA"), BinaryData("BBBBB"), BinaryData("CCCCC")
-    };
+    static inline const auto new_value =
+        std::vector<BinaryData>{BinaryData("AAAAA"), BinaryData("BBBBB"), BinaryData("CCCCC")};
 };
 
 // MARK: Date Corpus
 template <>
-struct Corpus<PT::Date>: BaseCorpus<Timestamp, PT::Date> {
+struct Corpus<PT::Date> : BaseCorpus<Timestamp, PT::Date> {
     static const inline auto default_value = Timestamp(42, 0);
     static const inline auto new_value = Timestamp(84, 0);
 };
 template <>
-struct Corpus<PT::Date | PT::Nullable>: BaseOptCorpus<Timestamp, PT::Date | PT::Nullable> {
+struct Corpus<PT::Date | PT::Nullable> : BaseOptCorpus<Timestamp, PT::Date | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Timestamp(84, 0);
 };
 template <>
-struct Corpus<PT::Array | PT::Date>: BaseLstCorpus<Timestamp, PT::Array | PT::Date> {
+struct Corpus<PT::Array | PT::Date> : BaseLstCorpus<Timestamp, PT::Array | PT::Date> {
     static inline const auto default_value = std::vector<Timestamp>();
-    static inline const auto new_value = std::vector<Timestamp>{
-        Timestamp(42, 0), Timestamp(84, 0), Timestamp(168, 0)
-    };
+    static inline const auto new_value =
+        std::vector<Timestamp>{Timestamp(42, 0), Timestamp(84, 0), Timestamp(168, 0)};
 };
 
 // MARK: Double Corpus
 template <>
-struct Corpus<PT::Double>: BaseCorpus<Double, PT::Double> {
+struct Corpus<PT::Double> : BaseCorpus<Double, PT::Double> {
     static const inline auto default_value = 42.42;
     static const inline auto new_value = 84.84;
 };
 template <>
-struct Corpus<PT::Double | PT::Nullable>: BaseOptCorpus<Double, PT::Double | PT::Nullable> {
+struct Corpus<PT::Double | PT::Nullable> : BaseOptCorpus<Double, PT::Double | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Optional<Double>(84.84);
 };
 template <>
-struct Corpus<PT::Array | PT::Double>: BaseLstCorpus<Double, PT::Array | PT::Double> {
+struct Corpus<PT::Array | PT::Double> : BaseLstCorpus<Double, PT::Array | PT::Double> {
     static inline const auto default_value = std::vector<Double>();
     static inline const auto new_value = std::vector<Double>{42.42, 84.84, 169.68};
 };
 
 // MARK: ObjectId Corpus
 template <>
-struct Corpus<PT::ObjectId>: BaseCorpus<ObjectId, PT::ObjectId> {
+struct Corpus<PT::ObjectId> : BaseCorpus<ObjectId, PT::ObjectId> {
     static const inline auto default_value = ObjectId();
     static const inline auto new_value = ObjectId::gen();
 };
 template <>
-struct Corpus<PT::ObjectId | PT::Nullable>: BaseOptCorpus<ObjectId, PT::ObjectId | PT::Nullable> {
+struct Corpus<PT::ObjectId | PT::Nullable> : BaseOptCorpus<ObjectId, PT::ObjectId | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Optional<ObjectId>(ObjectId::gen());
 };
 template <>
-struct Corpus<PT::Array | PT::ObjectId>: BaseLstCorpus<ObjectId, PT::Array | PT::ObjectId> {
+struct Corpus<PT::Array | PT::ObjectId> : BaseLstCorpus<ObjectId, PT::Array | PT::ObjectId> {
     static inline const auto default_value = std::vector<ObjectId>();
-    static inline const auto new_value = std::vector<ObjectId>{
-        ObjectId::gen(), ObjectId::gen(), ObjectId::gen()
-    };
+    static inline const auto new_value = std::vector<ObjectId>{ObjectId::gen(), ObjectId::gen(), ObjectId::gen()};
 };
 
 // MARK: Decimal Corpus
 template <>
-struct Corpus<PT::Decimal>: BaseCorpus<Decimal, PT::Decimal> {
+struct Corpus<PT::Decimal> : BaseCorpus<Decimal, PT::Decimal> {
     static const inline auto default_value = Decimal();
     static const inline auto new_value = Decimal("42.42");
 };
 template <>
-struct Corpus<PT::Decimal | PT::Nullable>: BaseOptCorpus<Decimal, PT::Decimal | PT::Nullable> {
+struct Corpus<PT::Decimal | PT::Nullable> : BaseOptCorpus<Decimal, PT::Decimal | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Optional<Decimal>(Decimal("42.42"));
 };
 template <>
-struct Corpus<PT::Array | PT::Decimal>: BaseLstCorpus<Decimal, PT::Array | PT::Decimal> {
+struct Corpus<PT::Array | PT::Decimal> : BaseLstCorpus<Decimal, PT::Array | PT::Decimal> {
     static inline const auto default_value = std::vector<Decimal>();
     static inline const auto new_value = std::vector<Decimal>{
-        Decimal("42.42"), Decimal("84.84"), Decimal("169.68"),
+        Decimal("42.42"),
+        Decimal("84.84"),
+        Decimal("169.68"),
     };
 };
 
 // MARK: UUID Corpus
 template <>
-struct Corpus<PT::UUID>: BaseCorpus<UUID, PT::UUID> {
+struct Corpus<PT::UUID> : BaseCorpus<UUID, PT::UUID> {
     static const inline auto default_value = UUID();
     static const inline auto new_value = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
 };
 template <>
-struct Corpus<PT::UUID | PT::Nullable>: BaseOptCorpus<UUID, PT::UUID | PT::Nullable> {
+struct Corpus<PT::UUID | PT::Nullable> : BaseOptCorpus<UUID, PT::UUID | PT::Nullable> {
     static const auto inline default_value = none;
     static const auto inline new_value = Optional<UUID>(UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
 };
 template <>
-struct Corpus<PT::Array | PT::UUID>: BaseLstCorpus<UUID, PT::Array | PT::UUID> {
+struct Corpus<PT::Array | PT::UUID> : BaseLstCorpus<UUID, PT::Array | PT::UUID> {
     static inline const auto default_value = std::vector<UUID>();
     static inline const auto new_value = std::vector<UUID>{
         UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
@@ -350,16 +351,36 @@ namespace {
 template <typename T>
 inline constexpr PropertyType property_type_from_type()
 {
-    if constexpr(std::is_same_v<T, Int>) { return PT::Int; }
-    else if constexpr(std::is_same_v<T, Bool>) { return PT::Bool; }
-    else if constexpr(std::is_same_v<T, String>) { return PT::String; }
-    else if constexpr(std::is_same_v<T, BinaryData>) { return PT::Data; }
-    else if constexpr(std::is_same_v<T, Timestamp>) { return PT::Date; }
-    else if constexpr(std::is_same_v<T, Double>) { return PT::Double; }
-    else if constexpr(std::is_same_v<T, ObjectId>) { return PT::ObjectId; }
-    else if constexpr(std::is_same_v<T, Decimal>) { return PT::Decimal; }
-    else if constexpr(std::is_same_v<T, UUID>) { return PT::UUID; }
-    else { return PT::Flags; }
+    if constexpr (std::is_same_v<T, Int>) {
+        return PT::Int;
+    }
+    else if constexpr (std::is_same_v<T, Bool>) {
+        return PT::Bool;
+    }
+    else if constexpr (std::is_same_v<T, String>) {
+        return PT::String;
+    }
+    else if constexpr (std::is_same_v<T, BinaryData>) {
+        return PT::Data;
+    }
+    else if constexpr (std::is_same_v<T, Timestamp>) {
+        return PT::Date;
+    }
+    else if constexpr (std::is_same_v<T, Double>) {
+        return PT::Double;
+    }
+    else if constexpr (std::is_same_v<T, ObjectId>) {
+        return PT::ObjectId;
+    }
+    else if constexpr (std::is_same_v<T, Decimal>) {
+        return PT::Decimal;
+    }
+    else if constexpr (std::is_same_v<T, UUID>) {
+        return PT::UUID;
+    }
+    else {
+        return PT::Flags;
+    }
 }
 inline constexpr PropertyType operator<<(PropertyType a, PropertyType b)
 {
@@ -367,101 +388,103 @@ inline constexpr PropertyType operator<<(PropertyType a, PropertyType b)
     // specialized corpus types
     return static_cast<PropertyType>(-1 * (to_underlying(a) << to_underlying(b)));
 }
-}
+} // namespace
 
 template <>
-struct Corpus<PT::Mixed << PT::Int>: BaseMixedCorpus<Int> {
+struct Corpus<PT::Mixed << PT::Int> : BaseMixedCorpus<Int> {
     static const auto inline default_value = none;
     static const inline auto new_value = 84;
 };
 template <>
-struct Corpus<PT::Mixed << PT::Bool>: BaseMixedCorpus<Bool> {
+struct Corpus<PT::Mixed << PT::Bool> : BaseMixedCorpus<Bool> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(true);
 };
 template <>
-struct Corpus<PT::Mixed << PT::String>: BaseMixedCorpus<String> {
+struct Corpus<PT::Mixed << PT::String> : BaseMixedCorpus<String> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed("bar");
 };
 template <>
-struct Corpus<PT::Mixed << PT::Data>: BaseMixedCorpus<BinaryData> {
+struct Corpus<PT::Mixed << PT::Data> : BaseMixedCorpus<BinaryData> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(BinaryData("def"));
 };
 template <>
-struct Corpus<PT::Mixed << PT::Date>: BaseMixedCorpus<Timestamp> {
+struct Corpus<PT::Mixed << PT::Date> : BaseMixedCorpus<Timestamp> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(Timestamp(84, 0));
 };
 template <>
-struct Corpus<PT::Mixed << PT::Double>: BaseMixedCorpus<Double> {
+struct Corpus<PT::Mixed << PT::Double> : BaseMixedCorpus<Double> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(42.42);
 };
 template <>
-struct Corpus<PT::Mixed << PT::ObjectId>: BaseMixedCorpus<ObjectId> {
+struct Corpus<PT::Mixed << PT::ObjectId> : BaseMixedCorpus<ObjectId> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(ObjectId::gen());
 };
 template <>
-struct Corpus<PT::Mixed << PT::Decimal>: BaseMixedCorpus<Decimal> {
+struct Corpus<PT::Mixed << PT::Decimal> : BaseMixedCorpus<Decimal> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(Decimal("42.42"));
 };
 template <>
-struct Corpus<PT::Mixed << PT::UUID>: BaseMixedCorpus<UUID> {
+struct Corpus<PT::Mixed << PT::UUID> : BaseMixedCorpus<UUID> {
     static const auto inline default_value = none;
     static const inline auto new_value = Mixed(UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
 };
 template <>
-struct Corpus<PT::Mixed | PT::Nullable>: BaseMixedCorpus<Int> {
+struct Corpus<PT::Mixed | PT::Nullable> : BaseMixedCorpus<Int> {
     static const auto inline default_value = none;
     static const auto inline new_value = Mixed(42);
 };
 template <>
-struct Corpus<PT::Array | PT::Mixed | PT::Nullable>: BaseLstCorpus<Mixed, PT::Array | PT::Mixed | PT::Nullable> {
+struct Corpus<PT::Array | PT::Mixed | PT::Nullable> : BaseLstCorpus<Mixed, PT::Array | PT::Mixed | PT::Nullable> {
     static inline const auto default_value = std::vector<Mixed>();
-    static inline const auto new_value = std::vector<Mixed>{
-        42,
-        true,
-        "foo",
-        BinaryData("abc"),
-        Timestamp(42, 0),
-        42.42,
-        ObjectId::gen(),
-        Decimal("42.42"),
-        UUID("3b241101-e2bb-4255-8caf-4136c566a962")
-    };
+    static inline const auto new_value = std::vector<Mixed>{42,
+                                                            true,
+                                                            "foo",
+                                                            BinaryData("abc"),
+                                                            Timestamp(42, 0),
+                                                            42.42,
+                                                            ObjectId::gen(),
+                                                            Decimal("42.42"),
+                                                            UUID("3b241101-e2bb-4255-8caf-4136c566a962")};
 };
 
 // MARK: Full Corpus
 /// Returns a tuple of all type combinations we are testing.
-static constexpr auto corpus_types() {
-    return std::tuple<
-        Corpus<PT::Int>, Corpus<PT::Int | PT::Nullable>, Corpus<PT::Array | PT::Int>,
-        Corpus<PT::Bool>, Corpus<PT::Bool | PT::Nullable>, Corpus<PT::Array | PT::Bool>,
-        Corpus<PT::String>, Corpus<PT::String | PT::Nullable>, Corpus<PT::Array | PT::String>,
-        Corpus<PT::Data>, Corpus<PT::Data | PT::Nullable>, Corpus<PT::Array | PT::Data>,
-        Corpus<PT::Date>, Corpus<PT::Date | PT::Nullable>, Corpus<PT::Array | PT::Date>,
-        Corpus<PT::Double>, Corpus<PT::Double | PT::Nullable>, Corpus<PT::Array | PT::Double>,
-        Corpus<PT::ObjectId>, Corpus<PT::ObjectId | PT::Nullable>, Corpus<PT::Array | PT::ObjectId>,
-        Corpus<PT::Decimal>, Corpus<PT::Decimal | PT::Nullable>, Corpus<PT::Array | PT::Decimal>,
-        Corpus<PT::UUID>, Corpus<PT::UUID | PT::Nullable>, Corpus<PT::Array | PT::UUID>,
-        Corpus<PT::Mixed | PT::Nullable> /*, TODO: Not supported yet: Corpus<PT::Array | PT::Mixed | PT::Nullable> */
-    >{};
+static constexpr auto corpus_types()
+{
+    return std::tuple<Corpus<PT::Int>, Corpus<PT::Int | PT::Nullable>, Corpus<PT::Array | PT::Int>, Corpus<PT::Bool>,
+                      Corpus<PT::Bool | PT::Nullable>, Corpus<PT::Array | PT::Bool>, Corpus<PT::String>,
+                      Corpus<PT::String | PT::Nullable>, Corpus<PT::Array | PT::String>, Corpus<PT::Data>,
+                      Corpus<PT::Data | PT::Nullable>, Corpus<PT::Array | PT::Data>, Corpus<PT::Date>,
+                      Corpus<PT::Date | PT::Nullable>, Corpus<PT::Array | PT::Date>, Corpus<PT::Double>,
+                      Corpus<PT::Double | PT::Nullable>, Corpus<PT::Array | PT::Double>, Corpus<PT::ObjectId>,
+                      Corpus<PT::ObjectId | PT::Nullable>, Corpus<PT::Array | PT::ObjectId>, Corpus<PT::Decimal>,
+                      Corpus<PT::Decimal | PT::Nullable>, Corpus<PT::Array | PT::Decimal>, Corpus<PT::UUID>,
+                      Corpus<PT::UUID | PT::Nullable>, Corpus<PT::Array | PT::UUID>,
+                      Corpus<PT::Mixed | PT::Nullable> /*, TODO: Not supported yet: Corpus<PT::Array | PT::Mixed |
+                                                          PT::Nullable> */
+                      >{};
 }
 
 // MARK: - Schema
-ObjectSchema AllTypesSyncObject::schema() {
+ObjectSchema AllTypesSyncObject::schema()
+{
     auto object_schema = ObjectSchema();
     object_schema.name = "AllTypesSyncObject";
     // push back PK
     object_schema.persisted_properties.push_back(realm::Property("_id", PropertyType::ObjectId, true));
     object_schema.primary_key = "_id";
-    std::apply([&object_schema](auto&&... corpus) {
-        (object_schema.persisted_properties.push_back(corpus.property()), ...);
-    }, corpus_types());
+    std::apply(
+        [&object_schema](auto&&... corpus) {
+            (object_schema.persisted_properties.push_back(corpus.property()), ...);
+        },
+        corpus_types());
     return object_schema;
 }
 
@@ -478,9 +501,11 @@ AllTypesSyncObject::AllTypesSyncObject(SharedRealm realm)
 
     m_obj = table->create_object_with_primary_key(ObjectId::gen());
 
-    std::apply([this](auto&&... corpus) {
-        (corpus.set(*this, corpus.default_value), ...);
-    }, corpus_types());
+    std::apply(
+        [this](auto&&... corpus) {
+            (corpus.set(*this, corpus.default_value), ...);
+        },
+        corpus_types());
 
     if (did_begin_transaction) {
         realm->commit_transaction();
@@ -493,20 +518,17 @@ AllTypesSyncObject::AllTypesSyncObject(SharedRealm realm)
 /// slate to test sync on. The purpose of this is to emulate and control
 /// the flow of syncing, forcing downloads and uploads of data.
 struct Harness {
-    Harness(std::function<void(Realm::Config&)> set_up = [](auto&){})
-    : factory([] { return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport); })
-    , app_config(App::Config{get_runtime_app_id(get_config_path()),
-        factory,
-        get_base_url(),
-        util::none,
-        Optional<std::string>("A Local App Version"),
-        util::none,
-        "Object Store Platform Tests",
-        "Object Store Platform Version Blah",
-        "An sdk version"})
-    , base_path(util::make_temp_dir() + app_config.app_id)
-    , opt_set_up(set_up)
-    , sync_manager(TestSyncManager::Config(app_config), {})
+    Harness(std::function<void(Realm::Config&)> set_up = [](auto&) {})
+        : factory([] {
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        })
+        , app_config(App::Config{get_runtime_app_id(get_config_path()), factory, get_base_url(), util::none,
+                                 Optional<std::string>("A Local App Version"), util::none,
+                                 "Object Store Platform Tests", "Object Store Platform Version Blah",
+                                 "An sdk version"})
+        , base_path(util::make_temp_dir() + app_config.app_id)
+        , opt_set_up(set_up)
+        , sync_manager(TestSyncManager::Config(app_config), {})
     {
         REQUIRE(!get_base_url().empty());
         REQUIRE(!get_config_path().empty());
@@ -520,22 +542,24 @@ struct Harness {
     std::function<void(Realm::Config&)> opt_set_up;
     TestSyncManager sync_manager;
 
-    std::shared_ptr<App> get_app_and_login(SharedApp app)  {
+    std::shared_ptr<App> get_app_and_login(SharedApp app)
+    {
         auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
         auto password = random_string(10);
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-                                                                                   email, password, [&](Optional<app::AppError> error) {
-            CHECK(!error);
-        });
+            email, password, [&](Optional<app::AppError> error) {
+                CHECK(!error);
+            });
         app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            REQUIRE(user);
-            CHECK(!error);
-        });
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
         return app;
     }
 
-    realm::Realm::Config setup_and_get_config(std::shared_ptr<App> app) {
+    realm::Realm::Config setup_and_get_config(std::shared_ptr<App> app)
+    {
         realm::Realm::Config config;
         config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -544,29 +568,32 @@ struct Harness {
         };
         config.schema_version = 1;
         config.path = base_path + "/default.realm";
-        const auto dog_schema = realm::ObjectSchema(
-                                                    "Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-            realm::Property("breed", PropertyType::String | PropertyType::Nullable),
-            realm::Property("name", PropertyType::String),
-            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+        const auto dog_schema =
+            realm::ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                                        realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                                        realm::Property("name", PropertyType::String),
+                                        realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
         const auto person_schema = realm::ObjectSchema(
-                                                       "Person",
-                                                       {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-            realm::Property("age", PropertyType::Int),
-            realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
-            realm::Property("firstName", PropertyType::String), realm::Property("lastName", PropertyType::String),
-            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+            "Person",
+            {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+             realm::Property("age", PropertyType::Int),
+             realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+             realm::Property("firstName", PropertyType::String), realm::Property("lastName", PropertyType::String),
+             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
         config.schema = realm::Schema({AllTypesSyncObject::schema(), dog_schema, person_schema});
         return config;
     }
 
-    void run(std::function<void(SharedRealm)> block) {
+    void run(std::function<void(SharedRealm)> block)
+    {
         auto realm = set_up();
         block(realm);
         tear_down(realm);
     }
+
 private:
-    SharedRealm set_up() {
+    SharedRealm set_up()
+    {
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         opt_set_up(config);
@@ -575,7 +602,8 @@ private:
         return realm;
     }
 
-    void tear_down(SharedRealm) {
+    void tear_down(SharedRealm)
+    {
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
     }
@@ -583,7 +611,8 @@ private:
 
 
 template <PropertyType PT>
-void test_round_trip(Corpus<PT> corpus) {
+void test_round_trip(Corpus<PT> corpus)
+{
     static_assert(Corpus<PT>::value, "PropertyType must be added to corpus before testing");
     // Add a new `AllTypesSyncObject` to the Realm
     Harness().run([](auto realm) {
@@ -628,42 +657,40 @@ void test_round_trip(Corpus<PT> corpus) {
 
 TEST_CASE("canonical_sync_corpus", "[sync][app]") {
     // MARK: Int Round Trip
-    std::apply([](auto... corpus) {
-        auto test = [](auto corpus) {
-            auto PT = std::decay_t<decltype(corpus)>::property_type;
-            DYNAMIC_SECTION(util::format("%1 %2 %3", {
-                string_for_property_type(PT & ~PropertyType::Flags),
-                is_array(PT) ? "(array)" : is_nullable(PT) ? "(nullable)" : "-",
-                "round trip"
-            })) {
-                test_round_trip(corpus);
+    std::apply(
+        [](auto... corpus) {
+            auto test = [](auto corpus) {
+                auto PT = std::decay_t<decltype(corpus)>::property_type;
+                DYNAMIC_SECTION(util::format("%1 %2 %3", {string_for_property_type(PT & ~PropertyType::Flags),
+                                                          is_array(PT)      ? "(array)"
+                                                          : is_nullable(PT) ? "(nullable)"
+                                                                            : "-",
+                                                          "round trip"})) {
+                    test_round_trip(corpus);
+                };
             };
-        };
-        (test(corpus), ...);
-    }, corpus_types());
+            (test(corpus), ...);
+        },
+        corpus_types());
 
-    auto mixed_corpus_types = std::tuple<
-        Corpus<PT::Mixed << PT::Int>,
-        Corpus<PT::Mixed << PT::Bool>,
-        Corpus<PT::Mixed << PT::String>,
-        Corpus<PT::Mixed << PT::Data>,
-        Corpus<PT::Mixed << PT::Date>,
-        Corpus<PT::Mixed << PT::Double>,
-        Corpus<PT::Mixed << PT::ObjectId>,
-        Corpus<PT::Mixed << PT::Decimal>,
-        Corpus<PT::Mixed << PT::UUID>
-    >{};
-    std::apply([](auto... corpus) {
-        auto test = [](auto corpus) {
-            DYNAMIC_SECTION(util::format("mixed of type %1 %2", {
-                string_for_property_type(property_type_from_type<typename decltype(corpus)::mixed_type>()),
-                "round trip"
-            })) {
-                test_round_trip(corpus);
+    auto mixed_corpus_types =
+        std::tuple<Corpus<PT::Mixed << PT::Int>, Corpus<PT::Mixed << PT::Bool>, Corpus<PT::Mixed << PT::String>,
+                   Corpus<PT::Mixed << PT::Data>, Corpus<PT::Mixed << PT::Date>, Corpus<PT::Mixed << PT::Double>,
+                   Corpus<PT::Mixed << PT::ObjectId>, Corpus<PT::Mixed << PT::Decimal>,
+                   Corpus<PT::Mixed << PT::UUID>>{};
+    std::apply(
+        [](auto... corpus) {
+            auto test = [](auto corpus) {
+                DYNAMIC_SECTION(util::format(
+                    "mixed of type %1 %2",
+                    {string_for_property_type(property_type_from_type<typename decltype(corpus)::mixed_type>()),
+                     "round trip"})) {
+                    test_round_trip(corpus);
+                };
             };
-        };
-        (test(corpus), ...);
-    }, mixed_corpus_types);
+            (test(corpus), ...);
+        },
+        mixed_corpus_types);
 }
 
 TEST_CASE("sync_unhappy_paths", "[sync][app]") {
@@ -707,7 +734,8 @@ TEST_CASE("sync_unhappy_paths", "[sync][app]") {
             };
         });
         harness.run([&error_did_occur, &harness](SharedRealm realm) {
-            auto session = harness.sync_manager.app()->current_user()->session_for_on_disk_path(realm->config().path); // needed to keep session alive
+            auto session = harness.sync_manager.app()->current_user()->session_for_on_disk_path(
+                realm->config().path); // needed to keep session alive
             util::EventLoop::main().run_until([&] {
                 return error_did_occur.load();
             });
@@ -724,10 +752,9 @@ TEST_CASE("sync_unhappy_paths", "[sync][app]") {
             REQUIRE(it->primary_key_property()->name == "_id");
             it->primary_key_property()->name = invalid_pk_name;
             it->primary_key = invalid_pk_name;
-            realm::Realm::get_shared_realm(config),
-            util::format(
-                "The primary key property on a synchronized Realm must be named '%1' but found '%2' for type 'Dog'",
-                "_id", invalid_pk_name);
+            realm::Realm::get_shared_realm(config), util::format("The primary key property on a synchronized Realm "
+                                                                 "must be named '%1' but found '%2' for type 'Dog'",
+                                                                 "_id", invalid_pk_name);
         });
     }
 
@@ -739,10 +766,11 @@ TEST_CASE("sync_unhappy_paths", "[sync][app]") {
             it->primary_key_property()->is_primary = false;
             it->primary_key = "";
             REQUIRE(!it->primary_key_property());
-            REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
-                                      util::format("There must be a primary key property named '%1' on a synchronized "
-                                                   "Realm but none was found for type 'Dog'",
-                                                   "_id"));
+            REQUIRE_THROWS_CONTAINING(
+                realm::Realm::get_shared_realm(config),
+                util::format("There must be a primary key property named '%1' on a synchronized "
+                             "Realm but none was found for type 'Dog'",
+                             "_id"));
         });
     }
 
