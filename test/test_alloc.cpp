@@ -367,6 +367,7 @@ TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
         CHECK_EQUAL(initial_translated, alloc.translate(1000));
 
         _impl::SimulatedFailure::prime_mmap(nullptr);
+        alloc.get_file().resize(page_size * 2);
         alloc.update_reader_view(page_size * 2);
         CHECK_EQUAL(alloc.get_baseline(), page_size * 2);
         CHECK_EQUAL(initial_version + 1, alloc.get_mapping_version());
@@ -440,8 +441,7 @@ TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
 
 namespace {
 
-class TestSlabAlloc : public SlabAlloc
-{
+class TestSlabAlloc : public SlabAlloc {
 
 public:
     size_t test_get_upper_section_boundary(size_t start_pos)
@@ -456,7 +456,8 @@ public:
     {
         return get_section_base(index);
     }
-    size_t test_get_section_index(size_t ref) {
+    size_t test_get_section_index(size_t ref)
+    {
         return get_section_index(ref);
     }
 };
