@@ -103,7 +103,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     object_store::Dictionary links(r, obj, col_links);
     auto keys_as_results = dict.get_keys();
     auto values_as_results = dict.get_values();
-    CppContext ctx(r);
+    CppContext ctx(r, &links.get_object_schema());
 
     auto values = TestType::values();
     std::vector<std::string> keys;
@@ -169,6 +169,11 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             dict.insert(ctx, keys[i], TestType::to_any(values[i]));
             REQUIRE(dict.get<T>(keys[i]) == values[i]);
         }
+    }
+
+    SECTION("links") {
+        links.insert(ctx, "foo", util::Any(another));
+        links.insert(ctx, "m", util::Any());
     }
 
     SECTION("iteration") {
