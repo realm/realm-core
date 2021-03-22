@@ -5,8 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
-* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
+* None.
  
 ### Breaking changes
 * None.
@@ -16,6 +15,78 @@
 ### Internals
 * None.
 
+----------------------------------------------
+
+# 10.5.6 Release notes
+
+### Fixed
+* Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
+* Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
+* Avoid race condition leading to possible hangs on windows. ([realm-dotnet#2245](https://github.com/realm/realm-dotnet/issues/2245))
+ 
+----------------------------------------------
+
+# 10.5.5 Release notes
+
+### Fixed
+* During integration of a large amount of data from the server, you may get "Assertion failed: !fields.has_missing_parent_update()" ([#4497](https://github.com/realm/realm-core/issues/4497), since v6.0.0)
+ 
+----------------------------------------------
+
+# 10.5.4 Release notes
+
+### Enhancements
+* None.
+
+### Fixed
+* Fixed queries for constant null across links to an indexed property not returning matches when the link was null. ([#4460]https://github.com/realm/realm-core/pull/4460), since 5.23.6).
+* Support upgrading from file format 5. ([#7089](https://github.com/realm/realm-cocoa/issues/7089), since v6.0.0)
+* On 32bit devices you may get exception with "No such object" when upgrading to v10.* ([#7314](https://github.com/realm/realm-java/issues/7314), since v10.0.0)
+* The notification worker thread would rerun queries after every commit rather than only commits which modified tables which could effect the query results if the table had any outgoing links to tables not used in the query ([#4456](https://github.com/realm/realm-core/pull/4456), since v6.0.0).
+* Fix "Invalid ref translation entry [16045690984833335023, 78187493520]" assertion failure which could occur when using sync or multiple processes writing to a single Realm file. ([Cocoa #7086](https://github.com/realm/realm-cocoa/issues/7086), since v6.0.0.
+ 
+-----------
+
+### Internals
+* Changed some query parser exceptions types around to be more consistent. ([#4474](https://github.com/realm/realm-core/pull/4474)).
+
+----------------------------------------------
+
+# 10.5.3 Release notes
+
+### Fixed
+* Fixed a conflict resolution bug related to the ArrayMove instruction, which could sometimes cause an "Invalid prior_size" exception to prevent synchronization ([#4436](https://github.com/realm/realm-core/pull/4436), since v10.3.0).
+* Fix another bug which could lead to the assertion failures "!skip_version.version" if a write transaction was committed while the first run of a notifier with no registered observers was happening ([#4449](https://github.com/realm/realm-core/pull/4449), since v10.5.0).
+* Skipping a change notification in the first write transaction after the observer was added could potentially fail to skip the notification (since v10.3.3).
+ 
+-----------
+
+### Internals
+* Added query parser headers to release tarballs. ([#4448](https://github.com/realm/realm-core/pull/4448))
+
+----------------------------------------------
+
+# 10.5.2 Release notes
+
+### Enhancements
+* Performance of sorting on more than one property has been improved. Especially important if many elements match on the first property. Mitigates ([#7092](https://github.com/realm/realm-cocoa/issues/7092))
+
+### Fixed
+* Fixed a bug that prevented an ObjectSchema with incoming links from being marked as embedded during migrations. ([#4414](https://github.com/realm/realm-core/pull/4414))
+* `Results::get_dictionary_element()` on frozen Results was not thread-safe.
+* The Realm notification listener thread could sometimes hit the assertion failure "!skip_version.version" if a write transaction was committed at a very specific time (since v10.5.0).
+* Fixed parsing queries comparing a link or list to an arguments of TypedLink. ([#4429](https://github.com/realm/realm-core/issues/4429), this never previously worked)
+* Fixed `links_to` queries that searched for an object key in a list or set of objects that contained more than 1000 objects where sometimes an object might not be found. ([#4429](https://github.com/realm/realm-core/pull/4429), since v6.0.0)
+* Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
+
+----------------------------------------------
+
+# 10.5.1 Release notes
+
+### Fixed
+* Fixed property aliases not working in the parsed queries which use the `@links.Class.property` syntax. ([#4398](https://github.com/realm/realm-core/issues/4398), this never previously worked)
+* Fix "Invalid ref translation entry" assertion failure which could occur when querying over a link after creating objects in the destination table.
+ 
 ----------------------------------------------
 
 # 10.5.0 Release notes

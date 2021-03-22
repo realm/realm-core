@@ -18,7 +18,9 @@
 
 #include <realm/util/logger.hpp>
 
-const char* realm::util::Logger::get_level_prefix(Level level) noexcept
+namespace realm::util {
+
+const char* Logger::get_level_prefix(Level level) noexcept
 {
     switch (level) {
         case Level::all:
@@ -38,3 +40,22 @@ const char* realm::util::Logger::get_level_prefix(Level level) noexcept
     }
     return "";
 }
+
+std::pair<std::string, size_t> Logger::subst_prepare(State& state)
+{
+    state.m_formatter << "%" << state.m_param_num;
+    std::string key = state.m_formatter.str();
+    state.m_formatter.str(std::string());
+    size_t j = state.m_search.find(key);
+    return std::make_pair(std::move(key), j);
+}
+
+void Logger::subst_finish(State& state, size_t j, const std::string& key)
+{
+    std::string str = state.m_formatter.str();
+    state.m_formatter.str(std::string());
+    state.m_message.replace(j, key.size(), str);
+    state.m_search.replace(j, key.size(), std::string(str.size(), '\0'));
+}
+
+} // namespace realm::util

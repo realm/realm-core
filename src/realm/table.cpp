@@ -328,8 +328,7 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not a link column",
-                                              util::serializer::get_printable_table_name(m_current_table->get_name()),
+        throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
                                               m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
@@ -1029,42 +1028,51 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-bool Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded)
 {
-    if (embedded == m_is_embedded)
-        return true;
+    if (embedded == m_is_embedded) {
+        return;
+    }
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error("Cannot change embedded property in sync client");
+            throw std::logic_error("Cannot change table to embedded when using Sync.");
         }
     }
 
-    if (get_primary_key_column()) {
-        return false;
+    if (embedded == false) {
+        do_set_embedded(false);
+        return;
     }
-    if (size() > 0) {
-        // Check if the table has any backlink columns. If not, it is not required
-        // to check all objects for backlinks.
-        bool has_backlink_columns = false;
-        for_each_backlink_column([&has_backlink_columns](ColKey) {
-            has_backlink_columns = true;
-            return true; // Done
-        });
 
-        if (has_backlink_columns) {
-            for (auto o : *this) {
-                // each object should be owned by one and only one parent
-                if (o.get_backlink_count() != 1) {
-                    return false;
-                }
+    // Embedded objects cannot have a primary key.
+    if (get_primary_key_column()) {
+        throw std::logic_error("Cannot change table to embedded when using a primary key.");
+    }
+
+    // `has_backlink_columns` indicates if the table is embedded in any other table.
+    bool has_backlink_columns = false;
+    for_each_backlink_column([&has_backlink_columns](ColKey) {
+        has_backlink_columns = true;
+        return true;
+    });
+    if (!has_backlink_columns) {
+        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in "
+                               "at least one other table.");
+    }
+    else if (size() > 0) {
+        for (auto object : *this) {
+            size_t backlink_count = object.get_backlink_count();
+            if (backlink_count == 0) {
+                throw std::logic_error("At least one object does not have a backlink (data would get lost).");
+            }
+            else if (backlink_count > 1) {
+                throw std::logic_error("At least one object does have multiple backlinks.");
             }
         }
     }
 
     do_set_embedded(embedded);
-
-    return true;
 }
 
 void Table::do_set_embedded(bool embedded)
@@ -1380,8 +1388,15 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-        case col_type_String:
-            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
+        case col_type_String: {
+            auto str = static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx);
+            // This is a workaround for a bug where the length could be -1
+            // Seen when upgrading very old file.
+            if (str.size() == size_t(-1)) {
+                return Mixed("");
+            }
+            return Mixed{str};
+        }
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
         default:
@@ -2073,26 +2088,15 @@ size_t Table::count_int(ColKey col_key, int64_t value) const
         return index->count(value);
     }
 
-    size_t count;
-    if (is_nullable(col_key)) {
-        aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_key, value, &count);
-    }
-    else {
-        aggregate<act_Count, int64_t, int64_t>(col_key, value, &count);
-    }
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_float(ColKey col_key, float value) const
 {
-    size_t count;
-    aggregate<act_Count, float, float>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_double(ColKey col_key, double value) const
 {
-    size_t count;
-    aggregate<act_Count, double, double>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
 {
@@ -2120,59 +2124,39 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     if (auto index = this->get_search_index(col_key)) {
         return index->count(value);
     }
-    size_t count;
-    aggregate<act_Count, StringData, StringData>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 
 // sum ----------------------------------------------
 
-template <>
-Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, Decimal128, size_t* resultcount,
-                                                             ObjKey*) const
-{
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 sum = Decimal128(0);
-    size_t count = 0;
-    auto f = [&leaf, column_key, &sum, &count](const Cluster* cluster) {
-        // direct aggregate on the leaf
-        cluster->init_leaf(column_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            if (!leaf.is_null(i)) {
-                sum = sum + leaf.get(i);
-                count++;
-            }
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-    if (resultcount) {
-        *resultcount = count;
-    }
-
-    return sum;
-}
-
 int64_t Table::sum_int(ColKey col_key) const
 {
+    QueryStateSum<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(col_key);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Sum, int64_t, int64_t>(col_key);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    return st.m_state;
 }
 double Table::sum_float(ColKey col_key) const
 {
-    return aggregate<act_Sum, float, double>(col_key);
+    QueryStateSum<float> st;
+    aggregate<float>(st, col_key);
+    return st.m_state;
 }
 double Table::sum_double(ColKey col_key) const
 {
-    return aggregate<act_Sum, double, double>(col_key);
+    QueryStateSum<double> st;
+    aggregate<double>(st, col_key);
+    return st.m_state;
 }
 Decimal128 Table::sum_decimal(ColKey col_key) const
 {
-    return aggregate<act_Sum, Decimal128, Decimal128>(col_key);
+    QueryStateSum<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
+    return st.m_state;
 }
 
 // average ----------------------------------------------
@@ -2194,13 +2178,14 @@ double Table::average_double(ColKey col_key, size_t* value_count) const
 }
 Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 {
-    size_t count;
-    auto sum = aggregate<act_Sum, Decimal128, Decimal128>(col_key, {}, &count);
+    QueryStateSum<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
+    auto sum = st.m_state;
     Decimal128 avg(0);
-    if (count != 0)
-        avg = sum / count;
+    if (st.m_match_count != 0)
+        avg = sum / st.m_match_count;
     if (value_count)
-        *value_count = count;
+        *value_count = st.m_match_count;
     return avg;
 }
 
@@ -2210,72 +2195,94 @@ Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 
 int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
 {
+    QueryStateMin<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Min, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, float, float>(col_key, 0.f, nullptr, return_ndx);
+    QueryStateMin<float> st;
+    aggregate<float>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, double, double>(col_key, 0., nullptr, return_ndx);
+    QueryStateMin<double> st;
+    aggregate<double>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
 {
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 min("+Inf");
-    ObjKey ret_key;
-    auto f = [&min, &ret_key, &leaf, col_key](const Cluster* cluster) {
-        // direct aggregate on the leaf
-        cluster->init_leaf(col_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto val = leaf.get(i);
-            if (!val.is_null() && val < min) {
-                min = val;
-                ret_key = cluster->get_real_key(i);
-            }
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
+    QueryStateMin<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
     if (return_ndx) {
-        *return_ndx = ret_key;
+        *return_ndx = st.m_minmax_key;
     }
-
-    return min;
+    return st.get_min();
 }
 
 Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
+    QueryStateMin<Timestamp> st;
+    aggregate<Timestamp>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_min();
 }
 
 // maximum ----------------------------------------------
 
 int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
 {
+    QueryStateMax<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Max, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, float, float>(col_key, 0.f, nullptr, return_ndx);
+    QueryStateMax<float> st;
+    aggregate<float>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, double, double>(col_key, 0., nullptr, return_ndx);
+    QueryStateMax<double> st;
+    aggregate<double>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
@@ -2306,7 +2313,12 @@ Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
 
 Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
+    QueryStateMax<Timestamp> st;
+    aggregate<Timestamp>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_max();
 }
 
 template <class T>

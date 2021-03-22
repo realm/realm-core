@@ -105,16 +105,34 @@ public:
     bool is_subset_of(It1, It2) const;
 
     template <class Rhs>
+    bool is_strict_subset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_strict_subset_of(It1, It2) const;
+
+    template <class Rhs>
     bool is_superset_of(const Rhs&) const;
 
     template <class It1, class It2>
     bool is_superset_of(It1, It2) const;
 
     template <class Rhs>
+    bool is_strict_superset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_strict_superset_of(It1, It2) const;
+
+    template <class Rhs>
     bool intersects(const Rhs&) const;
 
     template <class It1, class It2>
     bool intersects(It1, It2) const;
+
+    template <class Rhs>
+    bool set_equals(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool set_equals(It1, It2) const;
 
     template <class Rhs>
     void assign_union(const Rhs&);
@@ -193,14 +211,14 @@ private:
         m_valid = true;
     }
 
-    bool init_from_parent() const final
+    REALM_NOINLINE bool init_from_parent() const final
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
         return m_valid;
     }
 
-    void ensure_created()
+    REALM_NOINLINE void ensure_created()
     {
         if (!m_valid && m_obj.is_valid()) {
             create();
@@ -208,6 +226,8 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+
+    iterator find_impl(const T& value) const;
 
     friend class LnkSet;
 };
@@ -263,7 +283,9 @@ public:
     void assign_symmetric_difference(It1, It2);
 
     bool is_subset_of(const LnkSet& rhs) const;
+    bool is_strict_subset_of(const LnkSet& rhs) const;
     bool is_superset_of(const LnkSet& rhs) const;
+    bool is_strict_superset_of(const LnkSet& rhs) const;
     bool intersects(const LnkSet& rhs) const;
 
     // Overriding members of CollectionBase:
@@ -604,10 +626,8 @@ inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
 template <class T>
 size_t Set<T>::find(T value) const
 {
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    auto it = find_impl(value);
+    if (it != end() && SetElementEquals<T>{}(*it, value)) {
         return it.index();
     }
     return npos;
@@ -633,17 +653,23 @@ size_t Set<T>::find_any(Mixed value) const
 }
 
 template <class T>
+REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
+{
+    auto b = this->begin();
+    auto e = this->end();
+    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+}
+
+template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
 
     ensure_created();
     this->ensure_writeable();
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
         return {it.index(), false};
     }
 
@@ -681,11 +707,9 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     update_if_needed();
     this->ensure_writeable();
 
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it == e || !SetElementEquals<T>{}(*it, value)) {
+    if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
 
@@ -726,7 +750,7 @@ std::pair<size_t, bool> Set<T>::erase_null()
 }
 
 template <class T>
-size_t Set<T>::size() const
+REALM_NOINLINE size_t Set<T>::size() const
 {
     if (!is_attached())
         return 0;
@@ -790,17 +814,13 @@ inline Mixed Set<T>::avg(size_t* return_cnt) const
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending);
+
 template <class T>
 inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
-    indices.resize(sz);
-    if (ascending) {
-        std::iota(indices.begin(), indices.end(), 0);
-    }
-    else {
-        std::iota(indices.rbegin(), indices.rend(), 0);
-    }
+    set_sorted_indices(sz, indices, ascending);
 }
 
 template <class T>
@@ -838,6 +858,27 @@ bool Set<T>::is_subset_of(It1 first, It2 last) const
 
 template <class T>
 template <class Rhs>
+bool Set<T>::is_strict_subset_of(const Rhs& rhs) const
+{
+    if constexpr (std::is_same_v<Rhs, Set<T>>) {
+        return size() != rhs.size() && is_subset_of(rhs);
+    }
+    else {
+        return is_strict_subset_of(rhs.begin(), rhs.end());
+    }
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_strict_subset_of(It1 begin, It2 end) const
+{
+    if (size_t(std::distance(begin, end)) == size())
+        return false;
+    return is_subset_of(begin, end);
+}
+
+template <class T>
+template <class Rhs>
 bool Set<T>::is_superset_of(const Rhs& rhs) const
 {
     return is_superset_of(std::begin(rhs), std::end(rhs));
@@ -848,6 +889,27 @@ template <class It1, class It2>
 bool Set<T>::is_superset_of(It1 first, It2 last) const
 {
     return std::includes(begin(), end(), first, last, SetElementLessThan<T>{});
+}
+
+template <class T>
+template <class Rhs>
+bool Set<T>::is_strict_superset_of(const Rhs& rhs) const
+{
+    if constexpr (std::is_same_v<Rhs, Set<T>>) {
+        return size() != rhs.size() && is_superset_of(rhs);
+    }
+    else {
+        return is_strict_superset_of(rhs.begin(), rhs.end());
+    }
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_strict_superset_of(It1 begin, It2 end) const
+{
+    if (size_t(std::distance(begin, end)) == size())
+        return false;
+    return is_superset_of(begin, end);
 }
 
 template <class T>
@@ -875,6 +937,34 @@ bool Set<T>::intersects(It1 first, It2 last) const
         }
     }
     return false;
+}
+
+template <class T>
+template <class Rhs>
+bool Set<T>::set_equals(const Rhs& rhs) const
+{
+    if (size() != rhs.size())
+        return false;
+    return set_equals(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::set_equals(It1 begin2, It2 end2) const
+{
+    auto end1 = end();
+
+    auto it1 = begin();
+    auto it2 = begin2;
+
+    auto cmp = SetElementEquals<T>{};
+
+    for (; it1 != end1 && it2 != end2; ++it1, ++it2) {
+        if (!cmp(*it1, *it2)) {
+            return false;
+        }
+    }
+    return it1 == end1 && it2 == end2;
 }
 
 template <class T>

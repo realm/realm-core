@@ -1064,6 +1064,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 case 0:
                     file_format_ok = (top_ref == 0);
                     break;
+                case 5:
                 case 6:
                 case 7:
                 case 8:
@@ -2097,7 +2098,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-DB::version_type Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read()
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2129,7 +2130,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 
-    return version;
+    return VersionID{version, new_read_lock.m_reader_idx};
 }
 
 // Caller must lock m_mutex.
@@ -2598,8 +2599,9 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockGuard g(*this, read_lock);
         tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
+        version_type current_version = read_lock.m_version;
+        m_alloc.init_mapping_management(current_version);
         if (Replication* repl = get_replication()) {
-            version_type current_version = read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(*tr, current_version, history_updated); // Throws
         }

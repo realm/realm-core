@@ -381,6 +381,7 @@ Mixed Results::get_any(size_t ndx)
 }
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
+    util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Collection && ndx < m_collection->size()) {
         if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
             evaluate_sort_and_distinct_on_collection();

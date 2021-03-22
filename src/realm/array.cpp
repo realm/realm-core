@@ -192,8 +192,6 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
-ArrayPayload::~ArrayPayload() {}
-
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -1294,68 +1292,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-int_fast64_t Array::lbound_for_width(size_t width) noexcept
-{
-    if (width == 0) {
-        return 0;
-    }
-    else if (width == 1) {
-        return 0;
-    }
-    else if (width == 2) {
-        return 0;
-    }
-    else if (width == 4) {
-        return 0;
-    }
-    else if (width == 8) {
-        return -0x80LL;
-    }
-    else if (width == 16) {
-        return -0x8000LL;
-    }
-    else if (width == 32) {
-        return -0x80000000LL;
-    }
-    else if (width == 64) {
-        return -0x8000000000000000LL;
-    }
-    else {
-        REALM_UNREACHABLE();
-    }
-}
-
-int_fast64_t Array::ubound_for_width(size_t width) noexcept
-{
-    if (width == 0) {
-        return 0;
-    }
-    else if (width == 1) {
-        return 1;
-    }
-    else if (width == 2) {
-        return 3;
-    }
-    else if (width == 4) {
-        return 15;
-    }
-    else if (width == 8) {
-        return 0x7FLL;
-    }
-    else if (width == 16) {
-        return 0x7FFFLL;
-    }
-    else if (width == 32) {
-        return 0x7FFFFFFFLL;
-    }
-    else if (width == 64) {
-        return 0x7FFFFFFFFFFFFFFFLL;
-    }
-    else {
-        REALM_UNREACHABLE();
-    }
-}
-
 
 template <size_t width>
 struct Array::VTableForWidth {
@@ -1365,10 +1301,10 @@ struct Array::VTableForWidth {
             getter = &Array::get<width>;
             setter = &Array::set<width>;
             chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find<Equal, act_ReturnFirst, width>;
-            finder[cond_NotEqual] = &Array::find<NotEqual, act_ReturnFirst, width>;
-            finder[cond_Greater] = &Array::find<Greater, act_ReturnFirst, width>;
-            finder[cond_Less] = &Array::find<Less, act_ReturnFirst, width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
+            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
+            finder[cond_Less] = &Array::find_vtable<Less, width>;
         }
     };
     static const PopulatedVTable vtable;
@@ -1590,33 +1526,32 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
     if (end == npos)
         end = m_size;
 
-    QueryState<int64_t> state(act_FindAll, result);
-    REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
+    QueryStateFindAll state(*result);
+    REALM_TEMPEX2(find_optimized, Equal, m_width, (value, begin, end, col_offset, &state, nullptr));
 
     return;
 }
 
 
-bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
-                 QueryState<int64_t>* state, bool nullable_array, bool find_null) const
+bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     if (cond == cond_Equal) {
-        return find<Equal>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Equal>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_NotEqual) {
-        return find<NotEqual>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotEqual>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_Greater) {
-        return find<Greater>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Greater>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_Less) {
-        return find<Less>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Less>(value, start, end, baseindex, state, nullptr);
     }
     if (cond == cond_None) {
-        return find<None>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<None>(value, start, end, baseindex, state, nullptr);
     }
     else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotNull>(value, start, end, baseindex, state, nullptr);
     }
     REALM_ASSERT_DEBUG(false);
     return false;
@@ -1650,4 +1585,25 @@ void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     ::get_three(data, width, ndx, v0, v1, v2);
+}
+
+template <>
+bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed) noexcept
+{
+    ++m_match_count;
+
+    REALM_ASSERT(m_key_values);
+    int64_t key_value = m_key_values->get(index) + m_key_offset;
+    m_keys.add(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed) noexcept
+{
+    ++m_match_count;
+    m_keys.add(index);
+
+    return (m_limit > m_match_count);
 }

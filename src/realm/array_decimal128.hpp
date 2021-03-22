@@ -104,68 +104,6 @@ protected:
     }
 };
 
-template <>
-class QueryState<Decimal128> : public QueryStateBase {
-public:
-    Decimal128 m_state;
-
-    template <Action action>
-    bool uses_val()
-    {
-        return (action == act_Max || action == act_Min || action == act_Sum);
-    }
-
-    QueryState(Action action, Array* = nullptr, size_t limit = -1)
-        : QueryStateBase(limit)
-    {
-        if (action == act_Max)
-            m_state = Decimal128("-inf");
-        else if (action == act_Min)
-            m_state = Decimal128("+inf");
-    }
-
-    template <Action action, bool>
-    inline bool match(size_t index, uint64_t /*indexpattern*/, Decimal128 value)
-    {
-        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
-                      "Search action not supported");
-
-        if (action == act_Count) {
-            ++m_match_count;
-        }
-        else if (!value.is_null()) {
-            ++m_match_count;
-            if (action == act_Max) {
-                if (value > m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Min) {
-                if (value < m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Sum) {
-                m_state += value;
-            }
-        }
-
-        return (m_limit > m_match_count);
-    }
-};
-
 } // namespace realm
 
 #endif /* REALM_ARRAY_DECIMAL128_HPP */

@@ -40,6 +40,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/util/serializer.hpp>
+#include <realm/column_type_traits.hpp>
 
 namespace realm {
 
@@ -303,7 +304,7 @@ public:
 
     std::string validate();
 
-    std::string get_description() const;
+    std::string get_description(const std::string& class_prefix = "") const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
     Query& set_ordering(std::unique_ptr<DescriptorOrdering> ordering);
@@ -340,11 +341,12 @@ private:
     template <typename TConditionFunction>
     Query& add_size_condition(ColKey column_key, int64_t value);
 
-    template <typename T, bool Nullable>
-    double average(ColKey column_key, size_t* resultcount = nullptr) const;
+    template <typename T, typename R = typename AggregateResultType<T, act_Average>::result_type>
+    R average(ColKey column_key, size_t* resultcount = nullptr) const;
 
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey column_key, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount = nullptr,
+                   ObjKey* return_ndx = nullptr) const;
 
     size_t find_best_node(ParentNode* pn) const;
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,

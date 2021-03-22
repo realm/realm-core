@@ -3916,7 +3916,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        util::serializer::SerialisationState empty_state;
+        util::serializer::SerialisationState empty_state(state.class_prefix);
         return state.describe_columns(m_link_map, ColKey()) + util::serializer::value_separator +
                Operation::description() + util::serializer::value_separator + m_column.description(empty_state);
     }
@@ -4015,24 +4015,6 @@ private:
 };
 
 namespace aggregate_operations {
-template <typename T>
-static bool is_nan(T value)
-{
-    if constexpr (std::is_floating_point_v<T>) {
-        return std::isnan(value);
-    }
-    else {
-        // gcc considers the argument unused if it's only used in one branch of if constexpr
-        static_cast<void>(value);
-        return false;
-    }
-}
-
-template <>
-inline bool is_nan<Decimal128>(Decimal128 value)
-{
-    return value.is_nan();
-}
 
 template <typename T, typename Compare>
 class MinMaxAggregateOperator {
@@ -4337,7 +4319,15 @@ public:
         if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
             m_right->get_comparison_type() == ExpressionComparisonType::Any) {
             if (m_left_value.is_null()) {
-                m_matches = m_right->find_all(Mixed());
+                const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
+                // when checking for null across links, null links are considered matches,
+                // so we must compute the slow matching even if there is an index.
+                if (!prop || prop->links_exist()) {
+                    return dT;
+                }
+                else {
+                    m_matches = m_right->find_all(Mixed());
+                }
             }
             else {
                 if (m_right->get_type() != m_left_value.get_type()) {

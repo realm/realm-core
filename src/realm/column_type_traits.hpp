@@ -77,6 +77,21 @@ struct AggregateResultType<util::Optional<T>, action> {
     using result_type = T;
 };
 
+template <class T>
+struct AggregateResultType<T, act_Average> {
+    using result_type = double;
+};
+
+template <class T>
+struct AggregateResultType<util::Optional<T>, act_Average> {
+    using result_type = double;
+};
+
+template <>
+struct AggregateResultType<Decimal128, act_Average> {
+    using result_type = Decimal128;
+};
+
 template <>
 struct AggregateResultType<float, act_Sum> {
     using result_type = double;

@@ -3281,7 +3281,7 @@ TEST(Query_GA_Crash)
 TEST(Query_Float3)
 {
     Table t;
-    auto col_float = t.add_column(type_Float, "1");
+    auto col_float = t.add_column(type_Float, "1", true);
     auto col_double = t.add_column(type_Double, "2");
     auto col_int = t.add_column(type_Int, "3");
 
@@ -3292,7 +3292,7 @@ TEST(Query_Float3)
     t.create_object().set_all(float(1.5), double(2.5), 5); // match
     t.create_object().set_all(float(1.6), double(2.6), 6); // match
     t.create_object().set_all(float(1.7), double(2.7), 7);
-    t.create_object().set_all(float(1.8), double(2.8), 8);
+    t.create_object().set_all(nanf("7"), double(2.8), 8);
     t.create_object().set_all(float(1.9), double(2.9), 9);
 
     Query q1 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
@@ -3326,6 +3326,10 @@ TEST(Query_Float3)
     Query q8 = t.where().greater(col_int, 3).less(col_int, 7);
     int64_t a8 = q8.sum_int(col_int);
     CHECK_EQUAL(15, a8);
+
+    q8 = t.where().greater(col_int, 3);
+    float f = float(q8.sum_float(col_float));
+    CHECK_EQUAL(8.1f, f);
 }
 
 
@@ -3342,7 +3346,7 @@ TEST(Query_Float3_where)
     t.create_object().set_all(float(1.3), double(2.3), 3);
     t.create_object().set_all(float(1.4), double(2.4), 4); // match
     t.create_object().set_all(float(1.5), double(2.5), 5); // match
-    t.create_object().set_all(float(1.6), double(2.6), 6); // match
+    t.create_object(ObjKey(0xc001ede1b0)).set_all(float(1.6), double(2.6), 6); // match
     t.create_object().set_all(float(1.7), double(2.7), 7);
     t.create_object().set_all(float(1.8), double(2.8), 8);
     t.create_object().set_all(float(1.9), double(2.9), 9);
@@ -3352,6 +3356,11 @@ TEST(Query_Float3_where)
     Query q1 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
     int64_t a1 = q1.sum_int(col_int);
     CHECK_EQUAL(15, a1);
+
+    ObjKey k;
+    a1 = q1.maximum_int(col_int, &k);
+    CHECK_EQUAL(k.value, 0xc001ede1b0);
+    CHECK_EQUAL(a1, 6);
 
     Query q2 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
     int64_t a2 = q2.sum_int(col_int);
@@ -4205,12 +4214,13 @@ TEST(Query_LinkChainSortErrors)
     t1->create_object();
 
     // Disallow invalid column ids, linklists, other non-link column types.
-    ColKey backlink_ndx(2);
+    ColKey backlink_ndx(ColKey::Idx{2}, col_type_Link, ColumnAttrMask{}, 0);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
                       LogicError::type_mismatch);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
                       LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), LogicError::type_mismatch);
 }
 
 

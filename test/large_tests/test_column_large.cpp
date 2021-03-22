@@ -209,8 +209,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     if (v[w] != LL_MIN) {
                         // LESS
                         a.set(match, v[w] - 1);
-                        QueryState<int64_t> state(act_ReturnFirst, &accu, size_t(-1));
-                        a.find(cond_Less, act_ReturnFirst, v[w], from, to, 0, &state);
+                        QueryStateFindFirst state;
+                        a.find(cond_Less, v[w], from, to, 0, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
@@ -224,8 +224,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     if (v[w] != LL_MAX) {
                         // GREATER
                         a.set(match, v[w] + 1);
-                        QueryState<int64_t> state(act_ReturnFirst, &accu, size_t(-1));
-                        a.find(cond_Greater, act_ReturnFirst, v[w], from, to, 0, &state);
+                        QueryStateFindFirst state;
+                        a.find(cond_Greater, v[w], from, to, 0, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
                         if (match >= from && match < to) {
@@ -255,8 +255,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] - 1);
 
                             accu.clear();
-                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
-                            a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
+                            QueryStateFindAll state(accu);
+                            a.find(cond_Less, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
@@ -282,8 +282,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] + 1);
 
                             accu.clear();
-                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
-                            a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
+                            QueryStateFindAll state(accu);
+                            a.find(cond_Greater, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
@@ -308,8 +308,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] + 1);
 
                             accu.clear();
-                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
-                            a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
+                            QueryStateFindAll state(accu);
+                            a.find(cond_Equal, v[w] + 1, from, to, 0, &state);
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);

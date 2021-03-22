@@ -161,9 +161,8 @@ public:
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have exactly 1 backlink. Return value
-    // indicates if the conversion was done
-    bool set_embedded(bool embedded);
+    // not have a primary key and all objects must have exactly 1 backlink.
+    void set_embedded(bool embedded);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -790,8 +789,8 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey col_key, T value = {}, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey col_key) const;
     template <typename T>
     double average(ColKey col_key, size_t* resultcount) const;
 
