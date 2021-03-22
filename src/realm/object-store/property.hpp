@@ -238,7 +238,7 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
         case PT::Date:
             return fn((Timestamp*)0);
         case PT::Object:
-            return is_optional ? fn((Mixed *) 0) : fn((ObjType *) 0);
+            return fn((ObjType*)0);
         case PT::ObjectId:
             return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
         case PT::Decimal:
