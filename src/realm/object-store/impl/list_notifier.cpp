@@ -64,6 +64,17 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
+
+    // When adding or removing a callback the related tables can change due to the way we calculate related tables
+    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    if (m_did_modify_callbacks && m_type == PropertyType::Object) {
+        m_related_tables = {};
+        auto& list = static_cast<LnkLst&>(*m_list);
+        DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(list.get_target_table()),
+                                                        get_key_path_arrays(), all_callbacks_have_filters());
+        m_did_modify_callbacks = false;
+    }
+
     return true;
 }
 

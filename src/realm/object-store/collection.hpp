@@ -88,7 +88,8 @@ public:
     // Return a Results representing a live view of this Collection.
     Results as_results() const;
 
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
+    NotificationToken add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array = {}) &;
 
 protected:
     std::shared_ptr<Realm> m_realm;

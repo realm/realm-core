@@ -41,6 +41,8 @@ namespace _impl {
 class ResultsNotifierBase;
 }
 
+using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
+
 class Results {
 public:
     // Results can be either be backed by nothing, a thin wrapper around a table,
@@ -264,7 +266,7 @@ public:
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    NotificationToken add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array = {}) &;
 
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;

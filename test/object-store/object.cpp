@@ -203,7 +203,28 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
+    TestContext d(r);
+    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("all types"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+    auto create_sub = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("link target"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+    auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+
     SECTION("add_notification_callback()") {
+        using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
@@ -226,20 +247,24 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&] {
-            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
+        auto require_change = [&](KeyPathArray key_path_array = {}) {
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                },
+                key_path_array);
             advance_and_notify(*r);
             return token;
         };
 
-        auto require_no_change = [&] {
+        auto require_no_change = [&](KeyPathArray key_path_array = {}) {
             bool first = true;
-            auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                REQUIRE(first);
-                first = false;
-            });
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet, std::exception_ptr) {
+                    REQUIRE(first);
+                    first = false;
+                },
+                key_path_array);
             advance_and_notify(*r);
             return token;
         };
@@ -356,27 +381,172 @@ TEST_CASE("object") {
             });
             REQUIRE_THROWS(require_change());
         }
-    }
 
-    TestContext d(r);
-    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("all types"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
-    auto create_sub = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("link target"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
-    auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
+        SECTION("Notifications filtered by a KeyPathArray") {
+
+            SECTION("single objects without links") {
+                std::pair<TableKey, ColKey> key_path_element(table, col_keys[0]);
+                auto key_path = {key_path_element};
+                KeyPathArray key_path_array = {key_path};
+
+                SECTION("modifying a keypath filtered property of an observed object does send a notification") {
+                    auto token = require_change(key_path_array);
+
+                    write([&] {
+                        obj.set(col_keys[0], 42);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_keys[0].value], 0);
+                }
+
+                // SECTION("modifying a property of an observed object not filtered by a keypath does not send a "
+                //         "notification") {
+                //     auto token = require_no_change(key_path_array);
+
+                //     write([&] {
+                //         obj.set(col_keys[1], 42);
+                //     });
+                // }
+
+                // SECTION("deleting an object with a keypath filter sends a notification") {
+                //     auto token = require_no_change(key_path_array);
+
+                //     write([&] {
+                //         obj.remove();
+                //     });
+
+                //     REQUIRE_INDICES(change.deletions, 0);
+                // }
+
+                // SECTION("adding a keypath filter for an non-existent table throws an error") {
+                //     auto non_existent_table_key = TableKey(42);
+                //     std::pair<TableKey, ColKey> invalid_key_path_element(non_existent_table_key, col_keys[0]);
+                //     auto invalid_key_path = {invalid_key_path_element};
+                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
+                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
+                //     {},
+                //                                                     invalid_key_path_array));
+                // }
+
+                // SECTION("adding a keypath filter for an non-existent column throws an error") {
+                //     auto non_existent_column_key = ColKey(42);
+                //     std::pair<TableKey, ColKey> invalid_key_path_element(table, non_existent_column_key);
+                //     auto invalid_key_path = {invalid_key_path_element};
+                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
+                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
+                //     {},
+                //                                                     invalid_key_path_array));
+                // }
+            }
+
+            SECTION("linked objects") {
+                AnyDict adam{
+                    {"_id", "1"s},
+                    {"name", "Adam"s},
+                    {"age", INT64_C(42)},
+                };
+                AnyDict brian{
+                    {"_id", "2"s},
+                    {"name", "Brian"s},
+                    {"age", INT64_C(43)},
+                    {"assistant", adam},
+                };
+                AnyDict charley{
+                    {"_id", "3"s},
+                    {"name", "Charley"s},
+                    {"age", INT64_C(44)},
+                };
+                AnyDict david{{"_id", "4"s},
+                              {"name", "David"s},
+                              {"age", INT64_C(45)},
+                              {"assistant", brian},
+                              {"team", AnyVec{charley}}};
+                Object david_object = create_company(david, CreatePolicy::UpdateAll);
+                advance_and_notify(*r);
+                auto person_table = r->read_group().get_table("class_person");
+                REQUIRE(person_table->size() == 4);
+                Results person_results(r, person_table);
+                bool callback_called = false;
+                auto person_column_keys = person_table->get_column_keys();
+                auto assistent_column_key = person_column_keys[3];
+                std::pair<TableKey, ColKey> key_path_element_assistent(person_table, assistent_column_key);
+                auto key_path = {key_path_element_assistent, key_path_element_assistent, key_path_element_assistent};
+                KeyPathArray key_path_array = {key_path};
+                auto david_token = david_object.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        change = collection_change_set;
+                        callback_called = true;
+                    },
+                    key_path_array);
+
+                // FIXME: Crashes when calling `create_company`.
+                //                SECTION("changing the observed property at the end of the keypath sends a
+                //                notification") {
+                //                    adam["age"] = 43;
+                //                    create_company(david, CreatePolicy::UpdateModified);
+                //
+                //                    REQUIRE_INDICES(change.insertions);
+                //                    REQUIRE_INDICES(change.modifications, 0);
+                //                    REQUIRE_INDICES(change.modifications_new, 0);
+                //                    REQUIRE_INDICES(change.deletions);
+                //                    REQUIRE(change.columns.size() == 1);
+                //                    REQUIRE_INDICES(change.columns[assistent_column_key.value], 0);
+                //                }
+
+                //                SECTION("changing any of the links within a keypath filter sends a notification") {
+                //                    brian["age"] = 43;
+                //                    create_company(david, CreatePolicy::UpdateModified);
+                //
+                //                    REQUIRE_INDICES(change.insertions);
+                //                    REQUIRE_INDICES(change.modifications);
+                //                    REQUIRE_INDICES(change.modifications_new);
+                //                    REQUIRE_INDICES(change.deletions);
+                //                    REQUIRE(change.columns.size() == 0);
+                //                }
+
+                //                SECTION("changing a linked object that is not part of a keypath filter does not
+                //                send a "
+                //                        "notification") {
+                //                    david["team"] = nullptr;
+                //                    create_company(david, CreatePolicy::UpdateModified);
+                //
+                //                    REQUIRE_INDICES(change.insertions);
+                //                    REQUIRE_INDICES(change.modifications);
+                //                    REQUIRE_INDICES(change.modifications_new);
+                //                    REQUIRE_INDICES(change.deletions);
+                //                    REQUIRE(change.columns.size() == 0);
+                //                }
+
+                // SECTION("an invalid table key anywhere within a keypath throws an error") {
+                //     auto non_existent_table_key = TableKey(42);
+                //     std::pair<TableKey, ColKey> invalid_key_path_element(non_existent_table_key, col_keys[0]);
+                //     auto invalid_key_path = {key_path_element_assistent, invalid_key_path_element,
+                //                              key_path_element_assistent};
+                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
+                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
+                //     {},
+                //                                                     invalid_key_path_array));
+                // }
+
+                // SECTION("an invalid column key anywhere within a keypath throws an error") {
+                //     auto non_existent_column_key = ColKey(42);
+                //     std::pair<TableKey, ColKey> invalid_key_path_element(table, non_existent_column_key);
+                //     auto invalid_key_path = {key_path_element_assistent, invalid_key_path_element,
+                //                              key_path_element_assistent};
+                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
+                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
+                //     {},
+                //                                                     invalid_key_path_array));
+                // }
+
+                SECTION(
+                    "a valid column key within a keypath that is not a last element and not a link throws an error") {
+                }
+            }
+        }
+    }
 
     SECTION("create object") {
         auto obj = create(AnyDict{

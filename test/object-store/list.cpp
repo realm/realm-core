@@ -47,7 +47,7 @@ TEST_CASE("list") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {{"array", PropertyType::Array | PropertyType::Object, "target"}}},
-        {"target", {{"value", PropertyType::Int}}},
+        {"target", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
         {"other_origin", {{"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
         {"other_target", {{"value", PropertyType::Int}}},
     });
@@ -59,7 +59,7 @@ TEST_CASE("list") {
     auto other_origin = r->read_group().get_table("class_other_origin");
     auto other_target = r->read_group().get_table("class_other_target");
     ColKey col_link = origin->get_column_key("array");
-    ColKey col_value = target->get_column_key("value");
+    ColKey col_target_value = target->get_column_key("value");
     ColKey other_col_link = other_origin->get_column_key("array");
     ColKey other_col_value = other_target->get_column_key("value");
 
@@ -200,7 +200,7 @@ TEST_CASE("list") {
         SECTION("modifying one of the target rows sends a change notification") {
             auto token = require_change();
             write([&] {
-                lst.get(5).set(col_value, 6);
+                lst.get(5).set(col_target_value, 6);
             });
             REQUIRE_INDICES(change.modifications, 5);
         }
@@ -218,7 +218,7 @@ TEST_CASE("list") {
             write([&] {
                 Obj obj = target->get_object(target_keys[5]);
                 lst.add(obj);
-                obj.set(col_value, 10);
+                obj.set(col_target_value, 10);
             });
             REQUIRE_INDICES(change.insertions, 10);
             REQUIRE_INDICES(change.modifications, 5);
@@ -227,7 +227,7 @@ TEST_CASE("list") {
         SECTION("modifying and then moving a row reports move/insert but not modification") {
             auto token = require_change();
             write([&] {
-                target->get_object(target_keys[5]).set(col_value, 10);
+                target->get_object(target_keys[5]).set(col_target_value, 10);
                 lst.move(5, 8);
             });
             REQUIRE_INDICES(change.insertions, 8);
@@ -243,7 +243,7 @@ TEST_CASE("list") {
 
             auto token = require_change();
             write([&] {
-                target->get_object(target_keys[5]).set(col_value, 10);
+                target->get_object(target_keys[5]).set(col_target_value, 10);
             });
             REQUIRE_INDICES(change.modifications, 5, 10);
         }
@@ -296,7 +296,7 @@ TEST_CASE("list") {
             auto change_list = [&] {
                 r->begin_transaction();
                 if (lv->size()) {
-                    target->get_object(lv->size() - 1).set(col_value, int64_t(lv->size()));
+                    target->get_object(lv->size() - 1).set(col_target_value, int64_t(lv->size()));
                 }
                 lv->add(keys[lv->size()]);
                 r->commit_transaction();
@@ -443,7 +443,7 @@ TEST_CASE("list") {
             });
 
             r2->begin_transaction();
-            r2->read_group().get_table("class_target")->get_object(target_keys[0]).set(col_value, 10);
+            r2->read_group().get_table("class_target")->get_object(target_keys[0]).set(col_target_value, 10);
             r2->read_group()
                 .get_table("class_other_target")
                 ->get_object(other_target_keys[1])
@@ -457,7 +457,7 @@ TEST_CASE("list") {
 
             auto r3 = coordinator.get_realm();
             r3->begin_transaction();
-            r3->read_group().get_table("class_target")->get_object(target_keys[2]).set(col_value, 10);
+            r3->read_group().get_table("class_target")->get_object(target_keys[2]).set(col_target_value, 10);
             r3->read_group()
                 .get_table("class_other_target")
                 ->get_object(other_target_keys[3])
@@ -475,8 +475,8 @@ TEST_CASE("list") {
             auto token = require_change();
 
             r2->begin_transaction();
-            r2_lv->get_object(5).set(col_value, 10);
-            r2_lv->get_object(1).set(col_value, 10);
+            r2_lv->get_object(5).set(col_target_value, 10);
+            r2_lv->get_object(1).set(col_target_value, 10);
             r2_lv->move(5, 8);
             r2_lv->move(1, 2);
             r2->commit_transaction();
@@ -556,7 +556,7 @@ TEST_CASE("list") {
 
     SECTION("sorted add_notification_block()") {
         List lst(r, *lv);
-        Results results = lst.sort({{{col_value}}, {false}});
+        Results results = lst.sort({{{col_target_value}}, {false}});
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -587,7 +587,7 @@ TEST_CASE("list") {
 
         SECTION("change order by modifying target") {
             write([&] {
-                lst.get(5).set(col_value, 15);
+                lst.get(5).set(col_target_value, 15);
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 4);
@@ -611,7 +611,7 @@ TEST_CASE("list") {
 
     SECTION("filtered add_notification_block()") {
         List lst(r, *lv);
-        Results results = lst.filter(target->where().less(col_value, 9));
+        Results results = lst.filter(target->where().less(col_target_value, 9));
 
         int notification_calls = 0;
         CollectionChangeSet change;
@@ -673,10 +673,169 @@ TEST_CASE("list") {
         }
     }
 
+    SECTION("Keypath filtered change notifications") {
+        //        ColKey colkey_origin_value = origin->get_column_key("value");
+        ColKey colkey_target_value2 = target->get_column_key("value2");
+        List list(r, obj, col_link);
+
+        // Creating KeyPathArrays:
+        // 1. Property pairs
+        //        std::pair<TableKey, ColKey> pair_origin_value(origin, colkey_origin_value);
+        //        std::pair<TableKey, ColKey> pair_origin_link(origin, col_link);
+        std::pair<TableKey, ColKey> pair_target_value(target, col_target_value);
+        std::pair<TableKey, ColKey> pair_target_value2(target, colkey_target_value2);
+        // 2. Keypaths
+        //        auto keypath_origin_value = {pair_origin_value};
+        //        auto keypath_origin_link = {pair_origin_link};
+        auto keypath_target_value = {pair_target_value};
+        auto keypath_target_value2 = {pair_target_value2};
+        // 3. Aggregated `KeyPathArray`
+        //        KeyPathArray key_path_array_origin_value = {keypath_origin_value};
+        KeyPathArray key_path_array_target_value = {keypath_target_value};
+        KeyPathArray key_path_array_target_value2 = {keypath_target_value2};
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        // For the keypath filtered notifications we need to check three scenarios:
+        // - no callbacks have filters (this part is covered by other sections)
+        // - some callbacks have filters
+        // - all callbacks have filters
+        CollectionChangeSet collection_change_set_without_filter;
+        //        CollectionChangeSet collection_change_set_with_filter_on_origin_value;
+        CollectionChangeSet collection_change_set_with_filter_on_target_value;
+
+        SECTION("some callbacks have filters") {
+            auto require_change_no_filter = [&] {
+                auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr error) {
+                    REQUIRE_FALSE(error);
+                    collection_change_set_without_filter = c;
+                });
+                advance_and_notify(*r);
+                return token;
+            };
+
+            //            auto require_change_origin_value_filter = [&] {
+            //                auto token = list.add_notification_callback([&](CollectionChangeSet c,
+            //                std::exception_ptr error) {
+            //                    REQUIRE_FALSE(error);
+            //                    collection_change_set_with_filter_on_origin_value = c;
+            //                }, key_path_array_origin_value);
+            //                advance_and_notify(*r);
+            //                return token;
+            //            };
+
+            auto require_change_target_value_filter = [&] {
+                auto token = list.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_with_filter_on_target_value = c;
+                    },
+                    key_path_array_target_value);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            //            auto require_no_change = [&] {
+            //                bool first = true;
+            //                auto token = list.add_notification_callback([&, first](CollectionChangeSet,
+            //                std::exception_ptr error) mutable {
+            //                    REQUIRE_FALSE(error);
+            //                    REQUIRE(first);
+            //                    first = false;
+            //                });
+            //                advance_and_notify(*r);
+            //                return token;
+            //            };
+
+            SECTION("-> modifying table 'target', property 'value'"
+                    "-> DOES send a notification") {
+                auto token1 = require_change_no_filter();
+                //                auto token2 = require_change_origin_value_filter();
+                auto token2 = require_change_target_value_filter();
+                write([&] {
+                    list.get(0).set(col_target_value, 42);
+                });
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
+                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications, 0);
+                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications_new,
+                //                0);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
+            }
+
+            SECTION("-> modifying table 'target', property 'value2'"
+                    "-> DOES send a notification") {
+                auto token1 = require_change_no_filter();
+                //                auto token2 = require_change_origin_value_filter();
+                auto token2 = require_change_target_value_filter();
+                write([&] {
+                    list.get(0).set(colkey_target_value2, 42);
+                });
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
+                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications, 0);
+                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications_new,
+                //                0);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
+            }
+        }
+
+        SECTION("all callbacks have filters") {
+            auto require_change = [&] {
+                auto token = list.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_with_filter_on_target_value = c;
+                    },
+                    key_path_array_target_value);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            auto require_no_change = [&] {
+                bool first = true;
+                auto token = list.add_notification_callback(
+                    [&, first](CollectionChangeSet, std::exception_ptr error) mutable {
+                        REQUIRE_FALSE(error);
+                        REQUIRE(first);
+                        first = false;
+                    },
+                    key_path_array_target_value2);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            //            SECTION("-> modifying table 'target', property 'value'"
+            //                    "-> DOES send a notification") {
+            //                auto token = require_change();
+            //                write([&] {
+            //                    list.get(0).set(col_target_value, 42);
+            //                });
+            //                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
+            //                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
+            //            }
+
+            SECTION("-> modifying table 'target', property 'value2'"
+                    "-> does NOT send a notification") {
+                auto token = require_no_change();
+                write([&] {
+                    list.get(0).set(colkey_target_value2, 42);
+                });
+            }
+        }
+    }
+
     SECTION("sort()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, *lv);
-        auto results = list.sort({{{col_value}}, {false}});
+        auto results = list.sort({{{col_target_value}}, {false}});
 
         REQUIRE(&results.get_object_schema() == objectschema);
         REQUIRE(results.get_mode() == Results::Mode::LinkList);
@@ -684,11 +843,11 @@ TEST_CASE("list") {
 
         // Aggregates don't inherently have to convert to TableView, but do
         // because aggregates aren't implemented for LinkView
-        REQUIRE(results.sum(col_value) == 45);
+        REQUIRE(results.sum(col_target_value) == 45);
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
         // Reset to LinkView mode to test implicit conversion to TableView on get()
-        results = list.sort({{{col_value}}, {false}});
+        results = list.sort({{{col_target_value}}, {false}});
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[9 - i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
@@ -705,7 +864,7 @@ TEST_CASE("list") {
     SECTION("filter()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, *lv);
-        auto results = list.filter(target->where().greater(col_value, 5));
+        auto results = list.filter(target->where().greater(col_target_value, 5));
 
         REQUIRE(&results.get_object_schema() == objectschema);
         REQUIRE(results.get_mode() == Results::Mode::Query);
@@ -902,18 +1061,18 @@ TEST_CASE("list") {
         List list(r, *lv);
 
         SECTION("returns index in list for values in the list") {
-            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 5);
+            REQUIRE(list.find(std::move(target->where().equal(col_target_value, 5))) == 5);
         }
 
         SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
-            REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
+            REQUIRE(list.find(std::move(target->where().equal(col_target_value, 5))) == 4);
             r->cancel_transaction();
         }
 
         SECTION("returns npos for values not in the list") {
-            REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
+            REQUIRE(list.find(std::move(target->where().equal(col_target_value, 11))) == npos);
         }
     }
 
@@ -936,10 +1095,10 @@ TEST_CASE("list") {
         }
 
         SECTION("creates new object for dictionary") {
-            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
+            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}, {"value2", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == 11);
-            REQUIRE(list.get(10).get<Int>(col_value) == 20);
+            REQUIRE(list.get(10).get<Int>(col_target_value) == 20);
         }
 
         SECTION("throws for object in wrong table") {

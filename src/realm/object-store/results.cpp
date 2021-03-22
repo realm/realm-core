@@ -1229,10 +1229,10 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
+NotificationToken Results::add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array) &
 {
     prepare_async(ForCallback{true});
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+    return {m_notifier, m_notifier->add_callback(std::move(cb), key_path_array)};
 }
 
 // This function cannot be called on frozen results and so does not require locking
