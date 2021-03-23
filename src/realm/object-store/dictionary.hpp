@@ -133,6 +133,10 @@ inline Obj Dictionary::get<Obj>(StringData key) const
 template <typename T, typename Context>
 void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
+    if (ctx.is_null(value)) {
+        this->insert(key, Mixed());
+        return;
+    }
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
         auto obj_key = dict().create_and_insert_linked_object(key).get_key();
