@@ -27,6 +27,7 @@
 
 #ifdef REALM_DEBUG
 #include <iostream>
+#include <unordered_set>
 #endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -1209,7 +1210,8 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     for (size_t i = 0; i < m_translation_table_size - 1; ++i) {
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
-    m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+    m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - m_slabs.size(),
+                                    m_ref_translation_ptr.load());
     new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
     // Memory ranges with slab (working memory) can never have arrays that straddle a boundary,
     // so optimize by clamping the lowest possible xover offset to the end of the section.
@@ -1229,7 +1231,8 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
         if (m_translation_table_size)
-            m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+            m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - free_space_size,
+                                            m_ref_translation_ptr.load());
         m_translation_table_size = num_mappings + free_space_size;
         new_translation_table = new RefTranslation[m_translation_table_size];
         old_num_sections = 0;
@@ -1282,10 +1285,43 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
 }
 
+void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
+{
+    // Verify that each old ref translation pointer still points to a valid
+    // thing that we haven't released yet.
+#if REALM_DEBUG
+    std::unordered_set<const char*> mappings;
+    for (auto& m : m_old_mappings) {
+        REALM_ASSERT(m.mapping.is_attached());
+        mappings.insert(m.mapping.get_addr());
+    }
+    for (auto& m : m_mappings) {
+        REALM_ASSERT(m.primary_mapping.is_attached());
+        mappings.insert(m.primary_mapping.get_addr());
+        if (m.xover_mapping.is_attached())
+            mappings.insert(m.xover_mapping.get_addr());
+    }
+    if (m_data)
+        mappings.insert(m_data);
+    for (auto& t : m_old_translations) {
+        REALM_ASSERT_EX(youngest_live_version == 0 || t.replaced_at_version < youngest_live_version,
+                        youngest_live_version, t.replaced_at_version);
+        if (nonempty_attachment()) {
+            for (size_t i = 0; i < t.translation_count; ++i)
+                REALM_ASSERT(mappings.count(t.translations[i].mapping_addr));
+        }
+    }
+#else
+    static_cast<void>(youngest_live_version);
+#endif
+}
+
 
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
+    verify_old_translations(youngest_live_version);
+
     auto pred = [=](auto& oldie) {
         return oldie.replaced_at_version < oldest_live_version;
     };
@@ -1293,6 +1329,7 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     m_old_translations.erase(std::remove_if(m_old_translations.begin(), m_old_translations.end(), pred),
                              m_old_translations.end());
     m_youngest_live_version = youngest_live_version;
+    verify_old_translations(youngest_live_version);
 }
 
 void SlabAlloc::init_mapping_management(uint64_t currently_live_version)
