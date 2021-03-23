@@ -578,10 +578,10 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.id_val);
                 break;
             case type_Link:
-                out << ObjKey(m.int_val);
+                out << util::serializer::print_value(ObjKey(m.int_val));
                 break;
             case type_TypedLink:
-                out << m.link_val;
+                out << util::serializer::print_value(m.link_val);
                 break;
             case type_UUID:
                 out << util::serializer::print_value(m.uuid_val);
