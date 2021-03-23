@@ -434,16 +434,25 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 
     if (ColKey existing_key = table->get_column_key(col_name)) {
         DataType new_type = get_data_type(instr.type);
-        if (existing_key.get_type() != ColumnType(new_type) &&
-            !(new_type == type_Link && existing_key.get_type() == col_type_LinkList)) {
+        ColumnType existing_type = existing_key.get_type();
+        if (existing_type == col_type_LinkList) {
+            existing_type = col_type_Link;
+        }
+        if (existing_type != ColumnType(new_type)) {
             bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
-                                table->get_name(), col_name, existing_key.get_type(), new_type);
+                                table->get_name(), col_name, existing_type, new_type);
         }
         bool existing_is_list = existing_key.is_list();
         if ((instr.collection_type == CollectionType::List) != existing_is_list) {
             bad_transaction_log(
                 "AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a list, the other is%4)",
                 table->get_name(), col_name, existing_is_list ? "" : " not", existing_is_list ? " not" : "");
+        }
+        bool existing_is_set = existing_key.is_set();
+        if ((instr.collection_type == CollectionType::Set) != existing_is_set) {
+            bad_transaction_log(
+                "AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a set, the other is%4)",
+                table->get_name(), col_name, existing_is_set ? "" : " not", existing_is_set ? " not" : "");
         }
         bool existing_is_dict = existing_key.is_dictionary();
         if ((instr.collection_type == CollectionType::Dictionary) != existing_is_dict) {
@@ -501,6 +510,9 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
             }
             if (instr.collection_type == CollectionType::List) {
                 table->add_column_list(*target, col_name);
+            }
+            else if (instr.collection_type == CollectionType::Set) {
+                table->add_column_set(*target, col_name);
             }
             else if (instr.collection_type == CollectionType::Dictionary) {
                 table->add_column_dictionary(*target, col_name);
@@ -741,8 +753,8 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                         mixed_set.insert(link);
                     }
                     else if (data_type == type_Link) {
-                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
-                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        REALM_ASSERT(dynamic_cast<LnkSet*>(&set));
+                        auto& link_set = static_cast<LnkSet&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
@@ -813,8 +825,8 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                         mixed_set.erase(link);
                     }
                     else if (data_type == type_Link) {
-                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
-                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        REALM_ASSERT(dynamic_cast<LnkSet*>(&set));
+                        auto& link_set = static_cast<LnkSet&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
