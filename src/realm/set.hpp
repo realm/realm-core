@@ -802,11 +802,16 @@ auto convert_to_set(const CollectionBase& rhs, bool nullable)
     std::set<T, SetElementLessThan<T>> ret;
     for (size_t i = 0; i < rhs.size(); i++) {
         auto val = rhs.get_any(i);
-        if (val.is_type(ColumnTypeTraits<T>::id)) {
-            ret.emplace(val.get<T>());
+        if constexpr (std::is_same_v<T, Mixed>) {
+            ret.emplace(val);
         }
-        else if (val.is_null() && nullable) {
-            ret.emplace(BPlusTree<T>::default_value(true));
+        else {
+            if (val.is_type(ColumnTypeTraits<T>::id)) {
+                ret.emplace(val.get<T>());
+            }
+            else if (val.is_null() && nullable) {
+                ret.emplace(BPlusTree<T>::default_value(true));
+            }
         }
     }
     return ret;
