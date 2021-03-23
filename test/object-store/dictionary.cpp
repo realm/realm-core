@@ -66,6 +66,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 {
     using T = typename TestType::Type;
     using Boxed = typename TestType::Boxed;
+    using W = typename TestType::Wrapped;
 
     InMemoryTestFile config;
     config.cache = false;
@@ -144,6 +145,33 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         REQUIRE(values_as_results.get_type() == TestType::property_type());
     }
 
+    SECTION("size()") {
+        REQUIRE(dict.size() == keys.size());
+        dict.remove_all();
+        REQUIRE(dict.size() == 0);
+    }
+
+    SECTION("is_valid()") {
+        object_store::Dictionary unattached;
+        REQUIRE(dict.is_valid());
+        REQUIRE(!unattached.is_valid());
+    }
+
+    SECTION("verify_attached()") {
+        object_store::Dictionary unattached;
+        REQUIRE_NOTHROW(dict.verify_attached());
+        REQUIRE_THROWS_AS(unattached.verify_attached(), realm::List::InvalidatedException);
+    }
+
+    SECTION("verify_in_transaction()") {
+        object_store::Dictionary unattached;
+        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+        REQUIRE_NOTHROW(dict.verify_in_transaction());
+        r->commit_transaction();
+        REQUIRE_THROWS_AS(dict.verify_in_transaction(), InvalidTransactionException);
+        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+    }
+
     SECTION("clear()") {
         REQUIRE(dict.size() == keys.size());
         values_as_results.clear();
@@ -151,12 +179,27 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         REQUIRE(values_as_results.size() == 0);
     }
 
-    SECTION("get()") {
-        for (size_t i = 0; i < values.size(); ++i) {
-            REQUIRE(dict.get<T>(keys[i]) == values[i]);
-            auto val = dict.get(ctx, keys[i]);
-            REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
+    SECTION("equality and assign") {
+        REQUIRE(dict == dict);
+        REQUIRE(!(dict != dict));
+        object_store::Dictionary same(r, obj, col);
+        REQUIRE(dict == same);
+        REQUIRE(!(dict != same));
+        object_store::Dictionary other(r, obj1, col);
+        REQUIRE(!(dict == other));
+        REQUIRE(dict != other);
+        REQUIRE(other == other);
+        REQUIRE(!(other != other));
+
+        for (size_t i = 0; i < keys.size(); ++i) {
+            other.insert(keys[i], T(values[i]));
         }
+        REQUIRE(!(dict == other));
+        REQUIRE(dict != other);
+
+        other = dict;
+        REQUIRE(dict == other);
+        REQUIRE(!(dict != other));
     }
 
     SECTION("insert()") {
@@ -168,6 +211,43 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         for (size_t i = 0; i < values.size(); ++i) {
             dict.insert(ctx, keys[i], TestType::to_any(values[i]));
             REQUIRE(dict.get<T>(keys[i]) == values[i]);
+        }
+    }
+
+    SECTION("get()") {
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(dict.get<T>(keys[i]) == values[i]);
+            auto val = dict.get(ctx, keys[i]);
+            REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
+        }
+    }
+
+    SECTION("erase()") {
+        for (auto key : keys) {
+            REQUIRE(dict.contains(key));
+            dict.erase(key);
+            REQUIRE(!dict.contains(key));
+        }
+        REQUIRE(dict.size() == 0);
+    }
+
+    SECTION("contains()") {
+        for (auto key : keys) {
+            REQUIRE(dict.contains(key));
+        }
+        dict.remove_all();
+        for (auto key : keys) {
+            REQUIRE(!dict.contains(key));
+        }
+    }
+
+    SECTION("find_any()") {
+        for (auto key : keys) {
+            REQUIRE(dict.find_any(key));
+        }
+        dict.remove_all();
+        for (auto key : keys) {
+            REQUIRE(dict.find_any(key) == realm::not_found);
         }
     }
 
@@ -299,6 +379,46 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(!values_as_results.last<T>());
             REQUIRE(!values_as_results.last(ctx));
         }
+    }
+
+    SECTION("min()") {
+        if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(values_as_results.min(), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(Mixed(TestType::min()) == values_as_results.min());
+        dict.remove_all();
+        REQUIRE(!values_as_results.min());
+    }
+
+    SECTION("max()") {
+        if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(values_as_results.max(), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(Mixed(TestType::max()) == values_as_results.max());
+        dict.remove_all();
+        REQUIRE(!values_as_results.max());
+    }
+
+    SECTION("sum()") {
+        if (!TestType::can_sum()) {
+            REQUIRE_THROWS_AS(values_as_results.sum(), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(cf::get<W>(*values_as_results.sum()) == TestType::sum());
+        dict.remove_all();
+        REQUIRE(!values_as_results.sum());
+    }
+
+    SECTION("average()") {
+        if (!TestType::can_average()) {
+            REQUIRE_THROWS_AS(values_as_results.average(), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average()) == TestType::average());
+        dict.remove_all();
+        REQUIRE(!values_as_results.average());
     }
 
     SECTION("handover") {

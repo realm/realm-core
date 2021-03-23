@@ -4664,13 +4664,16 @@ TEST(Parser_Dictionary)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
     CHECK_EQUAL(message, "Property 'dict' in 'foo' is not an Object");
 
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Cannot add int and double");
-
+    // aggregates still work with mixed types
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 2);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
     dict.insert("Bar", Timestamp(1234, 5678));
-    // g.to_json(std::cout);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Sum not defined for timestamps");
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 1);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
 }
 
 TEST(Parser_DictionaryObjects)

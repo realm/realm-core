@@ -82,10 +82,13 @@ public:
     }
     Mixed min(size_t* return_ndx = nullptr) const;
     Mixed max(size_t* return_ndx = nullptr) const;
-    Mixed sum(size_t* return_cnt = nullptr) const;
-    Mixed avg(size_t* return_cnt = nullptr) const;
+    Mixed sum(size_t* return_cnt = nullptr, DataType type = type_Mixed) const;
+    Mixed avg(size_t* return_cnt = nullptr, DataType type = type_Mixed) const;
 
 private:
+    template <typename AggregateType>
+    void do_accumulate(size_t* return_ndx, AggregateType& agg) const;
+
     ArrayParent* m_owner;
     size_t m_ndx_in_cluster;
     ColKey m_keys_col;
