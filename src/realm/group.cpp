@@ -598,6 +598,9 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    // Non-Transaction Groups always allow writing and simply don't allow
+    // committing when opened in read-only mode
+    m_alloc.set_read_only(false);
 
     open(top_ref, file_path);
 }

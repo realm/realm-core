@@ -707,11 +707,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
-    // FIXME: Currently we cannot enforce read-only mode on every allocation
-    // in the shared slab allocator, because we always create a minimal group
-    // representation in memory, even in a read-transaction, if the file is empty.
-    // m_is_read_only = cfg.read_only;
-    set_read_only(false);
+    set_read_only(cfg.read_only);
     m_file.open(path.c_str(), access, create, 0); // Throws
     auto physical_file_size = m_file.get_size();
     // Note that get_size() may (will) return a different size before and after
@@ -846,19 +842,15 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // The file must be extended to match in size prior to being mmapped,
         // as extending it after mmap has undefined behavior.
         if (cfg.read_only) {
-
             // If the file is opened read-only, we cannot extend it. This is not a problem,
             // because for a read-only file we assume that it will not change while we use it.
             // This assumption obviously will not hold, if the file is shared by multiple
             // processes or threads with different opening modes.
             // Currently, there is no way to detect if this assumption is violated.
             m_baseline = 0;
-            ;
         }
         else {
-
             if (cfg.session_initiator || !cfg.is_shared) {
-
                 // We can only safely extend the file if we're the session initiator, or if
                 // the file isn't shared at all. Extending the file to a page boundary is ONLY
                 // done to ensure well defined behavior for memory mappings. It does not matter,
