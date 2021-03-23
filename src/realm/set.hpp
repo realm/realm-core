@@ -618,6 +618,9 @@ std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
 
+    if (value_is_null(value) && !m_nullable)
+        throw LogicError(LogicError::column_not_nullable);
+
     ensure_created();
     this->ensure_writeable();
     auto it = find_impl(value);

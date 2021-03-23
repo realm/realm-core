@@ -1411,7 +1411,7 @@ TEST(Parser_substitution)
     // int
     verify_query_sub(test_context, t, "age > $1", args, num_args, 2);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $3", args, num_args, 0));
+    verify_query_sub(test_context, t, "age > $3", args, num_args, 0);
     verify_query_sub(test_context, t, "age > $4", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $6", args, num_args, 0));
@@ -1419,7 +1419,7 @@ TEST(Parser_substitution)
     // double
     verify_query_sub(test_context, t, "fees > $0", args, num_args, 4);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $3", args, num_args, 0));
+    verify_query_sub(test_context, t, "fees > $3", args, num_args, 0);
     verify_query_sub(test_context, t, "fees > $4", args, num_args, 5);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $6", args, num_args, 0));
@@ -1428,7 +1428,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "floats > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "floats > $1", args, num_args, 1);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $3", args, num_args, 0));
+    verify_query_sub(test_context, t, "floats > $3", args, num_args, 0);
     verify_query_sub(test_context, t, "floats > $4", args, num_args, 2);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $6", args, num_args, 0));
@@ -4188,14 +4188,30 @@ TEST(Parser_UUID)
         verify_query(test_context, table, "nid == uuid(" + id.to_string() + ")", 1);
         verify_query(test_context, table, "id != uuid(" + id.to_string() + ")", num_rows - 1);
         verify_query(test_context, table, "nid != uuid(" + id.to_string() + ")", num_rows - 1);
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid > uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid >= uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid < uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid <= uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid BEGINSWITH uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid ENDSWITH uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid CONTAINS uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid LIKE uuid(" + id.to_string() + ")", 0));
+    }
+
+    UUID min;
+    UUID max("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    std::vector<std::string> props = {"id", "nid"};
+    for (auto prop_name : props) {
+        // a null value is neither greater nor less than any valid value
+        size_t num_valid_values = (prop_name == "nid" ? num_rows - 1 : num_rows);
+        verify_query(test_context, table, util::format("%1 > uuid(%2)", prop_name, min.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 >= uuid(%2)", prop_name, min.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 < uuid(%2)", prop_name, min.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 <= uuid(%2)", prop_name, min.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 > uuid(%2)", prop_name, max.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 >= uuid(%2)", prop_name, max.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 < uuid(%2)", prop_name, max.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 <= uuid(%2)", prop_name, max.to_string()),
+                     num_valid_values);
     }
 
     // argument substitution checks
@@ -4205,10 +4221,18 @@ TEST(Parser_UUID)
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id > $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id >= $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id <= $3", args, num_args, 0);
     verify_query_sub(test_context, table, "nid == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid > $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid >= $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid <= $3", args, num_args, 1);
 }
 
 
@@ -4640,13 +4664,16 @@ TEST(Parser_Dictionary)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
     CHECK_EQUAL(message, "Property 'dict' in 'foo' is not an Object");
 
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Cannot add int and double");
-
+    // aggregates still work with mixed types
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 2);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
     dict.insert("Bar", Timestamp(1234, 5678));
-    // g.to_json(std::cout);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Sum not defined for timestamps");
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 1);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
 }
 
 TEST(Parser_DictionaryObjects)

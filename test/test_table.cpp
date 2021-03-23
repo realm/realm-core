@@ -1515,7 +1515,10 @@ TEST(Table_AddInt)
     Table t;
     auto col_int = t.add_column(type_Int, "i");
     auto col_int_null = t.add_column(type_Int, "ni", /*nullable*/ true);
+    auto col_mixed = t.add_column(type_Mixed, "m");
     Obj obj = t.create_object();
+
+    obj.set(col_mixed, Mixed(5));
 
     obj.add_int(col_int, 1);
     CHECK_EQUAL(obj.get<Int>(col_int), 1);
@@ -1530,6 +1533,11 @@ TEST(Table_AddInt)
     // add_int() has no effect on a NULL
     CHECK(obj.is_null(col_int_null));
     CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), LogicError::illegal_combination);
+
+    obj.add_int(col_mixed, 1);
+    CHECK_EQUAL(obj.get_any(col_mixed).get_int(), 6);
+    obj.set(col_mixed, Mixed("Foo"));
+    CHECK_LOGIC_ERROR(obj.add_int(col_mixed, 123), LogicError::illegal_combination);
 }
 
 TEST(Table_AddIntIndexed)

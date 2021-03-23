@@ -405,15 +405,15 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
     auto setter = util::overload{
         [&](Obj& obj, ColKey col) {
             // Increment of object field.
-
-            if (col.get_type() != col_type_Int) {
-                auto table = obj.get_table();
-                bad_transaction_log("AddInteger: Not an integer field '%2.%1'", table->get_column_name(col),
-                                    table->get_name());
-            }
-
             if (!obj.is_null(col)) {
-                obj.add_int(col, instr.value);
+                try {
+                    obj.add_int(col, instr.value);
+                }
+                catch (const LogicError&) {
+                    auto table = obj.get_table();
+                    bad_transaction_log("AddInteger: Not an integer field '%2.%1'", table->get_column_name(col),
+                                        table->get_name());
+                }
             }
         },
         // FIXME: Implement increments of array elements, dictionary values.

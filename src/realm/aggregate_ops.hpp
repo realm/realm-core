@@ -92,6 +92,15 @@ public:
         return false;
     }
 
+    template <typename Type = T>
+    std::enable_if_t<!std::is_same_v<Type, Mixed>, bool> accumulate(const Mixed& value)
+    {
+        if (!value.is_null()) {
+            return accumulate(value.get<T>());
+        }
+        return false;
+    }
+
     bool is_null() const
     {
         return !m_result;
@@ -155,6 +164,14 @@ public:
         }
         return false;
     }
+    template <typename Type = T>
+    std::enable_if_t<!std::is_same_v<Type, Mixed>, bool> accumulate(const Mixed& value)
+    {
+        if (!value.is_null()) {
+            return accumulate(value.get<Type>());
+        }
+        return false;
+    }
 
     bool is_null() const
     {
@@ -182,6 +199,7 @@ template <typename T>
 class Average {
 public:
     using ResultType = typename std::conditional<realm::is_any_v<T, Decimal128, Mixed>, Decimal128, double>::type;
+
     bool accumulate(T value)
     {
         if constexpr (std::is_same_v<T, Mixed>) {
@@ -207,6 +225,15 @@ public:
         return false;
     }
 
+    template <typename Type = T>
+    std::enable_if_t<!std::is_same_v<Type, Mixed>, bool> accumulate(const Mixed& value)
+    {
+        if (!value.is_null()) {
+            return accumulate(value.get<Type>());
+        }
+        return false;
+    }
+
     bool is_null() const
     {
         return m_count == 0;
@@ -219,6 +246,10 @@ public:
     static const char* description()
     {
         return "@avg";
+    }
+    size_t items_counted() const
+    {
+        return m_count;
     }
 
 private:

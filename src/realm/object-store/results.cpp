@@ -539,7 +539,12 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
         case type_Mixed:
             break;
         default:
-            throw UnsupportedColumnTypeException{column, *m_table, name};
+            if (m_mode == Mode::Collection) {
+                throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
+            }
+            else {
+                throw UnsupportedColumnTypeException{column, *m_table, name};
+            }
     }
     return type;
 }
