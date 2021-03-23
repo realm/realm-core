@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
 * The error message when the intial steps of opening a Realm file fails is now more descriptive.
 
 ### Fixed
