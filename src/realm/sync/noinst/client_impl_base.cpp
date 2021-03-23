@@ -2271,7 +2271,7 @@ void Session::send_upload_message()
             }
 
 #if REALM_DEBUG
-            ChunkedBinaryInputStream in{ changeset_data };
+            ChunkedBinaryInputStream in{changeset_data};
             sync::Changeset log;
             sync::parse_changeset(in, log);
             std::stringstream ss;
