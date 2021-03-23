@@ -65,6 +65,7 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         s.insert("Hello");
         CHECK_EQUAL(s.size(), 2);
+        CHECK_THROW_ANY(s.insert(StringData{}));
         auto ndx = s.find("Hello");
         CHECK_NOT_EQUAL(ndx, realm::npos);
         auto [erased_ndx, erased] = s.erase("Hello");
@@ -171,6 +172,7 @@ TEST(Set_Links)
     CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
     CHECK_EQUAL(set_links.find(bar4.get_key()), realm::npos);
+    CHECK_THROW_ANY(set_links.insert({}));
 
     set_typed_links.insert(bar1.get_link());
     set_typed_links.insert(bar2.get_link());
