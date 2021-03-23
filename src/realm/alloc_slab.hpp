@@ -533,33 +533,16 @@ private:
 
     // Description of to-be-deleted memory mapping
     struct OldMapping {
-        OldMapping(uint64_t version, util::File::Map<char>&& map) noexcept
-            : replaced_at_version(version)
-            , mapping(std::move(map))
-        {
-        }
-        OldMapping(OldMapping&& other) noexcept
-            : replaced_at_version(other.replaced_at_version)
-            , mapping()
-        {
-            mapping = std::move(other.mapping);
-        }
-        void operator=(OldMapping&& other) noexcept
-        {
-            replaced_at_version = other.replaced_at_version;
-            mapping = std::move(other.mapping);
-        }
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
     struct OldRefTranslation {
         OldRefTranslation(uint64_t v, RefTranslation* m) noexcept
+        : replaced_at_version(v), translations(m)
         {
-            replaced_at_version = v;
-            translations = m;
         }
         uint64_t replaced_at_version;
-        RefTranslation* translations;
+        std::unique_ptr<RefTranslation[]> translations;
     };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");

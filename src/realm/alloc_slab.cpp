@@ -1157,7 +1157,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // that there was already something mapped after the last section
         REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
         // save the old mapping/keep it open
-        m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+        m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
         m_mappings.pop_back();
         m_mapping_version++;
     }
@@ -1286,30 +1286,12 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    for (size_t i = 0; i < m_old_mappings.size();) {
-        if (m_old_mappings[i].replaced_at_version >= oldest_live_version) {
-            ++i;
-            continue;
-        }
-        // move last over:
-        auto oldie = std::move(m_old_mappings[i]);
-        m_old_mappings[i] = std::move(m_old_mappings.back());
-        m_old_mappings.pop_back();
-        oldie.mapping.unmap();
-    }
-
-    for (size_t i = 0; i < m_old_translations.size();) {
-        if (m_old_translations[i].replaced_at_version < oldest_live_version) {
-            // This translation is too old - purge by move last over:
-            auto oldie = std::move(m_old_translations[i]);
-            m_old_translations[i] = std::move(m_old_translations.back());
-            m_old_translations.pop_back();
-            delete[] oldie.translations;
-        }
-        else {
-            ++i;
-        }
-    }
+    auto pred = [=](auto& oldie) {
+        return oldie.replaced_at_version < oldest_live_version;
+    };
+    m_old_mappings.erase(std::remove_if(m_old_mappings.begin(), m_old_mappings.end(), pred), m_old_mappings.end());
+    m_old_translations.erase(std::remove_if(m_old_translations.begin(), m_old_translations.end(), pred),
+                             m_old_translations.end());
     m_youngest_live_version = youngest_live_version;
 }
 
