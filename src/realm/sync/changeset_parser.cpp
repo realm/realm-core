@@ -558,12 +558,15 @@ UUID ChangesetParser::State::read_uuid()
 
 Decimal128 ChangesetParser::State::read_decimal()
 {
-    Decimal128::Bid128 cx;
-    cx.w[0] = read_int<uint64_t>(); // Throws
-    cx.w[1] = 0;
+    _impl::Bid128 cx;
+    if (!_impl::decode_int(*this, cx))
+        parser_error("bad changeset - decimal decoding failure");
+
     int exp = read_int<int>();
     bool sign = read_int<int>() != 0;
-    return Decimal128(cx, exp, sign);
+    Decimal128::Bid128 tmp;
+    memcpy(&tmp, &cx, sizeof(Decimal128::Bid128));
+    return Decimal128(tmp, exp, sign);
 }
 
 StringData ChangesetParser::State::read_string()

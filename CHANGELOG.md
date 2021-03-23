@@ -2,11 +2,12 @@
 
 ### Enhancements
 * UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
+* The error message when the intial steps of opening a Realm file fails is now more descriptive.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
- 
+* Potential/unconfirmed fix for crashes associated with failure to memory map (low on memory, low on virtual address space). For example ([#4514](https://github.com/realm/realm-core/issues/4514)).
+
 ### Breaking changes
 * None.
 
@@ -15,6 +16,15 @@
 ### Internals
 * None.
 
+----------------------------------------------
+
+# 10.5.6 Release notes
+
+### Fixed
+* Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
+* Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
+* Avoid race condition leading to possible hangs on windows. ([realm-dotnet#2245](https://github.com/realm/realm-dotnet/issues/2245))
+ 
 ----------------------------------------------
 
 # 10.5.5 Release notes
