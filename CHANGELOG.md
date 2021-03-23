@@ -13,6 +13,7 @@
 * Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
 * Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
 * Fixed the query parser rejecting <,>,<=,>= queries on UUID types. ([#4475](https://github.com/realm/realm-core/issues/4475), since v10.0.0)
+* Fixed min/max/sum/avg not working on dictionaries of Mixed types when more than one type existed as values. ([#4546](https://github.com/realm/realm-core/issues/4546), since v11.0.0-beta.0)
 * Creating dictionaries with null links through SDK context would crash. ([#4537](https://github.com/realm/realm-core/issues/4537))
 * An exception is now thrown, if a null link is attempted inserted in a set of links ([#4540](https://github.com/realm/realm-core/issues/4540), since v10.0.0)
 

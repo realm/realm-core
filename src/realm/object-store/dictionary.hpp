@@ -44,6 +44,7 @@ public:
     using Collection::Collection;
 
     bool operator==(const Dictionary& rgt) const noexcept;
+    bool operator!=(const Dictionary& rgt) const noexcept;
 
     template <typename T>
     void insert(StringData key, T value);
