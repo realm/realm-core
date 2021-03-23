@@ -33,9 +33,6 @@ TEST(Decimal_Basics)
     auto test_str = [&](const std::string& str, const std::string& ref) {
         Decimal128 d = Decimal128(str);
         CHECK_EQUAL(d.to_string(), ref);
-        auto x = d.to_bid64();
-        Decimal128 d1(x);
-        CHECK_EQUAL(d, d1);
     };
     test_str("0", "0");
     test_str("0.000", "0E-3");
@@ -55,8 +52,9 @@ TEST(Decimal_Basics)
     test_str("  0", "0");
     test_str_nan(":");
     test_str_nan("0.0.0");
-    CHECK_THROW(Decimal128("10000000000000000000000000000000000000000000000000.0"), std::overflow_error);
-    CHECK_THROW(Decimal128("1.00000000000000000000000000000000000000000000000001"), std::overflow_error);
+    test_str("9.99e6144", "+9990000000000000000000000000000000E+6111"); // largest decimal128
+    test_str("1.701e38", "1.701E38");                                   // largest float
+    test_str("1.797e308", "1.797E308");                                 // largest double
     test_str_nan("0.0Q1");
     test_str_nan("0.0Eq");
     Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
