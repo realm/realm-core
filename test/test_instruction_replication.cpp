@@ -1,7 +1,7 @@
 #include "test.hpp"
 #include "util/compare_groups.hpp"
 
-#include <realm/db.hpp>
+#include <realm.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -492,6 +492,59 @@ TEST(InstructionReplication_LinkLists)
         Obj bar_2 = *(bar->begin() + 1);
         CHECK_EQUAL(bar_1.get_linklist(bar_ll).size(), 1);
         CHECK_EQUAL(bar_2.get_linklist(bar_ll).size(), 1);
+    }
+}
+
+TEST(InstructionReplication_LinkSets)
+{
+    Fixture fixture{test_context};
+    {
+        WriteTransaction wt{fixture.sg_1};
+        TableRef foo = sync::create_table(wt, "class_foo");
+        TableRef bar = sync::create_table(wt, "class_bar");
+        ColKey foo_i = foo->add_column(type_Int, "int");
+        ColKey bar_ls = bar->add_column_set(*foo, "link set");
+
+        ObjKey foo_1 = foo->create_object().set(foo_i, 123).get_key();
+        ObjKey foo_2 = foo->create_object().set(foo_i, 456).get_key();
+        ObjKey foo_3 = foo->create_object().set(foo_i, 789).get_key();
+
+        Obj bar_1 = bar->create_object();
+        Obj bar_2 = bar->create_object();
+
+        auto ls1 = bar_1.get_linkset(bar_ls);
+        ls1.insert(foo_1);
+        ls1.insert(foo_2);
+        ls1.insert(foo_1);
+
+        auto ls2 = bar_2.get_linkset(bar_ls);
+        ls2.insert(foo_3);
+        ls2.insert(foo_1);
+        ls2.insert(foo_3);
+
+        foo->remove_object(foo_1);
+
+        wt.commit();
+    }
+    fixture.replay_transactions();
+    fixture.check_equal();
+    {
+        ReadTransaction rt{fixture.sg_2};
+        CHECK(rt.has_table("class_foo"));
+        CHECK(rt.has_table("class_bar"));
+        ConstTableRef foo = rt.get_table("class_foo");
+        ConstTableRef bar = rt.get_table("class_bar");
+        CHECK_EQUAL(foo->size(), 2);
+        CHECK_EQUAL(bar->size(), 2);
+
+        ColKey foo_i = foo->get_column_key("int");
+        ColKey bar_ls = bar->get_column_key("link set");
+
+        CHECK_EQUAL(foo->begin()->get<Int>(foo_i), 456);
+        Obj bar_1 = *bar->begin();
+        Obj bar_2 = *(bar->begin() + 1);
+        CHECK_EQUAL(bar_1.get_linkset(bar_ls).size(), 1);
+        CHECK_EQUAL(bar_2.get_linkset(bar_ls).size(), 1);
     }
 }
 
