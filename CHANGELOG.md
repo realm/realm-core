@@ -2,6 +2,8 @@
 
 ### Enhancements
 * Support 'add_int' on a mixed property.
+* UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
+* The error message when the intial steps of opening a Realm file fails is now more descriptive.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -17,6 +19,7 @@
 * Creating dictionaries with null links through SDK context would crash. ([#4537](https://github.com/realm/realm-core/issues/4537))
 * An exception is now thrown, if a null link is attempted inserted in a set of links ([#4540](https://github.com/realm/realm-core/issues/4540), since v10.0.0)
 * Syncing sets of objects was not supported ([#4538](https://github.com/realm/realm-core/issues/4538), since v10.0.0)
+* Potential/unconfirmed fix for crashes associated with failure to memory map (low on memory, low on virtual address space). For example ([#4514](https://github.com/realm/realm-core/issues/4514)).
 
 ### Breaking changes
 * None.
@@ -64,6 +67,15 @@
 ### Breaking changes
 * File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
 
+----------------------------------------------
+
+# 10.5.6 Release notes
+
+### Fixed
+* Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
+* Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
+* Avoid race condition leading to possible hangs on windows. ([realm-dotnet#2245](https://github.com/realm/realm-dotnet/issues/2245))
+ 
 ----------------------------------------------
 
 # 10.5.5 Release notes
