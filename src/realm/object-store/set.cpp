@@ -269,74 +269,73 @@ std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
     return as<ObjKey>().insert(obj.get_key());
 }
 
-bool Set::is_subset_of(const Set& rhs) const
+bool Set::is_subset_of(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().is_subset_of(rhs.get_impl());
     });
 }
 
-bool Set::is_strict_subset_of(const Set& rhs) const
+bool Set::is_strict_subset_of(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_strict_subset_of(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().is_strict_subset_of(rhs.get_impl());
     });
 }
 
-bool Set::is_superset_of(const Set& rhs) const
+bool Set::is_superset_of(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().is_superset_of(rhs.get_impl());
     });
 }
 
-bool Set::is_strict_superset_of(const Set& rhs) const
+bool Set::is_strict_superset_of(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().is_strict_superset_of(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().is_strict_superset_of(rhs.get_impl());
     });
 }
 
-bool Set::intersects(const Set& rhs) const
+bool Set::intersects(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().intersects(rhs.get_impl());
     });
 }
 
-bool Set::set_equals(const Set& rhs) const
+bool Set::set_equals(const Collection& rhs) const
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().set_equals(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().set_equals(rhs.get_impl());
     });
 }
 
-void Set::assign_intersection(const Set& rhs)
+void Set::assign_intersection(const Collection& rhs)
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().assign_intersection(rhs.get_impl());
     });
 }
 
-void Set::assign_union(const Set& rhs)
+void Set::assign_union(const Collection& rhs)
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().assign_union(rhs.get_impl());
     });
 }
 
-void Set::assign_difference(const Set& rhs)
+void Set::assign_difference(const Collection& rhs)
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().assign_difference(rhs.get_impl());
     });
 }
 
-void Set::assign_symmetric_difference(const Set& rhs)
+void Set::assign_symmetric_difference(const Collection& rhs)
 {
     return dispatch([&](auto t) {
-        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(
-            rhs.as<std::decay_t<decltype(*t)>>());
+        return this->as<std::decay_t<decltype(*t)>>().assign_symmetric_difference(rhs.get_impl());
     });
 }
 

@@ -1001,6 +1001,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
             break;
         }
+        case Type::TYPED_LINK: {
+            size_t colon_pos = text.find(":");
+            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
+            auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
+            ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
+            break;
+        }
         case Type::NULL_VAL:
             if (hint == type_String) {
                 ret = new ConstantStringValue(StringData()); // Null string
@@ -1097,7 +1104,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     case type_TypedLink:
-                        if (hint == type_Link || hint == type_TypedLink) {
+                        if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
                             ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
                             break;
                         }
