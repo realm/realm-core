@@ -250,6 +250,11 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
     util::CheckedLockGuard lock(m_callback_mutex);
     auto it = find_callback(token);
     if (it != end(m_callbacks)) {
+        // We're inside a write on this collection's Realm, so the callback
+        // should have already been called and there are no versions after
+        // this one yet
+        REALM_ASSERT(it->changes_to_deliver.empty());
+        REALM_ASSERT(it->accumulated_changes.empty());
         it->skip_next = true;
     }
 }

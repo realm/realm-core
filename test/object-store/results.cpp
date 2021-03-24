@@ -1079,6 +1079,100 @@ TEST_CASE("notifications: skip") {
         exit = true;
         REQUIRE(calls1 == 1);
     }
+
+    SECTION("skipping from a write inside the skipped callback works") {
+        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            if (c.empty())
+                return;
+            r->begin_transaction();
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+
+        // no more notifications because the writing callback was skipped and
+        // so didn't make a second write
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+    }
+
+    SECTION("skipping from a write inside a callback before the skipped callback works") {
+        int calls3 = 0;
+        CollectionChangeSet changes3;
+        NotificationToken token3;
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls3 == 1);
+            r->begin_transaction();
+            REQUIRE(calls3 == 2);
+            table->create_object();
+            token3.suppress_next();
+            r->commit_transaction();
+        });
+        token3 = add_callback(results, calls3, changes3);
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls3 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls3 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls3 == 2);
+    }
+
+    SECTION("skipping from a write inside a callback after the skipped callback works") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        NotificationToken token2 = add_callback(results, calls2, changes2);
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls2 == 2);
+            r->begin_transaction();
+            REQUIRE(calls2 == 2);
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls2 == 2);
+    }
 }
 
 TEST_CASE("notifications: TableView delivery") {
