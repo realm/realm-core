@@ -101,12 +101,6 @@ if(ANDROID)
     # - Compile with -Oz in Release because on Android we favor code size over performance
     # 
     add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
-
-    # CMake hard-codes the `-fuse-ld=gold` linker flag on Android for Clang when LTO is enabled, but we want to use lld instead.
-    # Unset for now, until it's fixed upstream.
-    # see https://github.com/Kitware/CMake/blob/af695cee7346fa0eee478f71952fd02f0df989cf/Modules/Compiler/Clang.cmake#L81-L84
-    unset(CMAKE_C_LINK_OPTIONS_IPO)
-    unset(CMAKE_CXX_LINK_OPTIONS_IPO)
 endif()
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
