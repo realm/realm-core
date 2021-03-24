@@ -614,6 +614,12 @@ Set<U> Obj::get_set(ColKey col_key) const
     return Set<U>(*this, col_key);
 }
 
+template <typename U>
+inline SetPtr<U> Obj::get_set_ptr(ColKey col_key) const
+{
+    return std::make_unique<Set<U>>(*this, col_key);
+}
+
 inline LnkSet Obj::get_linkset(ColKey col_key) const
 {
     return LnkSet{*this, col_key};

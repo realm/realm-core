@@ -753,8 +753,8 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                         mixed_set.insert(link);
                     }
                     else if (data_type == type_Link) {
-                        REALM_ASSERT(dynamic_cast<LnkSet*>(&set));
-                        auto& link_set = static_cast<LnkSet&>(set);
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
@@ -825,8 +825,8 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                         mixed_set.erase(link);
                     }
                     else if (data_type == type_Link) {
-                        REALM_ASSERT(dynamic_cast<LnkSet*>(&set));
-                        auto& link_set = static_cast<LnkSet&>(set);
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
@@ -966,7 +966,14 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
             return callback(dict);
         }
         else if (col.is_set()) {
-            auto set = obj.get_setbase_ptr(col);
+            SetBasePtr set;
+            if (col.get_type() == col_type_Link) {
+                // We are interested in using non-condensed indexes - as for Lists below
+                set = obj.get_set_ptr<ObjKey>(col);
+            }
+            else {
+                set = obj.get_setbase_ptr(col);
+            }
             return callback(*set);
         }
         return callback(obj, col);
