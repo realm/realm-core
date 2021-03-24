@@ -111,44 +111,6 @@ struct StringMaker<util::None> {
 };
 } // namespace Catch
 
-template <typename T>
-T get(Mixed)
-{
-    abort();
-}
-
-template <>
-Mixed get(Mixed m)
-{
-    return m;
-}
-
-template <>
-int64_t get(Mixed m)
-{
-    return m.get_int();
-}
-template <>
-float get(Mixed m)
-{
-    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
-}
-template <>
-double get(Mixed m)
-{
-    return m.get_double();
-}
-template <>
-Timestamp get(Mixed m)
-{
-    return m.get_timestamp();
-}
-template <>
-Decimal128 get(Mixed m)
-{
-    return m.get<Decimal128>();
-}
-
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
                    cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
@@ -531,13 +493,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS(list.min());
-            REQUIRE_THROWS(results.min());
+            REQUIRE_THROWS_AS(list.min(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.min(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(*list.min()) == TestType::min());
-        REQUIRE(get<W>(*results.min()) == TestType::min());
+        REQUIRE(cf::get<W>(*list.min()) == TestType::min());
+        REQUIRE(cf::get<W>(*results.min()) == TestType::min());
         list.remove_all();
         REQUIRE(list.min() == util::none);
         REQUIRE(results.min() == util::none);
@@ -545,13 +507,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS(list.max());
-            REQUIRE_THROWS(results.max());
+            REQUIRE_THROWS_AS(list.max(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.max(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(*list.max()) == TestType::max());
-        REQUIRE(get<W>(*results.max()) == TestType::max());
+        REQUIRE(cf::get<W>(*list.max()) == TestType::max());
+        REQUIRE(cf::get<W>(*results.max()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
         REQUIRE(results.max() == util::none);
@@ -559,25 +521,25 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
-            REQUIRE_THROWS(list.sum());
+            REQUIRE_THROWS_AS(list.sum(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(list.sum()) == TestType::sum());
-        REQUIRE(get<W>(*results.sum()) == TestType::sum());
+        REQUIRE(cf::get<W>(list.sum()) == TestType::sum());
+        REQUIRE(cf::get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
-        REQUIRE(get<W>(list.sum()) == TestType::empty_sum_value());
-        REQUIRE(get<W>(*results.sum()) == TestType::empty_sum_value());
+        REQUIRE(cf::get<W>(list.sum()) == TestType::empty_sum_value());
+        REQUIRE(cf::get<W>(*results.sum()) == TestType::empty_sum_value());
     }
 
     SECTION("average()") {
         if (!TestType::can_average()) {
-            REQUIRE_THROWS(list.average());
+            REQUIRE_THROWS_AS(list.average(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<typename TestType::AvgType>(*list.average()) == TestType::average());
-        REQUIRE(get<typename TestType::AvgType>(*results.average()) == TestType::average());
+        REQUIRE(cf::get<typename TestType::AvgType>(*list.average()) == TestType::average());
+        REQUIRE(cf::get<typename TestType::AvgType>(*results.average()) == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);
         REQUIRE(results.average() == util::none);

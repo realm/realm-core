@@ -18,6 +18,7 @@
 
 #include <realm/dictionary.hpp>
 #include <realm/dictionary_cluster_tree.hpp>
+#include <realm/aggregate_ops.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/group.hpp>
 #include <realm/replication.hpp>
@@ -54,23 +55,19 @@ DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_ty
 
 DictionaryClusterTree::~DictionaryClusterTree() {}
 
-Mixed DictionaryClusterTree::min(size_t* return_ndx) const
+template <typename AggregateType>
+void DictionaryClusterTree::do_accumulate(size_t* return_ndx, AggregateType& agg) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
     ArrayMixed leaf(m_alloc);
     size_t start_ndx = 0;
+    size_t ndx = realm::npos;
 
     traverse([&](const Cluster* cluster) {
         size_t e = cluster->node_size();
         cluster->init_leaf(s_values_col, &leaf);
         for (size_t i = 0; i < e; i++) {
             auto val = leaf.get(i);
-            if (val.is_null())
-                continue;
-
-            if (m.is_null() || val < m) {
-                m = val;
+            if (agg.accumulate(val)) {
                 ndx = i + start_ndx;
             }
         }
@@ -81,120 +78,84 @@ Mixed DictionaryClusterTree::min(size_t* return_ndx) const
 
     if (return_ndx)
         *return_ndx = ndx;
+}
 
-    return m;
+Mixed DictionaryClusterTree::min(size_t* return_ndx) const
+{
+    aggregate_operations::Minimum<Mixed> agg;
+    do_accumulate(return_ndx, agg);
+    return agg.is_null() ? Mixed{} : agg.result();
 }
 
 Mixed DictionaryClusterTree::max(size_t* return_ndx) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
-    ArrayMixed leaf(m_alloc);
-    size_t start_ndx = 0;
-
-    traverse([&](const Cluster* cluster) {
-        size_t e = cluster->node_size();
-        cluster->init_leaf(s_values_col, &leaf);
-        for (size_t i = 0; i < e; i++) {
-            auto val = leaf.get(i);
-            if (val.is_null())
-                continue;
-
-            if (m.is_null() || val > m) {
-                m = val;
-                ndx = i + start_ndx;
-            }
-        }
-        start_ndx += e;
-        // Continue
-        return false;
-    });
-
-    if (return_ndx)
-        *return_ndx = ndx;
-
-    return m;
+    aggregate_operations::Maximum<Mixed> agg;
+    do_accumulate(return_ndx, agg);
+    return agg.is_null() ? Mixed{} : agg.result();
 }
 
-Mixed DictionaryClusterTree::sum(size_t* return_cnt) const
+Mixed DictionaryClusterTree::sum(size_t* return_cnt, DataType type) const
 {
-    Mixed s;
-    size_t cnt = 0;
-    ArrayMixed leaf(m_alloc);
-
-    traverse([&](const Cluster* cluster) {
-        size_t e = cluster->node_size();
-        cluster->init_leaf(s_values_col, &leaf);
-        for (size_t i = 0; i < e; i++) {
-            auto val = leaf.get(i);
-            if (val.is_null())
-                continue;
-
-            cnt++;
-
-            if (s.is_null()) {
-                auto type = val.get_type();
-                if (type != type_Int && type != type_Float && type != type_Double && type != type_Decimal) {
-                    throw std::runtime_error(util::format("Sum not defined for %1s", get_data_type_name(type)));
-                }
-                s = val;
-            }
-            else {
-                if (s.get_type() != val.get_type()) {
-                    throw std::runtime_error(util::format("Cannot add %1 and %2", get_data_type_name(s.get_type()),
-                                                          get_data_type_name(val.get_type())));
-                }
-                switch (s.get_type()) {
-                    case type_Int:
-                        s = Mixed(s.get_int() + val.get_int());
-                        break;
-                    case type_Float:
-                        s = Mixed(s.get_float() + val.get_float());
-                        break;
-                    case type_Double:
-                        s = Mixed(s.get_double() + val.get_double());
-                        break;
-                    case type_Decimal:
-                        s = Mixed(s.get<Decimal128>() + val.get<Decimal128>());
-                        break;
-                    default:
-                        REALM_UNREACHABLE();
-                        break;
-                }
-            }
-        }
-        // Continue
-        return false;
-    });
-
-    if (return_cnt)
-        *return_cnt = cnt;
-
-    return s;
-}
-
-Mixed DictionaryClusterTree::avg(size_t* return_cnt) const
-{
-    size_t cnt = 0;
-    auto s = sum(&cnt);
-    if (return_cnt)
-        *return_cnt = cnt;
-    if (cnt && !s.is_null()) {
-        switch (s.get_type()) {
-            case type_Int:
-                return Mixed(double(s.get_int()) / cnt);
-            case type_Float:
-                return Mixed(double(s.get_float()) / cnt);
-            case type_Double:
-                return Mixed(s.get_double() / cnt);
-            case type_Decimal:
-                return Mixed(s.get<Decimal128>() / cnt);
-            default:
-                throw std::runtime_error("Average not supported");
-                break;
-        }
+    if (type == type_Int) {
+        aggregate_operations::Sum<Int> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.result();
     }
-    return {};
+    else if (type == type_Double) {
+        aggregate_operations::Sum<Double> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.result();
+    }
+    else if (type == type_Float) {
+        aggregate_operations::Sum<Float> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.result();
+    }
+    else {
+        aggregate_operations::Sum<Mixed> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.result();
+    }
+}
+
+Mixed DictionaryClusterTree::avg(size_t* return_cnt, DataType type) const
+{
+    if (type == type_Int) {
+        aggregate_operations::Average<Int> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    else if (type == type_Double) {
+        aggregate_operations::Average<Double> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    else if (type == type_Float) {
+        aggregate_operations::Average<Float> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
+    else { // Decimal128 is covered with mixed as well.
+        aggregate_operations::Average<Mixed> agg;
+        do_accumulate(nullptr, agg);
+        if (return_cnt)
+            *return_cnt = agg.items_counted();
+        return agg.is_null() ? Mixed{} : agg.result();
+    }
 }
 
 /******************************** Dictionary *********************************/
@@ -348,7 +309,7 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
 {
     update_if_needed();
     if (m_clusters) {
-        return m_clusters->sum(return_cnt);
+        return m_clusters->sum(return_cnt, get_value_data_type());
     }
     if (return_cnt)
         *return_cnt = 0;
@@ -359,7 +320,7 @@ util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
 {
     update_if_needed();
     if (m_clusters) {
-        return m_clusters->avg(return_cnt);
+        return m_clusters->avg(return_cnt, get_value_data_type());
     }
     if (return_cnt)
         *return_cnt = 0;

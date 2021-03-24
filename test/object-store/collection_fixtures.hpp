@@ -47,6 +47,44 @@ struct greater {
     }
 };
 
+template <typename T>
+inline T get(Mixed)
+{
+    abort();
+}
+
+template <>
+inline Mixed get(Mixed m)
+{
+    return m;
+}
+
+template <>
+inline int64_t get(Mixed m)
+{
+    return m.get_int();
+}
+template <>
+inline float get(Mixed m)
+{
+    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
+}
+template <>
+inline double get(Mixed m)
+{
+    return m.get_double();
+}
+template <>
+inline Timestamp get(Mixed m)
+{
+    return m.get_timestamp();
+}
+template <>
+inline Decimal128 get(Mixed m)
+{
+    return m.get<Decimal128>();
+}
+
 template <PropertyType prop_type, typename T>
 struct Base {
     using Type = T;
