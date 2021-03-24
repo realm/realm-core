@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Adding overloads of the set methods that operate on collections ([#4226](https://github.com/realm/realm-core/issues/4226))
 * Support 'add_int' on a mixed property.
 * UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
 * The error message when the intial steps of opening a Realm file fails is now more descriptive.

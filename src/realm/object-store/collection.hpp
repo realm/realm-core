@@ -110,6 +110,11 @@ public:
         }
     };
 
+    const CollectionBase& get_impl() const
+    {
+        return *m_coll_base;
+    }
+
 protected:
     std::shared_ptr<Realm> m_realm;
     PropertyType m_type;
