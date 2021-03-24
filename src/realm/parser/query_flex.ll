@@ -17,7 +17,7 @@ unicode "\\u"{hex}{4}
 escape  "\\"[\"\'/bfnrt0\\]
 char1    [^\"\\]
 char2    [^\'\\]
-utf8    [\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x80-\xBF])[\x80-\xBF]
+utf8    [\xC2-\xDF][\x80-\xBF]|[\xE0-\xEF][\x80-\xBF]{2}|[\xF0-\xF7][\x80-\xBF]{3}
 letter  [a-zA-Z_$]
 ws      "\\"[ nrt]
 id_char [a-zA-Z_\-$0-9]
