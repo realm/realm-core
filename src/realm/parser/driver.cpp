@@ -1003,7 +1003,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
         case Type::TYPED_LINK: {
             size_t colon_pos = text.find(":");
-            auto table_key_val = strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0);
+            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
             auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
             ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
             break;
