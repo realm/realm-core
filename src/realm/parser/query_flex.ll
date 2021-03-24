@@ -17,6 +17,7 @@ unicode "\\u"{hex}{4}
 escape  "\\"[\"\'/bfnrt0\\]
 char1    [^\"\\]
 char2    [^\'\\]
+utf8    [\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x80-\xBF])[\x80-\xBF]
 letter  [a-zA-Z_$]
 ws      "\\"[ nrt]
 id_char [a-zA-Z_\-$0-9]
@@ -86,7 +87,7 @@ blank   [ \t\r]
 ("B64\""[a-zA-Z0-9/\+=]*\")         return yy::parser::make_BASE64(yytext);
 (\"({char1}|{escape}|{unicode})*\") return yy::parser::make_STRING (yytext);
 ('({char2}|{escape}|{unicode})*')   return yy::parser::make_STRING (yytext);
-{letter}({id_char}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
+({letter}|{utf8})({id_char}|{utf8}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
 
 .          {
              throw yy::parser::syntax_error

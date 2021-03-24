@@ -94,6 +94,9 @@ static std::vector<std::string> valid_queries = {
     "'\\uffFf' = '\\u0020'",
     "'\\u01111' = 'asdf\\u0111asdf'",
 
+    // utf8
+    "你好=5",
+
     // expressions (numbers, bools, keypaths, arguments)
     "-1 = 12",
     "0 = 001",
@@ -4968,6 +4971,24 @@ TEST(Parser_ClassPrefix)
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "id > 5", 0, mapping_with_prefix), message);
         CHECK_EQUAL(message, "'foo' has no property: 'id'");
     }
+}
+
+TEST(Parser_UTF8)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    ColKey col_dk = t->add_column(type_Int, "løbenummer");
+    ColKey col_ch = t->add_column(type_String, "姓名");
+
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    for (size_t i = 0; i < names.size(); ++i) {
+        Obj obj = t->create_object();
+        obj.set(col_dk, int64_t(i));
+        obj.set(col_ch, StringData(names[i]));
+    }
+
+    verify_query(test_context, t, "løbenummer > 2", 2);
+    verify_query(test_context, t, "姓名 == 'Bob'", 1);
 }
 
 #endif // TEST_PARSER
