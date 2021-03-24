@@ -1333,6 +1333,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     }
 }
 
+void DB::open(BinaryData buffer, bool take_ownership)
+{
+    REALM_ASSERT(0 && "Unimplemented");
+}
 
 void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
@@ -2733,6 +2737,15 @@ DBRef DB::create(Replication& repl, const DBOptions options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, options);
+    return retval;
+}
+
+DBRef DB::create(BinaryData buffer, bool take_ownership)
+{
+    DBOptions options;
+    options.is_immutable = true;
+    DBRef retval = std::make_shared<DBInit>(options);
+    retval->open(buffer, take_ownership);
     return retval;
 }
 

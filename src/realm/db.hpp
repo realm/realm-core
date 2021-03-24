@@ -115,6 +115,7 @@ public:
     // file (or another file), a new DB object is needed.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const DBOptions options = DBOptions());
+    static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
 
@@ -388,12 +389,12 @@ private:
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0; // highest version observed by this DB
+    uint_fast32_t m_local_max_entry = 0;          // highest version observed by this DB
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    util::File::Map<SharedInfo> m_file_map;   // Never remapped, provides access to everything but the ringbuffer
     util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
+    bool m_wait_for_change_enabled = true;    // Initially wait_for_change is enabled
     bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
@@ -444,10 +445,12 @@ private:
     /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
     /// is `false` and an upgrade is required.
     ///
+    /// \throw LogicError if both DBOptions::allow_upgrade and is_immutable is true.
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+    void open(BinaryData, bool take_ownership = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the DB.
@@ -589,7 +592,10 @@ public:
     }
     TransactionRef freeze();
     // Frozen transactions are created by freeze() or DB::start_frozen()
-    bool is_frozen() const noexcept override { return m_transact_stage == DB::transact_Frozen; }
+    bool is_frozen() const noexcept override
+    {
+        return m_transact_stage == DB::transact_Frozen;
+    }
     TransactionRef duplicate();
 
     _impl::History* get_history() const;
@@ -687,9 +693,7 @@ public:
     {
     }
 
-    ~ReadTransaction() noexcept
-    {
-    }
+    ~ReadTransaction() noexcept {}
 
     operator Transaction&()
     {
@@ -734,9 +738,7 @@ public:
     {
     }
 
-    ~WriteTransaction() noexcept
-    {
-    }
+    ~WriteTransaction() noexcept {}
 
     operator Transaction&()
     {
@@ -874,7 +876,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         if (!repl)
             throw LogicError(LogicError::no_history);
 
-        VersionID version = VersionID();                                              // Latest
+        VersionID version = VersionID(); // Latest
         m_history = repl->_get_history_write();
         bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 

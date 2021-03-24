@@ -101,6 +101,11 @@ struct DBOptions {
     /// is exceeded without being consumed, only the most recent entries will be stored.
     size_t metrics_buffer_size;
 
+    /// is_immutable should be set to true if run from a read-only file system.
+    /// this will prevent the DB from making any writes, also disabling the creation
+    /// of write transactions.
+    bool is_immutable = false;
+
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.
     /// It must be writable and allowed to create pipe/fifo file on it.
     /// set_sys_tmp_dir is not a thread-safe call and it is only supposed to be called once
