@@ -98,6 +98,9 @@ void setup_multi_table(Table& table, size_t rows)
     ColKey col_int_list = table.add_column_list(type_Int, "integers");         //  12
     ColKey col_string_list = table.add_column_list(type_String, "strings");    //  13
     ColKey col_dict = table.add_column_dictionary(type_Int, "dictionary");     //  14
+    ColKey col_set = table.add_column_set(type_Int, "set");                    //  15
+    ColKey col_uuid = table.add_column(type_UUID, "uuid");                     //  16
+
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -137,6 +140,7 @@ void setup_multi_table(Table& table, size_t rows)
         obj.set(col_binary, BinaryData("binary", 7));
         obj.set(col_oid, ObjectId());
         obj.set(col_decimal, Decimal128("1.2345"));
+        obj.set(col_uuid, UUID());
         auto int_list = obj.get_list<Int>(col_int_list);
         auto str_list = obj.get_list<String>(col_string_list);
         for (size_t n = 0; n < i % 5; n++) {
@@ -148,6 +152,9 @@ void setup_multi_table(Table& table, size_t rows)
 
         auto dict = obj.get_dictionary(col_dict);
         dict.insert("a", 2);
+
+        auto set = obj.get_set<Int>(col_set);
+        set.insert(123);
     }
 
     // We also want a StringEnumColumn
@@ -514,6 +521,154 @@ TEST(Xjson_LinkList1)
     ss.str("");
     table1->to_json(ss, 2, m, output_mode_xjson_plus);
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
+}
+
+TEST(Xjson_LinkSet1)
+{
+    // Basic non-cyclic LinkList test that also tests column and table renaming
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+
+    // add some more columns to table1 and table2
+    ColKey table1Coll = table1->add_column(type_Int, "int1");
+    ColKey table2Coll = table2->add_column(type_Int, "int2");
+
+    // add some rows
+    auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
+    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+
+
+    table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
+    auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
+    auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
+
+    ColKey col_link2 = table1->add_column_set(*table2, "linkA");
+
+    // set some links
+    auto ll0 = obj0.get_linkset(col_link2); // Links to table 2
+    ll0.insert(k21);
+
+    auto ll1 = obj1.get_linkset(col_link2); // Links to table 2
+    ll1.insert(k21);
+    ll1.insert(k22);
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linkset1", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linkset1", generate_all));
+
+    // Column and table renaming
+    std::map<std::string, std::string> m;
+    m["str1"] = "STR1";
+    m["linkA"] = "LINKA";
+    m["table1"] = "TABLE1";
+    ss.str("");
+    table1->to_json(ss, 2, m, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linkset2", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 2, m, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linkset2", generate_all));
+}
+
+TEST(Xjson_LinkDictionary1)
+{
+    // Basic non-cyclic LinkList test that also tests column and table renaming
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+
+    // add some more columns to table1 and table2
+    ColKey table1Coll = table1->add_column(type_Int, "int1");
+    ColKey table2Coll = table2->add_column(type_Int, "int2");
+
+    // add some rows
+    auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
+    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+
+
+    table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
+    auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
+    auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
+
+    ColKey col_link2 = table1->add_column_dictionary(*table2, "linkA");
+
+    // set some links
+    auto ll0 = obj0.get_dictionary(col_link2); // Links to table 2
+    ll0.insert("key1", k21);
+
+    auto ll1 = obj1.get_dictionary(col_link2); // Links to table 2
+    ll1.insert("key2", k21);
+    ll1.insert("key3", k22);
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linkdict1", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linkdict1", generate_all));
+
+    // Column and table renaming
+    std::map<std::string, std::string> m;
+    m["str1"] = "STR1";
+    m["linkA"] = "LINKA";
+    m["table1"] = "TABLE1";
+    ss.str("");
+    table1->to_json(ss, 2, m, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linkdict2", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 2, m, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linkdict2", generate_all));
+}
+
+TEST(Xjson_DictionaryEmbeddedObject1)
+{
+    // Basic EmbeddedDictionary test
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_embedded_table("table2");
+
+    // add some more columns to table1 and table2
+    ColKey table1Coll = table1->add_column(type_Int, "int1");
+    table2->add_column(type_Int, "int2");
+
+    // add some rows
+    auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
+    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+
+    ColKey col_dict = table1->add_column_dictionary(*table2, "linkA");
+
+    auto dict1 = obj0.get_dictionary(col_dict);
+    dict1.create_and_insert_linked_object("key1").set("int2", 111);
+
+    auto dict2 = obj1.get_dictionary(col_dict);
+    dict2.create_and_insert_linked_object("key2").set("int2", 222);
+    dict2.create_and_insert_linked_object("key3").set("int2", 333);
+
+    std::stringstream ss;
+
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_embeddeddict1", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_embeddeddict1", generate_all));
 }
 
 TEST(Xjson_LinkCycles)
