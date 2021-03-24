@@ -4338,6 +4338,7 @@ TEST(Parser_Mixed)
     auto col_any = table->add_column(type_Mixed, "mixed");
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
+    auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
 
     size_t int_over_50 = 0;
@@ -4368,6 +4369,7 @@ TEST(Parser_Mixed)
         auto obj = origin->create_object();
         auto ll = obj.get_linklist(col_links);
         obj.set(col_link, it->get_key());
+        obj.set(col_mixed, Mixed(it->get_link()));
         for (int64_t j = 0; j < 10; j++) {
             ll.add(it->get_key());
             ++it;
@@ -4405,6 +4407,7 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
     verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
+    verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
     verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
@@ -4424,15 +4427,12 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == int", 71);
 
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
-    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
-                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "link == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'link' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "links == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'links' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
 }
 
 TEST(Parser_TypeOfValue)

@@ -479,6 +479,7 @@ namespace yy {
       // "UUID"
       // "ObjectId"
       // "link"
+      // "typed link"
       // "argument"
       // "beginswith"
       // "endswith"
@@ -578,15 +579,16 @@ namespace yy {
     TOK_UUID = 297,                // "UUID"
     TOK_OID = 298,                 // "ObjectId"
     TOK_LINK = 299,                // "link"
-    TOK_ARG = 300,                 // "argument"
-    TOK_BEGINSWITH = 301,          // "beginswith"
-    TOK_ENDSWITH = 302,            // "endswith"
-    TOK_CONTAINS = 303,            // "contains"
-    TOK_LIKE = 304,                // "like"
-    TOK_BETWEEN = 305,             // "between"
-    TOK_SIZE = 306,                // "@size"
-    TOK_TYPE = 307,                // "@type"
-    TOK_KEY_VAL = 308              // "key or value"
+    TOK_TYPED_LINK = 300,          // "typed link"
+    TOK_ARG = 301,                 // "argument"
+    TOK_BEGINSWITH = 302,          // "beginswith"
+    TOK_ENDSWITH = 303,            // "endswith"
+    TOK_CONTAINS = 304,            // "contains"
+    TOK_LIKE = 305,                // "like"
+    TOK_BETWEEN = 306,             // "between"
+    TOK_SIZE = 307,                // "@size"
+    TOK_TYPE = 308,                // "@type"
+    TOK_KEY_VAL = 309              // "key or value"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -603,7 +605,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 62, ///< Number of tokens.
+        YYNTOKENS = 63, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -650,52 +652,53 @@ namespace yy {
         SYM_UUID = 42,                           // "UUID"
         SYM_OID = 43,                            // "ObjectId"
         SYM_LINK = 44,                           // "link"
-        SYM_ARG = 45,                            // "argument"
-        SYM_BEGINSWITH = 46,                     // "beginswith"
-        SYM_ENDSWITH = 47,                       // "endswith"
-        SYM_CONTAINS = 48,                       // "contains"
-        SYM_LIKE = 49,                           // "like"
-        SYM_BETWEEN = 50,                        // "between"
-        SYM_SIZE = 51,                           // "@size"
-        SYM_TYPE = 52,                           // "@type"
-        SYM_KEY_VAL = 53,                        // "key or value"
-        SYM_54_ = 54,                            // '('
-        SYM_55_ = 55,                            // ')'
-        SYM_56_ = 56,                            // '['
-        SYM_57_ = 57,                            // ']'
-        SYM_58_ = 58,                            // '.'
-        SYM_59_ = 59,                            // ','
-        SYM_60_ = 60,                            // '{'
-        SYM_61_ = 61,                            // '}'
-        SYM_YYACCEPT = 62,                       // $accept
-        SYM_query = 63,                          // query
-        SYM_pred = 64,                           // pred
-        SYM_and_pred = 65,                       // and_pred
-        SYM_atom_pred = 66,                      // atom_pred
-        SYM_value = 67,                          // value
-        SYM_prop = 68,                           // prop
-        SYM_simple_prop = 69,                    // simple_prop
-        SYM_subquery = 70,                       // subquery
-        SYM_pred_suffix = 71,                    // pred_suffix
-        SYM_distinct = 72,                       // distinct
-        SYM_distinct_param = 73,                 // distinct_param
-        SYM_sort = 74,                           // sort
-        SYM_sort_param = 75,                     // sort_param
-        SYM_limit = 76,                          // limit
-        SYM_direction = 77,                      // direction
-        SYM_list = 78,                           // list
-        SYM_list_content = 79,                   // list_content
-        SYM_constant = 80,                       // constant
-        SYM_boolexpr = 81,                       // boolexpr
-        SYM_comp_type = 82,                      // comp_type
-        SYM_post_op = 83,                        // post_op
-        SYM_aggr_op = 84,                        // aggr_op
-        SYM_equality = 85,                       // equality
-        SYM_relational = 86,                     // relational
-        SYM_stringop = 87,                       // stringop
-        SYM_path = 88,                           // path
-        SYM_path_elem = 89,                      // path_elem
-        SYM_id = 90                              // id
+        SYM_TYPED_LINK = 45,                     // "typed link"
+        SYM_ARG = 46,                            // "argument"
+        SYM_BEGINSWITH = 47,                     // "beginswith"
+        SYM_ENDSWITH = 48,                       // "endswith"
+        SYM_CONTAINS = 49,                       // "contains"
+        SYM_LIKE = 50,                           // "like"
+        SYM_BETWEEN = 51,                        // "between"
+        SYM_SIZE = 52,                           // "@size"
+        SYM_TYPE = 53,                           // "@type"
+        SYM_KEY_VAL = 54,                        // "key or value"
+        SYM_55_ = 55,                            // '('
+        SYM_56_ = 56,                            // ')'
+        SYM_57_ = 57,                            // '['
+        SYM_58_ = 58,                            // ']'
+        SYM_59_ = 59,                            // '.'
+        SYM_60_ = 60,                            // ','
+        SYM_61_ = 61,                            // '{'
+        SYM_62_ = 62,                            // '}'
+        SYM_YYACCEPT = 63,                       // $accept
+        SYM_query = 64,                          // query
+        SYM_pred = 65,                           // pred
+        SYM_and_pred = 66,                       // and_pred
+        SYM_atom_pred = 67,                      // atom_pred
+        SYM_value = 68,                          // value
+        SYM_prop = 69,                           // prop
+        SYM_simple_prop = 70,                    // simple_prop
+        SYM_subquery = 71,                       // subquery
+        SYM_pred_suffix = 72,                    // pred_suffix
+        SYM_distinct = 73,                       // distinct
+        SYM_distinct_param = 74,                 // distinct_param
+        SYM_sort = 75,                           // sort
+        SYM_sort_param = 76,                     // sort_param
+        SYM_limit = 77,                          // limit
+        SYM_direction = 78,                      // direction
+        SYM_list = 79,                           // list
+        SYM_list_content = 80,                   // list_content
+        SYM_constant = 81,                       // constant
+        SYM_boolexpr = 82,                       // boolexpr
+        SYM_comp_type = 83,                      // comp_type
+        SYM_post_op = 84,                        // post_op
+        SYM_aggr_op = 85,                        // aggr_op
+        SYM_equality = 86,                       // equality
+        SYM_relational = 87,                     // relational
+        SYM_stringop = 88,                       // stringop
+        SYM_path = 89,                           // path
+        SYM_path_elem = 90,                      // path_elem
+        SYM_id = 91                              // id
       };
     };
 
@@ -813,6 +816,7 @@ namespace yy {
       case symbol_kind::SYM_UUID: // "UUID"
       case symbol_kind::SYM_OID: // "ObjectId"
       case symbol_kind::SYM_LINK: // "link"
+      case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
@@ -1173,6 +1177,7 @@ switch (yykind)
       case symbol_kind::SYM_UUID: // "UUID"
       case symbol_kind::SYM_OID: // "ObjectId"
       case symbol_kind::SYM_LINK: // "link"
+      case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
@@ -2023,6 +2028,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_TYPED_LINK (std::string v)
+      {
+        return symbol_type (token::TOK_TYPED_LINK, std::move (v));
+      }
+#else
+      static
+      symbol_type
+      make_TYPED_LINK (const std::string& v)
+      {
+        return symbol_type (token::TOK_TYPED_LINK, v);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_ARG (std::string v)
       {
         return symbol_type (token::TOK_ARG, std::move (v));
@@ -2483,9 +2503,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 261,     ///< Last index in yytable_.
+      yylast_ = 265,     ///< Last index in yytable_.
       yynnts_ = 29,  ///< Number of nonterminal symbols.
-      yyfinal_ = 38 ///< Termination state number.
+      yyfinal_ = 39 ///< Termination state number.
     };
 
 
@@ -2509,15 +2529,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      54,    55,     2,     2,    59,     2,    58,     2,     2,     2,
+      55,    56,     2,     2,    60,     2,    59,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    56,     2,    57,     2,     2,     2,     2,     2,     2,
+       2,    57,     2,    58,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    60,     2,    61,     2,     2,     2,     2,
+       2,     2,     2,    61,     2,    62,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2535,10 +2555,10 @@ switch (yykind)
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
-      45,    46,    47,    48,    49,    50,    51,    52,    53
+      45,    46,    47,    48,    49,    50,    51,    52,    53,    54
     };
     // Last valid token kind.
-    const int code_max = 308;
+    const int code_max = 309;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2639,6 +2659,7 @@ switch (yykind)
       case symbol_kind::SYM_UUID: // "UUID"
       case symbol_kind::SYM_OID: // "ObjectId"
       case symbol_kind::SYM_LINK: // "link"
+      case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
@@ -2765,6 +2786,7 @@ switch (yykind)
       case symbol_kind::SYM_UUID: // "UUID"
       case symbol_kind::SYM_OID: // "ObjectId"
       case symbol_kind::SYM_LINK: // "link"
+      case symbol_kind::SYM_TYPED_LINK: // "typed link"
       case symbol_kind::SYM_ARG: // "argument"
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
       case symbol_kind::SYM_ENDSWITH: // "endswith"
