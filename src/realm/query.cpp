@@ -537,7 +537,12 @@ Query& Query::between(ColKey column_key, int from, int to)
 
 Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    if (origin_column_key.get_type() == col_type_Mixed) {
+        add_condition<Equal>(origin_column_key, Mixed(target_key));
+    }
+    else {
+        add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    }
     return *this;
 }
 
