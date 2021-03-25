@@ -226,7 +226,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         REQUIRE(!base_url.empty());
         REQUIRE(!config_path.empty());
 
-        // this app id is configured in tests/mongodb/stitch.json
+        // this app id is configured in tests/mongodb/config.json
         auto config = App::Config{get_runtime_app_id(config_path),
                                   factory,
                                   base_url,
