@@ -481,12 +481,13 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     ObjLink new_link;
     if (value.is_type(type_TypedLink)) {
         new_link = value.get<ObjLink>();
-        m_obj.get_table()->get_parent_group()->validate(new_link);
+        if (!new_link.is_unresolved())
+            m_obj.get_table()->get_parent_group()->validate(new_link);
     }
     else if (value.is_type(type_Link)) {
         auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
         auto key = value.get<ObjKey>();
-        if (!target_table->is_valid(key)) {
+        if (!key.is_unresolved() && !target_table->is_valid(key)) {
             throw LogicError(LogicError::target_row_index_out_of_range);
         }
 
