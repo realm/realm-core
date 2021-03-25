@@ -5,6 +5,7 @@
 * Support 'add_int' on a mixed property.
 * UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
 * The error message when the intial steps of opening a Realm file fails is now more descriptive.
+* Allow UTF8 encoded characters in property names in query parser ([#4467](https://github.com/realm/realm-core/issues/4467))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
