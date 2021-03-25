@@ -1009,7 +1009,6 @@ public:
         return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
     }
 
-
     template <class T>
     BacklinkCount<T> get_backlink_count()
     {

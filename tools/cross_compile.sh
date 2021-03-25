@@ -64,7 +64,8 @@ fi
 if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D ANDROID_ABI="${ARCH}" \
