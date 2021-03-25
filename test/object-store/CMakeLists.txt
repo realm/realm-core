@@ -51,6 +51,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_test_utils.cpp
         sync/user.cpp
         sync/app.cpp
+        sync/cloud_sync.cpp
     )
 
 endif()
