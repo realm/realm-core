@@ -137,7 +137,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -667,7 +667,7 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 3);
     }
 
-    SECTION("begin_Transaction() from within a notification adds new changes to the pending callbacks"
+    SECTION("begin_transaction() from within a notification adds new changes to the pending callbacks"
             " and restarts invoking callbacks recursively") {
         size_t calls1 = 0, calls2 = 0, calls3 = 0;
         token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
@@ -827,6 +827,49 @@ TEST_CASE("notifications: async delivery") {
         coordinator->on_change();
         r->begin_transaction();
         REQUIRE_FALSE(r->is_in_transaction());
+    }
+
+    SECTION("committing a transaction after beginning it refreshed from within a notification works") {
+        int calls = 0;
+        auto r2 = coordinator->get_realm();
+        auto table2 = r2->read_group().get_table("class_object");
+
+        SECTION("other write set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                Results results2(r2, table2);
+                auto token2 = results2.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+                advance_and_notify(*r2);
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
+
+        SECTION("other write did not set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
     }
 }
 
