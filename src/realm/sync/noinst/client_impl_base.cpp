@@ -2269,6 +2269,15 @@ void Session::send_upload_message()
                 logger.trace("Changeset(comp): %1 % 2", changeset_data.size(),
                              protocol.compressed_hex_dump(changeset_data));
             }
+
+#if REALM_DEBUG
+            ChunkedBinaryInputStream in{changeset_data};
+            sync::Changeset log;
+            sync::parse_changeset(in, log);
+            std::stringstream ss;
+            log.print(ss);
+            logger.trace("Changeset (parsed):\n%1", ss.str());
+#endif
         }
 
         if (!get_client().m_disable_upload_compaction) {
