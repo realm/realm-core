@@ -742,9 +742,15 @@ inline void Set<T>::clear()
         m_tree->clear();
         bump_content_version();
 
-        // For Set<ObjKey>, we are sure that there are no longer any unresolved
-        // links.
-        m_tree->set_context_flag(false);
+        // For Set<ObjKey> the context flag is used to indicate if the set
+        // contains unresolved links. As the set is now cleared we can clear
+        // this flag.
+        // If 'T' is not ObjKey we must not clear the flag because it can be
+        // used for other purposes for other types, eg. in ArrayBinary it
+        // is used to indicate a 'big blob' array.
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            m_tree->set_context_flag(false);
+        }
     }
 }
 

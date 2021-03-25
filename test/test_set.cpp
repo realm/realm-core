@@ -296,6 +296,62 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
     }
 }
 
+TEST(Set_BinarySets)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.add_table("class_foo");
+        auto set1 = foo->add_column_set(type_Binary, "bin1");
+        auto set2 = foo->add_column_set(type_Binary, "bin2");
+
+        auto obj = foo->create_object();
+        auto s1 = obj.get_set<Binary>(set1);
+        auto s2 = obj.get_set<Binary>(set2);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        auto set1 = foo->get_column_key("bin1");
+        auto set2 = foo->get_column_key("bin2");
+
+        auto s1 = foo->begin()->get_set<Binary>(set1);
+        auto s2 = foo->begin()->get_set<Binary>(set2);
+
+        std::string str1(1024, 'a');
+        std::string str2(256, 'b');
+        std::string str3(64, 'c');
+        std::string str4(256, 'd');
+        std::string str5(1024, 'e');
+
+        s1.insert(BinaryData(str1.data(), str1.size()));
+        s1.insert(BinaryData(str2.data(), str2.size()));
+        s1.insert(BinaryData(str3.data(), str3.size()));
+
+        s2.insert(BinaryData(str3.data(), str3.size()));
+        s2.insert(BinaryData(str4.data(), str4.size()));
+        s2.insert(BinaryData(str5.data(), str5.size()));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        auto set1 = foo->get_column_key("bin1");
+        auto set2 = foo->get_column_key("bin2");
+
+        auto s1 = foo->begin()->get_set<Binary>(set1);
+        auto s2 = foo->begin()->get_set<Binary>(set2);
+
+        s1.assign_intersection(s2);
+        wt.commit();
+    }
+
+    sg->start_read()->verify();
+}
+
 TEST(Set_LnkSetUnresolved)
 {
     Group g;

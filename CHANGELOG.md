@@ -23,6 +23,7 @@
 * Equality queries between mixed and object was not supported in query parser ([#4531](https://github.com/realm/realm-core/issues/4531), since v10.0.0)
 * Syncing sets of objects was not supported ([#4538](https://github.com/realm/realm-core/issues/4538), since v10.0.0)
 * Potential/unconfirmed fix for crashes associated with failure to memory map (low on memory, low on virtual address space). For example ([#4514](https://github.com/realm/realm-core/issues/4514)).
+* Invoking Set<Binary>::clear() - directly or indirectly -  could sometimes leave the database in an inconsistent state leading to a crash.
 
 ### Breaking changes
 * None.
