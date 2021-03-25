@@ -600,6 +600,7 @@ TEST(Xjson_LinkDictionary1)
     table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
     auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
     auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
+    auto k_unres = table2->get_objkey_from_primary_key("t2o4");
 
     ColKey col_link2 = table1->add_column_dictionary(*table2, "linkA");
 
@@ -610,6 +611,7 @@ TEST(Xjson_LinkDictionary1)
     auto ll1 = obj1.get_dictionary(col_link2); // Links to table 2
     ll1.insert("key2", k21);
     ll1.insert("key3", k22);
+    ll1.insert("key4", k_unres);
 
     std::stringstream ss;
 

@@ -1137,31 +1137,31 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 }
                 else if (it.second.is_type(type_TypedLink)) {
                     auto obj_link = it.second.get<ObjLink>();
+                    auto obj_key = obj_link.get_obj_key();
                     auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
+                    auto primary_key_coll = target_table->get_primary_key_column();
 
                     if (target_table->is_embedded()) {
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
                         auto link = it.second.get<ObjKey>();
                         target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
                     }
-                    else if (output_mode == output_mode_xjson && !obj_link.is_unresolved()) {
-                        auto primary_key_coll = target_table->get_primary_key_column();
-                        out_mixed_xjson(out,
-                                        target_table->get_object(obj_link.get_obj_key()).get_any(primary_key_coll));
+                    else if (primary_key_coll && output_mode == output_mode_xjson) {
+                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
                     }
-                    else if (output_mode == output_mode_xjson_plus && !obj_link.is_unresolved()) {
-                        auto primary_key_coll = target_table->get_primary_key_column();
-                        out_mixed_xjson(out,
-                                        target_table->get_object(obj_link.get_obj_key()).get_any(primary_key_coll));
+                    else if (primary_key_coll && output_mode == output_mode_xjson_plus) {
+                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
                     }
-                    else if (link_depth == 0 || link_depth == not_found) {
-                        out << "{\"table\": \"" << target_table->get_name()
-                            << "\", \"key\": " << obj_link.get_obj_key().value << "}";
-                    }
-                    else {
-                        auto obj = target_table->get_object(obj_link.get_obj_key());
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        obj.to_json(out, new_depth, renames, followed, output_mode);
+                    else if (!obj_key.is_unresolved()) {
+                        if (link_depth == 0 || link_depth == not_found) {
+                            out << "{\"table\": \"" << target_table->get_name() << "\", \"key\": " << obj_key.value
+                                << "}";
+                        }
+                        else {
+                            auto obj = target_table->get_object(obj_key);
+                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                            obj.to_json(out, new_depth, renames, followed, output_mode);
+                        }
                     }
                 }
                 else {
