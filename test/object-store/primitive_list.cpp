@@ -990,6 +990,47 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE_INDICES(srchange.deletions, TestType::is_optional);
         }
 
+        SECTION("modify value in place") {
+            REQUIRE(calls == 0);
+            advance_and_notify(*r);
+            REQUIRE(calls == 3);
+            // Remove the existing copy of this value so that the sorted list
+            // doesn't have dupes resulting in an unstable order
+            r->begin_transaction();
+            list.remove(0);
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(calls == 6);
+
+            REQUIRE(list.size() > 0);
+            REQUIRE(list.get<T>(0) == static_cast<T>(values[1]));
+
+            size_t sorted_ndx_pre_modification = sorted.index_of<T>(static_cast<T>(values[1]));
+            r->begin_transaction();
+            list.set(0, static_cast<T>(values[0]));
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(calls == 9);
+            size_t sorted_ndx_post_modification = sorted.index_of<T>(static_cast<T>(values[0]));
+
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.deletions);
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(rchange.insertions);
+            REQUIRE_INDICES(rchange.deletions);
+            REQUIRE_INDICES(rchange.modifications, 0);
+            if (sorted_ndx_pre_modification == sorted_ndx_post_modification) {
+                REQUIRE_INDICES(srchange.insertions);
+                REQUIRE_INDICES(srchange.deletions);
+                REQUIRE_INDICES(srchange.modifications, sorted_ndx_post_modification);
+            }
+            else {
+                REQUIRE_INDICES(srchange.insertions, sorted_ndx_post_modification);
+                REQUIRE_INDICES(srchange.deletions, sorted_ndx_pre_modification);
+                REQUIRE_INDICES(srchange.modifications);
+            }
+        }
+
         SECTION("clear list") {
             advance_and_notify(*r);
 
