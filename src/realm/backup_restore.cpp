@@ -108,6 +108,7 @@ void BackupHandler::restore_from_backup()
         if (backup_exists(m_prefix, v)) {
             prep_logging();
             auto backup_nm = backup_name(m_prefix, v);
+            std::cerr << "Restoring from backup " << backup_nm << std::endl;
             m_logger->info("%1 : Restoring from backup: %2", m_time_buf, backup_nm);
             util::File::move(backup_nm, m_path);
             return;
@@ -125,10 +126,15 @@ void BackupHandler::cleanup_backups()
                 // Assuming time_t is in seconds (should be on posix, but...)
                 auto last_modified = util::File::last_write_time(fn);
                 double diff = difftime(now, last_modified);
+                std::cerr << "Now = " << now << "   Modified = " << last_modified << std::endl;
                 if (diff > v.second) {
                     prep_logging();
+                    std::cerr << "Removing backup file " << fn << " age " << diff << std::endl;
                     m_logger->info("%1 : Removing old backup: %2   (age %3)", m_time_buf, fn, diff);
                     util::File::remove(fn);
+                }
+                else {
+                    std::cerr << "NOT removing backup file " << fn << " age " << diff << std::endl;
                 }
             }
         }
@@ -186,6 +192,9 @@ void BackupHandler::backup_realm_if_needed(int current_file_format_version, int 
     try {
         util::File::copy(m_path, part_name);
         util::File::move(part_name, backup_nm);
+        auto now = std::time(nullptr);
+        std::cerr << "Creating backup " << backup_nm << " at time = " << now << " with timestamp "
+                  << util::File::last_write_time(backup_nm) << std::endl;
         prep_logging();
         m_logger->info("%1 : Completed backup: %2", m_time_buf, backup_nm);
     }

@@ -1774,7 +1774,7 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
     _impl::GroupFriend::fake_target_file_format({});
 }
 
-NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
+ONLY(Upgrade_BackupAtoBbypassAtoC)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
@@ -1827,13 +1827,13 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // downgrade/restore backup of format 200, but simulate that no downgrade
     // is actually shipped. Instead directly move forward to version 203,
-    // bypassing the outlawed 201 and 202. Set an age limit of 100 for any backuo
+    // bypassing the outlawed 201 and 202. Set an age limit of a day for any backuo
     // of version 201 to prevent it from being deleted
     _impl::GroupFriend::fake_target_file_format(203);
     {
         DBOptions options;
         options.accepted_versions = {203, 200};
-        options.to_be_deleted = {{201, 100}};
+        options.to_be_deleted = {{201, 24 * 60 * 60}};
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist, options);
         auto tr = db->start_write();
