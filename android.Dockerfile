@@ -3,7 +3,11 @@ FROM ubuntu:20.04
 ARG NDK_VERSION=r22
 ARG CMAKE_VERSION=3.20.0
 
-ENV DEBIAN_FRONTEND "noninteractive" 
+ENV DEBIAN_FRONTEND "noninteractive"
+
+# adb attempts to write under $HOME/.android but if the container is ran as a user other than root
+# as Jenkins does, this will fail
+ENV HOME /tmp
 
 # Locales
 RUN apt-get clean && apt-get update -qq && apt-get install -y locales && locale-gen en_US.UTF-8
