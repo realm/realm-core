@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 11.0.0-beta.2 Release notes
 
 ### Enhancements
 * Adding overloads of the set methods that operate on collections ([#4226](https://github.com/realm/realm-core/issues/4226))
@@ -9,7 +9,6 @@
 * Allow unresolved links to be inserted in Dictionary.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed queries of min/max/sum/avg on list of primitive mixed. ([#4472](https://github.com/realm/realm-core/pull/4472), never before working)
 * Fixed sort and distinct on dictionary keys, and distinct on dictionary values. ([#4496](https://github.com/realm/realm-core/pull/4496))
 * Fixed getting a dictionary value which is null via `object_store::Dictionary::get<T>(key)` for any type other than Mixed. ([#4496](https://github.com/realm/realm-core/pull/4496))
@@ -27,9 +26,6 @@
 * Potential/unconfirmed fix for crashes associated with failure to memory map (low on memory, low on virtual address space). For example ([#4514](https://github.com/realm/realm-core/issues/4514)).
 * Invoking Set<Binary>::clear() - directly or indirectly -  could sometimes leave the database in an inconsistent state leading to a crash.
 * Fixed name aliasing not working in sort/distinct clauses of the query parser. ([#4550](https://github.com/realm/realm-core/issues/4550), never before working).
-
-### Breaking changes
-* None.
 
 -----------
 
