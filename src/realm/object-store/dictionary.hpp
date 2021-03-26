@@ -44,6 +44,7 @@ public:
     using Collection::Collection;
 
     bool operator==(const Dictionary& rgt) const noexcept;
+    bool operator!=(const Dictionary& rgt) const noexcept;
 
     template <typename T>
     void insert(StringData key, T value);
@@ -111,7 +112,16 @@ void Dictionary::insert(StringData key, T value)
 template <typename T>
 T Dictionary::get(StringData key) const
 {
-    return dict().get(key).get<T>();
+    auto res = dict().get(key);
+    if (res.is_null()) {
+        if constexpr (std::is_same_v<T, Decimal128>) {
+            return Decimal128{realm::null()};
+        }
+        else {
+            return T{};
+        }
+    }
+    return res.get<T>();
 }
 
 template <>
@@ -123,6 +133,10 @@ inline Obj Dictionary::get<Obj>(StringData key) const
 template <typename T, typename Context>
 void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
+    if (ctx.is_null(value)) {
+        this->insert(key, Mixed());
+        return;
+    }
     if (m_is_embedded) {
         validate_embedded(ctx, value, policy);
         auto obj_key = dict().create_and_insert_linked_object(key).get_key();

@@ -32,7 +32,6 @@
 namespace realm {
 class Obj;
 class Query;
-class SortDescriptor;
 class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;

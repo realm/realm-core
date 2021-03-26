@@ -98,6 +98,7 @@ using namespace realm::query_parser;
 %token <std::string> UUID "UUID"
 %token <std::string> OID "ObjectId"
 %token <std::string> LINK "link"
+%token <std::string> TYPED_LINK "typed link"
 %token <std::string> ARG "argument"
 %token <std::string> BEGINSWITH "beginswith"
 %token <std::string> ENDSWITH "endswith"
@@ -232,6 +233,7 @@ constant
     | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
     | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
     | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
+    | TYPED_LINK                { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
     | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
     | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }

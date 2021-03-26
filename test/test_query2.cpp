@@ -5784,6 +5784,7 @@ TEST(Query_Mixed)
     auto col_any = table->add_column(type_Mixed, "any");
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
+    auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
     size_t int_over_50 = 0;
     size_t nb_strings = 0;
@@ -5812,6 +5813,12 @@ TEST(Query_Mixed)
         auto ll = obj.get_linklist(col_links);
 
         obj.set(col_link, it->get_key());
+        if (i % 3) {
+            obj.set(col_mixed, Mixed(i));
+        }
+        else {
+            obj.set(col_mixed, Mixed(table->begin()->get_key()));
+        }
         for (int64_t j = 0; j < 10; j++) {
             ll.add(it->get_key());
             ++it;
@@ -5883,6 +5890,10 @@ TEST(Query_Mixed)
     tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
     CHECK_EQUAL(tv.size(), 72);
 
+    tv = (origin->column<Mixed>(col_mixed) == Mixed(table->begin()->get_key())).find_all();
+    CHECK_EQUAL(tv.size(), 4);
+    tv = (origin->where().links_to(col_mixed, table->begin()->get_key())).find_all();
+    CHECK_EQUAL(tv.size(), 4);
     tv = (origin->link(col_links).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();

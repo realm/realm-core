@@ -2029,6 +2029,11 @@ TEST_CASE("KeyPathMapping generation") {
     SECTION("class aliasing") {
         Schema schema = {
             {"PersistedName", {{"age", PropertyType::Int}}, {}, "AlternativeName"},
+            {"class_with_policy",
+             {{"value", PropertyType::Int},
+              {"child", PropertyType::Object | PropertyType::Nullable, "class_with_policy"}},
+             {{"parents", PropertyType::LinkingObjects | PropertyType::Array, "class_with_policy", "child"}},
+             "ClassWithPolicy"},
         };
         schema.validate();
         config.schema = schema;
@@ -2036,5 +2041,10 @@ TEST_CASE("KeyPathMapping generation") {
         realm::populate_keypath_mapping(mapping, *realm);
         REQUIRE(mapping.has_table_mapping("AlternativeName"));
         REQUIRE("class_PersistedName" == mapping.get_table_mapping("AlternativeName"));
+
+        auto table = realm->read_group().get_table("class_class_with_policy");
+        std::vector<Mixed> args{0};
+        auto q = table->query("parents.value = $0", args, mapping);
+        REQUIRE(q.count() == 0);
     }
 }

@@ -166,16 +166,27 @@ std::string print_value<>(realm::ObjKey k)
 }
 
 template <>
+std::string print_value<>(realm::ObjLink link)
+{
+    std::stringstream ss;
+    if (!link) {
+        ss << "NULL";
+    }
+    else {
+        ss << "L" << link.get_table_key().value << ":" << link.get_obj_key().value;
+    }
+    return ss.str();
+}
+
+template <>
 std::string print_value<>(realm::UUID uuid)
 {
     return "uuid(" + uuid.to_string() + ")";
 }
 
-StringData get_printable_table_name(StringData name)
+StringData get_printable_table_name(StringData name, const std::string& prefix)
 {
-    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
-    static const std::string prefix = "class_";
-    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+    if (prefix.size() && name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
         name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
     }
     return name;
@@ -232,8 +243,9 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = origin->first->get_name();
+        std::string source_table_name = get_printable_table_name(origin->first->get_name(), class_prefix);
         std::string source_col_name = get_column_name(origin->first, origin->second);
+
         return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
                source_col_name;
     }

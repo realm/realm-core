@@ -326,8 +326,7 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not a link column",
-                                              util::serializer::get_printable_table_name(m_current_table->get_name()),
+        throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
                                               m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
@@ -848,7 +847,7 @@ void Table::add_search_index(ColKey col_key)
         return;
 
     if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
-        // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
+        // This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
     }
@@ -982,13 +981,6 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     m_clusters.insert_column(col_key);
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
-        /*
-          FIXME: fails
-        if (col_key == get_primary_key_column())
-            m_tombstones->insert_column(col_key);
-        else if (col_key.get_type() == col_type_BackLink)
-            m_tombstones->insert_column(col_key);
-        */
     }
 
     bump_storage_version();
@@ -2563,10 +2555,9 @@ TableView Table::find_all_binary(ColKey, BinaryData)
     throw util::runtime_error("Not implemented");
 }
 
-ConstTableView Table::find_all_binary(ColKey, BinaryData) const
+ConstTableView Table::find_all_binary(ColKey col_key, BinaryData value) const
 {
-    // FIXME: Implement this!
-    throw util::runtime_error("Not implemented");
+    return const_cast<Table*>(this)->find_all_binary(col_key, value);
 }
 
 TableView Table::find_all_null(ColKey col_key)
@@ -2637,11 +2628,9 @@ void Table::update_from_parent() noexcept
                 index->update_from_parent();
             }
         }
-        // FIXME: REMOVE CONDITIONAL CHECKS?
-        if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent();
-        if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent();
+
+        m_opposite_table.update_from_parent();
+        m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
@@ -3251,7 +3240,7 @@ ObjKey Table::global_to_local_object_id_hashed(GlobalKey object_id) const
 ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                      ObjKey colliding_local_id)
 {
-    // FIXME: Cache these accessors
+    // TODO: Cache these accessors
     Allocator& alloc = m_top.get_alloc();
     Array collision_map{alloc};
     Array hi{alloc};
@@ -3338,7 +3327,7 @@ Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
 void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
-        // FIXME: Cache these accessors
+        // TODO: Cache these accessors
         Array collision_map{m_alloc};
         Array local_id{m_alloc};
 
@@ -3499,7 +3488,7 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
 {
     REALM_ASSERT(!attr.test(col_attr_Indexed));
     REALM_ASSERT(!attr.test(col_attr_Unique)); // Must not be encoded into col_key
-    // FIXME: Change this to be random number mixed with the TableKey.
+
     int64_t col_seq_number = m_top.get_as_ref_or_tagged(top_position_for_column_key).get_as_int();
     unsigned upper = unsigned(col_seq_number ^ get_key().value);
 

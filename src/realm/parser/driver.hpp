@@ -102,6 +102,7 @@ public:
         UUID_T,
         OID,
         LINK,
+        TYPED_LINK,
         NULL_VAL,
         TRUE,
         FALSE,
@@ -389,6 +390,7 @@ public:
     ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping);
     ~ParserDriver();
 
+    util::serializer::SerialisationState m_serializer_state;
     OrNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
@@ -408,6 +410,8 @@ public:
         error_string = err;
         parse_error = true;
     }
+
+    StringData get_printable_name(StringData table_name) const;
 
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);

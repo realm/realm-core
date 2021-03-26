@@ -170,6 +170,19 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
     return false;
 }
 
+static bool (*s_mmap_predicate)(size_t);
+
+void SimulatedFailure::do_prime_mmap(bool (*predicate)(size_t))
+{
+    s_mmap_predicate = predicate;
+}
+
+void SimulatedFailure::do_trigger_mmap(size_t size)
+{
+    if (s_mmap_predicate && s_mmap_predicate(size))
+        throw std::bad_alloc();
+}
+
 #endif // REALM_ENABLE_SIMULATED_FAILURE
 
 

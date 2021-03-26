@@ -40,9 +40,13 @@ struct GlobalKey;
 
 template <class>
 class Lst;
+template <class>
+class Set;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 using LstBasePtr = std::unique_ptr<LstBase>;
+template <class T>
+using SetPtr = std::unique_ptr<Set<T>>;
 using SetBasePtr = std::unique_ptr<SetBase>;
 using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 
@@ -261,6 +265,8 @@ public:
     }
     template <typename U>
     Set<U> get_set(ColKey col_key) const;
+    template <typename U>
+    SetPtr<U> get_set_ptr(ColKey col_key) const;
     LnkSet get_linkset(ColKey col_key) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
@@ -336,6 +342,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
+    void sync(Array& arr);
     int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>

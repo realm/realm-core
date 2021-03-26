@@ -466,7 +466,8 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
 
 size_t Mixed::hash() const
 {
-    REALM_ASSERT(!is_null());
+    if (is_null())
+        return 0;
 
     size_t hash = 0;
     switch (get_type()) {
@@ -577,10 +578,10 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.id_val);
                 break;
             case type_Link:
-                out << ObjKey(m.int_val);
+                out << util::serializer::print_value(ObjKey(m.int_val));
                 break;
             case type_TypedLink:
-                out << m.link_val;
+                out << util::serializer::print_value(m.link_val);
                 break;
             case type_UUID:
                 out << util::serializer::print_value(m.uuid_val);

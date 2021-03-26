@@ -190,6 +190,12 @@ TEST(Dictionary_Links)
         CHECK_EQUAL(lady.get_backlink_count(), 1);
         dict.erase("Pet");
         CHECK_EQUAL(lady.get_backlink_count(), 0);
+
+        dict.insert("Pet", dogs->get_objkey_from_primary_key("pongo"));
+        cmp(dict["Pet"], Mixed());
+        Obj pongo = dogs->create_object_with_primary_key("pongo");
+        CHECK_EQUAL(pongo.get_backlink_count(), 1);
+        cmp(dict["Pet"], Mixed(pongo.get_key()));
     }
 }
 
@@ -231,6 +237,12 @@ TEST(Dictionary_TypedLinks)
         auto invalid_link = pluto.get_link();
         pluto.remove();
         CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+
+        dict.insert("Pet", Mixed(ObjLink(dogs->get_key(), dogs->get_objkey_from_primary_key("pongo"))));
+        cmp(dict["Pet"], Mixed());
+        Obj pongo = dogs->create_object_with_primary_key("pongo");
+        CHECK_EQUAL(pongo.get_backlink_count(), 1);
+        cmp(dict["Pet"], Mixed(pongo.get_link()));
     }
 }
 
