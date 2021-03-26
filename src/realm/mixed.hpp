@@ -161,6 +161,7 @@ public:
     ~Mixed() noexcept
     {
     }
+    enum class SourceType { StronglyTyped, MixedType };
 
     DataType get_type() const noexcept
     {
@@ -175,7 +176,9 @@ public:
     }
 
     static bool types_are_comparable(const Mixed& l, const Mixed& r);
-    static bool data_types_are_comparable(DataType l_type, DataType r_type);
+    static bool data_types_are_comparable(DataType l_type, DataType r_type,
+                                          SourceType l_source = SourceType::StronglyTyped,
+                                          SourceType r_source = SourceType::StronglyTyped);
 
     template <class T>
     T get() const noexcept;
@@ -227,6 +230,10 @@ public:
     }
     size_t hash() const;
     void use_buffer(std::string& buf);
+    void set_source_type(SourceType type)
+    {
+        m_source_type = type;
+    }
 
 protected:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -245,6 +252,8 @@ protected:
         ObjLink link_val;
         UUID uuid_val;
     };
+
+    SourceType m_source_type = SourceType::StronglyTyped;
 
 private:
     static bool _is_type() noexcept

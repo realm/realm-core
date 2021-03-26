@@ -402,7 +402,7 @@ struct NotEqual {
         return true;
     }
 
-    bool operator()(const QueryValue& m1, const Mixed& m2) const
+    bool operator()(const QueryValue& m1, const QueryValue& m2) const
     {
         return !Equal()(m1, m2);
     }

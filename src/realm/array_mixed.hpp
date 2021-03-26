@@ -125,6 +125,7 @@ private:
     {
         return DataType((m_composite.get(ndx) & s_data_type_mask) - 1);
     }
+    Mixed do_get(size_t ndx) const;
     int64_t store(const Mixed&);
     void ensure_array_accessor(Array& arr, size_t ndx_in_parent) const;
     void ensure_int_array() const;

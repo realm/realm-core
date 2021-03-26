@@ -1374,7 +1374,12 @@ protected:
                 auto bin = m_value.get_binary();
                 OwnedBinaryData tmp(bin.data(), bin.size());
                 m_buffer = std::move(tmp);
-                m_value = Mixed(m_buffer.get());
+                if (m_value.get_type() == type_String) {
+                    m_value = Mixed(StringData(m_buffer.get().data(), m_buffer.get().size()));
+                }
+                else {
+                    m_value = Mixed(m_buffer.get());
+                }
             }
         }
     }

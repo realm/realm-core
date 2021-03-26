@@ -210,7 +210,11 @@ TEST(Mixed_Compare)
     CHECK(Mixed(nan("123")) < 5);
 
     std::string str("Hello");
-    CHECK(Mixed(str) == Mixed(BinaryData(str)));
+    Mixed mixed_str(str);
+    Mixed mixed_bin = Mixed(BinaryData(str));
+    CHECK(mixed_str == mixed_bin);
+    mixed_str.set_source_type(Mixed::SourceType::MixedType);
+    CHECK(mixed_str != mixed_bin);
     CHECK_NOT(Mixed::types_are_comparable(Mixed(), Mixed()));
     CHECK(Mixed() == Mixed());
     CHECK(Mixed(0.f) < Mixed(1));
@@ -221,8 +225,13 @@ TEST(Mixed_Compare)
     CHECK(Mixed(BinaryData("b")) < Mixed("c"));
     CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
-    CHECK(Mixed(ObjectId(Timestamp(1, 2), 0, 0)) < Mixed(Timestamp(2, 3)));
+    CHECK(Mixed(Timestamp()) < Mixed(ObjectId()));
+    Mixed oid12 = Mixed(ObjectId(Timestamp(1, 2), 0, 0));
+    Mixed ts23 = Mixed(Timestamp(2, 3));
+    CHECK(oid12 < ts23);
+    oid12.set_source_type(Mixed::SourceType::MixedType);
+    CHECK(oid12 > ts23);
     CHECK(Mixed(Timestamp(1, 2)) < Mixed(ObjectId(Timestamp(2, 3), 0, 0)));
 }
 
-#endif // TEST_ARRAY_VARIANT
+#endif // TEST_ARRAY_MIXED

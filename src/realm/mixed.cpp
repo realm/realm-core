@@ -32,10 +32,10 @@ namespace _impl {
 static const int sorting_rank[19] = {
     0, // null
     0, // type_Int = 0,
-    0, // type_Bool = 1,
+    5, // type_Bool = 1,
     1, // type_String = 2,
     -1,
-    1,  // type_Binary = 4,
+    6,  // type_Binary = 4,
     -1, // type_OldTable = 5,
     -1, // type_Mixed = 6,
     -1, // type_OldDateTime = 7,
@@ -46,9 +46,9 @@ static const int sorting_rank[19] = {
     3,  // type_Link = 12,
     4,  // type_LinkList = 13,
     -1,
-    5, // type_ObjectId = 15,
-    6, // type_TypedLink = 16
-    7, // type_UUID = 17
+    7, // type_ObjectId = 15,
+    8, // type_TypedLink = 16
+    9, // type_UUID = 17
 };
 
 inline int compare_string(StringData a, StringData b)
@@ -178,27 +178,33 @@ bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 
     DataType l_type = lhs.get_type();
     DataType r_type = rhs.get_type();
-    return data_types_are_comparable(l_type, r_type);
+    return data_types_are_comparable(l_type, r_type, lhs.m_source_type, rhs.m_source_type);
 }
 
-bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
+bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type, SourceType l_source, SourceType r_source)
 {
     if (l_type == r_type)
         return true;
 
-    bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
-                        l_type == type_Decimal;
-    bool r_is_numeric = r_type == type_Int || r_type == type_Bool || r_type == type_Float || r_type == type_Double ||
-                        r_type == type_Decimal;
+    bool l_is_numeric = l_type == type_Int || l_type == type_Float || l_type == type_Double || l_type == type_Decimal;
+    bool r_is_numeric = r_type == type_Int || r_type == type_Float || r_type == type_Double || r_type == type_Decimal;
     if (l_is_numeric && r_is_numeric) {
         return true;
     }
-    if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
-        return true;
-    }
-    if ((l_type == type_ObjectId && r_type == type_Timestamp) ||
-        (r_type == type_ObjectId && l_type == type_Timestamp)) {
-        return true;
+    // on strongly typed columns we also allow some coercion which mixed types do not
+    if (l_source == SourceType::StronglyTyped && r_source == SourceType::StronglyTyped) {
+        if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
+            return true;
+        }
+        if ((l_type == type_ObjectId && r_type == type_Timestamp) ||
+            (r_type == type_ObjectId && l_type == type_Timestamp)) {
+            return true;
+        }
+        l_is_numeric = l_type == type_Bool || l_is_numeric;
+        r_is_numeric = r_type == type_Bool || r_is_numeric;
+        if (l_is_numeric && r_is_numeric) {
+            return true;
+        }
     }
     if (l_type == type_Mixed || r_type == type_Mixed) {
         return true; // Mixed is comparable with any type
@@ -245,6 +251,7 @@ int Mixed::compare(const Mixed& b) const
     }
     if (b.is_null())
         return 1;
+    bool strong_typing = m_source_type == SourceType::StronglyTyped && b.m_source_type == SourceType::StronglyTyped;
 
     // None is null
     auto type = get_type();
@@ -253,15 +260,19 @@ int Mixed::compare(const Mixed& b) const
             int64_t i_val = bool_val ? 1 : 0;
             switch (b.get_type()) {
                 case type_Int:
-                    return _impl::compare_generic(i_val, b.int_val);
+                    if (strong_typing)
+                        return _impl::compare_generic(i_val, b.int_val);
                 case type_Bool:
                     return _impl::compare_generic(bool_val, b.bool_val);
                 case type_Float:
-                    return _impl::compare_long_to_double(i_val, b.float_val);
+                    if (strong_typing)
+                        return _impl::compare_long_to_double(i_val, b.float_val);
                 case type_Double:
-                    return _impl::compare_long_to_double(i_val, b.double_val);
+                    if (strong_typing)
+                        return _impl::compare_long_to_double(i_val, b.double_val);
                 case type_Decimal:
-                    return _impl::compare_decimals(Decimal128(i_val), b.decimal_val);
+                    if (strong_typing)
+                        return _impl::compare_decimals(Decimal128(i_val), b.decimal_val);
                 default:
                     break;
             }
@@ -272,7 +283,8 @@ int Mixed::compare(const Mixed& b) const
                 case type_Int:
                     return _impl::compare_generic(int_val, b.int_val);
                 case type_Bool:
-                    return _impl::compare_generic(int_val, int64_t(b.bool_val ? 1 : 0));
+                    if (strong_typing)
+                        return _impl::compare_generic(int_val, int64_t(b.bool_val ? 1 : 0));
                 case type_Float:
                     return _impl::compare_long_to_double(int_val, b.float_val);
                 case type_Double:
@@ -286,9 +298,11 @@ int Mixed::compare(const Mixed& b) const
         case type_String:
             if (b.get_type() == type_String)
                 return _impl::compare_string(get<StringData>(), b.get<StringData>());
+            if (!strong_typing)
+                break;
             [[fallthrough]];
         case type_Binary:
-            if (b.get_type() == type_String || b.get_type() == type_Binary)
+            if (b.get_type() == type_Binary || (b.get_type() == type_String && strong_typing))
                 return _impl::compare_binary(get<BinaryData>(), b.get<BinaryData>());
             break;
         case type_Float:
@@ -296,7 +310,8 @@ int Mixed::compare(const Mixed& b) const
                 case type_Int:
                     return -_impl::compare_long_to_double(b.int_val, float_val);
                 case type_Bool:
-                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, float_val);
+                    if (strong_typing)
+                        return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, float_val);
                 case type_Float:
                     return _impl::compare_float(float_val, b.float_val);
                 case type_Double:
@@ -312,7 +327,8 @@ int Mixed::compare(const Mixed& b) const
                 case type_Int:
                     return -_impl::compare_long_to_double(b.int_val, double_val);
                 case type_Bool:
-                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, double_val);
+                    if (strong_typing)
+                        return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, double_val);
                 case type_Float:
                     return _impl::compare_float(double_val, double(b.float_val));
                 case type_Double:
@@ -327,7 +343,7 @@ int Mixed::compare(const Mixed& b) const
             if (b.get_type() == type_Timestamp) {
                 return _impl::compare_generic(date_val, b.date_val);
             }
-            else if (b.get_type() == type_ObjectId) {
+            else if (b.get_type() == type_ObjectId && strong_typing) {
                 return _impl::compare_generic(date_val, b.id_val.get_timestamp());
             }
             break;
@@ -335,7 +351,7 @@ int Mixed::compare(const Mixed& b) const
             if (b.get_type() == type_ObjectId) {
                 return _impl::compare_generic(id_val, b.id_val);
             }
-            else if (b.get_type() == type_Timestamp) {
+            else if (b.get_type() == type_Timestamp && strong_typing) {
                 return _impl::compare_generic(id_val.get_timestamp(), b.date_val);
             }
             break;
@@ -344,7 +360,8 @@ int Mixed::compare(const Mixed& b) const
                 case type_Int:
                     return _impl::compare_decimals(decimal_val, Decimal128(b.int_val));
                 case type_Bool:
-                    return _impl::compare_decimals(decimal_val, Decimal128(b.bool_val ? 1 : 0));
+                    if (strong_typing)
+                        return _impl::compare_decimals(decimal_val, Decimal128(b.bool_val ? 1 : 0));
                 case type_Float:
                     return _impl::compare_decimal_to_double(decimal_val, double(b.float_val));
                 case type_Double:

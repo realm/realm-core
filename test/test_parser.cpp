@@ -2433,8 +2433,8 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "ANY values == 'one'", 1);
     verify_query(test_context, t, "ANY values CONTAINS[c] 'O'", 2);
     verify_query(test_context, t, "values.length == 3", 2);  // string lengths
-    verify_query(test_context, t, "ANY values == false", 2); // 0 also matching
-    verify_query(test_context, t, "ANY values == true", 3);  // 1 also matching
+    verify_query(test_context, t, "ANY values == false", 1); // numeric 0 not matching
+    verify_query(test_context, t, "ANY values == true", 1);  // numeric 1 not matching
     verify_query(test_context, t, "ANY values == false && ANY values.@type == 'bool'", 1);
     verify_query(test_context, t, "ANY values == true && ANY values.@type == 'bool'", 1);
     verify_query(test_context, t, "values.@type == 'string'", 3);
@@ -2446,7 +2446,7 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "values.@avg == 1", 1);
     verify_query(test_context, t, "values.@avg == 2.725", 1);
     verify_query(test_context, t, "values.@avg == 2.4", 1);
-    verify_query(test_context, t, "values.@min == 0", 2);
+    verify_query(test_context, t, "values.@min == 0", 1); // does not convert bool(false) to 0
     verify_query(test_context, t, "values.@min == 1", 1);
     verify_query(test_context, t, "values.@max == 2", 1);
     verify_query(test_context, t, "values.@max == 4.4", 1);
@@ -4385,9 +4385,9 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed != 50", 99);
     verify_query(test_context, table, "mixed == null", 1);
     verify_query(test_context, table, "mixed != null", 99);
-    verify_query(test_context, table, "mixed beginswith 'String2'", 3); // 20, 24, 28
+    verify_query(test_context, table, "mixed beginswith 'String2'", 2); // 20, 24
     verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"",
-                 3); // 20, 24, 28, this string literal is base64 for 'String2'
+                 1); // 28 this string literal is base64 for 'String2'
     verify_query(test_context, table, "mixed contains \"trin\"", 25);
     verify_query(test_context, table, "mixed like \"Strin*\"", 25);
     verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84

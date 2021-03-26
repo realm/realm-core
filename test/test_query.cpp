@@ -2419,9 +2419,8 @@ TEST(Query_TwoColumnsCrossTypes)
                 bool_vs_numeric_comparison = true;
             }
             else if ((lhs_type == type_Mixed || rhs_type == type_Mixed) &&
-                     ((lhs_type == type_String || rhs_type == type_String) ||
-                      (lhs_type == type_Binary || rhs_type == type_Binary))) {
-                num_expected_matches = num_rows; // mixed was set to the same string/binary value
+                     ((lhs_type == type_String || rhs_type == type_String))) {
+                num_expected_matches = num_rows; // mixed was set to the same string value
             }
             {
                 size_t actual_matches = table.where().equal(lhs, rhs).count();

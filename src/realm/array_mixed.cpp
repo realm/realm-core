@@ -87,6 +87,13 @@ void ArrayMixed::set_null(size_t ndx)
 
 Mixed ArrayMixed::get(size_t ndx) const
 {
+    Mixed m = do_get(ndx);
+    m.set_source_type(Mixed::SourceType::MixedType);
+    return m;
+}
+
+Mixed ArrayMixed::do_get(size_t ndx) const
+{
     int64_t val = m_composite.get(ndx);
 
     if (val) {
