@@ -131,6 +131,56 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
     return true;
 }
 
+#ifdef _WIN32
+
+std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
+{
+    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
+    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
+
+    // Construct a 64 bit value that is the number of nanoseconds from the
+    // Windows epoch which is 1601-01-01 00:00:00 UTC
+    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
+    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
+
+    // FILETIME is 100's of nanoseconds since Windows epoch
+    totalMicros /= 10;
+    // Move it from micros since the Windows epoch to micros since the Unix epoch
+    totalMicros -= kEpochDifferenceMicros;
+
+    std::chrono::duration<uint64_t, std::micro> totalMicrosDur(totalMicros);
+    return std::chrono::system_clock::time_point(totalMicrosDur);
+}
+
+struct WindowsFileHandleHolder {
+    WindowsFileHandleHolder() = default;
+    explicit WindowsFileHandleHolder(HANDLE h)
+        : handle(h)
+    {
+    }
+
+    WindowsFileHandleHolder(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder(const WindowsFileHandleHolder&) = delete;
+    WindowsFileHandleHolder& operator=(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder& operator=(const WindowsFileHandleHolder&) = delete;
+
+    operator HANDLE() const noexcept
+    {
+        return handle;
+    }
+
+    ~WindowsFileHandleHolder()
+    {
+        if (handle != INVALID_HANDLE_VALUE) {
+            ::CloseHandle(handle);
+        }
+    }
+
+    HANDLE handle = INVALID_HANDLE_VALUE;
+};
+
+#endif
+
 } // anonymous namespace
 
 
@@ -1620,17 +1670,29 @@ void File::MapBase::sync()
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
-    struct _stat statbuf;
-    if (::_stat(path.c_str(), &statbuf) != 0) {
-        throw std::system_error(errno, std::system_category(), "stat() failed");
+    auto wpath = string_to_wstring(path);
+    WindowsFileHandleHolder fileHandle(::CreateFileW(wpath.c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                                     OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
     }
+
+    FILETIME mtime = {0};
+    if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileTime failed");
+    }
+
+    auto tp = file_time_to_system_clock(mtime);
+    return std::chrono::system_clock::to_time_t(tp);
 #else
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) != 0) {
         throw std::system_error(errno, std::system_category(), "stat() failed");
     }
-#endif
     return statbuf.st_mtime;
+#endif
 }
 
 File::SizeType File::get_free_space(const std::string& path)
