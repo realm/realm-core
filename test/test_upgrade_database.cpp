@@ -1827,13 +1827,13 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
 
     // downgrade/restore backup of format 200, but simulate that no downgrade
     // is actually shipped. Instead directly move forward to version 203,
-    // bypassing the outlawed 201 and 202. Set an age limit of 1 day for any backuo
+    // bypassing the outlawed 201 and 202. Set an age limit of 2 seconds for any backuo
     // of version 201 to prevent it from being deleted
     _impl::GroupFriend::fake_target_file_format(203);
     {
         DBOptions options;
         options.accepted_versions = {203, 200};
-        options.to_be_deleted = {{201, 24 * 60 * 60}};
+        options.to_be_deleted = {{201, 2}};
         auto hist = make_in_realm_history(path);
         auto db = DB::create(*hist, options);
         auto tr = db->start_write();
