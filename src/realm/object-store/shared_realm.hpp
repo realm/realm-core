@@ -451,9 +451,9 @@ private:
     // that's actually fully working
     bool m_dynamic_schema = true;
 
-    // True while sending the notifications caused by advancing the read
+    // Non-zero while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
-    bool m_is_sending_notifications = false;
+    size_t m_is_sending_notifications = 0;
 
     // True while we're performing a schema migration via this Realm instance
     // to allow for different behavior (such as allowing modifications to

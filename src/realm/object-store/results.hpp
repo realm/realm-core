@@ -20,13 +20,13 @@
 #define REALM_RESULTS_HPP
 
 #include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
-#include <realm/object-store/set.hpp>
-#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
@@ -36,7 +36,6 @@
 
 namespace realm {
 class Mixed;
-class ObjectSchema;
 
 namespace _impl {
 class ResultsNotifierBase;

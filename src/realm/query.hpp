@@ -304,7 +304,7 @@ public:
 
     std::string validate();
 
-    std::string get_description() const;
+    std::string get_description(const std::string& class_prefix = "") const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
     Query& set_ordering(std::unique_ptr<DescriptorOrdering> ordering);

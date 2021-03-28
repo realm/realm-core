@@ -1234,7 +1234,7 @@ void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileM
 #endif
 }
 
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
 
 void File::unmap(void* addr, size_t size) noexcept
 {

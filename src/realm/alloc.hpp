@@ -153,6 +153,11 @@ public:
 
     struct MappedFile;
 
+    static constexpr size_t section_size() noexcept
+    {
+        return 1 << section_shift;
+    }
+
 protected:
     constexpr static int section_shift = 26;
 

@@ -19,15 +19,16 @@
 #include "testsettings.hpp"
 #ifdef TEST_ALLOC
 
-#include <string>
-#include <map>
-#include <unordered_map>
 #include <list>
+#include <map>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
-#include <realm/util/file.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/impl/simulated_failure.hpp>
 #include <realm/util/allocator.hpp>
+#include <realm/util/file.hpp>
 
 #include "test.hpp"
 
@@ -314,10 +315,133 @@ TEST(Alloc_Fuzzy)
     }
 }
 
+TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
+{
+    GROUP_TEST_PATH(path);
+
+    SlabAlloc::Config cfg;
+    SlabAlloc alloc;
+
+    { // Initial Header mapping fails
+        _impl::SimulatedFailure::prime_mmap([](size_t) {
+            return true;
+        });
+        CHECK_THROW(alloc.attach_file(path, cfg), InvalidDatabase);
+        CHECK(!alloc.is_attached());
+    }
+
+    { // Initial Footer mapping fails
+        _impl::SimulatedFailure::prime_mmap([](size_t) {
+            static int c = 0;
+            return ++c > 1;
+        });
+        CHECK_THROW(alloc.attach_file(path, cfg), InvalidDatabase);
+        CHECK(!alloc.is_attached());
+    }
+
+    const size_t page_size = util::page_size();
+
+    { // Verify we can still open the file with the same allocator
+        _impl::SimulatedFailure::prime_mmap(nullptr);
+        alloc.attach_file(path, cfg);
+        CHECK(alloc.is_attached());
+        CHECK(alloc.get_baseline() == page_size);
+
+        alloc.init_mapping_management(1);
+    }
+
+    { // Extendind the first mapping
+        const auto initial_baseline = alloc.get_baseline();
+        const auto initial_version = alloc.get_mapping_version();
+        const char* initial_translated = alloc.translate(1000);
+
+        _impl::SimulatedFailure::prime_mmap([](size_t) {
+            return true;
+        });
+        // Does not expand so it succeeds
+        alloc.update_reader_view(page_size);
+
+        CHECK_THROW(alloc.update_reader_view(page_size * 2), std::bad_alloc);
+        CHECK_EQUAL(initial_baseline, alloc.get_baseline());
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());
+        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+
+        _impl::SimulatedFailure::prime_mmap(nullptr);
+        alloc.get_file().resize(page_size * 2);
+        alloc.update_reader_view(page_size * 2);
+        CHECK_EQUAL(alloc.get_baseline(), page_size * 2);
+        CHECK_EQUAL(initial_version + 1, alloc.get_mapping_version());
+        CHECK_NOT_EQUAL(initial_translated, alloc.translate(1000));
+
+        // Delete the old mapping. Will double-delete it if we incorrectly added
+        // the mapping in the call that failed.
+        alloc.purge_old_mappings(2, 2);
+    }
+
+    // Expand the first mapping to a full section
+    static constexpr auto section_size = Allocator::section_size();
+    alloc.get_file().resize(section_size * 2);
+    alloc.update_reader_view(Allocator::section_size());
+    alloc.purge_old_mappings(3, 3);
+
+    { // Add a new complete section after a complete section
+        const auto initial_baseline = alloc.get_baseline();
+        const auto initial_version = alloc.get_mapping_version();
+        const char* initial_translated = alloc.translate(1000);
+
+        _impl::SimulatedFailure::prime_mmap([](size_t) {
+            return true;
+        });
+
+        CHECK_THROW(alloc.update_reader_view(section_size * 2), std::bad_alloc);
+        CHECK_EQUAL(initial_baseline, alloc.get_baseline());
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());
+        CHECK_EQUAL(initial_translated, alloc.translate(1000));
+
+        _impl::SimulatedFailure::prime_mmap(nullptr);
+        alloc.update_reader_view(section_size * 2);
+        CHECK_EQUAL(alloc.get_baseline(), section_size * 2);
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
+        CHECK_EQUAL(initial_translated, alloc.translate(1000));    // first section was not remapped
+        CHECK_EQUAL(0, *alloc.translate(section_size * 2 - page_size));
+
+        alloc.purge_old_mappings(4, 4);
+    }
+
+    alloc.get_file().resize(section_size * 4);
+
+    { // Add complete section and a a partial section after that
+        const auto initial_baseline = alloc.get_baseline();
+        const auto initial_version = alloc.get_mapping_version();
+        const char* initial_translated_1 = alloc.translate(1000);
+        const char* initial_translated_2 = alloc.translate(section_size + 1000);
+
+        _impl::SimulatedFailure::prime_mmap([](size_t size) {
+            // Let the first allocation succeed and only the second one fail
+            return size < section_size;
+        });
+
+        CHECK_THROW(alloc.update_reader_view(section_size * 3 + page_size), std::bad_alloc);
+        CHECK_EQUAL(initial_baseline, alloc.get_baseline());
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version());
+        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
+
+        _impl::SimulatedFailure::prime_mmap(nullptr);
+        alloc.update_reader_view(section_size * 3 + page_size);
+        CHECK_EQUAL(alloc.get_baseline(), section_size * 3 + page_size);
+        CHECK_EQUAL(initial_version, alloc.get_mapping_version()); // did not alter an existing mapping
+        CHECK_EQUAL(initial_translated_1, alloc.translate(1000));
+        CHECK_EQUAL(initial_translated_2, alloc.translate(section_size + 1000));
+        CHECK_EQUAL(0, *alloc.translate(section_size * 2 + 1000));
+
+        alloc.purge_old_mappings(5, 5);
+    }
+}
+
 namespace {
 
-class TestSlabAlloc : public SlabAlloc
-{
+class TestSlabAlloc : public SlabAlloc {
 
 public:
     size_t test_get_upper_section_boundary(size_t start_pos)
@@ -332,7 +456,8 @@ public:
     {
         return get_section_base(index);
     }
-    size_t test_get_section_index(size_t ref) {
+    size_t test_get_section_index(size_t ref)
+    {
         return get_section_index(ref);
     }
 };

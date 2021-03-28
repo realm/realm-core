@@ -285,12 +285,6 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// The file_size argument must be aligned to a *section* boundary:
-    /// The database file is logically split into sections, each section
-    /// guaranteed to be mapped as a contiguous address range. The allocation
-    /// of memory in the file must ensure that no allocation crosses the
-    /// boundary between two sections.
-    ///
     /// Updates the memory mappings to reflect a new size for the file.
     /// Stale mappings are retained so that they remain valid for other threads,
     /// which haven't yet seen the file size change. The stale mappings are
@@ -305,8 +299,8 @@ public:
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
-    /// retranslated to new pointers. The allocator tries to avoid this, and we
-    /// believe it will only ever occur on Windows based platforms.
+    /// retranslated to new pointers. This will happen whenever the reader view
+    /// is extended unless the old size was aligned to a section boundary.
     uint64_t get_mapping_version()
     {
         return m_mapping_version;

@@ -77,6 +77,13 @@ public:
     /// defined during compilation.
     static constexpr bool is_enabled();
 
+    /// Register a callback which will be invoked whenever mmap is called with
+    /// the size of the mapping. If it returns true, pretend the mmap failed and
+    /// throw std::bad_alloc.
+    static void prime_mmap(bool (*)(size_t));
+    /// Throws std::bad_alloc if a mmap predicate has been set and it returns true.
+    static void trigger_mmap(size_t);
+
     SimulatedFailure(std::error_code);
 
 private:
@@ -85,6 +92,8 @@ private:
     static void do_prime_random(FailureType, int n, int m, uint_fast64_t seed);
     static void do_unprime(FailureType) noexcept;
     static bool do_check_trigger(FailureType) noexcept;
+    static void do_prime_mmap(bool (*)(size_t));
+    static void do_trigger_mmap(size_t);
 #endif
 };
 
@@ -197,6 +206,24 @@ inline constexpr bool SimulatedFailure::is_enabled()
 inline SimulatedFailure::SimulatedFailure(std::error_code ec)
     : std::system_error(ec)
 {
+}
+
+inline void SimulatedFailure::prime_mmap(bool (*predicate)(size_t))
+{
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
+    do_prime_mmap(predicate);
+#else
+    static_cast<void>(predicate);
+#endif
+}
+
+inline void SimulatedFailure::trigger_mmap(size_t size)
+{
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
+    do_trigger_mmap(size);
+#else
+    static_cast<void>(size);
+#endif
 }
 
 inline SimulatedFailure::OneShotPrimeGuard::OneShotPrimeGuard(FailureType failure_type)
