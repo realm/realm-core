@@ -179,6 +179,7 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+    void do_clear();
 
     iterator find_impl(const T& value) const;
 
@@ -337,6 +338,8 @@ template <>
 void Set<ObjKey>::do_insert(size_t, ObjKey);
 template <>
 void Set<ObjKey>::do_erase(size_t);
+template <>
+void Set<ObjKey>::do_clear();
 
 template <>
 void Set<ObjLink>::do_insert(size_t, ObjLink);
@@ -739,18 +742,8 @@ inline void Set<T>::clear()
         if (Replication* repl = this->m_obj.get_replication()) {
             this->clear_repl(repl);
         }
-        m_tree->clear();
+        do_clear();
         bump_content_version();
-
-        // For Set<ObjKey> the context flag is used to indicate if the set
-        // contains unresolved links. As the set is now cleared we can clear
-        // this flag.
-        // If 'T' is not ObjKey we must not clear the flag because it can be
-        // used for other purposes for other types, eg. in ArrayBinary it
-        // is used to indicate a 'big blob' array.
-        if constexpr (std::is_same_v<T, ObjKey>) {
-            m_tree->set_context_flag(false);
-        }
     }
 }
 
@@ -799,15 +792,21 @@ inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 }
 
 template <class T>
-void Set<T>::do_insert(size_t ndx, T value)
+inline void Set<T>::do_insert(size_t ndx, T value)
 {
     m_tree->insert(ndx, value);
 }
 
 template <class T>
-void Set<T>::do_erase(size_t ndx)
+inline void Set<T>::do_erase(size_t ndx)
 {
     m_tree->erase(ndx);
+}
+
+template <class T>
+inline void Set<T>::do_clear()
+{
+    m_tree->clear();
 }
 
 namespace {
