@@ -60,6 +60,7 @@ set(REALM_SOURCES
     utilities.cpp
     uuid.cpp
     version.cpp
+    backup_restore.cpp
 ) # REALM_SOURCES
 
 set(UTIL_SOURCES
@@ -184,6 +185,7 @@ set(REALM_INSTALL_HEADERS
     uuid.hpp
     version.hpp
     version_id.hpp
+    backup_restore.hpp
 
     impl/array_writer.hpp
     impl/cont_transact_hist.hpp
