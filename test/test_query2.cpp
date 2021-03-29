@@ -5883,7 +5883,7 @@ TEST(Query_Mixed)
     tv = table->where().not_equal(col_any, "string2binary", false).find_all();
     CHECK_EQUAL(tv.size(), 99);
 
-    tv = (table->column<Mixed>(col_any) == "String48").find_all();
+    tv = (table->column<Mixed>(col_any) == StringData("String48")).find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any) == 3.).find_all();
     CHECK_EQUAL(tv.size(), 3);

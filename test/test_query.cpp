@@ -2358,48 +2358,36 @@ TEST(Query_TwoSameCols)
 void construct_all_types_table(Table& table)
 {
     table.add_column(type_Int, "int");
-    table.add_column(type_Bool, "bool");
-    table.add_column(type_String, "string");
-    table.add_column(type_Binary, "binary");
-    table.add_column(type_Mixed, "mixed");
-    table.add_column(type_Timestamp, "timestamp");
     table.add_column(type_Float, "float");
     table.add_column(type_Double, "double");
     table.add_column(type_Decimal, "decimal128");
-    table.add_column(type_ObjectId, "objectId");
-    table.add_column(type_UUID, "uuid");
+    table.add_column(type_Mixed, "mixed");
+    table.add_column(type_String, "string");
 
     table.add_column(type_Int, "int?", true);
-    table.add_column(type_Bool, "bool?", true);
-    table.add_column(type_String, "string?", true);
-    table.add_column(type_Binary, "binary?", true);
-    table.add_column(type_Mixed, "mixed?", true);
-    table.add_column(type_Timestamp, "timestamp?", true);
     table.add_column(type_Float, "float?", true);
     table.add_column(type_Double, "double?", true);
     table.add_column(type_Decimal, "decimal128?", true);
-    table.add_column(type_ObjectId, "objectId?", true);
-    table.add_column(type_UUID, "uuid?", true);
+    table.add_column(type_Mixed, "mixed?", true);
+    table.add_column(type_String, "string?", true);
 }
 
-TEST(Query_TwoColumnsCrossTypes)
+TEST(Query_TwoColumnsNumeric)
 {
     Table table;
     construct_all_types_table(table);
     TestValueGenerator gen;
 
-    constexpr size_t num_rows = 10;
+    std::vector<int64_t> ints = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    std::vector<float> floats = gen.values_from_int<float>(ints);
+    std::vector<double> doubles = gen.values_from_int<double>(ints);
+    std::vector<Decimal128> decimals = gen.values_from_int<Decimal128>(ints);
+    std::vector<Mixed> mixeds = gen.values_from_int<Mixed>(ints);
+    std::vector<StringData> strings = gen.values_from_int<StringData>(ints);
+    size_t num_rows = ints.size();
     for (size_t i = 0; i < num_rows; ++i) {
-        std::string str = util::format("foo %1", i);
-        Timestamp ts{int64_t(i), 0};
-        BinaryData bd(str.c_str(), str.size());
-        ObjectId oid(ts, int(i), int(i));
-        UUID uuid = gen.convert_for_test<UUID>(i);
-        table.create_object()
-            .set_all(int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts, float(i), double(i),
-                     Decimal128(int64_t(i)), oid, uuid, int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts,
-                     float(i), double(i), Decimal128(int64_t(i)), oid, uuid)
-            .get_key();
+        table.create_object().set_all(ints[i], floats[i], doubles[i], decimals[i], mixeds[i], strings[i], ints[i],
+                                      floats[i], doubles[i], decimals[i], mixeds[i], strings[i]);
     }
 
     ColKeys columns = table.get_column_keys();
@@ -2409,19 +2397,17 @@ TEST(Query_TwoColumnsCrossTypes)
             ColKey rhs = columns[j];
             DataType lhs_type = DataType(lhs.get_type());
             DataType rhs_type = DataType(rhs.get_type());
-            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type) &&
-                                  !((lhs_type == type_Mixed || rhs_type == type_Mixed) && lhs_type != rhs_type);
-            size_t num_expected_matches = are_comparable ? num_rows : 0;
-            bool bool_vs_numeric_comparison = false;
-            if (are_comparable && ((lhs_type == type_Bool && rhs_type != type_Bool) ||
-                                   (lhs_type != type_Bool && rhs_type == type_Bool))) {
-                num_expected_matches = 2; // bool only stores two values so only matches the first two numerics
-                bool_vs_numeric_comparison = true;
+            size_t num_expected_matches = num_rows;
+            if ((lhs_type == type_Mixed) != (rhs_type == type_Mixed)) {
+                // Only one prop is mixed
+                num_expected_matches = 6;
             }
-            else if ((lhs_type == type_Mixed || rhs_type == type_Mixed) &&
-                     ((lhs_type == type_String || rhs_type == type_String) ||
-                      (lhs_type == type_Binary || rhs_type == type_Binary))) {
-                num_expected_matches = num_rows; // mixed was set to the same string/binary value
+            if ((lhs_type == type_String) != (rhs_type == type_String)) {
+                // Only one prop is string
+                num_expected_matches = 0;
+                if ((lhs_type == type_Mixed) || (rhs_type == type_Mixed)) {
+                    num_expected_matches = 2;
+                }
             }
             {
                 size_t actual_matches = table.where().equal(lhs, rhs).count();
@@ -2436,10 +2422,6 @@ TEST(Query_TwoColumnsCrossTypes)
                 size_t actual_matches = (table.column<Int>(lhs) == table.column<Double>(rhs)).count();
                 CHECK_EQUAL(num_expected_matches, actual_matches);
             }
-            if (lhs_type == type_String && rhs_type == type_Binary) {
-                size_t actual_matches = (table.column<String>(lhs) == table.column<Binary>(rhs)).count();
-                CHECK_EQUAL(num_expected_matches, actual_matches);
-            }
             {
                 size_t actual_matches = table.where().not_equal(lhs, rhs).count();
                 CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
@@ -2449,9 +2431,6 @@ TEST(Query_TwoColumnsCrossTypes)
                 }
             }
             {
-                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
-                    num_expected_matches = num_rows;
-                }
                 size_t actual_matches = table.where().greater_equal(lhs, rhs).count();
                 CHECK_EQUAL(num_expected_matches, actual_matches);
                 if (actual_matches != num_expected_matches) {
@@ -2460,9 +2439,6 @@ TEST(Query_TwoColumnsCrossTypes)
                 }
             }
             {
-                if (bool_vs_numeric_comparison) {
-                    num_expected_matches = (rhs_type == type_Bool) ? 2 : num_rows;
-                }
                 size_t actual_matches = table.where().less_equal(lhs, rhs).count();
                 CHECK_EQUAL(num_expected_matches, actual_matches);
                 if (actual_matches != num_expected_matches) {
@@ -2472,9 +2448,6 @@ TEST(Query_TwoColumnsCrossTypes)
             }
             {
                 num_expected_matches = 0;
-                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
-                    num_expected_matches = num_rows - 2;
-                }
                 size_t actual_matches = table.where().greater(lhs, rhs).count();
                 CHECK_EQUAL(num_expected_matches, actual_matches);
                 if (actual_matches != num_expected_matches) {
@@ -2484,9 +2457,6 @@ TEST(Query_TwoColumnsCrossTypes)
             }
             {
                 num_expected_matches = 0;
-                if (bool_vs_numeric_comparison) {
-                    num_expected_matches = (lhs_type == type_Bool) ? num_rows - 2 : 0;
-                }
                 size_t actual_matches = table.where().less(lhs, rhs).count();
                 CHECK_EQUAL(num_expected_matches, actual_matches);
                 if (actual_matches != num_expected_matches) {
