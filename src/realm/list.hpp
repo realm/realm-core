@@ -159,6 +159,7 @@ protected:
     void do_set(size_t ndx, T value);
     void do_insert(size_t ndx, T value);
     void do_remove(size_t ndx);
+    void do_clear();
 
     friend class LnkLst;
 
@@ -179,13 +180,14 @@ protected:
 
 // Specialization of Lst<ObjKey>:
 template <>
-void Lst<ObjKey>::clear();
-template <>
 void Lst<ObjKey>::do_set(size_t, ObjKey);
 template <>
 void Lst<ObjKey>::do_insert(size_t, ObjKey);
 template <>
 void Lst<ObjKey>::do_remove(size_t);
+template <>
+void Lst<ObjKey>::do_clear();
+
 extern template class Lst<ObjKey>;
 
 // Specialization of Lst<Mixed>:
@@ -546,6 +548,12 @@ inline void Lst<T>::do_remove(size_t ndx)
     m_tree->erase(ndx);
 }
 
+template <class T>
+inline void Lst<T>::do_clear()
+{
+    m_tree->clear();
+}
+
 
 template <typename U>
 inline Lst<U> Obj::get_list(ColKey col_key) const
@@ -577,7 +585,6 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
 template <class T>
 void Lst<T>::clear()
 {
-    static_assert(!std::is_same_v<T, ObjKey>);
     ensure_created();
     update_if_needed();
     this->ensure_writeable();
@@ -585,7 +592,7 @@ void Lst<T>::clear()
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_clear(*this);
         }
-        m_tree->clear();
+        do_clear();
         bump_content_version();
     }
 }
