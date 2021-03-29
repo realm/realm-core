@@ -1671,9 +1671,9 @@ std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
     auto wpath = string_to_wstring(path);
-    WindowsFileHandleHolder fileHandle(::CreateFileW(wpath.c_str(), FILE_READ_ATTRIBUTES,
-                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                                     OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+    WindowsFileHandleHolder fileHandle(::CreateFile2(wpath.c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                     OPEN_EXISTING, nullptr));
 
     if (fileHandle == INVALID_HANDLE_VALUE) {
         throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
