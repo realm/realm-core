@@ -49,6 +49,10 @@ functions:
           source evergreen/cmake_vars_utils.sh
           export CMAKE=$(./evergreen/abspath.sh ${cmake_bindir}/cmake)
 
+          if [ -n "${xcode_developer_dir}" ]; then
+              export DEVELOPER_DIR="${xcode_developer_dir}"
+          fi
+
           if [ -n "${c_compiler}" ]; then
               [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
               set_cmake_var compiler_vars CMAKE_C_COMPILER PATH $(./evergreen/abspath.sh ${c_compiler})
@@ -521,6 +525,7 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
   tasks:
   - name: compile_test
     distros:
@@ -535,6 +540,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
+    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
