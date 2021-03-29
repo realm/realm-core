@@ -978,6 +978,9 @@ void RealmCoordinator::run_async_notifiers()
         // be here even if the notifiers don't need to rerun.
         notifiers = m_notifiers;
     }
+    else {
+        REALM_ASSERT(!skip_version.version);
+    }
 
     auto new_notifiers = std::move(m_new_notifiers);
     m_new_notifiers.clear();
