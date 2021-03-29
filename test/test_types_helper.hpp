@@ -91,13 +91,6 @@ inline ObjectId TestValueGenerator::convert_for_test<ObjectId>(int64_t v)
 }
 
 template <>
-inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
-{
-    static std::vector<Mixed> arr = {4, 5.6, Timestamp(5, 6), "Hello", false};
-    return arr[v % arr.size()];
-}
-
-template <>
 inline util::Optional<ObjectId> TestValueGenerator::convert_for_test<util::Optional<ObjectId>>(int64_t v)
 {
     return util::Optional<ObjectId>(convert_for_test<ObjectId>(v));
@@ -121,6 +114,31 @@ inline BinaryData TestValueGenerator::convert_for_test<BinaryData>(int64_t t)
     b.append(str);
     m_buffer_space.emplace_back(std::move(b));
     return BinaryData(m_buffer_space[m_buffer_space.size() - 1].data(), str.size());
+}
+
+template <>
+inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
+{
+    static std::vector<Mixed> arr = {4, 5.6, Timestamp(5, 6), "Hello", false};
+    switch (v & 0x7) {
+        case 0:
+            return Mixed(v);
+        case 1:
+            return Mixed(true);
+        case 2:
+            return Mixed(convert_for_test<StringData>(v));
+        case 3:
+            return Mixed(convert_for_test<double>(v));
+        case 4:
+            return Mixed(convert_for_test<Timestamp>(v));
+        case 5:
+            return Mixed(convert_for_test<Decimal128>(v));
+        case 6:
+            return Mixed(v);
+        case 7:
+            return Mixed(convert_for_test<UUID>(v));
+    }
+    return Mixed();
 }
 
 enum class ColumnState { Normal = 0, Nullable = 1, Indexed = 2, NullableIndexed = 3 };
