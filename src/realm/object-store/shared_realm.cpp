@@ -80,7 +80,6 @@ Group& Realm::read_group()
 
 Transaction& Realm::transaction()
 {
-    REALM_ASSERT(!m_config.immutable());
     verify_open();
 
     if (!m_transaction)
@@ -90,7 +89,6 @@ Transaction& Realm::transaction()
 
 Transaction& Realm::transaction() const
 {
-    REALM_ASSERT(!m_config.immutable());
     // FIXME: read_group() is not even remotly const
     Realm* nc_realm = const_cast<Realm*>(this);
     return nc_realm->transaction();

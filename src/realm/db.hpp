@@ -403,6 +403,7 @@ private:
     const char* m_key;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
+    std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
 #endif
@@ -809,7 +810,7 @@ struct DB::BadVersion : std::exception {
 
 inline bool DB::is_attached() const noexcept
 {
-    return m_file_map.is_attached();
+    return bool(m_fake_read_lock_if_immutable) || m_file_map.is_attached();
 }
 
 inline DB::TransactStage Transaction::get_transact_stage() const noexcept

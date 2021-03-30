@@ -759,11 +759,27 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #endif
 
     m_db_path = path;
+    SlabAlloc& alloc = m_alloc;
+    if (options.is_immutable) {
+        SlabAlloc::Config cfg;
+        cfg.read_only = true;
+        cfg.no_create = true;
+        cfg.encryption_key = options.encryption_key;
+        try {
+            m_fake_read_lock_if_immutable = std::make_unique<ReadLockInfo>();
+            m_fake_read_lock_if_immutable->m_top_ref = m_alloc.attach_file(path, cfg);
+            m_fake_read_lock_if_immutable->m_file_size = m_alloc.get_baseline();
+            return;
+        }
+        catch (...) {
+            m_fake_read_lock_if_immutable.reset();
+            throw;
+        }
+    }
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
-    SlabAlloc& alloc = m_alloc;
     m_alloc.set_read_only(false);
 
 #if REALM_METRICS
@@ -1335,7 +1351,17 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
 void DB::open(BinaryData buffer, bool take_ownership)
 {
-    REALM_ASSERT(0 && "Unimplemented");
+    try {
+        m_fake_read_lock_if_immutable = std::make_unique<ReadLockInfo>();
+        m_fake_read_lock_if_immutable->m_top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size());
+        m_fake_read_lock_if_immutable->m_file_size = buffer.size();
+    }
+    catch (...) {
+        m_fake_read_lock_if_immutable.reset();
+        throw;
+    }
+    if (take_ownership)
+        m_alloc.own_buffer();
 }
 
 void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
@@ -1534,8 +1560,24 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
-    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
-                   allow_open_read_transactions);
+    if (m_fake_read_lock_if_immutable) {
+        if (!is_attached())
+            return;
+        {
+            std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+            if (!allow_open_read_transactions && m_transaction_count)
+                throw LogicError(LogicError::wrong_transact_state);
+        }
+        if (m_alloc.is_attached())
+            m_alloc.detach();
+        if (m_replication)
+            m_replication->terminate_session();
+        m_fake_read_lock_if_immutable.reset();
+    }
+    else {
+        close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
+                       allow_open_read_transactions);
+    }
 }
 
 void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
@@ -1865,6 +1907,9 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
+    // ignore if opened with immutable file (then we have no lockfile)
+    if (m_fake_read_lock_if_immutable)
+        return;
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     bool found_match = false;
     // simple linear search and move-last-over if a match is found.
@@ -2359,12 +2404,18 @@ TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id);
-    ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+    Transaction* tr;
+    if (m_fake_read_lock_if_immutable) {
+        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
+    }
+    else {
+        ReadLockInfo read_lock;
+        grab_read_lock(read_lock, version_id);
+        ReadLockGuard g(*this, read_lock);
+        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+        g.release();
+    }
     tr->set_file_format_version(get_file_format_version());
-    g.release();
     return TransactionRef(tr, TransactionDeleter);
 }
 
@@ -2372,12 +2423,18 @@ TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id);
-    ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+    Transaction* tr;
+    if (m_fake_read_lock_if_immutable) {
+        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
+    }
+    else {
+        ReadLockInfo read_lock;
+        grab_read_lock(read_lock, version_id);
+        ReadLockGuard g(*this, read_lock);
+        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+        g.release();
+    }
     tr->set_file_format_version(get_file_format_version());
-    g.release();
     return TransactionRef(tr, TransactionDeleter);
 }
 
@@ -2579,6 +2636,9 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 
 TransactionRef DB::start_write(bool nonblocking)
 {
+    if (m_fake_read_lock_if_immutable) {
+        REALM_ASSERT(false && "Can't write an immutable DB");
+    }
     if (nonblocking) {
         bool succes = do_try_begin_write();
         if (!succes) {
