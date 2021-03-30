@@ -83,6 +83,69 @@ struct TestContext : CppContext {
     }
 };
 
+class CreatePolicyRecordingContext {
+public:
+    CreatePolicyRecordingContext(CreatePolicyRecordingContext&, Obj, Property const&) {}
+    CreatePolicyRecordingContext() = default;
+    CreatePolicyRecordingContext(std::shared_ptr<Realm>, const ObjectSchema*) {}
+
+    util::Optional<util::Any> value_for_property(util::Any&, const Property&, size_t) const
+    {
+        return util::none;
+    }
+
+    template <typename Func>
+    void enumerate_collection(util::Any&, Func&&)
+    {
+    }
+
+    template <typename Func>
+    void enumerate_dictionary(util::Any&, Func&&)
+    {
+    }
+
+    bool is_same_set(object_store::Set const&, util::Any const&)
+    {
+        return false;
+    }
+
+    bool is_same_list(List const&, util::Any const&)
+    {
+        return false;
+    }
+
+    bool is_same_dictionary(const object_store::Dictionary&, const util::Any&)
+    {
+        return false;
+    }
+
+    util::Any box(Mixed v) const
+    {
+        return v;
+    }
+
+    template <typename T>
+    T unbox(util::Any& v, CreatePolicy p, ObjKey = ObjKey()) const
+    {
+        last_create_policy = p;
+        return util::any_cast<T>(v);
+    }
+
+    bool is_null(util::Any const& v) const noexcept
+    {
+        return !v.has_value();
+    }
+    util::Any null_value() const noexcept
+    {
+        return {};
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+
+    mutable CreatePolicy last_create_policy;
+};
+
 TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -1219,6 +1282,29 @@ TEST_CASE("object") {
 
         REQUIRE_THROWS(obj.get_property_value<util::Any>(d, "not a property"));
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5))));
+    }
+
+    SECTION("setter has correct create policy") {
+        r->begin_transaction();
+        auto table = r->read_group().get_table("class_all types");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+        CreatePolicyRecordingContext ctx;
+
+        auto validate = [&obj, &ctx](CreatePolicy policy) {
+            obj.set_property_value(ctx, "mixed", util::Any(Mixed("Hello")), policy);
+            REQUIRE(policy.copy == ctx.last_create_policy.copy);
+            REQUIRE(policy.diff == ctx.last_create_policy.diff);
+            REQUIRE(policy.create == ctx.last_create_policy.create);
+            REQUIRE(policy.update == ctx.last_create_policy.update);
+        };
+
+        validate(CreatePolicy::Skip);
+        validate(CreatePolicy::ForceCreate);
+        validate(CreatePolicy::UpdateAll);
+        validate(CreatePolicy::UpdateModified);
+        validate(CreatePolicy::SetLink);
+        r->commit_transaction();
     }
 
     SECTION("list property self-assign is a no-op") {
