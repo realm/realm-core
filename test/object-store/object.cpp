@@ -87,36 +87,36 @@ struct TestContext : CppContext {
 
 class TestContext2 {
 public:
-    TestContext2(TestContext2& c, Obj parent, Property const& prop) {}
+    TestContext2(TestContext2&, Obj, Property const&) {}
     TestContext2() = default;
-    TestContext2(std::shared_ptr<Realm> realm, const ObjectSchema* os = nullptr) {}
+    TestContext2(std::shared_ptr<Realm>, const ObjectSchema* os = nullptr) {}
 
-    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop, size_t) const
+    util::Optional<util::Any> value_for_property(util::Any&, const Property&, size_t) const
     {
         return util::none;
     }
 
     template <typename Func>
-    void enumerate_collection(util::Any& value, Func&& fn)
+    void enumerate_collection(util::Any&, Func&&)
     {
     }
 
     template <typename Func>
-    void enumerate_dictionary(util::Any& value, Func&& fn)
+    void enumerate_dictionary(util::Any&, Func&&)
     {
     }
 
-    bool is_same_set(object_store::Set const& set, util::Any const& value)
-    {
-        return false;
-    }
-
-    bool is_same_list(List const& list, util::Any const& value)
+    bool is_same_set(object_store::Set const&, util::Any const&)
     {
         return false;
     }
 
-    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
+    bool is_same_list(List const&, util::Any const&)
+    {
+        return false;
+    }
+
+    bool is_same_dictionary(const object_store::Dictionary&, const util::Any&)
     {
         return false;
     }
@@ -127,7 +127,7 @@ public:
     }
 
     template <typename T>
-    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const
+    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey = ObjKey()) const
     {
         return util::any_cast<T>(v);
     }
