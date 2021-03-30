@@ -1369,12 +1369,15 @@ protected:
 
     void get_ownership()
     {
-        if (!m_value_is_null) {
-            if (m_value.get_type() == type_String || m_value.get_type() == type_Binary) {
-                auto bin = m_value.get_binary();
-                OwnedBinaryData tmp(bin.data(), bin.size());
-                m_buffer = std::move(tmp);
-                m_value = Mixed(m_buffer.get());
+        if (m_value.is_type(type_String, type_Binary)) {
+            auto bin = m_value.get_binary();
+            m_buffer = OwnedBinaryData(bin.data(), bin.size());
+            auto tmp = m_buffer.get();
+            if (m_value.is_type(type_String)) {
+                m_value = Mixed(StringData(tmp.data(), tmp.size()));
+            }
+            else {
+                m_value = Mixed(tmp);
             }
         }
     }
