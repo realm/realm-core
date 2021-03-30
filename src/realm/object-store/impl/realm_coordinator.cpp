@@ -483,6 +483,7 @@ void RealmCoordinator::open_db()
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
         if (m_history) {
+            options.backup_at_file_format_change = m_config.backup_at_file_format_change;
             m_db = DB::create(*m_history, options);
         }
         else {
@@ -976,6 +977,9 @@ void RealmCoordinator::run_async_notifiers()
         // on_change() can be triggered by things other than writes, so we may
         // be here even if the notifiers don't need to rerun.
         notifiers = m_notifiers;
+    }
+    else {
+        REALM_ASSERT(!skip_version.version);
     }
 
     auto new_notifiers = std::move(m_new_notifiers);

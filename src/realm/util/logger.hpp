@@ -186,6 +186,17 @@ private:
     std::ostream m_out;
 };
 
+class AppendToFileLogger : public StreamLogger {
+public:
+    explicit AppendToFileLogger(std::string path);
+    explicit AppendToFileLogger(util::File);
+
+private:
+    util::File m_file;
+    util::File::Streambuf m_streambuf;
+    std::ostream m_out;
+};
+
 
 /// A thread-safe logger. This logger ignores the level threshold of the base
 /// logger. Instead, it introduces new a LevelThreshold object with a fixed
@@ -462,6 +473,22 @@ inline FileLogger::FileLogger(std::string path)
 }
 
 inline FileLogger::FileLogger(util::File file)
+    : StreamLogger(m_out)
+    , m_file(std::move(file))
+    , m_streambuf(&m_file) // Throws
+    , m_out(&m_streambuf)  // Throws
+{
+}
+
+inline AppendToFileLogger::AppendToFileLogger(std::string path)
+    : StreamLogger(m_out)
+    , m_file(path, util::File::mode_Append) // Throws
+    , m_streambuf(&m_file)                  // Throws
+    , m_out(&m_streambuf)                   // Throws
+{
+}
+
+inline AppendToFileLogger::AppendToFileLogger(util::File file)
     : StreamLogger(m_out)
     , m_file(std::move(file))
     , m_streambuf(&m_file) // Throws

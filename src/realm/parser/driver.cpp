@@ -1145,18 +1145,20 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
             std::vector<std::vector<ColKey>> property_columns;
             for (auto& col_names : cur_ordering->columns) {
                 std::vector<ColKey> columns;
-                ConstTableRef cur_table = target;
+                LinkChain link_chain(target);
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
-                    ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
+                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
                     if (!col_key) {
                         throw InvalidQueryError(
                             util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path], drv->get_printable_name(cur_table->get_name()),
+                                         col_names[ndx_in_path],
+                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
                                          is_distinct ? "distinct" : "sort"));
                     }
                     columns.push_back(col_key);
                     if (ndx_in_path < col_names.size() - 1) {
-                        cur_table = cur_table->get_link_target(col_key);
+                        link_chain.link(col_key);
                     }
                 }
                 property_columns.push_back(columns);

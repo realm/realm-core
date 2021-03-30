@@ -137,7 +137,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -600,7 +600,7 @@ TEST_CASE("notifications: async delivery") {
         }
     }
 
-    SECTION("refresh() from within changes_available() do not interfere with notification delivery") {
+    SECTION("refresh() from within changes_available() works and does not interfere with notification delivery") {
         struct Context : BindingContext {
             Realm& realm;
             Context(Realm& realm)
@@ -643,17 +643,18 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE_FALSE(r->refresh()); // does not advance since it's now up-to-date
     }
 
-    SECTION("begin_transaction() from within a notification does not send notifications immediately") {
-        bool first = true;
+    SECTION("begin_transaction() from within a notification sends notifications recursively") {
+        size_t calls = 0;
         auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
-            if (first)
-                first = false;
-            else {
-                // would deadlock if it tried to send notifications as they aren't ready yet
-                r->begin_transaction();
-                r->cancel_transaction();
-            }
+            if (++calls != 2)
+                return;
+
+            REQUIRE(calls == 2);
+            coordinator->on_change();
+            r->begin_transaction();
+            REQUIRE(calls == 3);
+            r->cancel_transaction();
         });
         advance_and_notify(*r);
 
@@ -661,19 +662,67 @@ TEST_CASE("notifications: async delivery") {
         coordinator->on_change();
         make_remote_change(); // 2
         r->notify();          // advances to version from 1
-        REQUIRE(notification_calls == 2);
-        coordinator->on_change();
+        REQUIRE(notification_calls == 3);
         REQUIRE_FALSE(r->refresh()); // we made the commit locally, so no advancing here
         REQUIRE(notification_calls == 3);
+    }
+
+    SECTION("begin_transaction() from within a notification adds new changes to the pending callbacks"
+            " and restarts invoking callbacks recursively") {
+        size_t calls1 = 0, calls2 = 0, calls3 = 0;
+        token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls1;
+            // This callback is before the callback performing writes and so
+            // sees each notification normally
+            if (calls1 > 1)
+                REQUIRE_INDICES(c.insertions, calls1 + 2);
+        });
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls2;
+            if (calls2 > 1)
+                REQUIRE_INDICES(c.insertions, calls2 + 2);
+            if (calls2 == 10)
+                return;
+
+            // We get here due to a call to begin_transaction() (either at the
+            // top level of the test or later in this function), so we're already
+            // in a write transaction.
+            table->create_object().set_all(5);
+            r->commit_transaction();
+
+            // Calculate the changeset from the wriet we just made and then
+            // start another write, which restarts notification sending and
+            // recursively calls this function again.
+            coordinator->on_change();
+            r->begin_transaction();
+
+            // By the time the outermost begin_transaction() returns we've
+            // recurred all the way to 10
+            REQUIRE(calls2 == 10);
+        });
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls3;
+            // This callback comes after the one performing writes, and so doesn't
+            // even get the initial notification until after all the writes.
+            REQUIRE_INDICES(c.insertions, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+        });
+        coordinator->on_change();
+        r->begin_transaction();
+        r->cancel_transaction();
+
+        REQUIRE(calls1 == 10);
+        REQUIRE(calls2 == 10);
+        REQUIRE(calls3 == 1);
     }
 
     SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
         size_t calls = 0;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
-            if (++calls == 1)
+            if (++calls != 2)
                 return;
 
+            coordinator->on_change();
             // force the read version to advance by beginning a transaction
             r->begin_transaction();
             r->cancel_transaction();
@@ -696,15 +745,17 @@ TEST_CASE("notifications: async delivery") {
         make_remote_change(); // 2
         r->notify();          // advances to version from 1
 
-        REQUIRE(calls == 2);
+        REQUIRE(calls == 3);
         REQUIRE(calls2 == 2);
     }
 
     SECTION("begin_transaction() from within did_change() does not break delivering collection notification") {
         struct Context : BindingContext {
+            _impl::RealmCoordinator& coordinator;
             Realm& realm;
-            Context(Realm& realm)
-                : realm(realm)
+            Context(_impl::RealmCoordinator& coordinator, Realm& realm)
+                : coordinator(coordinator)
+                , realm(realm)
             {
             }
 
@@ -712,12 +763,13 @@ TEST_CASE("notifications: async delivery") {
             {
                 if (!realm.is_in_transaction()) {
                     // advances to version from 2 (and recursively calls this, hence the check above)
+                    coordinator.on_change();
                     realm.begin_transaction();
                     realm.cancel_transaction();
                 }
             }
         };
-        r->m_binding_context.reset(new Context(*r));
+        r->m_binding_context.reset(new Context(*coordinator, *r));
 
         make_remote_change(); // 1
         coordinator->on_change();
@@ -775,6 +827,49 @@ TEST_CASE("notifications: async delivery") {
         coordinator->on_change();
         r->begin_transaction();
         REQUIRE_FALSE(r->is_in_transaction());
+    }
+
+    SECTION("committing a transaction after beginning it refreshed from within a notification works") {
+        int calls = 0;
+        auto r2 = coordinator->get_realm();
+        auto table2 = r2->read_group().get_table("class_object");
+
+        SECTION("other write set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                Results results2(r2, table2);
+                auto token2 = results2.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+                advance_and_notify(*r2);
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
+
+        SECTION("other write did not set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
     }
 }
 
@@ -1026,6 +1121,100 @@ TEST_CASE("notifications: skip") {
 
         exit = true;
         REQUIRE(calls1 == 1);
+    }
+
+    SECTION("skipping from a write inside the skipped callback works") {
+        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            if (c.empty())
+                return;
+            r->begin_transaction();
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+
+        // no more notifications because the writing callback was skipped and
+        // so didn't make a second write
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+    }
+
+    SECTION("skipping from a write inside a callback before the skipped callback works") {
+        int calls3 = 0;
+        CollectionChangeSet changes3;
+        NotificationToken token3;
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls3 == 1);
+            r->begin_transaction();
+            REQUIRE(calls3 == 2);
+            table->create_object();
+            token3.suppress_next();
+            r->commit_transaction();
+        });
+        token3 = add_callback(results, calls3, changes3);
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls3 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls3 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls3 == 2);
+    }
+
+    SECTION("skipping from a write inside a callback after the skipped callback works") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        NotificationToken token2 = add_callback(results, calls2, changes2);
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls2 == 2);
+            r->begin_transaction();
+            REQUIRE(calls2 == 2);
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls2 == 2);
     }
 }
 

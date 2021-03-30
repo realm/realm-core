@@ -95,27 +95,18 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
 
     // Drop any inserted-then-deleted rows, then merge in new insertions
     for (auto it = other.m_deletions.begin(); it != other.m_deletions.end();) {
-        auto previously_inserted = m_insertions.find(*it);
-        auto previously_modified = m_modifications.find(*it);
-        if (previously_modified != m_modifications.end()) {
-            m_modifications.erase(previously_modified);
-        }
-        if (previously_inserted != m_insertions.end()) {
-            m_insertions.erase(previously_inserted);
+        m_modifications.erase(*it);
+        if (m_insertions.erase(*it)) {
             it = m_deletions.erase(it);
         }
         else {
             ++it;
         }
     }
-    if (!other.m_insertions.empty()) {
-        m_insertions.insert(other.m_insertions.begin(), other.m_insertions.end());
-    }
-    if (!other.m_deletions.empty()) {
-        m_deletions.insert(other.m_deletions.begin(), other.m_deletions.end());
-    }
-    for (auto it = other.m_modifications.begin(); it != other.m_modifications.end(); ++it) {
-        m_modifications[it->first].insert(it->second.begin(), it->second.end());
+    m_insertions.merge(std::move(other.m_insertions));
+    m_deletions.merge(std::move(other.m_deletions));
+    for (auto& obj : other.m_modifications) {
+        m_modifications[obj.first].merge(std::move(obj.second));
     }
 
     verify();
@@ -127,6 +118,7 @@ void ObjectChangeSet::verify()
 {
 #ifdef REALM_DEBUG
     for (auto it = m_deletions.begin(); it != m_deletions.end(); ++it) {
+        REALM_ASSERT_EX(m_modifications.find(*it) == m_modifications.end(), *it);
         REALM_ASSERT_EX(m_insertions.find(*it) == m_insertions.end(), *it);
     }
 #endif

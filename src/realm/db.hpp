@@ -33,6 +33,7 @@
 #include <realm/replication.hpp>
 #include <realm/version_id.hpp>
 #include <realm/db_options.hpp>
+#include <realm/util/logger.hpp>
 
 namespace realm {
 

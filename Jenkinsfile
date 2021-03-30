@@ -283,7 +283,7 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
 
-            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
+            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/config.json\""
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
@@ -487,7 +487,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
+            def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
