@@ -48,6 +48,40 @@ std::vector<T> get_vector(std::initializer_list<T> list)
 {
     return std::vector<T>(list);
 }
+} // namespace
+
+struct TestContext : CppContext {
+    std::map<std::string, AnyDict> defaults;
+
+    using CppContext::CppContext;
+    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
+        : CppContext(parent, obj, prop)
+        , defaults(parent.defaults)
+    {
+    }
+
+    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
+    {
+        auto obj_it = defaults.find(object.name);
+        if (obj_it == defaults.end())
+            return util::none;
+        auto prop_it = obj_it->second.find(prop.name);
+        if (prop_it == obj_it->second.end())
+            return util::none;
+        return prop_it->second;
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+    std::string print(util::Any)
+    {
+        return "not implemented";
+    }
+    bool allow_missing(util::Any)
+    {
+        return false;
+    }
+};
 
 class CreatePolicyRecordingContext {
 public:
@@ -91,16 +125,10 @@ public:
     }
 
     template <typename T>
-    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey = ObjKey()) const
-    {
-        return util::any_cast<T>(v);
-    }
-
-    template <>
-    Mixed unbox(util::Any& v, CreatePolicy p, ObjKey) const
+    T unbox(util::Any& v, CreatePolicy p, ObjKey = ObjKey()) const
     {
         last_create_policy = p;
-        return util::any_cast<Mixed>(v);
+        return util::any_cast<T>(v);
     }
 
     bool is_null(util::Any const& v) const noexcept
@@ -116,40 +144,6 @@ public:
     void did_change() {}
 
     mutable CreatePolicy last_create_policy;
-};
-} // namespace
-
-struct TestContext : CppContext {
-    std::map<std::string, AnyDict> defaults;
-
-    using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
-        : CppContext(parent, obj, prop)
-        , defaults(parent.defaults)
-    {
-    }
-
-    util::Optional<util::Any> default_value_for_property(ObjectSchema const& object, Property const& prop)
-    {
-        auto obj_it = defaults.find(object.name);
-        if (obj_it == defaults.end())
-            return util::none;
-        auto prop_it = obj_it->second.find(prop.name);
-        if (prop_it == obj_it->second.end())
-            return util::none;
-        return prop_it->second;
-    }
-
-    void will_change(Object const&, Property const&) {}
-    void did_change() {}
-    std::string print(util::Any)
-    {
-        return "not implemented";
-    }
-    bool allow_missing(util::Any)
-    {
-        return false;
-    }
 };
 
 TEST_CASE("object") {
