@@ -48,8 +48,6 @@ std::vector<T> get_vector(std::initializer_list<T> list)
 {
     return std::vector<T>(list);
 }
-// Used for unit testing CreatePolicy's
-static CreatePolicy last_create_policy;
 } // namespace
 
 struct TestContext : CppContext {
@@ -85,11 +83,11 @@ struct TestContext : CppContext {
     }
 };
 
-class TestContext2 {
+class CreatePolicyRecordingContext {
 public:
-    TestContext2(TestContext2&, Obj, Property const&) {}
-    TestContext2() = default;
-    TestContext2(std::shared_ptr<Realm>, const ObjectSchema* os = nullptr) {}
+    CreatePolicyRecordingContext(CreatePolicyRecordingContext&, Obj, Property const&) {}
+    CreatePolicyRecordingContext() = default;
+    CreatePolicyRecordingContext(std::shared_ptr<Realm>, const ObjectSchema*) {}
 
     util::Optional<util::Any> value_for_property(util::Any&, const Property&, size_t) const
     {
@@ -150,6 +148,8 @@ public:
 
     void will_change(Object const&, Property const&) {}
     void did_change() {}
+
+    mutable CreatePolicy last_create_policy;
 };
 
 TEST_CASE("object") {
@@ -1295,14 +1295,14 @@ TEST_CASE("object") {
         auto table = r->read_group().get_table("class_all types");
         table->create_object_with_primary_key(1);
         Object obj(r, *r->schema().find("all types"), *table->begin());
-        TestContext2 ctx;
+        CreatePolicyRecordingContext ctx;
 
         auto validate = [&obj, &ctx](CreatePolicy policy) {
             obj.set_property_value(ctx, "mixed", util::Any(Mixed("Hello")), policy);
-            REQUIRE(policy.copy == last_create_policy.copy);
-            REQUIRE(policy.diff == last_create_policy.diff);
-            REQUIRE(policy.create == last_create_policy.create);
-            REQUIRE(policy.update == last_create_policy.update);
+            REQUIRE(policy.copy == ctx.last_create_policy.copy);
+            REQUIRE(policy.diff == ctx.last_create_policy.diff);
+            REQUIRE(policy.create == ctx.last_create_policy.create);
+            REQUIRE(policy.update == ctx.last_create_policy.update);
         };
 
         validate(CreatePolicy::Skip);
