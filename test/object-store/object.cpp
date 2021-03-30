@@ -87,21 +87,24 @@ struct TestContext : CppContext {
 
 class TestContext2 {
 public:
-    TestContext2(TestContext2& c, Obj parent, Property const& prop) { }
+    TestContext2(TestContext2& c, Obj parent, Property const& prop) {}
     TestContext2() = default;
-    TestContext2(std::shared_ptr<Realm> realm, const ObjectSchema* os = nullptr) { }
+    TestContext2(std::shared_ptr<Realm> realm, const ObjectSchema* os = nullptr) {}
 
-    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop,
-                                                 size_t) const
+    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop, size_t) const
     {
         return util::none;
     }
 
     template <typename Func>
-    void enumerate_collection(util::Any& value, Func&& fn) { }
+    void enumerate_collection(util::Any& value, Func&& fn)
+    {
+    }
 
     template <typename Func>
-    void enumerate_dictionary(util::Any& value, Func&& fn) { }
+    void enumerate_dictionary(util::Any& value, Func&& fn)
+    {
+    }
 
     bool is_same_set(object_store::Set const& set, util::Any const& value)
     {
@@ -129,7 +132,7 @@ public:
         return util::any_cast<T>(v);
     }
 
-    template<>
+    template <>
     Mixed unbox(util::Any& v, CreatePolicy p, ObjKey) const
     {
         last_create_policy = p;
