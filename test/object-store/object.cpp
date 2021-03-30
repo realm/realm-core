@@ -48,6 +48,8 @@ std::vector<T> get_vector(std::initializer_list<T> list)
 {
     return std::vector<T>(list);
 }
+// Used for unit testing CreatePolicy's
+static CreatePolicy last_create_policy;
 } // namespace
 
 struct TestContext : CppContext {
@@ -81,6 +83,70 @@ struct TestContext : CppContext {
     {
         return false;
     }
+};
+
+class TestContext2 {
+public:
+    TestContext2(TestContext2& c, Obj parent, Property const& prop) { }
+    TestContext2() = default;
+    TestContext2(std::shared_ptr<Realm> realm, const ObjectSchema* os = nullptr) { }
+
+    util::Optional<util::Any> value_for_property(util::Any& dict, const Property& prop,
+                                                 size_t) const
+    {
+        return util::none;
+    }
+
+    template <typename Func>
+    void enumerate_collection(util::Any& value, Func&& fn) { }
+
+    template <typename Func>
+    void enumerate_dictionary(util::Any& value, Func&& fn) { }
+
+    bool is_same_set(object_store::Set const& set, util::Any const& value)
+    {
+        return false;
+    }
+
+    bool is_same_list(List const& list, util::Any const& value)
+    {
+        return false;
+    }
+
+    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
+    {
+        return false;
+    }
+
+    util::Any box(Mixed v) const
+    {
+        return v;
+    }
+
+    template <typename T>
+    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const
+    {
+        return util::any_cast<T>(v);
+    }
+
+    template<>
+    Mixed unbox(util::Any& v, CreatePolicy p, ObjKey) const
+    {
+        last_create_policy = p;
+        return util::any_cast<Mixed>(v);
+    }
+
+    bool is_null(util::Any const& v) const noexcept
+    {
+        return !v.has_value();
+    }
+    util::Any null_value() const noexcept
+    {
+        return {};
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
 };
 
 TEST_CASE("object") {
@@ -1219,6 +1285,29 @@ TEST_CASE("object") {
 
         REQUIRE_THROWS(obj.get_property_value<util::Any>(d, "not a property"));
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5))));
+    }
+
+    SECTION("setter has correct create policy") {
+        r->begin_transaction();
+        auto table = r->read_group().get_table("class_all types");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+        TestContext2 ctx;
+
+        auto validate = [&obj, &ctx](CreatePolicy policy) {
+            obj.set_property_value(ctx, "mixed", util::Any(Mixed("Hello")), policy);
+            REQUIRE(policy.copy == last_create_policy.copy);
+            REQUIRE(policy.diff == last_create_policy.diff);
+            REQUIRE(policy.create == last_create_policy.create);
+            REQUIRE(policy.update == last_create_policy.update);
+        };
+
+        validate(CreatePolicy::Skip);
+        validate(CreatePolicy::ForceCreate);
+        validate(CreatePolicy::UpdateAll);
+        validate(CreatePolicy::UpdateModified);
+        validate(CreatePolicy::SetLink);
+        r->commit_transaction();
     }
 
     SECTION("list property self-assign is a no-op") {
