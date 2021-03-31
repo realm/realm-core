@@ -26,9 +26,9 @@
 #include <ostream>
 
 #include <realm.hpp>
+#include <external/json/json.hpp>
 
 #include "util/misc.hpp"
-#include "util/jsmn.hpp"
 
 #include "test.hpp"
 
@@ -166,27 +166,21 @@ bool json_test(std::string json, std::string expected_file, bool generate)
     std::string file_name = get_test_resource_path();
     file_name += expected_file + ".json";
 
-    jsmn_parser p;
-    jsmntok_t* t = new jsmntok_t[10000];
-    jsmn_init(&p);
-    int r = jsmn_parse(&p, json.c_str(), strlen(json.c_str()), t, 10000);
-    delete[] t;
-    if (r < 0)
-        return false;
+    auto j = nlohmann::json::parse(json);
 
     if (generate) {
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
         std::ofstream test_file(file_name.c_str(), std::ios::out | std::ios::binary);
-        test_file << json;
+        test_file << j;
         std::cerr << "\n----------------------------------------\n";
         std::cerr << "Generated " << expected_file << ":\n";
         std::cerr << json << "\n----------------------------------------\n";
         return true;
     }
     else {
-        std::string expected;
+        nlohmann::json expected;
         std::ifstream test_file(file_name.c_str(), std::ios::in | std::ios::binary);
 
         // fixme, find a way to use CHECK from a function
@@ -194,8 +188,8 @@ bool json_test(std::string json, std::string expected_file, bool generate)
             return false;
         if (test_file.fail())
             return false;
-        getline(test_file, expected);
-        if (json != expected) {
+        test_file >> expected;
+        if (j != expected) {
             std::cout << json << std::endl;
             std::cout << expected << std::endl;
             std::string file_name = get_test_resource_path();
