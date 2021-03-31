@@ -490,7 +490,6 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         if (!key.is_unresolved() && !target_table->is_valid(key)) {
             throw LogicError(LogicError::target_row_index_out_of_range);
         }
-
         new_link = ObjLink(target_table->get_key(), key);
         value = Mixed(new_link);
     }

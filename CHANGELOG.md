@@ -1,8 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Update the to_json() function to properly encode UUIDs, mixed types, dictionaries, and sets as MongoDB extended JSON. 
 * Remove type coercion on bool and ObjectId when doing queries.
 * Pass CreatePolicy to `unbox<T>` from the object accessor.
+
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

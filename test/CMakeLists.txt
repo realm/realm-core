@@ -193,7 +193,6 @@ if(REALM_ENABLE_SYNC)
 	    util/crypt_key.cpp
 	    util/demangle.cpp
 	    util/dump_changesets.cpp
-	    util/jsmn.cpp
 	    util/misc.cpp
 	    util/mock_metrics.cpp
 	    util/quote.cpp
@@ -214,7 +213,6 @@ if(REALM_ENABLE_SYNC)
 	    util/check_system_error.hpp
 	    util/crypt_key.hpp
 	    util/demangle.hpp
-	    util/jsmn.hpp
 	    util/misc.hpp
 	    util/mock_metrics.hpp
 	    util/number_names.hpp
