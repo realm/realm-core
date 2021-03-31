@@ -501,9 +501,9 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         }
         case Bson::Type::Uuid: {
             const UUID& u = static_cast<UUID>(b);
-            out << "{\"$binary\": {\"base64\": \"";
+            out << "{\"$binary\":{\"base64\":\"";
             out << u.to_base64();
-            out << "\", \"subType\": \"04\"}}";
+            out << "\",\"subType\":\"04\"}}";
             break;
         }
     }
