@@ -1345,6 +1345,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         close();
         throw;
     }
+
+    m_alloc.set_read_only(true);
 }
 
 
@@ -2065,6 +2067,8 @@ void DB::finish_begin_write()
         m_balancemutex.unlock();
     }
 #endif // REALM_ASYNC_DAEMON
+
+    m_alloc.set_read_only(false);
 }
 
 
@@ -2075,6 +2079,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
 }
@@ -2590,8 +2595,8 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (nonblocking) {
-        bool succes = do_try_begin_write();
-        if (!succes) {
+        bool success = do_try_begin_write();
+        if (!success) {
             return TransactionRef();
         }
     }
