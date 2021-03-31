@@ -91,6 +91,13 @@ inline ObjectId TestValueGenerator::convert_for_test<ObjectId>(int64_t v)
 }
 
 template <>
+inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
+{
+    static std::vector<Mixed> arr = {4, 5.6, Timestamp(5, 6), "Hello", false};
+    return arr[v % arr.size()];
+}
+
+template <>
 inline util::Optional<ObjectId> TestValueGenerator::convert_for_test<util::Optional<ObjectId>>(int64_t v)
 {
     return util::Optional<ObjectId>(convert_for_test<ObjectId>(v));

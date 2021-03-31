@@ -1001,6 +1001,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
             break;
         }
+        case Type::TYPED_LINK: {
+            size_t colon_pos = text.find(":");
+            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
+            auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
+            ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
+            break;
+        }
         case Type::NULL_VAL:
             if (hint == type_String) {
                 ret = new ConstantStringValue(StringData()); // Null string
@@ -1097,7 +1104,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                         ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     case type_TypedLink:
-                        if (hint == type_Link || hint == type_TypedLink) {
+                        if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
                             ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
                             break;
                         }
@@ -1178,18 +1185,20 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
             std::vector<std::vector<ColKey>> property_columns;
             for (auto& col_names : cur_ordering->columns) {
                 std::vector<ColKey> columns;
-                ConstTableRef cur_table = target;
+                LinkChain link_chain(target);
                 for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
-                    ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
+                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
                     if (!col_key) {
                         throw InvalidQueryError(
                             util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path], drv->get_printable_name(cur_table->get_name()),
+                                         col_names[ndx_in_path],
+                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
                                          is_distinct ? "distinct" : "sort"));
                     }
                     columns.push_back(col_key);
                     if (ndx_in_path < col_names.size() - 1) {
-                        cur_table = cur_table->get_link_target(col_key);
+                        link_chain.link(col_key);
                     }
                 }
                 property_columns.push_back(columns);

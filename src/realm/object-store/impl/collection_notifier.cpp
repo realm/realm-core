@@ -353,6 +353,11 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
     util::CheckedLockGuard lock(m_callback_mutex);
     auto it = find_callback(token);
     if (it != end(m_callbacks)) {
+        // We're inside a write on this collection's Realm, so the callback
+        // should have already been called and there are no versions after
+        // this one yet
+        REALM_ASSERT(it->changes_to_deliver.empty());
+        REALM_ASSERT(it->accumulated_changes.empty());
         it->skip_next = true;
     }
 }
@@ -444,7 +449,8 @@ void CollectionNotifier::after_advance()
         }
         callback.initial_delivered = true;
 
-        auto changes = std::move(callback.changes_to_deliver);
+        auto changes = std::move(callback.changes_to_deliver).finalize();
+        callback.changes_to_deliver = {};
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
@@ -455,7 +461,8 @@ void CollectionNotifier::after_advance()
 
 void CollectionNotifier::deliver_error(std::exception_ptr error)
 {
-    // Don't complain about double-unregistering callbacks
+    // Don't complain about double-unregistering callbacks if we sent an error
+    // because we're going to remove all the callbacks immediately.
     m_error = true;
 
     m_callback_count = m_callbacks.size();
@@ -484,7 +491,11 @@ bool CollectionNotifier::package_for_delivery()
         return false;
     util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks) {
-        callback.changes_to_deliver = std::move(callback.accumulated_changes).finalize();
+        // changes_to_deliver will normally be empty here. If it's non-empty
+        // then that means package_for_delivery() was called multiple times
+        // without the notification actually being delivered, which can happen
+        // if the Realm was refreshed from within a notification callback.
+        callback.changes_to_deliver.merge(std::move(callback.accumulated_changes));
         callback.accumulated_changes = {};
     }
     m_callback_count = m_callbacks.size();
@@ -496,7 +507,7 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
 {
     util::CheckedUniqueLock callback_lock(m_callback_mutex);
     REALM_ASSERT_DEBUG(m_callback_count <= m_callbacks.size());
-    for (++m_callback_index; m_callback_index < m_callback_count; ++m_callback_index) {
+    for (m_callback_index = 0; m_callback_index < m_callback_count; ++m_callback_index) {
         fn(callback_lock, m_callbacks[m_callback_index]);
         if (!callback_lock.owns_lock())
             callback_lock.lock_unchecked();
@@ -529,10 +540,13 @@ void CollectionNotifier::add_changes(CollectionChangeBuilder change)
     util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks) {
         if (callback.skip_next) {
+            // Only the first commit in a batched set of transactions can be
+            // skipped, so if we already have some changes something went wrong.
             REALM_ASSERT_DEBUG(callback.accumulated_changes.empty());
             callback.skip_next = false;
         }
         else {
+            // Only copy the changeset if there's more callbacks that need it
             if (&callback == &m_callbacks.back())
                 callback.accumulated_changes.merge(std::move(change));
             else
@@ -599,10 +613,4 @@ void NotifierPackage::after_advance()
     }
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
-}
-
-void NotifierPackage::add_notifier(std::shared_ptr<CollectionNotifier> notifier)
-{
-    m_notifiers.push_back(notifier);
-    m_coordinator->register_notifier(notifier);
 }

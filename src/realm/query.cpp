@@ -537,7 +537,12 @@ Query& Query::between(ColKey column_key, int from, int to)
 
 Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    if (origin_column_key.get_type() == col_type_Mixed) {
+        add_condition<Equal>(origin_column_key, Mixed(target_key));
+    }
+    else {
+        add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    }
     return *this;
 }
 
@@ -1110,6 +1115,17 @@ Decimal128 Query::sum_decimal128(ColKey column_key) const
     return st.result_sum();
 }
 
+Decimal128 Query::sum_mixed(ColKey column_key) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
+    QueryStateSum<Mixed> st;
+    aggregate<Mixed>(st, column_key);
+    return st.result_sum();
+}
+
 // Maximum
 
 int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
@@ -1160,6 +1176,27 @@ Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) cons
     return st.get_max();
 }
 
+Mixed Query::maximum_mixed(ColKey column_key, ObjKey* return_ndx) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    QueryStateMax<Mixed> st;
+    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
+    return st.get_max();
+}
+
+Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    QueryStateMax<Timestamp> st;
+    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
+    return st.get_max();
+}
 
 // Minimum
 
@@ -1221,17 +1258,16 @@ Decimal128 Query::minimum_decimal128(ColKey column_key, ObjKey* return_ndx) cons
     return st.get_min();
 }
 
-Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
+Mixed Query::minimum_mixed(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
+    QueryStateMin<Mixed> st;
+    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
+    return st.get_min();
 }
-
 
 // Average
 
@@ -1274,6 +1310,13 @@ Decimal128 Query::average_decimal128(ColKey column_key, size_t* resultcount) con
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
     return average<Decimal128>(column_key, resultcount);
+}
+Decimal128 Query::average_mixed(ColKey column_key, size_t* resultcount) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
+#endif
+    return average<Mixed>(column_key, resultcount);
 }
 
 

@@ -59,6 +59,7 @@ function(use_faster_linker)
         set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
         check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
         if(HAVE_LINKER_${LINKER})
+            message(STATUS Using linker ${LINKER})
             add_link_options("-fuse-ld=${LINKER}")
             return()
         endif()
@@ -92,15 +93,14 @@ endif()
 
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
-    # - Replace `-O2` with `-Oz`.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
-    add_compile_options($<$<CONFIG:Release>:-Oz>)
-
-    # On some architectures char is unsigned by default. Make it signed
-    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
+    # - On some architectures char is unsigned by default. Make it signed
+    # - Compile with -Oz in Release because on Android we favor code size over performance
+    # 
+    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})

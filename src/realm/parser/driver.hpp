@@ -102,6 +102,7 @@ public:
         UUID_T,
         OID,
         LINK,
+        TYPED_LINK,
         NULL_VAL,
         TRUE,
         FALSE,

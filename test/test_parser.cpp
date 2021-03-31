@@ -94,6 +94,9 @@ static std::vector<std::string> valid_queries = {
     "'\\uffFf' = '\\u0020'",
     "'\\u01111' = 'asdf\\u0111asdf'",
 
+    // utf8
+    "你好=5",
+
     // expressions (numbers, bools, keypaths, arguments)
     "-1 = 12",
     "0 = 001",
@@ -2519,13 +2522,11 @@ TEST(Parser_SortAndDistinctSerialisation)
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
 }
 
-TableView get_sorted_view(TableRef t, std::string query_string)
+TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
 {
-    Query q = t->query(query_string);
-
-    std::string query_description = q.get_description();
-    Query q2 = t->query(query_description);
-
+    Query q = t->query(query_string, {}, mapping);
+    std::string query_description = q.get_description(mapping.get_backlink_class_prefix());
+    Query q2 = t->query(query_description, {}, mapping);
     return q2.find_all();
 }
 
@@ -2565,75 +2566,143 @@ TEST(Parser_SortAndDistinct)
     p3.set(age_col, 28);
     p3.set(account_col, account2.get_key());
 
+    query_parser::KeyPathMapping mapping;
+    mapping.add_mapping(people, "sol_rotations", "age");
+    mapping.add_mapping(people, "nominal_identifier", "name");
+    mapping.add_mapping(people, "holdings", "account");
+    mapping.add_mapping(accounts, "funds", "balance");
+    mapping.add_mapping(accounts, "sum_of_actions", "num_transactions");
+
     // person:                      | account:
     // name     age     account     | balance       num_transactions
     // Adam     28      0 ->        | 50.55         2
     // Frank    30      1 ->        | 50.55         73
     // Ben      28      2 ->        | 98.92         17
 
-    // sort serialisation
-    TableView tv = get_sorted_view(people, "age > 0 SORT(age ASC)");
-    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) <= tv.get(row_ndx).get<Int>(age_col));
+    {
+        auto check_tv = [&](TableView tv) {
+            for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) <= tv.get(row_ndx).get<Int>(age_col));
+            }
+        };
+        check_tv(get_sorted_view(people, "age > 0 SORT(age ASC)"));
+        check_tv(get_sorted_view(people, "sol_rotations > 0 SORT(sol_rotations ASC)", mapping));
     }
 
-    tv = get_sorted_view(people, "age > 0 SORT(age DESC)");
-    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) >= tv.get(row_ndx).get<Int>(age_col));
+    {
+        auto check_tv = [&](TableView tv) {
+            for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) >= tv.get(row_ndx).get<Int>(age_col));
+            }
+        };
+        check_tv(get_sorted_view(people, "age > 0 SORT(age DESC)"));
+        check_tv(get_sorted_view(people, "sol_rotations > 0 SORT(sol_rotations DESC)", mapping));
     }
 
-    tv = get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)");
-    CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Adam");
-    CHECK_EQUAL(tv.get(2).get<String>(name_col), "Frank");
-
-    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance ascending)");
-    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
-        ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
-        CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) <=
-              accounts->get_object(link_ndx2).get<double>(balance_col));
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 3);
+            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Adam");
+            CHECK_EQUAL(tv.get(2).get<String>(name_col), "Frank");
+        };
+        check_tv(get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)"));
+        check_tv(
+            get_sorted_view(people, "sol_rotations > 0 SORT(sol_rotations ASC, nominal_identifier DESC)", mapping));
     }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance descending)");
-    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
-        ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
-        CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) >=
-              accounts->get_object(link_ndx2).get<double>(balance_col));
+    {
+        auto check_tv = [&](TableView tv) {
+            for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+                ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
+                ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+                CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) <=
+                      accounts->get_object(link_ndx2).get<double>(balance_col));
+            }
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(account.balance ascending)", mapping));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(holdings.funds ascending)", mapping));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(account.funds ascending)", mapping));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(holdings.balance ascending)", mapping));
     }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)");
-    CHECK_EQUAL(tv.size(), 2);
-    for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) != tv.get(row_ndx).get<Int>(age_col));
+    {
+        auto check_tv = [&](TableView tv) {
+            for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+                ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
+                ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+                CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) >=
+                      accounts->get_object(link_ndx2).get<double>(balance_col));
+            }
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(account.balance descending)", mapping));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(holdings.funds descending)", mapping));
     }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)");
-    CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
-    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
-    CHECK_EQUAL(tv.get(2).get<String>(name_col), "Ben");
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 2);
+            for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
+                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) != tv.get(row_ndx).get<Int>(age_col));
+            }
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)"));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(sol_rotations)", mapping));
+    }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)");
-    CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 3);
+            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
+            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+            CHECK_EQUAL(tv.get(2).get<String>(name_col), "Ben");
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)", mapping));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(sol_rotations, holdings.funds)", mapping));
+    }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)");
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get<Int>(age_col), 28);
-    CHECK_EQUAL(tv.get(1).get<Int>(age_col), 30);
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 1);
+            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)"));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(sol_rotations) DISTINCT(holdings.funds)", mapping));
+    }
 
-    tv = get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)");
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 2);
+            CHECK_EQUAL(tv.get(0).get<Int>(age_col), 28);
+            CHECK_EQUAL(tv.get(1).get<Int>(age_col), 30);
+        };
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)"));
+        check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(sol_rotations ASC) DISTINCT(sol_rotations)", mapping));
+    }
 
-    tv = get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)");
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 2);
+            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+        };
+        check_tv(
+            get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)"));
+        check_tv(get_sorted_view(people,
+                                 "TRUEPREDICATE SORT(nominal_identifier DESC) DISTINCT(sol_rotations) "
+                                 "SORT(nominal_identifier ASC) DISTINCT(nominal_identifier)",
+                                 mapping));
+    }
+
+    {
+        auto check_tv = [&](TableView tv) {
+            CHECK_EQUAL(tv.size(), 2);
+            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+        };
+        check_tv(get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)"));
+        check_tv(get_sorted_view(people, "holdings.sum_of_actions > 10 SORT(nominal_identifier ASC)", mapping));
+    }
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE DISTINCT(balance)"), message);
@@ -4338,6 +4407,7 @@ TEST(Parser_Mixed)
     auto col_any = table->add_column(type_Mixed, "mixed");
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
+    auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
 
     size_t int_over_50 = 0;
@@ -4368,6 +4438,7 @@ TEST(Parser_Mixed)
         auto obj = origin->create_object();
         auto ll = obj.get_linklist(col_links);
         obj.set(col_link, it->get_key());
+        obj.set(col_mixed, Mixed(it->get_link()));
         for (int64_t j = 0; j < 10; j++) {
             ll.add(it->get_key());
             ++it;
@@ -4405,6 +4476,7 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
     verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
+    verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
     verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
@@ -4424,15 +4496,12 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == int", 71);
 
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
-    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
-                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "link == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'link' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "links == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'links' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
 }
 
 TEST(Parser_TypeOfValue)
@@ -4968,6 +5037,24 @@ TEST(Parser_ClassPrefix)
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "id > 5", 0, mapping_with_prefix), message);
         CHECK_EQUAL(message, "'foo' has no property: 'id'");
     }
+}
+
+TEST(Parser_UTF8)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    ColKey col_dk = t->add_column(type_Int, "løbenummer");
+    ColKey col_ch = t->add_column(type_String, "姓名");
+
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    for (size_t i = 0; i < names.size(); ++i) {
+        Obj obj = t->create_object();
+        obj.set(col_dk, int64_t(i));
+        obj.set(col_ch, StringData(names[i]));
+    }
+
+    verify_query(test_context, t, "løbenummer > 2", 2);
+    verify_query(test_context, t, "姓名 == 'Bob'", 1);
 }
 
 #endif // TEST_PARSER
