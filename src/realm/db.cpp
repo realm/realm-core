@@ -1436,6 +1436,7 @@ void DB::open(Replication& repl, const DBOptions options)
 // transaction. The user must ensure that this race never happens if she uses DB::close().
 bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
 
     // To enter compact, the DB object must already have been attached to a file,
@@ -1538,6 +1539,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
 uint_fast64_t DB::get_number_of_versions()
 {
+    if (m_fake_read_lock_if_immutable)
+        return 1;
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
@@ -1559,6 +1562,7 @@ DB::~DB() noexcept
 
 void DB::release_all_read_locks() noexcept
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
     SharedInfo* r_info = m_reader_map.get_addr();
     for (auto& read_lock : m_local_locks_held) {
@@ -1664,12 +1668,15 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
 
 bool DB::has_changed(TransactionRef tr)
 {
+    if (m_fake_read_lock_if_immutable)
+        return false; // immutable doesn't change
     bool changed = tr->m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
 bool DB::wait_for_change(TransactionRef tr)
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     while (tr->m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
@@ -1681,6 +1688,8 @@ bool DB::wait_for_change(TransactionRef tr)
 
 void DB::wait_for_change_release()
 {
+    if (m_fake_read_lock_if_immutable)
+        return;
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
     m_new_commit_available.notify_all();
@@ -1689,6 +1698,8 @@ void DB::wait_for_change_release()
 
 void DB::enable_wait_for_change()
 {
+    if (m_fake_read_lock_if_immutable)
+        return;
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
@@ -2218,6 +2229,8 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
 
 VersionID DB::get_version_id_of_latest_snapshot()
 {
+    if (m_fake_read_lock_if_immutable)
+        return {m_fake_read_lock_if_immutable->m_version, 0};
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
     // mutex, another thread may be performing changes to the ringbuffer
