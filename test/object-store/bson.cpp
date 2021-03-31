@@ -164,10 +164,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         }
 
         SECTION("subtype 0x04 (UUID)") {
-            run_corpus<UUID>("u", {"{\"u\":{\"$binary\":{\"base64\":\"ASNFZ4mrze/ty6mHZUMhAQ==\",\"subType\":\"04\"}}}", [](auto val) {
-                                       auto uuid = UUID("01234567-89ab-cdef-edcb-a98765432101");
-                                       CHECK(val == uuid);
-                                   }});
+            run_corpus<UUID>(
+                "u",
+                {"{\"u\":{\"$binary\":{\"base64\":\"ASNFZ4mrze/ty6mHZUMhAQ==\",\"subType\":\"04\"}}}", [](auto val) {
+                     auto uuid = UUID("01234567-89ab-cdef-edcb-a98765432101");
+                     CHECK(val == uuid);
+                 }});
         }
     }
 
