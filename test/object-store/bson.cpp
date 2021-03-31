@@ -106,7 +106,7 @@ TEST_CASE("canonical_extjson_fragments", "[bson]") {
 
     SECTION("UUID") {
         auto a = bson::parse("{ \"$uuid\" : \"c8edabc3-f738-4ca3-b68d-ab92a91478a3\"}");
-        auto b = bson::parse("{ \"$binary\":{\"base64\":\"yO2rw/c4TKO2jauSqRR4ow==\",\"subType\":\"04\"}}");
+        auto b = bson::parse("{ \"$binary\" : {\"base64\" : \"yO2rw/c4TKO2jauSqRR4ow==\", \"subType\" : \"04\"}}");
         auto uuid = UUID("c8edabc3-f738-4ca3-b68d-ab92a91478a3");
         CHECK((a == uuid));
         CHECK((b == uuid));
