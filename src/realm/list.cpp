@@ -219,53 +219,42 @@ void Lst<ObjKey>::do_remove(size_t ndx)
 }
 
 template <>
-void Lst<ObjKey>::clear()
+void Lst<ObjKey>::do_clear()
 {
-    update_if_needed();
-    auto sz = Lst<ObjKey>::size();
+    auto origin_table = m_obj.get_table();
+    TableRef target_table = m_obj.get_target_table(m_col_key);
 
-    if (sz > 0) {
-        auto origin_table = m_obj.get_table();
-        TableRef target_table = m_obj.get_target_table(m_col_key);
-
-        if (Replication* repl = m_obj.get_replication())
-            repl->list_clear(*this); // Throws
-
-        if (!target_table->is_embedded()) {
-            size_t ndx = sz;
-            while (ndx--) {
-                do_set(ndx, null_key);
-                m_tree->erase(ndx);
-            }
-            // m_obj.bump_both_versions();
-            m_obj.bump_content_version();
-            m_tree->set_context_flag(false);
-            return;
+    size_t sz = size();
+    if (!target_table->is_embedded()) {
+        size_t ndx = sz;
+        while (ndx--) {
+            do_set(ndx, null_key);
+            m_tree->erase(ndx);
         }
-
-        TableKey target_table_key = target_table->get_key();
-        ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
-
-        CascadeState state;
-
-        typedef _impl::TableFriend tf;
-        size_t num_links = size();
-        for (size_t ndx = 0; ndx < num_links; ++ndx) {
-            ObjKey target_key = m_tree->get(ndx);
-            Obj target_obj = target_table->get_object(target_key);
-            target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
-            size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
-            if (num_remaining == 0) {
-                state.m_to_be_deleted.emplace_back(target_table_key, target_key);
-            }
-        }
-
-        m_tree->clear();
-        m_obj.bump_both_versions();
         m_tree->set_context_flag(false);
-
-        tf::remove_recursive(*origin_table, state); // Throws
+        return;
     }
+
+    TableKey target_table_key = target_table->get_key();
+    ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
+
+    CascadeState state;
+
+    typedef _impl::TableFriend tf;
+    for (size_t ndx = 0; ndx < sz; ++ndx) {
+        ObjKey target_key = m_tree->get(ndx);
+        Obj target_obj = target_table->get_object(target_key);
+        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
+        if (num_remaining == 0) {
+            state.m_to_be_deleted.emplace_back(target_table_key, target_key);
+        }
+    }
+
+    m_tree->clear();
+    m_tree->set_context_flag(false);
+
+    tf::remove_recursive(*origin_table, state); // Throws
 }
 
 template <>

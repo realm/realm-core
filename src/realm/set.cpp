@@ -155,6 +155,17 @@ void Set<ObjKey>::do_erase(size_t ndx)
 }
 
 template <>
+void Set<ObjKey>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_erase(ndx);
+    }
+
+    m_tree->set_context_flag(false);
+}
+
+template <>
 void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
 {
     m_obj.set_backlink(m_col_key, target_link);

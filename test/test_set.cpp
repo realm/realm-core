@@ -173,6 +173,9 @@ TEST(Set_Links)
     CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
     CHECK_EQUAL(set_links.find(bar4.get_key()), realm::npos);
     CHECK_THROW_ANY(set_links.insert({}));
+    set_links.erase(bar1.get_key());
+    CHECK_EQUAL(bar1.get_backlink_count(), 0);
+    set_links.insert(bar1.get_key());
 
     set_typed_links.insert(bar1.get_link());
     set_typed_links.insert(bar2.get_link());
@@ -346,6 +349,40 @@ TEST(Set_BinarySets)
         auto s2 = foo->begin()->get_set<Binary>(set2);
 
         s1.assign_intersection(s2);
+        wt.commit();
+    }
+
+    sg->start_read()->verify();
+}
+
+TEST(Set_TableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.add_table("class_foo");
+        TableRef origin = wt.add_table("class_origin");
+        auto set = origin->add_column_set(*foo, "set");
+
+        auto obj = foo->create_object();
+        auto s1 = origin->create_object().get_linkset(set);
+        s1.insert(obj.get_key());
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef origin = wt.get_or_add_table("class_origin");
+        auto set = origin->get_column_key("set");
+        auto s1 = origin->begin()->get_linkset(set);
+        s1.clear();
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        foo->clear();
         wt.commit();
     }
 
