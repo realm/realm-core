@@ -78,7 +78,7 @@ const bool generate_all = false;
 // make all successive runs compare their produced json with these files
 //
 // All produced json is automatically checked for syntax regardless of
-// the setting of generate_all. This is done using the 'jsmn' parser.
+// the setting of generate_all. This is done using the 'nlohmann::json' parser.
 
 void setup_multi_table(Table& table, size_t rows)
 {
