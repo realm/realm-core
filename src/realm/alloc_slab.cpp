@@ -27,6 +27,7 @@
 
 #ifdef REALM_DEBUG
 #include <iostream>
+#include <unordered_set>
 #endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
@@ -706,11 +707,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = cfg.read_only || cfg.no_create ? File::create_Never : File::create_Auto;
-    // FIXME: Currently we cannot enforce read-only mode on every allocation
-    // in the shared slab allocator, because we always create a minimal group
-    // representation in memory, even in a read-transaction, if the file is empty.
-    // m_is_read_only = cfg.read_only;
-    set_read_only(false);
+    set_read_only(cfg.read_only);
     m_file.open(path.c_str(), access, create, 0); // Throws
     auto physical_file_size = m_file.get_size();
     // Note that get_size() may (will) return a different size before and after
@@ -844,29 +841,16 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // We must extend the file to a page boundary (unless already there)
         // The file must be extended to match in size prior to being mmapped,
         // as extending it after mmap has undefined behavior.
-
-        // The mapping of the first part of the file *must* be contiguous, because
-        // we do not know if the file was created by a version of the code, that took
-        // the section boundaries into account. If it wasn't we cannot map it in sections
-        // without risking datastructures that cross a mapping boundary.
-
-        // FIXME: This should be replaced by special handling for the older file formats,
-        // where we map contiguously but split the mapping into same sized maps afterwards.
-        // This will allow os to avoid a lot of mapping manipulations during file open.
         if (cfg.read_only) {
-
             // If the file is opened read-only, we cannot extend it. This is not a problem,
             // because for a read-only file we assume that it will not change while we use it.
             // This assumption obviously will not hold, if the file is shared by multiple
             // processes or threads with different opening modes.
             // Currently, there is no way to detect if this assumption is violated.
             m_baseline = 0;
-            ;
         }
         else {
-
             if (cfg.session_initiator || !cfg.is_shared) {
-
                 // We can only safely extend the file if we're the session initiator, or if
                 // the file isn't shared at all. Extending the file to a page boundary is ONLY
                 // done to ensure well defined behavior for memory mappings. It does not matter,
@@ -1166,7 +1150,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // that there was already something mapped after the last section
         REALM_ASSERT(!cur_entry.xover_mapping.is_attached());
         // save the old mapping/keep it open
-        m_old_mappings.emplace_back(m_youngest_live_version, std::move(cur_entry.primary_mapping));
+        m_old_mappings.push_back({m_youngest_live_version, std::move(cur_entry.primary_mapping)});
         m_mappings.pop_back();
         m_mapping_version++;
     }
@@ -1218,7 +1202,8 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     for (size_t i = 0; i < m_translation_table_size - 1; ++i) {
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
-    m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+    m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - m_slabs.size(),
+                                    m_ref_translation_ptr.load());
     new_fast_mapping[m_translation_table_size - 1].mapping_addr = address;
     // Memory ranges with slab (working memory) can never have arrays that straddle a boundary,
     // so optimize by clamping the lowest possible xover offset to the end of the section.
@@ -1238,7 +1223,8 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
         if (m_translation_table_size)
-            m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
+            m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - free_space_size,
+                                            m_ref_translation_ptr.load());
         m_translation_table_size = num_mappings + free_space_size;
         new_translation_table = new RefTranslation[m_translation_table_size];
         old_num_sections = 0;
@@ -1291,35 +1277,51 @@ void SlabAlloc::get_or_add_xover_mapping(RefTranslation& txl, size_t index, size
     txl.xover_mapping_addr.store(map_entry->xover_mapping.get_addr(), std::memory_order_release);
 }
 
+void SlabAlloc::verify_old_translations(uint64_t youngest_live_version)
+{
+    // Verify that each old ref translation pointer still points to a valid
+    // thing that we haven't released yet.
+#if REALM_DEBUG
+    std::unordered_set<const char*> mappings;
+    for (auto& m : m_old_mappings) {
+        REALM_ASSERT(m.mapping.is_attached());
+        mappings.insert(m.mapping.get_addr());
+    }
+    for (auto& m : m_mappings) {
+        REALM_ASSERT(m.primary_mapping.is_attached());
+        mappings.insert(m.primary_mapping.get_addr());
+        if (m.xover_mapping.is_attached())
+            mappings.insert(m.xover_mapping.get_addr());
+    }
+    if (m_data)
+        mappings.insert(m_data);
+    for (auto& t : m_old_translations) {
+        REALM_ASSERT_EX(youngest_live_version == 0 || t.replaced_at_version < youngest_live_version,
+                        youngest_live_version, t.replaced_at_version);
+        if (nonempty_attachment()) {
+            for (size_t i = 0; i < t.translation_count; ++i)
+                REALM_ASSERT(mappings.count(t.translations[i].mapping_addr));
+        }
+    }
+#else
+    static_cast<void>(youngest_live_version);
+#endif
+}
+
 
 void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version)
 {
     std::lock_guard<std::mutex> lock(m_mapping_mutex);
-    for (size_t i = 0; i < m_old_mappings.size();) {
-        if (m_old_mappings[i].replaced_at_version >= oldest_live_version) {
-            ++i;
-            continue;
-        }
-        // move last over:
-        auto oldie = std::move(m_old_mappings[i]);
-        m_old_mappings[i] = std::move(m_old_mappings.back());
-        m_old_mappings.pop_back();
-        oldie.mapping.unmap();
-    }
+    verify_old_translations(youngest_live_version);
 
-    for (size_t i = 0; i < m_old_translations.size();) {
-        if (m_old_translations[i].replaced_at_version < oldest_live_version) {
-            // This translation is too old - purge by move last over:
-            auto oldie = std::move(m_old_translations[i]);
-            m_old_translations[i] = std::move(m_old_translations.back());
-            m_old_translations.pop_back();
-            delete[] oldie.translations;
-        }
-        else {
-            ++i;
-        }
-    }
+    auto pred = [=](auto& oldie) {
+        return oldie.replaced_at_version < oldest_live_version;
+    };
+    m_old_mappings.erase(std::remove_if(m_old_mappings.begin(), m_old_mappings.end(), pred), m_old_mappings.end());
+    m_old_translations.erase(std::remove_if(m_old_translations.begin(), m_old_translations.end(), pred),
+                             m_old_translations.end());
     m_youngest_live_version = youngest_live_version;
+    verify_old_translations(youngest_live_version);
 }
 
 void SlabAlloc::init_mapping_management(uint64_t currently_live_version)

@@ -250,6 +250,9 @@ public:
         // Maximum number of active versions in the Realm file allowed before an exception
         // is thrown.
         uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
+
+        // Disable automatic backup at file format upgrade by setting to false
+        bool backup_at_file_format_change = true;
     };
 
     // Returns a thread-confined live Realm for the given configuration

@@ -4,7 +4,11 @@
 * Update the to_json() function to properly encode UUIDs, mixed types, dictionaries, and sets as MongoDB extended JSON. 
 * Remove type coercion on bool and ObjectId when doing queries.
 * Pass CreatePolicy to `unbox<T>` from the object accessor.
-
+* We now make a backup of the realm file prior to any file format upgrade. The backup is retained for 3 months.
+  Backups from before a file format upgrade allows for better analysis of any upgrade failure. We also restore
+  a backup, if a) an attempt is made to open a realm file whith a "future" file format and b) a backup file exist
+  that fits the current file format. ([#4166](https://github.com/realm/realm-core/pull/4166))
+* Make conversion of Decimal128 to/from string work for numbers with more than 19 significant digits. ([#4548](https://github.com/realm/realm-core/issues/4548))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -16,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* Add additional debug validation to file map management that will hopefully catch cases where we unmap something which is still in use.
 
 ----------------------------------------------
 

@@ -30,15 +30,13 @@
 #endif
 
 #include <realm.hpp>
-#include <realm/query_expression.hpp>
-#include <realm/util/to_string.hpp>
-#include <realm/util/file.hpp>
-#include <realm/version.hpp>
 #include <realm/history.hpp>
-
+#include <realm/query_expression.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/to_string.hpp>
+#include <realm/version.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
-
 
 using namespace realm;
 using namespace realm::util;
@@ -81,9 +79,9 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-// Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
-// it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
-// even read using Get()) without upgrading the database first.
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -381,7 +379,8 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
-TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction,
+        REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -671,7 +670,9 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { DB sg(temp_copy); });
+        tt.start([&]() {
+            DB sg(temp_copy);
+        });
     }
 
     for (auto& tt : t)
@@ -778,7 +779,9 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int) { throw std::exception(); };
+    auto exception_callback = [&](int, int) {
+        throw std::exception();
+    };
     auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
@@ -1695,6 +1698,169 @@ TEST(Upgrade_FixColumnKeys)
 
     auto hist = make_in_realm_history(temp_copy);
     DB::create(*hist)->start_read()->verify();
+}
+
+NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
+
+    // Build a realm file with format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->add_table("MyTable");
+        table->add_column(type_String, "names");
+        tr->commit();
+    }
+
+    // upgrade to format 201
+    _impl::GroupFriend::fake_target_file_format(201);
+    {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        table->create_object().set(col, "hr hansen");
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // downgrade/restore backup of format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        CHECK(table->size() == 0); // no sign of "hr hansen"
+        table->create_object().set(col, "mr Kirby");
+        tr->commit();
+    }
+    CHECK(!File::exists(prefix + "v200.backup.realm"));
+
+    // move forward to version 202, bypassing the outlawed 201
+    _impl::GroupFriend::fake_target_file_format(202);
+    {
+        DBOptions options;
+        options.accepted_versions = {202, 200};
+        options.to_be_deleted = {{201, 0}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        CHECK(table->size() == 1);
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // Cleanup file and disable mockup versioning
+    File::try_remove(prefix + "v200.backup.realm");
+    _impl::GroupFriend::fake_target_file_format({});
+}
+
+NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
+    File::try_remove(prefix + "v201.backup.realm");
+
+    // Build a realm file with format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->add_table("MyTable");
+        table->add_column(type_String, "names");
+        tr->commit();
+    }
+
+    // upgrade to format 201
+    _impl::GroupFriend::fake_target_file_format(201);
+    {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        table->create_object().set(col, "hr hansen");
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // upgrade further to 202, based on 201, to create a v201 backup
+    _impl::GroupFriend::fake_target_file_format(202);
+    {
+        DBOptions options;
+        options.accepted_versions = {202, 201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+
+    // downgrade/restore backup of format 200, but simulate that no downgrade
+    // is actually shipped. Instead directly move forward to version 203,
+    // bypassing the outlawed 201 and 202. Set an age limit of 2 seconds for any backuo
+    // of version 201 to prevent it from being deleted
+    _impl::GroupFriend::fake_target_file_format(203);
+    {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 2}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        CHECK(table->size() == 0);
+        tr->commit();
+    }
+
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+    // Ask for v201 to have a max age of one sec.
+    // When opened more than a sec later,
+    // the v201 backup will be too old and automagically removed
+    millisleep(2000);
+    {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 1}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(!File::exists(prefix + "v201.backup.realm"));
+
+    // Cleanup file and disable mockup versioning
+    File::try_remove(prefix + "v200.backup.realm");
+    _impl::GroupFriend::fake_target_file_format({});
 }
 
 /*

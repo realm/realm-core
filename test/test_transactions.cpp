@@ -240,8 +240,7 @@ TEST(Transactions_StateChanges)
     CHECK_THROW(writer->freeze(), realm::LogicError);
     writer->commit_and_continue_as_read();
     // verify that we cannot modify data in a read transaction
-    // FIXME: Checks are not applied at group level yet.
-    // CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
+    CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
     CHECK_THROW(obj.set(col, 100), realm::LogicError);
     // verify that we can freeze a read transaction
     TransactionRef frozen = writer->freeze();
