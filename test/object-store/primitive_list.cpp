@@ -1016,18 +1016,72 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE_INDICES(change.insertions);
             REQUIRE_INDICES(change.deletions);
             REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change.modifications_new, 0);
             REQUIRE_INDICES(rchange.insertions);
             REQUIRE_INDICES(rchange.deletions);
             REQUIRE_INDICES(rchange.modifications, 0);
+            REQUIRE_INDICES(rchange.modifications_new, 0);
             if (sorted_ndx_pre_modification == sorted_ndx_post_modification) {
                 REQUIRE_INDICES(srchange.insertions);
                 REQUIRE_INDICES(srchange.deletions);
                 REQUIRE_INDICES(srchange.modifications, sorted_ndx_post_modification);
+                REQUIRE_INDICES(srchange.modifications_new, sorted_ndx_post_modification);
             }
             else {
                 REQUIRE_INDICES(srchange.insertions, sorted_ndx_post_modification);
                 REQUIRE_INDICES(srchange.deletions, sorted_ndx_pre_modification);
                 REQUIRE_INDICES(srchange.modifications);
+                REQUIRE_INDICES(srchange.modifications_new);
+            }
+        }
+
+        SECTION("delete and modify") {
+            auto distinct = results.distinct({{"self"}});
+            CollectionChangeSet drchange;
+            auto drtoken = distinct.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                drchange = c;
+                ++calls;
+            });
+
+            REQUIRE(calls == 0);
+            advance_and_notify(*r);
+            REQUIRE(calls == 4);
+            size_t sorted_ndx_pre_modification = sorted.index_of<T>(static_cast<T>(values[1]));
+            size_t sorted_ndx_pre_delete = sorted.index_of<T>(static_cast<T>(values[0]));
+            r->begin_transaction();
+            list.remove(0); // remove values[0]
+            REQUIRE(list.size() > 0);
+            REQUIRE(list.get<T>(0) == static_cast<T>(values[1]));
+            list.set(0, static_cast<T>(values[0]));
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(calls == 8);
+            size_t sorted_ndx_post_modification = sorted.index_of<T>(static_cast<T>(values[0]));
+
+            REQUIRE_INDICES(change.insertions);
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.modifications, 1);
+            REQUIRE_INDICES(change.modifications_new, 0);
+            REQUIRE_INDICES(rchange.insertions);
+            REQUIRE_INDICES(rchange.deletions, 0);
+            REQUIRE_INDICES(rchange.modifications, 1);
+            REQUIRE_INDICES(rchange.modifications_new, 0);
+            REQUIRE_INDICES(drchange.insertions);
+            REQUIRE_INDICES(drchange.deletions, 0);
+            REQUIRE_INDICES(drchange.modifications, 1);
+            REQUIRE_INDICES(drchange.modifications_new, 0);
+
+            if (sorted_ndx_pre_modification == sorted_ndx_post_modification) {
+                REQUIRE_INDICES(srchange.insertions);
+                REQUIRE_INDICES(srchange.deletions, sorted_ndx_pre_delete);
+                REQUIRE_INDICES(srchange.modifications, sorted_ndx_post_modification);
+                REQUIRE_INDICES(srchange.modifications_new, sorted_ndx_post_modification);
+            }
+            else {
+                REQUIRE_INDICES(srchange.insertions, sorted_ndx_post_modification);
+                REQUIRE_INDICES(srchange.deletions, sorted_ndx_pre_modification, sorted_ndx_pre_delete);
+                REQUIRE_INDICES(srchange.modifications);
+                REQUIRE_INDICES(srchange.modifications_new);
             }
         }
 
