@@ -1324,6 +1324,7 @@ public:
         : m_value(v)
         , m_value_is_null(v.is_null())
     {
+        REALM_ASSERT(column.get_type() == col_type_Mixed);
         get_ownership();
         m_condition_column_key = column;
     }
@@ -2340,10 +2341,8 @@ private:
 class LinksToNode : public ParentNode {
 public:
     LinksToNode(ColKey origin_column_key, ObjKey target_key)
-        : m_target_keys(1, target_key)
+        : LinksToNode(origin_column_key, std::vector<ObjKey>{target_key})
     {
-        m_dT = 50.0;
-        m_condition_column_key = origin_column_key;
     }
 
     LinksToNode(ColKey origin_column_key, const std::vector<ObjKey>& target_keys)
@@ -2351,21 +2350,17 @@ public:
     {
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
-    }
-
-    void table_changed() override
-    {
-        m_column_type = m_table.unchecked_ptr()->get_column_type(m_condition_column_key);
-        REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
+        m_column_type = origin_column_key.get_type();
+        REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
     }
 
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        if (m_column_type == type_Link) {
+        if (m_column_type == col_type_Link) {
             m_array_ptr = LeafPtr(new (&m_storage.m_list) ArrayKey(m_table.unchecked_ptr()->get_alloc()));
         }
-        else if (m_column_type == type_LinkList) {
+        else if (m_column_type == col_type_LinkList) {
             m_array_ptr = LeafPtr(new (&m_storage.m_linklist) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         }
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
@@ -2376,7 +2371,7 @@ public:
     {
         REALM_ASSERT(m_condition_column_key);
         if (m_target_keys.size() > 1)
-            throw SerialisationError("Serialising a query which links to multiple objects is currently unsupported.");
+            throw SerialisationError("Serializing a query which links to multiple objects is currently unsupported.");
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(m_target_keys[0]);
     }
@@ -2388,7 +2383,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end) override
     {
-        if (m_column_type == type_LinkList || m_condition_column_key.is_set()) {
+        if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
             BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
             for (size_t i = start; i < end; i++) {
                 if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
@@ -2402,7 +2397,7 @@ public:
                 }
             }
         }
-        else if (m_column_type == type_Link) {
+        else if (m_column_type == col_type_Link) {
             for (auto& key : m_target_keys) {
                 if (key) {
                     // LinkColumn stores link to row N as the integer N + 1
@@ -2424,7 +2419,7 @@ public:
 
 private:
     std::vector<ObjKey> m_target_keys;
-    DataType m_column_type = type_Link;
+    ColumnType m_column_type;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
     union Storage {
         typename std::aligned_storage<sizeof(ArrayKey), alignof(ArrayKey)>::type m_list;

@@ -1285,6 +1285,9 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         }
         return set_null(col_key, is_default);
     }
+    if (value.is_type(type_Link)) {
+        throw LogicError(LogicError::illegal_combination);
+    }
 
     if (value.is_type(type_TypedLink)) {
         ObjLink new_link = value.template get<ObjLink>();
