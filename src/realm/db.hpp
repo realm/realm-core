@@ -383,6 +383,15 @@ private:
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
+
+        // a little helper
+        static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
+        {
+            auto res = std::make_unique<ReadLockInfo>();
+            res->m_top_ref = top_ref;
+            res->m_file_size = file_size;
+            return res;
+        }
     };
     class ReadLockGuard;
 

@@ -765,16 +765,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         cfg.read_only = true;
         cfg.no_create = true;
         cfg.encryption_key = options.encryption_key;
-        try {
-            m_fake_read_lock_if_immutable = std::make_unique<ReadLockInfo>();
-            m_fake_read_lock_if_immutable->m_top_ref = m_alloc.attach_file(path, cfg);
-            m_fake_read_lock_if_immutable->m_file_size = m_alloc.get_baseline();
-            return;
-        }
-        catch (...) {
-            m_fake_read_lock_if_immutable.reset();
-            throw;
-        }
+        auto top_ref = alloc.attach_file(path, cfg);
+        m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, m_alloc.get_baseline());
+        return;
     }
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
@@ -1365,15 +1358,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
 void DB::open(BinaryData buffer, bool take_ownership)
 {
-    try {
-        m_fake_read_lock_if_immutable = std::make_unique<ReadLockInfo>();
-        m_fake_read_lock_if_immutable->m_top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size());
-        m_fake_read_lock_if_immutable->m_file_size = buffer.size();
-    }
-    catch (...) {
-        m_fake_read_lock_if_immutable.reset();
-        throw;
-    }
+    auto top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size());
+    m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, buffer.size());
     if (take_ownership)
         m_alloc.own_buffer();
 }
