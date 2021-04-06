@@ -27,20 +27,20 @@
 #include <type_traits>
 #include <random>
 
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/replication.hpp>
+#include <realm/set.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/errno.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file_mapper.hpp>
-#include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/set.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -982,6 +982,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
+        // - restore of a backup, if desired
+        // - backup of the realm file in preparation of file format upgrade
         // - DB beginning/ending a session
         // - Waiting for and signalling database changes
         {
@@ -1021,27 +1023,33 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
-                if (top_ref) {
-                    alloc.note_reader_start(this);
-                    auto handler = [this, &alloc]() noexcept {
-                        alloc.note_reader_end(this);
-                    };
-                    auto reader_end_guard = make_scope_exit(handler);
-                    Array top{alloc};
-                    top.init_from_ref(top_ref);
-                    Group::validate_top_array(top, alloc);
-                }
             }
             catch (const SlabAlloc::Retry&) {
+                // On a SlabAlloc::Retry file mappings are already unmapped, no
+                // need to do more
                 continue;
             }
-            catch (InvalidDatabase& e) {
-                if (e.get_path().empty()) {
-                    e.set_path(path);
-                }
-                throw;
+
+            // Determine target file format version for session (upgrade
+            // required if greater than file format version of attached file).
+            current_file_format_version = alloc.get_committed_file_format_version();
+            target_file_format_version =
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+            BackupHandler backup(path, options.accepted_versions, options.to_be_deleted);
+            if (backup.must_restore_from_backup(current_file_format_version)) {
+                // we need to unmap before any file ops that'll change the realm
+                // file:
+                // (only strictly needed for Windows)
+                alloc.detach();
+                backup.restore_from_backup();
+                // finally, retry with the restored file instead of the original
+                // one:
+                continue;
             }
-            // If we fail in any way, we must detach the allocator.
+            backup.cleanup_backups();
+
+            // From here on, if we fail in any way, we must detach the
+            // allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
@@ -1050,38 +1058,44 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             };
             auto reader_end_guard = make_scope_exit(handler);
 
-            // Determine target file format version for session (upgrade
-            // required if greater than file format version of attached file).
+            // Check validity of top array (to give more meaningful errors
+            // early)
+            if (top_ref) {
+                try {
+                    alloc.note_reader_start(this);
+                    auto reader_end_guard = make_scope_exit([&]() noexcept {
+                        alloc.note_reader_end(this);
+                    });
+                    Array top{alloc};
+                    top.init_from_ref(top_ref);
+                    Group::validate_top_array(top, alloc);
+                }
+                catch (InvalidDatabase& e) {
+                    if (e.get_path().empty()) {
+                        e.set_path(path);
+                    }
+                    throw;
+                }
+            }
+            if (options.backup_at_file_format_change) {
+                backup.backup_realm_if_needed(current_file_format_version, target_file_format_version);
+            }
             using gf = _impl::GroupFriend;
-            current_file_format_version = alloc.get_committed_file_format_version();
-
-            bool file_format_ok = false;
+            bool file_format_ok;
             // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format
             // versions listed below. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
-            switch (current_file_format_version) {
-                case 0:
-                    file_format_ok = (top_ref == 0);
-                    break;
-                case 5:
-                case 6:
-                case 7:
-                case 8:
-                case 9:
-                case 10:
-                case 11:
-                case 20:
-                    file_format_ok = true;
-                    break;
+            if (current_file_format_version == 0) {
+                file_format_ok = (top_ref == 0);
+            }
+            else {
+                file_format_ok = backup.is_accepted_file_format(current_file_format_version);
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {
                 throw UnsupportedFileFormatVersion(current_file_format_version);
             }
-
-            target_file_format_version =
-                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
@@ -1331,6 +1345,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         close();
         throw;
     }
+
+    m_alloc.set_read_only(true);
 }
 
 
@@ -2051,6 +2067,8 @@ void DB::finish_begin_write()
         m_balancemutex.unlock();
     }
 #endif // REALM_ASYNC_DAEMON
+
+    m_alloc.set_read_only(false);
 }
 
 
@@ -2061,6 +2079,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
 }
@@ -2576,8 +2595,8 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (nonblocking) {
-        bool succes = do_try_begin_write();
-        if (!succes) {
+        bool success = do_try_begin_write();
+        if (!success) {
             return TransactionRef();
         }
     }

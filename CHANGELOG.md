@@ -1,6 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
+* We now make a backup of the realm file prior to any file format upgrade. The backup is retained for 3 months.
+  Backups from before a file format upgrade allows for better analysis of any upgrade failure. We also restore
+  a backup, if a) an attempt is made to open a realm file whith a "future" file format and b) a backup file exist
+  that fits the current file format.
+  ([#4166](https://github.com/realm/realm-core/pull/4166))
 * UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
 * The error message when the intial steps of opening a Realm file fails is now more descriptive.
 
@@ -18,6 +23,7 @@
 
 ### Internals
 * Android: build with NDK r22. Make `-Wl,-gc-sections` an interface linker flag, which reduces code size because Core is compiled `-fdata-sections` and `-ffunction-sections`. Use `-Oz` even when we enable link-time optimization (previously we used with `-O2`). ([#4407](https://github.com/realm/realm-core/pull/4407))
+* Add additional debug validation to file map management that will hopefully catch cases where we unmap something which is still in use.
 
 ----------------------------------------------
 

@@ -392,12 +392,16 @@ private:
         Slab(const Slab&) = delete;
         Slab(Slab&& other) noexcept
             : ref_end(other.ref_end)
+            , addr(other.addr)
             , size(other.size)
         {
-            addr = other.addr;
             other.addr = nullptr;
             other.size = 0;
+            other.ref_end = 0;
         }
+
+        Slab& operator=(const Slab&) = delete;
+        Slab& operator=(Slab&&) = delete;
     };
 
     // free blocks that are in the slab area are managed using the following structures:
@@ -533,33 +537,19 @@ private:
 
     // Description of to-be-deleted memory mapping
     struct OldMapping {
-        OldMapping(uint64_t version, util::File::Map<char>&& map) noexcept
-            : replaced_at_version(version)
-            , mapping(std::move(map))
-        {
-        }
-        OldMapping(OldMapping&& other) noexcept
-            : replaced_at_version(other.replaced_at_version)
-            , mapping()
-        {
-            mapping = std::move(other.mapping);
-        }
-        void operator=(OldMapping&& other) noexcept
-        {
-            replaced_at_version = other.replaced_at_version;
-            mapping = std::move(other.mapping);
-        }
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
     struct OldRefTranslation {
-        OldRefTranslation(uint64_t v, RefTranslation* m) noexcept
+        OldRefTranslation(uint64_t v, size_t c, RefTranslation* m) noexcept
+            : replaced_at_version(v)
+            , translation_count(c)
+            , translations(m)
         {
-            replaced_at_version = v;
-            translations = m;
         }
         uint64_t replaced_at_version;
-        RefTranslation* translations;
+        size_t translation_count;
+        std::unique_ptr<RefTranslation[]> translations;
     };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
@@ -570,6 +560,8 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     util::RaceDetector changes;
+
+    void verify_old_translations(uint64_t verify_old_translations);
 
     // mappings used by newest transactions - additional mappings may be open
     // and in use by older transactions. These translations are in m_old_mappings.

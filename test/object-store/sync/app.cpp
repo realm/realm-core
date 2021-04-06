@@ -971,17 +971,14 @@ TEST_CASE("app: call function", "[sync][app]") {
                                      CHECK(!error);
                                  });
 
-    app->call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
-
-    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
+    bson::BsonArray toSum(5);
+    std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
+    const auto checkFn = [](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    };
+    app->call_function<int64_t>("sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
