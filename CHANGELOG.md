@@ -13,6 +13,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Clearing a set of links would result in crash when target objects are deleted.
+* Query::links_to() took wrong argument for Mixed columns. ([#4585](https://github.com/realm/realm-core/issues/4585))
  
 ### Breaking changes
 * None.

@@ -101,6 +101,8 @@ public:
 
     // Find links that point to a specific target row
     Query& links_to(ColKey column_key, ObjKey target_key);
+    // Find links that point to a specific object (for Mixed columns)
+    Query& links_to(ColKey column_key, ObjLink target_link);
     // Find links that point to specific target objects
     Query& links_to(ColKey column_key, const std::vector<ObjKey>& target_obj);
 
