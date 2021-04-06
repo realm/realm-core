@@ -746,6 +746,7 @@ public:
     /// Move the mapping from another Map object to this Map object
     File::Map<T>& operator=(File::Map<T>&& other) noexcept
     {
+        REALM_ASSERT(this != &other);
         if (m_addr)
             unmap();
         m_addr = other.get_addr();
