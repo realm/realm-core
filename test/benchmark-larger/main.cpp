@@ -126,8 +126,8 @@ int main()
                              }
                              else {
                                  // doing r/w tests:
-                                 for (int probe_index = 0; probe_index < rw_probes.size(); ++probe_index) {
-                                     int probe_size = rw_probes[probe_index]; // fixed number of probes - not varied with step size
+                                 for (size_t probe_index = 0; probe_index < rw_probes.size(); ++probe_index) {
+                                     size_t probe_size = rw_probes[probe_index]; // fixed number of probes - not varied with step size
                                      // cannot be a full step size, has to have room for the worst case deleted objects
                                      // from here use access to the last step_size elements of 'keys' for evaluations
                                      std::vector<Obj> objects;
@@ -139,7 +139,7 @@ int main()
                                      auto start_idx = keys.size();
                                      if (start_idx > probe_size) start_idx -= probe_size;
                                      else start_idx = 0;
-                                     for (int i = 0; i < probe_size; ++i) {
+                                     for (size_t i = 0; i < probe_size; ++i) {
                                          auto& s = keys[i + start_idx];
                                          if (st == DIRECT || st == INDEXED_BEST || st == INDEXED_WORST) {
                                              objects.push_back(t->get_object(t->find_first_string(col, s)));
@@ -154,7 +154,7 @@ int main()
                                      std::cout << "Obj " << step_names[st] << " " << step_layout << " ";
                                      std::cout << j + step_size << " _ " << probe_size << " " << print_diff.count() / probe_size << std::endl;
                                      start = end;
-                                     for (int i = 0; i <  probe_size; ++i) {
+                                     for (size_t i = 0; i <  probe_size; ++i) {
                                          sum += objects[i].get<Int>(col2);
                                      }
                                      end = std::chrono::steady_clock::now();
@@ -165,7 +165,7 @@ int main()
 
                                      //std::cout << " " << print_diff.count() / probe_size;
                                      start = end;
-                                     for (int i = 0; i < probe_size; ++i) {
+                                     for (size_t i = 0; i < probe_size; ++i) {
                                          objects[i].set<Int>(col2, i + j + 3);
                                      }
                                      trans->commit();
@@ -199,6 +199,8 @@ int main()
                             run_steps(10, 1000000, st, "10x1000000", {900, 3000, 9000, 30000, 90000});
                         }
                     };
+
+    REALM_ASSERT_RELEASE(realm::get_disable_sync_to_disk() == false);
     // insertion tests
     run_type(DIRECT);
     run_type(INDEXED_BEST);
