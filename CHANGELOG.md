@@ -25,6 +25,7 @@
 ### Internals
 * Android: build with NDK r22. Make `-Wl,-gc-sections` an interface linker flag, which reduces code size because Core is compiled `-fdata-sections` and `-ffunction-sections`. Use `-Oz` even when we enable link-time optimization (previously we used with `-O2`). ([#4407](https://github.com/realm/realm-core/pull/4407))
 * Add additional debug validation to file map management that will hopefully catch cases where we unmap something which is still in use.
+* Add new benchmark used for performance characterization.
 
 ----------------------------------------------
 
