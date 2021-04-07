@@ -1077,7 +1077,7 @@ TEST(Shared_Writes)
         }
 
         // Do a lot of repeated write transactions
-        for (size_t i = 0; i < 1000; ++i) {
+        for (size_t i = 0; i < 100; ++i) {
             WriteTransaction wt(sg);
             wt.get_group().verify();
             auto t1 = wt.get_table("test");
@@ -3174,7 +3174,7 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
 // Scaled down stress test. (Use string length ~15MB for max stress)
 NONCONCURRENT_TEST(Shared_BigAllocations)
 {
-    size_t string_length = 15 * 1024 * 1024;
+    size_t string_length = 64 * 1024;
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
     std::string long_string(string_length, 'a');
@@ -3193,32 +3193,19 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
         }
         wt.commit();
     }
-    int stamp = 0;
-    for (int k = 0; k < 100; ++k) {
+    for (int k = 0; k < 10; ++k) {
         // sg.compact(); // <--- enable this if you want to stress with compact()
-        for (int j = 0; j < 1; ++j) {
+        for (int j = 0; j < 20; ++j) {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             auto cols = table->get_column_keys();
             for (int i = 0; i < 20; ++i) {
-                for (int v = 0; v < string_length - 4; v += 512) {
-
-                    long_string[v] = 32 + (stamp & 0x3F);
-                    long_string[v + 1] = 32 + ((stamp >> 6) & 0x3F);
-                    long_string[v + 2] = 32 + ((stamp >> 12) & 0x3F);
-                    long_string[v + 3] = 32 + ((stamp >> 18) & 0x3F);
-                    stamp++;
-
-                    // long_string[v]++;
-                    // long_string[v]--;
-                }
                 table->get_object(ObjKey(i)).set(cols[0], long_string.c_str());
             }
             wt.commit();
         }
     }
     sg->close();
-    exit(0);
 }
 
 #if !REALM_ANDROID // FIXME
