@@ -57,16 +57,17 @@ typedef struct realm_results realm_results_t;
 /* Config types */
 typedef struct realm_config realm_config_t;
 typedef struct realm_sync_config realm_sync_config_t;
-typedef void (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
+typedef bool (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
-typedef void (*realm_data_initialization_func_t)(void* userdata, realm_t* realm);
+typedef bool (*realm_data_initialization_func_t)(void* userdata, realm_t* realm);
 typedef bool (*realm_should_compact_on_launch_func_t)(void* userdata, uint64_t total_bytes, uint64_t used_bytes);
 typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_AUTOMATIC,
     RLM_SCHEMA_MODE_IMMUTABLE,
     RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE,
     RLM_SCHEMA_MODE_RESET_FILE,
-    RLM_SCHEMA_MODE_ADDITIVE,
+    RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED,
+    RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT,
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
@@ -96,6 +97,12 @@ typedef enum realm_value_type {
     RLM_TYPE_LINK,
     RLM_TYPE_UUID,
 } realm_value_type_e;
+
+typedef enum realm_schema_validation_mode {
+    RLM_SCHEMA_VALIDATION_BASIC = 0,
+    RLM_SCHEMA_VALIDATION_SYNC = 1,
+    RLM_SCHEMA_VALIDATION_REJECT_EMBEDDED_ORPHANS = 2
+} realm_schema_validation_mode_e;
 
 typedef struct realm_string {
     const char* data;
@@ -159,11 +166,15 @@ typedef enum realm_errno {
     RLM_ERR_OUT_OF_MEMORY,
     RLM_ERR_NOT_CLONABLE,
 
+    RLM_ERR_NOT_IN_A_TRANSACTION,
+    RLM_ERR_WRONG_THREAD,
+
     RLM_ERR_INVALIDATED_OBJECT,
     RLM_ERR_INVALID_PROPERTY,
     RLM_ERR_MISSING_PROPERTY_VALUE,
     RLM_ERR_PROPERTY_TYPE_MISMATCH,
     RLM_ERR_MISSING_PRIMARY_KEY,
+    RLM_ERR_UNEXPECTED_PRIMARY_KEY,
     RLM_ERR_WRONG_PRIMARY_KEY_TYPE,
     RLM_ERR_MODIFY_PRIMARY_KEY,
     RLM_ERR_READ_ONLY_PROPERTY,
@@ -172,9 +183,8 @@ typedef enum realm_errno {
 
     RLM_ERR_LOGIC,
     RLM_ERR_NO_SUCH_TABLE,
-    RLM_ERR_TABLE_NAME_IN_USE,
+    RLM_ERR_NO_SUCH_OBJECT,
     RLM_ERR_CROSS_TABLE_LINK_TARGET,
-    RLM_ERR_DESCRIPTOR_MISMATCH,
     RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
     RLM_ERR_MULTIPLE_SYNC_AGENTS,
     RLM_ERR_ADDRESS_SPACE_EXHAUSTED,
@@ -192,7 +202,8 @@ typedef enum realm_errno {
 
     RLM_ERR_INVALID_QUERY_STRING,
     RLM_ERR_INVALID_QUERY,
-    // ...
+
+    RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
 } realm_errno_e;
 
 typedef enum realm_logic_error_kind {
@@ -383,6 +394,16 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void);
  * called to propagate the exception unchanged.
  */
 RLM_EXPORT void realm_rethrow_last_error(void);
+
+/**
+ * Invoke a function that may throw an exception, and report that exception as
+ * part of the C API error handling mechanism.
+ *
+ * This is used to test translation of exceptions to error codes.
+ *
+ * @return True if no exception was thrown.
+ */
+RLM_EXPORT bool realm_wrap_exceptions(void (*)()) noexcept;
 #endif // __cplusplus
 
 /**
@@ -485,17 +506,47 @@ RLM_API realm_thread_safe_reference_t* realm_create_thread_safe_reference(const 
 RLM_API realm_config_t* realm_config_new(void);
 
 /**
- * Set the path of the realm being opened.
+ * Get the path of the realm being opened.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_path(realm_config_t*, const char* path);
+RLM_API const char* realm_config_get_path(const realm_config_t*);
+
+/**
+ * Set the path of the realm being opened.
+ *
+ * This function aborts when out of memory, but otherwise cannot fail.
+ */
+RLM_API void realm_config_set_path(realm_config_t*, const char* path);
+
+/**
+ * Get the encryption key for the realm.
+ *
+ * The output buffer must be at least 64 bytes.
+ *
+ * @returns The length of the encryption key (0 or 64)
+ */
+RLM_API size_t realm_config_get_encryption_key(const realm_config_t*, uint8_t* out_key);
 
 /**
  * Set the encryption key for the realm.
  *
  * The key must be either 64 bytes long or have length zero (in which case
  * encryption is disabled).
+ *
+ * This function may fail if the encryption key has the wrong length.
  */
-RLM_API bool realm_config_set_encryption_key(realm_config_t*, realm_binary_t key);
+RLM_API bool realm_config_set_encryption_key(realm_config_t*, const uint8_t* key, size_t key_size);
+
+/**
+ * Get the schema for this realm.
+ *
+ * Note: The caller obtains ownership of the returned value, and must manually
+ *       free it by calling `realm_release()`.
+ *
+ * @return A schema object, or NULL if the schema is not set (empty).
+ */
+RLM_API realm_schema_t* realm_config_get_schema(const realm_config_t*);
 
 /**
  * Set the schema object for this realm.
@@ -503,20 +554,39 @@ RLM_API bool realm_config_set_encryption_key(realm_config_t*, realm_binary_t key
  * This does not take ownership of the schema object, and it should be released
  * afterwards.
  *
- * @param schema The schema object. May be NULL if the realm is opened without a
- *               schema.
+ * This function aborts when out of memory, but otherwise cannot fail.
+ *
+ * @param schema The schema object. May be NULL, which means an empty schema.
  */
-RLM_API bool realm_config_set_schema(realm_config_t*, const realm_schema_t* schema);
+RLM_API void realm_config_set_schema(realm_config_t*, const realm_schema_t* schema);
+
+/**
+ * Get the schema version of the schema.
+ *
+ * This function cannot fail.
+ */
+RLM_API uint64_t realm_config_get_schema_version(const realm_config_t*);
 
 /**
  * Set the schema version of the schema.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_schema_version(realm_config_t*, uint64_t version);
+RLM_API void realm_config_set_schema_version(realm_config_t*, uint64_t version);
+
+/**
+ * Get the schema mode.
+ *
+ * This function cannot fail.
+ */
+RLM_API realm_schema_mode_e realm_config_get_schema_mode(const realm_config_t*);
 
 /**
  * Set the schema mode.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
+RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
 
 /**
  * Set the migration callback.
@@ -525,8 +595,10 @@ RLM_API bool realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
  * `RLM_SCHEMA_MODE_AUTOMATIC` and `RLM_SCHEMA_MODE_MANUAL`. The callback is
  * invoked with a realm instance before the migration and the realm instance
  * that is currently performing the migration.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
+RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
 
 /**
  * Set the data initialization function.
@@ -535,8 +607,10 @@ RLM_API bool realm_config_set_migration_function(realm_config_t*, realm_migratio
  * user can perform one-time initialization of the data in the realm.
  *
  * The realm instance passed to the callback is in a write transaction.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
+RLM_API void realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
                                                            void* userdata);
 
 /**
@@ -546,41 +620,74 @@ RLM_API bool realm_config_set_data_initialization_function(realm_config_t*, real
  * to decide whether the realm file should be compacted.
  *
  * Note: If another process has the realm file open, it will not be compacted.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_should_compact_on_launch_function(realm_config_t*,
+RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
                                                                 realm_should_compact_on_launch_func_t,
                                                                 void* userdata);
+
+/**
+ * True if file format upgrades on open are disabled.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_config_get_disable_format_upgrade(const realm_config_t*);
 
 /**
  * Disable file format upgrade on open (default: false).
  *
  * If a migration is needed to open the realm file with the provided schema, an
  * error is thrown rather than automatically performing the migration.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_disable_format_upgrade(realm_config_t*, bool);
+RLM_API void realm_config_set_disable_format_upgrade(realm_config_t*, bool);
+
+/**
+ * True if automatic change notifications should be generated.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_config_get_automatic_change_notifications(const realm_config_t*);
 
 /**
  * Automatically generated change notifications (default: true).
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_automatic_change_notifications(realm_config_t*, bool);
+RLM_API void realm_config_set_automatic_change_notifications(realm_config_t*, bool);
 
 /**
  * The scheduler which this realm should be bound to (default: NULL).
  *
  * If NULL, the realm will be bound to the default scheduler for the current thread.
+ *
+ * This function aborts when out of memory, but otherwise cannot fail.
  */
-RLM_API bool realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t*);
+RLM_API void realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t*);
 
 /**
  * Sync configuration for this realm (default: NULL).
+ *
+ * This function aborts when out of memory, but otherwise cannot fail.
  */
-RLM_API bool realm_config_set_sync_config(realm_config_t*, realm_sync_config_t*);
+RLM_API void realm_config_set_sync_config(realm_config_t*, realm_sync_config_t*);
+
+/**
+ * Get whether the realm file should be forcibly initialized as a synchronized.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_config_get_force_sync_history(const realm_config_t*);
 
 /**
  * Force the realm file to be initialized as a synchronized realm, even if no
  * sync config is provided (default: false).
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_force_sync_history(realm_config_t*, bool);
+RLM_API void realm_config_set_force_sync_history(realm_config_t*, bool);
 
 /**
  * Set the audit interface for the realm (unimplemented).
@@ -588,10 +695,20 @@ RLM_API bool realm_config_set_force_sync_history(realm_config_t*, bool);
 RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);
 
 /**
- * Maximum number of active versions in the realm file allowed before an
- * exception is thrown (default: UINT64_MAX).
+ * Get maximum number of active versions in the realm file allowed before an
+ * exception is thrown.
+ *
+ * This function cannot fail.
  */
-RLM_API bool realm_config_set_max_number_of_active_versions(realm_config_t*, size_t);
+RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_config_t*);
+
+/**
+ * Set maximum number of active versions in the realm file allowed before an
+ * exception is thrown (default: UINT64_MAX).
+ *
+ * This function cannot fail.
+ */
+RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uint64_t);
 
 /**
  * Create a custom scheduler object from callback functions.
@@ -729,6 +846,16 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
 RLM_API realm_t* _realm_from_native_ptr(const void* pshared_ptr, size_t n);
 
 /**
+ * Get a `std::shared_ptr<Realm>` from a `realm_t*`.
+ *
+ * This is intended as a migration path for users of the C++ Object Store API.
+ *
+ * @param pshared_ptr A pointer to an instance of `std::shared_ptr<Realm>`.
+ * @param n Must be equal to `sizeof(std::shared_ptr<Realm>)`.
+ */
+RLM_API void _realm_get_native_ptr(const realm_t*, void* pshared_ptr, size_t n);
+
+/**
  * Forcibly close a Realm file.
  *
  * Note that this invalidates all Realm instances for the same path.
@@ -827,8 +954,36 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 
 /**
  * Update the schema of an open realm.
+ *
+ * This is equivalent to calling `realm_update_schema_advanced(realm, schema, 0,
+ * NULL, NULL, NULL, NULL, false)`.
  */
 RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema);
+
+/**
+ * Update the schema of an open realm, with options to customize certain steps
+ * of the process.
+ *
+ * @param realm The realm for which the schema should be updated.
+ * @param schema The new schema for the realm. If the schema is the same the
+ *               existing schema, this function does nothing.
+ * @param version The version of the new schema.
+ * @param migration_func Callback to perform the migration. Has no effect if the
+ *                       Realm is opened with `RLM_SCHEMA_MODE_ADDITIVE`.
+ * @param migration_func_userdata Userdata pointer to pass to `migration_func`.
+ * @param data_init_func Callback to perform initialization of the data in the
+ *                       Realm if it is opened for the first time (i.e., it has
+ *                       no previous schema version).
+ * @param data_init_func_userdata Userdata pointer to pass to `data_init_func`.
+ * @param is_in_transaction Pass true if the realm is already in a write
+ *                          transaction. Otherwise, if the migration requires a
+ *                          write transaction, this function will perform the
+ *                          migration in its own write transaction.
+ */
+RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* schema, uint64_t version,
+                                          realm_migration_func_t migration_func, void* migration_func_userdata,
+                                          realm_data_initialization_func_t data_init_func,
+                                          void* data_init_func_userdata, bool is_in_transaction);
 
 /**
  * Get the `realm::Schema*` pointer for this realm.
@@ -842,11 +997,14 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
 /**
  * Validate the schema.
  *
+ *  @param validation_mode A bitwise combination of values from the
+ *                         enum realm_schema_validation_mode.
+ *
  * @return True if the schema passed validation. If validation failed,
  *         `realm_get_last_error()` will produce an error describing the
  *         validation failure.
  */
-RLM_API bool realm_schema_validate(const realm_schema_t*);
+RLM_API bool realm_schema_validate(const realm_schema_t*, uint64_t validation_mode);
 
 /**
  * Return the number of classes in the Realm's schema.
@@ -1015,6 +1173,16 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm
                                                            bool* out_found);
 
 /**
+ * Find all objects in class.
+ *
+ * Note: This is faster than running a query matching all objects (such as
+ *       "TRUEPREDICATE").
+ *
+ * @return A non-NULL pointer if no exception was thrown.
+ */
+RLM_API realm_results_t* realm_object_find_all(const realm_t*, realm_class_key_t);
+
+/**
  * Create an object in a class without a primary key.
  *
  * @return A non-NULL pointer if the object was created successfully.
@@ -1039,7 +1207,7 @@ RLM_API bool realm_object_delete(realm_object_t*);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
-RLM_API void* _realm_object_get_native_ptr(realm_object_t*);
+RLM_API const void* _realm_object_get_native_ptr(realm_object_t*);
 
 /**
  * True if this object still exists in the realm.
@@ -1236,11 +1404,20 @@ RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value)
 RLM_API bool realm_list_erase(realm_list_t*, size_t index);
 
 /**
- * Clear a list.
+ * Clear a list, removing all elements in the list. In a list of links, this
+ * does *NOT* delete the target objects.
  *
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_clear(realm_list_t*);
+
+/**
+ * In a list of objects, delete all objects in the list and clear the list. In a
+ * list of values, clear the list.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_list_remove_all(realm_list_t*);
 
 /**
  * Replace the contents of a list with values.
@@ -1529,6 +1706,23 @@ RLM_API bool realm_results_count(realm_results_t*, size_t* out_count);
  * @return True if no exception occurred (including out-of-bounds).
  */
 RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Get the matching object at @a index in the results.
+ *
+ * If the result is "live" (not a snapshot), this may rerun the query if things
+ * have changed.
+ *
+ * Note: The bound returned by `realm_results_count()` for a non-snapshot result
+ *       is not a reliable way to iterate over elements in the result, because
+ *       the result will be live-updated if changes are made in each iteration
+ *       that may change the number of query results or even change the
+ *       ordering. In other words, this method should probably only be used with
+ *       snapshot results.
+ *
+ * @return An instance of `realm_object_t` if no exception occurred.
+ */
+RLM_API realm_object_t* realm_results_get_object(realm_results_t*, size_t index);
 
 /**
  * Delete all objects in the result.

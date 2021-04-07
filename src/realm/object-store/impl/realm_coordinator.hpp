@@ -221,7 +221,7 @@ private:
     std::vector<WeakRealmNotifier> m_weak_realm_notifiers GUARDED_BY(m_realm_mutex);
 
     util::CheckedMutex m_notifier_mutex;
-    std::condition_variable m_notifier_cv;
+    std::condition_variable m_notifier_cv GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_new_notifiers GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers GUARDED_BY(m_notifier_mutex);
     VersionID m_notifier_skip_version GUARDED_BY(m_notifier_mutex) = {0, 0};

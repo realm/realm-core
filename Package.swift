@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.3.3"
+let versionStr = "10.5.6"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -93,6 +93,8 @@ let package = Package(
                 "bid128_div.c",
                 "bid128_add.c",
                 "bid128_fma.c",
+                "bid128_string.c",
+                "bid128_2_str_tables.c",
                 "bid64_to_bid128.c",
                 "bid_convert_data.c",
                 "bid_decimal_data.c",
@@ -172,7 +174,7 @@ let package = Package(
             ]),
         .target(
             name: "ObjectStore",
-            dependencies: ["SyncClient", "QueryParser"],
+            dependencies: ["SyncClient"],
             path: "src",
             exclude: [
                 "realm/object-store/impl/epoll",
@@ -189,7 +191,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "Capi",
-            dependencies: ["ObjectStore"],
+            dependencies: ["ObjectStore", "QueryParser"],
             path: "src",
             exclude: [
                 "realm/object-store/c_api/realm.c"
@@ -206,31 +208,37 @@ let package = Package(
             dependencies: ["Capi"],
             path: "src/swift"),
         .target(
-            name: "ObjectStoreTests",
+            name: "ObjectStoreTestUtils",
             dependencies: ["ObjectStore", "SyncServer"],
+            path: "test/object-store/util",
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .define("REALM_ENABLE_SYNC", to: "1"),
+                .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .headerSearchPath(".."),
+                .headerSearchPath("../../../external/catch/single_include"),
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "ObjectStoreTests",
+            dependencies: ["ObjectStore", "SyncServer", "QueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "benchmarks",
                 "notifications-fuzzer",
-                "c_api"
+                "c_api",
+                "util",
+                "backup.cpp",
             ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
-                .headerSearchPath("../../external/catch/single_include")
+                .headerSearchPath("../../external/catch/single_include"),
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "CapiTests",
-            dependencies: ["Capi"],
+            dependencies: ["Capi", "ObjectStoreTestUtils"],
             path: "test/object-store/c_api",
-            exclude: [
-                "benchmarks",
-                "mongodb",
-                "notifications-fuzzer",
-                "sync",
-                "util"
-            ],
             cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),

@@ -383,8 +383,11 @@ void ChangesetEncoder::append_value(Decimal128 id)
     int exp;
     bool sign;
     id.unpack(cx, exp, sign);
-    REALM_ASSERT(cx.w[1] == 0); // FIXME
-    append_value(cx.w[0]);
+    char buffer[16];
+    _impl::Bid128 tmp;
+    memcpy(&tmp, &cx, sizeof(Decimal128::Bid128));
+    auto n = _impl::encode_int(buffer, tmp);
+    append_bytes(buffer, n);
     append_value(int64_t(exp));
     append_value(sign);
 }

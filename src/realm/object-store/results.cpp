@@ -285,21 +285,14 @@ Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
 {
     // Using a Table iterator is much faster for repeated access into a table
     // than indexing into it as the iterator caches the cluster the last accessed
-    // object is stored in.
-    if (!m_it && table.size() > 5) {
-        m_it = std::make_unique<Table::Iterator>(table.begin());
-    }
+    // object is stored in, but creating the iterator is somewhat expensive.
     if (!m_it) {
-        return const_cast<Table&>(table).get_object(ndx);
-    }
-    try {
-        return (*m_it)[ndx];
-    }
-    catch (...) {
-        // Iterator might be outdated
+        if (table.size() <= 5)
+            return const_cast<Table&>(table).get_object(ndx);
         m_it = std::make_unique<Table::Iterator>(table.begin());
-        return (*m_it)[ndx];
     }
+    m_it->go(ndx);
+    return **m_it;
 }
 
 template <>
@@ -388,6 +381,7 @@ Mixed Results::get_any(size_t ndx)
 }
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
 {
+    util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Collection && ndx < m_collection->size()) {
         if (auto dict = dynamic_cast<realm::Dictionary*>(m_collection.get())) {
             evaluate_sort_and_distinct_on_collection();

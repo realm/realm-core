@@ -60,6 +60,7 @@ set(REALM_SOURCES
     utilities.cpp
     uuid.cpp
     version.cpp
+    backup_restore.cpp
 ) # REALM_SOURCES
 
 set(UTIL_SOURCES
@@ -184,6 +185,7 @@ set(REALM_INSTALL_HEADERS
     uuid.hpp
     version.hpp
     version_id.hpp
+    backup_restore.hpp
 
     impl/array_writer.hpp
     impl/cont_transact_hist.hpp
@@ -302,6 +304,9 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     endif()
 elseif(ANDROID)
     target_link_libraries(Storage INTERFACE android log atomic)
+    # Because on Android we compile with `-ffunction-sections` and `-fdata-sections` (see the root CMakeLists.txt)
+    # it makes sense to export this linker flag as well
+    target_link_options(Storage INTERFACE LINKER:-gc-sections)
 elseif(APPLE)
     target_link_options(Storage INTERFACE "SHELL:-framework Foundation")
 endif()

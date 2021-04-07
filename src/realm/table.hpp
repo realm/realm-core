@@ -161,9 +161,8 @@ public:
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have exactly 1 backlink. Return value
-    // indicates if the conversion was done
-    bool set_embedded(bool embedded);
+    // not have a primary key and all objects must have exactly 1 backlink.
+    void set_embedded(bool embedded);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -627,8 +626,6 @@ protected:
     /// index (as expressed through the DataType enum).
     bool compare_objects(const Table&) const;
 
-    void check_lists_are_empty(size_t row_ndx) const;
-
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
@@ -644,6 +641,10 @@ private:
     void update_allocator_wrapper(bool writable)
     {
         m_alloc.update_from_underlying_allocator(writable);
+    }
+    void refresh_allocator_wrapper() const noexcept
+    {
+        m_alloc.refresh_ref_translation();
     }
     Spec m_spec;                                    // 1st slot in m_top
     TableClusterTree m_clusters;                    // 3rd slot in m_top
@@ -788,8 +789,8 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey col_key, T value = {}, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey col_key) const;
     template <typename T>
     double average(ColKey col_key, size_t* resultcount) const;
 
@@ -1013,7 +1014,6 @@ public:
         static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
         return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
     }
-
 
     template <class T>
     BacklinkCount<T> get_backlink_count()

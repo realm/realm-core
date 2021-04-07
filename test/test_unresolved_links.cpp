@@ -524,4 +524,35 @@ TEST(Unresolved_Recursive)
     g.verify();
 }
 
+TEST(Links_ManyObjects)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+    TableRef table = tr->add_table_with_primary_key("table", type_Int, "id");
+    auto col = table->add_column_list(*table, "l");
+    Obj obj = table->create_object_with_primary_key(0xcafe);
+    auto link_list = obj.get_list<ObjKey>(col);
+
+    for (int64_t i = 0; i < 1500; i++) {
+        link_list.add(table->get_objkey_from_primary_key(i));
+    }
+    for (int64_t i = 0; i < 1500; i++) {
+        table->create_object_with_primary_key(i);
+    }
+    // now the context flag of the root node of the BPlusTree be cleared as all
+    // objects are now created. The context flags of the leaves is still set.
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+
+    // When the first leaf becomes root, it has to have the context flag cleared
+    // which will trigger a COW. If the parent array is not updated, we will have a
+    // double free when the array is COW next time.
+    link_list.clear();
+
+    tr->commit();
+}
+
 #endif

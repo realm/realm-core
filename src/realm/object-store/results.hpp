@@ -20,13 +20,13 @@
 #define REALM_RESULTS_HPP
 
 #include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
-#include <realm/object-store/set.hpp>
-#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
@@ -36,7 +36,6 @@
 
 namespace realm {
 class Mixed;
-class ObjectSchema;
 
 namespace _impl {
 class ResultsNotifierBase;
@@ -74,10 +73,12 @@ public:
     // Object schema describing the vendored object type
     const ObjectSchema& get_object_schema() const REQUIRES(!m_mutex);
 
+    // Get the table of the vendored object type
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
+
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
-    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const
@@ -111,7 +112,7 @@ public:
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
 
-    std::pair<StringData, Mixed> get_dictionary_element(size_t index);
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()

@@ -140,7 +140,8 @@ jobWrapper {
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+            // FIXME: disabled due to issues with CI
+	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -282,7 +283,7 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
 
-            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
+            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/config.json\""
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
@@ -486,7 +487,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
+            def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
@@ -494,7 +495,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
             } else if (test.hasValue(TestAction.Build)) {
                 // TODO: should we build sync tests, too?
-                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON'
+                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
             }
 
             def doBuild = {
@@ -506,13 +507,15 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                         filters: warningFilters,
                     )
                 }
-                dir(buildDir) {
-                    archiveArtifacts('realm-*.tar.gz')
-                    stash includes: 'realm-*.tar.gz', name: stashName
-                }
-                androidStashes << stashName
-                if (gitTag) {
-                    publishingStashes << stashName
+                if (test == TestAction.None) {
+                    dir(buildDir) {
+                        archiveArtifacts('realm-*.tar.gz')
+                        stash includes: 'realm-*.tar.gz', name: stashName
+                    }
+                    androidStashes << stashName
+                    if (gitTag) {
+                        publishingStashes << stashName
+                    }
                 }
             }
 

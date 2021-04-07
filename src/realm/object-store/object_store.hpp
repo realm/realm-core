@@ -26,6 +26,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <limits>
 
@@ -46,9 +47,6 @@ class ObjectStore {
 public:
     // Schema version used for uninitialized Realms
     static constexpr uint64_t NotVersioned = std::numeric_limits<uint64_t>::max();
-
-    // Column name used for subtables which store an array
-    static constexpr const char* const ArrayColumnName = "!ARRAY_VALUE";
 
     // get the last set schema version
     static uint64_t get_schema_version(Group const& group);
@@ -89,7 +87,8 @@ public:
                                      std::vector<SchemaChange> const& changes,
                                      std::function<void()> migration_function = {});
 
-    static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
+    static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes,
+                                       std::unordered_set<std::string>&& ignore_types);
 
     // get a table for an object type
     static realm::TableRef table_for_object_type(Group& group, StringData object_type);
@@ -97,10 +96,6 @@ public:
 
     // get existing Schema from a group
     static Schema schema_from_group(Group const& group);
-
-    // get the property for a existing column in the given table. return none if the column is reserved internally.
-    // NOTE: is_primary won't be set for the returned property.
-    static util::Optional<Property> property_for_column_key(ConstTableRef& table, ColKey column_key);
 
     static void set_schema_keys(Group const& group, Schema& schema);
 
@@ -113,13 +108,6 @@ public:
     // renames the object_type's column of the old_name to the new name
     static void rename_property(Group& group, Schema& schema, StringData object_type, StringData old_name,
                                 StringData new_name);
-
-    // get primary key property name for object type
-    static StringData get_primary_key_for_object(Group const& group, StringData object_type);
-
-    // sets primary key property for object type
-    // must be in write transaction to set
-    static void set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key);
 
     static std::string table_name_for_object_type(StringData class_name);
     static StringData object_type_for_table_name(StringData table_name);

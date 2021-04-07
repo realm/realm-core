@@ -31,6 +31,22 @@
 
 namespace realm::query_parser {
 
+/// Exception thrown when parsing fails due to invalid syntax.
+struct SyntaxError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+/// Exception thrown when binding a syntactically valid query string in a
+/// context where it does not make sense.
+struct InvalidQueryError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+/// Exception thrown when there is a problem accessing the arguments in a query string
+struct InvalidQueryArgError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 struct AnyContext {
     template <typename T>
     T unbox(const util::Any& wrapper)
@@ -83,6 +99,12 @@ struct AnyContext {
         if (type == typeid(UUID)) {
             return type_UUID;
         }
+        if (type == typeid(ObjLink)) {
+            return type_TypedLink;
+        }
+        if (type == typeid(Mixed)) {
+            return type_Mixed;
+        }
         return DataType(-1);
     }
 };
@@ -105,6 +127,7 @@ public:
     virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
+    virtual ObjLink objlink_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
     virtual DataType type_for_argument(size_t argument_index) = 0;
     size_t get_num_args() const
@@ -189,6 +212,10 @@ public:
     {
         return get<ObjKey>(i);
     }
+    ObjLink objlink_for_argument(size_t i) override
+    {
+        return get<ObjLink>(i);
+    }
     bool is_argument_null(size_t i) override
     {
         return m_ctx.is_null(at(i));
@@ -216,10 +243,10 @@ private:
     }
 };
 
-class NoArgsError : public std::runtime_error {
+class NoArgsError : public std::out_of_range {
 public:
     NoArgsError()
-        : std::runtime_error("Attempt to retreive an argument when no arguments were given")
+        : std::out_of_range("Attempt to retreive an argument when no arguments were given")
     {
     }
 };
@@ -271,6 +298,10 @@ public:
         throw NoArgsError();
     }
     ObjKey object_index_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    ObjLink objlink_for_argument(size_t)
     {
         throw NoArgsError();
     }

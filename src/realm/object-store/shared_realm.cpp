@@ -35,8 +35,8 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
-#include <realm/util/scope_exit.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
@@ -49,6 +49,24 @@
 
 using namespace realm;
 using namespace realm::_impl;
+
+namespace {
+class CountGuard {
+public:
+    CountGuard(size_t& count)
+        : m_count(count)
+    {
+        ++m_count;
+    }
+    ~CountGuard()
+    {
+        --m_count;
+    }
+
+private:
+    size_t& m_count;
+};
+} // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              MakeSharedTag)
@@ -252,7 +270,8 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             reset_file(schema, changes);
             return true;
 
-        case SchemaMode::Additive: {
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit: {
             bool will_apply_index_changes = version > m_schema_version;
             if (ObjectStore::verify_valid_additive_changes(changes, will_apply_index_changes))
                 return true;
@@ -312,7 +331,8 @@ void Realm::set_schema_subset(Schema schema)
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
-        case SchemaMode::Additive:
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit:
             ObjectStore::verify_valid_additive_changes(changes);
             break;
 
@@ -327,7 +347,15 @@ void Realm::set_schema_subset(Schema schema)
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
-    schema.validate(bool(m_config.sync_config));
+    uint64_t validation_mode = SchemaValidationMode::Basic;
+    if (m_config.sync_config) {
+        validation_mode |= SchemaValidationMode::Sync;
+    }
+    if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
+        validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
+    }
+
+    schema.validate(validation_mode);
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -369,7 +397,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     uint64_t old_schema_version = m_schema_version;
-    bool additive = m_config.schema_mode == SchemaMode::Additive;
+    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
@@ -604,24 +633,10 @@ void Realm::begin_transaction()
     // strong reference to `this`
     auto retain_self = shared_from_this();
 
-    // If we're already in the middle of sending notifications, just begin the
-    // write transaction without sending more notifications. If this actually
-    // advances the read version this could leave the user in an inconsistent
-    // state, but that's unavoidable.
-    if (m_is_sending_notifications) {
-        _impl::NotifierPackage notifiers;
-        transaction::begin(transaction_ref(), m_binding_context.get(), notifiers);
-        return;
-    }
-
     // make sure we have a read transaction
     read_group();
 
-    m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
-
+    CountGuard sending_notifications(m_is_sending_notifications);
     try {
         m_coordinator->promote_to_write(*this);
     }
@@ -671,6 +686,9 @@ void Realm::invalidate()
     check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
+        // This was originally because closing the Realm during notification
+        // sending would break things, but we now support that. However, it's a
+        // breaking change so we keep the old behavior for now.
         return;
     }
 
@@ -741,11 +759,8 @@ void Realm::notify()
         }
     }
 
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
     if (!m_coordinator->can_advance(*this)) {
-        m_is_sending_notifications = true;
+        CountGuard sending_notifications(m_is_sending_notifications);
         m_coordinator->process_available_async(*this);
         return;
     }
@@ -759,7 +774,7 @@ void Realm::notify()
             return;
     }
 
-    m_is_sending_notifications = true;
+    CountGuard sending_notifications(m_is_sending_notifications);
     if (m_auto_refresh) {
         if (m_group) {
             try {
@@ -810,11 +825,7 @@ bool Realm::do_refresh()
     // strong reference to `this`
     auto retain_self = shared_from_this();
 
-    m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
-
+    CountGuard sending_notifications(m_is_sending_notifications);
     if (m_binding_context) {
         m_binding_context->before_notify();
     }

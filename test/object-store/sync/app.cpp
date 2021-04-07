@@ -35,6 +35,7 @@
 #include <external/json/json.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
+#include <realm/util/websocket.hpp>
 #include <thread>
 
 using namespace realm;
@@ -225,7 +226,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         REQUIRE(!base_url.empty());
         REQUIRE(!config_path.empty());
 
-        // this app id is configured in tests/mongodb/stitch.json
+        // this app id is configured in tests/mongodb/config.json
         auto config = App::Config{get_runtime_app_id(config_path),
                                   factory,
                                   base_url,
@@ -970,17 +971,14 @@ TEST_CASE("app: call function", "[sync][app]") {
                                      CHECK(!error);
                                  });
 
-    app->call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
-
-    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
+    bson::BsonArray toSum(5);
+    std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
+    const auto checkFn = [](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    };
+    app->call_function<int64_t>("sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
@@ -2080,6 +2078,60 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                                "Realm but none was found for type 'Dog'",
                                                valid_pk_name));
     }
+
+    SECTION("too large sync message error handling") {
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+
+        std::mutex sync_error_mutex;
+        std::vector<SyncError> sync_errors;
+        config.sync_config->error_handler = [&](auto, SyncError error) {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            sync_errors.push_back(std::move(error));
+        };
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+        // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
+        // and get uploaded at once, which for now is an error on the server.
+        r->begin_transaction();
+        CppContext c;
+        for (auto i = 'a'; i < 'z'; ++i) {
+            Object::create(c, r, "Dog",
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                    {"breed", std::string("bulldog")},
+                                                    {"name", random_string(1024 * 1024)},
+                                                    {"realm_id", std::string("foo")}}),
+                           CreatePolicy::ForceCreate);
+        }
+        r->commit_transaction();
+
+        const auto wait_start = std::chrono::steady_clock::now();
+        auto pred = [](const SyncError& error) {
+            return error.error_code.category() == util::websocket::websocket_close_status_category();
+        };
+        util::EventLoop::main().run_until([&]() -> bool {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+            // and we should fail the test.
+            if (std::chrono::steady_clock::now() - wait_start > std::chrono::minutes(2)) {
+                return false;
+            }
+            return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
+        });
+
+        auto captured_error = [&] {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
+            REQUIRE(it != sync_errors.end());
+            return *it;
+        }();
+
+        REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
+        REQUIRE(captured_error.error_code.value() == 1009);
+        REQUIRE(captured_error.message == "read limited at 16777217 bytes");
+    }
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -2094,8 +2146,7 @@ public:
 
     void send_request_to_server(const Request, std::function<void(const Response)> completion_block) override
     {
-        completion_block(Response{ResponseResult::Success, 0, m_code, std::map<std::string, std::string>(),
-                                  util::none, m_message});
+        completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
     }
 
 private:
@@ -2215,7 +2266,7 @@ private:
                             {"data", profile_0}})
                 .dump();
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, response});
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_login(const Request request, std::function<void(Response)> completion_block)
@@ -2238,7 +2289,7 @@ private:
                                                {"device_id", "Panda Bear"}})
                                    .dump();
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, response});
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_location(const Request request, std::function<void(Response)> completion_block)
@@ -2252,7 +2303,7 @@ private:
                                                {"location", "matter"}})
                                    .dump();
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, response});
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_create_api_key(const Request request, std::function<void(Response)> completion_block)
@@ -2266,7 +2317,7 @@ private:
             nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
                 .dump();
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, response});
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_fetch_api_key(const Request request, std::function<void(Response)> completion_block)
@@ -2280,7 +2331,7 @@ private:
         std::string response =
             nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, response});
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_fetch_api_keys(const Request request, std::function<void(Response)> completion_block)
@@ -2296,8 +2347,7 @@ private:
             elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
         }
 
-        completion_block(
-            Response{realm::app::ResponseResult::Success, 200, 0, {}, util::none, nlohmann::json(elements).dump()});
+        completion_block(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
     void handle_token_refresh(const Request request, std::function<void(Response)> completion_block)
@@ -2311,7 +2361,7 @@ private:
         auto elements = std::vector<nlohmann::json>();
         nlohmann::json json{{"access_token", access_token}};
 
-        completion_block(Response{ResponseResult::Success, 200, 0, {}, util::none, json.dump()});
+        completion_block(Response{200, 0, {}, json.dump()});
     }
 
 public:
@@ -2324,8 +2374,7 @@ public:
             handle_profile(request, completion_block);
         }
         else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            completion_block(
-                Response{ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("")});
+            completion_block(Response{200, 0, {}, ""});
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
@@ -2344,8 +2393,7 @@ public:
             handle_location(request, completion_block);
         }
         else {
-            completion_block(Response{
-                ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("something arbitrary")});
+            completion_block(Response{200, 0, {}, "something arbitrary"});
         }
     }
 };
@@ -2500,19 +2548,15 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                             std::function<void(const Response)> completion_block)
                 {
                     if (request.url.find("/login") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_json(bad_access_token).dump()});
+                        completion_block({200, 0, {}, user_json(bad_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                        completion_block({200, 0, {}, user_profile_json().dump()});
                     }
                     else {
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
                                           nlohmann::json({{"deployment_model", "this"},
                                                           {"hostname", "field"},
                                                           {"ws_hostname", "shouldn't"},
@@ -2623,28 +2667,22 @@ TEST_CASE("app: user_semantics", "[app]") {
             void send_request_to_server(const Request request, std::function<void(const Response)> completion_block)
             {
                 if (request.url.find("/login") != std::string::npos) {
-                    completion_block(
-                        {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/profile") != std::string::npos) {
-                    completion_block({ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                    completion_block({200, 0, {}, user_profile_json().dump()});
                 }
                 else if (request.url.find("/session") != std::string::npos) {
                     CHECK(request.method == HttpMethod::del);
-                    completion_block(
-                        {ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("")});
+                    completion_block({200, 0, {}, ""});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
                     CHECK(request.method == HttpMethod::get);
-                    completion_block(
-                        {ResponseResult::Success,
-                         200,
-                         0,
-                         {},
-                         util::none,
-                         util::Optional<std::string>(
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://"
-                             "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                    completion_block({200,
+                                      0,
+                                      {},
+                                      "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://"
+                                      "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
@@ -2826,8 +2864,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
                                                 {"device_id", "Panda Bear"}})
                                     .dump();
 
-    Response response{
-        ResponseResult::Success, 200, 0, {{"Content-Type", "application/json"}}, util::none, response_body};
+    Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
 
     std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
         return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
@@ -2886,7 +2923,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
     SECTION("custom error code") {
         response.custom_status_code = 42;
-        response.body = util::Optional<std::string>("Custom error message");
+        response.body = "Custom error message";
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          CHECK(!user);
@@ -2933,7 +2970,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 
     SECTION("json error code") {
-        response.body = util::Optional<std::string>("this: is not{} a valid json body!");
+        response.body = "this: is not{} a valid json body!";
         app->log_in_with_credentials(
             realm::app::AppCredentials::anonymous(),
             [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -3137,28 +3174,22 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
             void send_request_to_server(const Request request, std::function<void(const Response)> completion_block)
             {
                 if (request.url.find("/login") != std::string::npos) {
-                    completion_block(
-                        {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/profile") != std::string::npos) {
-                    completion_block({ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                    completion_block({200, 0, {}, user_profile_json().dump()});
                 }
                 else if (request.url.find("/session") != std::string::npos) {
                     CHECK(request.method == HttpMethod::del);
-                    completion_block(
-                        {ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("")});
+                    completion_block({200, 0, {}, ""});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
                     CHECK(request.method == HttpMethod::get);
-                    completion_block(
-                        {ResponseResult::Success,
-                         200,
-                         0,
-                         {},
-                         util::none,
-                         util::Optional<std::string>(
-                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://"
-                             "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                    completion_block({200,
+                                      0,
+                                      {},
+                                      "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":\"http://"
+                                      "localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                 }
             }
         };
@@ -3226,32 +3257,25 @@ TEST_CASE("app: link_user", "[sync][app]") {
                                             std::function<void(const Response)> completion_block)
                 {
                     if (request.url.find("/login?link=true") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                        completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/login") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                        completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                        completion_block({200, 0, {}, user_profile_json().dump()});
                     }
                     else if (request.url.find("/session") != std::string::npos) {
                         CHECK(request.method == HttpMethod::del);
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("")});
+                        completion_block({200, 0, {}, ""});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3308,28 +3332,22 @@ TEST_CASE("app: link_user", "[sync][app]") {
                                             std::function<void(const Response)> completion_block)
                 {
                     if (request.url.find("/login") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                        completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                        completion_block({200, 0, {}, user_profile_json().dump()});
                     }
                     else if (request.url.find("/session") != std::string::npos) {
                         CHECK(request.method == HttpMethod::del);
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, util::Optional<std::string>("")});
+                        completion_block({200, 0, {}, ""});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3481,18 +3499,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 {
                     if (request.url.find("/session") != std::string::npos) {
                         nlohmann::json json{{"access_token", good_access_token}};
-                        completion_block({ResponseResult::Success, 200, 0, {}, util::none, json.dump()});
+                        completion_block({200, 0, {}, json.dump()});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3524,18 +3539,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     if (request.url.find("/session") != std::string::npos) {
                         session_route_hit = true;
                         nlohmann::json json{{"access_token", good_access_token}};
-                        completion_block({ResponseResult::Success, 200, 0, {}, util::none, json.dump()});
+                        completion_block({200, 0, {}, json.dump()});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3572,18 +3584,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     if (request.url.find("/session") != std::string::npos) {
                         session_route_hit = true;
                         nlohmann::json json{{"access_token", bad_access_token}};
-                        completion_block({ResponseResult::Success, 200, 0, {}, util::none, json.dump()});
+                        completion_block({200, 0, {}, json.dump()});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3632,8 +3641,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 {
                     if (request.url.find("/login") != std::string::npos) {
                         login_hit = true;
-                        completion_block(
-                            {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                        completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
 
@@ -3648,19 +3656,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
                             get_profile_2_hit = true;
 
-                            completion_block(
-                                {ResponseResult::Success, 200, 0, {}, util::none, user_profile_json().dump()});
+                            completion_block({200, 0, {}, user_profile_json().dump()});
                         }
                         else if (access_token.find(good_access_token) != std::string::npos) {
                             CHECK(!get_profile_2_hit);
                             get_profile_1_hit = true;
 
-                            completion_block({ResponseResult::Failure,
-                                              401,
-                                              0,
-                                              {},
-                                              {AppError(realm::app::make_http_error_code(401), "This is an error")},
-                                              util::none});
+                            completion_block({401, 0, {}});
                         }
                     }
                     else if (request.url.find("/session") != std::string::npos &&
@@ -3671,18 +3673,15 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                         refresh_hit = true;
 
                         nlohmann::json json{{"access_token", good_access_token2}};
-                        completion_block({ResponseResult::Success, 200, 0, {}, util::none, json.dump()});
+                        completion_block({200, 0, {}, json.dump()});
                     }
                     else if (request.url.find("/location") != std::string::npos) {
                         CHECK(request.method == HttpMethod::get);
-                        completion_block({ResponseResult::Success,
-                                          200,
+                        completion_block({200,
                                           0,
                                           {},
-                                          util::none,
-                                          util::Optional<std::string>(
-                                              "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                              "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}")});
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
                     }
                 }
             };
@@ -3720,16 +3719,13 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
             {
                 if (request.url.find("/login") != std::string::npos) {
                     REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
-                    completion_block(
-                        {ResponseResult::Success, 200, 0, {}, util::none, user_json(good_access_token).dump()});
+                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
                 }
                 else if (request.url.find("/location") != std::string::npos) {
                     CHECK(request.method == HttpMethod::get);
-                    completion_block({ResponseResult::Success,
-                                      200,
+                    completion_block({200,
                                       0,
                                       {},
-                                      util::none,
                                       nlohmann::json({{"deployment_model", "LOCAL"},
                                                       {"location", "IE"},
                                                       {"hostname", test_hostname},

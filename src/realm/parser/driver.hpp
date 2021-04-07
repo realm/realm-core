@@ -381,6 +381,7 @@ public:
     ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping);
     ~ParserDriver();
 
+    util::serializer::SerialisationState m_serializer_state;
     OrNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
@@ -401,6 +402,8 @@ public:
         parse_error = true;
     }
 
+    StringData get_printable_name(StringData table_name) const;
+
     template <class T>
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
@@ -408,7 +411,7 @@ public:
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
-    void translate(LinkChain&, std::string&);
+    std::string translate(LinkChain&, const std::string&);
 
 private:
     // The string being parsed.

@@ -157,31 +157,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         config.encryption_key = std::move(*encryption_key);
     }
 
-    config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
-        if (old_realm->schema_version() < 2) {
-            TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
-            TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-
-            // Column indices.
-            ColKey old_idx_identity = old_table->get_column_key(c_sync_identity);
-            ColKey old_idx_url = old_table->get_column_key(c_sync_provider_type);
-            ColKey idx_local_uuid = table->get_column_key(c_sync_local_uuid);
-            ColKey idx_url = table->get_column_key(c_sync_provider_type);
-
-            auto to = table->begin();
-            for (auto& from : *old_table) {
-                REALM_ASSERT(to != table->end());
-                // Set the UUID equal to the user identity for existing users.
-                auto identity = from.get<String>(old_idx_identity);
-                to->set(idx_local_uuid, identity);
-                // Migrate the auth server URLs to a non-nullable property.
-                auto url = from.get<String>(old_idx_url);
-                to->set<String>(idx_url, url.is_null() ? "" : url);
-                ++to;
-            }
-        }
-    };
-
     SharedRealm realm = Realm::get_shared_realm(config);
 
     // Get data about the (hardcoded) schemas

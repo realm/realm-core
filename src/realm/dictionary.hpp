@@ -59,7 +59,7 @@ public:
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
-    std::pair<Mixed, Mixed> get_pair(size_t ndx);
+    std::pair<Mixed, Mixed> get_pair(size_t ndx) const;
     size_t find_any(Mixed value) const final;
 
     Mixed min(size_t* return_ndx = nullptr) const final;

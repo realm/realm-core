@@ -3281,7 +3281,7 @@ TEST(Query_GA_Crash)
 TEST(Query_Float3)
 {
     Table t;
-    auto col_float = t.add_column(type_Float, "1");
+    auto col_float = t.add_column(type_Float, "1", true);
     auto col_double = t.add_column(type_Double, "2");
     auto col_int = t.add_column(type_Int, "3");
 
@@ -3292,7 +3292,7 @@ TEST(Query_Float3)
     t.create_object().set_all(float(1.5), double(2.5), 5); // match
     t.create_object().set_all(float(1.6), double(2.6), 6); // match
     t.create_object().set_all(float(1.7), double(2.7), 7);
-    t.create_object().set_all(float(1.8), double(2.8), 8);
+    t.create_object().set_all(nanf("7"), double(2.8), 8);
     t.create_object().set_all(float(1.9), double(2.9), 9);
 
     Query q1 = t.where().greater(col_float, 1.35f).less(col_double, 2.65);
@@ -3326,6 +3326,10 @@ TEST(Query_Float3)
     Query q8 = t.where().greater(col_int, 3).less(col_int, 7);
     int64_t a8 = q8.sum_int(col_int);
     CHECK_EQUAL(15, a8);
+
+    q8 = t.where().greater(col_int, 3);
+    float f = float(q8.sum_float(col_float));
+    CHECK_EQUAL(8.1f, f);
 }
 
 
@@ -3342,7 +3346,7 @@ TEST(Query_Float3_where)
     t.create_object().set_all(float(1.3), double(2.3), 3);
     t.create_object().set_all(float(1.4), double(2.4), 4); // match
     t.create_object().set_all(float(1.5), double(2.5), 5); // match
-    t.create_object().set_all(float(1.6), double(2.6), 6); // match
+    t.create_object(ObjKey(0xc001ede1b0)).set_all(float(1.6), double(2.6), 6); // match
     t.create_object().set_all(float(1.7), double(2.7), 7);
     t.create_object().set_all(float(1.8), double(2.8), 8);
     t.create_object().set_all(float(1.9), double(2.9), 9);
@@ -3352,6 +3356,11 @@ TEST(Query_Float3_where)
     Query q1 = t.where(&v).greater(col_float, 1.35f).less(col_double, 2.65);
     int64_t a1 = q1.sum_int(col_int);
     CHECK_EQUAL(15, a1);
+
+    ObjKey k;
+    a1 = q1.maximum_int(col_int, &k);
+    CHECK_EQUAL(k.value, 0xc001ede1b0);
+    CHECK_EQUAL(a1, 6);
 
     Query q2 = t.where(&v).less(col_double, 2.65).greater(col_float, 1.35f);
     int64_t a2 = q2.sum_int(col_int);
@@ -4205,12 +4214,13 @@ TEST(Query_LinkChainSortErrors)
     t1->create_object();
 
     // Disallow invalid column ids, linklists, other non-link column types.
-    ColKey backlink_ndx(2);
+    ColKey backlink_ndx(ColKey::Idx{2}, col_type_Link, ColumnAttrMask{}, 0);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
                       LogicError::type_mismatch);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
                       LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), LogicError::type_mismatch);
 }
 
 
@@ -5523,7 +5533,7 @@ TEST(Query_Performance)
     */
 }
 
-TEST(Query_AllocatorBug)
+TEST(Query_AllocatorBug_DestOlderThanSource)
 {
     // At some point this test failed when cluster node size was 4.
     Group g;
@@ -5562,6 +5572,50 @@ TEST(Query_AllocatorBug)
     CHECK_EQUAL(cnt, 421);
 }
 
+TEST(Query_AllocatorBug_SourceOlderThanDest)
+{
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column_list(type_Double, "doubles");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++)
+        foo->create_object();
+
+    // foo's WrappedAllocator now points to a translation table with 2 elements
+
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // bar's WrappedAllocator now points to a translation table with 3 elements
+
+    int i = 0;
+    for (auto& obj : *foo) {
+        obj.get_list<double>(col_double).add(double(i % 19));
+        ++i;
+    }
+
+    // foo's WrappedAllocator now points to a translation table with 6 elements
+
+    // If this query uses bar's allocator to access foo it'll perform an out-of-bounds read
+    // for any of the values in slabs 3-5
+    auto cnt = (bar->link(col_link).column<Lst<double>>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
+    cnt = (bar->link(col_link).column<Lst<double>>(col_double).size() == 1).count();
+    cnt = (bar->link(col_link).column<Lst<double>>(col_double).min() == 1).count();
+}
+
 TEST(Query_StringNodeEqualBaseBug)
 {
     Group g;
@@ -5586,7 +5640,8 @@ TEST(Query_StringNodeEqualBaseBug)
     CHECK_EQUAL(tv.size(), 0);
 }
 
-TEST(Query_OptimalNode)
+// Disabled because it is timing-dependent and frequently causes spurious failures on CI.
+TEST_IF(Query_OptimalNode, false)
 {
     const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
     Group g;
@@ -5638,6 +5693,55 @@ TEST(Query_OptimalNode)
     CHECK_GREATER(dur3, dur1);
     CHECK_LESS(dur3, dur2 / 5);
     // std::cout << "cnt: " << cnt << " dur3: " << dur3 << " us" << std::endl;
+}
+
+TEST(Query_IntPerformance)
+{
+    Table table;
+    auto col_1 = table.add_column(type_Int, "1");
+    auto col_2 = table.add_column(type_Int, "2");
+
+    for (int i = 0; i < 1000; i++) {
+        Obj o = table.create_object().set(col_1, i).set(col_2, i == 500 ? 500 : 2);
+    }
+
+    Query q1 = table.where().equal(col_2, 2);
+    Query q2 = table.where().not_equal(col_1, 500);
+
+    auto t1 = steady_clock::now();
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    size_t nb_reps = 1000;
+    for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q1.find_all();
+        CHECK_EQUAL(tv.size(), 999);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (size_t t = 0; t < nb_reps; t++) {
+        TableView tv = q2.find_all();
+        CHECK_EQUAL(tv.size(), 999);
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (size_t t = 0; t < nb_reps; t++) {
+        auto sum = q2.sum_int(col_2);
+        CHECK_EQUAL(sum, 1998);
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_reps << " repetitions in Query_IntPerformance" << std::endl;
+    std::cout << "    time equal: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep"
+              << std::endl;
+    std::cout << "    time not_equal: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/rep"
+              << std::endl;
+    std::cout << "    time sum: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep" << std::endl;
 }
 
 #endif // TEST_QUERY

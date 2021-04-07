@@ -59,6 +59,7 @@ function(use_faster_linker)
         set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
         check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
         if(HAVE_LINKER_${LINKER})
+            message(STATUS Using linker ${LINKER})
             add_link_options("-fuse-ld=${LINKER}")
             return()
         endif()
@@ -75,7 +76,7 @@ else()
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation)
+        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
     endif()
 
     # This warning is too agressive. It warns about moves that are not redundant on older
@@ -92,15 +93,14 @@ endif()
 
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
-    # - Replace `-O3` with `-Oz`.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
-    #
-    # On some architectures char is unsigned by default. Make it signed
-    add_compile_options($<$<CONFIG:Release>:-Oz>)
-    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
+    # - On some architectures char is unsigned by default. Make it signed
+    # - Compile with -Oz in Release because on Android we favor code size over performance
+    # 
+    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
@@ -241,7 +241,18 @@ endif()
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
 if(REALM_ENABLE_SYNC AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+    if(ANDROID)
+        # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
+        # (see https://github.com/android/ndk/issues/1179)
+        # We want to link against the stub library instead of statically linking anyway,
+        # so we hack find_library to only consider shared object libraries when looking for libz
+        set(_CMAKE_FIND_LIBRARY_SUFFIXES_orig ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
+    endif()
     find_package(ZLIB REQUIRED)
+    if(ANDROID)
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES_orig})
+    endif()
 endif()
 
 # Store configuration in header file

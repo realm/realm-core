@@ -135,7 +135,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw InvalidEncryptionKeyException();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
-    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+    if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
+         config.schema_mode == SchemaMode::AdditiveExplicit) &&
+        config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");
@@ -484,6 +486,7 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
+        options.backup_at_file_format_change = m_config.backup_at_file_format_change;
         m_db = DB::create(*m_history, options);
     }
     catch (realm::FileFormatUpgradeRequired const&) {
@@ -709,28 +712,45 @@ void RealmCoordinator::commit_write(Realm& realm)
     REALM_ASSERT(realm.is_in_transaction());
 
     Transaction& tr = Realm::Internal::get_transaction(realm);
+    VersionID new_version;
     {
         // Need to acquire this lock before committing or another process could
         // perform a write and notify us before we get the chance to set the
         // skip version
         util::CheckedLockGuard l(m_notifier_mutex);
+        new_version = tr.commit_and_continue_as_read();
 
-        tr.commit_and_continue_as_read();
-
-        // Don't need to check m_new_notifiers because those don't skip versions
+        // The skip version must always be the notifier transaction's current
+        // version plus one, as we can only skip a prefix and not intermediate
+        // transactions. If we have a notifier for the current Realm, then we
+        // waited until it finished running in begin_transaction() and this
+        // invarient holds. If we don't have any notifiers then we don't need
+        // to set the skip version, but more importantly *can't* because we
+        // didn't block when starting the write and the notifier transaction
+        // may still be on an older version.
+        //
+        // Note that this relies on the fact that callbacks cannot be added from
+        // within write transactions. If they could be, we could hit this point
+        // with an implicit-created notifier which ran (and so is in m_notifiers
+        // and not m_new_notifiers) but didn't have a callback at the start of
+        // the write so we didn't block for it then, but does now have a callback.
+        // If we add support for that, we'll need to update this logic.
         bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(), [&](auto&& notifier) {
-            return notifier->is_for_realm(realm);
+            return notifier->is_for_realm(realm) && notifier->have_callbacks();
         });
         if (have_notifiers) {
-            m_notifier_skip_version = Realm::Internal::get_transaction(realm).get_version_of_current_transaction();
+            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(m_notifier_sg);
+            REALM_ASSERT_3(m_notifier_sg->get_transact_stage(), ==, DB::transact_Reading);
+            REALM_ASSERT_3(m_notifier_sg->get_version() + 1, ==, new_version.version);
+            m_notifier_skip_version = new_version;
         }
     }
 
 #if REALM_ENABLE_SYNC
     // Realm could be closed in did_change. So send sync notification first before did_change.
     if (m_sync_session) {
-        auto version = tr.get_version();
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
+        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, new_version.version);
     }
 #endif
     if (realm.m_binding_context) {
@@ -921,11 +941,13 @@ void RealmCoordinator::run_async_notifiers()
     clean_up_dead_notifiers();
 
     if (m_notifiers.empty() && m_new_notifiers.empty()) {
+        REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_cv.notify_all();
         return;
     }
 
     if (!m_notifier_sg) {
+        REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_sg = m_db->start_read();
     }
 
@@ -936,7 +958,10 @@ void RealmCoordinator::run_async_notifiers()
         return;
     }
 
-    VersionID version;
+    // We need to pick the final version to advance to while the lock is held
+    // as otherwise if a commit is made while new notifiers are being advanced
+    // we could end up advancing over the skip version.
+    VersionID version = m_db->get_version_id_of_latest_snapshot();
     auto skip_version = m_notifier_skip_version;
     m_notifier_skip_version = {0, 0};
 
@@ -954,17 +979,20 @@ void RealmCoordinator::run_async_notifiers()
         // be here even if the notifiers don't need to rerun.
         notifiers = m_notifiers;
     }
+    else {
+        REALM_ASSERT(!skip_version.version);
+    }
 
     auto new_notifiers = std::move(m_new_notifiers);
     m_new_notifiers.clear();
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
 
-    lock.unlock();
-
     // Advance all of the new notifiers to the most recent version, if any
     TransactionRef new_notifier_transaction;
     util::Optional<IncrementalChangeInfo> new_notifier_change_info;
     if (!new_notifiers.empty()) {
+        lock.unlock();
+
         // Starting from the oldest notifier, incrementally advance the notifiers
         // to the latest version, attaching each new notifier as we reach its
         // source version. Suppose three new notifiers have been created:
@@ -987,26 +1015,17 @@ void RealmCoordinator::run_async_notifiers()
             notifier->attach_to(new_notifier_transaction);
             notifier->add_required_change_info(new_notifier_change_info->current());
         }
-        new_notifier_change_info->advance_to_final(VersionID{});
-
-        // We want to advance the non-new notifiers to the same version as the
-        // new notifiers to avoid having to merge changes from any new
-        // transaction that happen immediately after this into the new notifier
-        // changes
-        version = new_notifier_transaction->get_version_of_current_transaction();
+        new_notifier_change_info->advance_to_final(version);
     }
     else {
-        // If we have no new notifiers we want to just advance to the latest
-        // version, but we have to pick a "latest" version while holding the
-        // notifier lock to avoid advancing over a transaction which should be
-        // skipped
-        version = m_db->get_version_id_of_latest_snapshot();
         if (version == m_notifier_sg->get_version_of_current_transaction()) {
             // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(!skip_version.version);
             m_notifier_cv.notify_all();
             return;
         }
+
+        lock.unlock();
     }
 
     if (skip_version.version) {
