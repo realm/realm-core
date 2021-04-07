@@ -47,6 +47,9 @@ std::vector<std::string> step_names{"Direct", "Idx_bst", "Idx_wst", "PK"};
 
 int main()
 {
+    std::random_device rd;
+    std::mt19937 g(rd());
+
     auto run_steps = [&](int num_steps, int step_size, step_type st, const char* step_layout,
                          std::vector<int> rw_probes = {}) {
         bool test_rw = rw_probes.size() != 0;
@@ -77,7 +80,7 @@ int main()
             key_supply.push_back(std::to_string(i));
         }
         if (st == INDEXED_WORST /* || st == PK */) {
-            std::random_shuffle(key_supply.begin(), key_supply.end());
+            std::shuffle(key_supply.begin(), key_supply.end(), g);
         }
         std::vector<std::string> keys;
         keys.reserve(total_size);
@@ -108,7 +111,7 @@ int main()
             }
             if (st == INDEXED_WORST && test_rw) {
                 // worst case spreads deletions all over currently used key space
-                std::random_shuffle(keys.begin(), keys.end());
+                std::shuffle(keys.begin(), keys.end(), g);
                 // delete random 5% of step_size objects - and their keys
                 auto limit = step_size / 20;
                 while (limit--) {
