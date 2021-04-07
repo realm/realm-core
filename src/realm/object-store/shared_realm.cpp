@@ -573,7 +573,7 @@ VersionID Realm::read_transaction_version() const
     verify_thread();
     verify_open();
     check_can_create_any_transaction(this);
-    return static_cast<Transaction&>(*m_transaction).get_version_of_current_transaction();
+    return m_transaction->get_version_of_current_transaction();
 }
 
 uint_fast64_t Realm::get_number_of_versions() const
@@ -593,7 +593,7 @@ util::Optional<VersionID> Realm::current_transaction_version() const
 {
     util::Optional<VersionID> ret;
     if (m_transaction) {
-        ret = static_cast<Transaction&>(*m_transaction).get_version_of_current_transaction();
+        ret = m_transaction->get_version_of_current_transaction();
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
