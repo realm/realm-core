@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 11.0.0-beta.3 Release notes
 
 ### Enhancements
 * Update the to_json() function to properly encode UUIDs, mixed types, dictionaries, and sets as MongoDB extended JSON. 
@@ -11,13 +11,9 @@
 * Make conversion of Decimal128 to/from string work for numbers with more than 19 significant digits. ([#4548](https://github.com/realm/realm-core/issues/4548))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Clearing a set of links would result in crash when target objects are deleted.
 * Query::links_to() took wrong argument for Mixed columns. ([#4585](https://github.com/realm/realm-core/issues/4585))
+* Clearing a set of links would result in crash when target objects are deleted.([#4579](https://github.com/realm/realm-core/issues/4579))
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
