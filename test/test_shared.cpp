@@ -3188,7 +3188,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         auto cols = table->get_column_keys();
-        for (int i = 0; i < 32 ; ++i) {
+        for (int i = 0; i < 32; ++i) {
             table->create_object(ObjKey(i)).set(cols[0], long_string.c_str());
         }
         wt.commit();
@@ -3202,15 +3202,15 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
             auto cols = table->get_column_keys();
             for (int i = 0; i < 20; ++i) {
                 for (int v = 0; v < string_length - 4; v += 512) {
-                    
-                    long_string[v]  = 32 + (stamp & 0x3F);
-                    long_string[v+1]= 32 + ((stamp >>6) & 0x3F);
-                    long_string[v+2]= 32 + ((stamp >>12) & 0x3F);
-                    long_string[v+3]= 32 + ((stamp >> 18) & 0x3F);
+
+                    long_string[v] = 32 + (stamp & 0x3F);
+                    long_string[v + 1] = 32 + ((stamp >> 6) & 0x3F);
+                    long_string[v + 2] = 32 + ((stamp >> 12) & 0x3F);
+                    long_string[v + 3] = 32 + ((stamp >> 18) & 0x3F);
                     stamp++;
-                    
-                    //long_string[v]++;
-                    //long_string[v]--;
+
+                    // long_string[v]++;
+                    // long_string[v]--;
                 }
                 table->get_object(ObjKey(i)).set(cols[0], long_string.c_str());
             }
