@@ -140,4 +140,3 @@ endif()
 
 add_subdirectory(notifications-fuzzer)
 add_subdirectory(benchmarks)
-add_subdirectory(benchmarks-larger)
