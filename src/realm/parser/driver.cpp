@@ -409,12 +409,12 @@ Query EqualityNode::visit(ParserDriver* drv)
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
             if (link_column && link_column->link_map().get_nb_hops() == 1 &&
                 link_column->get_comparison_type() == ExpressionComparisonType::Any) {
-                // We can fall back to Query::links_to for != and == operations on links, but only
-                // for == on link lists. This is because negating query.links_to() is equivalent to
-                // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
+                // We can use equal/not_equal and get a LinksToNode based query
                 if (op == CompareNode::EQUAL) {
-                    return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
-                                                               val.get<ObjKey>());
+                    return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
+                }
+                else if (op == CompareNode::NOT_EQUAL) {
+                    return drv->m_base_table->where().not_equal(link_column->link_map().get_first_column_key(), val);
                 }
             }
         }

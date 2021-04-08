@@ -821,7 +821,6 @@ private:
     friend class Columns<StringData>;
     friend class ParentNode;
     friend struct util::serializer::SerialisationState;
-    friend class LinksToNode;
     friend class LinkMap;
     friend class LinkView;
     friend class Group;

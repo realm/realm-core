@@ -691,3 +691,72 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from)
     , m_expression(from.m_expression->clone())
 {
 }
+
+template <>
+size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
+{
+    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
+        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
+        for (size_t i = start; i < end; i++) {
+            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+                links.init_from_ref(ref);
+                for (auto& key : m_target_keys) {
+                    if (key) {
+                        if (links.find_first(key) != not_found)
+                            return i;
+                    }
+                }
+            }
+        }
+    }
+    else if (m_column_type == col_type_Link) {
+        for (auto& key : m_target_keys) {
+            if (key) {
+                // LinkColumn stores link to row N as the integer N + 1
+                auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+                if (pos != realm::npos) {
+                    return pos;
+                }
+            }
+        }
+    }
+
+    return not_found;
+}
+
+template <>
+size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
+{
+    // NotEqual only makes sense for a single value
+    REALM_ASSERT(m_target_keys.size() == 1);
+    ObjKey key = m_target_keys[0];
+
+    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
+        if (!key) {
+            // Null key is never found in link lists
+            return start;
+        }
+        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
+        for (size_t i = start; i < end; i++) {
+            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+                links.init_from_ref(ref);
+                auto sz = links.size();
+                for (size_t j = 0; j < sz; j++) {
+                    if (links.get(j) != key) {
+                        return i;
+                    }
+                }
+            }
+        }
+    }
+    else if (m_column_type == col_type_Link) {
+        auto leaf = static_cast<const ArrayKey*>(m_leaf_ptr);
+        for (size_t i = start; i < end; i++) {
+            if (leaf->get(i) != key) {
+                return i;
+            }
+        }
+    }
+
+    return not_found;
+}
