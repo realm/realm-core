@@ -84,6 +84,7 @@ TEST(Dictionary_Basics)
 
     Obj obj1 = foo->create_object();
     Obj obj2 = foo->create_object();
+    StringData foo_key("foo.bar", 3); // The '.' must not be considered part of the key
 
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
@@ -107,10 +108,11 @@ TEST(Dictionary_Basics)
         CHECK_THROW_ANY(dict.get("Foo").get_string()); // Outside range
         CHECK_THROW_ANY(dict.insert("$foo", ""));      // Must not start with '$'
         CHECK_THROW_ANY(dict.insert("foo.bar", ""));   // Must not contain '.'
+        CHECK(dict.insert(foo_key, 9).second);         // This should be ok
     }
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
-        CHECK_EQUAL(dict.size(), 2);
+        CHECK_EQUAL(dict.size(), 3);
         cmp(dict.get("Hello"), 10);
         cmp(dict["Goodbye"], "cruel world");
         auto it = dict.find("puha");
@@ -118,9 +120,10 @@ TEST(Dictionary_Basics)
         it = dict.find("Goodbye");
         cmp((*it).second, "cruel world");
         dict.erase(it);
-        CHECK_EQUAL(dict.size(), 1);
-        cmp(dict["Goodbye"], Mixed());
         CHECK_EQUAL(dict.size(), 2);
+        cmp(dict["Goodbye"], Mixed());
+        CHECK_EQUAL(dict.size(), 3);
+        dict.erase("foo");
         dict.clear();
         CHECK_EQUAL(dict.size(), 0);
         // Check that you can insert after clear

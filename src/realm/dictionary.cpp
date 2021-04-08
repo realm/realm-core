@@ -31,11 +31,13 @@ namespace {
 void validate_key_value(const Mixed& key)
 {
     if (key.is_type(type_String)) {
-        const char* str = key.get_string().data();
-        if (str[0] == '$')
-            throw std::runtime_error("Dictionary::insert: key must not start with '$'");
-        if (strchr(str, '.'))
-            throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+        auto str = key.get_string();
+        if (str.size()) {
+            if (str[0] == '$')
+                throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+            if (memchr(str.data(), '.', str.size()))
+                throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+        }
     }
 }
 } // namespace
