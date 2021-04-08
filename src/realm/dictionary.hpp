@@ -293,7 +293,12 @@ public:
     }
     BPlusTree<ObjKey>* get_mutable_tree() const
     {
-        // FIXME: check if this is actually needed.
+        // We are faking being an ObjList because the underlying storage is not
+        // actually a BPlusTree<ObjKey> for dictionaries it is all mixed values.
+        // But this is ok, because we don't need to deal with unresolved link
+        // maintenance because they are not hidden from view in dictionaries in
+        // the same way as for LnkSet and LnkLst. This means that the functions
+        // that call get_mutable_tree do not need to do anything for dictionaries.
         return nullptr;
     }
 

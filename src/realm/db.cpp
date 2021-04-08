@@ -2681,15 +2681,11 @@ SetBasePtr Transaction::import_copy_of(const SetBase& original)
 
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
-    if (!&original)
-        return nullptr;
     if (Obj obj = import_copy_of(original.get_obj())) {
         ColKey ck = original.get_col_key();
         return obj.get_collection_ptr(ck);
     }
-    // return some empty collection where size() == 0
-    // the type shouldn't matter
-    return std::make_unique<LnkLst>();
+    return {};
 }
 
 LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
@@ -2712,6 +2708,19 @@ LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
         return obj.get_linkset_ptr(ck);
     }
     return std::make_unique<LnkSet>();
+}
+
+CollectionBasePtr Transaction::import_copy_of(const CollectionBasePtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_obj())) {
+        ColKey ck = original->get_col_key();
+        return obj.get_collection_ptr(ck);
+    }
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
+    return std::make_unique<LnkLst>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)

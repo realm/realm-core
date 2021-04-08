@@ -59,9 +59,9 @@ Query::Query(ConstTableRef table, const LnkSet& set)
     create();
 }
 
-Query::Query(ConstTableRef table, const Dictionary& dict_of_links)
+Query::Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links)
     : m_table(table.cast_away_const())
-    , m_source_collection(std::make_unique<DictionaryLinkValues>(dict_of_links))
+    , m_source_collection(dict_of_links.clone_collection())
 {
     m_view = dynamic_cast<ObjList*>(m_source_collection.get());
     REALM_ASSERT_DEBUG(m_view);
@@ -188,8 +188,8 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     else {
         // nothing?
     }
-    if (source->m_source_collection.get()) {
-        m_source_collection = tr->import_copy_of(*source->m_source_collection);
+    if (source->m_source_collection) {
+        m_source_collection = tr->import_copy_of(source->m_source_collection);
         m_view = dynamic_cast<ObjList*>(m_source_collection.get());
         REALM_ASSERT_DEBUG(m_view);
     }

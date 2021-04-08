@@ -772,7 +772,6 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
                    cf::UnboxedOptional<cf::Decimal>)
 {
     using T = typename TestType::Type;
-    using Boxed = typename TestType::Boxed;
     using W = typename TestType::Wrapped;
     InMemoryTestFile config;
     config.cache = false;

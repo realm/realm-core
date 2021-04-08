@@ -58,6 +58,7 @@ using LnkSetPtr = std::unique_ptr<LnkSet>;
 template <class>
 class Set;
 class Dictionary;
+class DictionaryLinkValues;
 using DictionaryPtr = std::unique_ptr<Dictionary>;
 
 enum JSONOutputMode {
