@@ -124,6 +124,7 @@ TEST(Dictionary_Basics)
         cmp(dict["Goodbye"], Mixed());
         CHECK_EQUAL(dict.size(), 3);
         dict.erase("foo");
+        CHECK_EQUAL(dict.size(), 2);
         dict.clear();
         CHECK_EQUAL(dict.size(), 0);
         // Check that you can insert after clear
