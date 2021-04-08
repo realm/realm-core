@@ -150,7 +150,7 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
         // FIXME: Exploit the fact that the values are sorted and unresolved
         // keys have a negative value.
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
 }
 

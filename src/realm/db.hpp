@@ -603,7 +603,7 @@ public:
     LstBasePtr import_copy_of(const LstBase& original);
     SetBasePtr import_copy_of(const SetBase& original);
     CollectionBasePtr import_copy_of(const CollectionBase& original);
-    LnkLstPtr import_copy_of(const LnkLstPtr& original);
+    LnkLstPtr import_copy_of(const LnkLstPtr& original); // FIXME: remove these?
     LnkSetPtr import_copy_of(const LnkSetPtr& original);
 
     // handover of the heavier Query and TableView

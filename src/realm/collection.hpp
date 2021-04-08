@@ -373,10 +373,10 @@ size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept;
 size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept;
 
 /// Rebuild the list of unresolved keys for tombstone handling.
-void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
+void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>* tree);
 
 /// Clear the context flag on the tree if there are no more unresolved links.
-void check_for_last_unresolved(BPlusTree<ObjKey>& tree);
+void check_for_last_unresolved(BPlusTree<ObjKey>* tree);
 
 /// Proxy class needed because the ObjList interface clobbers method names from
 /// CollectionBase.
@@ -448,7 +448,7 @@ protected:
 
     /// Implementations should return a non-const reference to their internal
     /// `BPlusTree<T>`.
-    virtual BPlusTree<ObjKey>& get_mutable_tree() const = 0;
+    virtual BPlusTree<ObjKey>* get_mutable_tree() const = 0;
 
     /// Calls `do_init_from_parent()` and updates the list of unresolved links.
     bool init_from_parent() const final

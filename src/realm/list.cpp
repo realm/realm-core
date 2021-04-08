@@ -181,7 +181,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     }
     else if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
 }
 
@@ -214,7 +214,7 @@ void Lst<ObjKey>::do_remove(size_t ndx)
     }
     if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
 }
 

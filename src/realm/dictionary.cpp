@@ -801,4 +801,45 @@ auto Dictionary::Iterator::operator*() const -> value_type
     return std::make_pair(key, values.get(m_state.m_current_index));
 }
 
+
+/************************* DictionaryLinkValues *************************/
+
+DictionaryLinkValues::DictionaryLinkValues(const Obj& obj, ColKey col_key)
+    : m_source(obj, col_key)
+{
+    REALM_ASSERT_EX(col_key.get_type() == col_type_Link, col_key.get_type());
+}
+
+DictionaryLinkValues::DictionaryLinkValues(const Dictionary& source)
+    : m_source(source)
+{
+    REALM_ASSERT_EX(source.get_value_data_type() == type_Link, source.get_value_data_type());
+}
+
+ObjKey DictionaryLinkValues::get_key(size_t ndx) const
+{
+    Mixed val = m_source.get_any(ndx);
+    if (val.is_type(type_Link)) {
+        return val.get<ObjKey>();
+    }
+    return {};
+}
+
+// In contrast to a link list and a link set, a dictionary can contain null links.
+// This is because the corresponding key may contain useful information by itself.
+bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
+{
+    Mixed val = m_source.get_any(ndx);
+    return val.is_type(type_Link);
+}
+
+Obj DictionaryLinkValues::get_object(size_t row_ndx) const
+{
+    Mixed val = m_source.get_any(row_ndx);
+    if (val.is_type(type_Link)) {
+        return get_target_table()->get_object(val.get<ObjKey>());
+    }
+    return {};
+}
+
 } // namespace realm

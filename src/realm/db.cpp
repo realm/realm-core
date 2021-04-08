@@ -2681,11 +2681,15 @@ SetBasePtr Transaction::import_copy_of(const SetBase& original)
 
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
+    if (!&original)
+        return nullptr;
     if (Obj obj = import_copy_of(original.get_obj())) {
         ColKey ck = original.get_col_key();
         return obj.get_collection_ptr(ck);
     }
-    return {};
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
+    return std::make_unique<LnkLst>();
 }
 
 LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
