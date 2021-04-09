@@ -406,10 +406,29 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_UUID: {
             return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
-        default: {
-            throw_type_mismatch_error();
-        }
+        case type_Link:
+        case type_LinkList:
+            if constexpr (std::is_same_v<T, Mixed> && realm::is_any_v<Cond, Equal, NotEqual>) {
+                ObjKey key;
+                if (value.is_type(type_Link)) {
+                    key = value.template get<ObjKey>();
+                }
+                else if (value.is_type(type_TypedLink)) {
+                    ObjLink link = value.get_link();
+                    auto target_table = table.get_link_target(column_key);
+                    if (target_table->get_key() != link.get_table_key()) {
+                        // This will never match
+                        return std::unique_ptr<ParentNode>{new ExpressionNode(std::make_unique<FalseExpression>())};
+                    }
+                    key = link.get_obj_key();
+                }
+                return std::unique_ptr<ParentNode>{new LinksToNode<Cond>(column_key, key)};
+            }
+            break;
+        default:
+            break;
     }
+    throw_type_mismatch_error();
 }
 
 template <class Cond>
@@ -537,7 +556,7 @@ Query& Query::between(ColKey column_key, int from, int to)
 
 Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode<Equal>(origin_column_key, target_key)));
     return *this;
 }
 
@@ -549,7 +568,7 @@ Query& Query::links_to(ColKey origin_column_key, ObjLink target_link)
 
 Query& Query::links_to(ColKey origin_column, const std::vector<ObjKey>& target_keys)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_keys)));
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode<Equal>(origin_column, target_keys)));
     return *this;
 }
 

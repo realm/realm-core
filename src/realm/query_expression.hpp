@@ -3519,20 +3519,17 @@ Query compare(const Subexpr2<Link>& left, const Obj& obj)
         REALM_ASSERT(link_map.get_target_table()->get_key() == obj.get_table()->get_key());
 #ifdef REALM_OLDQUERY_FALLBACK
         if (link_map.get_nb_hops() == 1) {
-            // We can fall back to Query::links_to for != and == operations on links, but only
-            // for == on link lists. This is because negating query.links_to() is equivalent to
-            // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
-            if (link_map.m_link_types[0] == col_type_Link ||
-                (link_map.m_link_types[0] == col_type_LinkList && std::is_same_v<Operator, Equal>)) {
+            // We can fall back to Query::links_to for != and == operations on links
+            if (link_map.m_link_types[0] == col_type_Link || (link_map.m_link_types[0] == col_type_LinkList)) {
                 ConstTableRef t = column->get_base_table();
                 Query query(t);
 
-                if (std::is_same_v<Operator, NotEqual>) {
-                    // Negate the following `links_to`.
-                    query.Not();
+                if (std::is_same_v<Operator, Equal>) {
+                    return query.equal(link_map.m_link_column_keys[0], obj.get_link());
                 }
-                query.links_to(link_map.m_link_column_keys[0], obj.get_key());
-                return query;
+                else {
+                    return query.not_equal(link_map.m_link_column_keys[0], obj.get_link());
+                }
             }
         }
 #endif

@@ -2338,20 +2338,21 @@ private:
 };
 
 
-class LinksToNode : public ParentNode {
+class LinksToNodeBase : public ParentNode {
 public:
-    LinksToNode(ColKey origin_column_key, ObjKey target_key)
-        : LinksToNode(origin_column_key, std::vector<ObjKey>{target_key})
+    LinksToNodeBase(ColKey origin_column_key, ObjKey target_key)
+        : LinksToNodeBase(origin_column_key, std::vector<ObjKey>{target_key})
     {
     }
 
-    LinksToNode(ColKey origin_column_key, const std::vector<ObjKey>& target_keys)
+    LinksToNodeBase(ColKey origin_column_key, const std::vector<ObjKey>& target_keys)
         : m_target_keys(target_keys)
     {
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
         m_column_type = origin_column_key.get_type();
         REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
+        REALM_ASSERT(!m_target_keys.empty());
     }
 
     void cluster_changed() override
@@ -2376,48 +2377,7 @@ public:
                util::serializer::print_value(m_target_keys[0]);
     }
 
-    virtual std::string describe_condition() const override
-    {
-        return "==";
-    }
-
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
-            BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
-            for (size_t i = start; i < end; i++) {
-                if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
-                    links.init_from_ref(ref);
-                    for (auto& key : m_target_keys) {
-                        if (key) {
-                            if (links.find_first(key) != not_found)
-                                return i;
-                        }
-                    }
-                }
-            }
-        }
-        else if (m_column_type == col_type_Link) {
-            for (auto& key : m_target_keys) {
-                if (key) {
-                    // LinkColumn stores link to row N as the integer N + 1
-                    auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
-                    if (pos != realm::npos) {
-                        return pos;
-                    }
-                }
-            }
-        }
-
-        return not_found;
-    }
-
-    std::unique_ptr<ParentNode> clone() const override
-    {
-        return std::unique_ptr<ParentNode>(new LinksToNode(*this));
-    }
-
-private:
+protected:
     std::vector<ObjKey> m_target_keys;
     ColumnType m_column_type;
     using LeafPtr = std::unique_ptr<ArrayPayload, PlacementDelete>;
@@ -2429,12 +2389,30 @@ private:
     LeafPtr m_array_ptr;
     const ArrayPayload* m_leaf_ptr = nullptr;
 
-    LinksToNode(const LinksToNode& source)
+    LinksToNodeBase(const LinksToNodeBase& source)
         : ParentNode(source)
         , m_target_keys(source.m_target_keys)
         , m_column_type(source.m_column_type)
     {
     }
+};
+
+template <class TConditionFunction>
+class LinksToNode : public LinksToNodeBase {
+public:
+    using LinksToNodeBase::LinksToNodeBase;
+
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new LinksToNode<TConditionFunction>(*this));
+    }
+
+    size_t find_first_local(size_t start, size_t end) override;
 };
 
 } // namespace realm

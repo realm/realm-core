@@ -5181,15 +5181,29 @@ TEST(Query_LinksTo)
 
     source->get_object(source_keys[2]).set(col_link, target_keys[2]);
     source->get_object(source_keys[5]).set(col_link, target_keys[5]);
+    source->get_object(source_keys[8]).set(col_link, target_keys[5]);
     source->get_object(source_keys[9]).set(col_link, target_keys[9]);
 
     q = source->column<Link>(col_link) == target->get_object(target_keys[2]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
 
+    q = source->where().equal(col_link, Mixed(target_keys[2]));
+    found_key = q.find();
+    CHECK_EQUAL(found_key, source_keys[2]);
+
     q = source->column<Link>(col_link) == target->get_object(target_keys[5]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[5]);
+    q = source->where().equal(col_link, Mixed(target_keys[5]));
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    q = source->where().not_equal(col_link, Mixed(target_keys[5]));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    q = source->where().equal(col_link, Mixed(ObjLink(source->get_key(), target_keys[5]))); // Wrong table
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 0);
 
     q = source->column<Link>(col_link) == target->get_object(target_keys[9]);
     found_key = q.find();
@@ -5200,12 +5214,18 @@ TEST(Query_LinksTo)
     CHECK_EQUAL(found_key, null_key);
 
     q = source->column<Link>(col_link).is_null();
-    auto tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 7);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 6);
+    q = source->where().equal(col_link, Mixed()); // Null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 6);
 
     q = source->column<Link>(col_link) != null();
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
+    q = source->where().not_equal(col_link, Mixed()); // Null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
 
     auto linklist = source->get_object(source_keys[1]).get_linklist_ptr(col_linklist);
     linklist->add(target_keys[6]);
@@ -5225,6 +5245,20 @@ TEST(Query_LinksTo)
     q = source->column<Link>(col_linklist) != target->get_object(target_keys[6]);
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
+
+    q = source->where().equal(col_linklist, Mixed(target_keys[0]));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    q = source->where().not_equal(col_linklist, Mixed(target_keys[6]));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    q = source->where().equal(col_linklist, Mixed());
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 0); // LinkList never matches null
+    q = source->where().not_equal(col_linklist, Mixed());
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
 }
 
 TEST(Query_Group_bug)
@@ -5890,10 +5924,22 @@ TEST(Query_Mixed)
     tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
     CHECK_EQUAL(tv.size(), 72);
 
-    tv = (origin->column<Mixed>(col_mixed) == Mixed(table->begin()->get_link())).find_all();
+    ObjLink link_to_first = table->begin()->get_link();
+    tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();
     CHECK_EQUAL(tv.size(), 4);
-    tv = (origin->where().links_to(col_mixed, table->begin()->get_link())).find_all();
+    tv = (origin->where().links_to(col_mixed, link_to_first)).find_all();
     CHECK_EQUAL(tv.size(), 4);
+    tv = (origin->where().equal(col_link, Mixed(link_to_first))).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (origin->where().equal(col_links, Mixed(link_to_first))).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    auto q = origin->where().not_equal(col_links, Mixed(link_to_first));
+    auto d = q.get_description();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 10);
+    q = origin->query(d);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 10);
     tv = (origin->link(col_links).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 5);
     tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
