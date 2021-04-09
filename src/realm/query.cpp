@@ -416,9 +416,11 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
                 else if (value.is_type(type_TypedLink)) {
                     ObjLink link = value.get_link();
                     auto target_table = table.get_link_target(column_key);
-                    if (target_table->get_key() == link.get_table_key()) {
-                        key = link.get_obj_key();
+                    if (target_table->get_key() != link.get_table_key()) {
+                        // This will never match
+                        return std::unique_ptr<ParentNode>{new ExpressionNode(std::make_unique<FalseExpression>())};
                     }
+                    key = link.get_obj_key();
                 }
                 return std::unique_ptr<ParentNode>{new LinksToNode<Cond>(column_key, key)};
             }

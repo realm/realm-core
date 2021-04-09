@@ -696,6 +696,11 @@ template <>
 size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
 {
     if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
+
+        // LinkLists never contain null
+        if (!m_target_keys[0] && m_target_keys.size() == 1 && start != end)
+            return not_found;
+
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
             if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
@@ -711,12 +716,9 @@ size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
     }
     else if (m_column_type == col_type_Link) {
         for (auto& key : m_target_keys) {
-            if (key) {
-                // LinkColumn stores link to row N as the integer N + 1
-                auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
-                if (pos != realm::npos) {
-                    return pos;
-                }
+            auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+            if (pos != realm::npos) {
+                return pos;
             }
         }
     }
@@ -732,10 +734,6 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
     ObjKey key = m_target_keys[0];
 
     if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
-        if (!key) {
-            // Null key is never found in link lists
-            return start;
-        }
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
             if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {

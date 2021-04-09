@@ -2352,6 +2352,7 @@ public:
         m_condition_column_key = origin_column_key;
         m_column_type = origin_column_key.get_type();
         REALM_ASSERT(m_column_type == col_type_Link || m_column_type == col_type_LinkList);
+        REALM_ASSERT(!m_target_keys.empty());
     }
 
     void cluster_changed() override

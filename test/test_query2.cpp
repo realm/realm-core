@@ -5216,10 +5216,16 @@ TEST(Query_LinksTo)
     q = source->column<Link>(col_link).is_null();
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 6);
+    q = source->where().equal(col_link, Mixed()); // Null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 6);
 
     q = source->column<Link>(col_link) != null();
     found_key = q.find();
     CHECK_EQUAL(found_key, source_keys[2]);
+    q = source->where().not_equal(col_link, Mixed()); // Null
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
 
     auto linklist = source->get_object(source_keys[1]).get_linklist_ptr(col_linklist);
     linklist->add(target_keys[6]);
@@ -5246,6 +5252,13 @@ TEST(Query_LinksTo)
     q = source->where().not_equal(col_linklist, Mixed(target_keys[6]));
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
+
+    q = source->where().equal(col_linklist, Mixed());
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 0); // LinkList never matches null
+    q = source->where().not_equal(col_linklist, Mixed());
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
 }
 
 TEST(Query_Group_bug)
