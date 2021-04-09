@@ -1007,13 +1007,13 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
             }
         }
         else {
-            for (size_t t = 0; t < m_view->size(); t++) {
-                const Obj obj = m_view->get_object(t);
+            m_view->for_each([&](const Obj& obj) {
                 if (eval_object(obj)) {
                     st.m_key_offset = obj.get_key().value;
                     st.match(realm::npos, obj.get<T>(column_key));
                 }
-            }
+                return false;
+            });
         }
     }
 
@@ -1413,8 +1413,8 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->get_object(i);
-            if (eval_object(obj)) {
+            const Obj obj = m_view->try_get_object(i);
+            if (obj && eval_object(obj)) {
                 return obj.get_key();
             }
         }
@@ -1454,8 +1454,8 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
-            const Obj obj = m_view->get_object(t);
-            if (eval_object(obj)) {
+            const Obj obj = m_view->try_get_object(t);
+            if (obj && eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
         }
@@ -1577,13 +1577,12 @@ size_t Query::do_count(size_t limit) const
     size_t cnt = 0;
 
     if (m_view) {
-        size_t sz = m_view->size();
-        for (size_t t = 0; t < sz && cnt < limit; t++) {
-            const Obj obj = m_view->get_object(t);
+        m_view->for_each([&](const Obj& obj) {
             if (eval_object(obj)) {
                 cnt++;
             }
-        }
+            return false;
+        });
     }
     else {
         size_t counter = 0;

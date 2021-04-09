@@ -69,6 +69,7 @@ size_t ParentNode::find_first(size_t start, size_t end)
 template <class T>
 inline bool Obj::evaluate(T func) const
 {
+    REALM_ASSERT(is_valid());
     Cluster cluster(0, get_alloc(), m_table->m_clusters);
     cluster.init(m_mem);
     cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
