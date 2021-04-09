@@ -312,7 +312,7 @@ public:
         ObjKey key = this->get(ndx);
         return get_target_table()->get_object(key);
     }
-    ObjKey get_key(size_t ndx) const final
+    ObjKey get_obj_key(size_t ndx) const final
     {
         return get(ndx);
     }

@@ -544,7 +544,7 @@ public:
     }
 
     // Perform queries on a Dictionary containing values of links to a single table.
-    Query where(const DictionaryLinkValues& dictionary_of_links) const
+    Query where(const Dictionary& dictionary_of_links) const
     {
         return Query(m_own_ref, dictionary_of_links);
     }

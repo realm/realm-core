@@ -59,7 +59,7 @@ Query::Query(ConstTableRef table, const LnkSet& set)
     create();
 }
 
-Query::Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links)
+Query::Query(ConstTableRef table, const Dictionary& dict_of_links)
     : m_table(table.cast_away_const())
     , m_source_collection(dict_of_links.clone_collection())
 {

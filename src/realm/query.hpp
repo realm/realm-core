@@ -87,7 +87,7 @@ public:
     Query(ConstTableRef table, std::unique_ptr<ConstTableView>);
     Query(ConstTableRef table, const LnkLst& list);
     Query(ConstTableRef table, const LnkSet& set);
-    Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links);
+    Query(ConstTableRef table, const Dictionary& dict_of_links);
     Query(ConstTableRef table, LnkLstPtr&& list);
     Query(ConstTableRef table, LnkSetPtr&& set);
     Query();

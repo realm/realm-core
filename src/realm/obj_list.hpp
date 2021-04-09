@@ -33,12 +33,17 @@ public:
 
     virtual size_t size() const = 0;
     virtual TableRef get_target_table() const = 0;
-    virtual ObjKey get_key(size_t ndx) const = 0;
+    virtual ObjKey get_obj_key(size_t ndx) const = 0;
     virtual bool is_obj_valid(size_t ndx) const noexcept = 0;
     virtual Obj get_object(size_t row_ndx) const = 0;
     virtual void sync_if_needed() const = 0;
     virtual void get_dependencies(TableVersions&) const = 0;
     virtual bool is_in_sync() const = 0;
+
+    ObjKey get_key(size_t ndx) const
+    {
+        return get_obj_key(ndx);
+    }
 
     // Get the versions of all tables which this list depends on
     TableVersions get_dependency_versions() const

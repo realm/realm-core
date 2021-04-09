@@ -210,7 +210,7 @@ public:
         return bool(m_table);
     }
 
-    ObjKey get_key(size_t ndx) const override
+    ObjKey get_obj_key(size_t ndx) const override
     {
         return m_key_values.get(ndx);
     }

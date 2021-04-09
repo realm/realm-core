@@ -277,7 +277,7 @@ public:
     // Overriding members of ObjList:
     bool is_obj_valid(size_t) const noexcept final;
     Obj get_object(size_t ndx) const final;
-    ObjKey get_key(size_t ndx) const final;
+    ObjKey get_obj_key(size_t ndx) const final;
 
     // LnkSet interface:
 
@@ -1247,7 +1247,7 @@ inline Obj LnkSet::get_object(size_t ndx) const
     return get_target_table()->get_object(key);
 }
 
-inline ObjKey LnkSet::get_key(size_t ndx) const
+inline ObjKey LnkSet::get_obj_key(size_t ndx) const
 {
     return get(ndx);
 }
