@@ -963,7 +963,7 @@ TEST(Query_SumMinMaxAvg)
     CHECK_EQUAL(Decimal128{9.9}, t.where().maximum_decimal128(decimal_col));
     CHECK_EQUAL(Mixed{"foo"}, t.where().maximum_mixed(mixed_col));
     CHECK_EQUAL(Decimal128{1.1}, t.where().minimum_decimal128(decimal_col));
-    CHECK_EQUAL(Mixed{}, t.where().minimum_mixed(mixed_col));
+    CHECK_EQUAL(Mixed{0.1}, t.where().minimum_mixed(mixed_col));
     CHECK_EQUAL(Decimal128{49.5}, t.where().sum_decimal128(decimal_col));
     CHECK_EQUAL(Mixed{48.5}, t.where().sum_mixed(mixed_col));
     CHECK_EQUAL(Decimal128{49.5 / 9}, t.where().average_decimal128(decimal_col));
@@ -971,6 +971,8 @@ TEST(Query_SumMinMaxAvg)
     Decimal128 expected_avg_mixed = Decimal128{48.5 / 6};
     Decimal128 allowed_epsilon{0.001};
     CHECK(avg_mixed <= (expected_avg_mixed + allowed_epsilon) && avg_mixed >= (expected_avg_mixed - allowed_epsilon));
+    t.get_object(keys[6]).set<Mixed>(mixed_col, Mixed{false});
+    CHECK_EQUAL(Mixed{false}, t.where().minimum_mixed(mixed_col));
 
     ObjKey resindex;
 
