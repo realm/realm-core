@@ -61,58 +61,57 @@ private:
 template <class R>
 class QueryStateMin : public QueryStateBase {
 public:
-    R m_state;
     explicit QueryStateMin(size_t limit = -1)
         : QueryStateBase(limit)
     {
-        m_state = std::numeric_limits<R>::max();
     }
     bool match(size_t index, Mixed value) noexcept final
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (!aggregate_operations::valid_for_agg(v))
-                return true;
-            ++m_match_count;
-            if (v < m_state) {
-                m_state = v;
-                m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
+            if (!m_state.accumulate(v)) {
+                return true; // no match, continue searching
             }
+            ++m_match_count;
+            m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
         }
         return (m_limit > m_match_count);
     }
     R get_min() const
     {
-        return m_match_count ? m_state : R{};
+        return m_state.is_null() ? R{} : m_state.result();
     }
+
+private:
+    aggregate_operations::Minimum<typename util::RemoveOptional<R>::type> m_state;
 };
+
 template <class R>
 class QueryStateMax : public QueryStateBase {
 public:
-    R m_state;
     explicit QueryStateMax(size_t limit = -1)
         : QueryStateBase(limit)
     {
-        m_state = std::numeric_limits<R>::lowest();
     }
     bool match(size_t index, Mixed value) noexcept final
     {
         if (!value.is_null()) {
             auto v = value.get<R>();
-            if (!aggregate_operations::valid_for_agg(v))
-                return true;
-            ++m_match_count;
-            if (v > m_state) {
-                m_state = v;
-                m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
+            if (!m_state.accumulate(v)) {
+                return true; // no match, continue search
             }
+            ++m_match_count;
+            m_minmax_key = (m_key_values ? m_key_values->get(index) : 0) + m_key_offset;
         }
         return (m_limit > m_match_count);
     }
     R get_max() const
     {
-        return m_match_count ? m_state : R{};
+        return m_state.is_null() ? R{} : m_state.result();
     }
+
+private:
+    aggregate_operations::Maximum<typename util::RemoveOptional<R>::type> m_state;
 };
 
 } // namespace realm

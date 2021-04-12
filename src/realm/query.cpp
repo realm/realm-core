@@ -1161,7 +1161,7 @@ int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
     else {
         aggregate<int64_t>(st, column_key, nullptr, return_ndx);
     }
-    return st.m_state;
+    return st.get_max();
 }
 
 float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
@@ -1172,7 +1172,7 @@ float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMax<float> st;
     aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_max();
 }
 double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1182,7 +1182,7 @@ double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMax<double> st;
     aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_max();
 }
 
 Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) const
@@ -1233,7 +1233,7 @@ int64_t Query::minimum_int(ColKey column_key, ObjKey* return_ndx) const
     else {
         aggregate<int64_t>(st, column_key, nullptr, return_ndx);
     }
-    return st.m_state;
+    return st.get_min();
 }
 float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1243,7 +1243,7 @@ float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMin<float> st;
     aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_min();
 }
 double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1253,7 +1253,7 @@ double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMin<double> st;
     aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_min();
 }
 
 Timestamp Query::minimum_timestamp(ColKey column_key, ObjKey* return_ndx)

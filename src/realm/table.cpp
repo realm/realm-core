@@ -2218,7 +2218,7 @@ int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_min();
 }
 
 float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
@@ -2228,7 +2228,7 @@ float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_min();
 }
 
 double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
@@ -2238,7 +2238,7 @@ double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_min();
 }
 
 Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
@@ -2286,7 +2286,7 @@ int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_max();
 }
 
 float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
@@ -2296,7 +2296,7 @@ float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_max();
 }
 
 double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
@@ -2306,7 +2306,7 @@ double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
     if (return_ndx) {
         *return_ndx = st.m_minmax_key;
     }
-    return st.m_state;
+    return st.get_max();
 }
 
 Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
