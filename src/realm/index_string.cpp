@@ -168,14 +168,14 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
     const char* header;
     uint_least8_t width = m_width;
     bool is_inner_node = m_is_inner_bptree_node;
-    typedef StringIndex::key_type key_type;
+    typedef StringIndexKey StringIndexKey;
     size_t stringoffset = 0;
 
     StringConversionBuffer buffer;
     StringData index_data = value.get_index_data(buffer);
 
     // Create 4 byte index key
-    key_type key = StringIndex::create_key(index_data, stringoffset);
+    StringIndexKey key = StringIndex::create_key(index_data, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -204,7 +204,7 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
             continue;
         }
 
-        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+        StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
             return local_not_found;
@@ -352,8 +352,8 @@ int32_t select_from_mask(int32_t a, int32_t b, int32_t mask) {
 // Permutation 1  = "ABCd"
 // Permutation 8  = "aBCD"
 // Permutation 15 = "abcd"
-using key_type = StringIndex::key_type;
-key_type generate_key(key_type upper, key_type lower, int permutation) {
+StringIndexKey generate_key(StringIndexKey upper, StringIndexKey lower, int permutation)
+{
     return select_from_mask(upper, lower, replicate_4_lsb_x8(permutation));
 }
 
@@ -364,7 +364,7 @@ struct SearchList {
     struct Item {
         const char* header;
         size_t string_offset;
-        key_type key;
+        StringIndexKey key;
     };
 
     SearchList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
@@ -378,12 +378,12 @@ struct SearchList {
     void add_all_for_level(const char* header, size_t string_offset)
     {
         m_keys_seen.clear();
-        const key_type upper_key = StringIndex::create_key(m_upper_value, string_offset);
-        const key_type lower_key = StringIndex::create_key(m_lower_value, string_offset);
+        const StringIndexKey upper_key = StringIndex::create_key(m_upper_value, string_offset);
+        const StringIndexKey lower_key = StringIndex::create_key(m_lower_value, string_offset);
         for (int p = 0; p < num_permutations; ++p) {
             // FIXME: This might still be incorrect due to multi-byte unicode characters (crossing the 4 byte key
             // size) being combined incorrectly.
-            const key_type key = generate_key(upper_key, lower_key, p);
+            const StringIndexKey key = generate_key(upper_key, lower_key, p);
             const bool new_key = std::find(m_keys_seen.cbegin(), m_keys_seen.cend(), key) == m_keys_seen.cend();
             if (new_key) {
                 m_keys_seen.push_back(key);
@@ -405,20 +405,20 @@ struct SearchList {
     }
 
     // Add a single entry to the internal work stack. Used to traverse the inner trees (same key)
-    void add_next(const char* header, size_t string_offset, key_type key)
+    void add_next(const char* header, size_t string_offset, StringIndexKey key)
     {
         m_items.push_back({header, string_offset, key});
     }
 
 private:
-    static constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
+    static constexpr int num_permutations = 1 << sizeof(StringIndexKey); // 4 bytes gives up to 16 search keys
 
     std::vector<Item> m_items;
 
     const util::Optional<std::string> m_upper_value;
     const util::Optional<std::string> m_lower_value;
 
-    std::vector<key_type> m_keys_seen;
+    std::vector<StringIndexKey> m_keys_seen;
 };
 
 
@@ -442,7 +442,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
 
         const char* const header = item.header;
         const size_t string_offset = item.string_offset;
-        const key_type key = item.key;
+        const StringIndexKey key = item.key;
         const char* const data = get_data_from_header(header);
         const uint_least8_t width = get_width_from_header(header);
         const bool is_inner_node = get_is_inner_bptree_node_from_header(header);
@@ -471,7 +471,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
             continue;
         }
 
-        const key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+        const StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
             continue;
@@ -520,7 +520,7 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
     StringConversionBuffer buffer;
     StringData index_data = value.get_index_data(buffer);
     // Create 4 byte index key
-    key_type key = StringIndex::create_key(index_data, stringoffset);
+    StringIndexKey key = StringIndex::create_key(index_data, stringoffset);
 
     for (;;) {
         // Get subnode table
@@ -549,7 +549,7 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
             continue;
         }
 
-        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+        StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
             return;
@@ -649,18 +649,18 @@ void StringIndex::set_target(const ClusterColumn& target_column) noexcept
 }
 
 
-StringIndex::key_type StringIndex::get_last_key() const
+StringIndexKey StringIndex::get_last_key() const
 {
     Array offsets(m_array->get_alloc());
     get_child(*m_array, 0, offsets);
-    return key_type(offsets.back());
+    return StringIndexKey(offsets.back());
 }
 
 
 void StringIndex::insert_with_offset(ObjKey obj_key, StringData index_data, const Mixed& value, size_t offset)
 {
     // Create 4 byte index key
-    key_type key = create_key(index_data, offset);
+    StringIndexKey key = create_key(index_data, offset);
     TreeInsert(obj_key, key, offset, index_data, value); // Throws
 }
 
@@ -718,7 +718,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData index_da
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
-    key_type key = create_key(index_data, offset);
+    StringIndexKey key = create_key(index_data, offset);
 
     // Get subnode table
     Allocator& alloc = m_array->get_alloc();
@@ -737,7 +737,7 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData index_da
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug code
     // Since we only use this for moving existing values to new
     // subindexes, there should never be an existing match.
-    key_type k = key_type(values.get(ins_pos));
+    StringIndexKey k = StringIndexKey(values.get(ins_pos));
     REALM_ASSERT(k != key);
 #endif // LCOV_EXCL_STOP ignore debug code
 
@@ -747,7 +747,8 @@ void StringIndex::insert_row_list(size_t ref, size_t offset, StringData index_da
 }
 
 
-void StringIndex::TreeInsert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value)
+void StringIndex::TreeInsert(ObjKey obj_key, StringIndexKey key, size_t offset, StringData index_data,
+                             const Mixed& value)
 {
     NodeChange nc = do_insert(obj_key, key, offset, index_data, value);
     switch (nc.type) {
@@ -782,8 +783,8 @@ void StringIndex::TreeInsert(ObjKey obj_key, key_type key, size_t offset, String
 }
 
 
-StringIndex::NodeChange StringIndex::do_insert(ObjKey obj_key, key_type key, size_t offset, StringData index_data,
-                                               const Mixed& value)
+StringIndex::NodeChange StringIndex::do_insert(ObjKey obj_key, StringIndexKey key, size_t offset,
+                                               StringData index_data, const Mixed& value)
 {
     Allocator& alloc = m_array->get_alloc();
     if (m_array->is_inner_bptree_node()) {
@@ -808,7 +809,7 @@ StringIndex::NodeChange StringIndex::do_insert(ObjKey obj_key, key_type key, siz
         NodeChange nc = target.do_insert(obj_key, key, offset, index_data, value);
         if (nc.type == NodeChange::change_None) {
             // update keys
-            key_type last_key = target.get_last_key();
+            StringIndexKey last_key = target.get_last_key();
             keys.set(node_ndx, last_key);
             return NodeChange::change_None; // no new nodes
         }
@@ -833,7 +834,7 @@ StringIndex::NodeChange StringIndex::do_insert(ObjKey obj_key, key_type key, siz
         StringIndex new_node(inner_node_tag(), alloc);
         if (nc.type == NodeChange::change_Split) {
             // update offset for left node
-            key_type last_key = target.get_last_key();
+            StringIndexKey last_key = target.get_last_key();
             keys.set(node_ndx, last_key);
 
             new_node.node_add_key(nc.ref2);
@@ -931,11 +932,11 @@ void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
     StringIndex new_col(new_ref, nullptr, 0, m_target_column, alloc);
 
     // Update original key
-    key_type last_key = orig_col.get_last_key();
+    StringIndexKey last_key = orig_col.get_last_key();
     offsets.set(ndx, last_key);
 
     // Insert new ref
-    key_type new_key = new_col.get_last_key();
+    StringIndexKey new_key = new_col.get_last_key();
     offsets.insert(ndx + 1, new_key);
     m_array->insert(ndx + 2, new_ref);
 }
@@ -955,7 +956,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
     StringIndex col(ref, nullptr, 0, m_target_column, alloc);
-    key_type last_key = col.get_last_key();
+    StringIndexKey last_key = col.get_last_key();
 
     offsets.insert(ndx, last_key);
     m_array->insert(ndx + 1, ref);
@@ -963,7 +964,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
 
 // This method reconstructs the string inserted in the search index based on a string
 // that matches so far and the last key (only works if complete strings are stored in the index)
-StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringData new_string)
+StringData reconstruct_string(size_t offset, StringIndexKey key, StringData new_string)
 {
     if (key == 0)
         return StringData();
@@ -984,8 +985,8 @@ StringData reconstruct_string(size_t offset, StringIndex::key_type key, StringDa
     return StringData(new_string.data(), offset + rest_len);
 }
 
-bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, StringData index_data, const Mixed& value,
-                              bool noextend)
+bool StringIndex::leaf_insert(ObjKey obj_key, StringIndexKey key, size_t offset, StringData index_data,
+                              const Mixed& value, bool noextend)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node());
 
@@ -1021,7 +1022,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
         return true;
     }
 
-    key_type k = key_type(keys.get(ins_pos));
+    StringIndexKey k = StringIndexKey(keys.get(ins_pos));
 
     // If key is not present we add it at the correct location
     if (k != key) {
@@ -1287,7 +1288,7 @@ void StringIndex::do_delete(ObjKey obj_key, StringData index_data, size_t offset
     REALM_ASSERT(m_array->size() == values.size() + 1);
 
     // Create 4 byte index key
-    key_type key = create_key(index_data, offset);
+    StringIndexKey key = create_key(index_data, offset);
 
     const size_t pos = values.lower_bound_int(key);
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -1305,8 +1306,8 @@ void StringIndex::do_delete(ObjKey obj_key, StringData index_data, size_t offset
             node.destroy();
         }
         else {
-            key_type max_val = node.get_last_key();
-            if (max_val != key_type(values.get(pos)))
+            StringIndexKey max_val = node.get_last_key();
+            if (max_val != StringIndexKey(values.get(pos)))
                 values.set(pos, max_val);
         }
     }

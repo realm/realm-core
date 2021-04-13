@@ -73,6 +73,8 @@ class ClusterColumn;
 template <class T>
 class BPlusTree;
 
+using StringIndexKey = int32_t;
+
 /// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
 public:
@@ -236,8 +238,6 @@ public:
     void do_dump_node_structure(std::ostream&, int) const;
 #endif
 
-    typedef int32_t key_type;
-
     // s_max_offset specifies the number of levels of recursive string indexes
     // allowed before storing everything in lists. This is to avoid nesting
     // to too deep of a level. Since every SubStringIndex stores 4 bytes, this
@@ -247,8 +247,8 @@ public:
     // binary search of approximate complexity log2(n) from `std::lower_bound`.
     static const size_t s_max_offset = 200; // max depth * s_index_key_length
     static const size_t s_index_key_length = 4;
-    static key_type create_key(StringData) noexcept;
-    static key_type create_key(StringData, size_t) noexcept;
+    static StringIndexKey create_key(StringData) noexcept;
+    static StringIndexKey create_key(StringData, size_t) noexcept;
 
 private:
     // m_array is a compact representation for storing the children of this StringIndex.
@@ -284,7 +284,7 @@ private:
     void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list);
     void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
                                           const IntegerColumnIterator& lower);
-    key_type get_last_key() const;
+    StringIndexKey get_last_key() const;
 
     struct NodeChange {
         size_t ref1;
@@ -305,10 +305,10 @@ private:
     };
 
     // B-Tree functions
-    void TreeInsert(ObjKey obj_key, key_type, size_t offset, StringData index_data, const Mixed& value);
-    NodeChange do_insert(ObjKey, key_type, size_t offset, StringData index_data, const Mixed& value);
+    void TreeInsert(ObjKey obj_key, StringIndexKey, size_t offset, StringData index_data, const Mixed& value);
+    NodeChange do_insert(ObjKey, StringIndexKey, size_t offset, StringData index_data, const Mixed& value);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(ObjKey obj_key, key_type, size_t offset, StringData index_data, const Mixed& value,
+    bool leaf_insert(ObjKey obj_key, StringIndexKey, size_t offset, StringData index_data, const Mixed& value,
                      bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
@@ -373,9 +373,9 @@ inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
 // range-lookups and iterate in order, etc, as future features. This, however, makes the same
 // features slower for string indexes. Todo, we should reverse the order conditionally, depending
 // on the column type.
-inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
+inline StringIndexKey StringIndex::create_key(StringData str) noexcept
 {
-    key_type key = 0;
+    StringIndexKey key = 0;
 
     if (str.size() >= 4)
         goto four;
@@ -392,20 +392,20 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
 // (encoded like this to allow literal comparisons
 // independently of endianness)
 four:
-    key |= (key_type(static_cast<unsigned char>(str[3])) << 0);
+    key |= (StringIndexKey(static_cast<unsigned char>(str[3])) << 0);
 three:
-    key |= (key_type(static_cast<unsigned char>(str[2])) << 8);
+    key |= (StringIndexKey(static_cast<unsigned char>(str[2])) << 8);
 two:
-    key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
+    key |= (StringIndexKey(static_cast<unsigned char>(str[1])) << 16);
 one:
-    key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
+    key |= (StringIndexKey(static_cast<unsigned char>(str[0])) << 24);
 none:
     return key;
 }
 
 // Index works as follows: All non-NULL values are stored as if they had appended an 'X' character at the end. So
 // "foo" is stored as if it was "fooX", and "" (empty string) is stored as "X". And NULLs are stored as empty strings.
-inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offset) noexcept
+inline StringIndexKey StringIndex::create_key(StringData str, size_t offset) noexcept
 {
     if (str.is_null())
         return 0;
@@ -415,9 +415,9 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
     // for very short strings
     size_t tail = str.size() - offset;
-    if (tail <= sizeof(key_type) - 1) {
-        char buf[sizeof(key_type)];
-        memset(buf, 0, sizeof(key_type));
+    if (tail <= sizeof(StringIndexKey) - 1) {
+        char buf[sizeof(StringIndexKey)];
+        memset(buf, 0, sizeof(StringIndexKey));
         buf[tail] = 'X';
         memcpy(buf, str.data() + offset, tail);
         return create_key(StringData(buf, tail + 1));
