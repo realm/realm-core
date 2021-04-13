@@ -1,7 +1,6 @@
 ---
 name: Bug report
 about: You think you have found a buggy behaviour - not a crash. NOTE: Report SDK specific issues in the SDK specific repo.
-
 ---
 
 #### Expected results
