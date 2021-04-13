@@ -108,12 +108,6 @@ std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 void App::clear_cached_apps()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
-    for (auto& app : s_apps_cache) {
-        if (app.second) {
-            app.second->sync_manager()->terminate_sessions();
-        }
-    }
-
     s_apps_cache.clear();
 }
 
@@ -146,6 +140,13 @@ App::App(const Config& config)
         sync_route.replace(uri_scheme_start, 4, "ws");
 
     m_sync_manager = std::make_shared<SyncManager>();
+}
+
+App::~App()
+{
+    // TODO: this should ideally move to `~SyncManager` but there is a
+    // reference loop between SyncManager and SyncUser.
+    m_sync_manager->close();
 }
 
 void App::configure(const SyncClientConfig& sync_client_config)

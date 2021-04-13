@@ -446,7 +446,7 @@ void SyncManager::remove_user(const std::string& user_id)
     }
 }
 
-void SyncManager::terminate_sessions()
+void SyncManager::close()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     m_metadata_manager = nullptr;
@@ -479,21 +479,6 @@ void SyncManager::terminate_sessions()
         m_sessions.clear();
         current_sessions.clear();
     }
-
-    //{
-    //    std::unique_lock<std::mutex> lock(m_session_mutex);
-    //    while (m_sessions.size()) {
-    //        auto& session = m_sessions.begin();
-    //        if (session->second->existing_external_reference()) {
-    //            lock.unlock();
-    //            session->second->shutdown_and_wait();
-    //            lock.lock();
-    //        }
-    //        else {
-    //            m_sessions.erase(session);
-    //        }
-    //    }
-    //}
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
