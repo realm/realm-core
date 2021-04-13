@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an enhancement or new feature for this project. NOTE: Features for SDKs should be reported in the respective SDK repo.
+about: Suggest an enhancement or new feature for this project. NOTE Features for SDKs should be reported in the respective SDK repo.
 ---
 
 #### Describe your problem or use case
