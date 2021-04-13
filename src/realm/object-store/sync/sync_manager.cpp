@@ -446,6 +446,72 @@ void SyncManager::remove_user(const std::string& user_id)
     }
 }
 
+void SyncManager::terminate_sessions()
+{
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    m_metadata_manager = nullptr;
+    m_client_uuid = util::none;
+    m_file_manager = nullptr;
+
+    {
+        // Destroy all the users.
+        std::lock_guard<std::mutex> lock(m_user_mutex);
+        m_users.clear();
+        m_current_user = nullptr;
+    }
+
+    std::vector<std::shared_ptr<SyncSession>> current_sessions;
+
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+
+        for (auto& session : m_sessions) {
+            current_sessions.push_back(session.second);
+        }
+    }
+
+    for (auto& session : current_sessions) {
+        session->shutdown_and_wait();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        m_sessions.clear();
+        current_sessions.clear();
+    }
+
+    //{
+    //    std::unique_lock<std::mutex> lock(m_session_mutex);
+    //    while (m_sessions.size()) {
+    //        auto& session = m_sessions.begin();
+    //        if (session->second->existing_external_reference()) {
+    //            lock.unlock();
+    //            session->second->shutdown_and_wait();
+    //            lock.lock();
+    //        }
+    //        else {
+    //            m_sessions.erase(session);
+    //        }
+    //    }
+    //}
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+        if (m_sync_client)
+            m_sync_client->stop();
+
+        // Destroy the client now that we have no remaining sessions.
+        m_sync_client = nullptr;
+
+        // Reset even more state.
+        m_config = {};
+
+        m_sync_route = "";
+    }
+}
+
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);

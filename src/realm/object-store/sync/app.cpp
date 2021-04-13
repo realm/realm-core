@@ -108,6 +108,12 @@ std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 void App::clear_cached_apps()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
+    for (auto& app : s_apps_cache) {
+        if (app.second) {
+            app.second->sync_manager()->terminate_sessions();
+        }
+    }
+
     s_apps_cache.clear();
 }
 
