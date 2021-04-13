@@ -19,10 +19,11 @@
 #include <realm/tokenizer.hpp>
 #include <string>
 #include <atomic>
+#include <realm/string_data.hpp>
 
 namespace realm {
 
-const char* stop_words[] = {
+const char* danish_stop_words[] = {
     "ad",    "af",    "alle",   "alt",   "anden", "at",    "blev",  "blive", "bliver", "da",   "de",    "dem",
     "den",   "denne", "der",    "deres", "det",   "dette", "dig",   "din",   "disse",  "dog",  "du",    "efter",
     "eller", "en",    "end",    "er",    "et",    "for",   "fra",   "ham",   "han",    "hans", "har",   "havde",
@@ -161,29 +162,63 @@ TokenRangesMap Tokenizer::get_ranges(std::string_view tokens, std::string_view t
     return ret;
 }
 
+class BloomFilter {
+public:
+    BloomFilter()
+        : m_bit_vector(2048)
+    {
+    }
+    void insert(std::string_view str)
+    {
+        auto hash = murmur2_32(reinterpret_cast<const unsigned char*>(str.data()), str.size());
+        m_bit_vector[hash & 0x7ff] = true;
+        hash >>= 11;
+        m_bit_vector[hash & 0x7ff] = true;
+        hash >>= 10;
+        m_bit_vector[hash & 0x7ff] = true;
+    }
+    bool includes(std::string_view str)
+    {
+        auto hash = murmur2_32(reinterpret_cast<const unsigned char*>(str.data()), str.size());
+        if (!m_bit_vector[hash & 0x7ff])
+            return false;
+        hash >>= 11;
+        if (!m_bit_vector[hash & 0x7ff])
+            return false;
+        hash >>= 10;
+        return m_bit_vector[hash & 0x7ff];
+    }
+
+private:
+    std::vector<bool> m_bit_vector;
+};
+
 class DefaultTokenizer : public Tokenizer {
 public:
     DefaultTokenizer()
     {
         if (!s_stop_words_has_been_built.test_and_set()) {
-            for (auto s : stop_words) {
-                s_stop_words.insert(s);
-            }
+            build_stop_word_list();
         }
     }
-    bool next() override;
-    bool is_stop_word(std::string_view token)
+    ~DefaultTokenizer()
     {
-        return s_stop_words.find(token) != s_stop_words.end();
+        // std::cout << "False positive: " << false_positive << std::endl;
     }
+    bool next() override;
+    bool is_stop_word(std::string_view token) override;
 
 private:
     static std::set<std::string_view> s_stop_words;
+    static BloomFilter s_stop_word_filter;
     static std::atomic_flag s_stop_words_has_been_built;
+
+    void build_stop_word_list();
 };
 
 std::atomic_flag DefaultTokenizer::s_stop_words_has_been_built = ATOMIC_FLAG_INIT;
 std::set<std::string_view> DefaultTokenizer::s_stop_words;
+BloomFilter DefaultTokenizer::s_stop_word_filter;
 
 static const uint8_t utf8_map[32] = {0x61, 0x61, 0x61, 0x61, 0x61, 0xe5, 0xe6, 0x63, 0x65, 0x65, 0x65,
                                      0x65, 0x69, 0x69, 0x69, 0x69, 0xf0, 0x6e, 0x6f, 0x6f, 0x6f, 0x6f,
@@ -269,6 +304,19 @@ bool DefaultTokenizer::next()
     }
 
     return first_alnum_found;
+}
+
+bool DefaultTokenizer::is_stop_word(std::string_view token)
+{
+    return s_stop_word_filter.includes(token) && s_stop_words.find(token) != s_stop_words.end();
+}
+
+void DefaultTokenizer::build_stop_word_list()
+{
+    for (auto s : danish_stop_words) {
+        s_stop_words.insert(s);
+        s_stop_word_filter.insert(s);
+    }
 }
 
 std::unique_ptr<Tokenizer> Tokenizer::get_instance()
