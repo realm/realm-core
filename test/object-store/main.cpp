@@ -22,6 +22,8 @@
 #define CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS
 #endif
 #include <catch2/catch.hpp>
+#include <external/json/json.hpp>
+#include <realm/util/to_string.hpp>
 
 #include <limits.h>
 
@@ -57,7 +59,132 @@ int main(int argc, char** argv)
         return 1;
     }
 #endif
-
-    int result = Catch::Session().run(argc, argv);
+    int result = -1;
+    if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
+        std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
+        Catch::ConfigData config;
+        config.reporterName = "evergreen";
+        config.outputFilename = str;
+        Catch::Session session;
+        session.useConfigData(config);
+        result = session.run();
+    }
+    else {
+        result = Catch::Session().run(argc, argv);
+    }
     return result < 0xff ? result : 0xff;
 }
+
+namespace Catch {
+class EvergreenReporter : public CumulativeReporterBase<EvergreenReporter> {
+public:
+    using Base = CumulativeReporterBase<EvergreenReporter>;
+    EvergreenReporter(ReporterConfig const& config)
+        : Base(config)
+    {
+    }
+    ~EvergreenReporter() = default;
+    static std::string getDescription()
+    {
+        return "Reports test results in a format consumable by MongoDB Evergreen.";
+    }
+    void noMatchingTestCases(std::string const& /*spec*/) override {}
+    using Base::assertionEnded;
+    using Base::testGroupEnded;
+    using Base::testGroupStarting;
+    using Base::testRunStarting;
+
+    void testCaseStarting(TestCaseInfo const& testCaseInfo) override
+    {
+        m_current_test = TestResult{TestResult::ResultType::Test};
+        m_current_test_name = testCaseInfo.name;
+        Base::testCaseStarting(testCaseInfo);
+    }
+    void testCaseEnded(TestCaseStats const& testCaseStats) override
+    {
+        if (testCaseStats.totals.assertions.allPassed()) {
+            m_current_test.status = "pass";
+        }
+        else {
+            m_current_test.status = "fail";
+        }
+        m_current_test.end_time = std::chrono::system_clock::now();
+        m_results.emplace(std::make_pair(testCaseStats.testInfo.name, m_current_test));
+
+        Base::testCaseEnded(testCaseStats);
+    }
+    void sectionStarting(SectionInfo const& sectionInfo) override
+    {
+        if (sectionInfo.name != m_current_test_name) {
+            m_results.emplace(std::make_pair(full_section_name(sectionInfo.name), TestResult{}));
+        }
+        Base::sectionStarting(sectionInfo);
+    }
+    void sectionEnded(SectionStats const& sectionStats) override
+    {
+        if (sectionStats.sectionInfo.name != m_current_test_name) {
+            auto it = m_results.find(full_section_name(sectionStats.sectionInfo.name));
+            if (it == m_results.end()) {
+                throw std::runtime_error("logic error in Evergreen section reporter");
+            }
+            if (sectionStats.assertions.allPassed()) {
+                it->second.status = "pass";
+            }
+            else {
+                it->second.status = "fail";
+            }
+            it->second.end_time = std::chrono::system_clock::now();
+        }
+        Base::sectionEnded(sectionStats);
+    }
+    void testRunEndedCumulative() override
+    {
+        auto results_arr = nlohmann::json::array();
+        for (const auto& [test_name, cur_result] : m_results) {
+            auto to_millis = [](const auto& tp) -> double {
+                return static_cast<double>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count());
+            };
+            double start_secs = to_millis(cur_result.start_time) / 1000;
+            double end_secs = to_millis(cur_result.end_time) / 1000;
+            int exit_code = 0;
+            if (cur_result.status != "pass") {
+                exit_code = 1;
+            }
+
+            nlohmann::json cur_result_obj = {{"test_file", test_name}, {"status", cur_result.status},
+                                             {"exit_code", exit_code}, {"start", start_secs},
+                                             {"end", end_secs},        {"elapsed", end_secs - start_secs}};
+            results_arr.push_back(std::move(cur_result_obj));
+        }
+        auto result_file_obj = nlohmann::json{{"results", std::move(results_arr)}};
+        stream << result_file_obj << std::endl;
+    }
+
+    std::string full_section_name(const std::string& section_name)
+    {
+        return realm::util::format("%1::%2", m_current_test_name, section_name);
+    }
+
+    struct TestResult {
+        enum class ResultType { Section, Test };
+        TestResult(TestResult::ResultType t = TestResult::ResultType::Section)
+            : type(t)
+            , start_time{std::chrono::system_clock::now()}
+            , end_time{}
+            , status{"unknown"}
+        {
+        }
+        ResultType type;
+        std::chrono::time_point<std::chrono::system_clock> start_time;
+        std::chrono::time_point<std::chrono::system_clock> end_time;
+        std::string status;
+    };
+    TestResult m_current_test;
+    std::string m_current_test_name;
+    std::map<std::string, TestResult> m_results;
+};
+
+CATCH_REGISTER_REPORTER("evergreen", EvergreenReporter)
+
+} // end namespace Catch
