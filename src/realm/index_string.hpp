@@ -78,10 +78,95 @@ using StringIndexKey = int32_t;
 /// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
 public:
-    IndexArray(Allocator& allocator)
-        : Array(allocator)
+    IndexArray(Allocator& alloc)
+        : Array(alloc)
+        , m_keys(alloc)
     {
+        m_keys.set_parent(this, 0);
     }
+
+    void init_from_ref(ref_type ref);
+    void init_from_parent()
+    {
+        init_from_ref(get_ref_from_parent());
+    }
+    void update_from_parent()
+    {
+        init_from_parent();
+    }
+    void create(bool is_leaf);
+    void clear();
+
+    size_t nb_elements() const
+    {
+        return m_keys.size();
+    }
+
+    bool can_expand() const
+    {
+        return m_keys.size() < REALM_MAX_BPNODE_SIZE;
+    }
+    size_t find_key(StringIndexKey key)
+    {
+        return m_keys.lower_bound_int(key);
+    }
+    size_t find_subnode(StringIndexKey key)
+    {
+        size_t node_ndx = m_keys.lower_bound_int(key);
+        if (node_ndx == m_keys.size()) {
+            // node can never be empty, so try to fit in last item
+            node_ndx = m_keys.size() - 1;
+        }
+        return node_ndx;
+    }
+    void set_key(size_t ndx, StringIndexKey key)
+    {
+        m_keys.set(ndx, key);
+    }
+
+    StringIndexKey get_key(size_t ndx) const
+    {
+        return StringIndexKey(m_keys.get(ndx));
+    }
+    StringIndexKey get_last_key() const
+    {
+        return StringIndexKey(m_keys.back());
+    }
+
+    void add_ref(ref_type ref);
+
+    void add_pair(StringIndexKey key, ObjKey obj_key)
+    {
+        m_keys.add(key);
+        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+        Array::add(shifted);
+    }
+    void add_pair(StringIndexKey key, ref_type ref)
+    {
+        m_keys.add(key);
+        add(ref);
+    }
+    void insert_pair(size_t ndx, StringIndexKey key, ObjKey obj_key)
+    {
+        m_keys.insert(ndx, key);
+        int64_t shifted = int64_t((uint64_t(obj_key.value) << 1) + 1); // shift to indicate literal
+        Array::insert(ndx + 1, shifted);
+    }
+    void insert_pair(size_t ndx, StringIndexKey key, ref_type ref)
+    {
+        m_keys.insert(ndx, key);
+        Array::insert(ndx + 1, ref);
+    }
+
+    void erase(size_t ndx)
+    {
+        m_keys.erase(ndx);
+        Array::erase(ndx + 1);
+    }
+
+    void move_to(size_t from_ndx, IndexArray& new_node);
+    void node_insert_split(size_t ndx, size_t new_ref);
+    void node_insert(size_t ndx, size_t ref);
 
     ObjKey index_string_find_first(Mixed value, const ClusterColumn& column) const;
     void index_string_find_all(std::vector<ObjKey>& result, Mixed value, const ClusterColumn& column,
@@ -89,7 +174,10 @@ public:
     FindRes index_string_find_all_no_copy(Mixed value, const ClusterColumn& column, InternalFindResult& result) const;
     size_t index_string_count(Mixed value, const ClusterColumn& column) const;
 
+    void insert_row_list(size_t ref, size_t offset, StringData value);
+
 private:
+    Array m_keys;
     template <IndexMethod>
     int64_t from_list(Mixed value, InternalFindResult& result_ref, const IntegerColumn& key_values,
                       const ClusterColumn& column) const;
@@ -227,7 +315,10 @@ public:
 
     void find_all_fulltext(std::vector<ObjKey>& result, StringData value) const;
 
-    void clear();
+    void clear()
+    {
+        m_array.clear();
+    }
 
     bool has_duplicate_values() const noexcept;
 
@@ -235,7 +326,7 @@ public:
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
-    void do_dump_node_structure(std::ostream&, int) const;
+    void print() const;
 #endif
 
     // s_max_offset specifies the number of levels of recursive string indexes
@@ -270,7 +361,7 @@ private:
     // type 2, or type 3 (no shifting in either case).
     // References point to a list if the context header flag is NOT set.
     // If the header flag is set, references point to a sub-StringIndex (nesting).
-    std::unique_ptr<IndexArray> m_array;
+    IndexArray m_array;
     ClusterColumn m_target_column;
 
     struct inner_node_tag {
@@ -280,11 +371,13 @@ private:
     static IndexArray* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(ObjKey key, StringData index_data, const Mixed& value, size_t offset);
-    void insert_row_list(size_t ref, size_t offset, StringData value);
     void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list);
     void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
                                           const IntegerColumnIterator& lower);
-    StringIndexKey get_last_key() const;
+    StringIndexKey get_last_key() const
+    {
+        return m_array.get_last_key();
+    }
 
     struct NodeChange {
         size_t ref1;
@@ -310,8 +403,7 @@ private:
     /// Returns true if there is room or it can join existing entries
     bool leaf_insert(ObjKey obj_key, StringIndexKey, size_t offset, StringData index_data, const Mixed& value,
                      bool noextend = false);
-    void node_insert_split(size_t ndx, size_t new_ref);
-    void node_insert(size_t ndx, size_t ref);
+    void leaf_add_one(ObjKey obj_key, StringData value, size_t offset);
     // Erase without getting value from parent column (useful when string stored
     // does not directly match string in parent, like with full-text indexing)
     void erase_string(ObjKey key, StringData value);
@@ -347,25 +439,26 @@ private:
 
 // Implementation:
 inline StringIndex::StringIndex(const ClusterColumn& target_column, Allocator& alloc)
-    : m_array(create_node(alloc, true)) // Throws
+    : m_array(alloc)
     , m_target_column(target_column)
 {
+    m_array.create(true);
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                                 const ClusterColumn& target_column, Allocator& alloc)
-    : m_array(new IndexArray(alloc))
+    : m_array(alloc)
     , m_target_column(target_column)
 {
-    REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
-    m_array->init_from_ref(ref);
-    set_parent(parent, ndx_in_parent);
+    m_array.set_parent(parent, ndx_in_parent);
+    m_array.init_from_ref(ref);
 }
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
-    : m_array(create_node(alloc, false)) // Throws
+    : m_array(alloc) // Throws
     , m_target_column(ClusterColumn(nullptr, {}, false))
 {
+    m_array.create(false);
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant
@@ -487,68 +580,68 @@ template <class T>
 ObjKey StringIndex::find_first(T value) const
 {
     // Use direct access method
-    return m_array->index_string_find_first(Mixed(value), m_target_column);
+    return m_array.index_string_find_first(Mixed(value), m_target_column);
 }
 
 template <class T>
 void StringIndex::find_all(std::vector<ObjKey>& result, T value, bool case_insensitive) const
 {
     // Use direct access method
-    return m_array->index_string_find_all(result, Mixed(value), m_target_column, case_insensitive);
+    return m_array.index_string_find_all(result, Mixed(value), m_target_column, case_insensitive);
 }
 
 template <class T>
 FindRes StringIndex::find_all_no_copy(T value, InternalFindResult& result) const
 {
-    return m_array->index_string_find_all_no_copy(Mixed(value), m_target_column, result);
+    return m_array.index_string_find_all_no_copy(Mixed(value), m_target_column, result);
 }
 
 template <class T>
 size_t StringIndex::count(T value) const
 {
     // Use direct access method
-    return m_array->index_string_count(Mixed(value), m_target_column);
+    return m_array.index_string_count(Mixed(value), m_target_column);
 }
 
 inline void StringIndex::destroy() noexcept
 {
-    return m_array->destroy_deep();
+    return m_array.destroy_deep();
 }
 
 inline bool StringIndex::is_attached() const noexcept
 {
-    return m_array->is_attached();
+    return m_array.is_attached();
 }
 
 inline void StringIndex::refresh_accessor_tree(const ClusterColumn& target_column)
 {
-    m_array->init_from_parent();
+    m_array.init_from_parent();
     m_target_column = target_column;
 }
 
 inline ref_type StringIndex::get_ref() const noexcept
 {
-    return m_array->get_ref();
+    return m_array.get_ref();
 }
 
 inline void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
-    m_array->set_parent(parent, ndx_in_parent);
+    m_array.set_parent(parent, ndx_in_parent);
 }
 
 inline size_t StringIndex::get_ndx_in_parent() const noexcept
 {
-    return m_array->get_ndx_in_parent();
+    return m_array.get_ndx_in_parent();
 }
 
 inline void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
-    m_array->set_ndx_in_parent(ndx_in_parent);
+    m_array.set_ndx_in_parent(ndx_in_parent);
 }
 
 inline void StringIndex::update_from_parent() noexcept
 {
-    m_array->update_from_parent();
+    m_array.update_from_parent();
 }
 
 } // namespace realm
