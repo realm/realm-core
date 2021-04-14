@@ -448,21 +448,20 @@ void SyncManager::remove_user(const std::string& user_id)
 
 void SyncManager::close()
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    m_metadata_manager = nullptr;
-    m_client_uuid = util::none;
-    m_file_manager = nullptr;
-
-    {
-        // Destroy all the users.
-        std::lock_guard<std::mutex> lock(m_user_mutex);
-        m_users.clear();
-        m_current_user = nullptr;
-    }
+    // Destroy all the users - this breaks the reference cycle between
+    // SyncManager and SyncUser. When the sessions are terminated, it
+    // will remove all strong references to the users, allowing them to
+    // be destructed.
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+    m_users.clear();
+    m_current_user = nullptr;
 
     std::vector<std::shared_ptr<SyncSession>> current_sessions;
 
     {
+        // We need to release the session lock and copy the sessions to another
+        // collection because the mutex will be acquited and m_sessions will be
+        // manipulated in unregister_session
         std::lock_guard<std::mutex> lock(m_session_mutex);
 
         for (auto& session : m_sessions) {
@@ -474,27 +473,14 @@ void SyncManager::close()
         session->shutdown_and_wait();
     }
 
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        m_sessions.clear();
-        current_sessions.clear();
-    }
+    std::lock_guard<std::mutex> lock(m_mutex);
 
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
+    // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+    if (m_sync_client)
+        m_sync_client->stop();
 
-        // Stop the client. This will abort any uploads that inactive sessions are waiting for.
-        if (m_sync_client)
-            m_sync_client->stop();
-
-        // Destroy the client now that we have no remaining sessions.
-        m_sync_client = nullptr;
-
-        // Reset even more state.
-        m_config = {};
-
-        m_sync_route = "";
-    }
+    // Destroy the client now that we have no remaining sessions.
+    m_sync_client = nullptr;
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
