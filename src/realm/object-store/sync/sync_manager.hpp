@@ -110,7 +110,7 @@ public:
 
     // Closes the sync manager and terminates all sessions created by it. This should be a destructor, but there's
     // a reference loop between SyncManager and SyncUser.
-    void close();
+    ~SyncManager();
 
     // Sets the log level for the Sync Client.
     // The log level can only be set up until the point the Sync Client is created. This happens when the first

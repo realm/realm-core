@@ -142,13 +142,6 @@ App::App(const Config& config)
     m_sync_manager = std::make_shared<SyncManager>();
 }
 
-App::~App()
-{
-    // TODO: this should ideally move to `~SyncManager` but there is a
-    // reference loop between SyncManager and SyncUser.
-    m_sync_manager->close();
-}
-
 void App::configure(const SyncClientConfig& sync_client_config)
 {
     // change the scheme in the base url to ws from http to satisfy the sync client

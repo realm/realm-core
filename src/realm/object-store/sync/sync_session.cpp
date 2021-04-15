@@ -317,7 +317,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 std::string SyncSession::get_recovery_file_path()
 {
     return util::reserve_unique_file_name(
-        m_config.user->sync_manager()->recovery_directory_path(m_config.recovery_directory),
+        m_config.user->sync_manager().recovery_directory_path(m_config.recovery_directory),
         util::create_timestamped_template("recovered_realm"));
 }
 
@@ -333,7 +333,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_config.user->sync_manager()->perform_metadata_update(
+    m_config.user->sync_manager().perform_metadata_update(
         [this, action, original_path = std::move(original_path),
          recovery_path = std::move(recovery_path)](const auto& manager) {
             std::string partition_value = m_config.partition_value;
@@ -586,7 +586,7 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = m_config.proxy_config;
     session_config.multiplex_ident = m_multiplex_identity;
     {
-        std::string sync_route = m_config.user->sync_manager()->sync_route();
+        std::string sync_route = m_config.user->sync_manager().sync_route();
 
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
@@ -733,7 +733,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_config.user->sync_manager()->unregister_session(m_realm_path);
+    m_config.user->sync_manager().unregister_session(m_realm_path);
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,

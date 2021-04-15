@@ -222,7 +222,7 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<SyncManager> sync_manager() const
+    SyncManager& sync_manager() const
     {
         return m_sync_manager;
     }
@@ -273,7 +273,7 @@ private:
 
     const std::string m_device_id;
 
-    std::shared_ptr<SyncManager> m_sync_manager;
+    SyncManager& m_sync_manager;
 };
 
 } // namespace realm
