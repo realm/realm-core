@@ -156,6 +156,10 @@ typedef struct realm_value {
     realm_value_type_e type;
 } realm_value_t;
 
+typedef struct realm_version_id {
+    uint64_t version;
+    uint64_t index;
+} realm_version_id_t;
 
 /* Error types */
 typedef struct realm_async_error realm_async_error_t;
@@ -317,6 +321,11 @@ typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_asyn
 typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, size_t total);
+
+/**
+ * Get the VersionID of the current transaction
+ */
+RLM_API bool realm_get_version_id(const realm_t*, realm_version_id_t* out_version);
 
 /**
  * Get a string representing the version number of the Realm library.

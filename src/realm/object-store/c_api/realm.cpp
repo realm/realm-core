@@ -3,6 +3,14 @@
 
 namespace realm::c_api {
 
+RLM_API bool realm_get_version_id(const realm_t* realm, realm_version_id_t* out_version)
+{
+    return wrap_err([&]() {
+        *out_version = to_capi((*realm)->read_transaction_version());
+        return true;
+    });
+}
+
 RLM_API const char* realm_get_library_version()
 {
     return REALM_VERSION_STRING;
