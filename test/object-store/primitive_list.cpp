@@ -785,6 +785,10 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 
+    SECTION("artificial failure") {
+        REQUIRE(false);
+    }
+
 #if 0
     SECTION("filtered index_of()") {
         REQUIRE_THROWS(results.index_of(table->get(0)));
