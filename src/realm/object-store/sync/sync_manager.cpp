@@ -452,7 +452,7 @@ void SyncManager::close()
     // SyncManager and SyncUser. When the sessions are terminated, it
     // will remove all strong references to the users, allowing them to
     // be destructed.
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::mutex> user_lock(m_user_mutex);
     m_users.clear();
     m_current_user = nullptr;
 
