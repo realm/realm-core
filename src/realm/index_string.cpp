@@ -1613,80 +1613,78 @@ void StringIndex::verify_entries(const ClusterColumn& column) const
     }
 }
 
-void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
+namespace {
+void dump_node_structure(const IndexArray& node, std::ostream& out, int level, bool is_sub)
 {
     int indent = level * 2;
     Allocator& alloc = node.get_alloc();
-    Array subnode(alloc);
 
-    size_t node_size = node.size();
+    size_t node_size = node.nb_elements();
     REALM_ASSERT(node_size >= 1);
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
-        out << std::setw(indent) << ""
-            << "Leaf (B+ tree) (ref: " << node.get_ref() << ")\n";
-    }
-    else {
-        out << std::setw(indent) << ""
-            << "Inner node (B+ tree) (ref: " << node.get_ref() << ")\n";
-    }
-
-    subnode.init_from_ref(to_ref(node.front()));
-    out << std::setw(indent) << ""
-        << "  Keys (keys_ref: " << subnode.get_ref() << ", ";
-    if (subnode.is_empty()) {
-        out << "no keys";
-    }
-    else {
-        out << "keys: ";
-        for (size_t i = 0; i != subnode.size(); ++i) {
-            if (i != 0)
-                out << ", ";
-            out << subnode.get(i);
+        if (is_sub) {
+            out << std::setw(indent) << "Subindex\n";
+        }
+        else {
+            out << "Leaf (B+ tree) (ref: " << std::hex << node.get_ref() << std::dec << " size: " << node_size
+                << ")\n";
         }
     }
-    out << ")\n";
+    else {
+        out << "Inner node (B+ tree) (ref: " << std::hex << node.get_ref() << std::dec << " size: " << node_size
+            << ")\n";
+    }
 
-    if (node_is_leaf) {
-        for (size_t i = 1; i != node_size; ++i) {
-            int_fast64_t value = node.get(i);
-            bool is_single_row_index = (value & 1) != 0;
-            if (is_single_row_index) {
-                out << std::setw(indent) << ""
-                    << "  Single row index (value: " << (value / 2) << ")\n";
-                continue;
-            }
-            subnode.init_from_ref(to_ref(value));
-            bool is_subindex = subnode.get_context_flag();
-            if (is_subindex) {
-                out << std::setw(indent) << ""
-                    << "  Subindex\n";
-                dump_node_structure(subnode, out, level + 2);
-                continue;
-            }
-            IntegerColumn indexes(alloc, to_ref(value));
+    for (size_t i = 0; i < node_size; ++i) {
+        auto key = node.get_key(i);
+        if (node_is_leaf) {
             out << std::setw(indent) << ""
-                << "  List of row indexes\n";
-            indexes.dump_values(out, level + 2);
+                << " key: " << std::hex << key << " ";
+            int_fast64_t value = node.get(i + 1);
+            bool is_ref = (value & 1) == 0;
+            bool is_subindex = false;
+            if (is_ref) {
+                Array arr(alloc);
+                arr.init_from_ref(to_ref(value));
+                is_subindex = arr.get_context_flag();
+            }
+            if (is_subindex) {
+                IndexArray subnode(alloc);
+                subnode.init_from_ref(to_ref(value));
+                dump_node_structure(subnode, out, level + 1, true);
+            }
+            else {
+                out << "val: " << std::dec;
+                if (!is_ref) {
+                    out << (value / 2);
+                }
+                else {
+                    IntegerColumn indexes(alloc, to_ref(value));
+                    for (size_t j = 0; j < indexes.size(); j++) {
+                        out << (j ? ", " : "") << int(indexes.get(j));
+                    }
+                }
+                out << std::endl;
+            }
         }
-        return;
-    }
-
-
-    size_t num_children = node_size - 1;
-    size_t child_ref_begin = 1;
-    size_t child_ref_end = 1 + num_children;
-    for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
-        subnode.init_from_ref(node.get_as_ref(i));
-        dump_node_structure(subnode, out, level + 1);
+        else {
+            IndexArray subnode(alloc);
+            subnode.init_from_ref(node.get_as_ref(i + 1));
+            dump_node_structure(subnode, out, level + 1, false);
+            out << std::setw(indent) << ""
+                << "split key: " << std::hex << key << " ";
+        }
     }
 }
-
+} // namespace
 
 void StringIndex::print() const
 {
-    dump_node_structure(m_array, std::cout, 0);
+#ifdef REALM_DEBUG
+    dump_node_structure(m_array, std::cout, 0, false);
+#endif
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

@@ -323,10 +323,10 @@ public:
     bool has_duplicate_values() const noexcept;
 
     void verify() const;
+    void print() const;
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
-    void print() const;
 #endif
 
     // s_max_offset specifies the number of levels of recursive string indexes
@@ -412,10 +412,6 @@ private:
     Mixed get(ObjKey key) const;
 
     void node_add_key(ref_type ref);
-
-#ifdef REALM_DEBUG
-    static void dump_node_structure(const Array& node, std::ostream&, int level);
-#endif
 };
 
 class SortedListComparator {
