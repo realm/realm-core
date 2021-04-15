@@ -96,44 +96,47 @@ public:
 
     void testCaseStarting(TestCaseInfo const& testCaseInfo) override
     {
-        m_current_test = TestResult{TestResult::ResultType::Test};
-        m_current_test_name = testCaseInfo.name;
+        m_results.emplace(std::make_pair(testCaseInfo.name, TestResult{}));
         Base::testCaseStarting(testCaseInfo);
     }
     void testCaseEnded(TestCaseStats const& testCaseStats) override
     {
+        auto it = m_results.find(testCaseStats.testInfo.name);
+        if (it == m_results.end()) {
+            throw std::runtime_error("logic error in Evergreen section reporter");
+        }
         if (testCaseStats.totals.assertions.allPassed()) {
-            m_current_test.status = "pass";
+            it->second.status = "pass";
         }
         else {
-            m_current_test.status = "fail";
+            it->second.status = "fail";
         }
-        m_current_test.end_time = std::chrono::system_clock::now();
-        m_results.emplace(std::make_pair(testCaseStats.testInfo.name, m_current_test));
-
+        it->second.end_time = std::chrono::system_clock::now();
         Base::testCaseEnded(testCaseStats);
     }
     void sectionStarting(SectionInfo const& sectionInfo) override
     {
-        if (sectionInfo.name != m_current_test_name) {
-            m_results.emplace(std::make_pair(full_section_name(sectionInfo.name), TestResult{}));
+        if (m_pending_name.empty()) {
+            m_pending_name = sectionInfo.name;
         }
+        else {
+            m_pending_name += "::" + sectionInfo.name;
+        }
+        m_pending_test = {};
         Base::sectionStarting(sectionInfo);
     }
     void sectionEnded(SectionStats const& sectionStats) override
     {
-        if (sectionStats.sectionInfo.name != m_current_test_name) {
-            auto it = m_results.find(full_section_name(sectionStats.sectionInfo.name));
-            if (it == m_results.end()) {
-                throw std::runtime_error("logic error in Evergreen section reporter");
-            }
+        if (!m_pending_name.empty()) {
             if (sectionStats.assertions.allPassed()) {
-                it->second.status = "pass";
+                m_pending_test.status = "pass";
             }
             else {
-                it->second.status = "fail";
+                m_pending_test.status = "fail";
             }
-            it->second.end_time = std::chrono::system_clock::now();
+            m_pending_test.end_time = std::chrono::system_clock::now();
+            m_results.emplace(std::make_pair(m_pending_name, m_pending_test));
+            m_pending_name = "";
         }
         Base::sectionEnded(sectionStats);
     }
@@ -161,27 +164,20 @@ public:
         stream << result_file_obj << std::endl;
     }
 
-    std::string full_section_name(const std::string& section_name)
-    {
-        return realm::util::format("%1::%2", m_current_test_name, section_name);
-    }
-
     struct TestResult {
-        enum class ResultType { Section, Test };
-        TestResult(TestResult::ResultType t = TestResult::ResultType::Section)
-            : type(t)
-            , start_time{std::chrono::system_clock::now()}
+        TestResult()
+            : start_time{std::chrono::system_clock::now()}
             , end_time{}
             , status{"unknown"}
         {
         }
-        ResultType type;
         std::chrono::time_point<std::chrono::system_clock> start_time;
         std::chrono::time_point<std::chrono::system_clock> end_time;
         std::string status;
     };
-    TestResult m_current_test;
-    std::string m_current_test_name;
+    TestResult m_pending_test;
+    std::string m_pending_name;
+    std::vector<std::pair<std::string, TestResult>> m_current_stack;
     std::map<std::string, TestResult> m_results;
 };
 
