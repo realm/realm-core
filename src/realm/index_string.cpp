@@ -169,14 +169,12 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
 
-        // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data = get_data_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+        ArrayUnsigned keys(m_alloc);
+        keys.init_from_ref(offsets_ref);
+        auto pos = keys.lower_bound(key);
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
+        if (pos == keys.size())
             return local_not_found;
 
         // Get entry under key
@@ -192,7 +190,7 @@ int64_t IndexArray::index_string(Mixed value, InternalFindResult& result_ref, co
             continue;
         }
 
-        StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
+        StringIndexKey stored_key = StringIndexKey(keys.get(pos));
 
         if (stored_key != key)
             return local_not_found;
@@ -438,14 +436,12 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
 
-        // Find the position matching the key
-        const char* const offsets_header = m_alloc.translate(offsets_ref);
-        const char* const offsets_data = get_data_from_header(offsets_header);
-        const size_t offsets_size = get_size_from_header(offsets_header);
-        const size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+        ArrayUnsigned keys(m_alloc);
+        keys.init_from_ref(offsets_ref);
+        auto pos = keys.lower_bound(key);
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
+        if (pos == keys.size())
             continue;
 
         // Get entry under key
@@ -459,7 +455,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
             continue;
         }
 
-        const StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
+        const StringIndexKey stored_key = StringIndexKey(keys.get(pos));
 
         if (stored_key != key)
             continue;
@@ -514,14 +510,12 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
 
-        // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data = get_data_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+        ArrayUnsigned keys(m_alloc);
+        keys.init_from_ref(offsets_ref);
+        auto pos = keys.lower_bound(key);
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size)
+        if (pos == keys.size())
             return;
 
         // Get entry under key
@@ -537,7 +531,7 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
             continue;
         }
 
-        StringIndexKey stored_key = StringIndexKey(get_direct<32>(offsets_data, pos));
+        StringIndexKey stored_key = StringIndexKey(keys.get(pos));
 
         if (stored_key != key)
             return;
@@ -618,8 +612,7 @@ void IndexArray::create(bool is_leaf)
 
     // Add subcolumns for leaves
     m_keys.set_parent(this, 0);
-    m_keys.create(Array::type_Normal);       // Throws
-    m_keys.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
+    m_keys.create(0, 0xffffffff);
     add(m_keys.get_ref());                   // first entry in refs points to offsets
 }
 
@@ -627,7 +620,7 @@ void IndexArray::init_from_ref(ref_type ref)
 {
     Array::init_from_ref(ref);
     REALM_ASSERT(get_context_flag());
-    m_keys.init_from_parent();
+    m_keys.init_from_ref(Array::get_as_ref(0));
 }
 
 ref_type StringIndex::create_empty(Allocator& alloc)
@@ -707,7 +700,7 @@ void IndexArray::insert_row_list(size_t ref, size_t offset, StringData index_dat
     // Get subnode table
     REALM_ASSERT(Array::size() == m_keys.size() + 1);
 
-    size_t ins_pos = m_keys.lower_bound_int(key);
+    size_t ins_pos = m_keys.lower_bound(key);
     if (ins_pos == m_keys.size()) {
         // When key is outside current range, we can just add it
         m_keys.add(key);
@@ -1236,8 +1229,7 @@ void StringIndex::find_all_fulltext(std::vector<ObjKey>& result, StringData valu
 
 void IndexArray::clear()
 {
-    m_keys.clear();
-    m_keys.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
+    m_keys.truncate(0);
 
     size_t size = 1;
     truncate_and_destroy_children(size); // Don't touch `keys` array

@@ -73,7 +73,7 @@ class ClusterColumn;
 template <class T>
 class BPlusTree;
 
-using StringIndexKey = int32_t;
+using StringIndexKey = uint32_t;
 
 /// Each StringIndex node contains an array of this type
 class IndexArray : public Array {
@@ -108,11 +108,11 @@ public:
     }
     size_t find_key(StringIndexKey key)
     {
-        return m_keys.lower_bound_int(key);
+        return m_keys.lower_bound(key);
     }
     size_t find_subnode(StringIndexKey key)
     {
-        size_t node_ndx = m_keys.lower_bound_int(key);
+        size_t node_ndx = m_keys.lower_bound(key);
         if (node_ndx == m_keys.size()) {
             // node can never be empty, so try to fit in last item
             node_ndx = m_keys.size() - 1;
@@ -130,7 +130,7 @@ public:
     }
     StringIndexKey get_last_key() const
     {
-        return StringIndexKey(m_keys.back());
+        return StringIndexKey(m_keys.get(m_keys.size() - 1));
     }
 
     void add_ref(ref_type ref);
@@ -177,7 +177,7 @@ public:
     void insert_row_list(size_t ref, size_t offset, StringData value);
 
 private:
-    Array m_keys;
+    ArrayUnsigned m_keys;
     template <IndexMethod>
     int64_t from_list(Mixed value, InternalFindResult& result_ref, const IntegerColumn& key_values,
                       const ClusterColumn& column) const;
