@@ -365,13 +365,69 @@ private:
     IndexArray m_array;
     ClusterColumn m_target_column;
 
-    struct inner_node_tag {
+    class ValueIterator {
+    public:
+        ValueIterator(Mixed value, size_t offset = 0)
+            : ValueIterator(offset)
+        {
+            m_current_value = value;
+            m_current_index_data = value.get_index_data(m_buffer);
+            m_current_key = create_key(m_current_index_data, m_offset);
+        }
+
+        virtual ~ValueIterator() {}
+        bool valid() const
+        {
+            return m_valid;
+        }
+        virtual void next()
+        {
+            m_valid = false;
+        }
+        void next_level()
+        {
+            m_offset += s_index_key_length;
+            m_current_key = create_key(m_current_index_data, m_offset);
+        }
+        bool is_at_string_end() const
+        {
+            return m_offset + 4 >= m_current_index_data.size();
+        }
+        size_t get_offset() const
+        {
+            return m_offset;
+        }
+        StringIndexKey get_key() const
+        {
+            return m_current_key;
+        }
+        Mixed get_value() const
+        {
+            return m_current_value;
+        }
+        StringData reconstruct_string();
+
+    protected:
+        StringConversionBuffer m_buffer;
+        Mixed m_current_value;
+        StringData m_current_index_data;
+        StringIndexKey m_current_key;
+        size_t m_offset;
+        bool m_valid;
+
+        explicit ValueIterator(size_t offset)
+            : m_current_key(0)
+            , m_offset(offset)
+            , m_valid(true)
+        {
+        }
     };
-    StringIndex(inner_node_tag, Allocator&);
 
-    static IndexArray* create_node(Allocator&, bool is_leaf);
+    class ValueIteratorSet;
 
-    void insert_with_offset(ObjKey key, StringData index_data, const Mixed& value, size_t offset);
+    StringIndex(Allocator&);
+
+    void insert_with_offset(ObjKey key, ValueIterator& it);
     void insert_to_existing_list(ObjKey key, Mixed value, IntegerColumn& list);
     void insert_to_existing_list_at_lower(ObjKey key, Mixed value, IntegerColumn& list,
                                           const IntegerColumnIterator& lower);
@@ -399,12 +455,11 @@ private:
     };
 
     // B-Tree functions
-    void TreeInsert(ObjKey obj_key, StringIndexKey, size_t offset, StringData index_data, const Mixed& value);
-    NodeChange do_insert(ObjKey, StringIndexKey, size_t offset, StringData index_data, const Mixed& value);
+    void TreeInsert(ObjKey obj_key, ValueIterator& it);
+    NodeChange do_insert(ObjKey, ValueIterator& it);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(ObjKey obj_key, StringIndexKey, size_t offset, StringData index_data, const Mixed& value,
-                     bool noextend = false);
-    void leaf_add_one(ObjKey obj_key, StringData value, size_t offset);
+    bool leaf_insert(ObjKey obj_key, ValueIterator& it);
+    void leaf_add_one(ObjKey obj_key, ValueIterator& it);
     // Erase without getting value from parent column (useful when string stored
     // does not directly match string in parent, like with full-text indexing)
     void erase_string(ObjKey key, StringData value);
@@ -451,7 +506,7 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
     m_array.init_from_ref(ref);
 }
 
-inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
+inline StringIndex::StringIndex(Allocator& alloc)
     : m_array(alloc) // Throws
     , m_target_column(ClusterColumn(nullptr, {}, false))
 {
@@ -519,10 +574,8 @@ inline StringIndexKey StringIndex::create_key(StringData str, size_t offset) noe
 template <class T>
 void StringIndex::insert(ObjKey key, T value)
 {
-    StringConversionBuffer buffer;
-    Mixed m(value);
-    size_t offset = 0;                                      // First key from beginning of string
-    insert_with_offset(key, m.get_index_data(buffer), m, offset); // Throws
+    ValueIterator it{Mixed{value}};
+    insert_with_offset(key, it); // Throws
 }
 
 template <>
@@ -552,10 +605,8 @@ void StringIndex::set(ObjKey key, T new_value)
         // might find the duplicate if we insert before erasing.
         erase(key); // Throws
 
-        StringConversionBuffer buffer;
-        size_t offset = 0;                               // First key from beginning of string
-        auto index_data = new_value2.get_index_data(buffer);
-        insert_with_offset(key, index_data, new_value2, offset); // Throws
+        ValueIterator it{new_value2};
+        insert_with_offset(key, it); // Throws
     }
 }
 

@@ -5956,10 +5956,10 @@ TEST(Table_FullTextIndexPerf)
         db->get_stats(free_space, used_space);
         std::cout << "used space: " << used_space << std::endl;
     }
+    /*
     auto rt = db->start_read();
     auto t = rt->get_table("uro");
-    t->get_search_index(col)->print_text();
-    /*
+    // t->get_search_index(col)->print_text();
     TableView res = t->find_all_fulltext(col, "Nørrebrogade");
     for (size_t i = 0; i < res.size(); i++) {
         auto obj = res.get_object(i);
