@@ -938,6 +938,18 @@ StringData reconstruct_string(size_t offset, StringIndexKey key, StringData new_
     return StringData(new_string.data(), offset + rest_len);
 }
 
+std::string key2string(StringIndexKey key) noexcept
+{
+    std::string ret;
+    if (key != 0) {
+        char* k = reinterpret_cast<char*>(&key);
+        char* p = k + 3;
+        while (*p != 'X' && p >= k)
+            ret += *p--;
+    }
+    return ret;
+}
+
 void StringIndex::leaf_add_one(ObjKey obj_key, StringData index_data, size_t offset)
 {
     StringIndexKey key = create_key(index_data, offset);
@@ -1678,7 +1690,56 @@ void dump_node_structure(const IndexArray& node, std::ostream& out, int level, b
         }
     }
 }
+
+void dump_node_structure_text(const IndexArray& node, std::ostream& out, const std::string prefix)
+{
+    Allocator& alloc = node.get_alloc();
+
+    size_t node_size = node.nb_elements();
+    REALM_ASSERT(node_size >= 1);
+
+    bool node_is_leaf = !node.is_inner_bptree_node();
+    for (size_t i = 0; i < node_size; ++i) {
+        auto key = node.get_key(i);
+        auto str = prefix + key2string(key);
+        if (node_is_leaf) {
+            int_fast64_t value = node.get(i + 1);
+            bool is_ref = (value & 1) == 0;
+            bool is_subindex = false;
+            if (is_ref) {
+                Array arr(alloc);
+                arr.init_from_ref(to_ref(value));
+                is_subindex = arr.get_context_flag();
+            }
+            if (is_subindex) {
+                IndexArray subnode(alloc);
+                subnode.init_from_ref(to_ref(value));
+                dump_node_structure_text(subnode, out, str);
+            }
+            else {
+                out << str << ": ";
+                if (!is_ref) {
+                    out << (value / 2);
+                }
+                else {
+                    IntegerColumn indexes(alloc, to_ref(value));
+                    for (size_t j = 0; j < indexes.size(); j++) {
+                        out << (j ? ", " : "") << int(indexes.get(j));
+                    }
+                }
+                out << std::endl;
+            }
+        }
+        else {
+            IndexArray subnode(alloc);
+            subnode.init_from_ref(node.get_as_ref(i + 1));
+            dump_node_structure_text(subnode, out, prefix);
+        }
+    }
+}
 } // namespace
+
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 void StringIndex::print() const
 {
@@ -1687,4 +1748,9 @@ void StringIndex::print() const
 #endif
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+void StringIndex::print_text() const
+{
+#ifdef REALM_DEBUG
+    dump_node_structure_text(m_array, std::cout, "");
+#endif
+}

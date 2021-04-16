@@ -45,7 +45,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 #include "test_types_helper.hpp"
 
-//#include <valgrind/callgrind.h>
+#include <valgrind/callgrind.h>
 //#define PERFORMACE_TESTING
 
 using namespace realm;
@@ -5944,7 +5944,9 @@ TEST(Table_FullTextIndexPerf)
         col = t->get_column_key("text");
         t->remove_search_index(col);
         auto t1 = steady_clock::now();
+        CALLGRIND_START_INSTRUMENTATION;
         t->add_search_index(col, true);
+        CALLGRIND_STOP_INSTRUMENTATION;
         auto t2 = steady_clock::now();
 
         wt->commit();
@@ -5956,6 +5958,8 @@ TEST(Table_FullTextIndexPerf)
     }
     auto rt = db->start_read();
     auto t = rt->get_table("uro");
+    t->get_search_index(col)->print_text();
+    /*
     TableView res = t->find_all_fulltext(col, "Nørrebrogade");
     for (size_t i = 0; i < res.size(); i++) {
         auto obj = res.get_object(i);
@@ -5970,5 +5974,6 @@ TEST(Table_FullTextIndexPerf)
             }
         }
     }
+    */
 }
 #endif // TEST_TABLE

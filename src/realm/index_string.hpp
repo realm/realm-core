@@ -324,6 +324,7 @@ public:
 
     void verify() const;
     void print() const;
+    void print_text() const;
 #ifdef REALM_DEBUG
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
