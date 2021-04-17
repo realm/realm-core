@@ -163,6 +163,10 @@ public:
     // Returns a frozen copy of this result
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
+    // Returns a live version of a frozen Result that has been resolved against
+    // a live Realm.
+    Results thaw(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
+
     // Returns whether or not this Results is frozen.
     bool is_frozen() const REQUIRES(!m_mutex);
 

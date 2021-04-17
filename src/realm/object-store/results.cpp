@@ -1329,6 +1329,47 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
     }
 }
 
+Results Results::thaw(std::shared_ptr<Realm> const& live_realm)
+{
+    REALM_ASSERT(!live_realm->is_frozen());
+    util::CheckedUniqueLock lock(m_mutex);
+    if (m_mode == Mode::Empty)
+        return *this;
+    switch (m_mode) {
+        case Mode::Table:
+            return Results(live_realm, live_realm->import_copy_of(m_table));
+        case Mode::Collection:
+            return Results(live_realm, live_realm->import_copy_of(*m_collection), m_descriptor_ordering);
+        case Mode::LinkList: {
+            std::shared_ptr<LnkLst> live_ll(
+                    live_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+
+            // If query/sort was provided for the original Results, mode would have changed to Query, so no need
+            // include them here.
+            return Results(live_realm, std::move(live_ll));
+        }
+        case Mode::LinkSet: {
+            std::shared_ptr<LnkSet> live_ls(
+                    live_realm->import_copy_of(std::make_unique<LnkSet>(*m_link_set)).release());
+            // If query/sort was provided for the original Results, mode would have changed to Query, so no need
+            // include them here.
+            return Results(live_realm, std::move(live_ls));
+        }
+        case Mode::Query:
+            return Results(live_realm, *live_realm->import_copy_of(m_query, PayloadPolicy::Copy),
+                           m_descriptor_ordering);
+        case Mode::TableView: {
+            Results results(live_realm, *live_realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
+                            m_descriptor_ordering);
+            results.assert_unlocked();
+            results.evaluate_query_if_needed(false);
+            return results;
+        }
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+}
+
 bool Results::is_frozen() const
 {
     return !m_realm || m_realm->is_frozen();

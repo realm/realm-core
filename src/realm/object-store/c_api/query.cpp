@@ -428,4 +428,22 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
     });
 }
 
+RLM_API realm_results_t* realm_results_freeze(realm_results_t* live_results, const realm_t* frozen_realm)
+{
+    return wrap_err([&]() {
+        const auto realm = *frozen_realm;
+        auto frozen_results = live_results->freeze(realm);
+        return new realm_results_t{std::move(frozen_results)};
+    });
+}
+
+RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm)
+{
+    return wrap_err([&]() {
+        const auto realm = *live_realm;
+        auto live_results = frozen_results->thaw(realm);
+        return new realm_results_t{std::move(live_results)};
+    });
+}
+
 } // namespace realm::c_api

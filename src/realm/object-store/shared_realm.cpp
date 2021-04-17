@@ -895,6 +895,11 @@ SharedRealm Realm::freeze()
     return Realm::get_frozen_realm(std::move(config), version);
 }
 
+SharedRealm Realm::thaw()
+{
+    return Realm::get_shared_realm(m_config);
+}
+
 void Realm::close()
 {
     if (m_coordinator) {

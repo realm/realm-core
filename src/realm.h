@@ -1758,7 +1758,12 @@ RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
 /**
  * Map the results into a frozen realm instance.
  */
-RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const realm_t* frozen_realm);
+RLM_API realm_results_t* realm_results_freeze(realm_results_t* live_results, const realm_t* frozen_realm);
+
+/**
+ * Turn a frozen Results into a live one that is evaluated against a given version of a live Realm.
+ */
+RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm);
 
 /**
  * Compute the minimum value of a property in the results.
