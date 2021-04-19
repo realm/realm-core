@@ -4348,10 +4348,32 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
+    size_t nb_ints = 71;
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
+    verify_query(test_context, table, "mixed.@type == 'float'", 0);
     verify_query(test_context, table, "mixed.@type == 'Decimal'", 1);
+    verify_query(test_context, table, "mixed.@type == 'decimal128'", 1);
     verify_query(test_context, table, "mixed.@type == 'binary'", 1);
+    verify_query(test_context, table, "mixed.@type == 'bytearray'", 1);
+    verify_query(test_context, table, "mixed.@type == 'byte[]'", 1);
+    verify_query(test_context, table, "mixed.@type == 'uuid'", 0);
+    verify_query(test_context, table, "mixed.@type == 'guid'", 0);
+    verify_query(test_context, table, "mixed.@type == 'bool'", 0);
+    verify_query(test_context, table, "mixed.@type == 'boolean'", 0);
+    verify_query(test_context, table, "mixed.@type == 'int'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'integer'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int16'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int32'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int64'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'short'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'long'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'byte'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
+    verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
+    verify_query(test_context, table, "mixed.@type == 'object'", 0);
+
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
     verify_query(test_context, table, "mixed.@type == 'null'", 1);

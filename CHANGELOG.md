@@ -4,6 +4,7 @@
 * None.
 
 ### Fixed
+* Added the names requested by .NET to match mixed type based querying. ([#4353](https://github.com/realm/realm-core/issues/4353))
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
