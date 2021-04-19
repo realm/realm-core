@@ -23,7 +23,7 @@
 #include <realm/db.hpp>
 #include <realm/utilities.hpp>
 
-using namespace realm;
+namespace realm {
 
 ParentNode::ParentNode(const ParentNode& from)
     : m_child(from.m_child ? from.m_child->clone() : nullptr)
@@ -164,6 +164,89 @@ size_t ParentNode::find_all_local(size_t start, size_t end)
     return end;
 }
 
+void MixedNode<Equal>::init(bool will_query_ranges)
+{
+    MixedNodeBase::init(will_query_ranges);
+
+    if (m_has_search_index) {
+        m_dT = 0.0;
+    }
+    else {
+        m_dT = 10.0;
+    }
+
+    if (m_has_search_index) {
+        // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        m_index_matches.clear();
+        index->find_all(m_index_matches, static_cast<Mixed>(m_value), true);
+        m_results_start = 0;
+        m_results_ndx = 0;
+        m_results_end = m_index_matches.size();
+        if (m_results_start != m_results_end) {
+            m_actual_key = m_index_matches[0];
+        }
+    }
+}
+
+size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(m_table);
+
+    if (m_has_search_index) {
+        if (start < end) {
+            ObjKey first_key = m_cluster->get_real_key(start);
+            if (first_key < m_last_start_key) {
+                // We are not advancing through the clusters. We basically don't know where we are,
+                // so just start over from the beginning.
+                m_results_ndx = m_results_start;
+                m_actual_key = (m_results_start != m_results_end) ? m_index_matches[m_results_start] : ObjKey();
+            }
+            m_last_start_key = first_key;
+
+            // Check if we can expect to find more keys
+            if (m_results_ndx < m_results_end) {
+                // Check if we should advance to next key to search for
+                while (first_key > m_actual_key) {
+                    m_results_ndx++;
+                    if (m_results_ndx == m_results_end) {
+                        return not_found;
+                    }
+                    m_actual_key = m_index_matches[m_results_ndx];
+                }
+
+                // If actual_key is bigger than last key, it is not in this leaf
+                ObjKey last_key = m_cluster->get_real_key(end - 1);
+                if (m_actual_key > last_key)
+                    return not_found;
+
+                // Now actual_key must be found in leaf keys
+                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
+            }
+        }
+    }
+    else {
+        Equal cond;
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            if (cond(val, m_value))
+                return i;
+        }
+    }
+
+    return not_found;
+}
+
+void MixedNode<Equal>::index_based_aggregate(size_t limit, Evaluator evaluator)
+{
+    for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
+        auto obj = m_table->get_object(m_index_matches[t]);
+        if (evaluator(obj)) {
+            --limit;
+        }
+    }
+}
+
 void StringNodeEqualBase::init(bool will_query_ranges)
 {
     StringNodeBase::init(will_query_ranges);
@@ -225,8 +308,6 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
     return _find_first_local(start, end);
 }
 
-
-namespace realm {
 
 size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
                        const Cluster* cluster, size_t start, size_t end)
@@ -504,8 +585,6 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
     REALM_TERMINATE("Unsupported column type.");
 }
 
-} // namespace realm
-
 size_t NotNode::find_first_local(size_t start, size_t end)
 {
     if (start <= m_known_range_start && end >= m_known_range_end) {
@@ -758,3 +837,5 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
 
     return not_found;
 }
+
+} // namespace realm

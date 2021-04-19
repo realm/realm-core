@@ -96,6 +96,7 @@ let package = Package(
                 "bid128_string.c",
                 "bid128_2_str_tables.c",
                 "bid64_to_bid128.c",
+                "bid128_to_int64.c",
                 "bid_convert_data.c",
                 "bid_decimal_data.c",
                 "bid_decimal_globals.c",

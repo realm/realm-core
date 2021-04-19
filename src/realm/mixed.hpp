@@ -226,6 +226,7 @@ public:
         return compare(other) >= 0;
     }
     size_t hash() const;
+    StringData get_index_data(std::array<char, 16>&) const;
     void use_buffer(std::string& buf);
 
 protected:

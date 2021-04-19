@@ -24,6 +24,7 @@
 #include <realm/table.hpp>
 #include <realm/query_value.hpp>
 #include <realm/util/serializer.hpp>
+#include <realm/index_string.hpp>
 
 namespace realm {
 
@@ -492,6 +493,75 @@ size_t Mixed::hash() const
     }
 
     return hash;
+}
+
+StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
+{
+    if (is_null()) {
+        return {};
+    }
+    switch (get_type()) {
+        case type_Int:
+            return GetIndexData<int64_t>::get_index_data(get_int(), buffer);
+        case type_Bool:
+            buffer[0] = get_bool() ? '\1' : '\0';
+            buffer[1] = 0xb;
+            return {buffer.data(), 2};
+        case type_Float: {
+            auto v2 = get_float();
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(float), buffer.data());
+            return StringData{buffer.data(), sizeof(float)};
+        }
+        case type_Double: {
+            auto v2 = get_double();
+            int i = int(v2);
+            if (i == v2) {
+                return GetIndexData<int64_t>::get_index_data(i, buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(double), buffer.data());
+            return StringData{buffer.data(), sizeof(double)};
+        }
+        case type_String:
+            return get_string();
+        case type_Binary: {
+            auto bin = get_binary();
+            return {bin.data(), bin.size()};
+        }
+        case type_Timestamp:
+            return GetIndexData<Timestamp>::get_index_data(get<Timestamp>(), buffer);
+        case type_ObjectId:
+            return GetIndexData<ObjectId>::get_index_data(get<ObjectId>(), buffer);
+        case type_Decimal: {
+            auto v2 = this->get_decimal();
+            int64_t i;
+            if (v2.to_int(i)) {
+                return GetIndexData<int64_t>::get_index_data(i, buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(v2), buffer.data());
+            return StringData{buffer.data(), sizeof(v2)};
+        }
+        case type_UUID:
+            return GetIndexData<UUID>::get_index_data(get<UUID>(), buffer);
+        case type_TypedLink: {
+            auto link = get<ObjLink>();
+            uint32_t k1 = link.get_table_key().value;
+            int64_t k2 = link.get_obj_key().value;
+            const char* src = reinterpret_cast<const char*>(&k1);
+            realm::safe_copy_n(src, sizeof(k1), buffer.data());
+            src = reinterpret_cast<const char*>(&k2);
+            realm::safe_copy_n(src, sizeof(k2), buffer.data() + sizeof(k1));
+            return StringData{buffer.data(), sizeof(k1) + sizeof(k2)};
+        }
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+            break;
+    }
+    REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
+    return {};
 }
 
 void Mixed::use_buffer(std::string& buf)

@@ -5812,8 +5812,9 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
     CHECK_NOT(table.find_first(col, type{}));
 }
 
-TEST(Query_Mixed)
+TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
+    bool has_index = TEST_TYPE::value;
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
@@ -5822,6 +5823,10 @@ TEST(Query_Mixed)
     auto col_link = origin->add_column(*table, "link");
     auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
+
+    if (has_index)
+        table->add_search_index(col_any);
+
     size_t int_over_50 = 0;
     size_t nb_strings = 0;
     for (int64_t i = 0; i < 100; i++) {
