@@ -311,7 +311,7 @@ void ListResultsNotifier::calculate_changes()
         }
 
         m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](int64_t key) {
-            return m_change.modifications_new.contains(static_cast<size_t>(key));
+            return m_change.modifications.contains(static_cast<size_t>(key));
         });
     }
 

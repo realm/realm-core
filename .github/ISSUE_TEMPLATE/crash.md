@@ -1,6 +1,6 @@
 ---
 name: Crash report
-about: You app crashed and you were instructed in the stacktrace to report this issue
+about: Your app crashed and you were instructed in the stacktrace to report this issue. Please goto the repo for the SDK you use and create an issue there.
 ---
 
 #### SDK and version
