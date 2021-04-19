@@ -167,6 +167,34 @@ RLM_API realm_object_key_t realm_object_get_key(const realm_object_t* obj)
     return obj->obj().get_key().value;
 }
 
+RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm)
+{
+    return wrap_err([&]() {
+        const auto realm = *frozen_realm;
+        auto frozen_object = live_object->freeze(realm);
+        return new realm_object_t{std::move(frozen_object)};
+        /**
+         *         auto shared_realm = results->get_realm();
+        auto obj = results->get<Obj>(index);
+        return new realm_object_t{Object{shared_realm, std::move(obj)}};
+         */
+    });
+}
+
+RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm)
+{
+    return wrap_err([&]() {
+        const auto realm = *live_realm;
+        auto live_object = frozen_object->freeze(realm);
+        return new realm_object_t{std::move(live_object)};
+        /**
+         *         auto shared_realm = results->get_realm();
+        auto obj = results->get<Obj>(index);
+        return new realm_object_t{Object{shared_realm, std::move(obj)}};
+         */
+    });
+}
+
 RLM_API realm_class_key_t realm_object_get_table(const realm_object_t* obj)
 {
     return obj->obj().get_table()->get_key().value;

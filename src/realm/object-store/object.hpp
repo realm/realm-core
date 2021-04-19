@@ -109,6 +109,9 @@ public:
     // Returns a frozen copy of this object.
     Object freeze(std::shared_ptr<Realm> frozen_realm) const;
 
+    // Returns a Live copy of a frozen object
+    Object thaw(std::shared_ptr<Realm> live_realm) const;
+
     // Returns whether or not this Object is frozen.
     bool is_frozen() const noexcept;
 

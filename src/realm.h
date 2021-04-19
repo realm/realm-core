@@ -1203,6 +1203,16 @@ RLM_API realm_results_t* realm_object_find_all(const realm_t*, realm_class_key_t
 RLM_API realm_object_t* realm_object_create(realm_t*, realm_class_key_t);
 
 /**
+ * Freeze the Realm object.
+ */
+RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm);
+
+/**
+ * Turn a frozen Realm Object into a live one that is evaluated against a given version of a Live Realm.
+ */
+RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm);
+
+/**
  * Create an object in a class with a primary key.
  *
  * @return A non-NULL pointer if the object was created successfully.

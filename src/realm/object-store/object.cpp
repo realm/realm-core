@@ -39,6 +39,11 @@ Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
     return Object(frozen_realm, frozen_realm->import_copy_of(m_obj));
 }
 
+Object Object::thaw(std::shared_ptr<Realm> live_realm) const
+{
+    return Object(live_realm, live_realm->import_copy_of(m_obj));
+}
+
 bool Object::is_frozen() const noexcept
 {
     return m_realm->is_frozen();
