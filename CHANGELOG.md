@@ -1,21 +1,13 @@
-# NEXT RELEASE
+# 11.0.0-beta.4 Release notes
 
 ### Enhancements
 * Support equal/not_equal on Query, where column is Link/LinkList and value is a Mixed containing a link.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Dictionary key validation now works on strings without nul termination. ([#4589](https://github.com/realm/realm-core/issues/4589))
 # Fixed queries for min/max of a Mixed column not returning the expected value when using the Query::minimum_mixed(). ([#4571](https://github.com/realm/realm-core/issues/4571), since v11.0.0-beta.2)
+* Fix collection notification reporting for modifications. This could be observed by receiving the wrong indices of modifications on sorted or distinct results, or notification blocks sometimes not being called when only modifications have occured. ([#4573](https://github.com/realm/realm-core/pull/4573) since v6).
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 11.0.0-beta.3 Release notes
