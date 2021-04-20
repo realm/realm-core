@@ -79,14 +79,14 @@ namespace Catch {
 class EvergreenReporter : public CumulativeReporterBase<EvergreenReporter> {
 public:
     using Base = CumulativeReporterBase<EvergreenReporter>;
-    EvergreenReporter(ReporterConfig const& config)
+    explicit EvergreenReporter(ReporterConfig const& config)
         : Base(config)
     {
     }
     ~EvergreenReporter() = default;
     static std::string getDescription()
     {
-        return "Reports test results in a format consumable by MongoDB Evergreen.";
+        return "Reports test results in a format consumable by Evergreen.";
     }
     void noMatchingTestCases(std::string const& /*spec*/) override {}
     using Base::assertionEnded;
@@ -103,7 +103,8 @@ public:
     {
         auto it = m_results.find(testCaseStats.testInfo.name);
         if (it == m_results.end()) {
-            throw std::runtime_error("logic error in Evergreen section reporter");
+            throw std::runtime_error("logic error in Evergreen section reporter, could not end test case '" +
+                                     testCaseStats.testInfo.name + "' which was never tracked as started.");
         }
         if (testCaseStats.totals.assertions.allPassed()) {
             it->second.status = "pass";
@@ -171,8 +172,8 @@ public:
             , status{"unknown"}
         {
         }
-        std::chrono::time_point<std::chrono::system_clock> start_time;
-        std::chrono::time_point<std::chrono::system_clock> end_time;
+        std::chrono::system_clock::time_point start_time;
+        std::chrono::system_clock::time_point end_time;
         std::string status;
     };
     TestResult m_pending_test;
