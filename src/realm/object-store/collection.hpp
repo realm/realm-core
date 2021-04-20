@@ -39,6 +39,7 @@ namespace object_store {
 class Collection {
 public:
     Collection() noexcept;
+    Collection(const Object& parent_obj, const Property* prop);
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
     Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll);

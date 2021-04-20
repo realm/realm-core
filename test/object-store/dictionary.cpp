@@ -900,3 +900,34 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
         }
     }
 }
+
+TEST_CASE("dictionary comparison different realm", "[dictionary]") {
+    TestFile config1;
+    TestFile config2;
+    Schema schema{
+        {"object", {{"value", PropertyType::Dictionary | PropertyType::Int}}},
+    };
+    config1.schema = schema;
+    config2.schema = schema;
+
+    auto r1 = Realm::get_shared_realm(config1);
+    auto r2 = Realm::get_shared_realm(config2);
+
+    CppContext ctx1(r1);
+    CppContext ctx2(r2);
+
+    AnyDict dict_content{{"val1", INT64_C(10)}};
+    Any init{AnyDict{{"value", dict_content}}};
+    r1->begin_transaction();
+    r2->begin_transaction();
+    auto obj1 = Object::create(ctx1, r1, *r1->schema().find("object"), init);
+    auto obj2 = Object::create(ctx2, r2, *r2->schema().find("object"), init);
+    auto prop1 = r1->schema().find("object")->property_for_name("value");
+    auto prop2 = r2->schema().find("object")->property_for_name("value");
+    r1->commit_transaction();
+    r2->commit_transaction();
+
+    object_store::Dictionary dict1(obj1, prop1);
+    object_store::Dictionary dict2(obj2, prop2);
+    REQUIRE(dict1 != dict2);
+}

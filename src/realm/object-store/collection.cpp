@@ -35,12 +35,19 @@ Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_
 
 Collection::Collection() noexcept {}
 
+Collection::Collection(const Object& parent_obj, const Property* prop)
+    : m_realm(parent_obj.get_realm())
+    , m_type(prop->type)
+    , m_coll_base(parent_obj.obj().get_collection_ptr(prop->column_key))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+{
+}
+
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
     , m_coll_base(parent_obj.get_collection_ptr(col))
     , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
-
 {
 }
 
