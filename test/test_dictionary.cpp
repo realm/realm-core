@@ -422,15 +422,19 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict");
+    auto col_int = bars->add_column(type_Int, "value");
+    ColKey col_dict = foos->add_column_dictionary(*bars, "dict");
 
     auto foo = foos->create_object_with_primary_key(123);
-    auto a = bars->create_object_with_primary_key("a");
-    auto b = bars->create_object_with_primary_key("b");
+    auto a = bars->create_object_with_primary_key("a").set(col_int, 1);
+    auto b = bars->create_object_with_primary_key("b").set(col_int, 2);
 
     auto dict = foo.get_dictionary(col_dict);
     dict.insert("a", a);
     dict.insert("b", b);
+
+    auto q = bars->where(dict).equal(col_int, 1);
+    CHECK_EQUAL(q.count(), 1);
 
     a.invalidate();
 
@@ -438,4 +442,6 @@ TEST(Dictionary_Tombstones)
     CHECK((*dict.find("a")).second.is_unresolved_link());
 
     CHECK(dict.find("b") != dict.end());
+
+    CHECK_EQUAL(q.count(), 0);
 }

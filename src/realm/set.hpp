@@ -328,9 +328,9 @@ private:
         return m_set.init_from_parent();
     }
 
-    BPlusTree<ObjKey>& get_mutable_tree() const final
+    BPlusTree<ObjKey>* get_mutable_tree() const final
     {
-        return *m_set.m_tree;
+        return m_set.m_tree.get();
     }
 };
 

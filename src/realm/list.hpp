@@ -387,9 +387,9 @@ private:
         return m_list.init_from_parent();
     }
 
-    BPlusTree<ObjKey>& get_mutable_tree() const final
+    BPlusTree<ObjKey>* get_mutable_tree() const final
     {
-        return *m_list.m_tree;
+        return m_list.m_tree.get();
     }
 };
 
@@ -897,7 +897,7 @@ inline util::Optional<Mixed> LnkLst::avg(size_t* return_cnt) const
 
 inline std::unique_ptr<CollectionBase> LnkLst::clone_collection() const
 {
-    return get_obj().get_linklist_ptr(get_col_key());
+    return clone_linklist();
 }
 
 inline void LnkLst::sort(std::vector<size_t>& indices, bool ascending) const

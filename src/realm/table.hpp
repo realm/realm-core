@@ -543,6 +543,12 @@ public:
         return Query(m_own_ref, set);
     }
 
+    // Perform queries on a Dictionary containing values of links to a single table.
+    Query where(const DictionaryLinkValues& dictionary_of_links) const
+    {
+        return Query(m_own_ref, dictionary_of_links);
+    }
+
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;

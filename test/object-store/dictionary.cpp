@@ -764,6 +764,91 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     }
 }
 
+TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+                   cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
+                   cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
+                   cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
+                   cf::UnboxedOptional<cf::String>, cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>,
+                   cf::UnboxedOptional<cf::Decimal>)
+{
+    using T = typename TestType::Type;
+    using W = typename TestType::Wrapped;
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target", {{"value", TestType::property_type()}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    Obj obj1 = table->create_object(); // empty dictionary
+    Obj empty_target = target->create_object();
+    ColKey col_links = table->get_column_key("links");
+    ColKey col_target_value = target->get_column_key("value");
+
+    object_store::Dictionary dict(r, obj, col_links);
+    auto keys_as_results = dict.get_keys();
+    auto values_as_results = dict.get_values();
+
+    auto values = TestType::values();
+    std::vector<std::string> keys;
+    for (size_t i = 0; i < values.size(); ++i) {
+        keys.push_back(util::format("key_%1", i));
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        Obj target_obj = target->create_object().set(col_target_value, T(values[i]));
+        dict.insert(keys[i], target_obj);
+    }
+
+    SECTION("min()") {
+        if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(values_as_results.min(col_target_value), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(Mixed(TestType::min()) == values_as_results.min(col_target_value));
+        dict.remove_all();
+        REQUIRE(!values_as_results.min(col_target_value));
+    }
+
+    SECTION("max()") {
+        if (!TestType::can_minmax()) {
+            REQUIRE_THROWS_AS(values_as_results.max(col_target_value), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(Mixed(TestType::max()) == values_as_results.max(col_target_value));
+        dict.remove_all();
+        REQUIRE(!values_as_results.max(col_target_value));
+    }
+
+    SECTION("sum()") {
+        if (!TestType::can_sum()) {
+            REQUIRE_THROWS_AS(values_as_results.sum(col_target_value), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(cf::get<W>(*values_as_results.sum(col_target_value)) == TestType::sum());
+        dict.remove_all();
+        REQUIRE(values_as_results.sum(col_target_value) == 0);
+    }
+
+    SECTION("average()") {
+        if (!TestType::can_average()) {
+            REQUIRE_THROWS_AS(values_as_results.average(col_target_value), Results::UnsupportedColumnTypeException);
+            return;
+        }
+        REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average(col_target_value)) ==
+                TestType::average());
+        dict.remove_all();
+        REQUIRE(!values_as_results.average(col_target_value));
+    }
+}
+
+
 TEST_CASE("dictionary with mixed links", "[dictionary]") {
     InMemoryTestFile config;
     config.cache = false;

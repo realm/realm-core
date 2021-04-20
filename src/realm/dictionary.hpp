@@ -157,6 +157,7 @@ public:
 
 private:
     friend class DictionaryAggregate;
+    friend class DictionaryLinkValues;
     mutable DictionaryClusterTree* m_clusters = nullptr;
     DataType m_key_type = type_String;
 
@@ -203,6 +204,108 @@ private:
 
     Iterator(const Dictionary* dict, size_t pos);
 };
+
+// An interface used when the value type of the dictionary consists of
+// links to a single table. Implementation of the ObjList interface on
+// top of a Dictionary of objects. This is the dictionary equivilent of
+// LnkLst and LnkSet.
+class DictionaryLinkValues final : public ObjCollectionBase<CollectionBase> {
+public:
+    DictionaryLinkValues() = default;
+    DictionaryLinkValues(const Obj& obj, ColKey col_key);
+    DictionaryLinkValues(const Dictionary& source);
+
+    // Overrides of ObjList:
+    ObjKey get_key(size_t ndx) const final;
+    bool is_obj_valid(size_t ndx) const noexcept final;
+    Obj get_object(size_t row_ndx) const final;
+
+    // Overrides of CollectionBase, these simply forward to the underlying dictionary.
+    size_t size() const final
+    {
+        return m_source.size();
+    }
+    bool is_null(size_t ndx) const final
+    {
+        return m_source.is_null(ndx);
+    }
+    Mixed get_any(size_t ndx) const final
+    {
+        return m_source.get_any(ndx);
+    }
+    void clear() final
+    {
+        m_source.clear();
+    }
+    util::Optional<Mixed> min(size_t* return_ndx = nullptr) const final
+    {
+        return m_source.min(return_ndx);
+    }
+    util::Optional<Mixed> max(size_t* return_ndx = nullptr) const final
+    {
+        return m_source.max(return_ndx);
+    }
+    util::Optional<Mixed> sum(size_t* return_cnt = nullptr) const final
+    {
+        return m_source.sum(return_cnt);
+    }
+    util::Optional<Mixed> avg(size_t* return_cnt = nullptr) const final
+    {
+        return m_source.avg(return_cnt);
+    }
+    std::unique_ptr<CollectionBase> clone_collection() const final
+    {
+        return std::make_unique<DictionaryLinkValues>(m_source);
+    }
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final
+    {
+        m_source.sort(indices, ascending);
+    }
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final
+    {
+        m_source.distinct(indices, sort_order);
+    }
+    size_t find_any(Mixed value) const final
+    {
+        return m_source.find_any(value);
+    }
+    const Obj& get_obj() const noexcept final
+    {
+        return m_source.get_obj();
+    }
+    ColKey get_col_key() const noexcept final
+    {
+        return m_source.get_col_key();
+    }
+    bool has_changed() const final
+    {
+        return m_source.has_changed();
+    }
+
+    // Overrides of ObjCollectionBase:
+    bool do_update_if_needed() const final
+    {
+        return m_source.update_if_needed();
+    }
+    bool do_init_from_parent() const final
+    {
+        return m_source.init_from_parent();
+    }
+    BPlusTree<ObjKey>* get_mutable_tree() const
+    {
+        // We are faking being an ObjList because the underlying storage is not
+        // actually a BPlusTree<ObjKey> for dictionaries it is all mixed values.
+        // But this is ok, because we don't need to deal with unresolved link
+        // maintenance because they are not hidden from view in dictionaries in
+        // the same way as for LnkSet and LnkLst. This means that the functions
+        // that call get_mutable_tree do not need to do anything for dictionaries.
+        return nullptr;
+    }
+
+private:
+    Dictionary m_source;
+};
+
 
 inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const Obj& obj)
 {
