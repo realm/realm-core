@@ -58,6 +58,7 @@ InternString Changeset::find_string(StringData string) const noexcept
     return InternString{};
 }
 
+#pragma runtime_checks( "", off )
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
     const auto& get = overload{
@@ -70,6 +71,7 @@ PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
     };
     return mpark::visit(get, key);
 }
+#pragma runtime_checks( "", restore )
 
 bool Changeset::operator==(const Changeset& that) const noexcept
 {
