@@ -375,9 +375,11 @@ void BenchmarkResults::save_results()
                 metric_objs.push_back(make_result_obj("stddev", result.stddev));
             }
 
-            test_results.push_back(json{{"info", json{{"test_name", measurement.first},
-                                                      {"parent", m_suite_name},
-                                                      {"args", json{{"count", result.rep}}}}},
+            test_results.push_back(json{{"info",
+                                         json{
+                                             {"test_name", measurement.first},
+                                             {"parent", m_suite_name},
+                                         }},
                                         {"metrics", std::move(metric_objs)}});
         }
 
