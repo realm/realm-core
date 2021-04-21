@@ -17,3 +17,6 @@ LIBRARY/src/bid_round.c
 )
 
 add_library(Bid OBJECT ${BID_SOURCES})
+if(MSVC)
+    target_compile_options(Bid PUBLIC /W1 /sdl-)
+endif()
