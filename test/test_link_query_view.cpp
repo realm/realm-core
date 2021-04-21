@@ -757,10 +757,11 @@ TEST(Link_EmptySortedView)
     TableRef destination = group.add_table("destination");
 
     auto col_link_list = source->add_column_list(*destination, "link");
+    auto col_int = destination->add_column(type_Int, "int");
     auto ll = source->create_object().get_linklist(col_link_list);
 
     CHECK_EQUAL(ll.size(), 0);
-    CHECK_EQUAL(ll.get_sorted_view(col_link_list).size(), 0);
+    CHECK_EQUAL(ll.get_sorted_view(col_int).size(), 0);
 }
 
 

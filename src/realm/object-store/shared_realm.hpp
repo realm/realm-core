@@ -250,6 +250,9 @@ public:
         // Maximum number of active versions in the Realm file allowed before an exception
         // is thrown.
         uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
+
+        // Disable automatic backup at file format upgrade by setting to false
+        bool backup_at_file_format_change = true;
     };
 
     // Returns a thread-confined live Realm for the given configuration
@@ -448,9 +451,9 @@ private:
     // that's actually fully working
     bool m_dynamic_schema = true;
 
-    // True while sending the notifications caused by advancing the read
+    // Non-zero while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
-    bool m_is_sending_notifications = false;
+    size_t m_is_sending_notifications = 0;
 
     // True while we're performing a schema migration via this Realm instance
     // to allow for different behavior (such as allowing modifications to

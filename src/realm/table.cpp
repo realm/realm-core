@@ -328,8 +328,7 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not a link column",
-                                              util::serializer::get_printable_table_name(m_current_table->get_name()),
+        throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
                                               m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
@@ -1389,8 +1388,15 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-        case col_type_String:
-            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
+        case col_type_String: {
+            auto str = static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx);
+            // This is a workaround for a bug where the length could be -1
+            // Seen when upgrading very old file.
+            if (str.size() == size_t(-1)) {
+                return Mixed("");
+            }
+            return Mixed{str};
+        }
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
         default:

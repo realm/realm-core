@@ -300,10 +300,19 @@ int Group::get_committed_file_format_version() const noexcept
     return m_alloc.get_committed_file_format_version();
 }
 
+std::optional<int> Group::fake_target_file_format;
+
+void _impl::GroupFriend::fake_target_file_format(const std::optional<int> format) noexcept
+{
+    Group::fake_target_file_format = format;
+}
 
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
+    if (Group::fake_target_file_format) {
+        return *Group::fake_target_file_format;
+    }
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
     // `current_file_format_version`, it will trigger a file format upgrade
@@ -375,6 +384,10 @@ uint64_t Group::get_sync_file_id() const noexcept
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
+    if (fake_target_file_format && *fake_target_file_format == target_file_format_version) {
+        // Testing, mockup scenario, not a real upgrade. Just pretend we're done!
+        return;
+    }
 
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
@@ -585,6 +598,9 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    // Non-Transaction Groups always allow writing and simply don't allow
+    // committing when opened in read-only mode
+    m_alloc.set_read_only(false);
 
     open(top_ref, file_path);
 }

@@ -129,7 +129,7 @@ struct ColKey {
     {
         return get_attrs().test(col_attr_Dictionary);
     }
-    bool is_collection()
+    bool is_collection() const
     {
         return get_attrs().test(col_attr_Collection);
     }

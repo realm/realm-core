@@ -369,11 +369,15 @@ int main(int argc, const char** argv)
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {
+                                 history.set_local_origin_timestamp_source([&]() {
+                                     return changeset.origin_timestamp;
+                                 });
                                  auto transaction = local_db->start_write();
                                  realm::sync::InstructionApplier applier(*transaction);
                                  applier.apply(changeset, logger.get());
                                  auto generated_version = transaction->commit();
                                  logger->debug("integrated local changesets as version %1", generated_version);
+                                 history.set_local_origin_timestamp_source(realm::sync::generate_changeset_timestamp);
                              }
                          },
                          [&](const ServerIdentMessage& ident_message) {

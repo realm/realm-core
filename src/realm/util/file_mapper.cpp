@@ -28,9 +28,10 @@
 #include <unistd.h>
 #endif
 
+#include <realm/exceptions.hpp>
+#include <realm/impl/simulated_failure.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/to_string.hpp>
-#include <realm/exceptions.hpp>
 #include <system_error>
 
 #if REALM_ENABLE_ENCRYPTION
@@ -44,7 +45,6 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <atomic>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <regex>
@@ -629,6 +629,7 @@ void remove_mapping(void* addr, size_t size)
 void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
            EncryptedFileMapping*& mapping)
 {
+    _impl::SimulatedFailure::trigger_mmap(size);
     if (encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
@@ -757,6 +758,7 @@ void* mmap_reserve(FileDesc fd, size_t reservation_size, size_t offset_in_file)
 
 void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
 {
+    _impl::SimulatedFailure::trigger_mmap(size);
 #if REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
         size = round_up_to_page_size(size);

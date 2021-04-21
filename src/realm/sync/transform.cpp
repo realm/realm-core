@@ -1927,6 +1927,8 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::ArrayInsert)
 DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayInsert)
 {
     if (same_container(left, right)) {
+        left.prior_size += 1;
+
         // Left insertion vs right removal
         if (right.index() > left.index()) {
             right.index() -= 1; // --->
@@ -2082,6 +2084,8 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
+
+        right.prior_size -= 1;
 
         if (left.index() == right.index()) {
             // CONFLICT: Removal of a moved element.

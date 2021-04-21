@@ -112,7 +112,7 @@ private:
     RealmCoordinator& m_parent;
 
     // The listener thread
-    std::future<void> m_thread;
+    std::thread m_thread;
 
     struct SharedPart {
         util::InterprocessCondVar::SharedPart cv;
@@ -130,6 +130,7 @@ private:
     util::InterprocessCondVar m_commit_available;
     util::InterprocessMutex m_mutex;
     bool m_keep_listening = true;
+    int64_t m_last_count;
 };
 
 } // namespace _impl

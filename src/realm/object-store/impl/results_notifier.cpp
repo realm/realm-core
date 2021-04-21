@@ -102,27 +102,6 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     return m_query->get_table() && has_run() && have_callbacks();
 }
 
-bool ResultsNotifier::need_to_run()
-{
-    REALM_ASSERT(m_info);
-
-    {
-        auto lock = lock_target();
-        // Don't run the query if the results aren't actually going to be used
-        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
-            return false;
-    }
-
-    // If we've run previously, check if we need to rerun
-    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
-        // Does m_last_seen_version match m_related_tables
-        if (all_related_tables_covered(m_last_seen_version)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void ResultsNotifier::calculate_changes()
 {
     if (has_run() && have_callbacks()) {
@@ -156,6 +135,8 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
+    REALM_ASSERT(m_info);
+
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()) {
         m_change = {};
@@ -164,14 +145,37 @@ void ResultsNotifier::run()
         return;
     }
 
-    if (!need_to_run())
+    {
+        auto lock = lock_target();
+        // Don't run the query if the results aren't actually going to be used
+        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
+            return;
+    }
+
+    auto new_versions = m_query->sync_view_if_needed();
+    m_descriptor_ordering.collect_dependencies(m_query->get_table().unchecked_ptr());
+    m_descriptor_ordering.get_versions(m_query->get_table()->get_parent_group(), new_versions);
+    if (has_run() && new_versions == m_last_seen_version) {
+        // We've run previously and none of the tables involved in the query
+        // changed so we don't need to rerun the query, but we still need to
+        // check each object in the results to see if it was modified
+        if (!any_related_table_was_modified(*m_info))
+            return;
+        REALM_ASSERT(m_change.empty());
+        auto checker = get_modification_checker(*m_info, m_query->get_table());
+        for (size_t i = 0; i < m_previous_rows.size(); ++i) {
+            if (checker(m_previous_rows[i])) {
+                m_change.modifications.add(i);
+            }
+        }
         return;
+    }
 
     m_query->sync_view_if_needed();
     m_run_tv = m_query->find_all();
     m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
     m_run_tv.sync_if_needed();
-    m_last_seen_version = m_run_tv.ObjList::get_dependency_versions();
+    m_last_seen_version = std::move(new_versions);
 
     calculate_changes();
 }
@@ -306,7 +310,7 @@ void ListResultsNotifier::calculate_changes()
         }
 
         m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](int64_t key) {
-            return m_change.modifications_new.contains(static_cast<size_t>(key));
+            return m_change.modifications.contains(static_cast<size_t>(key));
         });
     }
 

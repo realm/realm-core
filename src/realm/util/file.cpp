@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <fcntl.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -34,10 +35,10 @@
 #include <direct.h>
 #else
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
+#include <sys/statvfs.h>
 #endif
 
 #include <realm/exceptions.hpp>
@@ -129,6 +130,56 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
     }
     return true;
 }
+
+#ifdef _WIN32
+
+std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
+{
+    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
+    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
+
+    // Construct a 64 bit value that is the number of nanoseconds from the
+    // Windows epoch which is 1601-01-01 00:00:00 UTC
+    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
+    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
+
+    // FILETIME is 100's of nanoseconds since Windows epoch
+    totalMicros /= 10;
+    // Move it from micros since the Windows epoch to micros since the Unix epoch
+    totalMicros -= kEpochDifferenceMicros;
+
+    std::chrono::duration<uint64_t, std::micro> totalMicrosDur(totalMicros);
+    return std::chrono::system_clock::time_point(totalMicrosDur);
+}
+
+struct WindowsFileHandleHolder {
+    WindowsFileHandleHolder() = default;
+    explicit WindowsFileHandleHolder(HANDLE h)
+        : handle(h)
+    {
+    }
+
+    WindowsFileHandleHolder(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder(const WindowsFileHandleHolder&) = delete;
+    WindowsFileHandleHolder& operator=(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder& operator=(const WindowsFileHandleHolder&) = delete;
+
+    operator HANDLE() const noexcept
+    {
+        return handle;
+    }
+
+    ~WindowsFileHandleHolder()
+    {
+        if (handle != INVALID_HANDLE_VALUE) {
+            ::CloseHandle(handle);
+        }
+    }
+
+    HANDLE handle = INVALID_HANDLE_VALUE;
+};
+
+#endif
 
 } // anonymous namespace
 
@@ -606,6 +657,12 @@ uint64_t File::get_file_pos(FileDesc fd)
     }
     return uint64_t(pos);
 #endif
+}
+
+File::SizeType File::get_size_static(const std::string& path)
+{
+    File f(path);
+    return f.get_size();
 }
 
 File::SizeType File::get_size_static(FileDesc fd)
@@ -1227,7 +1284,7 @@ void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileM
 #endif
 }
 
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
 
 void File::unmap(void* addr, size_t size) noexcept
 {
@@ -1610,7 +1667,58 @@ void File::MapBase::sync()
     File::sync_map(m_fd, m_addr, m_size);
 }
 
+std::time_t File::last_write_time(const std::string& path)
+{
+#ifdef _WIN32
+    auto wpath = string_to_wstring(path);
+    WindowsFileHandleHolder fileHandle(::CreateFile2(wpath.c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                     OPEN_EXISTING, nullptr));
 
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
+    }
+
+    FILETIME mtime = {0};
+    if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileTime failed");
+    }
+
+    auto tp = file_time_to_system_clock(mtime);
+    return std::chrono::system_clock::to_time_t(tp);
+#else
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) != 0) {
+        throw std::system_error(errno, std::system_category(), "stat() failed");
+    }
+    return statbuf.st_mtime;
+#endif
+}
+
+File::SizeType File::get_free_space(const std::string& path)
+{
+#ifdef _WIN32
+    auto pos = path.find_last_of("/\\");
+    std::string dir_path;
+    if (pos != std::string::npos) {
+        dir_path = path.substr(0, pos);
+    }
+    else {
+        dir_path = path;
+    }
+    ULARGE_INTEGER available;
+    if (!GetDiskFreeSpaceExA(dir_path.c_str(), &available, NULL, NULL)) {
+        throw std::system_error(errno, std::system_category(), "GetDiskFreeSpaceExA failed");
+    }
+    return available.QuadPart;
+#else
+    struct statvfs stat;
+    if (statvfs(path.c_str(), &stat) != 0) {
+        throw std::system_error(errno, std::system_category(), "statvfs() failed");
+    }
+    return SizeType(stat.f_bavail) * stat.f_bsize;
+#endif
+}
 
 #ifndef _WIN32
 
