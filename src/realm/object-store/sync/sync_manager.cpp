@@ -450,17 +450,13 @@ SyncManager::~SyncManager()
 {
     std::vector<std::shared_ptr<SyncSession>> current_sessions;
 
-    {
-        // We need to release the session lock and copy the sessions to another
-        // collection because the mutex will be acquited and m_sessions will be
-        // manipulated in unregister_session
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-
-        for (auto& session : m_sessions) {
-            current_sessions.push_back(session.second);
-        }
+    for (auto& session : m_sessions) {
+        current_sessions.push_back(session.second);
     }
 
+    // We're copying the keys to another vector and iterating over that because
+    // session->shutdown_and_wait will call unregister_session which will
+    // modify the m_sessions collection.
     for (auto& session : current_sessions) {
         session->shutdown_and_wait();
     }
