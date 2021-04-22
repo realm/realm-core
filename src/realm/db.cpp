@@ -766,7 +766,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         cfg.no_create = true;
         cfg.encryption_key = options.encryption_key;
         auto top_ref = alloc.attach_file(path, cfg);
+        SlabAlloc::DetachGuard dg(alloc);
+        Group::read_only_version_check(alloc, top_ref, path);
         m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, m_alloc.get_baseline());
+        dg.release();
         return;
     }
     m_coordination_dir = path + ".management";
