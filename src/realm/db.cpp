@@ -1686,8 +1686,7 @@ void DB::wait_for_change_release()
 
 void DB::enable_wait_for_change()
 {
-    if (m_fake_read_lock_if_immutable)
-        return;
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
