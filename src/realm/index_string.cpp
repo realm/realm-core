@@ -60,23 +60,6 @@ Mixed ClusterColumn::get_value(ObjKey key) const
     return obj.get_any(m_column_key);
 }
 
-namespace realm {
-StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringConversionBuffer& buffer)
-{
-    if (dt.is_null())
-        return null{};
-
-    int64_t s = dt.get_seconds();
-    int32_t ns = dt.get_nanoseconds();
-    constexpr size_t index_size = sizeof(s) + sizeof(ns);
-    static_assert(index_size <= string_conversion_buffer_size, "Index string conversion buffer too small");
-    const char* s_buf = reinterpret_cast<const char*>(&s);
-    const char* ns_buf = reinterpret_cast<const char*>(&ns);
-    realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
-    realm::safe_copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
-    return StringData{buffer.data(), index_size};
-}
-
 template <>
 int64_t IndexArray::from_list<index_FindFirst>(Mixed value, InternalFindResult& /* result_ref */,
                                                const IntegerColumn& key_values, const ClusterColumn& column) const
@@ -593,9 +576,6 @@ void IndexArray::index_string_all(Mixed value, std::vector<ObjKey>& result, cons
         key = StringIndex::create_key(index_data, stringoffset);
     }
 }
-
-
-} // namespace realm
 
 ObjKey IndexArray::index_string_find_first(Mixed value, const ClusterColumn& column) const
 {

@@ -24,7 +24,6 @@
 #include <realm/table.hpp>
 #include <realm/query_value.hpp>
 #include <realm/util/serializer.hpp>
-#include <realm/index_string.hpp>
 
 namespace realm {
 
@@ -511,12 +510,16 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
         return {};
     }
     switch (get_type()) {
-        case type_Int:
-            return GetIndexData<int64_t>::get_index_data(get_int(), buffer);
-        case type_Bool:
-            buffer[0] = get_bool() ? '\1' : '\0';
-            buffer[1] = 0xb;
-            return {buffer.data(), 2};
+        case type_Int: {
+            int64_t i = get_int();
+            const char* c = reinterpret_cast<const char*>(&i);
+            realm::safe_copy_n(c, sizeof(int64_t), buffer.data());
+            return StringData{buffer.data(), sizeof(int64_t)};
+        }
+        case type_Bool: {
+            int64_t i = get_bool() ? 1 : 0;
+            return Mixed(i).get_index_data(buffer);
+        }
         case type_Float: {
             auto v2 = get_float();
             const char* src = reinterpret_cast<const char*>(&v2);
@@ -527,7 +530,7 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
             auto v2 = get_double();
             int i = int(v2);
             if (i == v2) {
-                return GetIndexData<int64_t>::get_index_data(i, buffer);
+                return Mixed(i).get_index_data(buffer);
             }
             const char* src = reinterpret_cast<const char*>(&v2);
             realm::safe_copy_n(src, sizeof(double), buffer.data());
@@ -539,22 +542,38 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
             auto bin = get_binary();
             return {bin.data(), bin.size()};
         }
-        case type_Timestamp:
-            return GetIndexData<Timestamp>::get_index_data(get<Timestamp>(), buffer);
-        case type_ObjectId:
-            return GetIndexData<ObjectId>::get_index_data(get<ObjectId>(), buffer);
+        case type_Timestamp: {
+            auto dt = get<Timestamp>();
+            int64_t s = dt.get_seconds();
+            int32_t ns = dt.get_nanoseconds();
+            constexpr size_t index_size = sizeof(s) + sizeof(ns);
+            const char* s_buf = reinterpret_cast<const char*>(&s);
+            const char* ns_buf = reinterpret_cast<const char*>(&ns);
+            realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
+            realm::safe_copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
+            return StringData{buffer.data(), index_size};
+        }
+        case type_ObjectId: {
+            auto id = get<ObjectId>();
+            memcpy(&buffer, &id, sizeof(ObjectId));
+            return StringData{buffer.data(), sizeof(ObjectId)};
+        }
         case type_Decimal: {
             auto v2 = this->get_decimal();
             int64_t i;
             if (v2.to_int(i)) {
-                return GetIndexData<int64_t>::get_index_data(i, buffer);
+                return Mixed(i).get_index_data(buffer);
             }
             const char* src = reinterpret_cast<const char*>(&v2);
             realm::safe_copy_n(src, sizeof(v2), buffer.data());
             return StringData{buffer.data(), sizeof(v2)};
         }
-        case type_UUID:
-            return GetIndexData<UUID>::get_index_data(get<UUID>(), buffer);
+        case type_UUID: {
+            auto id = get<UUID>();
+            const auto bytes = id.to_bytes();
+            std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+            return StringData{buffer.data(), bytes.size()};
+        }
         case type_TypedLink: {
             auto link = get<ObjLink>();
             uint32_t k1 = link.get_table_key().value;
