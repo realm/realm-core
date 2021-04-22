@@ -108,6 +108,9 @@ public:
     // disabled afterwards, and currently is incompatible with automatic failover.
     void enable_session_multiplexing();
 
+    // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
+    ~SyncManager();
+
     // Sets the log level for the Sync Client.
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.

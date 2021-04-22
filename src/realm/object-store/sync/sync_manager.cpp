@@ -446,6 +446,26 @@ void SyncManager::remove_user(const std::string& user_id)
     }
 }
 
+SyncManager::~SyncManager()
+{
+    std::vector<std::shared_ptr<SyncSession>> current_sessions;
+
+    for (auto& session : m_sessions) {
+        current_sessions.push_back(session.second);
+    }
+
+    // We're copying the keys to another vector and iterating over that because
+    // session->shutdown_and_wait will call unregister_session which will
+    // modify the m_sessions collection.
+    for (auto& session : current_sessions) {
+        session->shutdown_and_wait();
+    }
+
+    // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+    if (m_sync_client)
+        m_sync_client->stop();
+}
+
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
