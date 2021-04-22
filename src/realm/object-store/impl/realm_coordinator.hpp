@@ -161,7 +161,7 @@ public:
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
-    std::shared_ptr<Group> begin_read(VersionID version = {}, bool frozen_transaction = false);
+    TransactionRef begin_read(VersionID version = {}, bool frozen_transaction = false);
 
     // Check if advance_to_ready() would actually advance the Realm's read version
     bool can_advance(Realm& realm);
@@ -209,7 +209,6 @@ private:
     Realm::Config m_config;
     std::unique_ptr<Replication> m_history;
     std::shared_ptr<DB> m_db;
-    std::shared_ptr<Group> m_read_only_group;
 
     mutable util::CheckedMutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema GUARDED_BY(m_schema_cache_mutex);

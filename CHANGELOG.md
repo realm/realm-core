@@ -13,7 +13,8 @@
 -----------
 
 ### Internals
-* None.
+* The DB class now supports opening a realm file on a write-only file system.
+  ([#4582](https://github.com/realm/realm-core/pull/4582))
 
 ----------------------------------------------
 

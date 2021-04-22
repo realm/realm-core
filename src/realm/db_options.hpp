@@ -110,6 +110,11 @@ struct DBOptions {
     /// is exceeded without being consumed, only the most recent entries will be stored.
     size_t metrics_buffer_size;
 
+    /// is_immutable should be set to true if run from a read-only file system.
+    /// this will prevent the DB from making any writes, also disabling the creation
+    /// of write transactions.
+    bool is_immutable = false;
+
     /// Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change;
 
