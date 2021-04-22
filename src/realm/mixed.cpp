@@ -56,7 +56,7 @@ inline int compare_string(StringData a, StringData b)
 {
     if (a == b)
         return 0;
-    return utf8_compare(a, b) ? -1 : 1;
+    return a < b ? -1 : 1;
 }
 
 inline int compare_binary(BinaryData a, BinaryData b)
@@ -354,6 +354,16 @@ int Mixed::compare(const Mixed& b) const
     REALM_ASSERT(_impl::sorting_rank[m_type] != _impl::sorting_rank[b.m_type]);
     // Using rank table will ensure that all numeric values comes first
     return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
+}
+
+int Mixed::compare_utf8(const Mixed& b) const
+{
+    if (is_type(type_String) && b.is_type(type_String)) {
+        auto a_val = get_string();
+        auto b_val = b.get_string();
+        return a_val == b_val ? 0 : utf8_compare(a_val, b_val) ? -1 : 1;
+    }
+    return compare(b);
 }
 
 template <class T>
