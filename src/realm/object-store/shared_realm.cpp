@@ -107,7 +107,7 @@ Transaction& Realm::transaction()
 
 Transaction& Realm::transaction() const
 {
-    // FIXME: read_group() is not even remotly const
+    // one day we should change the way we use constness
     Realm* nc_realm = const_cast<Realm*>(this);
     return nc_realm->transaction();
 }
