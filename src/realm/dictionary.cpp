@@ -641,10 +641,17 @@ void Dictionary::nullify(Mixed key)
         repl->dictionary_set(*this, ndx, key, Mixed());
     }
 
+    Array fallback(m_obj.get_alloc());
+    Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
     ArrayMixed values(m_obj.get_alloc());
-    ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
-    values.init_from_ref(ref);
+    values.set_parent(&fields, 2);
+    values.init_from_parent();
+
     values.set(state.index, Mixed());
+
+    if (fields.has_missing_parent_update()) {
+        m_clusters->update_ref_in_parent(k, fields.get_ref());
+    }
 }
 
 void Dictionary::remove_backlinks(CascadeState& state) const
@@ -653,7 +660,6 @@ void Dictionary::remove_backlinks(CascadeState& state) const
         clear_backlink(elem.second, state);
     }
 }
-
 
 void Dictionary::clear()
 {
