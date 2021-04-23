@@ -541,12 +541,11 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // NOTE: Additional future upgrade steps go here.
 }
 
-void Group::open(ref_type top_ref, const std::string& file_path)
-{
-    SlabAlloc::DetachGuard dg(m_alloc);
 
+int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path)
+{
     // Select file format if it is still undecided.
-    m_file_format_version = m_alloc.get_committed_file_format_version();
+    auto file_format_version = alloc.get_committed_file_format_version();
 
     bool file_format_ok = false;
     // It is not possible to open prior file format versions without an upgrade.
@@ -554,7 +553,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
-    switch (m_file_format_version) {
+    switch (file_format_version) {
         case 0:
             file_format_ok = (top_ref == 0);
             break;
@@ -564,7 +563,14 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", file_path);
+        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+    return file_format_version;
+}
+
+void Group::open(ref_type top_ref, const std::string& file_path)
+{
+    SlabAlloc::DetachGuard dg(m_alloc);
+    m_file_format_version = read_only_version_check(m_alloc, top_ref, file_path);
 
     Replication::HistoryType history_type = Replication::hist_None;
     int target_file_format_version = get_target_file_format_version_for_session(m_file_format_version, history_type);
