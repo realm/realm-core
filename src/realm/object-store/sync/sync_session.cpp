@@ -28,6 +28,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/util/websocket.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
@@ -504,16 +505,16 @@ void SyncSession::handle_error(SyncError error)
         }
     }
     else {
-        switch (error_code.value()) {
-            // FIXME: We need to understand what errors can actually come from the server
-            // FIXME: and why the sync client is no longer parsing them correctly. */
-            case 11:
-                user()->refresh_custom_data(handle_refresh(shared_from_this()));
+        if (error_code == util::websocket::make_error_code(util::websocket::Error::bad_response_401_unauthorized)) {
+            if (auto u = user()) {
+                u->refresh_custom_data(handle_refresh(shared_from_this()));
                 return;
-            default:
-                // Unrecognized error code.
-                error.is_unrecognized_by_client = true;
+            }
         }
+        // FIXME: We need to understand what errors can actually come from the server
+        // FIXME: and why the sync client is no longer parsing them correctly.
+        // Unrecognized error code.
+        error.is_unrecognized_by_client = true;
     }
 
     // Dont't bother invoking m_config.error_handler if the sync is inactive.
@@ -575,6 +576,25 @@ void SyncSession::create_sync_session()
     if (m_session)
         return;
 
+    REALM_ASSERT(m_config.user);
+
+
+    std::atomic<bool> received_reply = false;
+    m_config.user->refresh_access_token_if_expired([&](util::Optional<app::AppError> /*err*/) {
+        received_reply.store(true);
+    });
+
+    // FIXME: is it ok to block this thread?
+    using namespace std::chrono_literals;
+    const std::chrono::time_point<std::chrono::system_clock> max_wait_time = std::chrono::system_clock::now() + 3s;
+    while (!received_reply.load() && std::chrono::system_clock::now() < max_wait_time) {
+        millisleep(100);
+    }
+    do_create_sync_session();
+}
+
+void SyncSession::do_create_sync_session()
+{
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
     session_config.realm_identifier = m_config.partition_value;

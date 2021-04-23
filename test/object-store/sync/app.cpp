@@ -33,9 +33,11 @@
 #include "util/event_loop.hpp"
 
 #include <external/json/json.hpp>
+#include <realm/sync/access_token.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
+#include <chrono>
 #include <thread>
 
 using namespace realm;
@@ -1773,7 +1775,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 
 // MARK: - Token refresh
 
-TEST_CASE("app: token refresh", "[sync][app]") {
+TEST_CASE("app: token refresh", "[sync][app][token]") {
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
@@ -1976,7 +1978,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     // MARK: Expired Session Refresh -
-    SECTION("Expired Session Refresh") {
+    SECTION("Invalid Access Token is Refreshed") {
         TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
             auto app = get_app_and_login(sync_manager.app());
@@ -2013,7 +2015,73 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         {
             auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
-            app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
+            // the expiry is valid so that the pre check doesn't trigger a refresh first
+            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+            using namespace std::chrono_literals;
+            int64_t expires = std::chrono::system_clock::to_time_t(now + 30min);
+            app->current_user()->update_access_token(encode_fake_jwt("fake_access_token", expires));
+
+            auto config = setup_and_get_config(app);
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            Results dogs = get_dogs(r, session);
+            REQUIRE(dogs.size() == 1);
+            REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+            REQUIRE(dogs.get(0).get<String>("name") == "fido");
+            REQUIRE(dogs.get(0).get<String>("realm_id") == "foo");
+        }
+    }
+
+    SECTION("Expired Access Token is Refreshed") {
+        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
+        realm::sync::AccessToken token;
+        realm::sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
+        {
+            auto app = get_app_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+            // clear state from previous runs
+            {
+                Results dogs = get_dogs(r, session);
+                r->begin_transaction();
+                dogs.clear();
+                r->commit_transaction();
+            }
+
+            REQUIRE(get_dogs(r, session).size() == 0);
+            r->begin_transaction();
+            CppContext c;
+            Object::create(c, r, "Dog",
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                    {"breed", std::string("bulldog")},
+                                                    {"name", std::string("fido")},
+                                                    {"realm_id", std::string("foo")}}),
+                           CreatePolicy::ForceCreate);
+            r->commit_transaction();
+
+            REQUIRE(get_dogs(r, session).size() == 1);
+            realm::sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
+            REQUIRE(error_state == realm::sync::AccessToken::ParseError::none);
+            REQUIRE(token.timestamp);
+            REQUIRE(token.expires);
+            REQUIRE(token.timestamp < token.expires);
+            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+            using namespace std::chrono_literals;
+            token.expires = std::chrono::system_clock::to_time_t(now - 30ms);
+            REQUIRE(token.expired(now));
+        }
+
+        delete &sync_manager;
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
+        {
+            auto app = get_app_and_login(reinit.app());
+            // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+            app->current_user()->update_access_token(
+                encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
 
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);

@@ -342,6 +342,7 @@ private:
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
+    void do_create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
 

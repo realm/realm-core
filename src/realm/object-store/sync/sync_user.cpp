@@ -67,8 +67,8 @@ RealmJWT::RealmJWT(std::string&& token)
     auto json_str = base64_decode(parts[1]);
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
-    this->expires_at = long(static_cast<int64_t>(json["exp"]));
-    this->issued_at = long(static_cast<int64_t>(json["iat"]));
+    this->expires_at = static_cast<int64_t>(json["exp"]);
+    this->issued_at = static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
         this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
@@ -431,6 +431,20 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
                                        "App has been deallocated"));
     }
 }
+
+void SyncUser::refresh_access_token_if_expired(std::function<void(util::Optional<app::AppError>)> completion_block)
+{
+    using namespace std::chrono;
+    constexpr size_t buffer_seconds = 5; // arbitrary
+    auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
+    if (is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold)) {
+        refresh_custom_data(std::move(completion_block));
+    }
+    else {
+        completion_block({});
+    }
+}
+
 } // namespace realm
 
 namespace std {
