@@ -1016,3 +1016,29 @@ TEST_CASE("dictionary comparison different realm", "[dictionary]") {
     object_store::Dictionary dict2(obj2, prop2);
     REQUIRE(dict1 != dict2);
 }
+
+TEST_CASE("dictionary snapshot null", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target", {{"id", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+    auto obj = Object::create(ctx, r, *r->schema().find("object"), Any{AnyDict{{"value", AnyDict{{"val", Any()}}}}});
+    auto prop = r->schema().find("object")->property_for_name("value");
+    r->commit_transaction();
+
+    r->read_group().to_json(std::cout);
+
+    object_store::Dictionary dict(obj, prop);
+    auto values = dict.get_values();
+    auto size1 = values.size();
+
+    auto snapshot = values.snapshot();
+    auto size2 = snapshot.size();
+    REQUIRE(size1 == size2);
+}

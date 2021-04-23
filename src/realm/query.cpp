@@ -1469,12 +1469,14 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
 
     init();
 
+    bool has_cond = has_conditions();
+
     if (m_view) {
         if (end == size_t(-1))
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
             const Obj obj = m_view->try_get_object(t);
-            if (obj && eval_object(obj)) {
+            if (!has_cond || (obj && eval_object(obj))) {
                 ret.m_key_values.add(obj.get_key());
             }
         }
@@ -1482,7 +1484,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     else {
         if (end == size_t(-1))
             end = m_table->size();
-        if (!has_conditions()) {
+        if (!has_cond) {
             KeyColumn& refs = ret.m_key_values;
 
             auto f = [&begin, &end, &limit, &refs](const Cluster* cluster) {

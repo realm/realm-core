@@ -7,6 +7,7 @@
 * Added the names requested by .NET to match mixed type based querying. ([#4353](https://github.com/realm/realm-core/issues/4353))
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Comparing dictionaries from different realms could sometimes return equality ([#4629](https://github.com/realm/realm-core/issues/4629), since v11.0.0-beta.0)
+* Calling Results::snapshot on dictionary values collection containing null returns incorrect results ([#4635](https://github.com/realm/realm-core/issues/4635), Not in any release)
  
 ### Breaking changes
 * None.
