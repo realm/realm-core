@@ -986,6 +986,33 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
     }
 }
 
+TEST_CASE("dictionary nullify", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "IntObject"},
+         }},
+        {"IntObject", {{"intCol", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+    auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                              Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(0)}})},
+                                                                    {"1", Any(AnyDict{{"intCol", INT64_C(1)}})},
+                                                                    {"2", Any(AnyDict{{"intCol", INT64_C(2)}})}}}}});
+    r->commit_transaction();
+
+    r->begin_transaction();
+    // Before fix, we would crash here
+    r->read_group().get_table("class_IntObject")->clear();
+    r->commit_transaction();
+    // r->read_group().to_json(std::cout);
+}
+
 TEST_CASE("dictionary comparison different realm", "[dictionary]") {
     TestFile config1;
     TestFile config2;
