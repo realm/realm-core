@@ -3219,6 +3219,47 @@ TEST(Parser_BacklinkCount)
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.@max.item_id == 1", -1));
 }
 
+TEST(Parser_BacklinksIndex)
+{
+    Group g;
+
+    TableRef items = g.add_table("items");
+    auto col_id = items->add_column(type_Int, "item_id");
+
+    std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
+    ObjKeys item_keys(item_ids);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        items->create_object(item_keys[i]).set(col_id, item_ids[i]);
+    }
+
+    auto person = g.add_table("person");
+    auto col_age = person->add_column(type_Int, "age");
+    person->add_search_index(col_age);
+    auto col_link = person->add_column_list(*items, "owns");
+    auto col_set = person->add_column_set(*items, "wish");
+    auto col_dict = person->add_column_dictionary(*items, "borrowed");
+
+    auto paul = person->create_object().set(col_age, 48);
+    auto list = paul.get_linklist(col_link);
+    list.add(item_keys[0]);
+    list.add(item_keys[1]);
+    auto set = paul.get_linkset(col_set);
+    set.insert(item_keys[2]);
+    set.insert(item_keys[3]);
+
+    auto peter = person->create_object().set(col_age, 25);
+    list = peter.get_linklist(col_link);
+    list.add(item_keys[0]);
+    list.add(item_keys[4]);
+    auto dict = peter.get_dictionary(col_dict);
+    dict.insert("Mary", Mixed(item_keys[3]));
+    dict.insert("Paul", Mixed());
+
+    verify_query(test_context, items, "@links.person.owns.age == 48", 2);
+    verify_query(test_context, items, "@links.person.wish.age == 48", 2);
+    verify_query(test_context, items, "@links.person.borrowed.age == 25", 1);
+}
+
 
 TEST(Parser_SubqueryVariableNames)
 {
@@ -4785,6 +4826,39 @@ TEST(Parser_SetMixed)
     verify_query(test_context, table, "set CONTAINS 'r'", 1);
     verify_query(test_context, table, "set.length == 5", 2);
     verify_query(test_context, table, "set.length == 3", 1);
+}
+
+TEST(Parser_SetLinks)
+{
+    Group g;
+    auto origin = g.add_table("origin");
+    auto table = g.add_table("foo");
+    auto target = g.add_table("bar");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_set = table->add_column_set(*target, "set");
+    auto col_int = target->add_column(type_Int, "val");
+
+    ObjKeys target_keys;
+    for (int64_t i = 0; i < 10; i++) {
+        target_keys.push_back(target->create_object().set(col_int, i).get_key());
+    }
+    auto set = table->create_object().get_linkset(col_set);
+    for (size_t i = 0; i < 6; i++) {
+        set.insert(target_keys[i]);
+    }
+    origin->create_object().set(col_link, set.get_obj().get_key());
+    set = table->create_object().get_linkset(col_set);
+    for (size_t i = 4; i < 10; i++) {
+        set.insert(target_keys[i]);
+    }
+    origin->create_object().set(col_link, set.get_obj().get_key());
+
+    // g.to_json(std::cout);
+
+    verify_query(test_context, table, "set.@count == 6", 2);
+
+    verify_query(test_context, origin, "link.set.val == 3", 1);
+    verify_query(test_context, origin, "link.set.val == 5", 2);
 }
 
 namespace {
