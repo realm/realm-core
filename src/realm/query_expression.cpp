@@ -97,6 +97,20 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
                 }
             });
         }
+        else if (column_key.is_set()) {
+            auto linkset = obj.get_linkset(column_key);
+            size_t sz = linkset.size();
+            for (size_t t = 0; t < sz; t++) {
+                ObjKey k = linkset.get(t);
+                if (!k.is_unresolved()) {
+                    if (last) {
+                        lm.consume(k);
+                    }
+                    else
+                        map_links(column + 1, k, lm);
+                }
+            }
+        }
         else if (ObjKey k = obj.get<ObjKey>(column_key)) {
             if (!k.is_unresolved()) {
                 if (last)
