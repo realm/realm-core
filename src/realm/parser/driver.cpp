@@ -1447,7 +1447,7 @@ Subexpr* LinkChain::column(const std::string& col)
                 return create_subexpr<Set<ObjectId>>(col_key);
             case col_type_Mixed:
                 return create_subexpr<Set<Mixed>>(col_key);
-            case col_type_LinkList:
+            case col_type_Link:
                 add(col_key);
                 return create_subexpr<Link>(col_key);
             default:
