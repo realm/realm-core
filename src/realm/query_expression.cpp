@@ -221,21 +221,20 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     auto link_type = m_link_types[column];
     if (link_type == col_type_BackLink) {
         auto link_table = origin->get_opposite_table(origin_col);
-        ColKey link_col_ndx = origin->get_opposite_column(origin_col);
-        auto forward_type = link_table->get_column_type(link_col_ndx);
+        ColKey link_col_key = origin->get_opposite_column(origin_col);
 
         for (auto k : keys) {
             const Obj o = link_table.unchecked_ptr()->get_object(k);
-            if (forward_type == type_Link) {
-                ret.push_back(o.get<ObjKey>(link_col_ndx));
-            }
-            else {
-                REALM_ASSERT(forward_type == type_LinkList);
-                auto ll = o.get_linklist(link_col_ndx);
-                auto sz = ll.size();
+            if (link_col_key.is_collection()) {
+                auto coll = o.get_linkcollection_ptr(link_col_key);
+                auto sz = coll->size();
                 for (size_t i = 0; i < sz; i++) {
-                    ret.push_back(ll.get(i));
+                    if (ObjKey x = coll->get_key(i))
+                        ret.push_back(x);
                 }
+            }
+            else if (link_col_key.get_type() == col_type_Link) {
+                ret.push_back(o.get<ObjKey>(link_col_key));
             }
         }
     }
