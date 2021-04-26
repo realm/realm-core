@@ -279,13 +279,6 @@ public:
     /// file will be unencrypted. Any other value will change the encryption of
     /// the file to the new 64 byte key.
     ///
-    /// FIXME: This function is not yet implemented in an exception-safe manner,
-    /// therefore, if it throws, the application should not attempt to
-    /// continue. If may not even be safe to destroy the DB object.
-    ///
-    /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
-    /// because it's not crash safe! It may corrupt your database if something fails
-    ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
 
@@ -924,7 +917,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 
-    // FIXME: We are currently creating two transaction log parsers, one here,
+    // Possible optimization: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
     // expensive.
     _impl::SimpleInputStream in(uncommitted_changes.data(), uncommitted_changes.size());
