@@ -438,8 +438,8 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-    //    FIXME: Enable once we get clang warning flags correct
-    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    int64_t res = static_cast<int64_t>(value);
+    REALM_ASSERT_DEBUG(res >= 0);
     return static_cast<int64_t>(value);
 }
 

@@ -192,7 +192,8 @@ MemRef SlabAlloc::do_alloc(size_t size)
 {
     CriticalSection cs(changes);
     REALM_ASSERT_EX(0 < size, size, get_file_path_for_assertions());
-    REALM_ASSERT_EX((size & 0x7) == 0, size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
+    REALM_ASSERT_EX((size & 0x7) == 0, size,
+                    get_file_path_for_assertions()); // only allow sizes that are multiples of 8
     REALM_ASSERT_EX(is_attached(), get_file_path_for_assertions());
     // This limits the size of any array to ensure it can fit within a memory section.
     // NOTE: This limit is lower than the limit set by the encoding in node_header.hpp
@@ -513,7 +514,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
 
     // Mutable memory cannot be freed unless it has first been allocated, and
     // any allocation puts free space tracking into the "dirty" state.
-    REALM_ASSERT_EX(read_only || m_free_space_state == free_space_Dirty, read_only, m_free_space_state, free_space_Dirty, get_file_path_for_assertions());
+    REALM_ASSERT_EX(read_only || m_free_space_state == free_space_Dirty, read_only, m_free_space_state,
+                    free_space_Dirty, get_file_path_for_assertions());
 
     m_free_space_state = free_space_Dirty;
 
@@ -524,9 +526,10 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
             REALM_ASSERT_RELEASE_EX(!(ref & 7), ref, get_file_path_for_assertions());
             auto next = m_free_read_only.lower_bound(ref);
             if (next != m_free_read_only.end()) {
-                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second, get_file_path_for_assertions());
+                REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second,
+                                        get_file_path_for_assertions());
                 // See if element can be combined with next element
-                if (ref + size == next->first) { 
+                if (ref + size == next->first) {
                     // if so, combine to include next element and remove that from collection
                     size += next->second;
                     next = m_free_read_only.erase(next);
@@ -537,7 +540,8 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
                 auto prev = next;
                 prev--;
 
-                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second, get_file_path_for_assertions());
+                REALM_ASSERT_RELEASE_EX(prev->first + prev->second <= ref, ref, size, prev->first, prev->second,
+                                        get_file_path_for_assertions());
                 // See if element can be combined with previous element
                 // We can do that just by adding the size
                 if (prev->first + prev->second == ref) {
@@ -602,9 +606,11 @@ MemRef SlabAlloc::do_realloc(size_t ref, char* addr, size_t old_size, size_t new
 {
     REALM_ASSERT_DEBUG(translate(ref) == addr);
     REALM_ASSERT_EX(0 < new_size, new_size, get_file_path_for_assertions());
-    REALM_ASSERT_EX((new_size & 0x7) == 0, new_size, get_file_path_for_assertions()); // only allow sizes that are multiples of 8
+    REALM_ASSERT_EX((new_size & 0x7) == 0, new_size,
+                    get_file_path_for_assertions()); // only allow sizes that are multiples of 8
 
-    // FIXME: Check if we can extend current space. In that case, remember to
+    // Possible future enhancement: check if we can extend current space instead
+    // of unconditionally allocating new space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
     // fill with zero if REALM_ENABLE_ALLOC_SET_ZERO is non-zero.
 
@@ -693,9 +699,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // DB, and in that case 'read_only' can never be true.
     REALM_ASSERT_EX(!(cfg.is_shared && cfg.read_only), cfg.is_shared, cfg.read_only, get_file_path_for_assertions());
     // session_initiator can be set *only* if we're shared.
-    REALM_ASSERT_EX(cfg.is_shared || !cfg.session_initiator, cfg.is_shared, cfg.session_initiator, get_file_path_for_assertions());
+    REALM_ASSERT_EX(cfg.is_shared || !cfg.session_initiator, cfg.is_shared, cfg.session_initiator,
+                    get_file_path_for_assertions());
     // clear_file can be set *only* if we're the first session.
-    REALM_ASSERT_EX(cfg.session_initiator || !cfg.clear_file, cfg.session_initiator, cfg.clear_file, get_file_path_for_assertions());
+    REALM_ASSERT_EX(cfg.session_initiator || !cfg.clear_file, cfg.session_initiator, cfg.clear_file,
+                    get_file_path_for_assertions());
 
     // Create a deep copy of the file_path string, otherwise it can appear that
     // users are leaking paths because string assignment operator implementations might
@@ -725,18 +733,6 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // been created with encryption
         throw std::runtime_error("Attempt to open unencrypted file with encryption key");
     }
-    // FIXME: This initialization procedure does not provide sufficient
-    // robustness given that processes may be abruptly terminated at any point
-    // in time. In unshared mode, we must be able to reliably detect any invalid
-    // file as long as its invalidity is due to a terminated serialization
-    // process (e.g. due to a power failure). In shared mode we can guarantee
-    // that if the database file was ever valid, then it will remain valid,
-    // however, there is no way we can ensure that initialization of an empty
-    // database file succeeds. Thus, in shared mode we must be able to reliably
-    // distiguish between three cases when opening a database file: A) It was
-    // never properly initialized. In this case we should simply reinitialize
-    // it. B) It looks corrupt. In this case we throw an exception. C) It looks
-    // good. In this case we proceede as normal.
     if (size == 0 || cfg.clear_file) {
         if (REALM_UNLIKELY(cfg.read_only))
             throw InvalidDatabase("Read-only access to empty Realm file", path);
@@ -825,11 +821,13 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         throw InvalidDatabase("Realm file initial open failed: unknown error", path);
     }
     m_baseline = 0;
-    auto handler = [this]() noexcept { note_reader_end(this); };
+    auto handler = [this]() noexcept {
+        note_reader_end(this);
+    };
     auto reader_end_guard = make_scope_exit(handler);
     // make sure that any call to begin_read cause any slab to be placed in free
     // lists correctly
-    m_free_space_state = free_space_Invalid; // Odd! FIXME
+    m_free_space_state = free_space_Invalid;
 
     // Ensure clean up, if we need to back out:
     DetachGuard dg(*this);
@@ -910,7 +908,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
     REALM_ASSERT_EX(size <= (1UL << section_shift), get_file_path_for_assertions());
 
     // Verify the data structures
-    std::string path; // No path
+    std::string path;                                     // No path
     ref_type top_ref = validate_header(data, size, path); // Throws
 
     m_data = data;
@@ -1421,7 +1419,7 @@ bool SlabAlloc::is_all_free() const
 // LCOV_EXCL_START
 void SlabAlloc::print() const
 {
-    /* FIXME
+    /* TODO
      *
 
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
