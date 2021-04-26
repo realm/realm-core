@@ -2071,6 +2071,21 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
     return {};
 }
 
+LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return get_linklist_ptr(col_key);
+    }
+    else if (col_key.is_set()) {
+        return get_linkset_ptr(col_key);
+    }
+    else if (col_key.is_dictionary()) {
+        auto dict = get_dictionary(col_key);
+        return std::make_unique<DictionaryLinkValues>(dict);
+    }
+    return {};
+}
+
 void Obj::assign_pk_and_backlinks(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());

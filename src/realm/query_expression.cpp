@@ -79,56 +79,25 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
     const Obj obj = m_tables[column]->get_object(key);
-    if (type == col_type_Link) {
-        if (column_key.is_dictionary()) {
-            auto dict = obj.get_dictionary(column_key);
-            // Insert all values
-            dict.for_all_values([&](const Mixed& value) {
-                if (value.is_type(type_TypedLink)) {
-                    auto link = value.get_link();
-                    REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
-                    auto k = link.get_obj_key();
-                    if (!k.is_unresolved()) {
-                        if (last)
-                            lm.consume(k);
-                        else
-                            map_links(column + 1, k, lm);
-                    }
-                }
-            });
-        }
-        else if (column_key.is_set()) {
-            auto linkset = obj.get_linkset(column_key);
-            size_t sz = linkset.size();
-            for (size_t t = 0; t < sz; t++) {
-                ObjKey k = linkset.get(t);
-                if (!k.is_unresolved()) {
-                    if (last) {
-                        lm.consume(k);
-                    }
-                    else
-                        map_links(column + 1, k, lm);
-                }
-            }
-        }
-        else if (ObjKey k = obj.get<ObjKey>(column_key)) {
-            if (!k.is_unresolved()) {
-                if (last)
+    if (column_key.is_collection()) {
+        auto coll = obj.get_linkcollection_ptr(column_key);
+        size_t sz = coll->size();
+        for (size_t t = 0; t < sz; t++) {
+            if (ObjKey k = coll->get_key(t)) {
+                // Unresolved links are filtered out
+                if (last) {
                     lm.consume(k);
+                }
                 else
                     map_links(column + 1, k, lm);
             }
         }
     }
-    else if (type == col_type_LinkList) {
-        auto linklist = obj.get_list<ObjKey>(column_key);
-        size_t sz = linklist.size();
-        for (size_t t = 0; t < sz; t++) {
-            ObjKey k = linklist.get(t);
+    else if (type == col_type_Link) {
+        if (ObjKey k = obj.get<ObjKey>(column_key)) {
             if (!k.is_unresolved()) {
-                if (last) {
+                if (last)
                     lm.consume(k);
-                }
                 else
                     map_links(column + 1, k, lm);
             }
