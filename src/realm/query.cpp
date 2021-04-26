@@ -970,7 +970,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 bool Query::eval_object(const Obj& obj) const
 {
     if (has_conditions())
-        return root_node()->match(obj);
+        return obj && root_node()->match(obj);
 
     // Query has no conditions, so all rows match, also the user given argument
     return true;
@@ -1433,7 +1433,7 @@ ObjKey Query::find()
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
             const Obj obj = m_view->try_get_object(i);
-            if (obj && eval_object(obj)) {
+            if (eval_object(obj)) {
                 return obj.get_key();
             }
         }
@@ -1476,7 +1476,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
             const Obj obj = m_view->try_get_object(t);
-            if (!has_cond || (obj && eval_object(obj))) {
+            if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
         }

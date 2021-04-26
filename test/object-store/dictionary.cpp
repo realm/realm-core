@@ -1032,7 +1032,7 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     auto prop = r->schema().find("object")->property_for_name("value");
     r->commit_transaction();
 
-    r->read_group().to_json(std::cout);
+    // r->read_group().to_json(std::cout);
 
     object_store::Dictionary dict(obj, prop);
     auto values = dict.get_values();
