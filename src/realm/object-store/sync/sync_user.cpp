@@ -437,10 +437,7 @@ bool SyncUser::access_token_refresh_required() const
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
     auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
-    if (is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold)) {
-        return true;
-    }
-    return false;
+    return is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
 }
 
 } // namespace realm
