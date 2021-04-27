@@ -17,14 +17,14 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/util/to_string.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <atomic>
 #include <dispatch/dispatch.h>
 #include <objc/runtime.h>
 #include <pthread.h>
 
-namespace {
-using namespace realm;
+namespace realm::util {
 
 class RunLoopScheduler : public util::Scheduler {
 public:
@@ -204,23 +204,4 @@ bool DispatchQueueScheduler::is_same_as(const Scheduler* other) const noexcept
     return (o && (o->m_queue == m_queue));
 }
 
-} // anonymous namespace
-
-namespace realm {
-namespace util {
-std::shared_ptr<Scheduler> Scheduler::make_default()
-{
-    return std::make_shared<RunLoopScheduler>();
-}
-
-std::shared_ptr<Scheduler> Scheduler::make_runloop(CFRunLoopRef run_loop)
-{
-    return std::make_shared<RunLoopScheduler>(run_loop ?: CFRunLoopGetCurrent());
-}
-
-std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)
-{
-    return std::make_shared<DispatchQueueScheduler>(static_cast<dispatch_queue_t>(queue));
-}
-} // namespace util
-} // namespace realm
+} // namespace realm::util
