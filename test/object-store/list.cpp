@@ -788,16 +788,16 @@ TEST_CASE("list") {
         }
 
         SECTION("all callbacks have filters") {
-            auto require_change = [&] {
-                auto token = list.add_notification_callback(
-                    [&](CollectionChangeSet c, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
-                        collection_change_set_with_filter_on_target_value = c;
-                    },
-                    key_path_array_target_value);
-                advance_and_notify(*r);
-                return token;
-            };
+            // auto require_change = [&] {
+            //     auto token = list.add_notification_callback(
+            //         [&](CollectionChangeSet c, std::exception_ptr error) {
+            //             REQUIRE_FALSE(error);
+            //             collection_change_set_with_filter_on_target_value = c;
+            //         },
+            //         key_path_array_target_value);
+            //     advance_and_notify(*r);
+            //     return token;
+            // };
 
             auto require_no_change = [&] {
                 bool first = true;
@@ -812,15 +812,15 @@ TEST_CASE("list") {
                 return token;
             };
 
-            //            SECTION("-> modifying table 'target', property 'value'"
-            //                    "-> DOES send a notification") {
-            //                auto token = require_change();
-            //                write([&] {
-            //                    list.get(0).set(col_target_value, 42);
-            //                });
-            //                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
-            //                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
-            //            }
+            // SECTION("-> modifying table 'target', property 'value'"
+            //         "-> DOES send a notification") {
+            //     auto token = require_change();
+            //     write([&] {
+            //         list.get(0).set(col_target_value, 42);
+            //     });
+            //     REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
+            //     REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
+            // }
 
             SECTION("-> modifying table 'target', property 'value2'"
                     "-> does NOT send a notification") {
