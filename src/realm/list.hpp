@@ -291,6 +291,16 @@ public:
             return std::make_unique<LnkLst>();
         }
     }
+    // Overriding members of ObjList:
+    LinkCollectionPtr clone_obj_list() const
+    {
+        if (get_obj().is_valid()) {
+            return std::make_unique<LnkLst>(get_obj(), get_col_key());
+        }
+        else {
+            return std::make_unique<LnkLst>();
+        }
+    }
     void set_null(size_t ndx) final;
     void set_any(size_t ndx, Mixed val) final;
     void insert_null(size_t ndx) final;

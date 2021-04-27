@@ -2710,13 +2710,13 @@ LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
     return std::make_unique<LnkSet>();
 }
 
-CollectionBasePtr Transaction::import_copy_of(const CollectionBasePtr& original)
+LinkCollectionPtr Transaction::import_copy_of(const LinkCollectionPtr& original)
 {
     if (!original)
         return nullptr;
-    if (Obj obj = import_copy_of(original->get_obj())) {
-        ColKey ck = original->get_col_key();
-        return obj.get_collection_ptr(ck);
+    if (Obj obj = import_copy_of(original->get_owning_obj())) {
+        ColKey ck = original->get_owning_col_key();
+        return obj.get_linkcollection_ptr(ck);
     }
     // return some empty collection where size() == 0
     // the type shouldn't matter

@@ -1069,3 +1069,29 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     auto size2 = snapshot.size();
     REQUIRE(size1 == size2);
 }
+
+TEST_CASE("dictionary aggregate", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "IntObject"},
+         }},
+        {"IntObject", {{"intCol", PropertyType::Int}}},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+    auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                              Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(5)}})},
+                                                                    {"1", Any(AnyDict{{"intCol", INT64_C(3)}})},
+                                                                    {"2", Any(AnyDict{{"intCol", INT64_C(8)}})}}}}});
+    auto prop = r->schema().find("DictionaryObject")->property_for_name("intDictionary");
+    r->commit_transaction();
+    object_store::Dictionary dict(obj, prop);
+    auto res = dict.get_values();
+    auto sum = res.sum("intCol");
+    REQUIRE(*sum == 16);
+}

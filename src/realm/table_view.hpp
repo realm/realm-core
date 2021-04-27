@@ -243,6 +243,11 @@ public:
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
     }
 
+    LinkCollectionPtr clone_obj_list() const
+    {
+        return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
+    }
+
     // import_copy_of() machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.

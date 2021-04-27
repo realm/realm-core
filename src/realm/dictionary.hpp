@@ -257,6 +257,10 @@ public:
     {
         return std::make_unique<DictionaryLinkValues>(m_source);
     }
+    LinkCollectionPtr clone_obj_list() const final
+    {
+        return std::make_unique<DictionaryLinkValues>(m_source);
+    }
     void sort(std::vector<size_t>& indices, bool ascending = true) const final
     {
         m_source.sort(indices, ascending);

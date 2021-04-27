@@ -268,6 +268,11 @@ public:
     {
         return clone_linkset();
     }
+    // Overriding members of ObjList:
+    LinkCollectionPtr clone_obj_list() const final
+    {
+        return clone_linkset();
+    }
     size_t find_any(Mixed) const final;
     std::pair<size_t, bool> insert_null() final;
     std::pair<size_t, bool> erase_null() final;

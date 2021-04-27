@@ -400,6 +400,8 @@ class ObjCollectionBase : public Interface, public _impl::ObjListProxy {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
+    using Interface::get_col_key;
+    using Interface::get_obj;
     using Interface::get_table;
     using Interface::is_attached;
     using Interface::size;
@@ -533,6 +535,19 @@ private:
     TableRef proxy_get_target_table() const final
     {
         return Interface::get_target_table();
+    }
+    bool matches(const ObjList& other) const final
+    {
+        return get_owning_obj().get_key() == other.get_owning_obj().get_key() &&
+               get_owning_col_key() == other.get_owning_col_key();
+    }
+    Obj get_owning_obj() const final
+    {
+        return get_obj();
+    }
+    ColKey get_owning_col_key() const final
+    {
+        return get_col_key();
     }
 };
 
