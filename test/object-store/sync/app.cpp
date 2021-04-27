@@ -1930,8 +1930,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     // MARK: Add Objects -
     SECTION("Add Objects") {
-        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
@@ -1960,11 +1960,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         // reset sync manager, deleting local data
-        delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(reinit.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
@@ -1979,8 +1978,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     // MARK: Expired Session Refresh -
     SECTION("Invalid Access Token is Refreshed") {
-        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
@@ -2007,12 +2006,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             REQUIRE(get_dogs(r, session).size() == 1);
         }
-
-        delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
             app->current_user()->update_access_token(encode_fake_jwt("fake_access_token"));
@@ -2029,10 +2026,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("Expired Access Token is Refreshed") {
-        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         realm::sync::AccessToken token;
-        realm::sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
         {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
@@ -2058,6 +2054,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             r->commit_transaction();
 
             REQUIRE(get_dogs(r, session).size() == 1);
+            realm::sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
             realm::sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
             REQUIRE(error_state == realm::sync::AccessToken::ParseError::none);
             REQUIRE(token.timestamp);
@@ -2069,11 +2066,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(token.expired(now));
         }
 
-        delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(reinit.app());
             // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
             app->current_user()->update_access_token(
