@@ -149,13 +149,6 @@ struct ColumnTypeTraits<ObjKey> {
     static constexpr const ColumnType column_id = col_type_Link;
 };
 
-// template <>
-// struct ColumnTypeTraits<Back> {
-//    using cluster_leaf_type = ArrayKey;
-//    static constexpr const DataType id = type_Link;
-//    static constexpr const ColumnType column_id = col_type_Link;
-//};
-
 template <>
 struct ColumnTypeTraits<Mixed> {
     using cluster_leaf_type = ArrayMixed;
