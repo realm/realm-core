@@ -432,17 +432,15 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
     }
 }
 
-void SyncUser::refresh_access_token_if_expired(std::function<void(util::Optional<app::AppError>)> completion_block)
+bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
     auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
     if (is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold)) {
-        refresh_custom_data(std::move(completion_block));
+        return true;
     }
-    else {
-        completion_block({});
-    }
+    return false;
 }
 
 } // namespace realm

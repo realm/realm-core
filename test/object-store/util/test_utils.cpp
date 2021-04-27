@@ -72,6 +72,18 @@ void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string se
 
 std::string encode_fake_jwt(const std::string& in, int64_t exp, int64_t iat)
 {
+    // by default make a valid expiry time so that the sync session pre check
+    // doesn't trigger a token refresh on first open
+    using namespace std::chrono_literals;
+    if (!exp) {
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        exp = std::chrono::system_clock::to_time_t(now + 30min);
+    }
+    if (!iat) {
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        iat = std::chrono::system_clock::to_time_t(now - 1s);
+    }
+
     std::string unencoded_prefix = nlohmann::json({"alg", "HS256"}).dump();
     std::string unencoded_body =
         nlohmann::json(

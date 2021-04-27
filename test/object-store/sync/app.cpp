@@ -2015,11 +2015,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         {
             auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
-            // the expiry is valid so that the pre check doesn't trigger a refresh first
-            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-            using namespace std::chrono_literals;
-            int64_t expires = std::chrono::system_clock::to_time_t(now + 30min);
-            app->current_user()->update_access_token(encode_fake_jwt("fake_access_token", expires));
+            app->current_user()->update_access_token(encode_fake_jwt("fake_access_token"));
 
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
@@ -2069,7 +2065,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(token.timestamp < token.expires);
             std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
             using namespace std::chrono_literals;
-            token.expires = std::chrono::system_clock::to_time_t(now - 30ms);
+            token.expires = std::chrono::system_clock::to_time_t(now - 30s);
             REQUIRE(token.expired(now));
         }
 

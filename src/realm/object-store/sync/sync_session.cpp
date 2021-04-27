@@ -46,13 +46,22 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///
 /// STATES:
 ///
+/// WAITING_FOR_ACCESS_TOKEN: a request has been initiated to ask
+/// for an updated access token and the session is waiting for a response.
+/// From: ACTIVE
+/// To:
+///    * ACTIVE: when the SDK successfully refreshes the token
+///    * INACTIVE: if asked to log out, or if asked to close
+///
 /// ACTIVE: the session is connected to the Sync Server and is actively
 /// transferring data.
-/// From: INACTIVE, DYING
+/// From: INACTIVE, DYING, WAITING_FOR_ACCESS_TOKEN
 /// To:
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
 ///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
+///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
+///                              but the token is invalid or expired.
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
 /// From: ACTIVE
@@ -66,7 +75,7 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 /// owned by this session is destroyed, and the session is quiescent.
 /// Note that a session briefly enters this state before being destroyed, but
 /// it can also enter this state and stay there if the user has been logged out.
-/// From: initial, ACTIVE, DYING
+/// From: initial, ACTIVE, DYING, WAITING_FOR_ACCESS_TOKEN
 /// To:
 ///    * ACTIVE: if the session is revived
 ///
@@ -105,9 +114,13 @@ struct SyncSession::State {
     // `inactive` state after the invocation of shutdown_and_wait().
     virtual void shutdown_and_wait(std::unique_lock<std::mutex>&, SyncSession&) const {}
 
+    // The user's access token was refreshed.
+    virtual void access_token_updated(std::unique_lock<std::mutex>&, SyncSession&, std::string) const {}
+
     static const State& active;
     static const State& dying;
     static const State& inactive;
+    static const State& waiting_for_access_token;
 };
 
 struct sync_session_states::Active : public SyncSession::State {
@@ -116,6 +129,19 @@ struct sync_session_states::Active : public SyncSession::State {
 
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        auto user = session.user();
+        if (user && user->access_token_refresh_required()) {
+            session.advance_state(lock, waiting_for_access_token);
+            // Release the lock for SDKs with a single threaded
+            // networking implementation such as our test suite
+            // so that the update can trigger a state change from
+            // the completion handler.
+            REALM_ASSERT(lock.owns_lock());
+            lock.unlock();
+            session.initiate_access_token_refresh();
+            return;
+        }
+
         // when entering from the Dying state the session will still be bound
         if (!session.m_session) {
             session.create_sync_session();
@@ -158,6 +184,14 @@ struct sync_session_states::Active : public SyncSession::State {
                 // Wait for all pending changes to upload.
                 session.advance_state(lock, dying);
                 break;
+        }
+    }
+
+    void access_token_updated(std::unique_lock<std::mutex>&, SyncSession& session,
+                              std::string signed_access_token) const override
+    {
+        if (session.m_session) {
+            session.m_session->refresh(signed_access_token);
         }
     }
 
@@ -210,6 +244,14 @@ struct sync_session_states::Dying : public SyncSession::State {
         return false;
     }
 
+    void access_token_updated(std::unique_lock<std::mutex>&, SyncSession& session,
+                              std::string signed_access_token) const override
+    {
+        if (session.m_session) {
+            session.m_session->refresh(signed_access_token);
+        }
+    }
+
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
@@ -249,6 +291,14 @@ struct sync_session_states::Inactive : public SyncSession::State {
             callback.second(make_error_code(util::error::operation_aborted));
     }
 
+    void access_token_updated(std::unique_lock<std::mutex>&, SyncSession& session,
+                              std::string signed_access_token) const override
+    {
+        if (session.m_session) {
+            session.m_session->refresh(signed_access_token);
+        }
+    }
+
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, active);
@@ -261,9 +311,44 @@ struct sync_session_states::Inactive : public SyncSession::State {
     }
 };
 
+struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
+    // msvc needs this to initialize the class correctly
+    constexpr WaitingForAccessToken() {}
+
+    void enter_state(std::unique_lock<std::mutex>&, SyncSession&) const override {}
+
+    void access_token_updated(std::unique_lock<std::mutex>& lock, SyncSession& session,
+                              std::string signed_access_token) const override
+    {
+        // We don't expect there to be a session at this point, but if there is refresh the token there.
+        // If not, the latest token will be seeded from SyncUser::access_token() on session creation.
+        if (session.m_session) {
+            session.m_session->refresh(signed_access_token);
+        }
+        session.advance_state(lock, active);
+    }
+
+    void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        session.advance_state(lock, inactive);
+    }
+
+    bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession&) const override
+    {
+        return false;
+    }
+
+    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        // Immediately kill the session.
+        session.advance_state(lock, inactive);
+    }
+};
+
 const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
+const SyncSession::State& SyncSession::State::waiting_for_access_token = WaitingForAccessToken();
 
 std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
 {
@@ -295,13 +380,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             }
         }
         else {
-            if (!session->m_session) {
-                std::unique_lock<std::mutex> lock(session->m_state_mutex);
-                session->advance_state(lock, State::active);
-            }
-            else {
-                session->m_session->refresh(session_user->access_token());
-            }
+            session->update_access_token(session_user->access_token());
         }
     };
 }
@@ -505,14 +584,15 @@ void SyncSession::handle_error(SyncError error)
         }
     }
     else {
+        // The server replies with '401: unauthorized' iff the access token is invalid or expired.
+        // If the access token is valid but was not authorized by the server a '403: forbidden' is sent.
+        // This means that if we did get the 401, the next step is always to request a new access token.
         if (error_code == util::websocket::make_error_code(util::websocket::Error::bad_response_401_unauthorized)) {
             if (auto u = user()) {
                 u->refresh_custom_data(handle_refresh(shared_from_this()));
                 return;
             }
         }
-        // FIXME: We need to understand what errors can actually come from the server
-        // FIXME: and why the sync client is no longer parsing them correctly.
         // Unrecognized error code.
         error.is_unrecognized_by_client = true;
     }
@@ -578,18 +658,6 @@ void SyncSession::create_sync_session()
 
     REALM_ASSERT(m_config.user);
 
-
-    std::atomic<bool> received_reply = false;
-    m_config.user->refresh_access_token_if_expired([&](util::Optional<app::AppError> /*err*/) {
-        received_reply.store(true);
-    });
-
-    // FIXME: is it ok to block this thread?
-    using namespace std::chrono_literals;
-    const std::chrono::time_point<std::chrono::system_clock> max_wait_time = std::chrono::system_clock::now() + 3s;
-    while (!received_reply.load() && std::chrono::system_clock::now() < max_wait_time) {
-        millisleep(100);
-    }
     do_create_sync_session();
 }
 
@@ -745,6 +813,20 @@ void SyncSession::shutdown_and_wait()
         m_state->shutdown_and_wait(lock, *this);
     }
     m_client.wait_for_session_terminations();
+}
+
+void SyncSession::update_access_token(std::string signed_token)
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    m_state->access_token_updated(lock, *this, signed_token);
+}
+
+void SyncSession::initiate_access_token_refresh()
+{
+    auto session_user = user();
+    if (session_user) {
+        session_user->refresh_custom_data(handle_refresh(shared_from_this()));
+    }
 }
 
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
