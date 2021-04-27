@@ -383,7 +383,6 @@ TEST_CASE("object") {
         }
 
         SECTION("Notifications filtered by a KeyPathArray") {
-
             SECTION("single objects without links") {
                 std::pair<TableKey, ColKey> key_path_element(table, col_keys[0]);
                 auto key_path = {key_path_element};
