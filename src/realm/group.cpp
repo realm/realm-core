@@ -266,11 +266,10 @@ size_t Group::key2ndx_checked(TableKey key) const
         if (tbl && tbl->get_key() == key)
             return idx;
     }
-    // FIXME: This is a temporary hack we should revisit.
     // The notion of a const group as it is now, is not really
     // useful. It is linked to a distinction between a read
-    // and a write transaction. This distinction is likely to
-    // be moved from compile time to run time.
+    // and a write transaction. This distinction is no longer
+    // a compile time aspect (it's not const anymore)
     Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
     if (m_tables.is_attached() && idx < m_tables.size()) {
         RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
@@ -769,7 +768,7 @@ void Group::update_num_objects()
 {
 #if REALM_METRICS
     if (m_metrics) {
-        // FIXME: this is quite invasive and completely defeats the lazy loading mechanism
+        // This is quite invasive and completely defeats the lazy loading mechanism
         // where table accessors are only instantiated on demand, because they are all created here.
 
         m_total_rows = 0;
@@ -895,7 +894,6 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 
     // get new key and index
     // find first empty spot:
-    // FIXME: Optimize with rowing ptr or free list of some sort
     uint32_t j;
     RefOrTagged rot = RefOrTagged::make_tagged(0);
     for (j = 0; j < m_tables.size(); ++j) {
@@ -1155,8 +1153,6 @@ public:
             }
             info.type = history_type;
             info.version = history_schema_version;
-            // FIXME: It's ugly that we have to instantiate a new array here,
-            // but it isn't obvious that Group should have history as a member.
             Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
             history.init_from_ref(history_ref);
             info.ref = history.write(out, deep, only_if_modified); // Throws
@@ -1219,9 +1215,6 @@ BinaryData Group::write_to_mem() const
     REALM_ASSERT(is_attached());
 
     // Get max possible size of buffer
-    //
-    // FIXME: This size could potentially be vastly bigger that what
-    // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
@@ -1275,7 +1268,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         Array top(new_alloc);
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
-        // FIXME: We really need an alternative to Array::truncate() that is able to expand.
         int_fast64_t value_1 = from_ref(names_ref);
         int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
@@ -1708,7 +1700,6 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    // FIXME: We can't write protect at group level as the allocator is shared: m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {

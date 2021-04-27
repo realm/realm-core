@@ -39,8 +39,6 @@ class SlabAlloc;
 
 /// This class is not supposed to be reused for multiple write sessions. In
 /// particular, do not reuse it in case any of the functions throw.
-///
-/// FIXME: Move this class to namespace realm::_impl and to subdir src/realm/impl.
 class GroupWriter : public _impl::ArrayWriterBase {
 public:
     // For groups in transactional mode (Group::m_is_shared), this constructor

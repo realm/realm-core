@@ -88,7 +88,6 @@ public:
     /// behavior.
     Group(unattached_tag) noexcept;
 
-    // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&) = delete;
     Group& operator=(const Group&) = delete;
 
