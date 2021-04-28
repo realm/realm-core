@@ -680,6 +680,8 @@ TEST_CASE("list") {
         CollectionChangeSet collection_change_set_without_filter;
         CollectionChangeSet collection_change_set_with_filter_on_target_value;
 
+        // Note that in case not all callbacks have filters we do accept false positive notifications by design.
+        // Distinguishing between these two cases would be a big change for little value.
         SECTION("some callbacks have filters") {
             auto require_change_no_filter = [&] {
                 auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr error) {
@@ -728,6 +730,9 @@ TEST_CASE("list") {
             }
         }
 
+        // In case all callbacks do have filters we expect every callback to only get called when the corresponding
+        // filter is hit. Compared to the above 'some callbacks have filters' case we do not expect false positives
+        // here.
         SECTION("all callbacks have filters") {
             auto require_change = [&] {
                 auto token = list.add_notification_callback(

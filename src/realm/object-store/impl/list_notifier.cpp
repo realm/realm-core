@@ -65,13 +65,16 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 
     m_info = &info;
 
-    // When adding or removing a callback the related tables can change due to the way we calculate related tables
-    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    // When adding or removing a callback, the related tables can change due to the way we calculate related tables
+    // when key path filters are set, hence we need to recalculate every time the callbacks are changed.
+    // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
     if (m_did_modify_callbacks && m_type == PropertyType::Object) {
         m_related_tables = {};
         auto& list = static_cast<LnkLst&>(*m_list);
         DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(list.get_target_table()),
                                                         get_key_path_arrays(), all_callbacks_have_filters());
+        // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
+        // necessary.
         m_did_modify_callbacks = false;
     }
 

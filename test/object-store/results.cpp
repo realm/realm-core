@@ -2137,6 +2137,8 @@ TEST_CASE("notifications: results") {
         CollectionChangeSet collection_change_set_with_filter_on_root_value;
         CollectionChangeSet collection_change_set_with_filter_on_linked_to_value;
 
+        // Note that in case not all callbacks have filters we do accept false positive notifications by design.
+        // Distinguishing between these two cases would be a big change for little value.
         SECTION("some callbacks have filters") {
             auto token_without_filter = results_for_notification_filter.add_notification_callback(
                 [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
@@ -2277,6 +2279,9 @@ TEST_CASE("notifications: results") {
             }
         }
 
+        // In case all callbacks do have filters we expect every callback to only get called when the corresponding
+        // filter is hit. Compared to the above 'some callbacks have filters' case we do not expect false positives
+        // here.
         SECTION("all callbacks have filters") {
             SECTION("keypath filter on root table 'object', property 'value'") {
                 auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
