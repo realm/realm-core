@@ -93,17 +93,16 @@ TEST_CASE("list") {
     auto r2 = coordinator.get_realm();
     auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
 
         auto require_change = [&] {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
@@ -568,13 +567,6 @@ TEST_CASE("list") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -623,13 +615,6 @@ TEST_CASE("list") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
         SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
@@ -687,13 +672,6 @@ TEST_CASE("list") {
         // 3. Aggregated `KeyPathArray`
         KeyPathArray key_path_array_target_value = {keypath_target_value};
         KeyPathArray key_path_array_target_value2 = {keypath_target_value2};
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
 
         // For the keypath filtered notifications we need to check three scenarios:
         // - no callbacks have filters (this part is covered by other sections)
@@ -1153,17 +1131,16 @@ TEST_CASE("embedded List") {
     auto r2 = coordinator.get_realm();
     auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
+
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
 
         auto require_change = [&] {
             auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
@@ -1276,14 +1253,6 @@ TEST_CASE("embedded List") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
-
         SECTION("change order by modifying target") {
             write([&] {
                 lst.get(5).set(col_value, 15);
@@ -1321,14 +1290,6 @@ TEST_CASE("embedded List") {
         });
 
         advance_and_notify(*r);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-
-            advance_and_notify(*r);
-        };
 
         SECTION("swap") {
             write([&] {
