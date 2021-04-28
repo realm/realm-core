@@ -50,6 +50,32 @@ using ObjKeyType = decltype(ObjKey::value);
 
 using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
 
+struct Callback {
+    // The actual callback to invoke
+    CollectionChangeCallback fn;
+    // The pending changes accumulated on the worker thread. This field is
+    // guarded by m_callback_mutex and is written to on the worker thread,
+    // then read from on the target thread.
+    CollectionChangeBuilder accumulated_changes;
+    // The changeset which will actually be passed to `fn`. This field is
+    // not guarded by a lock and can only be accessed on the notifier's
+    // target thread.
+    CollectionChangeBuilder changes_to_deliver;
+    // The filter that this `Callback` is restricted to. Elements not part
+    // of the `key_path_array` should not invoke a notification.
+    KeyPathArray key_path_array;
+    // A unique-per-notifier identifier used to unregister the callback.
+    uint64_t token;
+    // We normally want to skip calling the callback if there's no changes,
+    // but only if we've sent the initial notification (to support the
+    // async query use-case). Not guarded by a mutex and is only readable
+    // on the target thread.
+    bool initial_delivered;
+    // Set within a write transaction on the target thread if this callback
+    // should not be called with changes for that write. requires m_callback_mutex.
+    bool skip_next;
+};
+
 // A base class for a notifier that keeps a collection up to date and/or
 // generates detailed change notifications on a background thread. This manages
 // most of the lifetime-management issues related to sharing an object between

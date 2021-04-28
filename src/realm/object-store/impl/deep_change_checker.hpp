@@ -60,32 +60,6 @@ struct TransactionChangeInfo {
     bool schema_changed;
 };
 
-struct Callback {
-    // The actual callback to invoke
-    CollectionChangeCallback fn;
-    // The pending changes accumulated on the worker thread. This field is
-    // guarded by m_callback_mutex and is written to on the worker thread,
-    // then read from on the target thread.
-    CollectionChangeBuilder accumulated_changes;
-    // The changeset which will actually be passed to `fn`. This field is
-    // not guarded by a lock and can only be accessed on the notifier's
-    // target thread.
-    CollectionChangeBuilder changes_to_deliver;
-    // The filter that this `Callback` is restricted to. Elements not part
-    // of the `key_path_array` should not invoke a notification.
-    KeyPathArray key_path_array;
-    // A unique-per-notifier identifier used to unregister the callback.
-    uint64_t token;
-    // We normally want to skip calling the callback if there's no changes,
-    // but only if we've sent the initial notification (to support the
-    // async query use-case). Not guarded by a mutex and is only readable
-    // on the target thread.
-    bool initial_delivered;
-    // Set within a write transaction on the target thread if this callback
-    // should not be called with changes for that write. requires m_callback_mutex.
-    bool skip_next;
-};
-
 /**
  * The `DeepChangeChecker` serves two purposes:
  * - Given an initial `Table` and an optional `KeyPathArray` it find all tables related to that initial table.
@@ -101,7 +75,7 @@ public:
 
     /**
      * `RelatedTable` is used to describe a the connections of a `Table` to other tables.
-     * Tables count as related if they can be reached via a link.
+     * Tables count as related if they can be reached via a forward link.
      */
     struct RelatedTable {
         // The key of the table for which this struct holds all outgoing links.
