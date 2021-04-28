@@ -243,7 +243,7 @@ public:
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
     }
 
-    LinkCollectionPtr clone_obj_list() const
+    LinkCollectionPtr clone_obj_list() const final
     {
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
     }
