@@ -679,10 +679,8 @@ TEST_CASE("list") {
 
         // Creating KeyPathArrays:
         // 1. Property pairs
-        //        std::pair<TableKey, ColKey> pair_origin_value(origin, colkey_origin_value);
-        //        std::pair<TableKey, ColKey> pair_origin_link(origin, col_link);
-        std::pair<TableKey, ColKey> pair_target_value(target, col_target_value);
-        std::pair<TableKey, ColKey> pair_target_value2(target, colkey_target_value2);
+        std::pair<TableKey, ColKey> pair_target_value(target->get_key(), col_target_value);
+        std::pair<TableKey, ColKey> pair_target_value2(target->get_key(), colkey_target_value2);
         // 2. Keypaths
         auto keypath_target_value = {pair_target_value};
         auto keypath_target_value2 = {pair_target_value2};
@@ -753,16 +751,16 @@ TEST_CASE("list") {
         }
 
         SECTION("all callbacks have filters") {
-            // auto require_change = [&] {
-            //     auto token = list.add_notification_callback(
-            //         [&](CollectionChangeSet c, std::exception_ptr error) {
-            //             REQUIRE_FALSE(error);
-            //             collection_change_set_with_filter_on_target_value = c;
-            //         },
-            //         key_path_array_target_value);
-            //     advance_and_notify(*r);
-            //     return token;
-            // };
+            auto require_change = [&] {
+                auto token = list.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_with_filter_on_target_value = c;
+                    },
+                    key_path_array_target_value);
+                advance_and_notify(*r);
+                return token;
+            };
 
             auto require_no_change = [&] {
                 bool first = true;
@@ -777,21 +775,21 @@ TEST_CASE("list") {
                 return token;
             };
 
-            // SECTION("-> modifying table 'target', property 'value'"
-            //         "-> DOES send a notification") {
-            //     auto token = require_change();
-            //     write([&] {
-            //         list.get(0).set(col_target_value, 42);
-            //     });
-            //     REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
-            //     REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
-            // }
+            SECTION("-> modifying table 'target', property 'value'"
+                    "-> DOES send a notification for 'value'") {
+                auto token = require_change();
+                write([&] {
+                    list.get(0).set(col_target_value, 42);
+                });
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
+            }
 
-            SECTION("-> modifying table 'target', property 'value2'"
-                    "-> does NOT send a notification") {
+            SECTION("-> modifying table 'target', property 'value'"
+                    "-> does NOT send a notification for 'value'") {
                 auto token = require_no_change();
                 write([&] {
-                    list.get(0).set(colkey_target_value2, 42);
+                    list.get(0).set(col_target_value, 42);
                 });
             }
         }
