@@ -659,13 +659,13 @@ TEST_CASE("list") {
     }
 
     SECTION("Keypath filtered change notifications") {
-        ColKey colkey_target_value2 = target->get_column_key("value2");
+        ColKey col_target_value2 = target->get_column_key("value2");
         List list(r, obj, col_link);
 
         // Creating KeyPathArrays:
         // 1. Property pairs
         std::pair<TableKey, ColKey> pair_target_value(target->get_key(), col_target_value);
-        std::pair<TableKey, ColKey> pair_target_value2(target->get_key(), colkey_target_value2);
+        std::pair<TableKey, ColKey> pair_target_value2(target->get_key(), col_target_value2);
         // 2. Keypaths
         auto keypath_target_value = {pair_target_value};
         auto keypath_target_value2 = {pair_target_value2};
@@ -719,7 +719,7 @@ TEST_CASE("list") {
                 auto token1 = require_change_no_filter();
                 auto token2 = require_change_target_value_filter();
                 write([&] {
-                    list.get(0).set(colkey_target_value2, 42);
+                    list.get(0).set(col_target_value2, 42);
                 });
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
