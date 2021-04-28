@@ -34,9 +34,9 @@
         __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__);                                                \
     } while (0)
 
-namespace {
-using namespace realm;
+namespace realm::util {
 
+namespace {
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
 void notify_fd(int write_fd)
 {
@@ -71,6 +71,7 @@ void notify_fd(int write_fd)
 // in the new one's callback being invoked.
 std::mutex s_schedulers_mutex;
 std::vector<void*> s_live_schedulers;
+} // namespace
 
 class ALooperScheduler : public util::Scheduler, public std::enable_shared_from_this<ALooperScheduler> {
 public:
@@ -211,13 +212,4 @@ private:
         return 1;
     }
 };
-} // anonymous namespace
-
-namespace realm {
-namespace util {
-std::shared_ptr<Scheduler> Scheduler::make_default()
-{
-    return std::make_shared<ALooperScheduler>();
-}
-} // namespace util
-} // namespace realm
+} // namespace realm::util

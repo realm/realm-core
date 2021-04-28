@@ -847,8 +847,8 @@ void Table::add_search_index(ColKey col_key)
         return;
 
     if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
-        // This is what we used to throw, so keep throwing that for compatibility reasons, even though it
-        // should probably be a type mismatch exception instead.
+        // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
+        // it should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
     }
 
@@ -2551,7 +2551,6 @@ ConstTableView Table::find_all_string(ColKey col_key, StringData value) const
 
 TableView Table::find_all_binary(ColKey, BinaryData)
 {
-    // FIXME: Implement this!
     throw util::runtime_error("Not implemented");
 }
 
@@ -3240,7 +3239,7 @@ ObjKey Table::global_to_local_object_id_hashed(GlobalKey object_id) const
 ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                      ObjKey colliding_local_id)
 {
-    // TODO: Cache these accessors
+    // Possible optimization: Cache these accessors
     Allocator& alloc = m_top.get_alloc();
     Array collision_map{alloc};
     Array hi{alloc};
@@ -3327,7 +3326,7 @@ Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
 void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
-        // TODO: Cache these accessors
+        // Possible optimization: Cache these accessors
         Array collision_map{m_alloc};
         Array local_id{m_alloc};
 

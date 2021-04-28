@@ -272,7 +272,7 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
     if (!config.scheduler)
-        config.scheduler = version ? util::Scheduler::get_frozen(version.value()) : util::Scheduler::make_default();
+        config.scheduler = version ? util::Scheduler::make_frozen(version.value()) : util::Scheduler::make_default();
     // realm must be declared before lock so that the mutex is released before
     // we release the strong reference to realm, as Realm's destructor may want
     // to acquire the same lock
@@ -449,24 +449,19 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
 
 void RealmCoordinator::open_db()
 {
-    if (m_db || m_read_only_group)
+    if (m_db)
         return;
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
     try {
-        if (m_config.immutable()) {
-            if (m_config.realm_data.is_null()) {
-                m_read_only_group =
-                    std::make_shared<Group>(m_config.path, m_config.encryption_key.data(), Group::mode_ReadOnly);
-            }
-            else {
-                // Create in-memory read-only realm from existing buffer (without taking ownership of the buffer)
-                m_read_only_group = std::make_unique<Group>(m_config.realm_data, false);
-            }
+        if (m_config.immutable() && m_config.realm_data) {
+            m_db = DB::create(m_config.realm_data, false);
             return;
         }
-
-        if (server_synchronization_mode) {
+        if (m_config.immutable()) {
+            m_history.reset();
+        }
+        else if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
             m_history = sync::make_client_replication(m_config.path);
 #else
@@ -479,6 +474,7 @@ void RealmCoordinator::open_db()
 
         DBOptions options;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
+        options.is_immutable = m_config.immutable();
 
         if (!m_config.fifo_files_fallback_path.empty()) {
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
@@ -486,8 +482,13 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
-        options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-        m_db = DB::create(*m_history, options);
+        if (m_history) {
+            options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+            m_db = DB::create(*m_history, options);
+        }
+        else {
+            m_db = DB::create(m_config.path, true, options);
+        }
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (m_config.schema_mode != SchemaMode::ResetFile) {
@@ -531,11 +532,9 @@ void RealmCoordinator::close()
     m_db = nullptr;
 }
 
-std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
+TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
 {
     open_db();
-    if (m_read_only_group)
-        return m_read_only_group;
     return (frozen_transaction) ? m_db->start_frozen(version) : m_db->start_read(version);
 }
 

@@ -116,6 +116,7 @@ public:
     // file (or another file), a new DB object is needed.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const DBOptions options = DBOptions());
+    static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
 
@@ -278,13 +279,6 @@ public:
     /// file will be unencrypted. Any other value will change the encryption of
     /// the file to the new 64 byte key.
     ///
-    /// FIXME: This function is not yet implemented in an exception-safe manner,
-    /// therefore, if it throws, the application should not attempt to
-    /// continue. If may not even be safe to destroy the DB object.
-    ///
-    /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
-    /// because it's not crash safe! It may corrupt your database if something fails
-    ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
 
@@ -382,6 +376,15 @@ private:
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
+
+        // a little helper
+        static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
+        {
+            auto res = std::make_unique<ReadLockInfo>();
+            res->m_top_ref = top_ref;
+            res->m_file_size = file_size;
+            return res;
+        }
     };
     class ReadLockGuard;
 
@@ -389,12 +392,12 @@ private:
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0; // highest version observed by this DB
+    uint_fast32_t m_local_max_entry = 0;          // highest version observed by this DB
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    util::File::Map<SharedInfo> m_file_map;   // Never remapped, provides access to everything but the ringbuffer
     util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    bool m_wait_for_change_enabled = true; // Initially wait_for_change is enabled
+    bool m_wait_for_change_enabled = true;    // Initially wait_for_change is enabled
     bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;
@@ -403,6 +406,7 @@ private:
     const char* m_key;
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
+    std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessMutex m_balancemutex;
 #endif
@@ -445,10 +449,12 @@ private:
     /// \throw FileFormatUpgradeRequired if \a DBOptions::allow_upgrade
     /// is `false` and an upgrade is required.
     ///
+    /// \throw LogicError if both DBOptions::allow_upgrade and is_immutable is true.
     /// \throw UnsupportedFileFormatVersion if the file format version or
     /// history schema version is one which this version of Realm does not know
     /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
+    void open(BinaryData, bool take_ownership = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the DB.
@@ -590,7 +596,10 @@ public:
     }
     TransactionRef freeze();
     // Frozen transactions are created by freeze() or DB::start_frozen()
-    bool is_frozen() const noexcept override { return m_transact_stage == DB::transact_Frozen; }
+    bool is_frozen() const noexcept override
+    {
+        return m_transact_stage == DB::transact_Frozen;
+    }
     TransactionRef duplicate();
 
     _impl::History* get_history() const;
@@ -689,9 +698,7 @@ public:
     {
     }
 
-    ~ReadTransaction() noexcept
-    {
-    }
+    ~ReadTransaction() noexcept {}
 
     operator Transaction&()
     {
@@ -736,9 +743,7 @@ public:
     {
     }
 
-    ~WriteTransaction() noexcept
-    {
-    }
+    ~WriteTransaction() noexcept {}
 
     operator Transaction&()
     {
@@ -809,7 +814,7 @@ struct DB::BadVersion : std::exception {
 
 inline bool DB::is_attached() const noexcept
 {
-    return m_file_map.is_attached();
+    return bool(m_fake_read_lock_if_immutable) || m_file_map.is_attached();
 }
 
 inline DB::TransactStage Transaction::get_transact_stage() const noexcept
@@ -876,7 +881,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         if (!repl)
             throw LogicError(LogicError::no_history);
 
-        VersionID version = VersionID();                                              // Latest
+        VersionID version = VersionID(); // Latest
         m_history = repl->_get_history_write();
         bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 
@@ -913,7 +918,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 
-    // FIXME: We are currently creating two transaction log parsers, one here,
+    // Possible optimization: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
     // expensive.
     _impl::SimpleInputStream in(uncommitted_changes.data(), uncommitted_changes.size());
