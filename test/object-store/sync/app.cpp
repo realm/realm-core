@@ -2071,9 +2071,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         {
             TestSyncManager reinit(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(reinit.app());
+            REQUIRE(!app->current_user()->access_token_refresh_required());
             // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
             app->current_user()->update_access_token(
                 encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+            REQUIRE(app->current_user()->access_token_refresh_required());
 
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);

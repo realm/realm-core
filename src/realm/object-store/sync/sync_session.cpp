@@ -328,6 +328,14 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         session.advance_state(lock, active);
     }
 
+    void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession& session,
+                                 sync::version_type version) const override
+    {
+        if (session.m_session) {
+            session.m_session->nonsync_transact_notify(version);
+        }
+    }
+
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
