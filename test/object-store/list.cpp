@@ -666,12 +666,12 @@ TEST_CASE("list") {
         // 1. Property pairs
         std::pair<TableKey, ColKey> pair_target_value(target->get_key(), col_target_value);
         std::pair<TableKey, ColKey> pair_target_value2(target->get_key(), col_target_value2);
-        // 2. Keypaths
-        auto keypath_target_value = {pair_target_value};
-        auto keypath_target_value2 = {pair_target_value2};
+        // 2. KeyPaths
+        auto key_path_target_value = {pair_target_value};
+        auto key_path_target_value2 = {pair_target_value2};
         // 3. Aggregated `KeyPathArray`
-        KeyPathArray key_path_array_target_value = {keypath_target_value};
-        KeyPathArray key_path_array_target_value2 = {keypath_target_value2};
+        KeyPathArray key_path_array_target_value = {key_path_target_value};
+        KeyPathArray key_path_array_target_value2 = {key_path_target_value2};
 
         // For the keypath filtered notifications we need to check three scenarios:
         // - no callbacks have filters (this part is covered by other sections)
