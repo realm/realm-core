@@ -43,7 +43,7 @@ Query::Query(ConstTableRef table, const LnkLst& list)
     : m_table(table.cast_away_const())
     , m_source_collection(list.clone_linklist())
 {
-    m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+    m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
@@ -53,7 +53,7 @@ Query::Query(ConstTableRef table, const LnkSet& set)
     : m_table(table.cast_away_const())
     , m_source_collection(set.clone_linkset())
 {
-    m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+    m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(set.get_target_table() == m_table);
     create();
@@ -61,9 +61,9 @@ Query::Query(ConstTableRef table, const LnkSet& set)
 
 Query::Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links)
     : m_table(table.cast_away_const())
-    , m_source_collection(dict_of_links.clone_collection())
+    , m_source_collection(dict_of_links.clone_obj_list())
 {
-    m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+    m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(m_source_collection->get_target_table() == m_table);
     create();
@@ -73,7 +73,7 @@ Query::Query(ConstTableRef table, LnkLstPtr&& ll)
     : m_table(table.cast_away_const())
     , m_source_collection(std::move(ll))
 {
-    m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+    m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
@@ -83,7 +83,7 @@ Query::Query(ConstTableRef table, LnkSetPtr&& ll)
     : m_table(table.cast_away_const())
     , m_source_collection(std::move(ll))
 {
-    m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+    m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
@@ -125,16 +125,13 @@ Query::Query(const Query& source)
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-        m_source_collection = source.m_source_collection ? source.m_source_collection->clone_collection() : nullptr;
+        m_source_collection = source.m_source_collection ? source.m_source_collection->clone_obj_list() : nullptr;
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
     }
-    else {
-        if (m_source_collection) {
-            m_view = dynamic_cast<ObjList*>(m_source_collection.get());
-            REALM_ASSERT_DEBUG(m_view);
-        }
+    else if (m_source_collection) {
+        m_view = m_source_collection.get();
     }
 }
 
@@ -156,17 +153,13 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_collection =
-                source.m_source_collection ? source.m_source_collection->clone_collection() : nullptr;
+            m_source_collection = source.m_source_collection ? source.m_source_collection->clone_obj_list() : nullptr;
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;
         }
-        else {
-            if (m_source_collection) {
-                m_view = dynamic_cast<ObjList*>(m_source_collection.get());
-                REALM_ASSERT_DEBUG(m_view);
-            }
+        else if (m_source_collection) {
+            m_view = m_source_collection.get();
         }
         m_ordering = source.m_ordering;
     }
@@ -190,7 +183,7 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     }
     if (source->m_source_collection) {
         m_source_collection = tr->import_copy_of(source->m_source_collection);
-        m_view = dynamic_cast<ObjList*>(m_source_collection.get());
+        m_view = m_source_collection.get();
         REALM_ASSERT_DEBUG(m_view);
     }
     m_groups = source->m_groups;
@@ -1986,12 +1979,9 @@ Query& Query::and_query(Query&& q)
         add_node(std::move(q.m_groups[0].m_root_node));
 
         if (q.m_source_collection) {
-            REALM_ASSERT(!m_source_collection ||
-                         (m_source_collection->get_owner_key() == q.m_source_collection->get_owner_key() &&
-                          m_source_collection->get_col_key() == q.m_source_collection->get_col_key()));
+            REALM_ASSERT(!m_source_collection || (m_source_collection->matches(*q.m_source_collection)));
             m_source_collection = std::move(q.m_source_collection);
-            m_view = dynamic_cast<ObjList*>(m_source_collection.get());
-            REALM_ASSERT_DEBUG(m_view);
+            m_view = m_source_collection.get();
         }
     }
 

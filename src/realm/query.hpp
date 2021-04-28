@@ -400,7 +400,7 @@ private:
     // m_source_collection is a pointer to a collection which must also be a ObjList*
     // this includes: LnkLst, LnkSet, and DictionaryLinkValues. It cannot be a list of primitives because
     // it is used to populate a query through a collection of objects and there are asserts for this.
-    std::unique_ptr<CollectionBase> m_source_collection; // collections are owned by the query.
+    LinkCollectionPtr m_source_collection;         // collections are owned by the query.
     ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
     std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
     std::shared_ptr<DescriptorOrdering> m_ordering;
