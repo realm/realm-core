@@ -674,7 +674,6 @@ TEST_CASE("list") {
     }
 
     SECTION("Keypath filtered change notifications") {
-        //        ColKey colkey_origin_value = origin->get_column_key("value");
         ColKey colkey_target_value2 = target->get_column_key("value2");
         List list(r, obj, col_link);
 
@@ -685,12 +684,9 @@ TEST_CASE("list") {
         std::pair<TableKey, ColKey> pair_target_value(target, col_target_value);
         std::pair<TableKey, ColKey> pair_target_value2(target, colkey_target_value2);
         // 2. Keypaths
-        //        auto keypath_origin_value = {pair_origin_value};
-        //        auto keypath_origin_link = {pair_origin_link};
         auto keypath_target_value = {pair_target_value};
         auto keypath_target_value2 = {pair_target_value2};
         // 3. Aggregated `KeyPathArray`
-        //        KeyPathArray key_path_array_origin_value = {keypath_origin_value};
         KeyPathArray key_path_array_target_value = {keypath_target_value};
         KeyPathArray key_path_array_target_value2 = {keypath_target_value2};
 
@@ -706,7 +702,6 @@ TEST_CASE("list") {
         // - some callbacks have filters
         // - all callbacks have filters
         CollectionChangeSet collection_change_set_without_filter;
-        //        CollectionChangeSet collection_change_set_with_filter_on_origin_value;
         CollectionChangeSet collection_change_set_with_filter_on_target_value;
 
         SECTION("some callbacks have filters") {
@@ -719,16 +714,6 @@ TEST_CASE("list") {
                 return token;
             };
 
-            //            auto require_change_origin_value_filter = [&] {
-            //                auto token = list.add_notification_callback([&](CollectionChangeSet c,
-            //                std::exception_ptr error) {
-            //                    REQUIRE_FALSE(error);
-            //                    collection_change_set_with_filter_on_origin_value = c;
-            //                }, key_path_array_origin_value);
-            //                advance_and_notify(*r);
-            //                return token;
-            //            };
-
             auto require_change_target_value_filter = [&] {
                 auto token = list.add_notification_callback(
                     [&](CollectionChangeSet c, std::exception_ptr error) {
@@ -740,31 +725,15 @@ TEST_CASE("list") {
                 return token;
             };
 
-            //            auto require_no_change = [&] {
-            //                bool first = true;
-            //                auto token = list.add_notification_callback([&, first](CollectionChangeSet,
-            //                std::exception_ptr error) mutable {
-            //                    REQUIRE_FALSE(error);
-            //                    REQUIRE(first);
-            //                    first = false;
-            //                });
-            //                advance_and_notify(*r);
-            //                return token;
-            //            };
-
             SECTION("-> modifying table 'target', property 'value'"
                     "-> DOES send a notification") {
                 auto token1 = require_change_no_filter();
-                //                auto token2 = require_change_origin_value_filter();
                 auto token2 = require_change_target_value_filter();
                 write([&] {
                     list.get(0).set(col_target_value, 42);
                 });
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
-                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications, 0);
-                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications_new,
-                //                0);
                 REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
                 REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
             }
@@ -772,16 +741,12 @@ TEST_CASE("list") {
             SECTION("-> modifying table 'target', property 'value2'"
                     "-> DOES send a notification") {
                 auto token1 = require_change_no_filter();
-                //                auto token2 = require_change_origin_value_filter();
                 auto token2 = require_change_target_value_filter();
                 write([&] {
                     list.get(0).set(colkey_target_value2, 42);
                 });
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
                 REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
-                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications, 0);
-                //                REQUIRE_INDICES(collection_change_set_with_filter_on_origin_value.modifications_new,
-                //                0);
                 REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications, 0);
                 REQUIRE_INDICES(collection_change_set_with_filter_on_target_value.modifications_new, 0);
             }
