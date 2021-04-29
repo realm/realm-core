@@ -61,7 +61,7 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///                is Immediate.
 ///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
-///                              but the token is invalid or expired.
+///                                but the token is invalid or expired.
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
 /// From: ACTIVE

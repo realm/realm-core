@@ -21,6 +21,7 @@
 
 #include <catch2/catch.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/optional.hpp>
 
 #include <functional>
 
@@ -33,7 +34,8 @@ std::vector<char> make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
                                           std::function<void()> func);
 
-std::string encode_fake_jwt(const std::string& in, int64_t exp = 0, int64_t iat = 0);
+std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp = {},
+                            util::Optional<int64_t> iat = {});
 
 static inline std::string random_string(std::string::size_type length)
 {
