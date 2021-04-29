@@ -503,16 +503,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
 #if REALM_ENABLE_SYNC
 TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
-    TestFile local_config;
-    local_config.schema_version = 1;
-    local_config.schema = Schema{
-        {"object",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-    };
-
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -546,6 +536,57 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
+    }
+
+    SECTION("can write a realm file without client file id") {
+        bool file_written = false;
+        SyncTestFile config3(init_sync_manager.app(), "default");
+        config3.schema = config.schema;
+        config3.cache = false;
+
+        // Create some content
+        auto origin = Realm::get_shared_realm(config);
+        origin->begin_transaction();
+        origin->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        origin->commit_transaction();
+        wait_for_upload(*origin);
+
+        // Create realm file without client file id
+        {
+            auto task = Realm::get_synchronized_realm(config2);
+            task->start([&](auto ref, auto error) {
+                std::lock_guard<std::mutex> lock(mutex);
+                REQUIRE(!error);
+                SharedRealm realm = Realm::get_shared_realm(std::move(ref));
+                realm->write_copy(config3.path, BinaryData());
+                file_written = true;
+            });
+            util::EventLoop::main().run_until([&] {
+                return file_written;
+            });
+        }
+
+        // Create some more content on the server
+        origin->begin_transaction();
+        origin->read_group().get_table("class_object")->create_object_with_primary_key(7);
+        origin->commit_transaction();
+        wait_for_upload(*origin);
+
+        // Now open a realm based on the realm file created above
+        auto realm = Realm::get_shared_realm(config3);
+        wait_for_download(*realm);
+        REQUIRE(realm->read_group().get_table("class_object")->size() == 2);
+
+        // Check that we can continue committing to this realm
+        realm->begin_transaction();
+        realm->read_group().get_table("class_object")->create_object_with_primary_key(5);
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+
+        // Check that this change is now in the original realm
+        wait_for_download(*origin);
+        origin->refresh();
+        REQUIRE(origin->read_group().get_table("class_object")->size() == 3);
     }
 
     SECTION("downloads Realms which exist on the server") {

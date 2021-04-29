@@ -1498,6 +1498,26 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
+void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
+{
+    // group::write() will throw if the file already exists.
+    // To prevent this, we have to remove the file (should it exist)
+    // before calling group::write().
+    if (allow_overwrite)
+        File::try_remove(path);
+
+    SharedInfo* info = m_file_map.get_addr();
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
+
+    auto tr = start_write();
+    if (!tr->get_history()->is_clean(tr->get_version())) {
+        throw std::runtime_error("Client changes not integrated in server");
+    }
+    tr->remove_sync_file_id();
+    tr->write(path, write_key, info->latest_version_number, true);
+    tr->rollback();
+}
+
 uint_fast64_t DB::get_number_of_versions()
 {
     if (m_fake_read_lock_if_immutable)

@@ -113,6 +113,11 @@ public:
 
     virtual void verify() const = 0;
 
+    virtual bool is_clean(version_type) const
+    {
+        return true;
+    }
+
     virtual void set_group(Group* group, bool updated = false)
     {
         m_group = group;
