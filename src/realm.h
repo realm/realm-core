@@ -1179,7 +1179,7 @@ RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* ou
  *                  versions, if successful.
  * @return True if the number of versions could be found.
  */
-RLM_API bool realm_get_num_versions(const realm_t*, size_t* out_count);
+RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_count);
 
 /**
  * Get an object with a particular object key.
