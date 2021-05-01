@@ -1082,16 +1082,22 @@ Results Results::filter(Query&& q) const
 
 Results Results::limit(size_t max_count) const
 {
+    util::CheckedUniqueLock lock(m_mutex);
     auto new_order = m_descriptor_ordering;
     new_order.append_limit(max_count);
-    return Results(m_realm, get_query(), std::move(new_order));
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
 Results Results::apply_ordering(DescriptorOrdering&& ordering)
 {
+    util::CheckedUniqueLock lock(m_mutex);
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append(std::move(ordering));
-    return Results(m_realm, get_query(), std::move(new_order));
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
 Results Results::distinct(DistinctDescriptor&& uniqueness) const

@@ -219,6 +219,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(dict.get<T>(keys[i]) == values[i]);
             auto val = dict.get(ctx, keys[i]);
             REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
+            REQUIRE(dict.get_any(keys[i]) == Mixed{values[i]});
+            REQUIRE(*dict.try_get_any(keys[i]) == Mixed{values[i]});
         }
     }
 
@@ -242,14 +244,68 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("find_any()") {
-        for (auto key : keys) {
-            REQUIRE(dict.find_any(key));
+        for (auto val : values) {
+            auto ndx = dict.find_any(Mixed{val});
+            REQUIRE(ndx != realm::not_found);
         }
         dict.remove_all();
-        for (auto key : keys) {
-            REQUIRE(dict.find_any(key) == realm::not_found);
+        for (auto val : values) {
+            REQUIRE(dict.find_any(Mixed{val}) == realm::not_found);
         }
     }
+
+    SECTION("get_pair()") {
+        std::vector<Mixed> mixed_values;
+        for (auto val : values) {
+            mixed_values.push_back(Mixed{val});
+        }
+        std::vector<std::string> found_keys;
+        std::vector<Mixed> found_values;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            auto pair = dict.get_pair(i);
+            auto results_pair = values_as_results.get_dictionary_element(i);
+            REQUIRE(pair == results_pair);
+            found_keys.push_back(pair.first);
+            found_values.push_back(pair.second);
+        }
+        std::sort(begin(keys), end(keys), cf::less());
+        std::sort(begin(mixed_values), end(mixed_values), cf::less());
+        std::sort(begin(found_keys), end(found_keys), cf::less());
+        std::sort(begin(found_values), end(found_values), cf::less());
+        REQUIRE(keys == found_keys);
+        REQUIRE(mixed_values == found_values);
+    }
+
+    SECTION("index_of() keys") {
+        std::vector<size_t> found;
+        for (auto key : keys) {
+            size_t ndx = keys_as_results.index_of(StringData(key));
+            REQUIRE(ndx < keys.size());
+            size_t ndx_ctx = keys_as_results.index_of(ctx, util::Any(key));
+            REQUIRE(ndx_ctx == ndx);
+            found.push_back(ndx);
+        }
+        std::sort(begin(found), end(found), std::less());
+        std::vector<size_t> expected(keys.size());
+        std::iota(begin(expected), end(expected), 0);
+        REQUIRE(found == expected);
+    }
+
+    SECTION("index_of() values") {
+        std::vector<size_t> found;
+        for (auto val : values) {
+            size_t ndx = values_as_results.index_of(T(val));
+            REQUIRE(ndx < values.size());
+            size_t ndx_ctx = values_as_results.index_of(ctx, TestType::to_any(T(val)));
+            REQUIRE(ndx_ctx == ndx);
+            found.push_back(ndx);
+        }
+        std::sort(begin(found), end(found), std::less());
+        std::vector<size_t> expected(values.size());
+        std::iota(begin(expected), end(expected), 0);
+        REQUIRE(found == expected);
+    }
+
     SECTION("links") {
         links.insert(ctx, "foo", util::Any(another));
         links.insert(ctx, "m", util::Any());
@@ -278,10 +334,20 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             auto sorted = keys_as_results.sort({{"self", true}});
             std::sort(begin(keys), end(keys), cf::less());
             verify_keys_ordered(sorted);
+            // check the same but by generic descriptor
+            DescriptorOrdering ordering;
+            ordering.append_sort(SortDescriptor({{ColKey{}}}, {true}));
+            sorted = keys_as_results.apply_ordering(std::move(ordering));
+            verify_keys_ordered(sorted);
         }
         SECTION("descending") {
             auto sorted = keys_as_results.sort({{"self", false}});
             std::sort(begin(keys), end(keys), cf::greater());
+            verify_keys_ordered(sorted);
+            // check the same but by descriptor
+            DescriptorOrdering ordering;
+            ordering.append_sort(SortDescriptor({{ColKey{}}}, {false}));
+            sorted = keys_as_results.apply_ordering(std::move(ordering));
             verify_keys_ordered(sorted);
         }
     }
@@ -338,12 +404,28 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(sorted_and_distinct.size() == 2);
             REQUIRE(sorted_and_distinct.get<T>(0) == T(values[1]));
             REQUIRE(sorted_and_distinct.get<T>(1) == T(values[0]));
+            // check the same but by ordering
+            DescriptorOrdering ordering;
+            ordering.append_distinct(DistinctDescriptor({{ColKey{}}}));
+            ordering.append_sort(SortDescriptor({{ColKey{}}}, {true}));
+            sorted_and_distinct = values_as_results.apply_ordering(std::move(ordering));
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[1]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[0]));
         }
         SECTION("descending") {
             auto sorted_and_distinct = values_as_results.distinct({{"self"}}).sort({{"self", false}});
             REQUIRE(sorted_and_distinct.size() == 2);
             REQUIRE(sorted_and_distinct.get<T>(0) == T(values[0]));
             REQUIRE(sorted_and_distinct.get<T>(1) == T(values[1]));
+            // check the same but by ordering
+            DescriptorOrdering ordering;
+            ordering.append_distinct(DistinctDescriptor({{ColKey{}}}));
+            ordering.append_sort(SortDescriptor({{ColKey{}}}, {true}));
+            sorted_and_distinct = values_as_results.apply_ordering(std::move(ordering));
+            REQUIRE(sorted_and_distinct.size() == 2);
+            REQUIRE(sorted_and_distinct.get<T>(0) == T(values[1]));
+            REQUIRE(sorted_and_distinct.get<T>(1) == T(values[0]));
         }
     }
 
@@ -1013,6 +1095,77 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
     // r->read_group().to_json(std::cout);
 }
 
+TEST_CASE("dictionary assign", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+
+    auto obj = Object::create(
+        ctx, r, *r->schema().find("DictionaryObject"),
+        Any{AnyDict{{"_id", INT64_C(0)},
+                    {"intDictionary", AnyDict{{"0", INT64_C(0)}, {"1", INT64_C(1)}, {"2", INT64_C(2)}}}}});
+    object_store::Dictionary dict(obj, r->schema().find("DictionaryObject")->property_for_name("intDictionary"));
+    REQUIRE(dict.size() == 3);
+    REQUIRE(dict.get<Int>("0") == 0);
+    REQUIRE(dict.get<Int>("1") == 1);
+    REQUIRE(dict.get<Int>("2") == 2);
+
+    SECTION("UpdateAll replaces an entire dictionary") {
+        CreatePolicy policy = CreatePolicy::UpdateAll;
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                       Any{AnyDict{{"_id", INT64_C(0)}, {"intDictionary", AnyDict{{"2", INT64_C(22)}}}}}, policy);
+        REQUIRE(dict.size() == 1);
+        REQUIRE(dict.get<Int>("2") == 22);
+    }
+
+    SECTION("UpdateAll with no value clears the dictionary") {
+        CreatePolicy policy = CreatePolicy::UpdateAll;
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                       Any{AnyDict{{"_id", INT64_C(0)}, {"intDictionary", AnyDict{}}}}, policy);
+        REQUIRE(dict.size() == 0);
+    }
+
+    SECTION("UpdateModified changes an existing value") {
+        CreatePolicy policy = CreatePolicy::UpdateModified;
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                       Any{AnyDict{{"_id", INT64_C(0)}, {"intDictionary", AnyDict{{"2", INT64_C(22)}}}}}, policy);
+        REQUIRE(dict.size() == 3);
+        REQUIRE(dict.get<Int>("0") == 0);
+        REQUIRE(dict.get<Int>("1") == 1);
+        REQUIRE(dict.get<Int>("2") == 22);
+    }
+
+    SECTION("UpdateModified with a new value adds it in") {
+        CreatePolicy policy = CreatePolicy::UpdateModified;
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                       Any{AnyDict{{"_id", INT64_C(0)}, {"intDictionary", AnyDict{{"3", INT64_C(3)}}}}}, policy);
+        REQUIRE(dict.size() == 4);
+        REQUIRE(dict.get<Int>("0") == 0);
+        REQUIRE(dict.get<Int>("1") == 1);
+        REQUIRE(dict.get<Int>("2") == 2);
+        REQUIRE(dict.get<Int>("3") == 3);
+    }
+
+    SECTION("UpdateModified with null clears the dictionary") {
+        CreatePolicy policy = CreatePolicy::UpdateAll;
+        Object::create(ctx, r, *r->schema().find("DictionaryObject"),
+                       Any{AnyDict{{"_id", INT64_C(0)}, {"intDictionary", AnyDict{}}}}, policy);
+        REQUIRE(dict.size() == 0);
+    }
+
+    r->commit_transaction();
+}
+
 TEST_CASE("dictionary comparison different realm", "[dictionary]") {
     TestFile config1;
     TestFile config2;
@@ -1059,15 +1212,52 @@ TEST_CASE("dictionary snapshot null", "[dictionary]") {
     auto prop = r->schema().find("object")->property_for_name("value");
     r->commit_transaction();
 
-    // r->read_group().to_json(std::cout);
-
     object_store::Dictionary dict(obj, prop);
     auto values = dict.get_values();
     auto size1 = values.size();
 
+    // both should include the null link
     auto snapshot = values.snapshot();
     auto size2 = snapshot.size();
     REQUIRE(size1 == size2);
+
+    // a snapshot retains a null link after it is deleted
+    r->begin_transaction();
+    dict.remove_all();
+    r->commit_transaction();
+    REQUIRE(values.size() == 0);
+    REQUIRE(snapshot.size() == 1);
+    REQUIRE(snapshot.get_any(0) == Mixed{});
+
+    // a snaphot remains the same when a new link is added
+    snapshot = values.snapshot();
+    r->begin_transaction();
+    StringData new_key("foo");
+
+    auto target_obj = Object::create(ctx, r, *r->schema().find("target"), Any{AnyDict{{"id", Any{int64_t(42)}}}});
+    dict.insert(new_key, target_obj.obj().get_key());
+    r->commit_transaction();
+    REQUIRE(values.size() == 1);
+    REQUIRE(snapshot.size() == 0);
+
+    // a snapshot retains an entry for a link when the link is removed
+    snapshot = values.snapshot();
+    r->begin_transaction();
+    dict.remove_all();
+    r->commit_transaction();
+    REQUIRE(values.size() == 0);
+    REQUIRE(snapshot.size() == 1);
+    auto obj_link = ObjLink{target_obj.obj().get_table()->get_key(), target_obj.obj().get_key()};
+    REQUIRE(snapshot.get_any(0) == Mixed{obj_link});
+
+    // a snapshot retains an entry for a link when the underlying object is deleted
+    // but the snapshot link is nullified
+    r->begin_transaction();
+    target_obj.obj().remove();
+    r->commit_transaction();
+    REQUIRE(values.size() == 0);
+    REQUIRE(snapshot.size() == 1);
+    REQUIRE(snapshot.get_any(0) == Mixed{});
 }
 
 TEST_CASE("dictionary aggregate", "[dictionary]") {

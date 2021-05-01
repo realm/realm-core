@@ -182,7 +182,6 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
             this->insert(ctx, key, value, policy);
         }
     });
-    // FIXME: Remove entries not included in the new value
 }
 
 } // namespace object_store
