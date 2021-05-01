@@ -19,6 +19,13 @@ RLM_API bool realm_get_version_id(const realm_t* realm, bool* out_found, realm_v
     });
 }
 
+RLM_API bool realm_get_num_versions(const realm_t* realm, size_t* out_count) {
+    return wrap_err([&]() {
+        *out_count = (*realm)->get_number_of_versions();
+        return true;
+    });
+}
+
 RLM_API const char* realm_get_library_version()
 {
     return REALM_VERSION_STRING;

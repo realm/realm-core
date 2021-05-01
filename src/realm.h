@@ -1173,6 +1173,15 @@ RLM_API bool realm_find_primary_key_property(const realm_t*, realm_class_key_t c
 RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* out_count);
 
 /**
+ * Get the number of versions found in the Realm file.
+ *
+ * @param out_count A pointer to a `size_t` that will contain the number of
+ *                  versions, if successful.
+ * @return True if the number of versions could be found.
+ */
+RLM_API bool realm_get_num_versions(const realm_t*, size_t* out_count);
+
+/**
  * Get an object with a particular object key.
  *
  * @param class_key The class key.
