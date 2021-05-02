@@ -1328,13 +1328,13 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
 Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
 {
     REALM_ASSERT(frozen_realm->is_frozen());
-    return import_results_into_realm(frozen_realm);
+    return import_copy_into_realm(frozen_realm);
 }
 
 Results Results::thaw(std::shared_ptr<Realm> const& live_realm)
 {
     REALM_ASSERT(!live_realm->is_frozen());
-    return import_results_into_realm(live_realm);
+    return import_copy_into_realm(live_realm);
 }
 
 bool Results::is_frozen() const
