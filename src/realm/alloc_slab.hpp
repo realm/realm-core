@@ -285,12 +285,6 @@ public:
     /// or one that was not attached using attach_file(). Doing so
     /// will result in undefined behavior.
     ///
-    /// The file_size argument must be aligned to a *section* boundary:
-    /// The database file is logically split into sections, each section
-    /// guaranteed to be mapped as a contiguous address range. The allocation
-    /// of memory in the file must ensure that no allocation crosses the
-    /// boundary between two sections.
-    ///
     /// Updates the memory mappings to reflect a new size for the file.
     /// Stale mappings are retained so that they remain valid for other threads,
     /// which haven't yet seen the file size change. The stale mappings are
@@ -305,8 +299,8 @@ public:
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
-    /// retranslated to new pointers. The allocator tries to avoid this, and we
-    /// believe it will only ever occur on Windows based platforms.
+    /// retranslated to new pointers. This will happen whenever the reader view
+    /// is extended unless the old size was aligned to a section boundary.
     uint64_t get_mapping_version()
     {
         return m_mapping_version;
@@ -347,7 +341,6 @@ public:
 protected:
     MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, char*, size_t old_size, size_t new_size) override;
-    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, char*) override;
     char* do_translate(ref_type) const noexcept override;
 
@@ -398,12 +391,16 @@ private:
         Slab(const Slab&) = delete;
         Slab(Slab&& other) noexcept
             : ref_end(other.ref_end)
+            , addr(other.addr)
             , size(other.size)
         {
-            addr = other.addr;
             other.addr = nullptr;
             other.size = 0;
+            other.ref_end = 0;
         }
+
+        Slab& operator=(const Slab&) = delete;
+        Slab& operator=(Slab&&) = delete;
     };
 
     // free blocks that are in the slab area are managed using the following structures:
@@ -539,33 +536,19 @@ private:
 
     // Description of to-be-deleted memory mapping
     struct OldMapping {
-        OldMapping(uint64_t version, util::File::Map<char>&& map) noexcept
-            : replaced_at_version(version)
-            , mapping(std::move(map))
-        {
-        }
-        OldMapping(OldMapping&& other) noexcept
-            : replaced_at_version(other.replaced_at_version)
-            , mapping()
-        {
-            mapping = std::move(other.mapping);
-        }
-        void operator=(OldMapping&& other) noexcept
-        {
-            replaced_at_version = other.replaced_at_version;
-            mapping = std::move(other.mapping);
-        }
         uint64_t replaced_at_version;
         util::File::Map<char> mapping;
     };
     struct OldRefTranslation {
-        OldRefTranslation(uint64_t v, RefTranslation* m) noexcept
+        OldRefTranslation(uint64_t v, size_t c, RefTranslation* m) noexcept
+            : replaced_at_version(v)
+            , translation_count(c)
+            , translations(m)
         {
-            replaced_at_version = v;
-            translations = m;
         }
         uint64_t replaced_at_version;
-        RefTranslation* translations;
+        size_t translation_count;
+        std::unique_ptr<RefTranslation[]> translations;
     };
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
@@ -576,6 +559,8 @@ private:
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     util::RaceDetector changes;
+
+    void verify_old_translations(uint64_t verify_old_translations);
 
     // mappings used by newest transactions - additional mappings may be open
     // and in use by older transactions. These translations are in m_old_mappings.

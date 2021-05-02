@@ -1248,7 +1248,7 @@ TEST_CASE("C API") {
         }
 
         SECTION("realm_set_value() errors") {
-            CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_int_val(123), false));
+            CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_int_val(456), false));
             CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
 
             write([&]() {
@@ -1264,8 +1264,8 @@ TEST_CASE("C API") {
         }
 
         SECTION("realm_set_values() errors") {
-            realm_value_t int123 = rlm_int_val(123);
-            CHECK(!realm_set_values(obj1.get(), 1, &foo_int_key, &int123, false));
+            realm_value_t int456 = rlm_int_val(456);
+            CHECK(!realm_set_values(obj1.get(), 1, &foo_int_key, &int456, false));
             CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
 
             write([&]() {
@@ -1541,27 +1541,27 @@ TEST_CASE("C API") {
 
                 SECTION("type mismatch") {
                     CHECK(!realm_query_parse(realm, class_foo.key, "int == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "bool == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "string == $0", 1, &decimal_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "timestamp == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "double == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "float == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "binary == $0", 1, &int_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "decimal == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "object_id == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "uuid == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                     CHECK(!realm_query_parse(realm, class_foo.key, "link == $0", 1, &string_arg));
-                    CHECK_ERR(RLM_ERR_INVALID_ARGUMENT);
+                    CHECK_ERR(RLM_ERR_INVALID_QUERY);
                 }
             }
 

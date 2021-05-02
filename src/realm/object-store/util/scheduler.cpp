@@ -17,20 +17,28 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/util/terminate.hpp>
 #include <realm/version_id.hpp>
 
-#if REALM_USE_UV
+#if REALM_HAVE_UV
 #include <realm/object-store/util/uv/scheduler.hpp>
-#elif REALM_USE_CF
-#include <realm/object-store/util/apple/scheduler.hpp>
-#elif REALM_USE_ALOOPER
-#include <realm/object-store/util/android/scheduler.hpp>
-#else
-#include <realm/object-store/util/generic/scheduler.hpp>
 #endif
 
+#if REALM_PLATFORM_APPLE
+#include <realm/object-store/util/apple/scheduler.hpp>
+#endif
+
+#if REALM_ANDROID
+#include <realm/object-store/util/android/scheduler.hpp>
+#endif
+
+#include <realm/object-store/util/generic/scheduler.hpp>
+
+namespace realm {
+namespace util {
 namespace {
-using namespace realm;
+
+std::function<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
 
 class FrozenScheduler : public util::Scheduler {
 public:
@@ -60,14 +68,74 @@ private:
 };
 } // anonymous namespace
 
-namespace realm {
-namespace util {
-
 Scheduler::~Scheduler() = default;
+
+void Scheduler::set_default_factory(std::function<std::shared_ptr<Scheduler>()> factory)
+{
+    s_factory = std::move(factory);
+}
 
 std::shared_ptr<Scheduler> Scheduler::get_frozen(VersionID version)
 {
+    return make_frozen(version);
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_default()
+{
+    return s_factory();
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_platform_default()
+{
+#if REALM_USE_UV
+    return make_uv();
+#else
+#if REALM_PLATFORM_APPLE
+    return make_runloop(nullptr);
+#elif REALM_PLATFORM_ANDROID
+    return make_alooper();
+#else
+    REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
+                    "Scheduler::set_default_factory()");
+#endif
+#endif // REALM_USE_UV
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_generic()
+{
+    return std::make_shared<GenericScheduler>();
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_frozen(VersionID version)
+{
     return std::make_shared<FrozenScheduler>(version);
 }
+
+#if REALM_PLATFORM_APPLE
+std::shared_ptr<Scheduler> Scheduler::make_runloop(CFRunLoopRef run_loop)
+{
+    return std::make_shared<RunLoopScheduler>(run_loop ?: CFRunLoopGetCurrent());
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)
+{
+    return std::make_shared<DispatchQueueScheduler>(static_cast<dispatch_queue_t>(queue));
+}
+#endif // REALM_PLATFORM_APPLE
+
+#if REALM_PLATFORM_ANDROID
+std::shared_ptr<Scheduler> Scheduler::make_alooper()
+{
+    return std::make_shared<ALooperScheduler>();
+}
+#endif // REALM_PLATFORM_ANDROID
+
+#if REALM_HAVE_UV
+std::shared_ptr<Scheduler> Scheduler::make_uv()
+{
+    return std::make_shared<UvMainLoopScheduler>();
+}
+#endif // REALM_HAVE_UV
+
 } // namespace util
 } // namespace realm

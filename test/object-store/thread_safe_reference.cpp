@@ -492,7 +492,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(2) == 2);
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
-                config.scheduler = util::Scheduler::get_frozen(VersionID());
+                config.scheduler = util::Scheduler::make_frozen(VersionID());
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 
@@ -544,7 +544,7 @@ TEST_CASE("thread safe reference") {
 
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
-                config.scheduler = util::Scheduler::get_frozen(VersionID());
+                config.scheduler = util::Scheduler::make_frozen(VersionID());
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 

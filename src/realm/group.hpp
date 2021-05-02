@@ -24,6 +24,7 @@
 #include <vector>
 #include <map>
 #include <stdexcept>
+#include <optional>
 
 #include <realm/util/features.h>
 #include <realm/exceptions.hpp>
@@ -43,7 +44,7 @@ namespace _impl {
 class GroupFriend;
 class TransactLogConvenientEncoder;
 class TransactLogParser;
-}
+} // namespace _impl
 
 
 /// A group is a collection of named tables.
@@ -87,7 +88,6 @@ public:
     /// behavior.
     Group(unattached_tag) noexcept;
 
-    // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&) = delete;
     Group& operator=(const Group&) = delete;
 
@@ -219,7 +219,10 @@ public:
     /// results in undefined behavior.
     bool is_attached() const noexcept;
     /// A group is frozen only if it is actually a frozen transaction.
-    virtual bool is_frozen() const noexcept { return false; }
+    virtual bool is_frozen() const noexcept
+    {
+        return false;
+    }
     /// Returns true if, and only if the number of tables in this
     /// group is zero.
     bool is_empty() const noexcept;
@@ -463,9 +466,9 @@ public:
                 , old_target_key(otk)
             {
             }
-            TableKey origin_table;     ///< A group-level table.
-            ColKey origin_col_key;     ///< Link column being nullified.
-            ObjKey origin_key;         ///< Row in column being nullified.
+            TableKey origin_table; ///< A group-level table.
+            ColKey origin_col_key; ///< Link column being nullified.
+            ObjKey origin_key;     ///< Row in column being nullified.
             /// The target row index which is being removed. Mostly relevant for
             /// LinkList (to know which entries are being removed), but also
             /// valid for Link.
@@ -547,6 +550,10 @@ public:
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
 
+    /// check that an already attached realm file is valid for read only access.
+    /// if not detach the file and throw a FileFormatUpgradeRequired.
+    /// return the file format version.
+    static int read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path);
     void verify() const;
     void validate_primary_columns();
 #ifdef REALM_DEBUG
@@ -629,6 +636,7 @@ private:
     bool m_attached = false;
     bool m_is_writable = true;
     const bool m_is_shared;
+    static std::optional<int> fake_target_file_format;
 
     std::function<void(const CascadeNotification&)> m_notify_handler;
     std::function<void()> m_schema_change_handler;
@@ -829,7 +837,8 @@ private:
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
-    /// upgrade logic in Group::upgrade_file_format().
+    /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
+    /// file formats and the version deletion list residing in "backup_restore.cpp"
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
@@ -1148,9 +1157,7 @@ public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() noexcept
-    {
-    }
+    virtual ~TableWriter() noexcept {}
 };
 
 inline const Table* Group::do_get_table(size_t ndx) const
@@ -1214,8 +1221,7 @@ public:
     }
 
     static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
-                                             _impl::History::version_type& version,
-                                             int& history_type,
+                                             _impl::History::version_type& version, int& history_type,
                                              int& history_schema_version) noexcept
     {
         Array top{const_cast<Allocator&>(alloc)};
@@ -1252,6 +1258,8 @@ public:
     {
         return Group::get_target_file_format_version_for_session(current_file_format_version, history_type);
     }
+
+    static void fake_target_file_format(const std::optional<int> format) noexcept;
 };
 
 
@@ -1269,9 +1277,9 @@ public:
     };
 
     struct Link {
-        TableKey origin_table;     ///< A group-level table.
-        ColKey origin_col_key;     ///< Link column being nullified.
-        ObjKey origin_key;         ///< Row in column being nullified.
+        TableKey origin_table; ///< A group-level table.
+        ColKey origin_col_key; ///< Link column being nullified.
+        ObjKey origin_key;     ///< Row in column being nullified.
         /// The target row index which is being removed. Mostly relevant for
         /// LinkList (to know which entries are being removed), but also
         /// valid for Link.

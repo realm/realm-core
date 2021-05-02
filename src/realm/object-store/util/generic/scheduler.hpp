@@ -17,10 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
+#include <realm/object-store/util/scheduler.hpp>
 
-namespace {
-std::function<std::shared_ptr<realm::util::Scheduler>()> s_factory;
-
+namespace realm::util {
 class GenericScheduler : public realm::util::Scheduler {
 public:
     GenericScheduler() = default;
@@ -45,18 +44,4 @@ public:
 private:
     std::thread::id m_id = std::this_thread::get_id();
 };
-} // anonymous namespace
-
-namespace realm {
-namespace util {
-void Scheduler::set_default_factory(std::function<std::shared_ptr<Scheduler>()> factory)
-{
-    s_factory = std::move(factory);
-}
-
-std::shared_ptr<Scheduler> Scheduler::make_default()
-{
-    return s_factory ? s_factory() : std::make_shared<GenericScheduler>();
-}
-} // namespace util
-} // namespace realm
+} // namespace realm::util

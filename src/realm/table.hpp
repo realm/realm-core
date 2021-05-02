@@ -478,7 +478,7 @@ public:
     template <typename Func>
     bool for_each_backlink_column(Func func) const
     {
-        // FIXME: Optimize later - to not iterate through all non-backlink columns:
+        // Could be optimized - to not iterate through all non-backlink columns:
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
@@ -522,7 +522,6 @@ public:
         return Query(m_own_ref, tv);
     }
 
-    // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(ConstTableView* tv = nullptr) const
     {
         return Query(m_own_ref, tv);
@@ -685,16 +684,6 @@ private:
     /// non-checking nature of the low-level dynamically typed API
     /// makes it too risky to offer this feature as an
     /// operator.
-    ///
-    /// FIXME: assign() has not yet been implemented, but the
-    /// intention is that it will copy the rows of the argument table
-    /// into this table after clearing the original contents, and for
-    /// target tables without a shared spec, it would also copy the
-    /// spec. For target tables with shared spec, it would be an error
-    /// to pass an argument table with an incompatible spec, but
-    /// assign() would not check for spec compatibility. This would
-    /// make it ideal as a basis for implementing operator=() for
-    /// typed tables.
     Table& operator=(const Table&) = delete;
 
     /// Create an uninitialized accessor whose lifetime is managed by Group
@@ -1015,7 +1004,6 @@ public:
         return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
     }
 
-
     template <class T>
     BacklinkCount<T> get_backlink_count()
     {
@@ -1181,9 +1169,9 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_own_ref = TableRef(this, m_alloc.get_instance_version());
 
     // since we're rebinding to a new table, we'll bump version counters
-    // FIXME
-    // this can be optimized if version counters are saved along with the
-    // table data.
+    // Possible optimization: save version counters along with the table data
+    // and restore them from there. Should decrease amount of non-necessary
+    // recomputations of any queries relying on this table.
     bump_content_version();
     bump_storage_version();
     // we assume all other accessors are detached, so we're done.

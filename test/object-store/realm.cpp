@@ -639,6 +639,9 @@ TEST_CASE("SharedRealm: notifications") {
 
     struct Context : BindingContext {
         size_t* change_count;
+        std::function<void()> did_change_fn;
+        std::function<void()> changes_available_fn;
+
         Context(size_t* out)
             : change_count(out)
         {
@@ -647,13 +650,22 @@ TEST_CASE("SharedRealm: notifications") {
         void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
         {
             ++*change_count;
+            if (did_change_fn)
+                did_change_fn();
+        }
+
+        void changes_available() override
+        {
+            if (changes_available_fn)
+                changes_available_fn();
         }
     };
 
     size_t change_count = 0;
     auto realm = Realm::get_shared_realm(config);
     realm->read_group();
-    realm->m_binding_context.reset(new Context{&change_count});
+    auto context = new Context{&change_count};
+    realm->m_binding_context.reset(context);
     realm->m_binding_context->realm = realm;
 
     SECTION("local notifications are sent synchronously") {
@@ -675,19 +687,9 @@ TEST_CASE("SharedRealm: notifications") {
     }
 
     SECTION("refresh() from within changes_available() refreshes") {
-        struct Context : BindingContext {
-            Realm& realm;
-            Context(Realm& realm)
-                : realm(realm)
-            {
-            }
-
-            void changes_available() override
-            {
-                REQUIRE(realm.refresh());
-            }
+        context->changes_available_fn = [&] {
+            REQUIRE(realm->refresh());
         };
-        realm->m_binding_context.reset(new Context{*realm});
         realm->set_auto_refresh(false);
 
         auto r2 = Realm::get_shared_realm(config);
@@ -699,76 +701,51 @@ TEST_CASE("SharedRealm: notifications") {
     }
 
     SECTION("refresh() from within did_change() is a no-op") {
-        struct Context : BindingContext {
-            Realm& realm;
-            Context(Realm& realm)
-                : realm(realm)
-            {
-            }
+        context->did_change_fn = [&] {
+            if (change_count > 1)
+                return;
 
-            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
-            {
-                // Create another version so that refresh() could do something
-                auto r2 = Realm::get_shared_realm(realm.config());
-                r2->begin_transaction();
-                r2->commit_transaction();
+            // Create another version so that refresh() advances the version
+            auto r2 = Realm::get_shared_realm(realm->config());
+            r2->begin_transaction();
+            r2->commit_transaction();
 
-                // Should be a no-op
-                REQUIRE_FALSE(realm.refresh());
-            }
+            REQUIRE_FALSE(realm->refresh());
         };
-        realm->m_binding_context.reset(new Context{*realm});
 
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
         r2->commit_transaction();
-        REQUIRE(realm->refresh());
 
-        auto ver = realm->current_transaction_version();
-        realm->m_binding_context.reset();
-        // Should advance to the version created in the previous did_change()
         REQUIRE(realm->refresh());
-        auto new_ver = realm->current_transaction_version();
-        REQUIRE(*new_ver > *ver);
-        // No more versions, so returns false
+        REQUIRE(change_count == 1);
+
+        REQUIRE(realm->refresh());
+        REQUIRE(change_count == 2);
         REQUIRE_FALSE(realm->refresh());
     }
 
     SECTION("begin_write() from within did_change() produces recursive notifications") {
-        struct Context : BindingContext {
-            Realm& realm;
-            size_t calls = 0;
-            Context(Realm& realm)
-                : realm(realm)
-            {
-            }
+        context->did_change_fn = [&] {
+            if (realm->is_in_transaction())
+                realm->cancel_transaction();
+            if (change_count > 3)
+                return;
 
-            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
-            {
-                ++calls;
-                if (realm.is_in_transaction())
-                    return;
+            // Create another version so that begin_write() advances the version
+            auto r2 = Realm::get_shared_realm(realm->config());
+            r2->begin_transaction();
+            r2->commit_transaction();
 
-                // Create another version so that begin_write() advances the version
-                auto r2 = Realm::get_shared_realm(realm.config());
-                r2->begin_transaction();
-                r2->commit_transaction();
-
-                realm.begin_transaction();
-                realm.cancel_transaction();
-            }
+            realm->begin_transaction();
+            REQUIRE(change_count == 4);
         };
-        auto context = new Context{*realm};
-        realm->m_binding_context.reset(context);
 
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
         r2->commit_transaction();
         REQUIRE(realm->refresh());
-        REQUIRE(context->calls == 2);
-
-        // Despite not sending a new notification we did advance the version, so
-        // no more versions to refresh to
+        REQUIRE(change_count == 4);
         REQUIRE_FALSE(realm->refresh());
     }
 }
@@ -1157,7 +1134,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         ExternalWriter(Realm::Config const& config)
             : m_realm([&] {
                 auto c = config;
-                c.scheduler = util::Scheduler::get_frozen(VersionID());
+                c.scheduler = util::Scheduler::make_frozen(VersionID());
                 return _impl::RealmCoordinator::get_coordinator(c.path)->get_realm(c, util::none);
             }())
             , wt(TestHelper::get_db(m_realm))
@@ -1561,7 +1538,7 @@ TEST_CASE("SharedRealm: compact on launch") {
     }
 
     SECTION("compact function does not get invoked if realm is open on another thread") {
-        config.scheduler = util::Scheduler::get_frozen(VersionID());
+        config.scheduler = util::Scheduler::make_frozen(VersionID());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         std::thread([&] {
@@ -1719,7 +1696,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+                auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1784,7 +1761,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+                auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1836,7 +1813,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+                auto r = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1860,7 +1837,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+                auto r = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -2029,6 +2006,11 @@ TEST_CASE("KeyPathMapping generation") {
     SECTION("class aliasing") {
         Schema schema = {
             {"PersistedName", {{"age", PropertyType::Int}}, {}, "AlternativeName"},
+            {"class_with_policy",
+             {{"value", PropertyType::Int},
+              {"child", PropertyType::Object | PropertyType::Nullable, "class_with_policy"}},
+             {{"parents", PropertyType::LinkingObjects | PropertyType::Array, "class_with_policy", "child"}},
+             "ClassWithPolicy"},
         };
         schema.validate();
         config.schema = schema;
@@ -2036,5 +2018,10 @@ TEST_CASE("KeyPathMapping generation") {
         realm::populate_keypath_mapping(mapping, *realm);
         REQUIRE(mapping.has_table_mapping("AlternativeName"));
         REQUIRE("class_PersistedName" == mapping.get_table_mapping("AlternativeName"));
+
+        auto table = realm->read_group().get_table("class_class_with_policy");
+        std::vector<Mixed> args{0};
+        auto q = table->query("parents.value = $0", args, mapping);
+        REQUIRE(q.count() == 0);
     }
 }
