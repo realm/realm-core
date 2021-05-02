@@ -1300,26 +1300,22 @@ Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
         case Mode::Collection:
             return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::LinkList: {
-            std::shared_ptr<LnkLst> ll(
-                realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+            std::shared_ptr<LnkLst> ll(realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
 
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
             return Results(realm, std::move(ll));
         }
         case Mode::LinkSet: {
-            std::shared_ptr<LnkSet> ls(
-                realm->import_copy_of(std::make_unique<LnkSet>(*m_link_set)).release());
+            std::shared_ptr<LnkSet> ls(realm->import_copy_of(std::make_unique<LnkSet>(*m_link_set)).release());
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
             return Results(realm, std::move(ls));
         }
         case Mode::Query:
-            return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy),
-                           m_descriptor_ordering);
+            return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(realm, *realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
-                            m_descriptor_ordering);
+            Results results(realm, *realm->import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
             return results;
