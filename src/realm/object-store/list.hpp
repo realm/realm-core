@@ -87,8 +87,11 @@ public:
     // Return a Results representing a snapshot of this List.
     Results snapshot() const;
 
-    // Returns a frozen copy of this result
+    // Returns a frozen copy of this List.
     List freeze(std::shared_ptr<Realm> const& realm) const;
+
+    // Returns a live copy of this List.
+    List thaw(std::shared_ptr<Realm> const& realm) const;
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows

@@ -162,6 +162,10 @@ public:
     // Returns a frozen copy of this result
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
+    // Returns a live copy of a frozen Result that has been resolved against
+    // a live Realm.
+    Results thaw(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
+
     // Returns whether or not this Results is frozen.
     bool is_frozen() const REQUIRES(!m_mutex);
 
@@ -342,6 +346,8 @@ private:
 
     void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
     void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);
+    // Share logic between freezing and thawing Results as the Core API is the same.
+    void import_copy_into_realm(std::shared_ptr<Realm> const& realm);
 
     class IteratorWrapper {
     public:

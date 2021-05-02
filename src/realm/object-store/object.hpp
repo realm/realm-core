@@ -106,8 +106,11 @@ public:
         return m_obj.is_valid();
     }
 
-    // Returns a frozen copy of this object.
+    // Freeze a copy of this object in the context of the frozen Realm.
     Object freeze(std::shared_ptr<Realm> frozen_realm) const;
+
+    // Returns a live copy of this object, resolved against the live Realm.
+    Object thaw(std::shared_ptr<Realm> live_realm) const;
 
     // Returns whether or not this Object is frozen.
     bool is_frozen() const noexcept;

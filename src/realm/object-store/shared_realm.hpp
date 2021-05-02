@@ -309,6 +309,9 @@ public:
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
 
+    // Returns a Live copy of the current frozen version of this Realm.
+    SharedRealm thaw();
+
     // Returns `true` if the Realm is frozen, `false` otherwise.
     bool is_frozen() const;
 

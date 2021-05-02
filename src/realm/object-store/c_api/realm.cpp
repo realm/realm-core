@@ -87,11 +87,19 @@ RLM_API bool realm_refresh(realm_t* realm)
     });
 }
 
-RLM_API realm_t* realm_freeze(realm_t* realm)
+RLM_API realm_t* realm_freeze(realm_t* live_realm)
 {
     return wrap_err([&]() {
-        auto& p = **realm;
+        auto& p = **live_realm;
         return new realm_t{p.freeze()};
+    });
+}
+
+RLM_API realm_t* realm_thaw(realm_t* frozen_realm)
+{
+    return wrap_err([&]() {
+        auto& p = **frozen_realm;
+        return new realm_t{p.thaw()};
     });
 }
 

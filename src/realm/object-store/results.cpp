@@ -1289,36 +1289,36 @@ REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
     switch (m_mode) {
         case Mode::Table:
-            return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
+            return Results(realm, realm->import_copy_of(m_table));
         case Mode::Collection:
-            return Results(frozen_realm, frozen_realm->import_copy_of(*m_collection), m_descriptor_ordering);
+            return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::LinkList: {
-            std::shared_ptr<LnkLst> frozen_ll(
-                frozen_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
+            std::shared_ptr<LnkLst> ll(
+                realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
 
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
-            return Results(frozen_realm, std::move(frozen_ll));
+            return Results(realm, std::move(ll));
         }
         case Mode::LinkSet: {
-            std::shared_ptr<LnkSet> frozen_ls(
-                frozen_realm->import_copy_of(std::make_unique<LnkSet>(*m_link_set)).release());
+            std::shared_ptr<LnkSet> ls(
+                realm->import_copy_of(std::make_unique<LnkSet>(*m_link_set)).release());
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
-            return Results(frozen_realm, std::move(frozen_ls));
+            return Results(realm, std::move(ls));
         }
         case Mode::Query:
-            return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy),
+            return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy),
                            m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(frozen_realm, *frozen_realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
+            Results results(realm, *realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
                             m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
@@ -1327,6 +1327,18 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
+}
+
+Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+{
+    REALM_ASSERT(frozen_realm->is_frozen());
+    return import_results_into_realm(frozen_realm);
+}
+
+Results Results::thaw(std::shared_ptr<Realm> const& live_realm)
+{
+    REALM_ASSERT(!live_realm->is_frozen());
+    return import_results_into_realm(live_realm);
 }
 
 bool Results::is_frozen() const
