@@ -328,6 +328,7 @@ typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, s
  *
  * @param out_found True if version information is available. This requires an available Read or Write transaction.
  * @param out_version The version of the current transaction. If `out_found` returns False, this returns (0,0).
+ * @return True if no exception occurred.
  */
 RLM_API bool realm_get_version_id(const realm_t*, bool* out_found, realm_version_id_t* out_version);
 
@@ -1177,9 +1178,9 @@ RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* ou
  *
  * @param out_count A pointer to a `size_t` that will contain the number of
  *                  versions, if successful.
- * @return True if the number of versions could be found.
+ * @return True if no exception occurred.
  */
-RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_count);
+RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count);
 
 /**
  * Get an object with a particular object key.
