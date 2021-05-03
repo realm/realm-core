@@ -1176,8 +1176,8 @@ RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* ou
 /**
  * Get the number of versions found in the Realm file.
  *
- * @param out_count A pointer to a `size_t` that will contain the number of
- *                  versions, if successful.
+ * @param out_versions_count A pointer to a `size_t` that will contain the number of
+ *                           versions, if successful.
  * @return True if no exception occurred.
  */
 RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count);
