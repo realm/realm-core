@@ -423,6 +423,14 @@ static inline realm_class_info_t to_capi(const ObjectSchema& o)
     return info;
 }
 
+static inline realm_version_id_t to_capi(const VersionID& v)
+{
+    realm_version_id_t version_id;
+    version_id.version = v.version;
+    version_id.index = v.index;
+    return version_id;
+}
+
 } // namespace realm::c_api
 
 
