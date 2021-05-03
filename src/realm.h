@@ -920,7 +920,7 @@ RLM_API bool realm_refresh(realm_t*);
  *
  * @return A non-NULL realm instance representing the frozen state.
  */
-RLM_API realm_t* realm_freeze(realm_t*);
+RLM_API realm_t* realm_freeze(const realm_t*);
 
 /**
  * Produce a live Realm from a frozen one. This is equivalent to
@@ -928,7 +928,7 @@ RLM_API realm_t* realm_freeze(realm_t*);
  *
  * @return A non-NULL realm instance representing the live state.
  */
-RLM_API realm_t* realm_thaw(realm_t*);
+RLM_API realm_t* realm_thaw(const realm_t*);
 
 /**
  * Vacuum the free space from the realm file, reducing its file size.
@@ -1388,7 +1388,7 @@ RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const rea
  *
  * @return A live copy of the frozen list.
  */
-RLM_API realm_list_t* realm_list_thaw(realm_list_t* frozen_list, const realm_t* live_realm);
+RLM_API realm_list_t* realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm);
 
 /**
  * Get the size of a list, in number of elements.
@@ -1790,7 +1790,7 @@ RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const real
  *
  * @return A live copy of the Results.
  */
-RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm);
+RLM_API realm_results_t* realm_results_thaw(const realm_results_t* frozen_results, const realm_t* live_realm);
 
 /**
  * Compute the minimum value of a property in the results.

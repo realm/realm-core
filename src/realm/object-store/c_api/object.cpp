@@ -425,7 +425,7 @@ RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm
     });
 }
 
-RLM_API realm_list_t* realm_list_freeze(realm_list_t* live_list, const realm_t* frozen_realm)
+RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const realm_t* frozen_realm)
 {
     return wrap_err([&]() {
         const auto realm = *frozen_realm;
@@ -434,7 +434,7 @@ RLM_API realm_list_t* realm_list_freeze(realm_list_t* live_list, const realm_t* 
     });
 }
 
-RLM_API realm_list_t* realm_list_thaw(realm_list_t* frozen_list, const realm_t* live_realm)
+RLM_API realm_list_t* realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm)
 {
     return wrap_err([&]() {
         const auto realm = *live_realm;
