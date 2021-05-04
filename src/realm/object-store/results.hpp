@@ -41,8 +41,6 @@ namespace _impl {
 class ResultsNotifierBase;
 }
 
-using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
-
 class Results {
 public:
     // Results can be either be backed by nothing, a thin wrapper around a table,

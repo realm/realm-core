@@ -48,8 +48,6 @@ class RealmCoordinator;
 using TableKeyType = decltype(TableKey::value);
 using ObjKeyType = decltype(ObjKey::value);
 
-using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
-
 // A `NotificationCallback` is added to a collection when observing it.
 // It contains all information necessary in case we need to notify about changes
 // to this collection.
@@ -64,7 +62,7 @@ struct NotificationCallback {
     // not guarded by a lock and can only be accessed on the notifier's
     // target thread.
     CollectionChangeBuilder changes_to_deliver;
-    // The filter that this `Callback` is restricted to. Elements not part
+    // The filter that this `NotificationCallback` is restricted to. Elements not part
     // of the `key_path_array` should not invoke a notification.
     KeyPathArray key_path_array;
     // A unique-per-notifier identifier used to unregister the callback.

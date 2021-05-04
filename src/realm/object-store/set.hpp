@@ -116,7 +116,6 @@ public:
 
     bool operator==(const Set& rhs) const noexcept;
 
-    using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
     NotificationToken add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array = {}) &;
 
     struct InvalidEmbeddedOperationException : std::logic_error {

@@ -112,7 +112,6 @@ public:
     // Returns whether or not this Object is frozen.
     bool is_frozen() const noexcept;
 
-    using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 

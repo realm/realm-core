@@ -252,7 +252,6 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
         auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c, std::exception_ptr) {

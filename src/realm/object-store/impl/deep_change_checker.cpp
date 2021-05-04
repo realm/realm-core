@@ -214,7 +214,7 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
     // If all callbacks do have a filter, every `KeyPathArray` will have entries.
     // In this case we need to check the `ColKey`s and pass the filtered columns
     // to the checker.
-    // If at least one `Callback` does not have a filter we notify on any change.
+    // If at least one `NotificationCallback` does not have a filter we notify on any change.
     // This is signaled by leaving the `filtered_columns_in_root_table` and
     // `filtered_columns` empty.
     auto all_callbacks_filtered = all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](auto key_path_array) {

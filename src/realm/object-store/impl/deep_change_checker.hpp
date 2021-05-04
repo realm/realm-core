@@ -37,6 +37,8 @@ namespace realm {
 class Realm;
 class Transaction;
 
+using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
+
 namespace _impl {
 class RealmCoordinator;
 
@@ -50,8 +52,6 @@ struct ListChangeInfo {
 // FIXME: this should be in core
 using TableKeyType = decltype(TableKey::value);
 using ObjKeyType = decltype(ObjKey::value);
-
-using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
 
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
@@ -129,7 +129,7 @@ public:
      * @param out Return value containing all tables that can be reached from the given `table` including
      *            some additional information about those tables (see `OutgoingLink` in `RelatedTable`).
      * @param table The table that the related tables will be searched for.
-     * @param key_path_arrays A collection of all `KeyPathArray`s passed to the `Callback`s for this
+     * @param key_path_arrays A collection of all `KeyPathArray`s passed to the `NotificationCallback`s for this
      * `CollectionNotifier`.
      * @param all_callback_have_filters The beheviour when filtering tables depends on all of them having a filter or
      * just some. In the latter case the related tables will be a combination of all tables for the non-filtered way
