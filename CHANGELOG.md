@@ -7,7 +7,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime (v10.6.0).
  
 ### Breaking changes
 * None.
@@ -15,10 +15,23 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 10.6.1 Release notes
+
+### Fixed
+* Proactively check the expiry time on the access token and refresh it before attempting to initiate a sync session. This prevents some error logs from appearing on the client such as: "ERROR: Connection[1]: Websocket: Expected HTTP response 101 Switching Protocols, but received: HTTP/1.1 401 Unauthorized" ([RCORE-473](https://jira.mongodb.org/browse/RCORE-473), since v10.0.0)
+* Fix a race condition which could result in a skipping notifications failing to skip if several commits using notification skipping were made in succession (since v6.0.0).
+ 
+-----------
+
+### Internals
 * The `util::Scheduler` interface was refactored to support multiple implementations existing in a single binary. This allows multiple SDKs targeting the same platform but different language runtimes to use the same build of Core. Current SDKs are not affected by this change.
 * The function `util::Scheduler::set_default_factory()` now works on all platforms, and can be used to override the platform-default scheduler implementation.
 * The function `util::Scheduler::get_frozen()` was deprecated in favor of `util::Scheduler::make_frozen()`, which has the same behavior.
-* The DB class now supports opening a realm file on a write-only file system.
+* The DB class now supports opening a realm file on a read-only file system.
   ([#4582](https://github.com/realm/realm-core/pull/4582))
 
 ----------------------------------------------

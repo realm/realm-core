@@ -3,6 +3,40 @@
 
 namespace realm::c_api {
 
+RLM_API bool realm_get_version_id(const realm_t* realm, bool* out_found, realm_version_id_t* out_version)
+{
+    return wrap_err([&]() {
+        util::Optional<VersionID> version = (*realm)->current_transaction_version();
+        if (version) {
+            if (out_version) {
+                *out_version = to_capi(version.value());
+            }
+            if (out_found) {
+                *out_found = true;
+            }
+        }
+        else {
+            if (out_version) {
+                *out_version = to_capi(VersionID(0, 0));
+            }
+            if (out_found) {
+                *out_found = false;
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_get_num_versions(const realm_t* realm, uint64_t* out_versions_count)
+{
+    return wrap_err([&]() {
+        if (out_versions_count) {
+            *out_versions_count = (*realm)->get_number_of_versions();
+        }
+        return true;
+    });
+}
+
 RLM_API const char* realm_get_library_version()
 {
     return REALM_VERSION_STRING;
@@ -51,6 +85,14 @@ RLM_API bool realm_close(realm_t* realm)
 {
     return wrap_err([&]() {
         (*realm)->close();
+        return true;
+    });
+}
+
+RLM_API bool realm_begin_read(realm_t* realm)
+{
+    return wrap_err([&]() {
+        (*realm)->read_group();
         return true;
     });
 }

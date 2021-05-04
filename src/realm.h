@@ -156,6 +156,11 @@ typedef struct realm_value {
     realm_value_type_e type;
 } realm_value_t;
 
+typedef struct realm_version_id {
+    uint64_t version;
+    uint64_t index;
+} realm_version_id_t;
+
 
 /* Error types */
 typedef struct realm_async_error realm_async_error_t;
@@ -317,6 +322,15 @@ typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_asyn
 typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, int, int);
 typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, size_t total);
+
+/**
+ * Get the VersionID of the current transaction.
+ *
+ * @param out_found True if version information is available. This requires an available Read or Write transaction.
+ * @param out_version The version of the current transaction. If `out_found` returns False, this returns (0,0).
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_get_version_id(const realm_t*, bool* out_found, realm_version_id_t* out_version);
 
 /**
  * Get a string representing the version number of the Realm library.
@@ -875,6 +889,13 @@ RLM_API bool realm_close(realm_t*);
 RLM_API bool realm_is_closed(realm_t*);
 
 /**
+ * Begin a read transaction for the Realm file.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_begin_read(realm_t*);
+
+/**
  * Begin a write transaction for the Realm file.
  *
  * @return True if no exception occurred.
@@ -1151,6 +1172,15 @@ RLM_API bool realm_find_primary_key_property(const realm_t*, realm_class_key_t c
  * @return True if the table key was valid for this realm.
  */
 RLM_API bool realm_get_num_objects(const realm_t*, realm_class_key_t, size_t* out_count);
+
+/**
+ * Get the number of versions found in the Realm file.
+ *
+ * @param out_versions_count A pointer to a `size_t` that will contain the number of
+ *                           versions, if successful.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_get_num_versions(const realm_t*, uint64_t* out_versions_count);
 
 /**
  * Get an object with a particular object key.
