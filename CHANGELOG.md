@@ -1,19 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.6.2 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime (v10.6.0).
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime ([#4614](https://github.com/realm/realm-core/pull/4614) Since v10.6.0).
+* Fixed the android scheduler not being supplied which could result in `[realm-core-10.6.1] No built-in scheduler implementation for this platform. Register your own with Scheduler::set_default_factory()` ([#4660](https://github.com/realm/realm-core/pull/4660) Since v10.6.1).
 
 ----------------------------------------------
 
