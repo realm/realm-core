@@ -97,9 +97,6 @@ public:
      */
     bool operator()(int64_t obj_key);
 
-    static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                        std::vector<TableKey> tables_in_filters);
-
     /**
      * Search for related tables within the specified `table`.
      * Related tables are all tables that can be reached via links from the `table`.
@@ -126,7 +123,7 @@ public:
      * Likewise a search for related tables starting with `linked_table` would only return this table.
      *
      * Filter:
-     * Using a `key_path_array` that only consists of the table key for `"root_table"` would result
+     * Using a `key_path_array` that only consists of the table key for `root_table` would result
      * in `out` just having this one entry.
      *
      * @param out Return value containing all tables that can be reached from the given `table` including
@@ -141,6 +138,11 @@ public:
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
                                              std::vector<KeyPathArray> key_path_arrays,
                                              bool all_callback_have_filters);
+
+    // This function is only used by `find_filtered_related_tables` internally.
+    // It is however used in some tests and therefore exposed here.
+    static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
+                                        std::vector<TableKey> tables_in_filters);
 
 private:
     TransactionChangeInfo const& m_info;
@@ -164,9 +166,9 @@ private:
      *
      * @param table The `Table` that contains the `ObjKeyType` that will be checked.
      * @param obj_key The `ObjKeyType` identifying the object to be checked for changes.
+     * @param filtered_columns A `std::vector` of all `ColKey`s filtered in any of the `NotificationCallbacks`.
      * @param depth Determines how deep the search will be continued if the change could not be found
      *              on the first level.
-     * @param filtered_columns TBD
      *
      * @return True if the object was changed, false otherwise.
      */

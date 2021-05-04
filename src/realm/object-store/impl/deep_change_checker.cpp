@@ -59,20 +59,12 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
         // If a column within the `table` does link to another table it needs to be added to `table`'s
         // links.
         if (type == type_Link || type == type_LinkList) {
-            //            this does not seem to pick up the right links for objects
 
             out[out_index].links.push_back({col_key.value, type == type_LinkList});
             // Finally this function needs to be called again to traverse all linked tables using the
             // just found link.
             find_all_related_tables(out, *table.get_link_target(col_key), tables_in_filters);
         }
-    }
-    if (tables_in_filters.size() != 0) {
-        //        table.for_each_backlink_column([&](ColKey column_key) {
-        //            out[out_index].links.push_back({column_key.value, false});
-        //            find_all_related_tables(out, *table.get_link_target(column_key), tables_in_filters);
-        //            return false;
-        //        });
     }
 }
 
@@ -158,10 +150,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     auto linked_object_changed = [&](OutgoingLink const& link) {
         if (already_checking(link.col_key))
             return false;
-        if (ColKey(link.col_key).get_type() == col_type_BackLink) {
-            // TODO
-            return false;
-        }
+
         if (!link.is_list) {
             if (obj.is_null(ColKey(link.col_key)))
                 return false;
@@ -229,9 +218,10 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
     // If at least one `Callback` does not have a filter we notify on any change.
     // This is signaled by leaving the `filtered_columns_in_root_table` and
     // `filtered_columns` empty.
-    if (all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](auto key_path_array) {
-            return key_path_array.size() > 0;
-        })) {
+    auto all_callbacks_filtered = all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](auto key_path_array) {
+        return key_path_array.size() > 0;
+    });
+    if (all_callbacks_filtered) {
         for (auto key_path_array : m_key_path_arrays) {
             for (auto key_path : key_path_array) {
                 if (key_path.size() != 0) {
