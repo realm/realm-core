@@ -266,7 +266,7 @@ public:
      * The query will be run on a background thread and delivered to the callback,
      * and then rerun after each commit (if needed) and redelivered if it changed
      *
-     * @param cb The function to execute when a insertions, modification or deletion in this `Collection` was
+     * @param callback The function to execute when a insertions, modification or deletion in this `Collection` was
      * detected.
      * @param key_path_array A filter that can be applied to make sure the `CollectionChangeCallback` is only executed
      * when the property in the filter is changed but not otherwise.
@@ -274,7 +274,8 @@ public:
      * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
      * callback via `remove_callback`.
      */
-    NotificationToken add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array = {}) &;
+    NotificationToken add_notification_callback(CollectionChangeCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
 
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;

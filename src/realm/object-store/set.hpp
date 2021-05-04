@@ -128,7 +128,8 @@ public:
      * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
      * callback via `remove_callback`.
      */
-    NotificationToken add_notification_callback(CollectionChangeCallback cb, KeyPathArray key_path_array = {}) &;
+    NotificationToken add_notification_callback(CollectionChangeCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
 
     struct InvalidEmbeddedOperationException : std::logic_error {
         InvalidEmbeddedOperationException()
