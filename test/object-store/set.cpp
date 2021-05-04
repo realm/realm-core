@@ -1,5 +1,6 @@
 #include "catch2/catch.hpp"
 
+#include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
 #include "util/index_helpers.hpp"
 
@@ -14,10 +15,246 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 
-#include <realm/version.hpp>
 #include <realm/db.hpp>
+#include <realm/util/any.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
+using namespace realm::util;
+namespace cf = realm::collection_fixtures;
+
+TEMPLATE_TEST_CASE("set all types", "[set]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double, cf::String,
+                   cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
+                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+{
+    using T = typename TestType::Type;
+    using Boxed = typename TestType::Boxed;
+    using W = typename TestType::Wrapped;
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table",
+         {{"value_set", PropertyType::Set | TestType::property_type()},
+          {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
+        {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
+    });
+    auto table = r->read_group().get_table("class_table");
+    ColKey col_set = table->get_column_key("value_set");
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        if constexpr (std::is_void_v<decltype(f())>) {
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        }
+        else {
+            auto result = f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            return result;
+        }
+    };
+
+    auto obj = write([&] {
+        return table->create_object();
+    });
+
+    auto values = TestType::values();
+
+    SECTION("basics") {
+        object_store::Set set{r, obj, col_set};
+        Results set_as_results = set.as_results();
+        CppContext ctx(r);
+
+        SECTION("valid") {
+            REQUIRE(set.is_valid());
+            REQUIRE_NOTHROW(set.verify_attached());
+            object_store::Set unattached;
+            REQUIRE_THROWS(unattached.verify_attached());
+            REQUIRE(!unattached.is_valid());
+        }
+
+        SECTION("basic value operations") {
+            REQUIRE(set.size() == 0);
+            REQUIRE(set.get_type() == TestType::property_type());
+            REQUIRE(set_as_results.get_type() == TestType::property_type());
+            write([&]() {
+                for (size_t i = 0; i < values.size(); ++i) {
+                    auto result = set.insert(T(values[i]));
+                    REQUIRE(result.first < values.size());
+                    REQUIRE(result.second);
+                    auto result2 = set.insert(T(values[i]));
+                    REQUIRE(!result2.second);
+                }
+            });
+
+            REQUIRE(set.is_valid());
+            REQUIRE(set.size() == values.size());
+            REQUIRE(set_as_results.size() == values.size());
+
+            SECTION("get()") {
+                std::vector<size_t> found_indices;
+                for (auto val : values) {
+                    size_t ndx = set.find(T(val));
+                    REQUIRE(ndx < set.size());
+                    found_indices.push_back(ndx);
+                    size_t ndx_any = set.find_any(Mixed{T(val)});
+                    REQUIRE(ndx_any == ndx);
+                    REQUIRE(set.get<T>(ndx) == T(val));
+                    REQUIRE(set.get_any(ndx) == Mixed{T(val)});
+                    auto ctx_val = set.get(ctx, ndx);
+                    REQUIRE(any_cast<Boxed>(ctx_val) == Boxed(T(val)));
+                    // and through results
+                    auto res_ndx = set_as_results.index_of(T(val));
+                    REQUIRE(res_ndx == ndx);
+                    REQUIRE(set_as_results.get<T>(res_ndx) == T(val));
+                    auto res_ctx_val = set_as_results.get(ctx, res_ndx);
+                    REQUIRE(any_cast<Boxed>(res_ctx_val) == Boxed(T(val)));
+                    REQUIRE(set_as_results.get_any(res_ndx) == Mixed{T(val)});
+                }
+                // we do not require any particular ordering
+                std::sort(begin(found_indices), end(found_indices), std::less());
+                std::vector<size_t> expected_indices(values.size());
+                std::iota(begin(expected_indices), end(expected_indices), 0);
+                REQUIRE(found_indices == expected_indices);
+            }
+
+            auto check_empty = [&]() {
+                REQUIRE(set.size() == 0);
+                for (size_t i = 0; i < values.size(); ++i) {
+                    REQUIRE(set.find(T(values[i])) == realm::not_found);
+                }
+            };
+            SECTION("remove()") {
+                write([&]() {
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        auto result = set.remove(T(values[i]));
+                        REQUIRE(result.first < values.size());
+                        REQUIRE(result.second);
+                        auto result2 = set.remove(T(values[i]));
+                        REQUIRE(!result2.second);
+                    }
+                });
+                check_empty();
+            }
+            SECTION("remove_any()") {
+                write([&]() {
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        auto result = set.remove_any(Mixed(T(values[i])));
+                        REQUIRE(result.first < values.size());
+                        REQUIRE(result.second);
+                        auto result2 = set.remove_any(Mixed(T(values[i])));
+                        REQUIRE(!result2.second);
+                    }
+                });
+                check_empty();
+            }
+            SECTION("remove(ctx)") {
+                write([&]() {
+                    for (size_t i = 0; i < values.size(); ++i) {
+                        auto result = set.remove(ctx, TestType::to_any(T(values[i])));
+                        REQUIRE(result.first < values.size());
+                        REQUIRE(result.second);
+                        auto result2 = set.remove(ctx, TestType::to_any(T(values[i])));
+                        REQUIRE(!result2.second);
+                    }
+                });
+                check_empty();
+            }
+            SECTION("remove_all()") {
+                write([&]() {
+                    set.remove_all();
+                });
+                check_empty();
+            }
+            SECTION("delete_all()") {
+                write([&]() {
+                    set.delete_all();
+                });
+                check_empty();
+            }
+            SECTION("Results::clear()") {
+                write([&]() {
+                    set_as_results.clear();
+                });
+                check_empty();
+            }
+            SECTION("min()") {
+                if (!TestType::can_minmax()) {
+                    REQUIRE_THROWS_AS(set.min(), Results::UnsupportedColumnTypeException);
+                    REQUIRE_THROWS_AS(set_as_results.min(), Results::UnsupportedColumnTypeException);
+                    return;
+                }
+                REQUIRE(Mixed(TestType::min()) == set.min());
+                REQUIRE(Mixed(TestType::min()) == set_as_results.min());
+                write([&]() {
+                    set.remove_all();
+                });
+                REQUIRE(!set.min());
+                REQUIRE(!set_as_results.min());
+            }
+            SECTION("max()") {
+                if (!TestType::can_minmax()) {
+                    REQUIRE_THROWS_AS(set.max(), Results::UnsupportedColumnTypeException);
+                    REQUIRE_THROWS_AS(set_as_results.max(), Results::UnsupportedColumnTypeException);
+                    return;
+                }
+                REQUIRE(Mixed(TestType::max()) == set.max());
+                REQUIRE(Mixed(TestType::max()) == set_as_results.max());
+                write([&]() {
+                    set.remove_all();
+                });
+                REQUIRE(!set.max());
+                REQUIRE(!set_as_results.max());
+            }
+            SECTION("sum()") {
+                if (!TestType::can_sum()) {
+                    REQUIRE_THROWS_AS(set.sum(), Results::UnsupportedColumnTypeException);
+                    REQUIRE_THROWS_AS(set_as_results.sum(), Results::UnsupportedColumnTypeException);
+                    return;
+                }
+                REQUIRE(cf::get<W>(set.sum()) == TestType::sum());
+                REQUIRE(cf::get<W>(*set_as_results.sum()) == TestType::sum());
+                write([&]() {
+                    set.remove_all();
+                });
+                REQUIRE(set.sum() == 0);
+                REQUIRE(set_as_results.sum() == 0);
+            }
+            SECTION("average()") {
+                if (!TestType::can_average()) {
+                    REQUIRE_THROWS_AS(set.average(), Results::UnsupportedColumnTypeException);
+                    REQUIRE_THROWS_AS(set_as_results.average(), Results::UnsupportedColumnTypeException);
+                    return;
+                }
+                REQUIRE(cf::get<typename TestType::AvgType>(*set.average()) == TestType::average());
+                REQUIRE(cf::get<typename TestType::AvgType>(*set_as_results.average()) == TestType::average());
+                write([&]() {
+                    set.remove_all();
+                });
+                REQUIRE(!set.average());
+                REQUIRE(!set_as_results.average());
+            }
+            SECTION("sort") {
+                SECTION("ascending") {
+                    auto sorted = set_as_results.sort({{"self", true}});
+                    std::sort(begin(values), end(values), cf::less());
+                    REQUIRE(sorted == values);
+                }
+                SECTION("descending") {
+                    auto sorted = set_as_results.sort({{"self", false}});
+                    std::sort(begin(values), end(values), cf::greater());
+                    REQUIRE(sorted == values);
+                }
+            }
+        }
+    }
+}
 
 TEST_CASE("set", "[set]") {
     InMemoryTestFile config;

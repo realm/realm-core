@@ -64,7 +64,7 @@ public:
     template <class T, class Context>
     std::pair<size_t, bool> insert(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
-    std::pair<size_t, bool> remove(Context&, const T&);
+    std::pair<size_t, bool> remove(Context&, T&&);
 
     std::pair<size_t, bool> insert_any(Mixed value);
     Mixed get_any(size_t ndx) const final;
@@ -186,7 +186,7 @@ std::pair<size_t, bool> Set::insert(Context& ctx, T&& value, CreatePolicy policy
 }
 
 template <class T, class Context>
-std::pair<size_t, bool> Set::remove(Context& ctx, const T& value)
+std::pair<size_t, bool> Set::remove(Context& ctx, T&& value)
 {
     return dispatch([&](auto t) {
         return this->remove(ctx.template unbox<std::decay_t<decltype(*t)>>(value));
