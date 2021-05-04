@@ -164,14 +164,6 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         return;
     }
 
-    if (is_dictionary(property.type)) {
-        ContextType child_ctx(ctx, m_obj, property);
-        object_store::Dictionary dict(m_realm, m_obj, col);
-        dict.assign(child_ctx, value, policy);
-        ctx.did_change();
-        return;
-    }
-
     ValueUpdater<ValueType, ContextType> updater{ctx, property, value, m_obj, col, policy, is_default};
     switch_on_type(property.type, updater);
     ctx.did_change();

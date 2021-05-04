@@ -109,6 +109,9 @@ public:
     // Get an element in a list
     Mixed get_any(size_t index) REQUIRES(!m_mutex);
 
+    // Get the key/value pair at an index of the results.
+    // This method is only valid when applied to a results based on a
+    // object_store::Dictionary::get_values(), and will assert this.
     std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
@@ -153,10 +156,17 @@ public:
     Results apply_ordering(DescriptorOrdering&& ordering) REQUIRES(!m_mutex);
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
+    // A snapshot can still change if modified explicitly. The problem that a snapshot solves is that
+    // a collection of links may change in unexpected ways if the destination objects are removed.
+    // It’s unintuitive that users can accidentally modify the collection, e.g. when deleting
+    // the object from the Realm. This would work just fine with an in-memory collection but fail
+    // with Realm collections that are not snapshotted.
+    // Since snapshots only account for links to objects, using snapshot on a collection of
+    // primitive values has no effect.
     Results snapshot() const& REQUIRES(!m_mutex);
     Results snapshot() && REQUIRES(!m_mutex);
 
-    // Returns a frozen copy of this result
+    // Returns a frozen copy of this result.
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
