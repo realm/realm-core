@@ -22,16 +22,17 @@
 #include <realm/object-store/impl/collection_notifier.hpp>
 
 #include <realm/keys.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 
 namespace _impl {
 class ObjectNotifier : public CollectionNotifier {
 public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, ObjKey obj);
+    ObjectNotifier(std::shared_ptr<Realm> realm, TableRef table, ObjKey obj);
 
 private:
-    TableKey m_table;
+    TableRef m_table;
     ObjKey m_obj;
     TransactionChangeInfo* m_info;
 

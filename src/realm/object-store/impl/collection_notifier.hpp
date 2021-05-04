@@ -194,7 +194,8 @@ protected:
                                                                                  ConstTableRef);
     std::vector<KeyPathArray> get_key_path_arrays();
     std::vector<ColKey> get_filtered_col_keys(bool root_table_only);
-    bool all_callbacks_have_filters();
+    bool any_callbacks_filtered();
+    bool all_callbacks_filtered();
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
 

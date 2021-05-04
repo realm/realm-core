@@ -57,7 +57,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     if (m_related_tables.size() == 1) {
         auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
-            if (all_callbacks_have_filters()) {
+            if (all_callbacks_filtered()) {
                 return object_set.modifications_contains(object_key, get_filtered_col_keys(true));
             }
             else {
@@ -96,7 +96,20 @@ std::vector<ColKey> CollectionNotifier::get_filtered_col_keys(bool root_table_on
     return filtered_col_keys;
 }
 
-bool CollectionNotifier::all_callbacks_have_filters()
+bool CollectionNotifier::any_callbacks_filtered()
+{
+    return any_of(begin(m_callbacks), end(m_callbacks), [](auto callback) {
+        if (callback.key_path_array.size() > 0) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    });
+}
+
+
+bool CollectionNotifier::all_callbacks_filtered()
 {
     return all_of(begin(m_callbacks), end(m_callbacks), [](auto callback) {
         if (callback.key_path_array.size() > 0) {
@@ -222,7 +235,7 @@ void CollectionNotifier::set_table(ConstTableRef table)
 {
     m_related_tables.clear();
     DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, get_key_path_arrays(),
-                                                    all_callbacks_have_filters());
+                                                    all_callbacks_filtered());
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)

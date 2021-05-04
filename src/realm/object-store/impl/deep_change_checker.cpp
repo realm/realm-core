@@ -59,6 +59,8 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
         // If a column within the `table` does link to another table it needs to be added to `table`'s
         // links.
         if (type == type_Link || type == type_LinkList) {
+            //            this does not seem to pick up the right links for objects
+
             out[out_index].links.push_back({col_key.value, type == type_LinkList});
             // Finally this function needs to be called again to traverse all linked tables using the
             // just found link.
@@ -66,11 +68,11 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
         }
     }
     if (tables_in_filters.size() != 0) {
-        table.for_each_backlink_column([&](ColKey column_key) {
-            out[out_index].links.push_back({column_key.value, false});
-            find_all_related_tables(out, *table.get_link_target(column_key), tables_in_filters);
-            return false;
-        });
+        //        table.for_each_backlink_column([&](ColKey column_key) {
+        //            out[out_index].links.push_back({column_key.value, false});
+        //            find_all_related_tables(out, *table.get_link_target(column_key), tables_in_filters);
+        //            return false;
+        //        });
     }
 }
 
@@ -220,6 +222,7 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
 {
     std::vector<ColKey> filtered_columns_in_root_table = {};
     std::vector<ColKey> filtered_columns = {};
+
     // If all callbacks do have a filter, every `KeyPathArray` will have entries.
     // In this case we need to check the `ColKey`s and pass the filtered columns
     // to the checker.

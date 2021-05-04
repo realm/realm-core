@@ -105,7 +105,7 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     if (m_did_modify_callbacks) {
         m_related_tables = {};
         DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(m_query->get_table()),
-                                                        get_key_path_arrays(), all_callbacks_have_filters());
+                                                        get_key_path_arrays(), all_callbacks_filtered());
         m_did_modify_callbacks = false;
     }
 

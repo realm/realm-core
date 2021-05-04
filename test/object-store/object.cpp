@@ -97,6 +97,12 @@ TEST_CASE("object") {
              {"value 1", PropertyType::Int},
              {"value 2", PropertyType::Int},
          }},
+        {"table2",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             {"link", PropertyType::Object | PropertyType::Nullable, "table"},
+         }},
         {"all types",
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
@@ -224,7 +230,6 @@ TEST_CASE("object") {
     };
 
     SECTION("add_notification_callback()") {
-        using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
@@ -247,7 +252,8 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&](KeyPathArray key_path_array = {}) {
+        using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
+        auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c, std::exception_ptr) {
                     change = c;
@@ -257,7 +263,7 @@ TEST_CASE("object") {
             return token;
         };
 
-        auto require_no_change = [&](KeyPathArray key_path_array = {}) {
+        auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             bool first = true;
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet, std::exception_ptr) {
@@ -270,7 +276,7 @@ TEST_CASE("object") {
         };
 
         SECTION("deleting the object sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 obj.remove();
             });
@@ -278,7 +284,7 @@ TEST_CASE("object") {
         }
 
         SECTION("clearing the table sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 table->clear();
             });
@@ -289,7 +295,7 @@ TEST_CASE("object") {
             obj = table->get_object(table->size() - 1);
             object = Object(r, obj);
 
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 table->clear();
             });
@@ -297,7 +303,7 @@ TEST_CASE("object") {
         }
 
         SECTION("modifying the object sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             write([&] {
                 obj.set(col_keys[0], 10);
@@ -315,14 +321,14 @@ TEST_CASE("object") {
         }
 
         SECTION("modifying a different object") {
-            auto token = require_no_change();
+            auto token = require_no_change(object);
             write([&] {
                 table->get_object(1).set(col_keys[0], 10);
             });
         }
 
         SECTION("multiple write transactions") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             auto r2row = r2->read_group().get_table("class_table")->get_object(0);
             r2->begin_transaction();
@@ -339,7 +345,7 @@ TEST_CASE("object") {
         }
 
         SECTION("skipping a notification") {
-            auto token = require_no_change();
+            auto token = require_no_change(object);
             write([&] {
                 obj.set(col_keys[0], 1);
                 token.suppress_next();
@@ -347,7 +353,7 @@ TEST_CASE("object") {
         }
 
         SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             // would not produce a notification even if it wasn't skipped because no changes were made
             write([&] {
@@ -368,7 +374,7 @@ TEST_CASE("object") {
                     FAIL("This should never happen");
                 });
             }
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 obj.remove();
             });
@@ -379,169 +385,180 @@ TEST_CASE("object") {
             write([&] {
                 obj.remove();
             });
-            REQUIRE_THROWS(require_change());
+            REQUIRE_THROWS(require_change(object));
         }
 
-        SECTION("Notifications filtered by a KeyPathArray") {
-            SECTION("single objects without links") {
-                std::pair<TableKey, ColKey> key_path_element(table, col_keys[0]);
-                auto key_path = {key_path_element};
-                KeyPathArray key_path_array = {key_path};
+        SECTION("keypath filtered notifications") {
+            auto table_origin = r->read_group().get_table("class_table2");
+            auto col_origin_value = table_origin->get_column_key("value");
+            auto col_origin_link = table_origin->get_column_key("link");
 
-                SECTION("modifying a keypath filtered property of an observed object does send a notification") {
-                    auto token = require_change(key_path_array);
+            auto table_target = r->read_group().get_table("class_table");
+            auto col_target_value1 = table_target->get_column_key("value 1");
+            auto col_target_value2 = table_target->get_column_key("value 2");
+
+            r->begin_transaction();
+
+            Obj obj_target = table_target->create_object_with_primary_key(200);
+            Object object_target(r, obj_target);
+            object_target.set_column_value("value 1", 201);
+            object_target.set_column_value("value 2", 202);
+
+            Obj obj_origin = table_origin->create_object_with_primary_key(100);
+            Object object_origin(r, obj_origin);
+            object_origin.set_column_value("value", 101);
+            object_origin.set_property_value(d, "link", util::Any(object_target));
+
+            r->commit_transaction();
+
+            std::pair<TableKey, ColKey> pair_origin_value(table_origin->get_key(), col_origin_value);
+            std::pair<TableKey, ColKey> pair_origin_link(table_origin->get_key(), col_origin_link);
+            std::pair<TableKey, ColKey> pair_target_value1(table_target->get_key(), col_target_value1);
+            std::pair<TableKey, ColKey> pair_target_value2(table_target->get_key(), col_target_value2);
+
+            auto key_path_origin_value = {pair_origin_value};
+            auto key_path_origin_link = {pair_origin_link};
+            auto key_path_target_value1 = {pair_target_value1};
+            auto key_path_target_value2 = {pair_target_value2};
+
+            auto key_path_origin_to_target_value1 = {pair_origin_link, pair_target_value1};
+            auto key_path_origin_to_target_value2 = {pair_origin_link, pair_target_value2};
+
+            KeyPathArray key_path_array_origin_value = {key_path_origin_value};
+            KeyPathArray key_path_array_origin_link = {key_path_origin_link};
+            KeyPathArray key_path_array_target_value1 = {key_path_target_value1};
+            KeyPathArray key_path_array_target_value2 = {key_path_target_value2};
+
+            KeyPathArray key_path_array_origin_to_target_value1 = {key_path_origin_to_target_value1};
+            KeyPathArray key_path_array_origin_to_target_value2 = {key_path_origin_to_target_value2};
+
+            SECTION("callbacks on a single object") {
+
+                SECTION("modifying origin table 'table2', property 'value'"
+                        "while observing origin table 'table2', property 'value'"
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_origin, key_path_array_origin_value);
 
                     write([&] {
-                        obj.set(col_keys[0], 42);
+                        object_origin.set_column_value("value", 105);
                     });
                     REQUIRE_INDICES(change.modifications, 0);
-                    REQUIRE(change.columns.size() == 1);
-                    REQUIRE_INDICES(change.columns[col_keys[0].value], 0);
                 }
 
-                // SECTION("modifying a property of an observed object not filtered by a keypath does not send a "
-                //         "notification") {
-                //     auto token = require_no_change(key_path_array);
+                SECTION("-> modifying related table 'table', property 'value 1'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_value);
 
-                //     write([&] {
-                //         obj.set(col_keys[1], 42);
-                //     });
-                // }
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
 
-                // SECTION("deleting an object with a keypath filter sends a notification") {
-                //     auto token = require_no_change(key_path_array);
+                SECTION("-> modifying related table 'table', property 'value 2'"
+                        "while observing related table 'table', property 'value 2'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_value);
 
-                //     write([&] {
-                //         obj.remove();
-                //     });
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
 
-                //     REQUIRE_INDICES(change.deletions, 0);
-                // }
+                SECTION("modifying origin table 'table2', property 'value'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value1);
 
-                // SECTION("adding a keypath filter for an non-existent table throws an error") {
-                //     auto non_existent_table_key = TableKey(42);
-                //     std::pair<TableKey, ColKey> invalid_key_path_element(non_existent_table_key, col_keys[0]);
-                //     auto invalid_key_path = {invalid_key_path_element};
-                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
-                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
-                //     {},
-                //                                                     invalid_key_path_array));
-                // }
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
 
-                // SECTION("adding a keypath filter for an non-existent column throws an error") {
-                //     auto non_existent_column_key = ColKey(42);
-                //     std::pair<TableKey, ColKey> invalid_key_path_element(table, non_existent_column_key);
-                //     auto invalid_key_path = {invalid_key_path_element};
-                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
-                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
-                //     {},
-                //                                                     invalid_key_path_array));
-                // }
+                SECTION("-> modifying related table 'table', property 'value 1'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_target, key_path_array_target_value1);
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                }
+
+                SECTION("-> modifying related table 'table', property 'value 2'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value1);
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
+
+                SECTION("modifying origin table 'table2', property 'value'"
+                        "while observing related table 'table', property 'value 2'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
+                SECTION("-> modifying related table 'table', property 'value 1'"
+                        "while observing related table 'table', property 'value 2'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
+
+                SECTION("-> modifying related table 'table', property 'value 2'"
+                        "while observing related table 'table', property 'value 2'"
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                }
             }
 
-            SECTION("linked objects") {
-                AnyDict adam{
-                    {"_id", "1"s},
-                    {"name", "Adam"s},
-                    {"age", INT64_C(42)},
-                };
-                AnyDict brian{
-                    {"_id", "2"s},
-                    {"name", "Brian"s},
-                    {"age", INT64_C(43)},
-                    {"assistant", adam},
-                };
-                AnyDict charley{
-                    {"_id", "3"s},
-                    {"name", "Charley"s},
-                    {"age", INT64_C(44)},
-                };
-                AnyDict david{{"_id", "4"s},
-                              {"name", "David"s},
-                              {"age", INT64_C(45)},
-                              {"assistant", brian},
-                              {"team", AnyVec{charley}}};
-                Object david_object = create_company(david, CreatePolicy::UpdateAll);
-                advance_and_notify(*r);
-                auto person_table = r->read_group().get_table("class_person");
-                REQUIRE(person_table->size() == 4);
-                Results person_results(r, person_table);
-                bool callback_called = false;
-                auto person_column_keys = person_table->get_column_keys();
-                auto assistent_column_key = person_column_keys[3];
-                std::pair<TableKey, ColKey> key_path_element_assistent(person_table, assistent_column_key);
-                auto key_path = {key_path_element_assistent, key_path_element_assistent, key_path_element_assistent};
-                KeyPathArray key_path_array = {key_path};
-                auto david_token = david_object.add_notification_callback(
-                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                        REQUIRE_FALSE(error);
-                        change = collection_change_set;
-                        callback_called = true;
-                    },
-                    key_path_array);
+            SECTION("callbacks on linked objects") {
 
-                // FIXME: Crashes when calling `create_company`.
-                //                SECTION("changing the observed property at the end of the keypath sends a
-                //                notification") {
-                //                    adam["age"] = 43;
-                //                    create_company(david, CreatePolicy::UpdateModified);
-                //
-                //                    REQUIRE_INDICES(change.insertions);
-                //                    REQUIRE_INDICES(change.modifications, 0);
-                //                    REQUIRE_INDICES(change.modifications_new, 0);
-                //                    REQUIRE_INDICES(change.deletions);
-                //                    REQUIRE(change.columns.size() == 1);
-                //                    REQUIRE_INDICES(change.columns[assistent_column_key.value], 0);
-                //                }
+                SECTION("-> modifying origin table 'table2', property 'value'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
 
-                //                SECTION("changing any of the links within a keypath filter sends a notification") {
-                //                    brian["age"] = 43;
-                //                    create_company(david, CreatePolicy::UpdateModified);
-                //
-                //                    REQUIRE_INDICES(change.insertions);
-                //                    REQUIRE_INDICES(change.modifications);
-                //                    REQUIRE_INDICES(change.modifications_new);
-                //                    REQUIRE_INDICES(change.deletions);
-                //                    REQUIRE(change.columns.size() == 0);
-                //                }
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
 
-                //                SECTION("changing a linked object that is not part of a keypath filter does not
-                //                send a "
-                //                        "notification") {
-                //                    david["team"] = nullptr;
-                //                    create_company(david, CreatePolicy::UpdateModified);
-                //
-                //                    REQUIRE_INDICES(change.insertions);
-                //                    REQUIRE_INDICES(change.modifications);
-                //                    REQUIRE_INDICES(change.modifications_new);
-                //                    REQUIRE_INDICES(change.deletions);
-                //                    REQUIRE(change.columns.size() == 0);
-                //                }
+                SECTION("-> modifying related table 'table', property 'value 1'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_origin, key_path_array_origin_to_target_value1);
 
-                // SECTION("an invalid table key anywhere within a keypath throws an error") {
-                //     auto non_existent_table_key = TableKey(42);
-                //     std::pair<TableKey, ColKey> invalid_key_path_element(non_existent_table_key, col_keys[0]);
-                //     auto invalid_key_path = {key_path_element_assistent, invalid_key_path_element,
-                //                              key_path_element_assistent};
-                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
-                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
-                //     {},
-                //                                                     invalid_key_path_array));
-                // }
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                }
 
-                // SECTION("an invalid column key anywhere within a keypath throws an error") {
-                //     auto non_existent_column_key = ColKey(42);
-                //     std::pair<TableKey, ColKey> invalid_key_path_element(table, non_existent_column_key);
-                //     auto invalid_key_path = {key_path_element_assistent, invalid_key_path_element,
-                //                              key_path_element_assistent};
-                //     KeyPathArray invalid_key_path_array = {invalid_key_path};
-                //     REQUIRE_THROWS(object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr)
-                //     {},
-                //                                                     invalid_key_path_array));
-                // }
+                SECTION("-> modifying related table 'table', property 'value 2'"
+                        "while observing related table 'table', property 'value 1'"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
 
-                SECTION(
-                    "a valid column key within a keypath that is not a last element and not a link throws an error") {
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
                 }
             }
         }
