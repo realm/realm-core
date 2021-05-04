@@ -1,7 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Change notifications can now be filtered via a key path. This keypath is passed via the `add_notification_callback` on `Object`, `Set`, `List` and `Result`.
+  If such a key path was provided when adding a notification callback it will only ever be executed when a changed property was covered by this filter.
+  Multiple key path filters can be provided when adding a single notification callback. 
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
