@@ -67,30 +67,32 @@ bool ObjectChangeSet::insertions_contains(ObjectKeyType obj) const
     return m_insertions.count(obj) > 0;
 }
 
-bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, std::vector<ColKey> filtered_col_keys) const
+bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, std::vector<ColKey> filtered_column_keys) const
 {
     // If there is no filter we just check if the object in question was changed which means its key (`obj`)
     // can be found withing the `m_modifications`.
-    if (filtered_col_keys.size() == 0) {
+    if (filtered_column_keys.size() == 0) {
         return m_modifications.count(obj) > 0;
     }
-    // If a filter was set we need to addionally check if ...
-    else {
-        if (m_modifications.count(obj) > 0) {
-            std::unordered_set<ColKeyType> object_map_to_column_set = m_modifications.at(obj);
-            for (auto column_key_type : object_map_to_column_set) {
-                for (auto column_key_in_filter : filtered_col_keys) {
-                    if (column_key_type == column_key_in_filter.value) {
-                        return true;
-                    }
-                }
+
+    // If a filter is set but the `obj` is not contained within the `m_modifcations` at all we do not need to check
+    // further.
+    if (m_modifications.count(obj) == 0) {
+        return false;
+    }
+
+    // If a filter was set we need to addionally check if the changed column is part of this filter.
+    std::unordered_set<ColKeyType> changed_columns_for_object = m_modifications.at(obj);
+    for (auto column_key_in_modifications : changed_columns_for_object) {
+        for (auto column_key_in_filter : filtered_column_keys) {
+            if (column_key_in_modifications == column_key_in_filter.value) {
+                // We can return on the first hit since we only need to decide wheather to notify or not.
+                return true;
             }
-            return false;
-        }
-        else {
-            return false;
         }
     }
+
+    return false;
 }
 
 const ObjectChangeSet::ObjectSet* ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const

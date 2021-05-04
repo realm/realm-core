@@ -2427,64 +2427,6 @@ TEST_CASE("notifications: results") {
                 }
             }
         }
-
-        SECTION("keypath filter with a backlink") {
-            auto col_second_link = table->get_column_key("second link");
-            auto backlink_column_key = table->get_opposite_column(col_link);
-            std::pair<TableKey, ColKey> linked_to_backlink_pair(linked_to_table, backlink_column_key);
-            std::pair<TableKey, ColKey> table_second_link_pair(root_table_key, col_second_link);
-            auto backlink_value_key_path_element = {linked_to_backlink_pair, table_value_pair};
-            auto backlink_second_link_key_path_element = {linked_to_backlink_pair, table_second_link_pair};
-            KeyPathArray backlink_value_key_path = {backlink_value_key_path_element};
-            KeyPathArray backlink_second_link_key_path = {backlink_second_link_key_path_element};
-            Results linked_to_results(r, linked_to_table);
-            int notification_calls_backlink_to_value = 0;
-            int notification_calls_backlink_to_second_link = 0;
-            CollectionChangeSet collection_change_set_backlink_to_value;
-            CollectionChangeSet collection_change_set_backlink_to_second_link;
-            auto token_backlink_value = linked_to_results.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
-                    collection_change_set_backlink_to_value = collection_change_set;
-                    ++notification_calls_backlink_to_value;
-                },
-                backlink_value_key_path);
-            auto token_backlink_second_value = linked_to_results.add_notification_callback(
-                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                    REQUIRE_FALSE(error);
-                    collection_change_set_backlink_to_second_link = collection_change_set;
-                    ++notification_calls_backlink_to_second_link;
-                },
-                backlink_second_link_key_path);
-            // We advance and notify once to have a clean start.
-            advance_and_notify(*r);
-            // Check the initial state after notifying once since this it what we're comparing against
-            // later.
-            REQUIRE(notification_calls_backlink_to_value == 1);
-            REQUIRE(collection_change_set_backlink_to_value.empty());
-            REQUIRE(notification_calls_backlink_to_second_link == 1);
-            REQUIRE(collection_change_set_backlink_to_second_link.empty());
-
-            write([&] {
-                table->get_object(object_keys[1]).set(col_value, 3);
-            });
-            //            REQUIRE(notification_calls_backlink_to_value == 2);
-            //            REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-            //            REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 0);
-            //            REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 0);
-            //            REQUIRE(notification_calls_backlink_to_second_link == 1);
-            //            REQUIRE(collection_change_set_backlink_to_second_link.empty());
-        }
-
-        // The non-filtered code stops at a depth of 4. Keypath filters can exceed that.
-        SECTION("keypath filter with more than 4 elements") {
-        }
-
-        SECTION("keypath with invalid table key throws an error") {
-        }
-
-        SECTION("keypath with invalid column key throws an error") {
-        }
     }
 
     SECTION("distinct notifications") {

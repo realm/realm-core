@@ -74,8 +74,9 @@ public:
     };
 
     /**
-     * `RelatedTable` is used to describe a the connections of a `Table` to other tables.
+     * `RelatedTable` is used to describe the connections of a `Table` to other tables.
      * Tables count as related if they can be reached via a forward link.
+     * A table counts as being related to itself.
      */
     struct RelatedTable {
         // The key of the table for which this struct holds all outgoing links.

@@ -50,8 +50,11 @@ using ObjKeyType = decltype(ObjKey::value);
 
 using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
 
-struct Callback {
-    // The actual callback to invoke
+// A `NotificationCallback` is added to a collection when observing it.
+// It contains all information necessary in case we need to notify about changes
+// to this collection.
+struct NotificationCallback {
+    // The callback function being invoked when we notify for changes in this collection.
     CollectionChangeCallback fn;
     // The pending changes accumulated on the worker thread. This field is
     // guarded by m_callback_mutex and is written to on the worker thread,
@@ -105,9 +108,15 @@ public:
      * @return A token which can be passed to `remove_callback()`.
      */
     uint64_t add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) REQUIRES(!m_callback_mutex);
-    // Remove a previously added token. The token is no longer valid after
-    // calling this function and must not be used again. This function can be
-    // called from any thread.
+
+    /**
+     * Remove a previously added token.
+     * The token is no longer valid after calling this function and must not be used again.
+     * This function can be called from any thread.
+     *
+     * @param token The token that was genereted and returned from `add_callback` is used in this function
+     *              to identify the callback that is supposed to be removed.
+     */
     void remove_callback(uint64_t token) REQUIRES(!m_callback_mutex);
 
     void suppress_next_notification(uint64_t token) REQUIRES(!m_callback_mutex);
@@ -192,13 +201,29 @@ protected:
     bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
                                                                                  ConstTableRef);
+
+    // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
     std::vector<KeyPathArray> get_key_path_arrays();
-    std::vector<ColKey> get_filtered_col_keys(bool root_table_only);
+    /**
+     * Collects all `ColKey`s for all `m_callback`s attached to this notifier. These keys can then be used to compare
+     * against the actual changes made to decide wheather or not we need to send notifications based on the key path
+     * filtered keys.
+     *
+     * @param only_for_root_table If set to true, the `ColKey`s will only be gather for the root table.
+     *
+     * @return A `std::vector` of all `ColKey`s in all `m_callback`s.
+     */
+    std::vector<ColKey> get_filtered_column_keys(bool only_for_root_table);
+    // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
+    // filter is attached to each of them.
     bool any_callbacks_filtered();
+    // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
+    // filter is attached to all of them.
     bool all_callbacks_filtered();
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
 
+    // A vector of all tables related to this table (including itself).
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     // Due to the keypath filtered notifications we need to update the related tables every time the callbacks do see
@@ -228,8 +253,8 @@ private:
     // while doing anything with them or m_callback_index
     util::CheckedMutex m_callback_mutex;
 
-    // All `Callback`s added to this `ColellectionNotifier` via `add_callback()`.
-    std::vector<Callback> m_callbacks;
+    // All `NotificationCallback`s added to this `ColellectionNotifier` via `add_callback()`.
+    std::vector<NotificationCallback> m_callbacks;
 
     // Cached value for if m_callbacks is empty, needed to avoid deadlocks in
     // run() due to lock-order inversion between m_callback_mutex and m_target_mutex
@@ -255,7 +280,7 @@ private:
     template <typename Fn>
     void for_each_callback(Fn&& fn) REQUIRES(!m_callback_mutex);
 
-    std::vector<Callback>::iterator find_callback(uint64_t token);
+    std::vector<NotificationCallback>::iterator find_callback(uint64_t token);
 };
 
 // A smart pointer to a CollectionNotifier that unregisters the notifier when

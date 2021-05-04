@@ -22,7 +22,6 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-// #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/impl/deep_change_checker.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/transact_log_handler.hpp>

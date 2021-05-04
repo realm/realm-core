@@ -53,15 +53,15 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
     // In this case we do not need a `DeepChangeChecker` and check the modifications against the
-    // `ObjectChangeSet` within the `TransactionChangeInfo` for this table.
+    // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
+        auto& object_chenge_set = info.tables.find(m_related_tables[0].table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             if (all_callbacks_filtered()) {
-                return object_set.modifications_contains(object_key, get_filtered_col_keys(true));
+                return object_chenge_set.modifications_contains(object_key, get_filtered_column_keys(true));
             }
             else {
-                return object_set.modifications_contains(object_key, {});
+                return object_chenge_set.modifications_contains(object_key, {});
             }
         };
     }
@@ -78,22 +78,22 @@ std::vector<KeyPathArray> CollectionNotifier::get_key_path_arrays()
     return key_path_arrays;
 }
 
-std::vector<ColKey> CollectionNotifier::get_filtered_col_keys(bool root_table_only)
+std::vector<ColKey> CollectionNotifier::get_filtered_column_keys(bool only_for_root_table)
 {
-    std::vector<ColKey> filtered_col_keys = {};
+    std::vector<ColKey> filtered_column_keys = {};
     for (auto key_path_array : get_key_path_arrays()) {
         for (auto key_path : key_path_array) {
-            if (root_table_only && key_path.size() != 0) {
-                filtered_col_keys.push_back(key_path[0].second);
+            if (only_for_root_table && key_path.size() != 0) {
+                filtered_column_keys.push_back(key_path[0].second);
             }
             else {
                 for (auto key_path_element : key_path) {
-                    filtered_col_keys.push_back(key_path_element.second);
+                    filtered_column_keys.push_back(key_path_element.second);
                 }
             }
         }
     }
-    return filtered_col_keys;
+    return filtered_column_keys;
 }
 
 bool CollectionNotifier::any_callbacks_filtered()
@@ -158,7 +158,7 @@ void CollectionNotifier::remove_callback(uint64_t token)
 {
     // the callback needs to be destroyed after releasing the lock as destroying
     // it could cause user code to be called
-    Callback old;
+    NotificationCallback old;
     {
         util::CheckedLockGuard lock(m_callback_mutex);
         auto it = find_callback(token);
@@ -202,7 +202,7 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
     }
 }
 
-std::vector<Callback>::iterator CollectionNotifier::find_callback(uint64_t token)
+std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(uint64_t token)
 {
     REALM_ASSERT(m_error || m_callbacks.size() > 0);
 

@@ -433,7 +433,6 @@ TEST_CASE("object") {
             KeyPathArray key_path_array_origin_to_target_value2 = {key_path_origin_to_target_value2};
 
             SECTION("callbacks on a single object") {
-
                 SECTION("modifying origin table 'table2', property 'value'"
                         "while observing origin table 'table2', property 'value'"
                         "-> DOES send a notification") {
@@ -529,7 +528,6 @@ TEST_CASE("object") {
             }
 
             SECTION("callbacks on linked objects") {
-
                 SECTION("-> modifying origin table 'table2', property 'value'"
                         "while observing related table 'table', property 'value 1'"
                         "-> does NOT send a notification") {
