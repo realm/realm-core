@@ -285,7 +285,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(ndx_ctx == ndx);
             found.push_back(ndx);
         }
-        std::sort(begin(found), end(found), std::less());
+        std::sort(begin(found), end(found), std::less<size_t>());
         std::vector<size_t> expected(keys.size());
         std::iota(begin(expected), end(expected), 0);
         REQUIRE(found == expected);
@@ -300,7 +300,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(ndx_ctx == ndx);
             found.push_back(ndx);
         }
-        std::sort(begin(found), end(found), std::less());
+        std::sort(begin(found), end(found), std::less<size_t>());
         std::vector<size_t> expected(values.size());
         std::iota(begin(expected), end(expected), 0);
         REQUIRE(found == expected);
