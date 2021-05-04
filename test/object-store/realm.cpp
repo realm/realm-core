@@ -539,7 +539,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 
     SECTION("can write a realm file without client file id") {
-        bool file_written = false;
+        ThreadSafeReference realm_ref;
         SyncTestFile config3(init_sync_manager.app(), "default");
         config3.schema = config.schema;
         config3.cache = false;
@@ -554,16 +554,16 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Create realm file without client file id
         {
             auto task = Realm::get_synchronized_realm(config2);
-            task->start([&](auto ref, auto error) {
+            task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
                 std::lock_guard<std::mutex> lock(mutex);
                 REQUIRE(!error);
-                SharedRealm realm = Realm::get_shared_realm(std::move(ref));
-                realm->write_copy(config3.path, BinaryData());
-                file_written = true;
+                realm_ref = std::move(ref);
             });
             util::EventLoop::main().run_until([&] {
-                return file_written;
+                return bool(realm_ref);
             });
+            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            realm->write_copy(config3.path, BinaryData());
         }
 
         // Create some more content on the server
