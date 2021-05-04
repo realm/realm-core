@@ -25,14 +25,7 @@
 
 using namespace realm;
 
-ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
-    : m_source_column_key(src.m_source_column_key)
-    , m_key_values(Allocator::get_default())
-{
-    REALM_ASSERT(false); // unimplemented
-}
-
-ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
+ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPolicy mode)
     : m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
     , m_key_values(Allocator::get_default())
@@ -64,6 +57,7 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
         m_key_values = src.m_key_values;
     }
     else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
+        // Requires that 'src' is a writable object
         m_key_values = std::move(src.m_key_values);
     else {
         m_key_values.create();

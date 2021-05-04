@@ -699,21 +699,23 @@ BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs) noexcept
     if (m_root)
         m_root->change_owner(this);
     m_size = rhs.m_size;
+    rhs.m_size = 0;
 
     return *this;
 }
 
 void BPlusTreeBase::create()
 {
-    REALM_ASSERT(!is_attached());
-    m_root = create_leaf_node(); // Throws
-    if (m_parent) {
-        ref_type ref = get_ref();
-        _impl::DeepArrayRefDestroyGuard destroy_guard{ref, get_alloc()};
-        m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
-        destroy_guard.release();
+    if (!m_root) {                   // Idempotent
+        m_root = create_leaf_node(); // Throws
+        if (m_parent) {
+            ref_type ref = get_ref();
+            _impl::DeepArrayRefDestroyGuard destroy_guard{ref, get_alloc()};
+            m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
+            destroy_guard.release();
+        }
+        m_root->bp_set_parent(m_parent, m_ndx_in_parent);
     }
-    m_root->bp_set_parent(m_parent, m_ndx_in_parent);
 }
 
 void BPlusTreeBase::destroy()
