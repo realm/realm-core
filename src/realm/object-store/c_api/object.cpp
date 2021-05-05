@@ -170,7 +170,7 @@ RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, c
 {
     return wrap_err([&]() {
         const auto realm = *live_realm;
-        auto live_object = frozen_object->freeze(realm);
+        auto live_object = frozen_object->thaw(realm);
         return new realm_object_t{std::move(live_object)};
     });
 }

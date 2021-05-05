@@ -428,7 +428,7 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
     });
 }
 
-RLM_API realm_results_t* realm_results_freeze(const realm_results_t* live_results, const realm_t* frozen_realm)
+RLM_API realm_results_t* realm_results_freeze(realm_results_t* live_results, const realm_t* frozen_realm)
 {
     return wrap_err([&]() {
         const auto realm = *frozen_realm;
@@ -437,7 +437,7 @@ RLM_API realm_results_t* realm_results_freeze(const realm_results_t* live_result
     });
 }
 
-RLM_API realm_results_t* realm_results_thaw(const realm_results_t* frozen_results, const realm_t* live_realm)
+RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm)
 {
     return wrap_err([&]() {
         const auto realm = *live_realm;

@@ -2328,6 +2328,103 @@ TEST_CASE("C API") {
         }
     }
 
+    SECTION("freeze and thaw") {
+
+        SECTION("realm") {
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            CHECK(!realm_is_frozen(realm));
+            CHECK(realm_is_frozen(frozen_realm.get()));
+
+            auto thawed_realm = cptr_checked(realm_thaw(frozen_realm.get()));
+            CHECK(realm_is_frozen(frozen_realm.get()));
+            CHECK(!realm_is_frozen(thawed_realm.get()));
+        }
+
+        SECTION("objects") {
+            // realm objects
+            CPtr<realm_object_t> obj1;
+            realm_value_t value;
+
+            write([&]() {
+                obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+            CHECK(checked(realm_get_value(obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "", value.string.size) == 0);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            auto frozen_obj1 = cptr_checked(realm_object_freeze(obj1.get(), frozen_realm.get()));
+            CHECK(frozen_obj1);
+
+            write([&]() {
+                CHECK(checked(realm_set_value(obj1.get(), foo_str_key, rlm_str_val("Hello, World!"), false)));
+            });
+
+            CHECK(checked(realm_get_value(obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
+
+            CHECK(checked(realm_get_value(frozen_obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "", value.string.size) == 0);
+
+            auto thawed_obj1 = cptr_checked(realm_object_thaw(frozen_obj1.get(), realm));
+            CHECK(thawed_obj1);
+            CHECK(checked(realm_get_value(thawed_obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
+        }
+
+        SECTION("results") {
+            // realm result
+            auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
+            // TODO What is the return value of delete_all?
+            realm_results_delete_all(results.get());
+
+            write([&]() {
+                // Ensure that we start from a known initial state
+                CHECK(realm_results_delete_all(results.get()));
+
+                auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+
+            size_t count;
+            realm_results_count(results.get(), &count);
+            CHECK(count == 1);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            auto frozen_results = cptr_checked(realm_results_freeze(results.get(), frozen_realm.get()));
+            write([&]() {
+                auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+            realm_results_count(frozen_results.get(), &count);
+            CHECK(count == 1);
+            realm_results_count(results.get(), &count);
+            CHECK(count == 2);
+
+            // TODO Freezing a result with a live realm crashes due to an assert. Is that fine or
+            //  do we need to handle it in a nicer way
+            // cptr_checked(realm_results_freeze(results.get(), realm));
+
+            auto thawed_results = cptr_checked(realm_results_thaw(frozen_results.get(), realm));
+            realm_results_count(thawed_results.get(), &count);
+            CHECK(count == 2);
+        }
+
+        SECTION("lists") {
+            // TODO
+        }
+
+        // TODO Do we need the ability to verify if results, objects, list, etc. are frozen and can
+        //  we do it generically then.
+
+        // TODO Do we need to verify that we cannot modify a frozen realm, etc.
+    }
+
+
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
     realm_release(realm);
