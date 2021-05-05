@@ -183,7 +183,6 @@ public:
     ConstTableView& operator=(const ConstTableView&);
     ConstTableView& operator=(ConstTableView&&) noexcept;
 
-    ConstTableView(const ConstTableView& source, Transaction* tr, PayloadPolicy mode);
     ConstTableView(ConstTableView& source, Transaction* tr, PayloadPolicy mode);
 
     ~ConstTableView()
@@ -246,7 +245,7 @@ public:
     // import_copy_of() machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode) const
+    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode)
     {
         std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, tr, mode));
         return retval;
@@ -474,7 +473,7 @@ public:
         return std::unique_ptr<TableView>(new TableView(*this));
     }
 
-    std::unique_ptr<TableView> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
+    std::unique_ptr<TableView> clone_for_handover(Transaction* tr, PayloadPolicy policy)
     {
         std::unique_ptr<TableView> retval(new TableView(*this, tr, policy));
         return retval;

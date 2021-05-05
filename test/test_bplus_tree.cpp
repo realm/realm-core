@@ -349,6 +349,22 @@ TEST(BPlusTree_Copy)
     another_tree.destroy();
 }
 
+TEST(BPlusTree_Move)
+{
+    BPlusTree<Int> tree(Allocator::get_default());
+
+    auto another_tree = create_bplustree_int();
+    CHECK_EQUAL(tree.size(), 0);
+    CHECK_EQUAL(another_tree.size(), 10);
+
+    tree = std::move(another_tree);
+    CHECK_EQUAL(tree.size(), 10);
+    CHECK_EQUAL(another_tree.size(), 0);
+
+    tree.destroy();
+    another_tree.destroy();
+}
+
 TEST(BPlusTree_Performance)
 {
     // We try to optimize for add and sequential lookup

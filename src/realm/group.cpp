@@ -380,6 +380,12 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+void Group::remove_sync_file_id()
+{
+    REALM_ASSERT(m_top.is_attached() && m_top.size() > s_sync_file_id_ndx);
+    m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(0));
+}
+
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
