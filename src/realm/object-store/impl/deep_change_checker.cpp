@@ -112,6 +112,27 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     , m_related_tables(related_tables)
     , m_key_path_arrays(key_path_arrays)
 {
+    // If all callbacks do have a filter, every `KeyPathArray` will have entries.
+    // In this case we need to check the `ColKey`s and pass the filtered columns
+    // to the checker.
+    // If at least one `NotificationCallback` does not have a filter we notify on any change.
+    // This is signaled by leaving the `filtered_columns_in_root_table` and
+    // `filtered_columns` empty.
+    auto all_callbacks_filtered = all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](auto key_path_array) {
+        return key_path_array.size() > 0;
+    });
+    if (all_callbacks_filtered) {
+        for (auto key_path_array : m_key_path_arrays) {
+            for (auto key_path : key_path_array) {
+                if (key_path.size() != 0) {
+                    m_filtered_columns_in_root_table.push_back(key_path[0].second);
+                }
+                for (auto key_path_element : key_path) {
+                    m_filtered_columns.push_back(key_path_element.second);
+                }
+            }
+        }
+    }
 }
 
 bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key,
@@ -208,35 +229,12 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, std::vecto
 
 bool DeepChangeChecker::operator()(ObjKeyType key)
 {
-    std::vector<ColKey> filtered_columns_in_root_table = {};
-    std::vector<ColKey> filtered_columns = {};
-
-    // If all callbacks do have a filter, every `KeyPathArray` will have entries.
-    // In this case we need to check the `ColKey`s and pass the filtered columns
-    // to the checker.
-    // If at least one `NotificationCallback` does not have a filter we notify on any change.
-    // This is signaled by leaving the `filtered_columns_in_root_table` and
-    // `filtered_columns` empty.
-    auto all_callbacks_filtered = all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](auto key_path_array) {
-        return key_path_array.size() > 0;
-    });
-    if (all_callbacks_filtered) {
-        for (auto key_path_array : m_key_path_arrays) {
-            for (auto key_path : key_path_array) {
-                if (key_path.size() != 0) {
-                    filtered_columns_in_root_table.push_back(key_path[0].second);
-                }
-                for (auto key_path_element : key_path) {
-                    filtered_columns.push_back(key_path_element.second);
-                }
-            }
-        }
-    }
-
-    // If the root object changes we do not need to iterate over every row since a notification needs to be sent
+    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
     // anyway.
-    if (m_root_object_changes && m_root_object_changes->modifications_contains(key, filtered_columns_in_root_table)) {
+    if (m_root_object_changes &&
+        m_root_object_changes->modifications_contains(key, m_filtered_columns_in_root_table)) {
         return true;
     }
-    return check_row(m_root_table, key, filtered_columns, 0);
+
+    return check_row(m_root_table, key, m_filtered_columns, 0);
 }

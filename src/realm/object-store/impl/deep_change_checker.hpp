@@ -154,6 +154,9 @@ private:
     // The `m_key_path_array` contains all columns filtered for. We need this when checking for
     // changes in `operator()` to make sure only columns actually filtered for send notifications.
     std::vector<KeyPathArray> m_key_path_arrays;
+    // Contains all `ColKey`s that we filter for in the root table.
+    std::vector<ColKey> m_filtered_columns_in_root_table;
+    std::vector<ColKey> m_filtered_columns;
     struct Path {
         int64_t obj_key;
         int64_t col_key;
