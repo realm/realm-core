@@ -189,7 +189,7 @@ public:
 
 protected:
     void add_changes(CollectionChangeBuilder change) REQUIRES(!m_callback_mutex);
-    void set_table(ConstTableRef table);
+    void set_table(ConstTableRef table) REQUIRES(!m_callback_mutex);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
     // signal that the underlying source object of the collection has been deleted
@@ -198,10 +198,12 @@ protected:
 
     bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
-                                                                                 ConstTableRef);
+                                                                                 ConstTableRef)
+        REQUIRES(!m_callback_mutex);
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
-    std::vector<KeyPathArray> get_key_path_arrays();
+    void recalculate_key_path_arrays() REQUIRES(m_callback_mutex);
+    std::vector<KeyPathArray> m_key_path_arrays;
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
     bool any_callbacks_filtered();
@@ -217,6 +219,10 @@ protected:
     // Due to the keypath filtered notifications we need to update the related tables every time the callbacks do see
     // a change since the list of related tables is filtered by the key paths used for the notifcations.
     bool m_did_modify_callbacks = true;
+
+    // Currently registered callbacks and a mutex which must always be held
+    // while doing anything with them or m_callback_index
+    util::CheckedMutex m_callback_mutex;
 
 private:
     virtual void do_attach_to(Transaction&) {}
@@ -236,10 +242,6 @@ private:
     bool m_has_run = false;
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
-
-    // Currently registered callbacks and a mutex which must always be held
-    // while doing anything with them or m_callback_index
-    util::CheckedMutex m_callback_mutex;
 
     // All `NotificationCallback`s added to this `ColellectionNotifier` via `add_callback()`.
     std::vector<NotificationCallback> m_callbacks;

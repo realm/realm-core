@@ -62,16 +62,15 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         };
     }
 
-    return DeepChangeChecker(info, *root_table, m_related_tables, get_key_path_arrays());
+    return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
 }
 
-std::vector<KeyPathArray> CollectionNotifier::get_key_path_arrays()
+void CollectionNotifier::recalculate_key_path_arrays()
 {
-    std::vector<KeyPathArray> key_path_arrays = {};
+    m_key_path_arrays = {};
     for (auto&& callback : m_callbacks) {
-        key_path_arrays.push_back(callback.key_path_array);
+        m_key_path_arrays.push_back(callback.key_path_array);
     }
-    return key_path_arrays;
 }
 
 bool CollectionNotifier::any_callbacks_filtered()
@@ -202,7 +201,9 @@ std::unique_lock<std::mutex> CollectionNotifier::lock_target()
 void CollectionNotifier::set_table(ConstTableRef table)
 {
     m_related_tables.clear();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, get_key_path_arrays(),
+    util::CheckedLockGuard lock(m_callback_mutex);
+    recalculate_key_path_arrays();
+    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_arrays,
                                                     all_callbacks_filtered());
 }
 
