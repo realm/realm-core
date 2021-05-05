@@ -55,13 +55,13 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // In this case we do not need a `DeepChangeChecker` and check the modifications against the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1) {
-        auto& object_chenge_set = info.tables.find(m_related_tables[0].table_key.value)->second;
+        auto& object_change_set = info.tables.find(m_related_tables[0].table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             if (all_callbacks_filtered()) {
-                return object_chenge_set.modifications_contains(object_key, get_filtered_column_keys(true));
+                return object_change_set.modifications_contains(object_key, get_filtered_column_keys(true));
             }
             else {
-                return object_chenge_set.modifications_contains(object_key, {});
+                return object_change_set.modifications_contains(object_key, {});
             }
         };
     }
