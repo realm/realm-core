@@ -44,7 +44,6 @@
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/version.hpp>
 #endif
 
 using namespace realm;

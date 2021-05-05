@@ -24,7 +24,7 @@
 #include <realm/sync/noinst/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
@@ -2305,7 +2305,7 @@ TEST(Sync_HTTP404NotFound)
     const util::HTTPResponse& response = client.get_response();
 
     CHECK(response.status == util::HTTPStatus::NotFound);
-    CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_SYNC_VER_STRING);
+    CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_VERSION_STRING);
 }
 
 

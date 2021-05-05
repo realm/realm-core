@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* A separate sync version is removed.
 
 ----------------------------------------------
 
