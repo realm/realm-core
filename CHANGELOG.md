@@ -1,9 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
 * Change notifications can now be filtered via a key path. This keypath is passed via the `add_notification_callback` on `Object`, `Set`, `List` and `Result`.
   If such a key path was provided when adding a notification callback it will only ever be executed when a changed property was covered by this filter.
-  Multiple key path filters can be provided when adding a single notification callback. 
+  Multiple key path filters can be provided when adding a single notification callback.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
