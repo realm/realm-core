@@ -1434,6 +1434,63 @@ protected:
     }
 };
 
+template <>
+class MixedNode<Equal> : public MixedNodeBase {
+public:
+    MixedNode<Equal>(Mixed v, ColKey column)
+        : MixedNodeBase(v, column)
+    {
+    }
+    MixedNode<Equal>(const MixedNode<Equal>& other)
+        : MixedNodeBase(other)
+        , m_has_search_index(other.m_has_search_index)
+    {
+    }
+    void init(bool will_query_ranges) override;
+
+    void cluster_changed() override
+    {
+        // If we use searchindex, we do not need further access to clusters
+        if (!m_has_search_index) {
+            MixedNodeBase::cluster_changed();
+        }
+    }
+
+    void table_changed() override
+    {
+        m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
+    }
+
+    bool has_search_index() const override
+    {
+        return m_has_search_index;
+    }
+
+    size_t find_first_local(size_t start, size_t end) override;
+
+    virtual std::string describe_condition() const override
+    {
+        return Equal::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new MixedNode<Equal>(*this));
+    }
+
+protected:
+    std::vector<ObjKey> m_index_matches;
+
+    ObjKey m_actual_key;
+    ObjKey m_last_start_key;
+    size_t m_results_start;
+    size_t m_results_ndx;
+    size_t m_results_end;
+    bool m_has_search_index = false;
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override;
+};
+
 class StringNodeBase : public ParentNode {
 public:
     using TConditionValue = StringData;
@@ -1753,7 +1810,6 @@ public:
             StringNodeBase::cluster_changed();
         }
     }
-
 
     size_t find_first_local(size_t start, size_t end) override;
 

@@ -5465,8 +5465,9 @@ TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId
     CHECK_NOT(table.find_first(col, type{}));
 }
 
-TEST(Query_Mixed)
+TEST_TYPES(Query_Mixed, std::true_type, std::false_type)
 {
+    bool has_index = TEST_TYPE::value;
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
@@ -5475,6 +5476,10 @@ TEST(Query_Mixed)
     auto col_link = origin->add_column(*table, "link");
     auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
+
+    if (has_index)
+        table->add_search_index(col_any);
+
     size_t int_over_50 = 0;
     size_t nb_strings = 0;
     for (int64_t i = 0; i < 100; i++) {
@@ -5495,6 +5500,8 @@ TEST(Query_Mixed)
     table->get_object(28).set(col_any, Mixed(BinaryData(str2bin)));
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+    table->get_object(80).set(col_any, Mixed("abcdefgh"));
+    table->get_object(81).set(col_any, Mixed(int64_t(0x6867666564636261)));
 
     auto it = table->begin();
     for (int64_t i = 0; i < 10; i++) {
@@ -5550,12 +5557,12 @@ TEST(Query_Mixed)
     CHECK_EQUAL(tv.size(), 3);
 
     tv = table->where().contains(col_any, StringData("TRIN"), false).find_all();
-    CHECK_EQUAL(tv.size(), 25);
+    CHECK_EQUAL(tv.size(), 24);
     tv = table->where().contains(col_any, Mixed("TRIN"), false).find_all();
-    CHECK_EQUAL(tv.size(), 25);
+    CHECK_EQUAL(tv.size(), 24);
 
     tv = table->where().like(col_any, StringData("Strin*")).find_all();
-    CHECK_EQUAL(tv.size(), 25);
+    CHECK_EQUAL(tv.size(), 24);
 
     tv = table->where().ends_with(col_any, StringData("4")).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
@@ -5577,7 +5584,10 @@ TEST(Query_Mixed)
     tv = (table->column<Mixed>(col_any) == 3.).find_all();
     CHECK_EQUAL(tv.size(), 3);
     tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
-    CHECK_EQUAL(tv.size(), 72);
+    CHECK_EQUAL(tv.size(), 71);
+
+    tv = (table->column<Mixed>(col_any) == StringData("abcdefgh")).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 
     ObjLink link_to_first = table->begin()->get_link();
     tv = (origin->column<Mixed>(col_mixed) == Mixed(link_to_first)).find_all();

@@ -201,6 +201,7 @@ public:
     bool is_unresolved_link() const;
     bool is_same_type(const Mixed& b) const;
     int compare(const Mixed& b) const;
+    int compare_utf8(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
         return compare(other) == 0;
@@ -226,6 +227,7 @@ public:
         return compare(other) >= 0;
     }
     size_t hash() const;
+    StringData get_index_data(std::array<char, 16>&) const;
     void use_buffer(std::string& buf);
 
 protected:

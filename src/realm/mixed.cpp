@@ -55,7 +55,7 @@ inline int compare_string(StringData a, StringData b)
 {
     if (a == b)
         return 0;
-    return utf8_compare(a, b) ? -1 : 1;
+    return a < b ? -1 : 1;
 }
 
 inline int compare_binary(BinaryData a, BinaryData b)
@@ -355,6 +355,16 @@ int Mixed::compare(const Mixed& b) const
     return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
 }
 
+int Mixed::compare_utf8(const Mixed& b) const
+{
+    if (is_type(type_String) && b.is_type(type_String)) {
+        auto a_val = get_string();
+        auto b_val = b.get_string();
+        return a_val == b_val ? 0 : utf8_compare(a_val, b_val) ? -1 : 1;
+    }
+    return compare(b);
+}
+
 template <class T>
 T Mixed::export_to_type() const noexcept
 {
@@ -492,6 +502,95 @@ size_t Mixed::hash() const
     }
 
     return hash;
+}
+
+StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
+{
+    if (is_null()) {
+        return {};
+    }
+    switch (get_type()) {
+        case type_Int: {
+            int64_t i = get_int();
+            const char* c = reinterpret_cast<const char*>(&i);
+            realm::safe_copy_n(c, sizeof(int64_t), buffer.data());
+            return StringData{buffer.data(), sizeof(int64_t)};
+        }
+        case type_Bool: {
+            int64_t i = get_bool() ? 1 : 0;
+            return Mixed(i).get_index_data(buffer);
+        }
+        case type_Float: {
+            auto v2 = get_float();
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(float), buffer.data());
+            return StringData{buffer.data(), sizeof(float)};
+        }
+        case type_Double: {
+            auto v2 = get_double();
+            int i = int(v2);
+            if (i == v2) {
+                return Mixed(i).get_index_data(buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(double), buffer.data());
+            return StringData{buffer.data(), sizeof(double)};
+        }
+        case type_String:
+            return get_string();
+        case type_Binary: {
+            auto bin = get_binary();
+            return {bin.data(), bin.size()};
+        }
+        case type_Timestamp: {
+            auto dt = get<Timestamp>();
+            int64_t s = dt.get_seconds();
+            int32_t ns = dt.get_nanoseconds();
+            constexpr size_t index_size = sizeof(s) + sizeof(ns);
+            const char* s_buf = reinterpret_cast<const char*>(&s);
+            const char* ns_buf = reinterpret_cast<const char*>(&ns);
+            realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
+            realm::safe_copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
+            return StringData{buffer.data(), index_size};
+        }
+        case type_ObjectId: {
+            auto id = get<ObjectId>();
+            memcpy(&buffer, &id, sizeof(ObjectId));
+            return StringData{buffer.data(), sizeof(ObjectId)};
+        }
+        case type_Decimal: {
+            auto v2 = this->get_decimal();
+            int64_t i;
+            if (v2.to_int(i)) {
+                return Mixed(i).get_index_data(buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(v2), buffer.data());
+            return StringData{buffer.data(), sizeof(v2)};
+        }
+        case type_UUID: {
+            auto id = get<UUID>();
+            const auto bytes = id.to_bytes();
+            std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+            return StringData{buffer.data(), bytes.size()};
+        }
+        case type_TypedLink: {
+            auto link = get<ObjLink>();
+            uint32_t k1 = link.get_table_key().value;
+            int64_t k2 = link.get_obj_key().value;
+            const char* src = reinterpret_cast<const char*>(&k1);
+            realm::safe_copy_n(src, sizeof(k1), buffer.data());
+            src = reinterpret_cast<const char*>(&k2);
+            realm::safe_copy_n(src, sizeof(k2), buffer.data() + sizeof(k1));
+            return StringData{buffer.data(), sizeof(k1) + sizeof(k2)};
+        }
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+            break;
+    }
+    REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
+    return {};
 }
 
 void Mixed::use_buffer(std::string& buf)
