@@ -6,7 +6,7 @@
 #include <realm/util/features.h>
 #include <realm/util/scope_exit.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -1533,7 +1533,7 @@ void ClientHistoryImpl::record_current_schema_version(Array& schema_versions, ve
         Array sv_library_versions{alloc};
         sv_library_versions.set_parent(&schema_versions, s_sv_library_versions_iip);
         sv_library_versions.init_from_parent();
-        const char* library_version = REALM_SYNC_VER_STRING;
+        const char* library_version = REALM_VERSION_STRING;
         std::size_t size = std::strlen(library_version);
         Array value{alloc};
         bool context_flag = false;

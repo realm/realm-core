@@ -90,7 +90,6 @@ set(SYNC_INSTALL_HEADERS
     permissions.hpp
     protocol.hpp
     transform.hpp
-    version.hpp
 )
 
 set(NOINST_HEADERS

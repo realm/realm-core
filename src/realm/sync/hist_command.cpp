@@ -19,7 +19,7 @@
 #include <realm/util/load_file.hpp>
 #include <realm/noinst/server_history.hpp>
 #include <realm/group.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/protocol.hpp>
 
@@ -2271,7 +2271,7 @@ int main(int argc, char* argv[])
 #else
             build_mode = "Release";
 #endif
-            std::cerr << "RealmSync/" REALM_SYNC_VER_STRING " (build_mode=" << build_mode << ")\n";
+            std::cerr << "RealmSync/" REALM_VERSION_STRING " (build_mode=" << build_mode << ")\n";
             return EXIT_SUCCESS;
         }
 
