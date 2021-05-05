@@ -202,16 +202,6 @@ protected:
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
     std::vector<KeyPathArray> get_key_path_arrays();
-    /**
-     * Collects all filtered `ColKey`s for a given `Table` from all `m_callback`s attached to this notifier. These
-     * keys can then be used to compare against the actual changes made to decide wheather or not we need to send
-     * notifications based on the key path filtered keys.
-     *
-     * @param table_key The table for which the filtered columns should be extracted from the key paths.
-     *
-     * @return A `std::vector` of all `ColKey`s in all `m_callback`s for the given `TableKey`.
-     */
-    std::vector<ColKey> get_filtered_column_keys(TableKey table_key);
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
     bool any_callbacks_filtered();

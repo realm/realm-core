@@ -54,20 +54,12 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
     // In this case we do not need a `DeepChangeChecker` and check the modifications against the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
-    if (m_related_tables.size() == 1) {
+    if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
         auto root_table_key = m_related_tables[0].table_key;
         auto& object_change_set = info.tables.find(root_table_key.value)->second;
-        if (all_callbacks_filtered()) {
-            auto filtered_column_keys_for_root_table = get_filtered_column_keys(root_table_key);
-            return [&, filtered_column_keys_for_root_table](ObjectChangeSet::ObjectKeyType object_key) {
-                return object_change_set.modifications_contains(object_key, filtered_column_keys_for_root_table);
-            };
-        }
-        else {
-            return [&](ObjectChangeSet::ObjectKeyType object_key) {
-                return object_change_set.modifications_contains(object_key, {});
-            };
-        }
+        return [&](ObjectChangeSet::ObjectKeyType object_key) {
+            return object_change_set.modifications_contains(object_key, {});
+        };
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables, get_key_path_arrays());
@@ -80,19 +72,6 @@ std::vector<KeyPathArray> CollectionNotifier::get_key_path_arrays()
         key_path_arrays.push_back(callback.key_path_array);
     }
     return key_path_arrays;
-}
-
-std::vector<ColKey> CollectionNotifier::get_filtered_column_keys(TableKey table_key)
-{
-    std::vector<ColKey> filtered_column_keys = {};
-    for (auto&& key_path_array : get_key_path_arrays()) {
-        for (auto&& key_path : key_path_array) {
-            if (key_path.size() != 0 && key_path[0].first == table_key) {
-                filtered_column_keys.push_back(key_path[0].second);
-            }
-        }
-    }
-    return filtered_column_keys;
 }
 
 bool CollectionNotifier::any_callbacks_filtered()
