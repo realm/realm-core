@@ -1232,7 +1232,7 @@ void ClientHistoryImpl::trim_sync_history()
     do_trim_sync_history(n); // Throws
 }
 
-bool ClientHistoryImpl::is_clean(version_type version) const
+bool ClientHistoryImpl::no_pending_local_changes(version_type version) const
 {
     ensure_updated(version);
     for (size_t i = 0; i < m_sync_history_size; i++) {
@@ -1410,13 +1410,13 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
     REALM_ASSERT(client_file_ident != 0);
     using Instruction = realm::sync::Instruction;
-    bool did_modify;
-    auto promote_global_key = [&](GlobalKey* oid) {
+    auto promote_global_key = [client_file_ident](GlobalKey* oid) {
         if (oid->hi() == 0) {
             // client_file_ident == 0
             *oid = GlobalKey{uint64_t(client_file_ident), oid->lo()};
-            did_modify = true;
+            return true;
         }
+        return false;
     };
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
@@ -1442,7 +1442,7 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
         sync::parse_changeset(in, log);
 
         size_t size_before = changeset.size();
-        did_modify = false;
+        bool did_modify = false;
         auto last_class_name = sync::InternString::npos;
         ConstTableRef selected_table;
         for (auto instr : log) {
@@ -1459,7 +1459,7 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
                 // Fix up instructions using GlobalKey to identify objects.
                 if (auto global_key = mpark::get_if<GlobalKey>(&obj_instr->object)) {
-                    promote_global_key(global_key);
+                    did_modify = promote_global_key(global_key);
                 }
 
                 // Fix up the payload for Set and ArrayInsert.
@@ -1473,7 +1473,7 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
                 if (payload && payload->type == Instruction::Payload::Type::Link) {
                     if (auto global_key = mpark::get_if<GlobalKey>(&payload->data.link.target)) {
-                        promote_global_key(global_key);
+                        did_modify = promote_global_key(global_key);
                     }
                 }
             }

@@ -1510,8 +1510,8 @@ void DB::write_copy(StringData path, util::Optional<const char*> output_encrypti
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
 
     auto tr = start_write();
-    if (!tr->get_history()->is_clean(tr->get_version())) {
-        throw std::runtime_error("Client changes not integrated in server");
+    if (!tr->get_history()->no_pending_local_changes(tr->get_version())) {
+        throw std::runtime_error("Could not write file as not all client changes are integrated in server");
     }
     tr->remove_sync_file_id();
     tr->write(path, write_key, info->latest_version_number, true);

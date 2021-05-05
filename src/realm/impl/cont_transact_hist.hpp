@@ -113,7 +113,9 @@ public:
 
     virtual void verify() const = 0;
 
-    virtual bool is_clean(version_type) const
+    /// Returns true if all local changes has been integrated on the server.
+    /// The history is effectively clean
+    virtual bool no_pending_local_changes(version_type) const
     {
         return true;
     }

@@ -347,7 +347,7 @@ private:
     void set_oldest_bound_version(version_type) override final;
     BinaryData get_uncommitted_changes() const noexcept override final;
     void verify() const override final;
-    bool is_clean(version_type version) const final;
+    bool no_pending_local_changes(version_type version) const final;
 };
 
 
