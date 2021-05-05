@@ -74,7 +74,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 std::vector<KeyPathArray> CollectionNotifier::get_key_path_arrays()
 {
     std::vector<KeyPathArray> key_path_arrays = {};
-    for (auto callback : m_callbacks) {
+    for (auto&& callback : m_callbacks) {
         key_path_arrays.push_back(callback.key_path_array);
     }
     return key_path_arrays;
