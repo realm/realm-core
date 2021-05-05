@@ -70,7 +70,7 @@ bool ObjectChangeSet::insertions_contains(ObjectKeyType obj) const
 bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, std::vector<ColKey> filtered_column_keys) const
 {
     // If there is no filter we just check if the object in question was changed which means its key (`obj`)
-    // can be found withing the `m_modifications`.
+    // can be found within the `m_modifications`.
     if (filtered_column_keys.size() == 0) {
         return m_modifications.count(obj) > 0;
     }

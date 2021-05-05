@@ -55,10 +55,11 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // In this case we do not need a `DeepChangeChecker` and check the modifications against the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1) {
-        auto& object_change_set = info.tables.find(m_related_tables[0].table_key.value)->second;
+        auto root_table_key = m_related_tables[0].table_key;
+        auto& object_change_set = info.tables.find(root_table_key.value)->second;
         if (all_callbacks_filtered()) {
-            return [&](ObjectChangeSet::ObjectKeyType object_key) {
-                return object_change_set.modifications_contains(object_key, get_filtered_column_keys(true));
+            return [&, root_table_key](ObjectChangeSet::ObjectKeyType object_key) {
+                return object_change_set.modifications_contains(object_key, get_filtered_column_keys(root_table_key));
             };
         }
         else {
@@ -80,18 +81,13 @@ std::vector<KeyPathArray> CollectionNotifier::get_key_path_arrays()
     return key_path_arrays;
 }
 
-std::vector<ColKey> CollectionNotifier::get_filtered_column_keys(bool only_for_root_table)
+std::vector<ColKey> CollectionNotifier::get_filtered_column_keys(TableKey table_key)
 {
     std::vector<ColKey> filtered_column_keys = {};
-    for (auto key_path_array : get_key_path_arrays()) {
-        for (auto key_path : key_path_array) {
-            if (only_for_root_table && key_path.size() != 0) {
+    for (auto&& key_path_array : get_key_path_arrays()) {
+        for (auto&& key_path : key_path_array) {
+            if (key_path.size() != 0 && key_path[0].first == table_key) {
                 filtered_column_keys.push_back(key_path[0].second);
-            }
-            else {
-                for (auto key_path_element : key_path) {
-                    filtered_column_keys.push_back(key_path_element.second);
-                }
             }
         }
     }
