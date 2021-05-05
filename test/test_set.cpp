@@ -126,10 +126,12 @@ TEST(Set_Mixed)
     std::transform(begin(sorted_indices), end(sorted_indices), std::back_inserter(sorted), [&](size_t index) {
         return set.get(index);
     });
-    CHECK(std::equal(begin(sorted), end(sorted), set.begin()));
-    auto sorted2 = sorted;
-    std::sort(begin(sorted2), end(sorted2), SetElementLessThan<Mixed>{});
-    CHECK(sorted2 == sorted);
+    auto expected = sorted;
+    std::sort(begin(expected), end(expected), [](auto v1, auto v2) {
+        // sorting uses Mixed comparison which is a different ordering then what is stored in the file
+        return v1 < v2;
+    });
+    CHECK(expected == sorted);
 }
 
 TEST(Set_Links)

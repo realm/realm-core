@@ -787,6 +787,18 @@ inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
     set_sorted_indices(sz, indices, ascending);
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (ascending) {
+            std::sort(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
+                return get_any(i1) < get_any(i2);
+            });
+        }
+        else {
+            std::sort(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
+                return get_any(i1) > get_any(i2);
+            });
+        }
+    }
 }
 
 template <class T>
