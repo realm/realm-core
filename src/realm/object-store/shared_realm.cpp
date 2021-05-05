@@ -715,14 +715,14 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData key)
+void Realm::write_copy(StringData path, BinaryData key, bool allow_overwrite)
 {
     if (key.data() && key.size() != 64) {
         throw InvalidEncryptionKeyException();
     }
     verify_thread();
     try {
-        read_group().write(path, key.data());
+        m_coordinator->write_copy(path, key, allow_overwrite);
     }
     catch (...) {
         _impl::translate_file_exception(path);
