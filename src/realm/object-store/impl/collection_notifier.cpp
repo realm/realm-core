@@ -96,26 +96,16 @@ std::vector<ColKey> CollectionNotifier::get_filtered_column_keys(TableKey table_
 
 bool CollectionNotifier::any_callbacks_filtered()
 {
-    return any_of(begin(m_callbacks), end(m_callbacks), [](auto callback) {
-        if (callback.key_path_array.size() > 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+    return any_of(begin(m_callbacks), end(m_callbacks), [](auto& callback) {
+        return callback.key_path_array.size() > 0;
     });
 }
 
 
 bool CollectionNotifier::all_callbacks_filtered()
 {
-    return all_of(begin(m_callbacks), end(m_callbacks), [](auto callback) {
-        if (callback.key_path_array.size() > 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+    return all_of(begin(m_callbacks), end(m_callbacks), [](auto& callback) {
+        return callback.key_path_array.size() > 0;
     });
 }
 
