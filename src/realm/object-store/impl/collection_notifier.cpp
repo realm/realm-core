@@ -58,8 +58,9 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         auto root_table_key = m_related_tables[0].table_key;
         auto& object_change_set = info.tables.find(root_table_key.value)->second;
         if (all_callbacks_filtered()) {
-            return [&, root_table_key](ObjectChangeSet::ObjectKeyType object_key) {
-                return object_change_set.modifications_contains(object_key, get_filtered_column_keys(root_table_key));
+            auto filtered_column_keys_for_root_table = get_filtered_column_keys(root_table_key);
+            return [&, filtered_column_keys_for_root_table](ObjectChangeSet::ObjectKeyType object_key) {
+                return object_change_set.modifications_contains(object_key, filtered_column_keys_for_root_table);
             };
         }
         else {
