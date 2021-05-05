@@ -928,6 +928,9 @@ SyncSession::PublicState SyncSession::get_public_state() const
     else if (m_state == &State::inactive) {
         return PublicState::Inactive;
     }
+    else if (m_state == &State::waiting_for_access_token) {
+        return PublicState::WaitingForAccessToken;
+    }
     REALM_UNREACHABLE();
 }
 

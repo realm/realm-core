@@ -116,6 +116,7 @@ public:
         Active,
         Dying,
         Inactive,
+        WaitingForAccessToken,
     };
 
     enum class ConnectionState {
