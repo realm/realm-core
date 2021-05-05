@@ -118,7 +118,7 @@ TEMPLATE_TEST_CASE("set all types", "[set]", cf::MixedVal, cf::Int, cf::Bool, cf
                     REQUIRE(set_as_results.get_any(res_ndx) == Mixed{T(val)});
                 }
                 // we do not require any particular ordering
-                std::sort(begin(found_indices), end(found_indices), std::less());
+                std::sort(begin(found_indices), end(found_indices), std::less<size_t>());
                 std::vector<size_t> expected_indices(values.size());
                 std::iota(begin(expected_indices), end(expected_indices), 0);
                 REQUIRE(found_indices == expected_indices);
