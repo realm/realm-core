@@ -56,14 +56,16 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1) {
         auto& object_change_set = info.tables.find(m_related_tables[0].table_key.value)->second;
-        return [&](ObjectChangeSet::ObjectKeyType object_key) {
-            if (all_callbacks_filtered()) {
+        if (all_callbacks_filtered()) {
+            return [&](ObjectChangeSet::ObjectKeyType object_key) {
                 return object_change_set.modifications_contains(object_key, get_filtered_column_keys(true));
-            }
-            else {
+            };
+        }
+        else {
+            return [&](ObjectChangeSet::ObjectKeyType object_key) {
                 return object_change_set.modifications_contains(object_key, {});
-            }
-        };
+            };
+        }
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables, get_key_path_arrays());
