@@ -2329,7 +2329,6 @@ TEST_CASE("C API") {
     }
 
     SECTION("freeze and thaw") {
-
         SECTION("realm") {
             auto frozen_realm = cptr_checked(realm_freeze(realm));
             CHECK(!realm_is_frozen(realm));
@@ -2341,7 +2340,6 @@ TEST_CASE("C API") {
         }
 
         SECTION("objects") {
-            // realm objects
             CPtr<realm_object_t> obj1;
             realm_value_t value;
 
@@ -2377,7 +2375,6 @@ TEST_CASE("C API") {
         }
 
         SECTION("results") {
-            // realm result
             auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
             // TODO What is the return value of delete_all?
             realm_results_delete_all(results.get());
