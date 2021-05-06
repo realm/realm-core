@@ -172,7 +172,7 @@ TableRef Obj::get_target_table(ObjLink link) const
 bool Obj::update() const
 {
     // Get a new object from key
-    Obj new_obj = get_tree_top()->get(m_key);
+    Obj new_obj = get_tree_top()->get(m_key); // Throws `KeyNotFound`
 
     bool changes = (m_mem.get_addr() != new_obj.m_mem.get_addr()) || (m_row_ndx != new_obj.m_row_ndx);
     if (changes) {
@@ -192,6 +192,27 @@ inline bool Obj::_update_if_needed() const
         return update();
     }
     return false;
+}
+
+UpdateStatus Obj::update_if_needed_with_status() const
+{
+    auto current_version = get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        ClusterNode::State state = get_tree_top()->try_get(m_key);
+
+        if (!state) {
+            return UpdateStatus::Detached;
+        }
+
+        // Always update versions
+        m_storage_version = current_version;
+        if ((m_mem.get_addr() != state.mem.get_addr()) || (m_row_ndx != state.index)) {
+            m_mem = state.mem;
+            m_row_ndx = state.index;
+            return UpdateStatus::Updated;
+        }
+    }
+    return UpdateStatus::NoChange;
 }
 
 template <class T>
@@ -252,7 +273,7 @@ ObjKey Obj::get_unfiltered_link(ColKey col_key) const
 template <>
 int64_t Obj::_get<int64_t>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
@@ -307,7 +328,7 @@ bool Obj::get<bool>(ColKey col_key) const
 template <>
 StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
@@ -332,7 +353,7 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
 template <>
 BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
