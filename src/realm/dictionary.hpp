@@ -156,7 +156,8 @@ public:
     Iterator end() const;
 
 private:
-    friend class DictionaryAggregate;
+    template <typename T, typename Op>
+    friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
     mutable DictionaryClusterTree* m_clusters = nullptr;
     DataType m_key_type = type_String;

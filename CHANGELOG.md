@@ -23,6 +23,7 @@
 * The function `util::Scheduler::get_frozen()` was deprecated in favor of `util::Scheduler::make_frozen()`, which has the same behavior.
 * The DB class now supports opening a realm file on a write-only file system.
   ([#4582](https://github.com/realm/realm-core/pull/4582))
+* The `ListColumnAggregate` has been renamed to `CollectionColumnAggregate` which now supports dictionaries instead of having a separate type `DictionaryAggregate` which is now removed. This allows `ColumnsCollection` min/max/sum/avg to work on dictionary column queries as well.
 
 ----------------------------------------------
 

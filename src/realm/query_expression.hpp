@@ -138,6 +138,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/table.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
@@ -2810,7 +2811,7 @@ private:
 template <typename T>
 class ListColumns;
 template <typename T, typename Operation>
-class ListColumnAggregate;
+class CollectionColumnAggregate;
 namespace aggregate_operations {
 template <typename T>
 class Minimum;
@@ -2957,22 +2958,22 @@ public:
         return TypeOfValueOperator<T>(this->clone());
     }
 
-    ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    CollectionColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
     {
         return {*this};
     }
 
-    ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    CollectionColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
     {
         return {*this};
     }
 
-    ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    CollectionColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
     {
         return {*this};
     }
 
-    ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    CollectionColumnAggregate<T, aggregate_operations::Average<T>> average() const
     {
         return {*this};
     }
@@ -3132,10 +3133,6 @@ public:
         // Not supported for Dictionary
         return {};
     }
-    std::unique_ptr<Subexpr> max_of() override;
-    std::unique_ptr<Subexpr> min_of() override;
-    std::unique_ptr<Subexpr> sum_of() override;
-    std::unique_ptr<Subexpr> avg_of() override;
 
     void evaluate(size_t index, ValueBase& destination) override;
 
@@ -3409,81 +3406,117 @@ SizeOperator<int64_t> ColumnsCollection<T>::size()
 }
 
 template <typename T, typename Operation>
-class ListColumnAggregate : public Subexpr2<decltype(Operation().result())> {
+class CollectionColumnAggregate : public Subexpr2<decltype(Operation().result())> {
 public:
-
-    ListColumnAggregate(ColumnsCollection<T> column)
-        : m_list(std::move(column))
+    CollectionColumnAggregate(ColumnsCollection<T> column)
+        : m_columns_collection(std::move(column))
     {
+        if (m_columns_collection.m_column_key.is_dictionary()) {
+            m_dictionary_key_type = m_columns_collection.m_link_map.get_target_table()->get_dictionary_key_type(
+                m_columns_collection.m_column_key);
+        }
     }
 
-    ListColumnAggregate(const ListColumnAggregate& other)
-        : m_list(other.m_list)
+    CollectionColumnAggregate(const CollectionColumnAggregate& other)
+        : m_columns_collection(other.m_columns_collection)
+        , m_dictionary_key_type(other.m_dictionary_key_type)
     {
     }
 
     std::unique_ptr<Subexpr> clone() const override
     {
-        return make_subexpr<ListColumnAggregate>(*this);
+        return make_subexpr<CollectionColumnAggregate>(*this);
     }
 
     ConstTableRef get_base_table() const override
     {
-        return m_list.get_base_table();
+        return m_columns_collection.get_base_table();
     }
 
     void set_base_table(ConstTableRef table) override
     {
-        m_list.set_base_table(table);
+        m_columns_collection.set_base_table(table);
     }
 
     void set_cluster(const Cluster* cluster) override
     {
-        m_list.set_cluster(cluster);
+        m_columns_collection.set_cluster(cluster);
     }
 
     void collect_dependencies(std::vector<TableKey>& tables) const override
     {
-        m_list.collect_dependencies(tables);
+        m_columns_collection.collect_dependencies(tables);
     }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Allocator& alloc = m_list.get_alloc();
-        Value<int64_t> list_refs;
-        m_list.get_lists(index, list_refs, 1);
-        size_t sz = list_refs.size();
-        REALM_ASSERT_DEBUG(sz > 0 || list_refs.m_from_link_list);
-        // The result is an aggregate value for each table
-        destination.init_for_links(!list_refs.m_from_link_list, sz);
-        for (size_t i = 0; i < list_refs.size(); i++) {
-            auto list_ref = to_ref(list_refs[i].get_int());
-            Operation op;
-            if (list_ref) {
-                if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
-                    if (m_list.m_is_nullable_storage) {
-                        accumulate<util::Optional<T>>(op, alloc, list_ref);
+        if (m_dictionary_key_type) {
+            if (m_columns_collection.links_exist()) {
+                std::vector<ObjKey> links = m_columns_collection.m_link_map.get_links(index);
+                auto sz = links.size();
+
+                destination.init_for_links(m_columns_collection.m_link_map.only_unary_links(), sz);
+                for (size_t t = 0; t < sz; t++) {
+                    const Obj obj = m_columns_collection.m_link_map.get_target_table()->get_object(links[t]);
+                    auto dict = obj.get_dictionary(m_columns_collection.m_column_key);
+                    if (dict.size() > 0) {
+                        destination.set(t, do_dictionary_agg(*dict.m_clusters));
+                    }
+                    else {
+                        destination.set_null(t);
+                    }
+                }
+            }
+            else {
+                if (m_columns_collection.m_leaf_ptr->get(index)) {
+                    Allocator& alloc = m_columns_collection.get_base_table()->get_alloc();
+                    DictionaryClusterTree dict_cluster(static_cast<Array*>(m_columns_collection.m_leaf_ptr),
+                                                       *m_dictionary_key_type, alloc, index);
+                    dict_cluster.init_from_parent();
+                    destination.set(0, do_dictionary_agg(dict_cluster));
+                }
+                else {
+                    destination.set_null(0);
+                }
+            }
+        }
+        else {
+            Allocator& alloc = m_columns_collection.get_alloc();
+            Value<int64_t> list_refs;
+            m_columns_collection.get_lists(index, list_refs, 1);
+            size_t sz = list_refs.size();
+            REALM_ASSERT_DEBUG(sz > 0 || list_refs.m_from_link_list);
+            // The result is an aggregate value for each table
+            destination.init_for_links(!list_refs.m_from_link_list, sz);
+            for (size_t i = 0; i < list_refs.size(); i++) {
+                auto list_ref = to_ref(list_refs[i].get_int());
+                Operation op;
+                if (list_ref) {
+                    if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
+                        if (m_columns_collection.m_is_nullable_storage) {
+                            accumulate<util::Optional<T>>(op, alloc, list_ref);
+                        }
+                        else {
+                            accumulate<T>(op, alloc, list_ref);
+                        }
                     }
                     else {
                         accumulate<T>(op, alloc, list_ref);
                     }
                 }
-                else {
-                    accumulate<T>(op, alloc, list_ref);
+                if (op.is_null()) {
+                    destination.set_null(i);
                 }
-            }
-            if (op.is_null()) {
-                destination.set_null(i);
-            }
-            else {
-                destination.set(i, op.result());
+                else {
+                    destination.set(i, op.result());
+                }
             }
         }
     }
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        return m_list.description(state) + util::serializer::value_separator + Operation::description();
+        return m_columns_collection.description(state) + util::serializer::value_separator + Operation::description();
     }
 
 private:
@@ -3505,7 +3538,26 @@ private:
             }
         }
     }
-    ColumnsCollection<T> m_list;
+
+    Mixed do_dictionary_agg(const DictionaryClusterTree& dict_cluster)
+    {
+        if constexpr (std::is_same_v<Operation, aggregate_operations::Maximum<Mixed>>) {
+            return dict_cluster.max();
+        }
+        else if constexpr (std::is_same_v<Operation, aggregate_operations::Minimum<Mixed>>) {
+            return dict_cluster.min();
+        }
+        else if constexpr (std::is_same_v<Operation, aggregate_operations::Average<Mixed>>) {
+            return dict_cluster.avg();
+        }
+        else if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
+            return dict_cluster.sum();
+        }
+        REALM_UNREACHABLE();
+    }
+
+    ColumnsCollection<T> m_columns_collection;
+    util::Optional<DataType> m_dictionary_key_type;
 };
 
 template <class Operator>
