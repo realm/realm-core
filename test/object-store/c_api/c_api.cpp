@@ -2401,10 +2401,6 @@ TEST_CASE("C API") {
             realm_results_count(results.get(), &count);
             CHECK(count == 2);
 
-            // TODO Freezing a result with a live realm crashes due to an assert. Is that fine or
-            //  do we need to handle it in a nicer way
-            // cptr_checked(realm_results_freeze(results.get(), realm));
-
             auto thawed_results = cptr_checked(realm_results_thaw(frozen_results.get(), realm));
             realm_results_count(thawed_results.get(), &count);
             CHECK(count == 2);
@@ -2441,11 +2437,6 @@ TEST_CASE("C API") {
             realm_list_size(thawed_list.get(), &count);
             CHECK(count == 1);
         }
-
-        // TODO Do we need the ability to verify if results, objects, list, etc. are frozen and can
-        //  we do it generically then.
-
-        // TODO Do we need to verify that we cannot modify a frozen realm, etc.
     }
 
     realm_close(realm);
