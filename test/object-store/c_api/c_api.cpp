@@ -2376,7 +2376,6 @@ TEST_CASE("C API") {
 
         SECTION("results") {
             auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
-            // TODO What is the return value of delete_all?
             realm_results_delete_all(results.get());
 
             write([&]() {
@@ -2412,7 +2411,35 @@ TEST_CASE("C API") {
         }
 
         SECTION("lists") {
-            // TODO
+            CPtr<realm_object_t> obj1;
+            size_t count;
+
+            write([&]() {
+                obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(1)));
+                CHECK(obj1);
+            });
+
+            auto list = cptr_checked(realm_get_list(obj1.get(), bar_strings_property.key));
+            realm_list_size(list.get(), &count);
+            CHECK(count == 0);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            auto frozen_list = cptr_checked(realm_list_freeze(list.get(), frozen_realm.get()));
+            realm_list_size(frozen_list.get(), &count);
+            CHECK(count == 0);
+
+            write([&]() {
+                checked(realm_list_insert(list.get(), 0, rlm_str_val("Hello")));
+            });
+
+            realm_list_size(frozen_list.get(), &count);
+            CHECK(count == 0);
+            realm_list_size(list.get(), &count);
+            CHECK(count == 1);
+
+            auto thawed_list = cptr_checked(realm_list_thaw(frozen_list.get(), realm));
+            realm_list_size(thawed_list.get(), &count);
+            CHECK(count == 1);
         }
 
         // TODO Do we need the ability to verify if results, objects, list, etc. are frozen and can
@@ -2420,7 +2447,6 @@ TEST_CASE("C API") {
 
         // TODO Do we need to verify that we cannot modify a frozen realm, etc.
     }
-
 
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
