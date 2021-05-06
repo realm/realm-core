@@ -145,7 +145,7 @@ public:
     template <typename Func>
     void find_all(value_type value, Func&& func) const
     {
-        if (m_valid && init_from_parent())
+        if (update())
             m_tree->find_all(value, std::forward<Func>(func));
     }
 
@@ -154,26 +154,100 @@ public:
         return *m_tree;
     }
 
+    UpdateStatus update_if_needed() const final
+    {
+        auto status = Base::update_if_needed();
+        switch (status) {
+            case UpdateStatus::Detached: {
+                m_tree.reset();
+                return UpdateStatus::Detached;
+            }
+            case UpdateStatus::NoChange:
+                if (m_tree && m_tree->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(false);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+        REALM_UNREACHABLE();
+    }
+
+    UpdateStatus ensure_writable(bool allow_create) final
+    {
+        auto status = Base::ensure_writable(allow_create);
+        switch (status) {
+            case UpdateStatus::Detached:
+                break; // Not possible (would have thrown earlier).
+            case UpdateStatus::NoChange: {
+                if (m_tree && m_tree->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            }
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(allow_create);
+                REALM_ASSERT(attached || !allow_create);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+
+        REALM_UNREACHABLE();
+    }
+
 protected:
-    void ensure_created();
+    // `do_` methods here perform the action after preconditions have been
+    // checked (bounds check, writability, etc.).
     void do_set(size_t ndx, T value);
     void do_insert(size_t ndx, T value);
     void do_remove(size_t ndx);
 
-    friend class LnkLst;
-
+    // FIXME: BPlusTree must be wrapped in an `std::unique_ptr` for the
+    // following reasons:
+    // - It is not default-constructible, due to its `Allocator&` member.
+    // - Its move/copy assignment operators write to the database! (they call
+    //   `destroy()`).
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
+
+    using Base::bump_content_version;
     using Base::m_col_key;
     using Base::m_nullable;
     using Base::m_obj;
-    using Base::m_valid;
-    using Base::update_if_needed;
 
-    bool init_from_parent() const final
+    // Friend because it needs access to `m_tree` in the implementation of
+    // `ObjCollectionBase::get_mutable_tree()`.
+    friend class LnkLst;
+
+    bool init_from_parent(bool allow_create) const
     {
-        m_valid = m_tree->init_from_parent();
-        update_content_version();
-        return m_valid;
+        if (!m_tree) {
+            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            const ArrayParent* parent = this;
+            m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+        }
+
+        bool attached = m_tree->init_from_parent();
+
+        if (!attached && allow_create) {
+            // The ref in the column was NULL, create the tree in place.
+            m_tree->create();
+            REALM_ASSERT(m_tree->is_attached());
+            return true;
+        }
+
+        return attached;
+    }
+
+    /// Update the accessor and return true if it is attached after the update.
+    inline bool update() const
+    {
+        return update_if_needed() != UpdateStatus::Detached;
     }
 };
 
@@ -235,7 +309,6 @@ public:
     LnkLst(const Obj& owner, ColKey col_key)
         : m_list(owner, col_key)
     {
-        update_unresolved();
     }
 
     LnkLst(const LnkLst& other) = default;
@@ -319,8 +392,6 @@ public:
 
     std::unique_ptr<LnkLst> clone_linklist() const
     {
-        // FIXME: The copy constructor requires this.
-        update_if_needed();
         return std::make_unique<LnkLst>(*this);
     }
 
@@ -367,6 +438,9 @@ public:
         return m_list.get_tree();
     }
 
+    using Base::ensure_writable;
+    using Base::update_if_needed;
+
 private:
     friend class ConstTableView;
     friend class Query;
@@ -375,14 +449,18 @@ private:
 
     // Overriding members of ObjCollectionBase:
 
-    bool do_update_if_needed() const final
+    UpdateStatus do_update_if_needed() const final
     {
+        // Note: Caller (`ObjCollectionBase::update_if_needed()`) takes care of
+        // maintaining the unresolved list.
         return m_list.update_if_needed();
     }
 
-    bool do_init_from_parent() const final
+    UpdateStatus do_ensure_writable(bool allow_create) final
     {
-        return m_list.init_from_parent();
+        // Note: Caller (`ObjCollectionBase::ensure_writable()`) takes care of
+        // maintaining the unresolved list.
+        return m_list.ensure_writable(allow_create);
     }
 
     BPlusTree<ObjKey>& get_mutable_tree() const final
@@ -406,36 +484,21 @@ inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
 template <class T>
 inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
-    , m_tree(new BPlusTree<T>(obj.get_alloc()))
 {
     if (!col_key.is_list()) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
     check_column_type<T>(m_col_key);
-
-    m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
-    if (m_obj) {
-        // Fine because init_from_parent() is final.
-        init_from_parent();
-    }
 }
 
 template <class T>
 inline Lst<T>::Lst(const Lst& other)
     : Base(static_cast<const Base&>(other))
 {
-    // FIXME: If the other side needed an update, we could be using a stale ref
-    // below.
-    REALM_ASSERT(!other.update_if_needed());
-
-    if (other.m_tree) {
-        Allocator& alloc = other.m_tree->get_alloc();
-        m_tree = std::make_unique<BPlusTree<T>>(alloc);
-        m_tree->set_parent(this, 0);
-        if (m_valid)
-            m_tree->init_from_ref(other.m_tree->get_ref());
-    }
+    // Reset the content version so we can rely on init_from_parent() being
+    // called lazily when the accessor is used.
+    reset_content_version();
 }
 
 template <class T>
@@ -449,27 +512,19 @@ inline Lst<T>::Lst(Lst&& other) noexcept
 }
 
 template <class T>
-inline void Lst<T>::create()
-{
-    m_tree->create();
-    m_valid = true;
-}
-
-template <class T>
 Lst<T>& Lst<T>::operator=(const Lst& other)
 {
     Base::operator=(static_cast<const Base&>(other));
 
     if (this != &other) {
+        // FIXME: Can't do copy-assignment because:
+        // - BPlusTree's assignment operator calls destroy().
+        // - BPlusTree has an `Allocator&` member.
+        //
+        // Just reset the pointer and rely on init_from_parent() being called
+        // when the accessor is actually used.
         m_tree.reset();
-        if (other.m_tree) {
-            Allocator& alloc = other.m_tree->get_alloc();
-            m_tree = std::make_unique<BPlusTree<T>>(alloc);
-            m_tree->set_parent(this, 0);
-            if (m_valid) {
-                m_tree->init_from_ref(other.m_tree->get_ref());
-            }
-        }
+        reset_content_version();
     }
 
     return *this;
@@ -484,6 +539,9 @@ inline Lst<T>& Lst<T>::operator=(Lst&& other) noexcept
         m_tree = std::exchange(other.m_tree, nullptr);
         if (m_tree) {
             m_tree->set_parent(this, 0);
+
+            // Note: We do not need to call reset_content_version(), because we
+            // took both `m_tree` and `m_content_version` from `other`.
         }
     }
 
@@ -499,12 +557,9 @@ inline T Lst<T>::remove(const iterator& it)
 template <class T>
 inline size_t Lst<T>::size() const
 {
-    if (!is_attached())
+    if (!update())
         return 0;
-    update_if_needed();
-    if (!m_valid) {
-        return 0;
-    }
+
     return m_tree->size();
 }
 
@@ -518,14 +573,6 @@ template <class T>
 inline Mixed Lst<T>::get_any(size_t ndx) const
 {
     return get(ndx);
-}
-
-template <class T>
-inline void Lst<T>::ensure_created()
-{
-    if (!m_valid && m_obj.is_valid()) {
-        create();
-    }
 }
 
 template <class T>
@@ -578,10 +625,10 @@ template <class T>
 void Lst<T>::clear()
 {
     static_assert(!std::is_same_v<T, ObjKey>);
-    ensure_created();
-    update_if_needed();
-    this->ensure_writeable();
-    if (size() > 0) {
+
+    ensure_writable(false);
+
+    if (m_tree->size() > 0) {
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_clear(*this);
         }
@@ -599,6 +646,7 @@ inline CollectionBasePtr Lst<T>::clone_collection() const
 template <class T>
 inline T Lst<T>::get(size_t ndx) const
 {
+    // Note: `size()` returns 0 if we are detached, so the bounds check will fail.
     const auto current_size = size();
     if (ndx >= current_size) {
         throw std::out_of_range("Index out of range");
@@ -609,37 +657,44 @@ inline T Lst<T>::get(size_t ndx) const
 template <class T>
 inline size_t Lst<T>::find_first(const T& value) const
 {
-    if (!m_valid && !init_from_parent())
+    if (!update())
         return not_found;
-    update_if_needed();
     return m_tree->find_first(value);
 }
 
 template <class T>
 inline Mixed Lst<T>::min(size_t* return_ndx) const
 {
-    update_if_needed();
+    if (!update()) {
+        return MinHelper<T>::not_found(return_ndx);
+    }
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::max(size_t* return_ndx) const
 {
-    update_if_needed();
+    if (!update()) {
+        return MaxHelper<T>::not_found(return_ndx);
+    }
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Lst<T>::sum(size_t* return_cnt) const
 {
-    update_if_needed();
+    if (!update()) {
+        return SumHelper<T>::not_found(return_cnt);
+    }
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Lst<T>::avg(size_t* return_cnt) const
 {
-    update_if_needed();
+    if (!update()) {
+        return AverageHelper<T>::not_found(return_cnt);
+    }
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
@@ -713,8 +768,7 @@ size_t Lst<T>::find_any(Mixed val) const
 template <class T>
 void Lst<T>::resize(size_t new_size)
 {
-    update_if_needed();
-    size_t current_size = m_tree->size();
+    size_t current_size = size();
     while (new_size > current_size) {
         insert_null(current_size++);
     }
@@ -733,12 +787,18 @@ inline void Lst<T>::remove(size_t from, size_t to)
 template <class T>
 void Lst<T>::move(size_t from, size_t to)
 {
-    update_if_needed();
+    // `size()` will return 0 if we are detached, so the bounds check will fail.
+    auto sz = size();
+    if (from >= sz || to >= sz) {
+        throw std::out_of_range{"index out of bounds"};
+    }
+
     if (from != to) {
-        this->ensure_writeable();
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_move(*this, from, to);
         }
+        ensure_writable(false);
+
         if (to > from) {
             to++;
         }
@@ -760,11 +820,18 @@ void Lst<T>::move(size_t from, size_t to)
 template <class T>
 void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
-    update_if_needed();
     if (ndx1 != ndx2) {
+        ensure_writable(false);
+
+        auto sz = m_tree->size();
+        if (ndx1 >= sz || ndx2 >= sz) {
+            throw std::out_of_range{"index out of bounds"};
+        }
+
         if (Replication* repl = this->m_obj.get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
+
         m_tree->swap(ndx1, ndx2);
         bump_content_version();
     }
@@ -773,15 +840,15 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
 template <class T>
 T Lst<T>::set(size_t ndx, T value)
 {
-    update_if_needed();
-
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    // get will check for ndx out of bounds
+    ensure_writable(false);
+
+    // `get()` will check for ndx out of bounds.
     T old = get(ndx);
+
     if (old != value) {
-        this->ensure_writeable();
         do_set(ndx, value);
         bump_content_version();
     }
@@ -794,16 +861,15 @@ T Lst<T>::set(size_t ndx, T value)
 template <class T>
 void Lst<T>::insert(size_t ndx, T value)
 {
-    update_if_needed();
-
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    ensure_created();
+    ensure_writable(true);
+
     if (ndx > m_tree->size()) {
         throw std::out_of_range("Index out of range");
     }
-    this->ensure_writeable();
+
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_insert(*this, ndx, value);
     }
@@ -814,12 +880,11 @@ void Lst<T>::insert(size_t ndx, T value)
 template <class T>
 T Lst<T>::remove(size_t ndx)
 {
-    update_if_needed();
+    ensure_writable(false);
 
-    this->ensure_writeable();
-
-    // get will check for ndx out of bounds
+    // `get()` will check bounds.
     T old = get(ndx);
+
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_erase(*this, ndx);
     }
@@ -859,6 +924,8 @@ inline Mixed LnkLst::get_any(size_t ndx) const
 
 inline void LnkLst::clear()
 {
+    // Note: Explicit call to `ensure_writable()` not needed, because we
+    // explicitly call `clear_unresolved()`.
     m_list.clear();
     clear_unresolved();
 }
@@ -923,25 +990,25 @@ inline ColKey LnkLst::get_col_key() const noexcept
 
 inline void LnkLst::set_null(size_t ndx)
 {
-    update_if_needed();
+    ensure_writable(false);
     m_list.set_null(virtual2real(ndx));
 }
 
 inline void LnkLst::set_any(size_t ndx, Mixed val)
 {
-    update_if_needed();
+    ensure_writable(false);
     m_list.set_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::insert_null(size_t ndx)
 {
-    update_if_needed();
+    ensure_writable(true);
     m_list.insert_null(virtual2real(ndx));
 }
 
 inline void LnkLst::insert_any(size_t ndx, Mixed val)
 {
-    update_if_needed();
+    ensure_writable(true);
     m_list.insert_any(virtual2real(ndx), val);
 }
 
@@ -958,25 +1025,28 @@ inline size_t LnkLst::find_any(Mixed value) const
 
 inline void LnkLst::resize(size_t new_size)
 {
-    update_if_needed();
+    ensure_writable(true);
+
+    // FIXME: This operation doesn't make much sense, because the inserted
+    // values at the end will be tombstones.
     m_list.resize(new_size + num_unresolved());
 }
 
 inline void LnkLst::remove(size_t from, size_t to)
 {
-    update_if_needed();
+    ensure_writable(false);
     m_list.remove(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::move(size_t from, size_t to)
 {
-    update_if_needed();
+    ensure_writable(false);
     m_list.move(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 {
-    update_if_needed();
+    ensure_writable(false);
     m_list.swap(virtual2real(ndx1), virtual2real(ndx2));
 }
 
@@ -992,6 +1062,7 @@ inline size_t LnkLst::find_first(const ObjKey& key) const
         return not_found;
 
     update_if_needed();
+
     size_t found = m_list.find_first(key);
     if (found == not_found)
         return not_found;
@@ -1003,8 +1074,10 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
-    update_if_needed();
+
+    ensure_writable(true);
     m_list.insert(virtual2real(ndx), value);
+    update_unresolved(UpdateStatus::Updated);
 }
 
 inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
@@ -1012,7 +1085,8 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
-    update_if_needed();
+
+    ensure_writable(false);
     ObjKey old = m_list.set(virtual2real(ndx), value);
     REALM_ASSERT(!old.is_unresolved());
     return old;
@@ -1020,9 +1094,10 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 
 inline ObjKey LnkLst::remove(size_t ndx)
 {
-    update_if_needed();
+    ensure_writable(false);
     ObjKey old = m_list.remove(virtual2real(ndx));
     REALM_ASSERT(!old.is_unresolved());
+    update_unresolved(UpdateStatus::Updated);
     return old;
 }
 

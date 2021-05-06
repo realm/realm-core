@@ -70,8 +70,6 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
-    void create();
-
     // first points to inserted/updated element.
     // second is true if the element was inserted
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
@@ -97,7 +95,7 @@ public:
     template <class T>
     void for_all_values(T&& f)
     {
-        if (m_clusters) {
+        if (update()) {
             ArrayMixed leaf(m_obj.get_alloc());
             // Iterate through cluster and call f on each value
             auto trv_func = [&leaf, &f](const Cluster* cluster) {
@@ -116,7 +114,7 @@ public:
     template <class T, class Func>
     void for_all_keys(Func&& f)
     {
-        if (m_clusters) {
+        if (update()) {
             typename ColumnTypeTraits<T>::cluster_leaf_type leaf(m_obj.get_alloc());
             ColKey col = m_clusters->get_keys_column_key();
             // Iterate through cluster and call f on each value
@@ -139,14 +137,68 @@ public:
 
 private:
     friend class DictionaryAggregate;
-    mutable DictionaryClusterTree* m_clusters = nullptr;
+    mutable std::unique_ptr<DictionaryClusterTree> m_clusters;
     DataType m_key_type = type_String;
 
-    bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
 
     friend struct CollectionIterator<Dictionary>;
+
+    bool init_from_parent(bool allow_create) const;
+
+    UpdateStatus update_if_needed() const final
+    {
+        auto status = Base::update_if_needed();
+        switch (status) {
+            case UpdateStatus::Detached: {
+                m_clusters.reset();
+                return UpdateStatus::Detached;
+            }
+            case UpdateStatus::NoChange: {
+                if (m_clusters && m_clusters->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            }
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(false);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+        REALM_UNREACHABLE();
+    }
+
+    UpdateStatus ensure_writable(bool allow_create) final
+    {
+        auto status = Base::ensure_writable(allow_create);
+        switch (status) {
+            case UpdateStatus::Detached:
+                break; // Not possible (would have thrown earlier).
+            case UpdateStatus::NoChange: {
+                if (m_clusters && m_clusters->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            }
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(allow_create);
+                REALM_ASSERT(attached || !allow_create);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+
+        REALM_UNREACHABLE();
+    }
+
+    inline bool update() const
+    {
+        return update_if_needed() != UpdateStatus::Detached;
+    }
 };
 
 class Dictionary::Iterator : public ClusterTree::Iterator {

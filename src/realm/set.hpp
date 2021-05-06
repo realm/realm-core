@@ -199,37 +199,102 @@ public:
         return *m_tree;
     }
 
-private:
-    mutable std::unique_ptr<BPlusTree<T>> m_tree;
-    using Base::m_col_key;
-    using Base::m_obj;
-    using Base::m_valid;
-
-    void create()
+    UpdateStatus update_if_needed() const final
     {
-        m_tree->create();
-        m_valid = true;
-    }
-
-    REALM_NOINLINE bool init_from_parent() const final
-    {
-        m_valid = m_tree->init_from_parent();
-        update_content_version();
-        return m_valid;
-    }
-
-    REALM_NOINLINE void ensure_created()
-    {
-        if (!m_valid && m_obj.is_valid()) {
-            create();
+        auto status = Base::update_if_needed();
+        switch (status) {
+            case UpdateStatus::Detached: {
+                m_tree.reset();
+                return UpdateStatus::Detached;
+            }
+            case UpdateStatus::NoChange:
+                if (m_tree && m_tree->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(false);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
         }
+        REALM_UNREACHABLE();
     }
+
+    UpdateStatus ensure_writable(bool allow_create) final
+    {
+        auto status = Base::ensure_writable(allow_create);
+        switch (status) {
+            case UpdateStatus::Detached:
+                break; // Not possible (would have thrown earlier).
+            case UpdateStatus::NoChange: {
+                if (m_tree && m_tree->is_attached()) {
+                    return UpdateStatus::NoChange;
+                }
+                // The tree has not been initialized yet for this accessor, so
+                // perform lazy initialization by treating it as an update.
+                [[fallthrough]];
+            }
+            case UpdateStatus::Updated: {
+                bool attached = init_from_parent(allow_create);
+                REALM_ASSERT(attached || !allow_create);
+                return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
+            }
+        }
+
+        REALM_UNREACHABLE();
+    }
+
+private:
+    // `do_` methods here perform the action after preconditions have been
+    // checked (bounds check, writability, etc.).
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
 
+    // FIXME: BPlusTree must be wrapped in an `std::unique_ptr` for the
+    // following reasons:
+    // - It is not default-constructible, due to its `Allocator&` member.
+    // - Its move/copy assignment operators write to the database! (they call
+    //   `destroy()`).
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
+
+    using Base::bump_content_version;
+    using Base::m_col_key;
+    using Base::m_nullable;
+    using Base::m_obj;
+
+    // Friend because it needs access to `m_tree` in the implementation of
+    // `ObjCollectionBase::get_mutable_tree()`.
+    friend class LnkSet;
+
+    bool init_from_parent(bool allow_create) const
+    {
+        if (!m_tree) {
+            m_tree.reset(new BPlusTree<T>(m_obj.get_alloc()));
+            const ArrayParent* parent = this;
+            m_tree->set_parent(const_cast<ArrayParent*>(parent), 0);
+        }
+
+        bool attached = m_tree->init_from_parent();
+
+        if (!attached && allow_create) {
+            // The ref in the column was NULL, create the tree in place.
+            m_tree->create();
+            REALM_ASSERT(m_tree->is_attached());
+            return true;
+        }
+
+        return attached;
+    }
+
     iterator find_impl(const T& value) const;
 
-    friend class LnkSet;
+    /// Update the accessor and return true if it is attached after the update.
+    inline bool update() const
+    {
+        return update_if_needed() != UpdateStatus::Detached;
+    }
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -242,7 +307,6 @@ public:
     LnkSet(const Obj& owner, ColKey col_key)
         : m_set(owner, col_key)
     {
-        update_unresolved();
     }
 
     LnkSet(const LnkSet&) = default;
@@ -364,14 +428,20 @@ public:
 private:
     Set<ObjKey> m_set;
 
-    bool do_update_if_needed() const final
+    // Overriding members of ObjCollectionBase:
+
+    UpdateStatus do_update_if_needed() const final
     {
+        // Note: Caller (`ObjCollectionBase::update_if_needed()`) takes care of
+        // maintaining the unresolved list.
         return m_set.update_if_needed();
     }
 
-    bool do_init_from_parent() const final
+    UpdateStatus do_ensure_writable(bool allow_create) final
     {
-        return m_set.init_from_parent();
+        // Note: Caller (`ObjCollectionBase::ensure_writable()`) takes care of
+        // maintaining the unresolved list.
+        return m_set.ensure_writable(allow_create);
     }
 
     BPlusTree<ObjKey>& get_mutable_tree() const final
@@ -530,36 +600,21 @@ struct SetElementEquals<Mixed> {
 template <class T>
 inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
-    , m_tree(new BPlusTree<value_type>(obj.get_alloc()))
 {
     if (!col_key.is_set()) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
     check_column_type<value_type>(m_col_key);
-
-    m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
-    if (m_obj) {
-        // Fine because init_from_parent() is final.
-        this->init_from_parent();
-    }
 }
 
 template <class T>
 inline Set<T>::Set(const Set& other)
     : Base(static_cast<const Base&>(other))
 {
-    // FIXME: If the other side needed an update, we could be using a stale ref
-    // below.
-    REALM_ASSERT(!other.update_if_needed());
-
-    if (other.m_tree) {
-        Allocator& alloc = other.m_tree->get_alloc();
-        m_tree = std::make_unique<BPlusTree<T>>(alloc);
-        m_tree->set_parent(this, 0);
-        if (m_valid)
-            m_tree->init_from_ref(other.m_tree->get_ref());
-    }
+    // Reset the content version so we can rely on init_from_parent() being
+    // called lazily when the accessor is used.
+    reset_content_version();
 }
 
 template <class T>
@@ -578,15 +633,14 @@ inline Set<T>& Set<T>::operator=(const Set& other)
     Base::operator=(static_cast<const Base&>(other));
 
     if (this != &other) {
+        // FIXME: Can't do copy-assignment because:
+        // - BPlusTree's assignment operator calls destroy().
+        // - BPlusTree has an `Allocator&` member.
+        //
+        // Just reset the pointer and rely on init_from_parent() being called
+        // when the accessor is actually used.
         m_tree.reset();
-        if (other.m_tree) {
-            Allocator& alloc = other.m_tree->get_alloc();
-            m_tree = std::make_unique<BPlusTree<T>>(alloc);
-            m_tree->set_parent(this, 0);
-            if (m_valid) {
-                m_tree->init_from_ref(other.m_tree->get_ref());
-            }
-        }
+        reset_content_version();
     }
 
     return *this;
@@ -601,6 +655,9 @@ inline Set<T>& Set<T>::operator=(Set&& other) noexcept
         m_tree = std::exchange(other.m_tree, nullptr);
         if (m_tree) {
             m_tree->set_parent(this, 0);
+
+            // Note: We do not need to call reset_content_version(), because we
+            // took both `m_tree` and `m_content_version` from `other`.
         }
     }
 
@@ -656,17 +713,15 @@ template <class T>
 REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 {
     auto b = this->begin();
-    auto e = this->end();
+    auto e = this->end(); // Note: This ends up calling `update_if_needed()`.
     return std::lower_bound(b, e, value, SetElementLessThan<T>{});
 }
 
 template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
-    update_if_needed();
+    ensure_writable(true);
 
-    ensure_created();
-    this->ensure_writeable();
     auto it = find_impl(value);
 
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
@@ -704,14 +759,13 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 template <class T>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    update_if_needed();
-    this->ensure_writeable();
-
-    auto it = find_impl(value);
+    auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
 
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
+
+    ensure_writable(false);
 
     if (Replication* repl = m_obj.get_replication()) {
         this->erase_repl(repl, it.index(), value);
@@ -752,12 +806,9 @@ std::pair<size_t, bool> Set<T>::erase_null()
 template <class T>
 REALM_NOINLINE size_t Set<T>::size() const
 {
-    if (!is_attached())
+    if (!update())
         return 0;
-    update_if_needed();
-    if (!m_valid) {
-        return 0;
-    }
+
     return m_tree->size();
 }
 
@@ -770,10 +821,9 @@ inline bool Set<T>::is_null(size_t ndx) const
 template <class T>
 inline void Set<T>::clear()
 {
-    ensure_created();
-    update_if_needed();
-    this->ensure_writeable();
     if (size() > 0) {
+        ensure_writable(false);
+
         if (Replication* repl = this->m_obj.get_replication()) {
             this->clear_repl(repl);
         }
@@ -789,28 +839,38 @@ inline void Set<T>::clear()
 template <class T>
 inline Mixed Set<T>::min(size_t* return_ndx) const
 {
-    update_if_needed();
+    if (!update()) {
+        return MinHelper<T>::not_found(return_ndx);
+    }
+    // FIXME: Use the natural order of the set.
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::max(size_t* return_ndx) const
 {
-    update_if_needed();
+    if (!update()) {
+        return MaxHelper<T>::not_found(return_ndx);
+    }
+    // FIXME: Use the natural order of the set.
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::sum(size_t* return_cnt) const
 {
-    update_if_needed();
+    if (!update()) {
+        return SumHelper<T>::not_found(return_cnt);
+    }
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Set<T>::avg(size_t* return_cnt) const
 {
-    update_if_needed();
+    if (!update()) {
+        return AverageHelper<T>::not_found(return_cnt);
+    }
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
@@ -1069,12 +1129,11 @@ inline ObjKey LnkSet::get(size_t ndx) const
 
 inline size_t LnkSet::find(ObjKey value) const
 {
-    update_if_needed();
-
     if (value.is_unresolved()) {
         return not_found;
     }
 
+    update_if_needed();
     size_t ndx = m_set.find(value);
     if (ndx == not_found) {
         return not_found;
@@ -1099,6 +1158,9 @@ inline std::pair<size_t, bool> LnkSet::insert(ObjKey value)
     update_if_needed();
 
     auto [ndx, inserted] = m_set.insert(value);
+    if (inserted) {
+        update_unresolved();
+    }
     return {real2virtual(ndx), inserted};
 }
 
@@ -1109,6 +1171,7 @@ inline std::pair<size_t, bool> LnkSet::erase(ObjKey value)
 
     auto [ndx, removed] = m_set.erase(value);
     if (removed) {
+        update_unresolved(UpdateStatus::Update);
         ndx = real2virtual(ndx);
     }
     return {ndx, removed};
@@ -1130,6 +1193,9 @@ inline std::pair<size_t, bool> LnkSet::insert_null()
 {
     update_if_needed();
     auto [ndx, inserted] = m_set.insert_null();
+    if (inserted) {
+        update_unresolved(UpdateStatus::Update);
+    }
     return {real2virtual(ndx), inserted};
 }
 
@@ -1138,6 +1204,7 @@ inline std::pair<size_t, bool> LnkSet::erase_null()
     update_if_needed();
     auto [ndx, erased] = m_set.erase_null();
     if (erased) {
+        update_unresolved(UpdateStatus::Update);
         ndx = real2virtual(ndx);
     }
     return {ndx, erased};
@@ -1147,6 +1214,9 @@ inline std::pair<size_t, bool> LnkSet::insert_any(Mixed value)
 {
     update_if_needed();
     auto [ndx, inserted] = m_set.insert_any(value);
+    if (inserted) {
+        update_unresolved(UpdateStatus::Update);
+    }
     return {real2virtual(ndx), inserted};
 }
 
@@ -1154,6 +1224,7 @@ inline std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
 {
     auto [ndx, erased] = m_set.erase_any(value);
     if (erased) {
+        update_unresolved(UpdateStatus::Update);
         ndx = real2virtual(ndx);
     }
     return {ndx, erased};
@@ -1161,12 +1232,15 @@ inline std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
 
 inline void LnkSet::clear()
 {
+    // Note: Explicit call to `ensure_writable()` not needed, because we
+    // explicitly call `clear_unresolved()`.
     m_set.clear();
     clear_unresolved();
 }
 
 inline Mixed LnkSet::min(size_t* return_ndx) const
 {
+    update_if_needed();
     size_t found = not_found;
     auto value = m_set.min(&found);
     if (found != not_found && return_ndx) {
@@ -1177,6 +1251,7 @@ inline Mixed LnkSet::min(size_t* return_ndx) const
 
 inline Mixed LnkSet::max(size_t* return_ndx) const
 {
+    update_if_needed();
     size_t found = not_found;
     auto value = m_set.max(&found);
     if (found != not_found && return_ndx) {
@@ -1290,8 +1365,10 @@ inline void LnkSet::assign_union(const Rhs& rhs)
 template <class It1, class It2>
 inline void LnkSet::assign_union(It1 first, It2 last)
 {
+    // Note: Explicit call to `update_if_needed()` not necessary because we
+    // explicitly call `update_unresolved()`.
     m_set.assign_union(first, last);
-    update_unresolved();
+    update_unresolved(UpdateStatus::Updated);
 }
 
 template <class Rhs>
@@ -1303,8 +1380,10 @@ inline void LnkSet::assign_intersection(const Rhs& rhs)
 template <class It1, class It2>
 inline void LnkSet::assign_intersection(It1 first, It2 last)
 {
+    // Note: Explicit call to `update_if_needed()` not necessary because we
+    // explicitly call `update_unresolved()`.
     m_set.assign_intersection(first, last);
-    update_unresolved();
+    update_unresolved(UpdateStatus::Updated);
 }
 
 template <class Rhs>
@@ -1316,8 +1395,10 @@ inline void LnkSet::assign_difference(const Rhs& rhs)
 template <class It1, class It2>
 inline void LnkSet::assign_difference(It1 first, It2 last)
 {
+    // Note: Explicit call to `update_if_needed()` not necessary because we
+    // explicitly call `update_unresolved()`.
     m_set.assign_difference(first, last);
-    update_unresolved();
+    update_unresolved(UpdateStatus::Updated);
 }
 
 template <class Rhs>
@@ -1329,8 +1410,10 @@ inline void LnkSet::assign_symmetric_difference(const Rhs& rhs)
 template <class It1, class It2>
 inline void LnkSet::assign_symmetric_difference(It1 first, It2 last)
 {
+    // Note: Explicit call to `update_if_needed()` not necessary because we
+    // explicitly call `update_unresolved()`.
     m_set.assign_symmetric_difference(first, last);
-    update_unresolved();
+    update_unresolved(UpdateStatus::Updated);
 }
 
 } // namespace realm
