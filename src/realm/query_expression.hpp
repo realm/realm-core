@@ -700,7 +700,7 @@ template <class T>
 class Columns;
 template <class T>
 class Value;
-class ConstantStringValue;
+class ConstantMixedValue;
 template <class T>
 class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr>
@@ -784,8 +784,12 @@ Query create(L left, const Subexpr2<R>& right)
     }
 
     // Return query_expression.hpp node
-    using ValueType = typename std::conditional_t<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>;
-    return make_expression<Compare<Cond>>(make_subexpr<ValueType>(left), right.clone());
+    if constexpr (std::is_same_v<L, TypeOfValue>) {
+        return make_expression<Compare<Cond>>(make_subexpr<Value<TypeOfValue>>(left), right.clone());
+    }
+    else {
+        return make_expression<Compare<Cond>>(make_subexpr<ConstantMixedValue>(left), right.clone());
+    }
 }
 
 // All overloads where left-hand-side is Subexpr2<L>:
@@ -1186,6 +1190,29 @@ public:
     {
         return make_subexpr<Value<T>>(*this);
     }
+};
+
+class ConstantMixedValue : public Value<Mixed> {
+public:
+    ConstantMixedValue(const Mixed& val)
+        : Value(val)
+    {
+        begin()->use_buffer(m_buffer);
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new ConstantMixedValue(*this));
+    }
+
+private:
+    ConstantMixedValue(const ConstantMixedValue& other)
+        : Value(other)
+    {
+        begin()->use_buffer(m_buffer);
+    }
+
+    std::string m_buffer;
 };
 
 class ConstantStringValue : public Value<StringData> {

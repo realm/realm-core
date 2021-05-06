@@ -595,6 +595,9 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
 
 void Mixed::use_buffer(std::string& buf)
 {
+    if (is_null()) {
+        return;
+    }
     switch (get_type()) {
         case type_String:
             buf = std::string(string_val);
