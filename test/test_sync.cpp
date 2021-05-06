@@ -24,7 +24,7 @@
 #include <realm/sync/noinst/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
@@ -2305,7 +2305,7 @@ TEST(Sync_HTTP404NotFound)
     const util::HTTPResponse& response = client.get_response();
 
     CHECK(response.status == util::HTTPStatus::NotFound);
-    CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_SYNC_VER_STRING);
+    CHECK(response.headers.find("Server")->second == "RealmSync/" REALM_VERSION_STRING);
 }
 
 
@@ -8388,6 +8388,37 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     CHECK_EQUAL(changeset.get_string(mpark::get<InternString>(arr_insert_instr.value.data.link.target)),
                 StringData("target3"));
     CHECK_EQUAL(arr_insert_instr.prior_size, 2);
+}
+
+TEST(Sync_BundledRealmFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SHARED_GROUP_TEST_PATH(path_1);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history = make_client_replication(path);
+
+    auto db = DB::create(*history);
+
+    Session session = fixture.make_session(path);
+    fixture.bind_session(session, "/test");
+
+    auto tr = db->start_write();
+    auto foos = tr->add_table_with_primary_key("class_Foo", type_Int, "id");
+    auto foo = foos->create_object_with_primary_key(123);
+    session.nonsync_transact_notify(tr->commit());
+
+    // We cannot write out file if changes are not synced to server
+    CHECK_THROW_ANY(db->write_copy(path_1.c_str()));
+
+    session.wait_for_upload_complete_or_client_stopped();
+    session.wait_for_download_complete_or_client_stopped();
+
+    // Now we can
+    db->write_copy(path_1.c_str());
 }
 
 } // unnamed namespace

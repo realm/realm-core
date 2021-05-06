@@ -242,6 +242,7 @@ public:
     /// GlobalKeys.
     uint64_t get_sync_file_id() const noexcept;
     void set_sync_file_id(uint64_t id);
+    void remove_sync_file_id();
 
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;

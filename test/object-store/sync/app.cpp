@@ -2069,6 +2069,16 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
         {
+            std::function<void()> hook;
+            std::vector<SyncSession::PublicState> session_states_seen;
+            std::function<std::unique_ptr<GenericNetworkTransport>()> hooked_factory = [&hook] {
+                if (hook) {
+                    hook();
+                }
+                return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+            };
+            app_config.transport_generator = hooked_factory;
+
             TestSyncManager reinit(TestSyncManager::Config(app_config), {});
             auto app = get_app_and_login(reinit.app());
             REQUIRE(!app->current_user()->access_token_refresh_required());
@@ -2077,9 +2087,21 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
             REQUIRE(app->current_user()->access_token_refresh_required());
 
+            // This assumes that we make an http request for the new token while
+            // already in the WaitingForAccessToken state.
+            std::vector<SyncSession::PublicState> seen_states;
             auto config = setup_and_get_config(app);
+            hook = [&]() {
+                auto user = app->current_user();
+                REQUIRE(user);
+                for (auto session : user->all_sessions()) {
+                    seen_states.push_back(session->state());
+                }
+            };
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            REQUIRE(std::find(begin(seen_states), end(seen_states),
+                              SyncSession::PublicState::WaitingForAccessToken) != end(seen_states));
             Results dogs = get_dogs(r, session);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");

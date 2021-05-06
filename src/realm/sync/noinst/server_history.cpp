@@ -8,7 +8,7 @@
 #include <realm/impl/input_stream.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/noinst/server_history.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/changeset_encoder.hpp>
@@ -2958,7 +2958,7 @@ void ServerHistory::record_current_schema_version(Array& schema_versions, versio
         Array sv_library_versions{alloc};
         sv_library_versions.set_parent(&schema_versions, s_sv_library_versions_iip);
         sv_library_versions.init_from_parent();
-        const char* library_version = REALM_SYNC_VER_STRING;
+        const char* library_version = REALM_VERSION_STRING;
         std::size_t size = std::strlen(library_version);
         Array value{alloc};
         bool context_flag = false;

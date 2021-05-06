@@ -358,7 +358,8 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    void write_copy(StringData path, BinaryData encryption_key);
+    // For synchronized realms, the file written will have the client file ident removed.
+    void write_copy(StringData path, BinaryData encryption_key, bool allow_overwrite = false);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;

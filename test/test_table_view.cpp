@@ -1369,7 +1369,7 @@ TEST(TableView_IsInSync)
     VersionID initial_v = initial_tr->get_version_of_current_transaction();
     CHECK_NOT_EQUAL(src_v.version, initial_v.version);
 
-    const TableView tv = table.where().find_all();
+    TableView tv = table.where().find_all();
     ConstTableView ctv0 = ConstTableView(tv, initial_tr.get(), PayloadPolicy::Copy);
     ConstTableView ctv1 = ConstTableView(tv, tr.get(), PayloadPolicy::Copy);
 

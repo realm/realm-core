@@ -92,7 +92,7 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
 #else
 #if REALM_PLATFORM_APPLE
     return make_runloop(nullptr);
-#elif REALM_PLATFORM_ANDROID
+#elif REALM_ANDROID
     return make_alooper();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
@@ -123,12 +123,12 @@ std::shared_ptr<Scheduler> Scheduler::make_dispatch(void* queue)
 }
 #endif // REALM_PLATFORM_APPLE
 
-#if REALM_PLATFORM_ANDROID
+#if REALM_ANDROID
 std::shared_ptr<Scheduler> Scheduler::make_alooper()
 {
     return std::make_shared<ALooperScheduler>();
 }
-#endif // REALM_PLATFORM_ANDROID
+#endif // REALM_ANDROID
 
 #if REALM_HAVE_UV
 std::shared_ptr<Scheduler> Scheduler::make_uv()

@@ -41,8 +41,6 @@
 #include <realm/util/parent_dir.hpp>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/version.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 
 #include "util/timer.hpp"
