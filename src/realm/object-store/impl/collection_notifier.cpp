@@ -62,6 +62,10 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         };
     }
 
+    if (all_callbacks_filtered()) {
+        return KeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+    }
+
     return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
 }
 

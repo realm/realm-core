@@ -53,6 +53,7 @@ struct ListChangeInfo {
 using TableKeyType = decltype(TableKey::value);
 using ObjKeyType = decltype(ObjKey::value);
 
+// A collection of all changes to all tables which we use to check against when the `DeepChangeChecker`.
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
     std::unordered_map<TableKeyType, ObjectChangeSet> tables;
@@ -130,10 +131,10 @@ public:
      *            some additional information about those tables (see `OutgoingLink` in `RelatedTable`).
      * @param table The table that the related tables will be searched for.
      * @param key_path_arrays A collection of all `KeyPathArray`s passed to the `NotificationCallback`s for this
-     * `CollectionNotifier`.
+     *                        `CollectionNotifier`.
      * @param all_callback_have_filters The beheviour when filtering tables depends on all of them having a filter or
-     * just some. In the latter case the related tables will be a combination of all tables for the non-filtered way
-     * plus the explicitely filtered tables.
+     *                                  just some. In the latter case the related tables will be a combination of all
+     *                                  tables for the non-filtered way plus the explicitely filtered tables.
      */
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
                                              std::vector<KeyPathArray> key_path_arrays,
@@ -144,19 +145,28 @@ public:
     static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
                                         std::vector<TableKey> tables_in_filters);
 
-private:
+protected:
     TransactionChangeInfo const& m_info;
+
+    // The `Table` this `DeepChangeChecker` is based on.
     Table const& m_root_table;
-    // The `ObjectChangeSet` for `root_table` if it is contained in `m_info`.
-    ObjectChangeSet const* const m_root_object_changes;
-    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
-    std::vector<RelatedTable> const& m_related_tables;
+
     // The `m_key_path_array` contains all columns filtered for. We need this when checking for
     // changes in `operator()` to make sure only columns actually filtered for send notifications.
     std::vector<KeyPathArray> m_key_path_arrays;
+
+    // The `ObjectChangeSet` for `root_table` if it is contained in `m_info`.
+    ObjectChangeSet const* const m_root_object_changes;
+
     // Contains all `ColKey`s that we filter for in the root table.
     std::vector<ColKey> m_filtered_columns_in_root_table;
     std::vector<ColKey> m_filtered_columns;
+
+private:
+    std::vector<RelatedTable> const& m_related_tables;
+
+    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
+
     struct Path {
         int64_t obj_key;
         int64_t col_key;
@@ -180,7 +190,6 @@ private:
     /**
      * Check the `table` within `m_related_tables` for changes in it's outgoing links.
      *
-     * @param table_key The `TableKey` for the `table` in question.
      * @param table The table to check for changed links.
      * @param obj_key The key for the object to look for.
      * @param depth The maximum depth that should be considered for this search.
@@ -189,8 +198,17 @@ private:
      *         False if the `table` is not contained in `m_related_tables` or the `table` does not have any
      *         outgoing links at all or the `table` does not have linked objects with changes.
      */
-    bool check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key,
-                              std::vector<ColKey> filtered_columns, size_t depth = 0);
+    bool check_outgoing_links(Table const& table, int64_t obj_key, std::vector<ColKey> filtered_columns,
+                              size_t depth = 0);
+};
+
+class KeyPathChangeChecker : DeepChangeChecker {
+
+public:
+    KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                         std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+
+    bool operator()(int64_t obj_key);
 };
 
 } // namespace _impl

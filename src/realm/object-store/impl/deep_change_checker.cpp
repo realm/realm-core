@@ -105,12 +105,12 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
                                      std::vector<KeyPathArray> key_path_arrays)
     : m_info(info)
     , m_root_table(root_table)
+    , m_key_path_arrays(key_path_arrays)
     , m_root_object_changes([&] {
         auto it = info.tables.find(root_table.get_key().value);
         return it != info.tables.end() ? &it->second : nullptr;
     }())
     , m_related_tables(related_tables)
-    , m_key_path_arrays(key_path_arrays)
 {
     // If all callbacks do have a filter, every `KeyPathArray` will have entries.
     // In this case we need to check the `ColKey`s and pass the filtered columns
@@ -135,9 +135,11 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     }
 }
 
-bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key,
+bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t obj_key,
                                              std::vector<ColKey> filtered_columns, size_t depth)
 {
+    auto table_key = table.get_key();
+
     // First we create an iterator pointing at the table identified by `table_key` within the `m_related_tables`.
     auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
         return tbl.table_key == table_key;
@@ -189,7 +191,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
 }
 
-bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, std::vector<ColKey> filtered_columns,
+bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key, std::vector<ColKey> filtered_columns,
                                   size_t depth)
 {
     // Arbitrary upper limit on the maximum depth to search
@@ -207,7 +209,7 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, std::vecto
     // end the search and return here.
     if (depth > 0) {
         auto it = m_info.tables.find(table_key.value);
-        if (it != m_info.tables.end() && it->second.modifications_contains(key, filtered_columns))
+        if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
             return true;
     }
 
@@ -215,15 +217,15 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, std::vecto
     // `key` can be found within them. If so, we can return without checking the
     // outgoing links.
     auto& not_modified = m_not_modified[table_key.value];
-    auto it = not_modified.find(key);
+    auto it = not_modified.find(object_key);
     if (it != not_modified.end())
         return false;
 
     // If both of the above short cuts don't lead to a result we need to check the
     // outgoing links.
-    bool ret = check_outgoing_links(table_key, table, key, filtered_columns, depth);
+    bool ret = check_outgoing_links(table, object_key, filtered_columns, depth);
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
-        not_modified.insert(key);
+        not_modified.insert(object_key);
     return ret;
 }
 
@@ -237,4 +239,46 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
     }
 
     return check_row(m_root_table, key, m_filtered_columns, 0);
+}
+
+KeyPathChangeChecker::KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                                           std::vector<RelatedTable> const& related_tables,
+                                           std::vector<KeyPathArray> key_path_arrays)
+    : DeepChangeChecker(info, root_table, related_tables, key_path_arrays)
+{
+}
+
+bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
+{
+    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
+    // anyway.
+    if (m_root_object_changes &&
+        m_root_object_changes->modifications_contains(object_key, m_filtered_columns_in_root_table)) {
+        return true;
+    }
+
+    for (auto&& key_path_array : m_key_path_arrays) {
+        for (auto&& key_path : key_path_array) {
+            Table const& next_table_to_check = m_root_table;
+            auto next_object_key_to_check = object_key;
+            for (size_t i = 0; i < key_path.size(); i++) {
+                auto& table_key = key_path[0].first;
+                REALM_ASSERT(m_root_table.get_key().value == table_key.value);
+                auto iterator = m_info.tables.find(key_path[i].first.value);
+                if (iterator != m_info.tables.end() &&
+                    iterator->second.modifications_contains(next_object_key_to_check, {key_path[i].second})) {
+                    return true;
+                }
+
+                auto col_key = ColKey(key_path[i].second);
+                auto col_type = col_key.get_type();
+                if (col_type == col_type_Link) {
+                    const Obj obj = next_table_to_check.get_object(ObjKey(next_object_key_to_check));
+                    next_object_key_to_check = obj.get<ObjKey>(ColKey(key_path[i].second)).value;
+                }
+            }
+        }
+    }
+
+    return false;
 }
