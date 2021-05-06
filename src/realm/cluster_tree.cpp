@@ -767,6 +767,9 @@ size_t ClusterTree::size_from_ref(ref_type ref, Allocator& alloc)
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
+    if (!ref)
+        return nullptr;
+
     MemRef mem{m_alloc.translate(ref), ref, m_alloc};
     const char* header = mem.get_addr();
     bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
@@ -835,11 +838,15 @@ void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
     }
 }
 
-void ClusterTree::init_from_parent()
+bool ClusterTree::init_from_parent()
 {
-    auto new_root = get_root_from_parent();
-    m_root = std::move(new_root);
-    m_size = m_root->get_tree_size();
+    m_root = get_root_from_parent();
+    if (m_root) {
+        m_size = m_root->get_tree_size();
+        return true;
+    }
+    m_size = 0;
+    return false;
 }
 
 void ClusterTree::update_from_parent() noexcept
