@@ -90,13 +90,13 @@ public:
                       std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
 
     /**
-     * Check if the object identified by `obj_key` was changed.
+     * Check if the object identified by `object_key` was changed.
      *
-     * @param obj_key The `ObjKey::value` for the object that is supposed to be checked.
+     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
      *
      * @return True if the object was changed, false otherwise.
      */
-    bool operator()(int64_t obj_key);
+    bool operator()(int64_t object_key);
 
     /**
      * Search for related tables within the specified `table`.
@@ -168,7 +168,7 @@ private:
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
 
     struct Path {
-        int64_t obj_key;
+        int64_t object_key;
         int64_t col_key;
         bool depth_exceeded;
     };
@@ -178,37 +178,50 @@ private:
      * Checks if a specific object, identified by it's `ObjKeyType` in a given `Table` was changed.
      *
      * @param table The `Table` that contains the `ObjKeyType` that will be checked.
-     * @param obj_key The `ObjKeyType` identifying the object to be checked for changes.
+     * @param object_key The `ObjKeyType` identifying the object to be checked for changes.
      * @param filtered_columns A `std::vector` of all `ColKey`s filtered in any of the `NotificationCallbacks`.
      * @param depth Determines how deep the search will be continued if the change could not be found
      *              on the first level.
      *
      * @return True if the object was changed, false otherwise.
      */
-    bool check_row(Table const& table, ObjKeyType obj_key, std::vector<ColKey> filtered_columns, size_t depth = 0);
+    bool check_row(Table const& table, ObjKeyType object_key, std::vector<ColKey> filtered_columns, size_t depth = 0);
 
     /**
      * Check the `table` within `m_related_tables` for changes in it's outgoing links.
      *
      * @param table The table to check for changed links.
-     * @param obj_key The key for the object to look for.
+     * @param object_key The key for the object to look for.
      * @param depth The maximum depth that should be considered for this search.
      *
      * @return True if the specified `table` does have linked objects that have been changed.
      *         False if the `table` is not contained in `m_related_tables` or the `table` does not have any
      *         outgoing links at all or the `table` does not have linked objects with changes.
      */
-    bool check_outgoing_links(Table const& table, int64_t obj_key, std::vector<ColKey> filtered_columns,
+    bool check_outgoing_links(Table const& table, int64_t object_key, std::vector<ColKey> filtered_columns,
                               size_t depth = 0);
 };
 
+/**
+ * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a check for objects as well
+ * but checks them by traversing and only traversing the given KeyPathArray. With this it supports any depth (as
+ * opposed to the maxium depth of 4 on the `DeepChangeChecker`) and backlinks.
+ */
 class KeyPathChangeChecker : DeepChangeChecker {
 
 public:
     KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                          std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
 
-    bool operator()(int64_t obj_key);
+    /**
+     * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided
+     * when construction this `KeyPathChangeChecker`.
+     *
+     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
+     *
+     * @return True if the object was changed, false otherwise.
+     */
+    bool operator()(int64_t object_key);
 };
 
 } // namespace _impl

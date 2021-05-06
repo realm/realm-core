@@ -135,7 +135,7 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     }
 }
 
-bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t obj_key,
+bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t object_key,
                                              std::vector<ColKey> filtered_columns, size_t depth)
 {
     auto table_key = table.get_key();
@@ -157,18 +157,18 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t obj_key
     auto already_checking = [&](int64_t col) {
         auto end = m_current_path.begin() + depth;
         auto match = std::find_if(m_current_path.begin(), end, [&](auto& p) {
-            return p.obj_key == obj_key && p.col_key == col;
+            return p.object_key == object_key && p.col_key == col;
         });
         if (match != end) {
             for (; match < end; ++match)
                 match->depth_exceeded = true;
             return true;
         }
-        m_current_path[depth] = {obj_key, col, false};
+        m_current_path[depth] = {object_key, col, false};
         return false;
     };
 
-    const Obj obj = table.get_object(ObjKey(obj_key));
+    const Obj obj = table.get_object(ObjKey(object_key));
     auto linked_object_changed = [&](OutgoingLink const& link) {
         if (already_checking(link.col_key))
             return false;
@@ -257,24 +257,26 @@ bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
         return true;
     }
 
+    // The `KeyPathChangeChecker` traverses along the given key path arrays and only those to check for changes
+    // along them.
     for (auto&& key_path_array : m_key_path_arrays) {
         for (auto&& key_path : key_path_array) {
-            Table const& next_table_to_check = m_root_table;
             auto next_object_key_to_check = object_key;
             for (size_t i = 0; i < key_path.size(); i++) {
-                auto& table_key = key_path[0].first;
-                REALM_ASSERT(m_root_table.get_key().value == table_key.value);
+
+                // Check for a change on the current depth.
+                auto column_key = key_path[i].second;
                 auto iterator = m_info.tables.find(key_path[i].first.value);
                 if (iterator != m_info.tables.end() &&
-                    iterator->second.modifications_contains(next_object_key_to_check, {key_path[i].second})) {
+                    iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
                     return true;
                 }
 
-                auto col_key = ColKey(key_path[i].second);
-                auto col_type = col_key.get_type();
-                if (col_type == col_type_Link) {
-                    const Obj obj = next_table_to_check.get_object(ObjKey(next_object_key_to_check));
-                    next_object_key_to_check = obj.get<ObjKey>(ColKey(key_path[i].second)).value;
+                // Advance one level deeper into the key path.
+                auto column_type = column_key.get_type();
+                if (column_type == col_type_Link) {
+                    const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
+                    next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
                 }
             }
         }

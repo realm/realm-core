@@ -353,7 +353,7 @@ TEST_CASE("set") {
                     return token;
                 };
 
-                SECTION("-> modifying table 'target', property 'value'"
+                SECTION("modifying table 'target', property 'value'"
                         "-> DOES send a notification") {
                     auto token1 = require_change_no_filter();
                     auto token2 = require_change_filter_table2_value();
@@ -366,7 +366,7 @@ TEST_CASE("set") {
                     REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications_new, 0);
                 }
 
-                SECTION("-> modifying table 'target', property 'value2'"
+                SECTION("modifying table 'target', property 'value2'"
                         "-> DOES send a notification") {
                     auto token1 = require_change_no_filter();
                     auto token2 = require_change_filter_table2_value2();
@@ -406,7 +406,7 @@ TEST_CASE("set") {
                     return token;
                 };
 
-                SECTION("-> modifying table 'target', property 'value'"
+                SECTION("modifying table 'target', property 'value'"
                         "-> DOES send a notification for 'value'") {
                     auto token2 = require_change();
                     write([&] {
@@ -416,7 +416,7 @@ TEST_CASE("set") {
                     REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications_new, 0);
                 }
 
-                SECTION("-> modifying table 'target', property 'value'"
+                SECTION("modifying table 'target', property 'value'"
                         "-> does NOT send a notification for 'value2'") {
                     auto token2 = require_no_change();
                     write([&] {

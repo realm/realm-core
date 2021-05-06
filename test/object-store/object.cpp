@@ -102,6 +102,7 @@ TEST_CASE("object") {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              {"link", PropertyType::Object | PropertyType::Nullable, "table"},
+             {"link2", PropertyType::Object | PropertyType::Nullable, "table2"},
          }},
         {"all types",
          {
@@ -391,6 +392,7 @@ TEST_CASE("object") {
             auto table_origin = r->read_group().get_table("class_table2");
             auto col_origin_value = table_origin->get_column_key("value");
             auto col_origin_link = table_origin->get_column_key("link");
+            auto col_origin_link2 = table_origin->get_column_key("link2");
 
             auto table_target = r->read_group().get_table("class_table");
             auto col_target_value1 = table_target->get_column_key("value 1");
@@ -412,6 +414,7 @@ TEST_CASE("object") {
 
             std::pair<TableKey, ColKey> pair_origin_value(table_origin->get_key(), col_origin_value);
             std::pair<TableKey, ColKey> pair_origin_link(table_origin->get_key(), col_origin_link);
+            std::pair<TableKey, ColKey> pair_origin_link2(table_origin->get_key(), col_origin_link2);
             std::pair<TableKey, ColKey> pair_target_value1(table_target->get_key(), col_target_value1);
             std::pair<TableKey, ColKey> pair_target_value2(table_target->get_key(), col_target_value2);
 
@@ -443,7 +446,7 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.modifications, 0);
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1'"
                         "while observing related table 'table', property 'value 1'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_value);
@@ -453,7 +456,7 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2'"
                         "while observing related table 'table', property 'value 2'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_value);
@@ -473,7 +476,7 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1'"
                         "while observing related table 'table', property 'value 1'"
                         "-> DOES send a notification") {
                     auto token = require_change(object_target, key_path_array_target_value1);
@@ -484,7 +487,7 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.modifications, 0);
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2'"
                         "while observing related table 'table', property 'value 1'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value1);
@@ -504,7 +507,7 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1'"
                         "while observing related table 'table', property 'value 2'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value2);
@@ -514,7 +517,7 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2'"
                         "while observing related table 'table', property 'value 2'"
                         "-> DOES send a notification") {
                     auto token = require_change(object_target, key_path_array_target_value2);
@@ -527,7 +530,7 @@ TEST_CASE("object") {
             }
 
             SECTION("callbacks on linked objects") {
-                SECTION("-> modifying origin table 'table2', property 'value'"
+                SECTION("modifying origin table 'table2', property 'value'"
                         "while observing related table 'table', property 'value 1'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
@@ -537,7 +540,7 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1'"
                         "while observing related table 'table', property 'value 1'"
                         "-> DOES send a notification") {
                     auto token = require_change(object_origin, key_path_array_origin_to_target_value1);
@@ -548,13 +551,77 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.modifications, 0);
                 }
 
-                SECTION("-> modifying related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2'"
                         "while observing related table 'table', property 'value 1'"
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
 
                     write([&] {
                         object_target.set_column_value("value 2", 205);
+                    });
+                }
+            }
+
+            SECTION("callbacks on objects with link depth > 4") {
+                r->begin_transaction();
+
+                Obj obj_depth6 = table_origin->create_object_with_primary_key(600);
+                Object object_depth6(r, obj_depth6);
+                object_depth6.set_column_value("value", 601);
+
+                Obj obj_depth5 = table_origin->create_object_with_primary_key(500);
+                Object object_depth5(r, obj_depth5);
+                object_depth5.set_column_value("value", 501);
+                object_depth5.set_property_value(d, "link2", util::Any(object_depth6));
+
+                Obj obj_depth4 = table_origin->create_object_with_primary_key(400);
+                Object object_depth4(r, obj_depth4);
+                object_depth4.set_column_value("value", 401);
+                object_depth4.set_property_value(d, "link2", util::Any(object_depth5));
+
+                Obj obj_depth3 = table_origin->create_object_with_primary_key(300);
+                Object object_depth3(r, obj_depth3);
+                object_depth3.set_column_value("value", 301);
+                object_depth3.set_property_value(d, "link2", util::Any(object_depth4));
+
+                Obj obj_depth2 = table_origin->create_object_with_primary_key(200);
+                Object object_depth2(r, obj_depth2);
+                object_depth2.set_column_value("value", 201);
+                object_depth2.set_property_value(d, "link2", util::Any(object_depth3));
+
+                Obj obj_depth1 = table_origin->create_object_with_primary_key(100);
+                Object object_depth1(r, obj_depth1);
+                object_depth1.set_column_value("value", 101);
+                object_depth1.set_property_value(d, "link2", util::Any(object_depth2));
+
+                r->commit_transaction();
+
+                auto key_path_to_depth_5 = {pair_origin_link2, pair_origin_link2, pair_origin_link2,
+                                            pair_origin_link2, pair_origin_value};
+                auto key_path_to_depth_6 = {pair_origin_link2, pair_origin_link2, pair_origin_link2,
+                                            pair_origin_link2, pair_origin_link2, pair_origin_value};
+
+                KeyPathArray key_path_array_to_depth_5 = {key_path_to_depth_5};
+                KeyPathArray key_path_array_to_depth_6 = {key_path_to_depth_6};
+
+                SECTION("modifying table 'table2', property 'link2' 5 depths deep"
+                        "while observing table 'table2', property 'link2' 5 depths deep"
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_depth1, key_path_array_to_depth_5);
+
+                    write([&] {
+                        object_depth5.set_column_value("value", 555);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                }
+
+                SECTION("modifying table 'table2', property 'link2' 6 depths deep"
+                        "while observing table 'table2', property 'link2' 5 depths deep"
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_depth1, key_path_array_to_depth_5);
+
+                    write([&] {
+                        object_depth6.set_column_value("value", 555);
                     });
                 }
             }
