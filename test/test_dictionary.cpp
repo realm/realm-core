@@ -445,3 +445,24 @@ TEST(Dictionary_Tombstones)
 
     CHECK_EQUAL(q.count(), 0);
 }
+
+TEST(Dictionary_UseAfterFree)
+{
+    Group g;
+    auto foos = g.add_table("Foo");
+    ColKey col_dict = foos->add_column_dictionary(type_String, "dict");
+
+    auto foo = foos->create_object();
+    auto dict = foo.get_dictionary(col_dict);
+    dict.insert("a", "monkey");
+    dict.insert("b", "lion");
+    dict.insert("c", "à");
+
+    Query q;
+    {
+        auto str = std::make_unique<std::string>("à");
+        auto col = foos->column<Dictionary>(col_dict);
+        q = col.equal(StringData(*str), true); // A copy of the string must be taken here
+    }
+    CHECK_EQUAL(q.count(), 1);
+}

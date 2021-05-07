@@ -11,6 +11,7 @@
 * Calling Results::snapshot on dictionary values collection containing null returns incorrect results ([#4635](https://github.com/realm/realm-core/issues/4635), Not in any release)
 * Making a aggregate query on Set of Objects would cause a crash in the parser ([#4633](https://github.com/realm/realm-core/issues/4633), since v11.0.0-beta.0)
 * Copying a Query constrained by a Dictionary would crash ([#4640](https://github.com/realm/realm-core/issues/4640), since v11.0.0-beta.0)
+* Some way - used in realm-cocoa - of constructing a Query could result in a use-after-free violation ([#4670](https://github.com/realm/realm-core/pull/4670), since v11.0.0-beta.0)
  
 ### Breaking changes
 * None.
