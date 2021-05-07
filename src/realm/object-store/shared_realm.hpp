@@ -356,7 +356,8 @@ public:
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
     // For synchronized realms, the file written will have the client file ident removed.
-    void write_copy(StringData path, BinaryData encryption_key, bool allow_overwrite = false);
+    void write_copy(StringData path, BinaryData encryption_key);
+    void write_copy_without_client_file_id(StringData path, BinaryData encryption_key, bool allow_overwrite = false);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;

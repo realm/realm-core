@@ -563,7 +563,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
                 return bool(realm_ref);
             });
             SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            realm->write_copy(config3.path, BinaryData());
+            realm->write_copy_without_client_file_id(config3.path, BinaryData());
         }
 
         // Create some more content on the server
