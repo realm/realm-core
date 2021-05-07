@@ -6,14 +6,14 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Writing a copy of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
- 
+
 ### Breaking changes
 * None.
 
 -----------
 
 ### Internals
-* None.
+* Restored original behavior of Realm::write_copy(). New behavior now in Realm::write_copy_without_client_file_id.
 
 ----------------------------------------------
 
