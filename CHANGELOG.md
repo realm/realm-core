@@ -1,19 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.7.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Writing a copy of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* Restored original behavior of Realm::write_copy(). New behavior now in Realm::write_copy_without_client_file_id.
+* Restored original behavior of Realm::write_copy() as it had breaking pre-conditions. New behavior now in Realm::write_copy_without_client_file_id(). ([#4674](https://github.com/realm/realm-core/pull/4674), since v10.7.0)
+* Realm::write_copy() of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
 
 ----------------------------------------------
 
