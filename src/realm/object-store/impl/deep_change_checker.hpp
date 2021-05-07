@@ -37,7 +37,8 @@ namespace realm {
 class Realm;
 class Transaction;
 
-using KeyPathArray = std::vector<std::vector<std::pair<TableKey, ColKey>>>;
+using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
+using KeyPathArray = std::vector<KeyPath>;
 
 namespace _impl {
 class RealmCoordinator;
