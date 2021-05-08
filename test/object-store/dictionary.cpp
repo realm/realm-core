@@ -494,7 +494,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         }
         REQUIRE(cf::get<W>(*values_as_results.sum()) == TestType::sum());
         dict.remove_all();
-        REQUIRE(!values_as_results.sum());
+        REQUIRE(values_as_results.sum() == 0);
     }
 
     SECTION("average()") {

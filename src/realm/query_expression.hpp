@@ -3463,7 +3463,7 @@ public:
                         destination.set(t, do_dictionary_agg(*dict.m_clusters));
                     }
                     else {
-                        destination.set_null(t);
+                        set_value_for_empty_dictionary(destination, t);
                     }
                 }
             }
@@ -3476,7 +3476,7 @@ public:
                     destination.set(0, do_dictionary_agg(dict_cluster));
                 }
                 else {
-                    destination.set_null(0);
+                    set_value_for_empty_dictionary(destination, 0);
                 }
             }
         }
@@ -3554,6 +3554,16 @@ private:
             return dict_cluster.sum();
         }
         REALM_UNREACHABLE();
+    }
+
+    inline void set_value_for_empty_dictionary(ValueBase& destination, size_t ndx)
+    {
+        if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
+            destination.set(ndx, 0); // the sum of nothing is zero
+        }
+        else {
+            destination.set_null(ndx);
+        }
     }
 
     ColumnsCollection<T> m_columns_collection;
