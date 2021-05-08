@@ -37,8 +37,10 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
 #endif
 
+#include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -663,6 +665,83 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         util::EventLoop::main().run_until([&] {
             return completed == 4;
         });
+    }
+
+    // Create a token which can be parsed as a JWT but is not valid
+    std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
+    std::string encoded_body;
+    encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
+    util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
+    auto invalid_token = "." + encoded_body + ".";
+
+    // Capture the token refresh callback so that we can invoke it later with
+    // the desired result
+    static std::function<void(app::Response)> refresh_completion;
+    init_sync_manager.transport_generator = [] {
+        struct transport : app::GenericNetworkTransport {
+            void send_request_to_server(app::Request, std::function<void(app::Response)> completion_block)
+            {
+                refresh_completion = completion_block;
+            }
+        };
+        return std::unique_ptr<app::GenericNetworkTransport>(new transport);
+    };
+
+    // Token refreshing requires that we have app metadata and we can't fetch
+    // it normally, so just stick some fake values in
+    init_sync_manager.app()->sync_manager()->perform_metadata_update([&](const SyncMetadataManager& manager) {
+        manager.set_app_metadata("GLOBAL", "location", "hostname", "ws_hostname");
+    });
+
+    SECTION("can async open while waiting for a token refresh") {
+        SyncTestFile config(init_sync_manager.app(), "realm");
+        auto valid_token = config.sync_config->user->access_token();
+        config.sync_config->user->update_access_token(std::move(invalid_token));
+
+        std::atomic<bool> called{false};
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
+            REQUIRE(ref);
+            REQUIRE(!error);
+            called = true;
+        });
+
+        auto body = nlohmann::json({{"access_token", valid_token}}).dump();
+        refresh_completion(app::Response{200, 0, {}, body});
+        util::EventLoop::main().run_until([&] {
+            return called.load();
+        });
+        refresh_completion = nullptr;
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(called);
+    }
+
+    SECTION("cancels download and reports an error on auth error") {
+        SyncTestFile config(init_sync_manager.app(), "realm");
+        config.sync_config->user->update_refresh_token(std::string(invalid_token));
+        config.sync_config->user->update_access_token(std::move(invalid_token));
+
+        bool got_error = false;
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            got_error = true;
+        };
+        std::atomic<bool> called{false};
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto ref, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
+            REQUIRE(error);
+            REQUIRE(!ref);
+            called = true;
+        });
+        refresh_completion(app::Response{403});
+        util::EventLoop::main().run_until([&] {
+            return called.load();
+        });
+        refresh_completion = nullptr;
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(called);
+        REQUIRE(got_error);
     }
 }
 #endif
