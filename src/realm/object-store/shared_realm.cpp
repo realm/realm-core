@@ -895,7 +895,6 @@ SharedRealm Realm::freeze()
 
 SharedRealm Realm::thaw()
 {
-    REALM_ASSERT(is_frozen());
     return Realm::get_shared_realm(m_config);
 }
 

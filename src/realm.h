@@ -1246,12 +1246,20 @@ RLM_API bool realm_object_delete(realm_object_t*);
 /**
  * Freeze the Realm object in the provided Realm.
  *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * Note: Will assert that frozen_realm is in fact frozen.
+ *
  * @return A frozen copy of the live object.
  */
 RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm);
 
 /**
  * Turn a frozen Realm Object into a live one that is evaluated against a given version of a Live Realm.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
+ *
+ * Note: Will assert that live_realm is not frozen.
  *
  * @return A live copy of the frozen object.
  */
@@ -1409,12 +1417,20 @@ RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
 /**
  * Map the list into a frozen Realm instance.
  *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * Note: Will assert that frozen_realm is in fact frozen.
+ *
  * @return A frozen copy of the live list.
  */
 RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const realm_t* frozen_realm);
 
 /**
  * Map the list into a live Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
+ *
+ * Note: Will assert that live_realm is not frozen.
  *
  * @return A live copy of the frozen list.
  */
@@ -1811,12 +1827,20 @@ RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
 /**
  * Map the results into a frozen realm instance.
  *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * Note: Will assert that frozen_realm is in fact frozen.
+ *
  * @return A frozen copy of the Results.
  */
 RLM_API realm_results_t* realm_results_freeze(realm_results_t*, const realm_t* frozen_realm);
 
 /**
  * Map the Results into a live Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
+ *
+ * Note: Will assert that live_realm is not frozen.
  *
  * @return A live copy of the Results.
  */

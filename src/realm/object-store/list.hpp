@@ -88,10 +88,14 @@ public:
     Results snapshot() const;
 
     // Returns a frozen copy of this List.
-    List freeze(std::shared_ptr<Realm> const& realm) const;
+    // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+    // Will assert that the frozen_realm is in fact frozen.
+    List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
 
     // Returns a live copy of this List.
-    List thaw(std::shared_ptr<Realm> const& realm) const;
+    // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+    // Will assert that the frozen_realm is not frozen.
+    List thaw(std::shared_ptr<Realm> const& live_realm) const;
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
