@@ -1015,7 +1015,7 @@ void Table::do_erase_root_column(ColKey col_key)
     build_column_mapping();
     while (m_index_accessors.size() > m_leaf_ndx2colkey.size()) {
         REALM_ASSERT(m_index_accessors.back() == nullptr);
-        m_index_accessors.erase(m_index_accessors.end() - 1);
+        m_index_accessors.pop_back();
     }
     bump_content_version();
     bump_storage_version();
@@ -1096,7 +1096,8 @@ void Table::fully_detach() noexcept
     m_spec.detach();
     m_top.detach();
     for (auto& index : m_index_accessors) {
-        delete index;
+        if (index)
+            delete index;
     }
     m_index_refs.detach();
     m_opposite_table.detach();
@@ -1107,19 +1108,19 @@ void Table::fully_detach() noexcept
 
 Table::~Table() noexcept
 {
-    // If destroyed as a standalone table, destroy all memory allocated
-    if (m_top.get_parent() == nullptr) {
-        m_top.destroy_deep();
-    }
-
     if (m_top.is_attached()) {
+        // If destroyed as a standalone table, destroy all memory allocated
+        if (m_top.get_parent() == nullptr) {
+            m_top.destroy_deep();
+        }
         fully_detach();
     }
-
-    for (auto& index : m_index_accessors) {
-        delete index;
+    else {
+        for (auto e : m_index_accessors) {
+            REALM_ASSERT(e == nullptr);
+        }
+        REALM_ASSERT(m_index_accessors.size() == 0);
     }
-    m_index_accessors.clear();
     m_cookie = cookie_deleted;
 }
 
