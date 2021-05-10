@@ -293,7 +293,7 @@ util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
     }
     if (return_ndx)
         *return_ndx = realm::npos;
-    return {};
+    return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
@@ -304,7 +304,7 @@ util::Optional<Mixed> Dictionary::max(size_t* return_ndx) const
     }
     if (return_ndx)
         *return_ndx = realm::npos;
-    return {};
+    return Mixed{};
 }
 
 util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
@@ -315,7 +315,7 @@ util::Optional<Mixed> Dictionary::sum(size_t* return_cnt) const
     }
     if (return_cnt)
         *return_cnt = 0;
-    return {};
+    return Mixed{0};
 }
 
 util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
@@ -326,7 +326,7 @@ util::Optional<Mixed> Dictionary::avg(size_t* return_cnt) const
     }
     if (return_cnt)
         *return_cnt = 0;
-    return {};
+    return Mixed{};
 }
 
 void Dictionary::align_indices(std::vector<size_t>& indices) const

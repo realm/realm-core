@@ -1295,6 +1295,25 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     }
 }
 
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      std::vector<Mixed> args, size_t num_results)
+{
+    std::string empty_string;
+    Query q = t->query(query_string, args, {});
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
+
 TEST(Parser_substitution)
 {
     Group g;
@@ -2356,7 +2375,7 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(empty_list.min(), Mixed{});
     CHECK_EQUAL(empty_list.max(), Mixed{});
     CHECK_EQUAL(empty_list.sum(), Mixed{0});
-    CHECK_EQUAL(empty_list.avg(), Mixed{0});
+    CHECK_EQUAL(empty_list.avg(), Mixed{});
 
     Obj obj_with_null = t->create_object();
     auto list_with_null = obj_with_null.get_list<Mixed>(col_list);
@@ -2364,7 +2383,7 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(list_with_null.min(), Mixed{});
     CHECK_EQUAL(list_with_null.max(), Mixed{});
     CHECK_EQUAL(list_with_null.sum(), Mixed{0});
-    CHECK_EQUAL(list_with_null.avg(), Mixed{0});
+    CHECK_EQUAL(list_with_null.avg(), Mixed{});
 
     Obj obj_with_empty_string = t->create_object();
     auto empty_string_list = obj_with_empty_string.get_list<Mixed>(col_list);
@@ -2372,7 +2391,7 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(empty_string_list.min(), Mixed{""});
     CHECK_EQUAL(empty_string_list.max(), Mixed{""});
     CHECK_EQUAL(empty_string_list.sum(), Mixed{0});
-    CHECK_EQUAL(empty_string_list.avg(), Mixed{0});
+    CHECK_EQUAL(empty_string_list.avg(), Mixed{});
 
     Obj obj_with_ints = t->create_object();
     auto ints_list = obj_with_ints.get_list<Mixed>(col_list);
@@ -2405,7 +2424,7 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(strings_list.min(), Mixed{""});
     CHECK_EQUAL(strings_list.max(), Mixed{"two"});
     CHECK_EQUAL(strings_list.sum(), Mixed(0));
-    CHECK_EQUAL(strings_list.avg(), Mixed(0));
+    CHECK_EQUAL(strings_list.avg(), Mixed());
 
     Obj obj_with_mixed_types = t->create_object();
     auto mixed_list = obj_with_mixed_types.get_list<Mixed>(col_list);
@@ -2443,6 +2462,7 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "values.@type == 'string'", 3);
     verify_query(test_context, t, "values == T1:0", 1);
     verify_query(test_context, t, "values.@sum > 0", 3);
+    verify_query(test_context, t, "values.@sum == 0", 4);
     verify_query(test_context, t, "values.@sum == 3", 1);
     verify_query(test_context, t, "values.@sum == 10.9", 1);
     verify_query(test_context, t, "values.@sum == 7.2", 1);
@@ -4779,7 +4799,7 @@ TEST(Parser_SetMixed)
     CHECK_EQUAL(list3.min(), Mixed{});
     CHECK_EQUAL(list3.max(), Mixed{});
     CHECK_EQUAL(list3.sum(), 0);
-    CHECK_EQUAL(list3.avg(), 0);
+    CHECK_EQUAL(list3.avg(), Mixed{});
     auto list4 = table->get_object(keys[4]).get_set<Mixed>(col_set);
     CHECK_EQUAL(list4.min(), -1);
     CHECK_EQUAL(list4.max(), 7.6);
@@ -4826,6 +4846,76 @@ TEST(Parser_SetMixed)
     verify_query(test_context, table, "set CONTAINS 'r'", 1);
     verify_query(test_context, table, "set.length == 5", 2);
     verify_query(test_context, table, "set.length == 3", 1);
+}
+
+TEST(Parser_CollectionsConsistency)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    bool is_nullable = true;
+    auto col_set = table->add_column_set(type_Mixed, "set", is_nullable);
+    auto col_list = table->add_column_list(type_Mixed, "list", is_nullable);
+    auto col_dict = table->add_column_dictionary(type_Mixed, "dict");
+    std::vector<ObjKey> keys;
+    table->create_objects(5, keys);
+    size_t key_ndx = 0;
+    auto set_values = [&](ObjKey key, const std::vector<Mixed>& value_list) {
+        auto obj = table->get_object(key);
+        auto set = obj.get_set<Mixed>(col_set);
+        auto list = obj.get_list<Mixed>(col_list);
+        auto dict = obj.get_dictionary(col_dict);
+        for (auto val : value_list) {
+            set.insert(val);
+            list.add(val);
+            dict.insert(util::format("key_%1", key_ndx++), val);
+        }
+    };
+    auto check_agg = [&](ObjKey key, Mixed min, Mixed max, Mixed sum, Mixed avg) {
+        auto obj = table->get_object(key);
+        auto set = obj.get_set<Mixed>(col_set);
+        auto list = obj.get_list<Mixed>(col_list);
+        auto dict = obj.get_dictionary(col_dict);
+        CHECK_EQUAL(set.min(), min);
+        CHECK_EQUAL(list.min(), min);
+        CHECK_EQUAL(dict.min(), min);
+        CHECK_EQUAL(set.max(), max);
+        CHECK_EQUAL(list.max(), max);
+        CHECK_EQUAL(dict.max(), max);
+        CHECK_EQUAL(set.sum(), sum);
+        CHECK_EQUAL(list.sum(), sum);
+        CHECK_EQUAL(dict.sum(), sum);
+        CHECK_EQUAL(set.avg(), avg);
+        CHECK_EQUAL(list.avg(), avg);
+        CHECK_EQUAL(dict.avg(), avg);
+
+        std::vector<Mixed> args = {min, max, sum, avg};
+        verify_query_sub(test_context, table, "set.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "list.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "dict.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "set.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "list.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "dict.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "set.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "list.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "dict.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "set.@avg == $3", args, 1);
+        verify_query_sub(test_context, table, "list.@avg == $3", args, 1);
+        verify_query_sub(test_context, table, "dict.@avg == $3", args, 1);
+    };
+    const Mixed same_value(300);
+
+    BinaryData data("foo", 3);
+    set_values(keys[0], {{3}, {"hello"}, same_value});
+    set_values(keys[1], {{3.5f}, {"world"}, {data}, {ObjectId::gen()}, {UUID()}, {}});
+    set_values(keys[2], {same_value});
+    // the collections at keys[3] are empty
+    set_values(keys[4], {int64_t(-1), Decimal128(StringData(/*NaN*/)), 4.4f, 7.6, 0, realm::null()});
+
+    check_agg(keys[0], 3, StringData("hello"), 303, 151.5);
+    check_agg(keys[1], 3.5, UUID(), 3.5, 3.5);
+    check_agg(keys[2], same_value, same_value, same_value, same_value);
+    check_agg(keys[3], Mixed{}, Mixed{}, 0, Mixed{});
+    check_agg(keys[4], -1, 7.6, 11, 2.75);
 }
 
 TEST(Parser_SetLinks)

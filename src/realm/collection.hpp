@@ -243,7 +243,12 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     template <class U>
     static util::Optional<Mixed> eval(U& tree, size_t* return_cnt)
     {
-        return Mixed{bptree_average<T>(tree, return_cnt)};
+        size_t count = 0;
+        auto result = Mixed{bptree_average<T>(tree, &count)};
+        if (return_cnt) {
+            *return_cnt = count;
+        }
+        return count == 0 ? util::none : result;
     }
 };
 
