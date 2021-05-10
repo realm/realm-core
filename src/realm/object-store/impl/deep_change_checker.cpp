@@ -284,3 +284,53 @@ bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
 
     return false;
 }
+
+ObjectChangeChecker::ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                                           std::vector<RelatedTable> const& related_tables,
+                                           std::vector<KeyPathArray> key_path_arrays)
+    : DeepChangeChecker(info, root_table, related_tables, key_path_arrays)
+{
+}
+
+std::vector<int64_t> ObjectChangeChecker::operator()(ObjKeyType object_key)
+{
+    std::vector<int64_t> changed_columns = {};
+    
+    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
+    // anyway.
+    if (m_root_object_changes &&
+        m_root_object_changes->modifications_contains(object_key, m_filtered_columns_in_root_table)) {
+        auto changed_columns_for_object = m_root_object_changes->get_columns_modified(object_key);
+        for (auto column : *changed_columns_for_object) {
+            changed_columns.push_back(column);
+        }
+        return changed_columns;
+    }
+
+    // The `KeyPathChangeChecker` traverses along the given key path arrays and only those to check for changes
+    // along them.
+    for (auto&& key_path_array : m_key_path_arrays) {
+        for (auto&& key_path : key_path_array) {
+            auto next_object_key_to_check = object_key;
+            for (size_t i = 0; i < key_path.size(); i++) {
+
+                // Check for a change on the current depth.
+                auto column_key = key_path[i].second;
+                auto iterator = m_info.tables.find(key_path[i].first.value);
+                if (iterator != m_info.tables.end() &&
+                    iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
+                    changed_columns.push_back(column_key.value);
+                }
+
+                // Advance one level deeper into the key path.
+                auto column_type = column_key.get_type();
+                if (column_type == col_type_Link) {
+                    const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
+                    next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
+                }
+            }
+        }
+    }
+
+    return changed_columns;
+}

@@ -69,6 +69,12 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
 }
 
+std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
+CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
+{
+    return ObjectChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+}
+
 void CollectionNotifier::recalculate_key_path_arrays()
 {
     m_key_path_arrays = {};

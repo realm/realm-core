@@ -204,9 +204,8 @@ private:
 };
 
 /**
- * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a check for objects as well
- * but checks them by traversing and only traversing the given KeyPathArray. With this it supports any depth (as
- * opposed to the maxium depth of 4 on the `DeepChangeChecker`) and backlinks.
+ * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a checks by traversing and only traversing the given KeyPathArray.
+ * With this it supports any depth (as opposed to the maxium depth of 4 on the `DeepChangeChecker`) and backlinks.
  */
 class KeyPathChangeChecker : DeepChangeChecker {
 
@@ -224,6 +223,31 @@ public:
      */
     bool operator()(int64_t object_key);
 };
+
+/**
+ * The `ObjectChangeChecker` is a specialised version of `DeepChangeChecker` that offers a deep change check for objects
+ * which is different from the checks done for `Collection`. Like `KeyPathChecker` it is only traversing the given KeyPathArray
+ * and has no depth limit.
+ *
+ * This difference is mainly seen in the fact that for objects we notify about the specific columns that have been changed
+ */
+class ObjectChangeChecker : DeepChangeChecker {
+
+public:
+    ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                         std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+
+    /**
+     * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided
+     * when construction this `KeyPathChangeChecker`.
+     *
+     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
+     *
+     * @return A list of columns changed in the root object.
+     */
+    std::vector<int64_t> operator()(int64_t object_key);
+};
+
 
 } // namespace _impl
 } // namespace realm

@@ -61,9 +61,14 @@ void ObjectNotifier::run()
     if (!m_change.modifications.contains(0) && any_callbacks_filtered()) {
         // If any callback has a key path filter we will check all related tables and if any of them was changed we
         // mark the this object as changed.
-        auto deep_change_check = get_modification_checker(*m_info, m_table);
-        if (deep_change_check(m_obj.value)) {
+        auto object_change_checker = get_object_modification_checker(*m_info, m_table);
+        std::vector<int64_t> changed_columns = object_change_checker(m_obj.value);
+        
+        if (changed_columns.size() > 0) {
             m_change.modifications.add(0);
+            for (auto changed_column : changed_columns) {
+                m_change.columns[changed_column].add(0);
+            }
         }
         if (all_callbacks_filtered()) {
             return;
@@ -72,8 +77,8 @@ void ObjectNotifier::run()
 
     auto it = m_info->tables.find(m_table->get_key().value);
     if (it == m_info->tables.end())
-        // This object's table is not in the map of changed tables held by `m_info` hence no further details have to
-        // be checked.
+        // This object's table is not in the map of changed tables held by `m_info`
+        // hence no further details have to be checked.
         return;
 
     auto& change = it->second;
