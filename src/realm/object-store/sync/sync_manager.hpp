@@ -224,6 +224,13 @@ public:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
+protected:
+    friend class SyncUser;
+    friend class SyncSesson;
+
+    using std::enable_shared_from_this<SyncManager>::shared_from_this;
+    using std::enable_shared_from_this<SyncManager>::weak_from_this;
+
 private:
     friend class app::App;
 

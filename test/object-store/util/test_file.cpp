@@ -189,8 +189,8 @@ static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(st
     std::mutex wait_mutex;
     bool wait_flag(false);
     std::error_code ec;
-    auto& session = *realm.config().sync_config->user->sync_manager().get_session(realm.config().path,
-                                                                                  *realm.config().sync_config);
+    auto& session = *realm.config().sync_config->user->sync_manager()->get_session(realm.config().path,
+                                                                                   *realm.config().sync_config);
     (session.*fn)([&](std::error_code error) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;

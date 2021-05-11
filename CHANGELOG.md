@@ -5,6 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Destroying the SyncManager in ObjectStore no longer causes segfaults in async callbacks in SyncUser/SyncSession ([4615](https://github.com/realm/realm-core/issues/4615))
 * None.
  
 ### Breaking changes
