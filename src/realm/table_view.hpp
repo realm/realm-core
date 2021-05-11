@@ -405,6 +405,9 @@ protected:
     size_t m_end = size_t(-1);
     size_t m_limit = size_t(-1);
 
+    // FIXME: This class should eventually be replaced by std::vector<ObjKey>
+    // It implements a vector of ObjKey, where the elements are held in the 
+    // heap (default allocator is the only option)
     class KeyValues : public KeyColumn {
     public:
         KeyValues()
