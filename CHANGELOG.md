@@ -5,9 +5,9 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Writing a copy of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
 * Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
   TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
+* Calling Realm::get_synchronized_realm() while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
 
 ### Breaking changes
 * None.
@@ -15,7 +15,15 @@
 -----------
 
 ### Internals
-* Restored original behavior of Realm::write_copy(). New behavior now in Realm::write_copy_without_client_file_id.
+* None.
+
+----------------------------------------------
+
+# 10.7.1 Release notes
+
+### Fixed
+* Restored original behavior of Realm::write_copy() as it had breaking pre-conditions. New behavior now in Realm::write_copy_without_client_file_id(). ([#4674](https://github.com/realm/realm-core/pull/4674), since v10.7.0)
+* Realm::write_copy() of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
 
 ----------------------------------------------
 

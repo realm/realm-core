@@ -857,7 +857,7 @@ void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
                                         std::make_pair(direction, std::move(callback)));
     // If the state is inactive then just store the callback and return. The callback will get
     // re-registered with the underlying session if/when the session ever becomes active again.
-    if (get_public_state() == PublicState::Inactive) {
+    if (!m_session) {
         return;
     }
 
