@@ -570,12 +570,13 @@ TEST_CASE("object") {
                         });
                     }
                 }
-                
+
                 SECTION("some callbacks filtered") {
                     SECTION("modifying origin table 'table2', property 'value'"
                             "while observing related table 'table', property 'value 1'"
                             "-> DOES send a notification") {
-                        auto token_with_filter = require_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_with_filter =
+                            require_change(object_origin, key_path_array_origin_to_target_value1);
                         auto token_without_filter = require_change(object_origin);
 
                         write([&] {
@@ -589,9 +590,10 @@ TEST_CASE("object") {
                     SECTION("modifying related table 'table', property 'value 1'"
                             "while observing related table 'table', property 'value 1'"
                             "-> DOES send a notification") {
-                        auto token_with_filter = require_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_with_filter =
+                            require_change(object_origin, key_path_array_origin_to_target_value1);
                         auto token_without_filter = require_change(object_origin);
-                        
+
                         write([&] {
                             object_target.set_column_value("value 1", 205);
                         });
@@ -603,7 +605,8 @@ TEST_CASE("object") {
                     SECTION("modifying related table 'table', property 'value 2'"
                             "while observing related table 'table', property 'value 1'"
                             "-> does NOT send a notification") {
-                        auto token_with_filter = require_no_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_with_filter =
+                            require_no_change(object_origin, key_path_array_origin_to_target_value1);
                         auto token_without_filter = require_no_change(object_origin);
 
                         write([&] {

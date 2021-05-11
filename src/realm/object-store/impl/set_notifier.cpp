@@ -73,7 +73,7 @@ bool SetNotifier::do_add_required_change_info(TransactionChangeInfo& info)
         auto& set = static_cast<LnkSet&>(*m_set);
         recalculate_key_path_arrays();
         DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(set.get_target_table()),
-                                                        m_key_path_arrays, all_callbacks_filtered());
+                                                        m_key_path_arrays);
         // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
         // necessary.
         m_did_modify_callbacks = false;

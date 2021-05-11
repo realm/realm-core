@@ -292,7 +292,7 @@ TEST_CASE("set") {
             REQUIRE(change.empty());
         }
 
-        SECTION("Keypath filtered change notifications") {
+        SECTION("key path filtered change notifications") {
             ColKey col_table2_value = table2->get_column_key("value");
             ColKey col_table2_value2 = table2->get_column_key("value2");
 

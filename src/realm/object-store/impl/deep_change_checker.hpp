@@ -133,13 +133,9 @@ public:
      * @param table The table that the related tables will be searched for.
      * @param key_path_arrays A collection of all `KeyPathArray`s passed to the `NotificationCallback`s for this
      *                        `CollectionNotifier`.
-     * @param all_callback_have_filters The beheviour when filtering tables depends on all of them having a filter or
-     *                                  just some. In the latter case the related tables will be a combination of all
-     *                                  tables for the non-filtered way plus the explicitely filtered tables.
      */
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                             std::vector<KeyPathArray> key_path_arrays,
-                                             bool all_callback_have_filters);
+                                             std::vector<KeyPathArray> key_path_arrays);
 
     // This function is only used by `find_filtered_related_tables` internally.
     // It is however used in some tests and therefore exposed here.
@@ -204,11 +200,11 @@ private:
 };
 
 /**
- * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a checks by traversing and only traversing the given KeyPathArray.
- * With this it supports any depth (as opposed to the maxium depth of 4 on the `DeepChangeChecker`) and backlinks.
+ * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a checks by traversing and
+ * only traversing the given KeyPathArray. With this it supports any depth (as opposed to the maxium depth of 4 on the
+ * `DeepChangeChecker`) and backlinks.
  */
 class KeyPathChangeChecker : DeepChangeChecker {
-
 public:
     KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                          std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
@@ -225,17 +221,17 @@ public:
 };
 
 /**
- * The `ObjectChangeChecker` is a specialised version of `DeepChangeChecker` that offers a deep change check for objects
- * which is different from the checks done for `Collection`. Like `KeyPathChecker` it is only traversing the given KeyPathArray
- * and has no depth limit.
+ * The `ObjectChangeChecker` is a specialised version of `DeepChangeChecker` that offers a deep change check for
+ * objects which is different from the checks done for `Collection`. Like `KeyPathChecker` it is only traversing the
+ * given KeyPathArray and has no depth limit.
  *
- * This difference is mainly seen in the fact that for objects we notify about the specific columns that have been changed
+ * This difference is mainly seen in the fact that for objects we notify about the specific columns that have been
+ * changed
  */
 class ObjectChangeChecker : DeepChangeChecker {
-
 public:
     ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                         std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+                        std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
 
     /**
      * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided

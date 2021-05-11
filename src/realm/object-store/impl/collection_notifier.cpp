@@ -52,7 +52,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
-    // In this case we do not need a `DeepChangeChecker` and check the modifications against the
+    // In this case we do not need a `DeepChangeChecker` and check the modifications using the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
         auto root_table_key = m_related_tables[0].table_key;
@@ -64,6 +64,16 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 
     if (all_callbacks_filtered()) {
         return KeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+    }
+    else if (any_callbacks_filtered()) {
+        // In case we have some callbacks, we need to combine the unfiltered `DeepChangeChecker` with
+        // the filtered `KeyPathChangeChecker` to make sure we send all expected notifications.
+        return [&info, root_table, this](ObjectChangeSet::ObjectKeyType object_key) {
+            auto key_path_change_checker =
+                KeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+            auto deep_change_checker = DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+            return key_path_change_checker(object_key) || deep_change_checker(object_key);
+        };
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
@@ -213,8 +223,7 @@ void CollectionNotifier::set_table(ConstTableRef table)
     m_related_tables.clear();
     util::CheckedLockGuard lock(m_callback_mutex);
     recalculate_key_path_arrays();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_arrays,
-                                                    all_callbacks_filtered());
+    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_arrays);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)

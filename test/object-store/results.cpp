@@ -2126,7 +2126,7 @@ TEST_CASE("notifications: results") {
         auto column_key_linked_to_table_value = linked_to_table->get_column_key("value");
         auto column_key_linked_to_table_value2 = linked_to_table->get_column_key("value2");
         auto column_key_other_table_value = other_table->get_column_key("value");
-        auto root_table_key = table->get_key();
+        auto origin_table_key = table->get_key();
         auto linked_to_table_key = linked_to_table->get_key();
         r->begin_transaction();
         auto other_table_obj_key = ObjKey(1);
@@ -2137,8 +2137,8 @@ TEST_CASE("notifications: results") {
 
         // Creating KeyPathArrays:
         // 1. Property pairs
-        std::pair<TableKey, ColKey> table_value_pair(root_table_key, col_value);
-        std::pair<TableKey, ColKey> table_link_pair(root_table_key, col_link);
+        std::pair<TableKey, ColKey> table_value_pair(origin_table_key, col_value);
+        std::pair<TableKey, ColKey> table_link_pair(origin_table_key, col_link);
         std::pair<TableKey, ColKey> linked_to_value_pair(linked_to_table_key, column_key_linked_to_table_value);
         // 2. Keypaths
         auto root_table_value_key_path = {table_value_pair};
@@ -2445,6 +2445,128 @@ TEST_CASE("notifications: results") {
 
                     REQUIRE(notification_calls_with_filter_on_linked_to_value == 1);
                     REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
+                }
+            }
+        }
+
+        SECTION("keypath filter with a backlink") {
+            auto col_second_link = table->get_column_key("second link");
+            auto col_linked_to_backlink_to_object = table->get_opposite_column(col_link);
+            auto col_second_linked_to_backlink_to_object = table->get_opposite_column(col_second_link);
+
+            std::pair<TableKey, ColKey> linked_to_backlink_pair(linked_to_table, col_linked_to_backlink_to_object);
+            std::pair<TableKey, ColKey> table_second_link_pair(origin_table_key, col_second_link);
+            std::pair<TableKey, ColKey> second_linked_to_backlink_pair(second_linked_to_table,
+                                                                       col_second_linked_to_backlink_to_object);
+
+            KeyPath backlink_to_value_key_path = {linked_to_backlink_pair, table_value_pair};
+            KeyPath backlink_to_second_link_key_path = {linked_to_backlink_pair, table_second_link_pair};
+            KeyPath backlink_from_second_link_to_value_key_path = {second_linked_to_backlink_pair, table_value_pair};
+
+            KeyPathArray backlink_to_value_key_path_array = {backlink_to_value_key_path};
+            KeyPathArray backlink_to_second_link_key_path_array = {backlink_to_second_link_key_path};
+            KeyPathArray backlink_from_second_link_to_value_key_path_array = {
+                backlink_from_second_link_to_value_key_path};
+
+            Results linked_to_results(r, linked_to_table);
+
+            int notification_calls_backlink_to_value = 0;
+            CollectionChangeSet collection_change_set_backlink_to_value;
+            CollectionChangeSet collection_change_set_backlink_to_second_link;
+
+            SECTION("all callbacks have filters") {
+                auto token_backlink_value = linked_to_results.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_backlink_to_value = collection_change_set;
+                        notification_calls_backlink_to_value++;
+                    },
+                    backlink_to_value_key_path_array);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against
+                // later.
+                REQUIRE(notification_calls_backlink_to_value == 1);
+                REQUIRE(collection_change_set_backlink_to_value.empty());
+
+                SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value' and "
+                        "'second link'"
+                        "modifying backlinked table 'object', property 'value'"
+                        "-> DOES send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_value, 3);
+                    });
+                    REQUIRE(notification_calls_backlink_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
+                    REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
+                }
+
+                SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value' and "
+                        "'second link'"
+                        "modifying backlinked table 'object', property 'link'"
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .set(col_second_link, second_linked_to_table->create_object().get_key());
+                    });
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+                }
+            }
+
+            SECTION("some callbacks have filters") {
+                auto token_backlink_value = linked_to_results.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_backlink_to_value = collection_change_set;
+                        notification_calls_backlink_to_value++;
+                    },
+                    backlink_to_value_key_path_array);
+                int notification_calls_without_filter = 0;
+                CollectionChangeSet collection_change_set_without_filter;
+                auto token_backlink_second_value = linked_to_results.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_without_filter = collection_change_set;
+                        notification_calls_without_filter++;
+                    });
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against
+                // later.
+                REQUIRE(notification_calls_backlink_to_value == 1);
+                REQUIRE(collection_change_set_backlink_to_value.empty());
+                REQUIRE(notification_calls_without_filter == 1);
+                REQUIRE(collection_change_set_without_filter.empty());
+
+                SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value'"
+                        "modifying backlinked table 'object', property 'value'"
+                        "-> DOES send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_value, 3);
+                    });
+                    REQUIRE(notification_calls_backlink_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
+                    REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
+                    REQUIRE(notification_calls_without_filter == 2);
+                    REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications, 4);
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 4);
+                }
+
+                SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value'"
+                        "modifying backlinked table 'object', property 'link'"
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .set(col_second_link, second_linked_to_table->create_object().get_key());
+                    });
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+                    REQUIRE(notification_calls_without_filter == 1);
+                    REQUIRE(collection_change_set_without_filter.empty());
                 }
             }
         }
