@@ -1,15 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
 * Change notifications can now be filtered via a key path. This keypath is passed via the `add_notification_callback` on `Object`, `Set`, `List` and `Result`.
   If such a key path was provided when adding a notification callback it will only ever be executed when a changed property was covered by this filter.
   Multiple key path filters can be provided when adding a single notification callback.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime (v10.6.0).
- 
+* Calling Realm::get_synchronized_realm() while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
+
 ### Breaking changes
 * None.
 
@@ -17,6 +16,31 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.7.1 Release notes
+
+### Fixed
+* Restored original behavior of Realm::write_copy() as it had breaking pre-conditions. New behavior now in Realm::write_copy_without_client_file_id(). ([#4674](https://github.com/realm/realm-core/pull/4674), since v10.7.0)
+* Realm::write_copy() of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
+
+----------------------------------------------
+
+# 10.7.0 Release notes
+
+### Enhancements
+* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
+
+### Fixed
+* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime ([#4614](https://github.com/realm/realm-core/pull/4614) Since v10.6.0).
+* Fixed the android scheduler not being supplied which could result in `[realm-core-10.6.1] No built-in scheduler implementation for this platform. Register your own with Scheduler::set_default_factory()` ([#4660](https://github.com/realm/realm-core/pull/4660) Since v10.6.1).
+* Fixed a crash that could happen adding a upload/download notification for a sync session. ([#4638](https://github.com/realm/realm-core/pull/4638#issuecomment-832227309) since v10.6.1).
+ 
+-----------
+
+### Internals
+* A separate sync version is removed.
 
 ----------------------------------------------
 

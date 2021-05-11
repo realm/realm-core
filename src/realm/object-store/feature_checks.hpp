@@ -21,10 +21,4 @@
 
 #include <realm/version.hpp>
 
-#if REALM_ENABLE_SYNC
-
-#include <realm/sync/version.hpp>
-
-#endif // REALM_ENABLE_SYNC
-
 #endif // REALM_OS_FEATURE_CHECKS_HPP

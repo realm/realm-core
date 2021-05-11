@@ -857,7 +857,7 @@ void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
                                         std::make_pair(direction, std::move(callback)));
     // If the state is inactive then just store the callback and return. The callback will get
     // re-registered with the underlying session if/when the session ever becomes active again.
-    if (get_public_state() == PublicState::Inactive) {
+    if (!m_session) {
         return;
     }
 
@@ -927,6 +927,9 @@ SyncSession::PublicState SyncSession::get_public_state() const
     }
     else if (m_state == &State::inactive) {
         return PublicState::Inactive;
+    }
+    else if (m_state == &State::waiting_for_access_token) {
+        return PublicState::WaitingForAccessToken;
     }
     REALM_UNREACHABLE();
 }
