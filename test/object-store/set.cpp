@@ -240,7 +240,6 @@ TEMPLATE_TEST_CASE("set all types", "[set]", cf::MixedVal, cf::Int, cf::Bool, cf
                 REQUIRE(!set.average());
                 REQUIRE(!set_as_results.average());
             }
-            /* FIXME
             SECTION("sort") {
                 SECTION("ascending") {
                     auto sorted = set_as_results.sort({{"self", true}});
@@ -253,7 +252,6 @@ TEMPLATE_TEST_CASE("set all types", "[set]", cf::MixedVal, cf::Int, cf::Bool, cf
                     REQUIRE(sorted == values);
                 }
             }
-            */
         }
     }
 }

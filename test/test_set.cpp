@@ -28,6 +28,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+extern unsigned int unit_test_random_seed;
+
 TEST(Set_Basics)
 {
     Group g;
@@ -95,41 +97,60 @@ TEST(Set_Mixed)
 {
     Group g;
 
+    Obj bar = g.add_table("bar")->create_object();
     auto t = g.add_table("foo");
     t->add_column_set(type_Mixed, "mixeds");
     auto obj = t->create_object();
 
+    // Check that different typed with same numeric value are treated as the same
     auto set = obj.get_set<Mixed>("mixeds");
     set.insert(123);
-    set.insert(123);
-    set.insert(123);
+    set.insert(123.f);
+    set.insert(123.);
+    set.insert(Decimal128("123"));
     CHECK_EQUAL(set.size(), 1);
     CHECK_EQUAL(set.get(0), Mixed(123));
+    set.clear();
 
-    // Sets of Mixed should be ordered by their type index (as specified by the `DataType` enum).
-    set.insert(56.f);
-    set.insert("Hello, World!");
-    set.insert(util::none);
-    set.insert(util::none);
-    set.insert("Hello, World!");
-    CHECK_EQUAL(set.size(), 4);
+    std::vector<Mixed> ref_values{{},
+                                  false,
+                                  true,
+                                  Decimal128("-123"),
+                                  25,
+                                  56.f,
+                                  88.,
+                                  "Hello, World!",
+                                  "æbler",
+                                  "ørken",
+                                  "ådsel",
+                                  Timestamp(1, 2),
+                                  ObjectId::gen(),
+                                  UUID("01234567-9abc-4def-9012-3456789abcde"),
+                                  bar.get_link()};
+    // Sets of Mixed should be ordered by the rules defined for Set<Mixed>. Refer to "realm/set.hpp".
+    std::vector<size_t> indices(ref_values.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::shuffle(indices.begin(), indices.end(), std::mt19937(unit_test_random_seed));
+    for (auto i : indices) {
+        set.insert(ref_values[i]);
+    }
+    std::vector<Mixed> actuals;
+    std::for_each(set.begin(), set.end(), [&actuals](auto v) {
+        actuals.push_back(v);
+    });
+    CHECK(ref_values == actuals);
+    actuals.clear();
 
-    CHECK_EQUAL(set.get(0), Mixed{});
-    CHECK_EQUAL(set.get(1), Mixed{123});
-    CHECK_EQUAL(set.get(2), Mixed{"Hello, World!"});
-    CHECK_EQUAL(set.get(3), Mixed{56.f});
-
-    // Sets of Mixed can be sorted.
-    std::vector<Mixed> sorted;
-    std::vector<size_t> sorted_indices;
-    set.sort(sorted_indices);
-    std::transform(begin(sorted_indices), end(sorted_indices), std::back_inserter(sorted), [&](size_t index) {
+    // Sets of Mixed can be sorted. Should sort according to the comparison rules defined for Mixed, which
+    // currently
+    set.sort(indices);
+    std::transform(begin(indices), end(indices), std::back_inserter(actuals), [&](size_t index) {
         return set.get(index);
     });
-    CHECK(std::equal(begin(sorted), end(sorted), set.begin()));
-    auto sorted2 = sorted;
-    std::sort(begin(sorted2), end(sorted2), SetElementLessThan<Mixed>{});
-    CHECK(sorted2 == sorted);
+    std::sort(begin(ref_values), end(ref_values), [](auto v1, auto v2) {
+        return v1 < v2;
+    });
+    CHECK(ref_values == actuals);
 }
 
 TEST(Set_Links)

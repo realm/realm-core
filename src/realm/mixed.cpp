@@ -30,6 +30,8 @@ namespace realm {
 namespace _impl {
 
 static const int sorting_rank[19] = {
+    // OBS. Changing these values breaks the file format for Set<Mixed>
+
     -1, // null
     1,  // type_Int = 0,
     0,  // type_Bool = 1,
@@ -44,11 +46,13 @@ static const int sorting_rank[19] = {
     1,  // type_Double = 10,
     1,  // type_Decimal = 11,
     7,  // type_Link = 12,
-    8,  // type_LinkList = 13,
+    -1, // type_LinkList = 13,
     -1,
     4, // type_ObjectId = 15,
-    5, // type_TypedLink = 16
-    6, // type_UUID = 17
+    6, // type_TypedLink = 16
+    5, // type_UUID = 17
+
+    // OBS. Changing these values breaks the file format for Set<Mixed>
 };
 
 inline int compare_string(StringData a, StringData b)
@@ -234,6 +238,8 @@ bool Mixed::accumulate_numeric_to(Decimal128& destination) const
 
 int Mixed::compare(const Mixed& b) const
 {
+    // OBS. Changing this function breaks the file format for Set<Mixed>
+
     if (is_null()) {
         return b.is_null() ? 0 : -1;
     }
@@ -348,11 +354,12 @@ int Mixed::compare(const Mixed& b) const
             break;
     }
 
-    // Comparing types as a fallback option makes it possible to make a sort of a list of Mixed
-    // This will also handle the case where null values are considered lower than all other values
+    // Comparing rank of types as a fallback makes it possible to sort of a list of Mixed
     REALM_ASSERT(_impl::sorting_rank[m_type] != _impl::sorting_rank[b.m_type]);
-    // Using rank table will ensure that all numeric values comes first
+    // Using rank table will ensure that all numeric values are kept together
     return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
+
+    // OBS. Changing this function breaks the file format for Set<Mixed>
 }
 
 int Mixed::compare_signed(const Mixed& b) const
