@@ -163,8 +163,8 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     try {
         realm = get_realm();
     }
-    catch (const RealmFileException&) {
-        if (!should_encrypt)
+    catch (const RealmFileException& e) {
+        if (e.kind() != RealmFileException::Kind::AccessError)
             throw;
 
         util::File::remove(m_metadata_config.path);

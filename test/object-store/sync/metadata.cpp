@@ -342,11 +342,10 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
+    const auto identity0 = "identity0";
+    const auto auth_url = "https://realm.example.org";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
-            const auto identity0 = "identity0";
-            const auto auth_url = "https://realm.example.org";
-
             // Open metadata realm, make metadata
             std::vector<char> key0 = make_test_encryption_key(10);
             SyncMetadataManager manager0(metadata_path, true, key0);
@@ -366,7 +365,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             SyncMetadataManager manager1(metadata_path, true, key1);
 
             auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
-            // Expect previous metadata to no longer be stored
+            // Expect previous metadata to have been deleted
             CHECK_FALSE(bool(user_metadata1));
 
             // But new metadata can still be created
@@ -378,8 +377,32 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
             CHECK(user_metadata2->is_valid());
         }
         SECTION("different encryption settings") {
-            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
+            // Encrypt metadata realm at path, make metadata
+            SyncMetadataManager manager0(metadata_path, true, make_test_encryption_key(10));
+
+            auto user_metadata = manager0.get_or_make_user_metadata(identity0, auth_url);
+            REQUIRE(bool(user_metadata));
+            CHECK(user_metadata->identity() == identity0);
+            CHECK(user_metadata->provider_type() == auth_url);
+            CHECK(user_metadata->access_token().empty());
+            CHECK(user_metadata->is_valid());
+
+            // Close realm
+            _impl::RealmCoordinator::get_coordinator(metadata_path)->clear_cache();
+
+            // Open metadata realm at path with different encryption configuration
+            SyncMetadataManager manager1(metadata_path, false);
+            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
+            // Expect previous metadata to have been deleted
+            CHECK_FALSE(bool(user_metadata1));
+
+            // But new metadata can still be created
+            const auto identity1 = "identity1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1, auth_url);
+            CHECK(user_metadata2->identity() == identity1);
+            CHECK(user_metadata2->provider_type() == auth_url);
+            CHECK(user_metadata2->access_token().empty());
+            CHECK(user_metadata2->is_valid());
         }
     }
 
