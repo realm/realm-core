@@ -557,7 +557,7 @@ TEST_CASE("object") {
                         });
                         REQUIRE_INDICES(change.modifications, 0);
                         REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_value1.value], 0);
+                        REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
                     }
 
                     SECTION("modifying related table 'table', property 'value 2'"
@@ -599,7 +599,7 @@ TEST_CASE("object") {
                         });
                         REQUIRE_INDICES(change.modifications, 0);
                         REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_value1.value], 0);
+                        REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
                     }
 
                     SECTION("modifying related table 'table', property 'value 2'"
@@ -668,7 +668,7 @@ TEST_CASE("object") {
                     });
                     REQUIRE_INDICES(change.modifications, 0);
                     REQUIRE(change.columns.size() == 1);
-                    REQUIRE_INDICES(change.columns[col_origin_value.value], 0);
+                    REQUIRE_INDICES(change.columns[col_origin_link2.value], 0);
                 }
 
                 SECTION("modifying table 'table2', property 'link2' 6 depths deep"

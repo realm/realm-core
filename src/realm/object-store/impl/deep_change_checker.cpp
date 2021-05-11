@@ -318,20 +318,23 @@ std::vector<int64_t> ObjectChangeChecker::operator()(ObjKeyType object_key)
     for (auto&& key_path_array : m_key_path_arrays) {
         for (auto&& key_path : key_path_array) {
             auto next_object_key_to_check = object_key;
-            for (size_t i = 0; i < key_path.size(); i++) {
-                // Check for a change on the current depth.
-                auto column_key = key_path[i].second;
-                auto iterator = m_info.tables.find(key_path[i].first.value);
-                if (iterator != m_info.tables.end() &&
-                    iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
-                    changed_columns.push_back(column_key.value);
-                }
+            if (key_path.size() > 0) {
+                auto root_column_key = key_path[0].second;
+                for (size_t i = 0; i < key_path.size(); i++) {
+                    // Check for a change on the current depth.
+                    auto column_key = key_path[i].second;
+                    auto iterator = m_info.tables.find(key_path[i].first.value);
+                    if (iterator != m_info.tables.end() &&
+                        iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
+                        changed_columns.push_back(root_column_key.value);
+                    }
 
-                // Advance one level deeper into the key path.
-                auto column_type = column_key.get_type();
-                if (column_type == col_type_Link) {
-                    const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
-                    next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
+                    // Advance one level deeper into the key path.
+                    auto column_type = column_key.get_type();
+                    if (column_type == col_type_Link) {
+                        const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
+                        next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
+                    }
                 }
             }
         }
