@@ -664,12 +664,15 @@ TEST_CASE("list") {
 
         // Creating KeyPathArrays:
         // 1. Property pairs
+        std::pair<TableKey, ColKey> pair_origin_link(origin->get_key(), col_link);
         std::pair<TableKey, ColKey> pair_target_value(target->get_key(), col_target_value);
         std::pair<TableKey, ColKey> pair_target_value2(target->get_key(), col_target_value2);
         // 2. KeyPaths
+        auto key_path_origin_link = {pair_origin_link};
         auto key_path_target_value = {pair_target_value};
         auto key_path_target_value2 = {pair_target_value2};
         // 3. Aggregated `KeyPathArray`
+        KeyPathArray key_path_array_origin_to_target_value = {key_path_origin_link, key_path_target_value};
         KeyPathArray key_path_array_target_value = {key_path_target_value};
         KeyPathArray key_path_array_target_value2 = {key_path_target_value2};
 
@@ -775,6 +778,34 @@ TEST_CASE("list") {
                     list.get(0).set(col_target_value, 42);
                 });
             }
+        }
+
+        SECTION("linked filter") {
+            CollectionChangeSet collection_change_set_linked_filter;
+            Object object(r, obj);
+
+            auto require_change_origin_to_target = [&] {
+                auto token = object.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_filter = c;
+                    },
+                    key_path_array_origin_to_target_value);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            auto token = require_change_origin_to_target();
+
+            write([&] {
+                auto foo = obj.get_linklist(col_link);
+                ObjKey obj_key = foo.get(0);
+                TableRef target_table = foo.get_target_table();
+                Obj target_object = target_table->get_object(obj_key);
+                target_object.set(col_target_value, 42);
+            });
+            REQUIRE_INDICES(collection_change_set_linked_filter.modifications, 0);
+            REQUIRE_INDICES(collection_change_set_linked_filter.modifications_new, 0);
         }
     }
 
