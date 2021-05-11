@@ -129,7 +129,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
         if (already_checking(link.col_key))
             return false;
         if (!link.is_list) {
-            if (obj.is_null(ColKey(link.col_key)))
+            if (obj.is_null(ColKey(link.col_key)) || obj.is_unresolved(ColKey(link.col_key)))
                 return false;
             auto dst = obj.get<ObjKey>(ColKey(link.col_key)).value;
             return check_row(*table.get_link_target(ColKey(link.col_key)), dst, depth + 1);

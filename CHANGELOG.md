@@ -8,6 +8,7 @@
 * Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
   TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
 * Calling Realm::get_synchronized_realm() while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
+* Fixed errors related to "uncaught exception in notifier thread: N5realm11KeyNotFoundE: No such object". This could happen in a sync'd app when a linked object was deleted by another client. ([realm-js#3611](https://github.com/realm/realm-js/issues/3611), since v6.1.0-alpha.5)
 
 ### Breaking changes
 * None.
