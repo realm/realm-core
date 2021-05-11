@@ -145,9 +145,11 @@ class TableRecycler : public std::vector<Table*> {
 public:
     ~TableRecycler()
     {
-        for (auto t : *this) {
-            delete t;
-        }
+        REALM_UNREACHABLE();
+        // if ever enabled, remember to release Tables:
+        // for (auto t : *this) {
+        //    delete t;
+        //}
     }
 };
 

@@ -1096,8 +1096,7 @@ void Table::fully_detach() noexcept
     m_spec.detach();
     m_top.detach();
     for (auto& index : m_index_accessors) {
-        if (index)
-            delete index;
+        delete index;
     }
     m_index_refs.detach();
     m_opposite_table.detach();
