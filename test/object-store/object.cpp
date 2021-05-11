@@ -681,6 +681,15 @@ TEST_CASE("object") {
                     });
                 }
             }
+
+            SECTION("deleting the object sends a change notification") {
+                auto token = require_change(object_origin, key_path_array_origin_value);
+
+                write([&] {
+                    obj_origin.remove();
+                });
+                REQUIRE_INDICES(change.deletions, 0);
+            }
         }
     }
 
