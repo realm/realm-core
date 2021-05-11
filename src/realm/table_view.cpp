@@ -25,10 +25,37 @@
 
 using namespace realm;
 
+void ConstTableView::KeyValues::copy_from(const KeyValues& rhs)
+{
+    Allocator& rhs_alloc = rhs.get_alloc();
+
+    // Destroy current tree
+    destroy();
+
+    if (rhs.is_attached()) {
+        // Take copy of other tree
+        MemRef mem(rhs.get_ref(), rhs_alloc);
+        MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
+
+        init_from_ref(copy_mem.get_ref());
+    }
+}
+
+void ConstTableView::KeyValues::move_from(KeyValues& rhs)
+{
+    // Destroy current tree
+    destroy();
+
+    m_root = std::move(rhs.m_root);
+    if (m_root)
+        m_root->change_owner(this);
+    m_size = rhs.m_size;
+    rhs.m_size = 0;
+}
+
 ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPolicy mode)
     : m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
-    , m_key_values(Allocator::get_default())
 {
     bool was_in_sync = src.is_in_sync();
     m_query = Query(src.m_query, tr, mode);
@@ -54,11 +81,11 @@ ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPoli
     }
     // don't use methods which throw after this point...or m_table_view_key_values will leak
     if (mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
-        m_key_values = src.m_key_values;
+        m_key_values.copy_from(src.m_key_values);
     }
     else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
         // Requires that 'src' is a writable object
-        m_key_values = std::move(src.m_key_values);
+        m_key_values.move_from(src.m_key_values);
     else {
         m_key_values.create();
     }

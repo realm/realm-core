@@ -672,38 +672,6 @@ BPlusTreeBase::~BPlusTreeBase()
 {
 }
 
-BPlusTreeBase& BPlusTreeBase::operator=(const BPlusTreeBase& rhs)
-{
-    Allocator& rhs_alloc = rhs.get_alloc();
-
-    // Destroy current tree
-    destroy();
-
-    if (rhs.is_attached()) {
-        // Take copy of other tree
-        MemRef mem(rhs.get_ref(), rhs_alloc);
-        MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
-
-        init_from_ref(copy_mem.get_ref());
-    }
-
-    return *this;
-}
-
-BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs) noexcept
-{
-    // Destroy current tree
-    destroy();
-
-    m_root = std::move(rhs.m_root);
-    if (m_root)
-        m_root->change_owner(this);
-    m_size = rhs.m_size;
-    rhs.m_size = 0;
-
-    return *this;
-}
-
 void BPlusTreeBase::create()
 {
     if (!m_root) {                   // Idempotent
