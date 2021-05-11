@@ -6,6 +6,8 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Writing a copy of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
+* Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
+  TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
 
 ### Breaking changes
 * None.
