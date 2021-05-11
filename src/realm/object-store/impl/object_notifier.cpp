@@ -62,7 +62,7 @@ void ObjectNotifier::run()
         // mark the this object as changed.
         auto object_change_checker = get_object_modification_checker(*m_info, m_table);
         std::vector<int64_t> changed_columns = object_change_checker(m_obj.value);
-        
+
         if (changed_columns.size() > 0) {
             m_change.modifications.add(0);
             for (auto changed_column : changed_columns) {
