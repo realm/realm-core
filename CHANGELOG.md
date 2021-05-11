@@ -6,7 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Calling Realm::get_synchronized_realm() while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
-* Opening a metadata realm with the wrong encryption key will remove that metadata realm and create a new realm using the new key. [#4285](https://github.com/realm/realm-core/pull/4285)
+* Opening a metadata realm with the wrong encryption key or different encryption configuration will remove that metadata realm and create a new metadata realm using the new key or configuration. [#4285](https://github.com/realm/realm-core/pull/4285)
 
 ### Breaking changes
 * None.
