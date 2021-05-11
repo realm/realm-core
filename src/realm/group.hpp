@@ -246,7 +246,7 @@ public:
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;
 
-    // Returns a new `VersionID` using the `m_read_lock_info`.
+    // Returns a new `VersionID` using the `m_read_lock`.
     VersionID get_current_version() const;
 
     /// \defgroup group_table_access Table Accessors
@@ -571,7 +571,7 @@ public:
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
     };
-    ReadLockInfo m_read_lock_info;
+    ReadLockInfo m_read_lock;
 
 protected:
     virtual Replication* const* get_repl() const
@@ -955,7 +955,7 @@ inline TableKeys Group::get_table_keys() const
 
 inline VersionID Group::get_current_version() const
 {
-    return VersionID(m_read_lock_info.m_version, m_read_lock_info.m_reader_idx);
+    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
 }
 
 inline bool Group::is_attached() const noexcept

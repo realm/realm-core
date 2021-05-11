@@ -204,10 +204,10 @@ TEST_CASE("object") {
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
     SECTION("add_notification_callback()") {
-        auto table = r->get_group().get_table("class_table");
+        auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
-        r->begin_write_transaction();
+        r->begin_transaction();
         for (int i = 0; i < 10; ++i)
             table->create_object_with_primary_key(pks[i]).set("value 1", i).set("value 2", i);
         r->commit_transaction();
@@ -219,7 +219,7 @@ TEST_CASE("object") {
         Object object(r, obj);
 
         auto write = [&](auto&& f) {
-            r->begin_write_transaction();
+            r->begin_transaction();
             f();
             r->commit_transaction();
 
@@ -299,11 +299,11 @@ TEST_CASE("object") {
         SECTION("multiple write transactions") {
             auto token = require_change();
 
-            auto r2row = r2->get_group().get_table("class_table")->get_object(0);
-            r2->begin_write_transaction();
+            auto r2row = r2->read_group().get_table("class_table")->get_object(0);
+            r2->begin_transaction();
             r2row.set(col_keys[0], 1);
             r2->commit_transaction();
-            r2->begin_write_transaction();
+            r2->begin_transaction();
             r2row.set(col_keys[1], 2);
             r2->commit_transaction();
 
@@ -360,19 +360,19 @@ TEST_CASE("object") {
 
     TestContext d(r);
     auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_write_transaction();
+        r->begin_transaction();
         auto obj = Object::create(d, r, *r->schema().find("all types"), value, policy);
         r->commit_transaction();
         return obj;
     };
     auto create_sub = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_write_transaction();
+        r->begin_transaction();
         auto obj = Object::create(d, r, *r->schema().find("link target"), value, policy);
         r->commit_transaction();
         return obj;
     };
     auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_write_transaction();
+        r->begin_transaction();
         Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
         r->commit_transaction();
         return obj;
@@ -412,10 +412,10 @@ TEST_CASE("object") {
         });
 
         Obj row = obj.obj();
-        auto link_target = *r->get_group().get_table("class_link target")->begin();
+        auto link_target = *r->read_group().get_table("class_link target")->begin();
         TableRef table = row.get_table();
         auto target_table = link_target.get_table();
-        auto array_target_table = r->get_group().get_table("class_array target");
+        auto array_target_table = r->read_group().get_table("class_array target");
         REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
@@ -561,7 +561,7 @@ TEST_CASE("object") {
     }
 
     SECTION("create does not complain about missing values for nullable fields") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         realm::Object obj;
         REQUIRE_NOTHROW(obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{})));
         r->commit_transaction();
@@ -604,7 +604,7 @@ TEST_CASE("object") {
             {"_id", INT64_C(7)},
         };
         // Core will throw if the list is populated before the PK is set
-        r->begin_write_transaction();
+        r->begin_transaction();
         REQUIRE_NOTHROW(Object::create(d, r, *r->schema().find("pk after list"), util::Any(value)));
     }
 
@@ -699,7 +699,7 @@ TEST_CASE("object") {
                       {"team", AnyVec{donald, charley}}};
         Object obj = create_company(eddie, CreatePolicy::UpdateAll);
 
-        auto table = r->get_group().get_table("class_person");
+        auto table = r->read_group().get_table("class_person");
         REQUIRE(table->size() == 5);
         Results result(r, table);
         result = result.sort({{"_id", false}});
@@ -767,7 +767,7 @@ TEST_CASE("object") {
             {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
-        auto obj_table = r->get_group().get_table("class_all types");
+        auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
         bool callback_called;
         bool results_callback_called;
@@ -783,7 +783,7 @@ TEST_CASE("object") {
         });
         advance_and_notify(*r);
 
-        auto table = r->get_group().get_table("class_link target");
+        auto table = r->read_group().get_table("class_link target");
         REQUIRE(table->size() == 1);
 
         create(
@@ -859,7 +859,7 @@ TEST_CASE("object") {
         };
         Object obj = create(dict);
 
-        auto obj_table = r->get_group().get_table("class_all types");
+        auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
         auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             callback_called = true;
@@ -908,7 +908,7 @@ TEST_CASE("object") {
                 {"decimal array", AnyVec{Decimal128("1.23e45")}},
                 {"uuid array", AnyVec{UUID("3b241101-1111-bbbb-cccc-4136c566a962")}},
             };
-            r->begin_write_transaction();
+            r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
 
             // Missing fields in dictionary do not update anything
@@ -1091,15 +1091,15 @@ TEST_CASE("object") {
             {"_id", "value"s},
         };
         auto create = [&](util::Any&& value, StringData type) {
-            r->begin_write_transaction();
+            r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
             r->commit_transaction();
             return obj;
         };
 
         auto obj = create(AnyDict{{"_id", d.null_value()}}, "nullable int pk");
-        auto col_pk_int = r->get_group().get_table("class_nullable int pk")->get_column_key("_id");
-        auto col_pk_str = r->get_group().get_table("class_nullable string pk")->get_column_key("_id");
+        auto col_pk_int = r->read_group().get_table("class_nullable int pk")->get_column_key("_id");
+        auto col_pk_str = r->read_group().get_table("class_nullable string pk")->get_column_key("_id");
         REQUIRE(obj.obj().is_null(col_pk_int));
         obj = create(AnyDict{{"_id", d.null_value()}}, "nullable string pk");
         REQUIRE(obj.obj().is_null(col_pk_str));
@@ -1112,36 +1112,36 @@ TEST_CASE("object") {
 
     SECTION("create null and 0 primary keys for Int types") {
         auto create = [&](util::Any&& value, StringData type) {
-            r->begin_write_transaction();
+            r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
             r->commit_transaction();
             return obj;
         };
         create(AnyDict{{"_id", util::Any()}}, "all optional types");
         create(AnyDict{{"_id", INT64_C(0)}}, "all optional types");
-        REQUIRE(Results(r, r->get_group().get_table("class_all optional types")).size() == 2);
+        REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
     }
 
     SECTION("create null and default primary keys for ObjectId types") {
         auto create = [&](util::Any&& value, StringData type) {
-            r->begin_write_transaction();
+            r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
             r->commit_transaction();
             return obj;
         };
         create(AnyDict{{"_id", util::Any()}}, "nullable object id pk");
         create(AnyDict{{"_id", ObjectId::gen()}}, "nullable object id pk");
-        REQUIRE(Results(r, r->get_group().get_table("class_nullable object id pk")).size() == 2);
+        REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
     }
 
     SECTION("getters and setters") {
-        r->begin_write_transaction();
+        r->begin_transaction();
 
-        auto table = r->get_group().get_table("class_all types");
+        auto table = r->read_group().get_table("class_all types");
         table->create_object_with_primary_key(1);
         Object obj(r, *r->schema().find("all types"), *table->begin());
 
-        auto link_table = r->get_group().get_table("class_link target");
+        auto link_table = r->read_group().get_table("class_link target");
         link_table->create_object_with_primary_key(0);
         Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
 
@@ -1240,7 +1240,7 @@ TEST_CASE("object") {
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
 
-        r->begin_write_transaction();
+        r->begin_transaction();
         obj.set_property_value(d, "bool array", obj.get_property_value<util::Any>(d, "bool array"));
         obj.set_property_value(d, "object array", obj.get_property_value<util::Any>(d, "object array"));
         r->commit_transaction();
@@ -1283,8 +1283,8 @@ TEST_CASE("object") {
         };
         c2.defaults = c1.defaults;
 
-        r1->begin_write_transaction();
-        r2->begin_write_transaction();
+        r1->begin_transaction();
+        r2->begin_transaction();
         auto object1 = Object::create(c1, r1, *r1->schema().find("pk after list"), util::Any(v1));
         auto object2 = Object::create(c2, r2, *r2->schema().find("pk after list"), util::Any(v2));
         r2->commit_transaction();
@@ -1292,7 +1292,7 @@ TEST_CASE("object") {
 
         server.start();
         util::EventLoop::main().run_until([&] {
-            return r1->get_group().get_table("class_array target")->size() == 4;
+            return r1->read_group().get_table("class_array target")->size() == 4;
         });
 
         Obj obj = object1.obj();
@@ -1339,7 +1339,7 @@ TEST_CASE("Embedded Object") {
     CppContext ctx(realm);
 
     auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
         realm->commit_transaction();
         return obj;
@@ -1370,7 +1370,7 @@ TEST_CASE("Embedded Object") {
         });
 
         SECTION("throws when given a managed object") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             REQUIRE_THROWS_WITH(
                 obj.set_property_value(ctx, "object", obj.get_property_value<util::Any>(ctx, "object")),
                 "Cannot set a link to an existing managed embedded object");
@@ -1378,7 +1378,7 @@ TEST_CASE("Embedded Object") {
         }
 
         SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}));
             auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
@@ -1388,7 +1388,7 @@ TEST_CASE("Embedded Object") {
         }
 
         SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}),
                                    CreatePolicy::UpdateModified);
@@ -1400,7 +1400,7 @@ TEST_CASE("Embedded Object") {
         }
 
         SECTION("can set embedded link to null") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any());
             auto new_linked = obj.get_property_value<util::Any>(ctx, "object");
@@ -1423,14 +1423,14 @@ TEST_CASE("Embedded Object") {
         List list2(realm, obj2.obj().get_linklist("array"));
 
         SECTION("throws when given a managed object") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "array", util::Any{AnyVector{list2.get(0)}}),
                                 "Cannot add an existing managed embedded object to a List.");
             realm->cancel_transaction();
         }
 
         SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
             obj.set_property_value(ctx, "array",
@@ -1447,7 +1447,7 @@ TEST_CASE("Embedded Object") {
         }
 
         SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
             obj.set_property_value(ctx, "array",
@@ -1464,7 +1464,7 @@ TEST_CASE("Embedded Object") {
         }
 
         SECTION("clears list when given null") {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             obj.set_property_value(ctx, "array", util::Any());
             REQUIRE(list.size() == 0);
             realm->cancel_transaction();
@@ -1478,7 +1478,7 @@ TEST_CASE("Embedded Object") {
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
 
-        auto array_table = realm->get_group().get_table("class_array target");
+        auto array_table = realm->read_group().get_table("class_array target");
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
@@ -1539,7 +1539,7 @@ TEST_CASE("Embedded Object") {
         advance_and_notify(*realm);
         REQUIRE(calls == 1);
 
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         parent.obj().remove();
         realm->commit_transaction();
         advance_and_notify(*realm);

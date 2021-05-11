@@ -440,8 +440,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
 
         // Add an object so there's something to upload
         auto r = Realm::get_shared_realm(config);
-        TableRef table = ObjectStore::table_for_object_type(r->get_group(), "object");
-        r->begin_write_transaction();
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object");
+        r->begin_transaction();
         table->create_object_with_primary_key(0);
         r->commit_transaction();
 
@@ -636,7 +636,7 @@ TEST_CASE("sync: stable IDs", "[sync]") {
 
         auto realm = Realm::get_shared_realm(config);
 
-        ObjectSchema object_schema(realm->get_group(), "object", TableKey());
+        ObjectSchema object_schema(realm->read_group(), "object", TableKey());
         REQUIRE(object_schema == *config.schema->find("object"));
     }
 }
@@ -675,7 +675,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
                 config.schema_mode = SchemaMode::Immutable;
                 auto recovered_realm = Realm::get_shared_realm(config);
 
-                TableRef table = ObjectStore::table_for_object_type(recovered_realm->get_group(), "object");
+                TableRef table = ObjectStore::table_for_object_type(recovered_realm->read_group(), "object");
                 REQUIRE(table);
                 REQUIRE(table->size() == 2);
             }
@@ -746,7 +746,7 @@ TEST_CASE("sync: client resync") {
     SyncTestFile config2(init_sync_manager.app(), "default");
 
     auto get_table = [](Realm& realm, StringData object_type) {
-        return ObjectStore::table_for_object_type(realm.get_group(), object_type);
+        return ObjectStore::table_for_object_type(realm.read_group(), object_type);
     };
     auto create_object = [&](Realm& realm, StringData object_type) -> Obj {
         auto table = get_table(realm, object_type);
@@ -757,7 +757,7 @@ TEST_CASE("sync: client resync") {
 
     auto setup = [&](auto fn) {
         auto realm = Realm::get_shared_realm(config);
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         fn(*realm);
         realm->commit_transaction();
         wait_for_upload(*realm);
@@ -767,7 +767,7 @@ TEST_CASE("sync: client resync") {
         auto realm = Realm::get_shared_realm(config);
         auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
         {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
 
             auto obj = create_object(*realm, "object");
             auto col = obj.get_table()->get_column_key("value");
@@ -781,7 +781,7 @@ TEST_CASE("sync: client resync") {
 
             // Make a change while offline so that log compaction will cause a
             // client reset
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             obj.set(col, 4);
             local(*realm);
             realm->commit_transaction();
@@ -794,7 +794,7 @@ TEST_CASE("sync: client resync") {
 
             for (int i = 0; i < 2; ++i) {
                 wait_for_download(*realm2);
-                realm2->begin_write_transaction();
+                realm2->begin_transaction();
                 auto table = get_table(*realm2, "object");
                 auto col = table->get_column_key("value");
                 table->begin()->set(col, i + 5);
@@ -803,7 +803,7 @@ TEST_CASE("sync: client resync") {
                 server.advance_clock(10s);
             }
 
-            realm2->begin_write_transaction();
+            realm2->begin_transaction();
             remote(*realm2);
             realm2->commit_transaction();
             wait_for_upload(*realm2);
@@ -844,7 +844,7 @@ TEST_CASE("sync: client resync") {
         wait_for_download(*realm);
         realm->refresh(); // FIXME: sync needs to notify
 
-        CHECK(ObjectStore::table_for_object_type(realm->get_group(), "object")->begin()->get<Int>("value") == 6);
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 6);
     }
 
     SECTION("should recover local changeset when mode is recover")
@@ -858,7 +858,7 @@ TEST_CASE("sync: client resync") {
         wait_for_download(*realm);
         realm->refresh();
 
-        CHECK(ObjectStore::table_for_object_type(realm->get_group(), "object")->begin()->get<Int>("value") == 4);
+        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 4);
     }
     */
 
@@ -879,7 +879,7 @@ TEST_CASE("sync: client resync") {
 
     SECTION("add table in discarded transaction") {
         setup([&](auto& realm) {
-            auto table = ObjectStore::table_for_object_type(realm.get_group(), "object2");
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
             REQUIRE(!table);
         });
 
@@ -900,12 +900,12 @@ TEST_CASE("sync: client resync") {
         wait_for_download(*realm);
         // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object2");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
         REQUIRE(table->size() == 1);
         // test resync'd realm that changes were overwritten
         realm = Realm::get_shared_realm(config);
-        table = ObjectStore::table_for_object_type(realm->get_group(), "object2");
+        table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(!table);
     }
 
@@ -921,19 +921,19 @@ TEST_CASE("sync: client resync") {
                          }},
                     },
                     0, nullptr, nullptr, true);
-                ObjectStore::table_for_object_type(realm.get_group(), "object")->begin()->set("value2", 123);
+                ObjectStore::table_for_object_type(realm.read_group(), "object")->begin()->set("value2", 123);
             },
             [](auto&) {});
         wait_for_download(*realm);
         // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->get_column_count() == 3);
         REQUIRE(table->begin()->get<Int>("value2") == 123);
         REQUIRE_THROWS(realm->refresh());
         // test resync'd realm that changes were overwritten
         realm = Realm::get_shared_realm(config);
-        table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+        table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table);
         REQUIRE(table->get_column_count() == 2);
         REQUIRE(!bool(table->get_column_key("value2")));
@@ -952,14 +952,14 @@ TEST_CASE("sync: client resync") {
                          }},
                     },
                     0, nullptr, nullptr, true);
-                auto table = ObjectStore::table_for_object_type(realm.get_group(), "object2");
+                auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
                 table->create_object_with_primary_key(Mixed());
                 table->create_object_with_primary_key(Mixed(1));
             },
             [](auto&) {});
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object2");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
         ColKey pk_col_key = table->get_column_key("_id");
         REQUIRE(bool(pk_col_key));
@@ -982,13 +982,13 @@ TEST_CASE("sync: client resync") {
                          }},
                     },
                     0, nullptr, nullptr, true);
-                auto table = ObjectStore::table_for_object_type(realm.get_group(), "object");
+                auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
                 table->begin()->set(table->get_column_key("value2"), 123);
             },
             [](auto&) {});
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->get_column_count() == 5);
         REQUIRE(bool(table->get_column_key("value2")));
         // FIXME: sync has object recovery disabled currently
@@ -1056,7 +1056,7 @@ TEST_CASE("sync: client resync") {
     SECTION("add object in recovered transaction") {
         Obj obj;
         auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = ObjectStore::table_for_object_type(realm.get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
             obj = table->create_object();
 
             realm.update_schema({
@@ -1068,18 +1068,18 @@ TEST_CASE("sync: client resync") {
         }, [](auto&){});
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->get_column_count() == 2);
         REQUIRE(table->begin()->get<Int>("value2") == 123);
     }
 
     SECTION("delete object in recovered transaction") {
         auto realm = trigger_client_reset([&](auto& realm) {
-            ObjectStore::table_for_object_type(realm.get_group(), "object")->clear();
+            ObjectStore::table_for_object_type(realm.read_group(), "object")->clear();
         }, [](auto&){});
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table->size() == 0);
     }
 

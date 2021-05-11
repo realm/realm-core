@@ -170,8 +170,8 @@ static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, s
 {
     fuzzer::RealmState state = {*r,
                                 *_impl::RealmCoordinator::get_existing_coordinator(r->config().path),
-                                *r->get_group()->get_table("class_object"),
-                                r->get_group()->get_table("class_linklist")->get_linklist(0, 0),
+                                *r->read_group()->get_table("class_object"),
+                                r->read_group()->get_table("class_linklist")->get_linklist(0, 0),
                                 0,
                                 {}};
 
@@ -184,9 +184,9 @@ static void test(Realm::Config const& config, SharedRealm& r, SharedRealm& r2, s
     fuzzer::RealmState state2 = {
         *r2,
         state.coordinator,
-        *r2->get_group()->get_table("class_object"),
+        *r2->read_group()->get_table("class_object"),
 #if FUZZ_LINKVIEW
-        r2->get_group()->get_table("class_linklist")->get_linklist(0, 0),
+        r2->read_group()->get_table("class_linklist")->get_linklist(0, 0),
 #else
         {},
 #endif
@@ -258,14 +258,14 @@ int main(int argc, char** argv)
     auto r2 = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_existing_coordinator(config.path);
 
-    r->begin_write_transaction();
-    r->get_group()->get_table("class_linklist")->add_empty_row();
+    r->begin_transaction();
+    r->read_group()->get_table("class_linklist")->add_empty_row();
     r->commit_transaction();
 
     auto test_on = [&](auto& buffer) {
         std::istringstream ss(buffer);
         test(config, r, r2, ss);
-        if (r->is_in_write_transaction())
+        if (r->is_in_transaction())
             r->cancel_transaction();
         r2->invalidate();
         coordinator.on_change();

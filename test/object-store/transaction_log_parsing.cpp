@@ -43,7 +43,7 @@ public:
         , m_list(lv)
         , m_table_key(table_key)
     {
-        m_realm->begin_write_transaction();
+        m_realm->begin_transaction();
 
         m_initial.reserve(lv.size());
         for (size_t i = 0; i < lv.size(); ++i)
@@ -71,7 +71,7 @@ public:
 
     explicit operator bool() const
     {
-        return m_realm->is_in_write_transaction();
+        return m_realm->is_in_transaction();
     }
 
 private:
@@ -234,7 +234,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
          {{"unindexed", PropertyType::Int},
           {"indexed", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}}},
     });
-    r->get_group();
+    r->read_group();
 
     auto history = make_in_realm_history(config.path);
     auto db = DB::create(*history, config.options());
@@ -285,11 +285,11 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             {"table", {{"pk", PropertyType::Int}, {"value", PropertyType::Int}}},
         });
 
-        auto& table = *r->get_group().get_table("class_table");
+        auto& table = *r->read_group().get_table("class_table");
         auto table_key = table.get_key().value;
         auto cols = table.get_column_keys();
 
-        r->begin_write_transaction();
+        r->begin_transaction();
         std::vector<ObjKey> objects;
         table.create_objects(10, objects);
         for (int i = 0; i < 10; ++i)
@@ -301,7 +301,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto track_changes = [&](std::vector<TableKeyType> tables_needed, auto&& f) {
             auto sg = coordinator->begin_read();
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             f();
             r->commit_transaction();
 
@@ -391,10 +391,10 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             {"target", {{"value", PropertyType::Int}}},
         });
 
-        auto origin = r->get_group().get_table("class_origin");
-        auto target = r->get_group().get_table("class_target");
+        auto origin = r->read_group().get_table("class_origin");
+        auto target = r->read_group().get_table("class_target");
 
-        r->begin_write_transaction();
+        r->begin_transaction();
 
         LnkLst lv = origin->create_object().get_linklist("array");
         std::vector<ObjKey> target_keys;
@@ -929,7 +929,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
 
             SECTION("delete a different lv") {
-                r->begin_write_transaction();
+                r->begin_transaction();
                 auto new_obj = origin->create_object();
                 r->commit_transaction();
 
@@ -944,7 +944,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         SECTION("modifying a different linkview should not produce notifications") {
-            r->begin_write_transaction();
+            r->begin_transaction();
             auto lv2 = origin->create_object().get_linklist("array");
             lv2.add(target_keys[5]);
             r->commit_transaction();
@@ -990,12 +990,12 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
              }},
         });
 
-        auto origin = realm->get_group().get_table("class_origin");
-        auto target = realm->get_group().get_table("class_target");
+        auto origin = realm->read_group().get_table("class_origin");
+        auto target = realm->read_group().get_table("class_target");
         auto origin_cols = origin->get_column_keys();
         auto target_cols = target->get_column_keys();
 
-        realm->begin_write_transaction();
+        realm->begin_transaction();
 
         std::vector<ObjKey> target_keys;
         target->create_objects(10, target_keys);
@@ -1019,19 +1019,19 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         for (int i = 0; i < 10; ++i)
             tr2.add(0);
 
-        realm->get_group().get_table("class_origin 2")->create_object_with_primary_key(48);
+        realm->read_group().get_table("class_origin 2")->create_object_with_primary_key(48);
 
         realm->commit_transaction();
 
         auto observe = [&](std::initializer_list<Obj> rows, auto&& fn) {
             auto realm2 = Realm::get_shared_realm(config);
-            auto& group = realm2->get_group();
+            auto& group = realm2->read_group();
             static_cast<void>(group); // silence unused warning
             KVOContext observer(rows);
             observer.realm = realm2;
             realm2->m_binding_context.reset(&observer);
 
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             lv.size();
             lv2.size();
             tr.size();
@@ -1054,7 +1054,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             observer.realm = realm;
             realm->m_binding_context.reset(&observer);
 
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             lv.size();
             lv2.size();
             tr.size();
@@ -1384,7 +1384,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         SECTION("array: modifying different table does not produce changes") {
             auto changes = observe({o}, [&] {
-                realm->get_group().get_table("class_origin 2")->begin()->get_linklist("array").add(target_keys[0]);
+                realm->read_group().get_table("class_origin 2")->begin()->get_linklist("array").add(target_keys[0]);
             });
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
@@ -1586,10 +1586,10 @@ TEST_CASE("DeepChangeChecker") {
           {"link2", PropertyType::Object | PropertyType::Nullable, "table"},
           {"array", PropertyType::Array | PropertyType::Object, "table"}}},
     });
-    auto table = r->get_group().get_table("class_table");
+    auto table = r->read_group().get_table("class_table");
 
     std::vector<Obj> objects;
-    r->begin_write_transaction();
+    r->begin_transaction();
     for (int i = 0; i < 10; ++i)
         objects.push_back(table->create_object().set_all(i));
     r->commit_transaction();
@@ -1599,7 +1599,7 @@ TEST_CASE("DeepChangeChecker") {
         auto db = DB::create(*history, config.options());
         auto rt = db->start_read();
 
-        r->begin_write_transaction();
+        r->begin_transaction();
         f();
         r->commit_transaction();
 
@@ -1628,7 +1628,7 @@ TEST_CASE("DeepChangeChecker") {
         bool did_run_section = false;
         SECTION("first link set") {
             did_run_section = true;
-            r->begin_write_transaction();
+            r->begin_transaction();
             objects[0].set(cols[1], objects[1].get_key());
             objects[1].set(cols[1], objects[2].get_key());
             objects[2].set(cols[1], objects[4].get_key());
@@ -1636,7 +1636,7 @@ TEST_CASE("DeepChangeChecker") {
         }
         SECTION("second link set") {
             did_run_section = true;
-            r->begin_write_transaction();
+            r->begin_transaction();
             objects[0].set(cols[2], objects[1].get_key());
             objects[1].set(cols[2], objects[2].get_key());
             objects[2].set(cols[2], objects[4].get_key());
@@ -1644,7 +1644,7 @@ TEST_CASE("DeepChangeChecker") {
         }
         SECTION("both set") {
             did_run_section = true;
-            r->begin_write_transaction();
+            r->begin_transaction();
             objects[0].set(cols[1], objects[1].get_key());
             objects[1].set(cols[1], objects[2].get_key());
             objects[2].set(cols[1], objects[4].get_key());
@@ -1656,7 +1656,7 @@ TEST_CASE("DeepChangeChecker") {
         }
         SECTION("circular link") {
             did_run_section = true;
-            r->begin_write_transaction();
+            r->begin_transaction();
             objects[0].set(cols[1], objects[0].get_key());
             objects[1].set(cols[1], objects[1].get_key());
             objects[2].set(cols[1], objects[2].get_key());
@@ -1683,7 +1683,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("changes over linklists are tracked") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         for (int i = 0; i < 3; ++i) {
             objects[i].get_linklist(cols[3]).add(objects[i].get_key());
             objects[i].get_linklist(cols[3]).add(objects[i].get_key());
@@ -1700,7 +1700,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("changes from an invalidated object") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         size_t obj_ndx_to_invalidate = 6;
         for (int i = 0; i < 3; ++i) {
             objects[i].get_linklist(cols[3]).add(objects[i].get_key());
@@ -1726,7 +1726,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("cycles over links do not loop forever") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         objects[0].set(cols[1], objects[0].get_key());
         r->commit_transaction();
 
@@ -1737,7 +1737,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("cycles over linklists do not loop forever") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         objects[0].get_linklist(cols[3]).add(objects[0].get_key());
         r->commit_transaction();
 
@@ -1748,7 +1748,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("link chains are tracked up to 4 levels deep") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         for (int i = 0; i < 10; ++i)
             objects.push_back(table->create_object());
         for (int i = 0; i < 19; ++i)
@@ -1781,7 +1781,7 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("changes made in the 3rd elements in the link list") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         objects[0].get_linklist(cols[3]).add(objects[1].get_key());
         objects[0].get_linklist(cols[3]).add(objects[2].get_key());
         objects[0].get_linklist(cols[3]).add(objects[3].get_key());

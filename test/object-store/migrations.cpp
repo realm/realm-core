@@ -67,7 +67,7 @@ void verify_schema(Realm& r, int line, bool in_migration)
 {
     CAPTURE(line);
     for (auto&& object_schema : r.schema()) {
-        auto table = r.get_group().get_table(object_schema.table_key);
+        auto table = r.read_group().get_table(object_schema.table_key);
         REQUIRE(table);
         REQUIRE(std::string(table->get_name()) == ObjectStore::table_name_for_object_type(object_schema.name));
         CAPTURE(object_schema.name);
@@ -94,7 +94,7 @@ void verify_schema(Realm& r, int line, bool in_migration)
 
 TableRef get_table(std::shared_ptr<Realm> const& realm, StringData object_type)
 {
-    return ObjectStore::table_for_object_type(realm->get_group(), object_type);
+    return ObjectStore::table_for_object_type(realm->read_group(), object_type);
 }
 
 // Helper functions for modifying Schema objects, mostly for the sake of making
@@ -529,7 +529,7 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
             REQUIRE_THROWS(realm->update_schema(schema, 2, [](SharedRealm, SharedRealm realm, Schema&) {
-                auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+                auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
                 table->create_object_with_primary_key(1);
                 table->create_object_with_primary_key(2).set("value", 1);
             }));
@@ -545,8 +545,8 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            realm->begin_write_transaction();
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             create_objects(*table, 2);
             realm->commit_transaction();
 
@@ -566,12 +566,12 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema1, 1);
 
             REQUIRE_THROWS(realm->update_schema(schema2, 2, [](SharedRealm, SharedRealm realm, Schema&) {
-                auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+                auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
                 table->create_object();
                 throw 5;
             }));
 
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE(table->size() == 0);
             REQUIRE(realm->schema_version() == 1);
             REQUIRE(realm->schema() == schema1);
@@ -590,7 +590,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
@@ -605,7 +605,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, nullptr));
@@ -620,7 +620,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_THROWS(realm->update_schema(set_embedded(schema, "object", true), 2, [](auto, auto, auto&) {}));
@@ -639,11 +639,11 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_write_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             Obj child_object = child_table->create_object();
             child_object.set("value", 42);
-            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
             parent_table->create_object().set_all(child_object_key);
             parent_table->create_object().set_all(child_object_key);
@@ -668,10 +668,10 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_write_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             Obj child_object = child_table->create_object();
-            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
             parent_table->create_object().set_all(child_object_key);
             realm->commit_transaction();
@@ -682,7 +682,7 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_THROWS(
                 realm->update_schema(set_embedded(schema, "child_table", true), 2, [](auto, auto new_realm, auto&) {
                     Object child_object(new_realm, "child_table", 0);
-                    auto parent_table = ObjectStore::table_for_object_type(new_realm->get_group(), "parent_table");
+                    auto parent_table = ObjectStore::table_for_object_type(new_realm->read_group(), "parent_table");
                     Obj parent_obj = parent_table->create_object();
                     Object parent_object(new_realm, parent_obj);
                     CppContext context(new_realm);
@@ -702,8 +702,8 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            realm->begin_write_transaction();
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             create_objects(*table, 10);
             realm->commit_transaction();
 
@@ -722,8 +722,8 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            realm->begin_write_transaction();
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto key = table->get_column_key("value");
             create_objects(*table, 10);
             for (int i = 0; i < 10; ++i)
@@ -746,8 +746,8 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            realm->begin_write_transaction();
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto key = table->get_column_key("value");
             create_objects(*table, 10);
             for (int i = 0; i < 10; ++i)
@@ -771,9 +771,9 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema, 1);
 
             realm->update_schema({}, 2, [](SharedRealm, SharedRealm realm, Schema&) {
-                ObjectStore::delete_data_for_object(realm->get_group(), "object");
+                ObjectStore::delete_data_for_object(realm->read_group(), "object");
             });
-            REQUIRE_FALSE(ObjectStore::table_for_object_type(realm->get_group(), "object"));
+            REQUIRE_FALSE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
         }
 
         SECTION("deleting table still in the schema recreates it with no rows") {
@@ -786,14 +786,14 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
 
-            realm->begin_write_transaction();
-            ObjectStore::table_for_object_type(realm->get_group(), "object")->create_object();
+            realm->begin_transaction();
+            ObjectStore::table_for_object_type(realm->read_group(), "object")->create_object();
             realm->commit_transaction();
 
             realm->update_schema(schema, 2, [](SharedRealm, SharedRealm realm, Schema&) {
-                ObjectStore::delete_data_for_object(realm->get_group(), "object");
+                ObjectStore::delete_data_for_object(realm->read_group(), "object");
             });
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE(table);
             REQUIRE(table->size() == 0);
         }
@@ -809,7 +809,7 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema, 1);
 
             REQUIRE_NOTHROW(realm->update_schema({}, 2, [](SharedRealm, SharedRealm realm, Schema&) {
-                ObjectStore::delete_data_for_object(realm->get_group(), "foo");
+                ObjectStore::delete_data_for_object(realm->read_group(), "foo");
             }));
         }
 
@@ -826,7 +826,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE_FALSE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
@@ -849,7 +849,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", false), 2, nullptr));
@@ -872,7 +872,7 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             REQUIRE(child_table->is_embedded());
 
             REQUIRE_NOTHROW(realm->update_schema(set_embedded(schema, "child_table", true), 2, nullptr));
@@ -894,13 +894,13 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_write_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             Obj child_object1 = child_table->create_object();
             child_object1.set("value", 42);
             Obj child_object2 = child_table->create_object();
             child_object2.set("value", 43);
-            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key1 = child_object1.get_key();
             auto child_object_key2 = child_object2.get_key();
             parent_table->create_object().set_all(child_object_key1);
@@ -939,11 +939,11 @@ TEST_CASE("migration: Automatic") {
             };
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(schema, 1);
-            realm->begin_write_transaction();
-            auto child_table = ObjectStore::table_for_object_type(realm->get_group(), "child_table");
+            realm->begin_transaction();
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "child_table");
             Obj child_object = child_table->create_object();
             child_object.set("value", 42);
-            auto parent_table = ObjectStore::table_for_object_type(realm->get_group(), "parent_table");
+            auto parent_table = ObjectStore::table_for_object_type(realm->read_group(), "parent_table");
             auto child_object_key = child_object.get_key();
             parent_table->create_object().set_all(child_object_key);
             parent_table->create_object().set_all(child_object_key);
@@ -960,7 +960,7 @@ TEST_CASE("migration: Automatic") {
                         any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
                     Int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
 
-                    auto child_table = ObjectStore::table_for_object_type(new_realm->get_group(), "child_table");
+                    auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
                     Obj child_object2 = child_table->create_object();
                     child_object2.set("value", value);
 
@@ -1126,12 +1126,12 @@ TEST_CASE("migration: Automatic") {
             {"EmployeeId", "XHGR"s},
             {"Name", "John Doe"s},
         };
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         Object::create(ctx, realm, *realm->schema().find("EmpDetails"), values);
         realm->commit_transaction();
 
         realm->update_schema(schema2, 2, [](auto old_realm, auto new_realm, auto&) {
-            // ObjectStore::delete_data_for_object(realm->get_group(), "DetailStudentStatus");
+            // ObjectStore::delete_data_for_object(realm->read_group(), "DetailStudentStatus");
             Object old_obj(old_realm, "EmpDetails", 0);
             Object new_obj(new_realm, "EmpDetails", 0);
 
@@ -1204,7 +1204,7 @@ TEST_CASE("migration: Automatic") {
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         };
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         Object::create(ctx, realm, *realm->schema().find("all types"), values);
         realm->commit_transaction();
 
@@ -1257,7 +1257,7 @@ TEST_CASE("migration: Automatic") {
                 Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", util::Any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
                 REQUIRE_THROWS(obj.set_property_value(ctx, "bool", util::Any(false)));
-                REQUIRE_THROWS(old_realm->begin_write_transaction());
+                REQUIRE_THROWS(old_realm->begin_transaction());
             });
         }
 
@@ -1363,7 +1363,7 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("create object in new realm") {
             realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
-                REQUIRE(new_realm->is_in_write_transaction());
+                REQUIRE(new_realm->is_in_transaction());
 
                 CppContext ctx(new_realm);
                 any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
@@ -1378,7 +1378,7 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("upsert in new realm") {
             realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
-                REQUIRE(new_realm->is_in_write_transaction());
+                REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
                 any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
@@ -1392,7 +1392,7 @@ TEST_CASE("migration: Automatic") {
         SECTION("upsert in new realm after modifying primary key") {
             realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
                 get_table(new_realm, "all types")->set_primary_key_column(ColKey());
-                REQUIRE(new_realm->is_in_write_transaction());
+                REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
                 any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
@@ -1438,7 +1438,7 @@ TEST_CASE("migration: Automatic") {
             // actually breaking if we're doing invalid things
             CppContext ctx(realm);
             auto object_schema = realm->schema().find("all types");
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             for (int i = 1; i < 10; ++i) {
                 any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
                 any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
@@ -1458,7 +1458,7 @@ TEST_CASE("migration: Automatic") {
             });
 
             // Create a new object with the no-longer-used pk of 1
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
             any_cast<AnyDict&>(values)["int"] = INT64_C(4);
             object_schema = realm->schema().find("all types");
@@ -1481,7 +1481,7 @@ TEST_CASE("migration: Automatic") {
             // actually breaking if we're doing invalid things
             CppContext ctx(realm);
             auto object_schema = realm->schema().find("string pk");
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             for (int64_t i = 0; i < 10; ++i) {
                 util::Any values = AnyDict{
                     {"pk", util::to_string(i)},
@@ -1503,7 +1503,7 @@ TEST_CASE("migration: Automatic") {
             });
 
             // Create a new object with the no-longer-used pk of 0
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             util::Any values = AnyDict{
                 {"pk", "0"s},
                 {"value", INT64_C(0)},
@@ -1523,7 +1523,7 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("create and modify int primary key inside migration") {
             SECTION("with index") {
-                realm->begin_write_transaction();
+                realm->begin_transaction();
                 auto table = get_table(realm, "int pk");
                 table->add_search_index(table->get_column_key("pk"));
                 realm->commit_transaction();
@@ -1552,7 +1552,7 @@ TEST_CASE("migration: Automatic") {
 
         SECTION("create and modify string primary key inside migration") {
             SECTION("with index") {
-                realm->begin_write_transaction();
+                realm->begin_transaction();
                 auto table = get_table(realm, "string pk");
                 table->add_search_index(table->get_column_key("pk"));
                 realm->commit_transaction();
@@ -1602,7 +1602,7 @@ TEST_CASE("migration: Automatic") {
         auto apply_renames = [&](std::initializer_list<Rename> renames) -> Realm::MigrationFunction {
             return [=](SharedRealm, SharedRealm realm, Schema& schema) {
                 for (auto rename : renames) {
-                    ObjectStore::rename_property(realm->get_group(), schema, rename.object_type, rename.old_name,
+                    ObjectStore::rename_property(realm->read_group(), schema, rename.object_type, rename.old_name,
                                                  rename.new_name);
                 }
             };
@@ -1735,8 +1735,8 @@ TEST_CASE("migration: Automatic") {
 
         auto init = [&](Schema const& old_schema) {
             realm->update_schema(old_schema, 1);
-            realm->begin_write_transaction();
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            realm->begin_transaction();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto col = table->get_primary_key_column();
             if (col)
                 table->create_object_with_primary_key(10);
@@ -1752,7 +1752,7 @@ TEST_CASE("migration: Automatic") {
         REQUIRE_NOTHROW(realm->update_schema(new_schema, 2, apply_renames({__VA_ARGS__})));                          \
         REQUIRE(realm->schema() == new_schema);                                                                      \
         VERIFY_SCHEMA(*realm, false);                                                                                \
-        auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");                               \
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");                              \
         auto key = table->get_column_keys()[0];                                                                      \
         if (table->get_column_attr(key).test(col_attr_Nullable))                                                     \
             REQUIRE(table->begin()->get<util::Optional<int64_t>>(key) == 10);                                        \
@@ -1809,7 +1809,7 @@ TEST_CASE("migration: Automatic") {
             auto new_schema = set_primary_key(rename_value(schema), "object", "new");
             init(schema);
             REQUIRE_NOTHROW(realm->update_schema(new_schema, 2, [](auto, auto realm, Schema& schema) {
-                ObjectStore::rename_property(realm->get_group(), schema, "object", "value", "new");
+                ObjectStore::rename_property(realm->read_group(), schema, "object", "value", "new");
 
                 CppContext ctx(realm);
                 util::Any values = AnyDict{{"new", INT64_C(11)}};
@@ -1817,7 +1817,7 @@ TEST_CASE("migration: Automatic") {
             }));
             REQUIRE(realm->schema() == new_schema);
             VERIFY_SCHEMA(*realm, false);
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto key = table->get_column_keys()[0];
             auto it = table->begin();
             REQUIRE(it->get<int64_t>(key) == 10);
@@ -2149,8 +2149,8 @@ TEST_CASE("migration: ResetFile") {
         auto ino = get_fileid();
         realm->update_schema(schema);
         REQUIRE(ino == get_fileid());
-        realm->begin_write_transaction();
-        ObjectStore::table_for_object_type(realm->get_group(), "object")->create_object();
+        realm->begin_transaction();
+        ObjectStore::table_for_object_type(realm->read_group(), "object")->create_object();
         realm->commit_transaction();
     }
     auto realm = Realm::get_shared_realm(config);
@@ -2158,13 +2158,13 @@ TEST_CASE("migration: ResetFile") {
 
     SECTION("file is reset when schema version increases") {
         realm->update_schema(schema, 1);
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 0);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 0);
         REQUIRE(ino != get_fileid());
     }
 
     SECTION("file is reset when an existing table is modified") {
         realm->update_schema(add_property(schema, "object", {"value 2", PropertyType::Int}));
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 0);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 0);
         REQUIRE(ino != get_fileid());
     }
 
@@ -2173,29 +2173,29 @@ TEST_CASE("migration: ResetFile") {
                                                 {
                                                     {"value", PropertyType::Int},
                                                 }}));
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
         REQUIRE(realm->schema().size() == 3);
         REQUIRE(ino == get_fileid());
     }
 
     SECTION("file is not reset when removing a table") {
         realm->update_schema(remove_table(schema, "object 2"));
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 1);
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object 2"));
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
         REQUIRE(realm->schema().size() == 1);
         REQUIRE(ino == get_fileid());
     }
 
     SECTION("file is not reset when adding an index") {
         realm->update_schema(set_indexed(schema, "object", "value", true));
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
         REQUIRE(ino == get_fileid());
     }
 
     SECTION("file is not reset when removing an index") {
         realm->update_schema(set_indexed(schema, "object", "value", true));
         realm->update_schema(schema);
-        REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
         REQUIRE(ino == get_fileid());
     }
 }
@@ -2224,7 +2224,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
 
         DYNAMIC_SECTION("can add new properties to existing tables" << mode_string) {
             REQUIRE_NOTHROW(realm->update_schema(add_property(schema, "object", {"value 3", PropertyType::Int})));
-            REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->get_column_count() == 3);
+            REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 3);
         }
 
         DYNAMIC_SECTION("can add new tables" << mode_string) {
@@ -2232,8 +2232,8 @@ TEST_CASE("migration: AdditiveDiscovered") {
                                                                     {
                                                                         {"value", PropertyType::Int},
                                                                     }})));
-            REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object"));
-            REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object 2"));
+            REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
+            REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
         }
 
         DYNAMIC_SECTION("embedded orphan types" << mode_string) {
@@ -2243,8 +2243,8 @@ TEST_CASE("migration: AdditiveDiscovered") {
                     add_table(schema, {"origin",
                                        ObjectSchema::IsEmbedded{true},
                                        {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}})));
-                REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object"));
-                REQUIRE(!ObjectStore::table_for_object_type(realm->get_group(), "origin"));
+                REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object"));
+                REQUIRE(!ObjectStore::table_for_object_type(realm->read_group(), "origin"));
             }
             else {
                 // explicitly included embedded orphan types is an error
@@ -2260,7 +2260,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("indexes are updated when schema version is bumped" << mode_string) {
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto col_keys = table->get_column_keys();
             REQUIRE(table->has_search_index(col_keys[0]));
             REQUIRE(!table->has_search_index(col_keys[1]));
@@ -2273,7 +2273,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("indexes are not updated when schema version is not bumped" << mode_string) {
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             auto col_keys = table->get_column_keys();
             REQUIRE(table->has_search_index(col_keys[0]));
             REQUIRE(!table->has_search_index(col_keys[1]));
@@ -2286,9 +2286,9 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("can remove properties from existing tables, but column is not removed" << mode_string) {
-            auto table = ObjectStore::table_for_object_type(realm->get_group(), "object");
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
             REQUIRE_NOTHROW(realm->update_schema(remove_property(schema, "object", "value")));
-            REQUIRE(ObjectStore::table_for_object_type(realm->get_group(), "object")->get_column_count() == 2);
+            REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->get_column_count() == 2);
             auto const& properties = realm->schema().find("object")->persisted_properties;
             REQUIRE(properties.size() == 1);
             auto col_keys = table->get_column_keys();
@@ -2341,8 +2341,8 @@ TEST_CASE("migration: AdditiveDiscovered") {
 
         DYNAMIC_SECTION("add new columns from different SG" << mode_string) {
             auto realm2 = Realm::get_shared_realm(config);
-            auto& group = realm2->get_group();
-            realm2->begin_write_transaction();
+            auto& group = realm2->read_group();
+            realm2->begin_transaction();
             auto table = ObjectStore::table_for_object_type(group, "object");
             auto col_keys = table->get_column_keys();
             table->add_column(type_Int, "new column");
@@ -2356,8 +2356,8 @@ TEST_CASE("migration: AdditiveDiscovered") {
 
         DYNAMIC_SECTION("opening new Realms uses the correct schema after an external change" << mode_string) {
             auto realm2 = Realm::get_shared_realm(config);
-            auto& group = realm2->get_group();
-            realm2->begin_write_transaction();
+            auto& group = realm2->read_group();
+            realm2->begin_transaction();
             auto table = ObjectStore::table_for_object_type(group, "object");
             auto col_keys = table->get_column_keys();
             table->add_column(type_Double, "newcol");
@@ -2452,7 +2452,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
 
         DYNAMIC_SECTION("update_schema() does not begin a write transaction when extra columns are present"
                         << mode_string) {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
             // will deadlock if it tries to start a write transaction
@@ -2463,7 +2463,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
             "update_schema() does not begin a write transaction when indexes are changed without bumping schema "
             "version"
             << mode_string) {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
             // will deadlock if it tries to start a write transaction
@@ -2472,7 +2472,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
 
         DYNAMIC_SECTION("update_schema() does not begin a write transaction for invalid schema changes"
                         << mode_string) {
-            realm->begin_write_transaction();
+            realm->begin_transaction();
 
             auto realm2 = Realm::get_shared_realm(config);
             auto new_schema =
@@ -2502,7 +2502,7 @@ TEST_CASE("migration: Manual") {
                           {"array", PropertyType::Array | PropertyType::Object, "object"},
                       }}};
     realm->update_schema(schema);
-    auto col_keys = realm->get_group().get_table("class_object")->get_column_keys();
+    auto col_keys = realm->read_group().get_table("class_object")->get_column_keys();
 
 #define REQUIRE_MIGRATION(schema, migration)                                                                         \
     do {                                                                                                             \
@@ -2521,7 +2521,7 @@ TEST_CASE("migration: Manual") {
                                                  {"value", PropertyType::Int},
                                              }}),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->get_group().add_table("class_new table")->add_column(type_Int, "value");
+                              realm->read_group().add_table("class_new table")->add_column(type_Int, "value");
                           });
     }
     SECTION("add property to table") {
@@ -2621,7 +2621,7 @@ TEST_CASE("migration: Manual") {
     }
 
     SECTION("update_schema() does not begin a write transaction when schema version is unchanged") {
-        realm->begin_write_transaction();
+        realm->begin_transaction();
 
         auto realm2 = Realm::get_shared_realm(config);
         // will deadlock if it tries to start a write transaction

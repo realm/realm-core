@@ -201,7 +201,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     TestContext d(r);
 
     SECTION("create object") {
-        r->begin_write_transaction();
+        r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
 
         int64_t benchmark_pk = 0;
@@ -234,8 +234,8 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 
     SECTION("update object") {
-        auto table = r->get_group().get_table("class_all types");
-        r->begin_write_transaction();
+        auto table = r->read_group().get_table("class_all types");
+        r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
         auto obj = Object::create(d, r, all_types,
                                   util::Any(AnyDict{
@@ -273,7 +273,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         REQUIRE(col_int);
         BENCHMARK_ADVANCED("update object")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             meter.measure([&d, &all_types, &update_int, &r] {
                 auto shadow = Object::create(d, r, all_types,
                                              util::Any(AnyDict{
@@ -291,7 +291,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 
     SECTION("change notifications reporting") {
-        auto table = r->get_group().get_table("class_person");
+        auto table = r->read_group().get_table("class_person");
         Results result(r, table);
         size_t num_calls = 0;
         size_t num_insertions = 0;
@@ -310,7 +310,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         BENCHMARK_ADVANCED("create notifications")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -318,7 +318,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
@@ -339,7 +339,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(result.size() == num_objects);
         };
 
-        r->begin_write_transaction();
+        r->begin_transaction();
         result.clear();
         r->commit_transaction();
         advance_and_notify(*r);
@@ -347,7 +347,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         BENCHMARK_ADVANCED("delete notifications")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -355,7 +355,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
@@ -372,7 +372,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             REQUIRE(num_deletions == 0);
             REQUIRE(result.size() == num_objects);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
 
@@ -388,7 +388,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         BENCHMARK_ADVANCED("modify notifications")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -396,7 +396,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
@@ -416,7 +416,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             num_modifications = 0;
             num_deletions = 0;
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
@@ -442,7 +442,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         advance_and_notify(*r);
         ObjectSchema schema = *r->schema().find("all types");
 
-        r->begin_write_transaction();
+        r->begin_transaction();
         AnyDict values{
             {"pk", INT64_C(0)},
             {"bool", true},
@@ -480,11 +480,11 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             std::vector<CallbackState> notifiers;
             auto get_object = [&] {
                 auto r = Realm::get_shared_realm(config);
-                auto obj = r->get_group().get_table("class_all types")->get_object(0);
+                auto obj = r->read_group().get_table("class_all types")->get_object(0);
                 return Object(r, obj);
             };
             auto change_object = [&] {
-                r->begin_write_transaction();
+                r->begin_transaction();
                 int64_t int_value = obj.get_column_value<int64_t>("int");
                 obj.set_column_value("int", int_value + 1);
                 obj.set_column_value("bool", !obj.get_column_value<bool>("bool"));
@@ -538,7 +538,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
     }
 
     SECTION("change notifications sorted") {
-        auto table = r->get_group().get_table("class_person");
+        auto table = r->read_group().get_table("class_person");
         auto age_col = table->get_column_key("age");
         Results result = Results(r, table).sort({{"age", true}});
         size_t num_insertions = 0;
@@ -553,7 +553,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         advance_and_notify(*r);
         ObjectSchema person_schema = *r->schema().find("person");
         auto add_objects = [&](size_t num_objects, size_t start_index = 0) {
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 size_t index = i + start_index;
                 std::stringstream name;
@@ -571,7 +571,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         {
             constexpr size_t num_initial_objects = 1000;
             constexpr size_t num_prepend_objects = 1000;
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -600,7 +600,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         BENCHMARK_ADVANCED("insert, delete odds")(Catch::Benchmark::Chronometer meter)
         {
             constexpr size_t num_objects = 800;
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -610,7 +610,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
             advance_and_notify(*r);
 
             // remove odds
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = result.size() - 1; i > 0; --i) {
                 if (i % 2 == 1) {
                     Obj odd = result.get(i);
@@ -636,7 +636,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
         };
 
         constexpr size_t num_objects = 1000;
-        r->begin_write_transaction();
+        r->begin_transaction();
         result.clear();
         r->commit_transaction();
         advance_and_notify(*r);
@@ -645,7 +645,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         BENCHMARK_ADVANCED("modify all")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < table->size(); ++i) {
                 Obj obj = table->get_object(i);
                 obj.set(age_col, obj.get<int64_t>(age_col) + 1);
@@ -668,12 +668,12 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
         BENCHMARK_ADVANCED("modify odds")(Catch::Benchmark::Chronometer meter)
         {
-            r->begin_write_transaction();
+            r->begin_transaction();
             result.clear();
             r->commit_transaction();
             advance_and_notify(*r);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < num_objects; ++i) {
                 std::stringstream name;
                 name << "person_" << i;
@@ -687,7 +687,7 @@ TEST_CASE("Benchmark object", "[benchmark]") {
 
             advance_and_notify(*r);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             for (size_t i = 0; i < table->size(); ++i) {
                 Obj obj = table->get_object(i);
                 int64_t age = obj.get<int64_t>(age_col);

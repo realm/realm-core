@@ -52,11 +52,11 @@ TEST_CASE("Benchmark results", "[benchmark]") {
     };
 
     auto realm = Realm::get_shared_realm(config);
-    auto table = realm->get_group().get_table("class_object");
-    auto table2 = realm->get_group().get_table("class_object 2");
+    auto table = realm->read_group().get_table("class_object");
+    auto table2 = realm->read_group().get_table("class_object 2");
     Results r(realm, table);
 
-    realm->begin_write_transaction();
+    realm->begin_transaction();
     ObjKeys table_keys;
     ObjKeys table2_keys;
     table->create_objects(4, table_keys);
@@ -133,7 +133,7 @@ TEST_CASE("Benchmark results", "[benchmark]") {
 
     SECTION("iteration") {
         const int additional_row_count = 10000;
-        realm->begin_write_transaction();
+        realm->begin_transaction();
         table->create_objects(additional_row_count, table_keys);
         for (int i = 0; i < additional_row_count; ++i)
             table->get_object(table_keys[i]).set_all((i + 2) % 4, bool(i % 2));

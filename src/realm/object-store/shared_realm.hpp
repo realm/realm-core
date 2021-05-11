@@ -179,7 +179,7 @@ public:
         // In order to work around this, a separate path can be specified for these files.
         std::string fifo_files_fallback_path;
 
-        bool is_in_memory = false;
+        bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
 
         // Optional schema for the file.
@@ -204,12 +204,12 @@ public:
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
         // WARNING: The original read_only() has been renamed to immutable().
-        bool is_immutable() const
+        bool immutable() const
         {
             return schema_mode == SchemaMode::Immutable;
         }
         // FIXME: Rename this to read_only().
-        bool is_read_only_alternative() const
+        bool read_only_alternative() const
         {
             return schema_mode == SchemaMode::ReadOnlyAlternative;
         }
@@ -298,13 +298,13 @@ public:
         return m_schema_version;
     }
 
-    void begin_write_transaction();
+    void begin_transaction();
     void commit_transaction();
     void cancel_transaction();
     // Returns `true`, if `m_group` is set and mutable (which means it is actually a transaction).
-    bool is_in_any_transaction() const noexcept;
+    bool is_in_read_transaction() const noexcept;
     // Returns `true` if `m_group` is set, mutable and in the `DB::transact_Writing` stage.
-    bool is_in_write_transaction() const noexcept;
+    bool is_in_transaction() const noexcept;
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -321,30 +321,30 @@ public:
     uint_fast64_t get_number_of_versions() const;
 
     // Returns the current version for `m_group`.
-    // This is only relevant for read-only realms since they cannot `use get_version_of_current_transaction()`
+    // This is only relevant for read-only realms since they cannot `use read_transaction_version()`
     // or `get_version_of_current_or_frozen_transaction()` for which a transaction is required.
     VersionID get_current_version() const;
     // Returns the current version of `m_group` (if it is a transaction).
     // Caution: crashes for read-only realms since they don't have a transaction.
-    VersionID get_version_of_current_transaction() const;
+    VersionID read_transaction_version() const;
     // Returns the version of the current read or frozen transaction, `null` otherwise.
     // This is only used in tests.
-    util::Optional<VersionID> get_version_of_current_or_frozen_transaction() const;
+    util::Optional<VersionID> current_transaction_version() const;
 
     // Returns `m_group`.
-    Group& get_group();
+    Group& read_group();
     // Returns `true` if `m_group` is set, `false` otherwise.
     bool has_group() const noexcept;
 
     TransactionRef duplicate() const;
 
     void enable_wait_for_change();
-    bool should_wait_for_change();
+    bool wait_for_change();
     void wait_for_change_release();
 
     bool is_in_migration() const noexcept
     {
-        return m_is_in_migration;
+        return m_in_migration;
     }
 
     bool refresh();
@@ -363,9 +363,9 @@ public:
     void write_copy(StringData path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
-    void verify_is_on_thread() const;
-    void verify_is_in_write_transaction() const;
-    void verify_is_open() const;
+    void verify_thread() const;
+    void verify_in_write() const;
+    void verify_open() const;
     bool verify_notifications_available(bool throw_on_error = true) const;
 
     bool can_deliver_notifications() const noexcept;
@@ -397,14 +397,14 @@ public:
     {
         // Read-only realms only have a group but no transaction. The group still supports `import_copy_of(..)`
         // though.
-        if (m_config.is_immutable()) {
-            Transaction& transaction = static_cast<Transaction&>(const_cast<Realm*>(this)->get_group());
+        if (m_config.immutable()) {
+            Transaction& transaction = static_cast<Transaction&>(const_cast<Realm*>(this)->read_group());
             auto copy = transaction.import_copy_of(std::forward<Args>(args)...);
             return copy;
         }
         else {
-            Transaction& transaction = get_transaction();
-            auto copy = transaction.import_copy_of(std::forward<Args>(args)...);
+            Transaction& transactionRef = transaction();
+            auto copy = transactionRef.import_copy_of(std::forward<Args>(args)...);
             return copy;
         }
     }
@@ -426,11 +426,11 @@ public:
 
         static Transaction& get_transaction(Realm& realm)
         {
-            return realm.get_transaction();
+            return realm.transaction();
         }
-        static std::shared_ptr<Transaction> get_transaction_reference(Realm& realm)
+        static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm)
         {
-            return realm.get_transaction_reference();
+            return realm.transaction_ref();
         }
 
         // CollectionNotifier needs to be able to access the owning
@@ -465,7 +465,7 @@ private:
 
     // FIXME: this should be a Dynamic schema mode instead, but only once
     // that's actually fully working
-    bool m_has_dynamic_schema = true;
+    bool m_dynamic_schema = true;
 
     // True while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
@@ -474,7 +474,7 @@ private:
     // True while we're performing a schema migration via this Realm instance
     // to allow for different behavior (such as allowing modifications to
     // primary key values)
-    bool m_is_in_migration = false;
+    bool m_in_migration = false;
 
     void begin_read(VersionID);
     bool do_refresh();
@@ -493,9 +493,9 @@ private:
     void translate_schema_error();
     void notify_schema_changed();
 
-    Transaction& get_transaction();
-    Transaction& get_transaction() const;
-    std::shared_ptr<Transaction> get_transaction_reference();
+    Transaction& transaction();
+    Transaction& transaction() const;
+    std::shared_ptr<Transaction> transaction_ref();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

@@ -32,7 +32,7 @@ inline void populate_keypath_mapping(query_parser::KeyPathMapping& mapping, Real
         TableRef table;
         auto get_table = [&] {
             if (!table)
-                table = realm.get_group().get_table(object_schema.table_key);
+                table = realm.read_group().get_table(object_schema.table_key);
             return table;
         };
 

@@ -60,8 +60,8 @@ bool Collection::is_valid() const
 {
     if (!m_realm)
         return false;
-    m_realm->verify_is_on_thread();
-    if (!m_realm->is_in_any_transaction())
+    m_realm->verify_thread();
+    if (!m_realm->is_in_read_transaction())
         return false;
     return m_coll_base->is_attached();
 }
@@ -111,7 +111,7 @@ void Collection::verify_attached() const
 void Collection::verify_in_transaction() const
 {
     verify_attached();
-    m_realm->verify_is_in_write_transaction();
+    m_realm->verify_in_write();
 }
 
 size_t Collection::size() const

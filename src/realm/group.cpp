@@ -142,7 +142,7 @@ Group::Group(SlabAlloc* alloc) noexcept
 }
 
 Group::Group(SlabAlloc* alloc, ReadLockInfo read_lock_info) noexcept
-    : m_read_lock_info(read_lock_info)
+    : m_read_lock(read_lock_info)
     , m_alloc(*alloc) // Throws
     , m_top(m_alloc)
     , m_tables(m_alloc)

@@ -42,7 +42,7 @@ using namespace realm;
 
 static TableRef get_table(Realm& realm, StringData object_name)
 {
-    return ObjectStore::table_for_object_type(realm.get_group(), object_name);
+    return ObjectStore::table_for_object_type(realm.read_group(), object_name);
 }
 
 static Object create_object(SharedRealm const& realm, StringData object_type, AnyDict value)
@@ -74,25 +74,25 @@ TEST_CASE("thread safe reference") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.cache = false;
-    SharedRealm realm = Realm::get_shared_realm(config);
-    realm->update_schema(schema);
+    SharedRealm r = Realm::get_shared_realm(config);
+    r->update_schema(schema);
 
     // Convenience object
-    realm->begin_write_transaction();
-    auto foo = create_object(realm, "foo object", {{"ignore me", INT64_C(0)}});
-    realm->commit_transaction();
+    r->begin_transaction();
+    auto foo = create_object(r, "foo object", {{"ignore me", INT64_C(0)}});
+    r->commit_transaction();
 
-    const auto int_column_key = realm->schema().find("int object")->persisted_properties[0].column_key;
+    const auto int_obj_col = r->schema().find("int object")->persisted_properties[0].column_key;
 
     SECTION("allowed during write transactions") {
         SECTION("obtain") {
-            realm->begin_write_transaction();
+            r->begin_transaction();
             REQUIRE_NOTHROW(ThreadSafeReference(foo));
         }
         SECTION("resolve") {
             auto ref = ThreadSafeReference(foo);
-            realm->begin_write_transaction();
-            REQUIRE_NOTHROW(ref.resolve<Object>(realm));
+            r->begin_transaction();
+            REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
     }
 
@@ -108,23 +108,23 @@ TEST_CASE("thread safe reference") {
 
         auto reference_version = get_current_version();
         auto ref = util::make_optional(ThreadSafeReference(foo));
-        realm->begin_write_transaction();
-        realm->commit_transaction(); // Advance version
+        r->begin_transaction();
+        r->commit_transaction(); // Advance version
 
         REQUIRE(get_current_version() != reference_version);          // Ensure advanced
         REQUIRE_NOTHROW(shared_group->start_read(reference_version)); // Ensure pinned
 
         ref = {}; // Destroy thread safe reference, unpinning version
-        realm->begin_write_transaction();
-        realm->commit_transaction();                                 // Clean up old versions
+        r->begin_transaction();
+        r->commit_transaction();                                     // Clean up old versions
         REQUIRE_THROWS(shared_group->start_read(reference_version)); // Verify unpinned
     }
 
     SECTION("version mismatch") {
         SECTION("resolves at older version") {
-            realm->begin_write_transaction();
-            Object num = create_object(realm, "int object", {{"value", INT64_C(7)}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
+            r->commit_transaction();
 
             ColKey col = num.get_object_schema().property_for_name("value")->column_key;
             ObjKey k = num.obj().get_key();
@@ -136,7 +136,7 @@ TEST_CASE("thread safe reference") {
                 Object num = Object(r2, "int object", k);
                 REQUIRE(num.obj().get<Int>(col) == 7);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 num.obj().set(col, 9);
                 r2->commit_transaction();
 
@@ -144,22 +144,22 @@ TEST_CASE("thread safe reference") {
             };
 
             REQUIRE(num.obj().get<Int>(col) == 7);
-            Object num_prime = ref.resolve<Object>(realm);
+            Object num_prime = ref.resolve<Object>(r);
             REQUIRE(num_prime.obj().get<Int>(col) == 9);
             REQUIRE(num.obj().get<Int>(col) == 9);
 
-            realm->begin_write_transaction();
+            r->begin_transaction();
             num.obj().set(col, 11);
-            realm->commit_transaction();
+            r->commit_transaction();
 
             REQUIRE(num_prime.obj().get<Int>(col) == 11);
             REQUIRE(num.obj().get<Int>(col) == 11);
         }
 
         SECTION("resolve at newer version") {
-            realm->begin_write_transaction();
-            Object num = create_object(realm, "int object", {{"value", INT64_C(7)}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
+            r->commit_transaction();
 
             ColKey col = num.get_object_schema().property_for_name("value")->column_key;
             ObjKey k = num.obj().get_key();
@@ -170,7 +170,7 @@ TEST_CASE("thread safe reference") {
                 SharedRealm r2 = Realm::get_shared_realm(config);
                 Object num = Object(r2, "int object", k);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 num.obj().set(col, 9);
                 r2->commit_transaction();
                 REQUIRE(num.obj().get<Int>(col) == 9);
@@ -178,7 +178,7 @@ TEST_CASE("thread safe reference") {
                 Object num_prime = ref.resolve<Object>(r2);
                 REQUIRE(num_prime.obj().get<Int>(col) == 9);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 num_prime.obj().set(col, 11);
                 r2->commit_transaction();
 
@@ -187,22 +187,22 @@ TEST_CASE("thread safe reference") {
             }
 
             REQUIRE(num.obj().get<Int>(col) == 7);
-            realm->refresh();
+            r->refresh();
             REQUIRE(num.obj().get<Int>(col) == 11);
         }
 
         SECTION("resolve at newer version when schema is specified") {
-            realm->close();
+            r->close();
             config.schema = schema;
             SharedRealm r = Realm::get_shared_realm(config);
-            r->begin_write_transaction();
+            r->begin_transaction();
             Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
             r->commit_transaction();
 
             ColKey col = num.get_object_schema().property_for_name("value")->column_key;
             auto ref = ThreadSafeReference(num);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             num.obj().set(col, 9);
             r->commit_transaction();
 
@@ -211,9 +211,9 @@ TEST_CASE("thread safe reference") {
 
         SECTION("resolve references at multiple versions") {
             auto commit_new_num = [&](int64_t value) -> Object {
-                realm->begin_write_transaction();
-                Object num = create_object(realm, "int object", {{"value", value}});
-                realm->commit_transaction();
+                r->begin_transaction();
+                Object num = create_object(r, "int object", {{"value", value}});
+                r->commit_transaction();
                 return num;
             };
 
@@ -232,9 +232,9 @@ TEST_CASE("thread safe reference") {
     }
 
     SECTION("same thread") {
-        realm->begin_write_transaction();
-        Object num = create_object(realm, "int object", {{"value", INT64_C(7)}});
-        realm->commit_transaction();
+        r->begin_transaction();
+        Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
+        r->commit_transaction();
 
         ColKey col = num.get_object_schema().property_for_name("value")->column_key;
         REQUIRE(num.obj().get<Int>(col) == 7);
@@ -244,11 +244,11 @@ TEST_CASE("thread safe reference") {
         SECTION("same realm") {
             did_run_section = true;
             {
-                Object num = ref.resolve<Object>(realm);
+                Object num = ref.resolve<Object>(r);
                 REQUIRE(num.obj().get<Int>(col) == 7);
-                realm->begin_write_transaction();
+                r->begin_transaction();
                 num.obj().set(col, 9);
-                realm->commit_transaction();
+                r->commit_transaction();
                 REQUIRE(num.obj().get<Int>(col) == 9);
             }
             REQUIRE(num.obj().get<Int>(col) == 9);
@@ -259,7 +259,7 @@ TEST_CASE("thread safe reference") {
                 SharedRealm r = Realm::get_shared_realm(config);
                 Object num = ref.resolve<Object>(r);
                 REQUIRE(num.obj().get<Int>(col) == 7);
-                r->begin_write_transaction();
+                r->begin_transaction();
                 num.obj().set(col, 9);
                 r->commit_transaction();
                 REQUIRE(num.obj().get<Int>(col) == 9);
@@ -267,9 +267,9 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num.obj().get<Int>(col) == 7);
         }
         catch2_ensure_section_run_workaround(did_run_section, "same thread", [&]() {
-            realm->begin_write_transaction(); // advance to latest version by starting a write
+            r->begin_transaction(); // advance to latest version by starting a write
             REQUIRE(num.obj().get<Int>(col) == 9);
-            realm->cancel_transaction();
+            r->cancel_transaction();
         });
     }
 
@@ -281,25 +281,25 @@ TEST_CASE("thread safe reference") {
             TestFile configuration;
             SharedRealm realm = Realm::get_shared_realm(configuration);
             realm->update_schema(schema);
-            realm->begin_write_transaction();
+            realm->begin_transaction();
             create_object(realm, "int object", {{"value", INT64_C(42)}});
             realm->commit_transaction();
             realm->close();
             configuration.schema_mode = SchemaMode::Immutable;
             SharedRealm read_only_realm = Realm::get_shared_realm(configuration);
-            auto table = read_only_realm->get_group().get_table("class_int object");
+            auto table = read_only_realm->read_group().get_table("class_int object");
             Results results(read_only_realm, table);
             REQUIRE(results.size() == 1);
-            REQUIRE(results.get(0).get<int64_t>(int_column_key) == 42);
+            REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 42);
 
             SECTION("read-only `ThreadSafeReference` to `Results`") {
                 auto thread_safe_results = ThreadSafeReference(results);
                 std::thread([thread_safe_results = std::move(thread_safe_results), configuration,
-                             int_column_key]() mutable {
+                             int_obj_col]() mutable {
                     SharedRealm realm_in_thread = Realm::get_shared_realm(configuration);
                     Results resolved_results = thread_safe_results.resolve<Results>(realm_in_thread);
                     REQUIRE(resolved_results.size() == 1);
-                    REQUIRE(resolved_results.get(0).get<int64_t>(int_column_key) == 42);
+                    REQUIRE(resolved_results.get(0).get<int64_t>(int_obj_col) == 42);
                 }).join();
             }
 
@@ -307,20 +307,20 @@ TEST_CASE("thread safe reference") {
                 Object object(read_only_realm, results.get(0));
                 auto thread_safe_object = ThreadSafeReference(object);
                 std::thread([thread_safe_object = std::move(thread_safe_object), configuration,
-                             int_column_key]() mutable {
+                             int_obj_col]() mutable {
                     SharedRealm realm_in_thread = Realm::get_shared_realm(configuration);
                     auto resolved_object = thread_safe_object.resolve<Object>(realm_in_thread);
                     REQUIRE(resolved_object.is_valid());
-                    REQUIRE(resolved_object.obj().get<int64_t>(int_column_key) == 42);
+                    REQUIRE(resolved_object.obj().get<int64_t>(int_obj_col) == 42);
                 }).join();
             }
         }
 
         SECTION("objects") {
-            realm->begin_write_transaction();
-            auto str = create_object(realm, "string object", {});
-            auto num = create_object(realm, "int object", {{"value", INT64_C(0)}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto str = create_object(r, "string object", {});
+            auto num = create_object(r, "int object", {{"value", INT64_C(0)}});
+            r->commit_transaction();
 
             ColKey col_num = num.get_object_schema().property_for_name("value")->column_key;
             ColKey col_str = str.get_object_schema().property_for_name("value")->column_key;
@@ -334,7 +334,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(str.obj().get<String>(col_str).is_null());
                 REQUIRE(num.obj().get<Int>(col_num) == 0);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 str.obj().set(col_str, "the meaning of life");
                 num.obj().set(col_num, 42);
                 r2->commit_transaction();
@@ -343,30 +343,30 @@ TEST_CASE("thread safe reference") {
             REQUIRE(str.obj().get<String>(col_str).is_null());
             REQUIRE(num.obj().get<Int>(col_num) == 0);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(str.obj().get<String>(col_str) == "the meaning of life");
             REQUIRE(num.obj().get<Int>(col_num) == 42);
         }
 
         SECTION("object list") {
-            realm->begin_write_transaction();
-            auto zero = create_object(realm, "int object", {{"value", INT64_C(0)}});
-            auto obj = create_object(realm, "int array object", {{"value", AnyVector{zero}}});
-            auto col = get_table(*realm, "int array object")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto zero = create_object(r, "int object", {{"value", INT64_C(0)}});
+            auto obj = create_object(r, "int array object", {{"value", AnyVector{zero}}});
+            auto col = get_table(*r, "int array object")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get<int64_t>(int_column_key) == 0);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
             auto ref = ThreadSafeReference(list);
             {
                 SharedRealm r2 = Realm::get_shared_realm(config);
                 List list = ref.resolve<List>(r2);
                 REQUIRE(list.size() == 1);
-                REQUIRE(list.get(0).get<int64_t>(int_column_key) == 0);
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 list.remove_all();
                 auto one = create_object(r2, "int object", {{"value", INT64_C(1)}});
                 auto two = create_object(r2, "int object", {{"value", INT64_C(2)}});
@@ -375,31 +375,31 @@ TEST_CASE("thread safe reference") {
                 r2->commit_transaction();
 
                 REQUIRE(list.size() == 2);
-                REQUIRE(list.get(0).get<int64_t>(int_column_key) == 1);
-                REQUIRE(list.get(1).get<int64_t>(int_column_key) == 2);
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 1);
+                REQUIRE(list.get(1).get<int64_t>(int_obj_col) == 2);
             }
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get<int64_t>(int_column_key) == 0);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 0);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(list.size() == 2);
-            REQUIRE(list.get(0).get<int64_t>(int_column_key) == 1);
-            REQUIRE(list.get(1).get<int64_t>(int_column_key) == 2);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 1);
+            REQUIRE(list.get(1).get<int64_t>(int_obj_col) == 2);
         }
 
         SECTION("sorted object results") {
-            auto& table = *get_table(*realm, "string object");
+            auto& table = *get_table(*r, "string object");
             auto col = table.get_column_key("value");
-            auto results = Results(realm, table.where().not_equal(col, "C")).sort({{{col}}, {false}});
+            auto results = Results(r, table.where().not_equal(col, "C")).sort({{{col}}, {false}});
 
-            realm->begin_write_transaction();
-            create_object(realm, "string object", {{"value", "A"s}});
-            create_object(realm, "string object", {{"value", "B"s}});
-            create_object(realm, "string object", {{"value", "C"s}});
-            create_object(realm, "string object", {{"value", "D"s}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            create_object(r, "string object", {{"value", "A"s}});
+            create_object(r, "string object", {{"value", "B"s}});
+            create_object(r, "string object", {{"value", "C"s}});
+            create_object(r, "string object", {{"value", "D"s}});
+            r->commit_transaction();
 
             REQUIRE(results.size() == 3);
             REQUIRE(results.get(0).get<StringData>(col) == "D");
@@ -415,7 +415,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(results.get(1).get<StringData>(col) == "B");
                 REQUIRE(results.get(2).get<StringData>(col) == "A");
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 results.get(2).remove();
                 results.get(0).remove();
                 create_object(r2, "string object", {{"value", "E"s}});
@@ -431,7 +431,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get(1).get<StringData>(col) == "B");
             REQUIRE(results.get(2).get<StringData>(col) == "A");
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get<StringData>(col) == "E");
@@ -439,15 +439,15 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("distinct object results") {
-            auto& table = *get_table(*realm, "string object");
+            auto& table = *get_table(*r, "string object");
             auto col = table.get_column_key("value");
-            auto results = Results(realm, table.where()).distinct({{{col}}}).sort({{"value", true}});
+            auto results = Results(r, table.where()).distinct({{{col}}}).sort({{"value", true}});
 
-            realm->begin_write_transaction();
-            create_object(realm, "string object", {{"value", "A"s}});
-            create_object(realm, "string object", {{"value", "A"s}});
-            create_object(realm, "string object", {{"value", "B"s}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            create_object(r, "string object", {{"value", "A"s}});
+            create_object(r, "string object", {{"value", "A"s}});
+            create_object(r, "string object", {{"value", "B"s}});
+            r->commit_transaction();
 
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get<StringData>(col) == "A");
@@ -461,7 +461,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(results.get(0).get<StringData>(col) == "A");
                 REQUIRE(results.get(1).get<StringData>(col) == "B");
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 results.get(0).remove();
                 create_object(r2, "string object", {{"value", "C"s}});
                 r2->commit_transaction();
@@ -476,7 +476,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get(0).get<StringData>(col) == "A");
             REQUIRE(results.get(1).get<StringData>(col) == "B");
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(results.size() == 3);
             REQUIRE(results.get(0).get<StringData>(col) == "A");
@@ -485,11 +485,11 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("int list") {
-            realm->begin_write_transaction();
-            auto obj = create_object(realm, "int array", {{"value", AnyVector{INT64_C(0)}}});
-            auto col = get_table(*realm, "int array")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             auto ref = ThreadSafeReference(list);
             {
@@ -498,7 +498,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(list.size() == 1);
                 REQUIRE(list.get<int64_t>(0) == 0);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 list.remove_all();
                 list.add(int64_t(1));
                 list.add(int64_t(2));
@@ -512,7 +512,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(list.size() == 1);
             REQUIRE(list.get<int64_t>(0) == 0);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(list.size() == 2);
             REQUIRE(list.get<int64_t>(0) == 1);
@@ -520,11 +520,11 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("sorted int results") {
-            realm->begin_write_transaction();
-            auto obj = create_object(realm, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
-            auto col = get_table(*realm, "int array")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             auto results = list.sort({{"self", true}});
 
@@ -543,7 +543,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(results.get<int64_t>(1) == 1);
                 REQUIRE(results.get<int64_t>(2) == 2);
 
-                r->begin_write_transaction();
+                r->begin_transaction();
                 auto table = get_table(*r, "int array");
                 List list(r, *table->begin(), table->get_column_key("value"));
                 list.remove(1);
@@ -561,7 +561,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(1) == 1);
             REQUIRE(results.get<int64_t>(2) == 2);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(results.size() == 3);
             REQUIRE(results.get<int64_t>(0) == -1);
@@ -570,13 +570,12 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("distinct int results") {
-            realm->begin_write_transaction();
-            auto obj =
-                create_object(realm, "int array",
-                              {{"value", AnyVector{INT64_C(3), INT64_C(2), INT64_C(1), INT64_C(1), INT64_C(2)}}});
-            auto col = get_table(*realm, "int array")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto obj = create_object(
+                r, "int array", {{"value", AnyVector{INT64_C(3), INT64_C(2), INT64_C(1), INT64_C(1), INT64_C(2)}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             auto results = list.as_results().distinct({"self"}).sort({{"self", true}});
 
@@ -596,7 +595,7 @@ TEST_CASE("thread safe reference") {
                 REQUIRE(results.get<int64_t>(1) == 2);
                 REQUIRE(results.get<int64_t>(2) == 3);
 
-                r->begin_write_transaction();
+                r->begin_transaction();
                 auto table = get_table(*r, "int array");
                 List list(r, *table->begin(), table->get_column_key("value"));
                 list.remove(1);
@@ -613,7 +612,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(1) == 2);
             REQUIRE(results.get<int64_t>(2) == 3);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(results.size() == 2);
             REQUIRE(results.get<int64_t>(0) == 1);
@@ -621,18 +620,18 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("multiple types") {
-            auto results = Results(realm, get_table(*realm, "int object")->where().equal(int_column_key, 5));
+            auto results = Results(r, get_table(*r, "int object")->where().equal(int_obj_col, 5));
 
-            realm->begin_write_transaction();
-            auto num = create_object(realm, "int object", {{"value", INT64_C(5)}});
-            auto obj = create_object(realm, "int array object", {{"value", AnyVector{}}});
-            auto col = get_table(*realm, "int array object")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            auto num = create_object(r, "int object", {{"value", INT64_C(5)}});
+            auto obj = create_object(r, "int array object", {{"value", AnyVector{}}});
+            auto col = get_table(*r, "int array object")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             REQUIRE(list.size() == 0);
             REQUIRE(results.size() == 1);
-            REQUIRE(results.get(0).get<int64_t>(int_column_key) == 5);
+            REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
             auto ref_num = ThreadSafeReference(num);
             auto ref_list = ThreadSafeReference(list);
             auto ref_results = ThreadSafeReference(results);
@@ -644,26 +643,26 @@ TEST_CASE("thread safe reference") {
 
                 REQUIRE(list.size() == 0);
                 REQUIRE(results.size() == 1);
-                REQUIRE(results.get(0).get<int64_t>(int_column_key) == 5);
+                REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
 
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 num.obj().set_all(6);
                 list.add(num.obj().get_key());
                 r2->commit_transaction();
 
                 REQUIRE(list.size() == 1);
-                REQUIRE(list.get(0).get<int64_t>(int_column_key) == 6);
+                REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 6);
                 REQUIRE(results.size() == 0);
             }
 
             REQUIRE(list.size() == 0);
             REQUIRE(results.size() == 1);
-            REQUIRE(results.get(0).get<int64_t>(int_column_key) == 5);
+            REQUIRE(results.get(0).get<int64_t>(int_obj_col) == 5);
 
-            realm->refresh();
+            r->refresh();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get<int64_t>(int_column_key) == 6);
+            REQUIRE(list.get(0).get<int64_t>(int_obj_col) == 6);
             REQUIRE(results.size() == 0);
         }
     }
@@ -673,47 +672,47 @@ TEST_CASE("thread safe reference") {
         auto delete_and_resolve = [&](auto&& list) {
             auto ref = ThreadSafeReference(list);
 
-            realm->begin_write_transaction();
+            r->begin_transaction();
             obj.obj().remove();
-            realm->commit_transaction();
+            r->commit_transaction();
 
-            return ref.resolve<typename std::remove_reference<decltype(list)>::type>(realm);
+            return ref.resolve<typename std::remove_reference<decltype(list)>::type>(r);
         };
 
         SECTION("object") {
-            realm->begin_write_transaction();
-            obj = create_object(realm, "int object", {{"value", INT64_C(7)}});
-            realm->commit_transaction();
+            r->begin_transaction();
+            obj = create_object(r, "int object", {{"value", INT64_C(7)}});
+            r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(obj).is_valid());
         }
 
         SECTION("object list") {
-            realm->begin_write_transaction();
-            obj = create_object(realm, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            auto col = get_table(*realm, "int array object")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+            auto col = get_table(*r, "int array object")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
 
         SECTION("int list") {
-            realm->begin_write_transaction();
-            obj = create_object(realm, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
-            auto col = get_table(*realm, "int array")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+            auto col = get_table(*r, "int array")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
 
         SECTION("object results") {
-            realm->begin_write_transaction();
-            obj = create_object(realm, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            auto col = get_table(*realm, "int array object")->get_column_key("value");
-            List list(realm, obj.obj(), col);
-            realm->commit_transaction();
+            r->begin_transaction();
+            obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
+            auto col = get_table(*r, "int array object")->get_column_key("value");
+            List list(r, obj.obj(), col);
+            r->commit_transaction();
 
             auto results = delete_and_resolve(list.sort({{"value", true}}));
             REQUIRE(results.is_valid());
@@ -721,10 +720,10 @@ TEST_CASE("thread safe reference") {
         }
 
         SECTION("int results") {
-            realm->begin_write_transaction();
-            obj = create_object(realm, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
-            List list(realm, obj.obj(), get_table(*realm, "int array")->get_column_key("value"));
-            realm->commit_transaction();
+            r->begin_transaction();
+            obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
+            List list(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
+            r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
@@ -735,7 +734,7 @@ TEST_CASE("thread safe reference") {
             ThreadSafeReference ref;
             {
                 SharedRealm r2 = Realm::get_shared_realm(config);
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 auto obj = fn(r2);
                 r2->commit_transaction();
                 ref = obj;
@@ -746,7 +745,7 @@ TEST_CASE("thread safe reference") {
         SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
-                       }).resolve<Object>(realm);
+                       }).resolve<Object>(r);
             REQUIRE(obj.is_valid());
             REQUIRE(obj.get_column_value<int64_t>("value") == 7);
         }
@@ -756,7 +755,7 @@ TEST_CASE("thread safe reference") {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
                             return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE(list.is_valid());
             REQUIRE(list.size() == 1);
         }
@@ -765,7 +764,7 @@ TEST_CASE("thread safe reference") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE(list.is_valid());
             REQUIRE(list.size() == 1);
         }
@@ -779,7 +778,7 @@ TEST_CASE("thread safe reference") {
                                           .sort({{"value", true}});
                     REQUIRE(results.size() == 1);
                     return results;
-                }).resolve<Results>(realm);
+                }).resolve<Results>(r);
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 1);
         }
@@ -789,7 +788,7 @@ TEST_CASE("thread safe reference") {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
                                    .sort({{"self", true}});
-                           }).resolve<Results>(realm);
+                           }).resolve<Results>(r);
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 1);
         }
@@ -800,7 +799,7 @@ TEST_CASE("thread safe reference") {
             ThreadSafeReference ref;
             {
                 SharedRealm r2 = Realm::get_shared_realm(config);
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 ref = fn(r2);
                 r2->commit_transaction();
             };
@@ -810,7 +809,7 @@ TEST_CASE("thread safe reference") {
         SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
-                       }).resolve<Object>(realm);
+                       }).resolve<Object>(r);
             REQUIRE(obj.is_valid());
             REQUIRE(obj.get_column_value<int64_t>("value") == 7);
         }
@@ -820,7 +819,7 @@ TEST_CASE("thread safe reference") {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
                             return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE(list.is_valid());
             REQUIRE(list.size() == 1);
         }
@@ -829,7 +828,7 @@ TEST_CASE("thread safe reference") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE(list.is_valid());
             REQUIRE(list.size() == 1);
         }
@@ -850,7 +849,7 @@ TEST_CASE("thread safe reference") {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
                                    .sort({{"self", true}});
-                           }).resolve<Results>(realm);
+                           }).resolve<Results>(r);
             REQUIRE(results.is_valid());
             REQUIRE(results.size() == 1);
         }
@@ -861,7 +860,7 @@ TEST_CASE("thread safe reference") {
             ThreadSafeReference ref;
             {
                 SharedRealm r2 = Realm::get_shared_realm(config);
-                r2->begin_write_transaction();
+                r2->begin_transaction();
                 ref = fn(r2);
                 r2->cancel_transaction();
             };
@@ -871,7 +870,7 @@ TEST_CASE("thread safe reference") {
         SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
-                       }).resolve<Object>(realm);
+                       }).resolve<Object>(r);
             REQUIRE_FALSE(obj.is_valid());
         }
 
@@ -880,7 +879,7 @@ TEST_CASE("thread safe reference") {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
                             return List(r, obj.obj(), get_table(*r, "int array object")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE_FALSE(list.is_valid());
         }
 
@@ -888,7 +887,7 @@ TEST_CASE("thread safe reference") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
-                        }).resolve<List>(realm);
+                        }).resolve<List>(r);
             REQUIRE_FALSE(list.is_valid());
         }
 
@@ -908,7 +907,7 @@ TEST_CASE("thread safe reference") {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
                                    .sort({{"self", true}});
-                           }).resolve<Results>(realm);
+                           }).resolve<Results>(r);
             REQUIRE_FALSE(results.is_valid());
         }
     }
@@ -917,24 +916,24 @@ TEST_CASE("thread safe reference") {
         SECTION("retains source realm") { // else version will become unpinned
             auto ref = ThreadSafeReference(foo);
             foo = {};
-            realm = nullptr;
-            realm = Realm::get_shared_realm(config);
-            REQUIRE_NOTHROW(ref.resolve<Object>(realm));
+            r = nullptr;
+            r = Realm::get_shared_realm(config);
+            REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
 
         SECTION("retains source RealmCoordinator") {
             auto ref = ThreadSafeReference(foo);
             auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path).get();
             foo = {};
-            realm = nullptr;
+            r = nullptr;
             REQUIRE(coordinator == _impl::RealmCoordinator::get_existing_coordinator(config.path).get());
         }
     }
 
     SECTION("metadata") {
-        realm->begin_write_transaction();
-        auto num = create_object(realm, "int object", {{"value", INT64_C(5)}});
-        realm->commit_transaction();
+        r->begin_transaction();
+        auto num = create_object(r, "int object", {{"value", INT64_C(5)}});
+        r->commit_transaction();
         REQUIRE(num.get_object_schema().name == "int object");
 
         auto ref = ThreadSafeReference(num);
@@ -947,7 +946,7 @@ TEST_CASE("thread safe reference") {
 
     SECTION("allow multiple resolves") {
         auto ref = ThreadSafeReference(foo);
-        ref.resolve<Object>(realm);
-        REQUIRE_NOTHROW(ref.resolve<Object>(realm));
+        ref.resolve<Object>(r);
+        REQUIRE_NOTHROW(ref.resolve<Object>(r));
     }
 }

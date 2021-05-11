@@ -509,9 +509,9 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     auto r = Realm::get_shared_realm(config);
     auto r2 = Realm::get_shared_realm(config);
 
-    auto table = r->get_group().get_table("class_object");
-    auto table2 = r2->get_group().get_table("class_object");
-    r->begin_write_transaction();
+    auto table = r->read_group().get_table("class_object");
+    auto table2 = r2->read_group().get_table("class_object");
+    r->begin_transaction();
     Obj obj = table->create_object();
     ColKey col = table->get_column_key("value");
 
@@ -624,7 +624,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 
-    if (!list.is_valid() || !r->is_in_write_transaction())
+    if (!list.is_valid() || !r->is_in_transaction())
         return;
 
     for (T value : values)
@@ -960,12 +960,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             // Remove the existing copy of this value so that the sorted list
             // doesn't have dupes resulting in an unstable order
             advance_and_notify(*r);
-            r->begin_write_transaction();
+            r->begin_transaction();
             list.remove(0);
             r->commit_transaction();
 
             advance_and_notify(*r);
-            r->begin_write_transaction();
+            r->begin_transaction();
             list.insert(0, static_cast<T>(values[0]));
             r->commit_transaction();
 
@@ -978,7 +978,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("remove value from list") {
             advance_and_notify(*r);
-            r->begin_write_transaction();
+            r->begin_transaction();
             list.remove(1);
             r->commit_transaction();
 
@@ -993,7 +993,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         SECTION("clear list") {
             advance_and_notify(*r);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             list.remove_all();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -1006,7 +1006,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             advance_and_notify(*r);
             REQUIRE(calls == 3);
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -1015,7 +1015,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE(rchange.deletions.count() == values.size());
             REQUIRE(srchange.deletions.count() == values.size());
 
-            r->begin_write_transaction();
+            r->begin_transaction();
             table->create_object();
             r->commit_transaction();
             advance_and_notify(*r);
@@ -1023,7 +1023,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
 
         SECTION("deleting containing row before first run of notifier") {
-            r2->begin_write_transaction();
+            r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();
             advance_and_notify(*r);
@@ -1043,7 +1043,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         {
             auto r = Realm::get_shared_realm(sync_config);
-            r->begin_write_transaction();
+            r->begin_transaction();
 
             CppContext ctx(r);
             auto obj = Object::create(ctx, r, *r->schema().find("object"), util::Any(AnyDict{}));
@@ -1058,7 +1058,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         {
             auto r = Realm::get_shared_realm(sync_config);
-            auto table = r->get_group().get_table("class_object");
+            auto table = r->read_group().get_table("class_object");
 
             util::EventLoop::main().run_until([&] {
                 return table->size() == 1;

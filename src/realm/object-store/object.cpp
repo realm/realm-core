@@ -98,30 +98,30 @@ Object::Object(SharedRealm r, Obj const& o)
     , m_obj(o)
 {
     REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->get_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
+                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(m_realm->get_group().get_table(m_object_schema->table_key)->get_object(key))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(key))
 {
     REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->get_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
+                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(SharedRealm r, StringData object_type, size_t index)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(m_realm->get_group().get_table(m_object_schema->table_key)->get_object(index))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(index))
 {
     REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->get_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
+                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(std::shared_ptr<Realm> r, ObjLink link)
     : m_realm(std::move(r))
-    , m_obj(m_realm->get_group().get_object(link))
+    , m_obj(m_realm->read_group().get_object(link))
 {
     m_object_schema =
         &*m_realm->schema().find(ObjectStore::object_type_for_table_name(m_obj.get_table()->get_name()));
@@ -147,7 +147,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
 
 void Object::verify_attached() const
 {
-    m_realm->verify_is_on_thread();
+    m_realm->verify_thread();
     if (!m_obj.is_valid()) {
         throw InvalidatedObjectException(m_object_schema->name);
     }
@@ -165,7 +165,7 @@ Property const& Object::property_for_name(StringData prop_name) const
 void Object::validate_property_for_setter(Property const& property) const
 {
     verify_attached();
-    m_realm->verify_is_in_write_transaction();
+    m_realm->verify_in_write();
 
     // Modifying primary keys is allowed in migrations to make it possible to
     // add a new primary key to a type (or change the property type), but it

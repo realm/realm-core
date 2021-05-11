@@ -9,7 +9,7 @@ RLM_API bool realm_get_num_objects(const realm_t* realm, realm_class_key_t key, 
 {
     return wrap_err([&]() {
         auto& rlm = **realm;
-        auto table = rlm.get_group().get_table(TableKey(key));
+        auto table = rlm.read_group().get_table(TableKey(key));
         if (out_count)
             *out_count = table->size();
         return true;
@@ -21,7 +21,7 @@ RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_class_key_t
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto table_key = TableKey(tbl_key);
-        auto table = shared_realm->get_group().get_table(table_key);
+        auto table = shared_realm->read_group().get_table(table_key);
         auto obj = table->get_object(ObjKey(obj_key));
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
@@ -34,7 +34,7 @@ RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm,
     return wrap_err([&]() -> realm_object_t* {
         auto& shared_realm = *realm;
         auto table_key = TableKey(class_key);
-        auto table = shared_realm->get_group().get_table(table_key);
+        auto table = shared_realm->read_group().get_table(table_key);
         auto pk_val = from_capi(pk);
 
         auto pk_col = table->get_primary_key_column();
@@ -69,7 +69,7 @@ RLM_API realm_results_t* realm_object_find_all(const realm_t* realm, realm_class
 {
     return wrap_err([&]() {
         auto& shared_realm = *realm;
-        auto table = shared_realm->get_group().get_table(TableKey(key));
+        auto table = shared_realm->read_group().get_table(TableKey(key));
         return new realm_results{Results{shared_realm, table}};
     });
 }
@@ -79,7 +79,7 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto tblkey = TableKey(table_key);
-        auto table = shared_realm->get_group().get_table(tblkey);
+        auto table = shared_realm->read_group().get_table(tblkey);
 
         if (table->get_primary_key_column()) {
             auto& object_schema = schema_for_table(*realm, tblkey);
@@ -98,7 +98,7 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto tblkey = TableKey(table_key);
-        auto table = shared_realm->get_group().get_table(tblkey);
+        auto table = shared_realm->read_group().get_table(tblkey);
         // FIXME: Provide did_create?
         auto pkval = from_capi(pk);
 

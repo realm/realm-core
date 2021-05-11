@@ -103,7 +103,7 @@ public:
     }
     bool is_in_memory() const noexcept
     {
-        return m_config.is_in_memory;
+        return m_config.in_memory;
     }
     // Returns the number of versions in the Realm file.
     uint_fast64_t get_number_of_versions() const

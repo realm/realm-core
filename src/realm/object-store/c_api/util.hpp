@@ -22,7 +22,7 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
 inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, TableKey table_key)
 {
     // Validate the table key.
-    realm->get_group().get_table(table_key);
+    realm->read_group().get_table(table_key);
     const auto& schema = realm->schema();
 
     auto it = schema.find(table_key);
@@ -71,7 +71,7 @@ inline void check_value_assignable(const List& list, Mixed val)
 {
     auto realm = list.get_realm();
     auto table_key = list.get_parent_table_key();
-    auto table = realm->get_group().get_table(table_key);
+    auto table = realm->read_group().get_table(table_key);
     auto col_key = list.get_parent_column_key();
     return check_value_assignable(realm, *table, col_key, val);
 }

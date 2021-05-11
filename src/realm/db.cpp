@@ -1604,7 +1604,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
 
 bool DB::has_changed(TransactionRef tr)
 {
-    bool changed = tr->m_read_lock_info.m_version != get_version_of_latest_snapshot();
+    bool changed = tr->m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
@@ -1612,10 +1612,10 @@ bool DB::wait_for_change(TransactionRef tr)
 {
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-    while (tr->m_read_lock_info.m_version == info->latest_version_number && m_wait_for_change_enabled) {
+    while (tr->m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
         m_new_commit_available.wait(m_controlmutex, 0);
     }
-    return tr->m_read_lock_info.m_version != info->latest_version_number;
+    return tr->m_read_lock.m_version != info->latest_version_number;
 }
 
 
@@ -1681,7 +1681,7 @@ void DB::do_async_commits()
     // overwritten by commits being made to memory by others.
     {
         VersionID version_id = VersionID();      // Latest available snapshot
-        grab_read_lock(m_read_lock_info, version_id); // Throws
+        grab_read_lock(m_read_lock, version_id); // Throws
     }
     // we must treat version and version_index the same way:
     {
@@ -1701,7 +1701,7 @@ void DB::do_async_commits()
         }
 
         bool is_same;
-        Group::ReadLockInfo next_read_lock = m_read_lock_info;
+        Group::ReadLockInfo next_read_lock = m_read_lock;
         {
             // detect if we're the last "client", and if so, shutdown (must be under lock):
             std::lock_guard<InterprocessMutex> lock2(m_writemutex);
@@ -1715,7 +1715,7 @@ void DB::do_async_commits()
                 std::cerr << "Daemon exiting nicely" << std::endl << std::endl;
 #endif
                 release_read_lock(next_read_lock);
-                release_read_lock(m_read_lock_info);
+                release_read_lock(m_read_lock);
                 info->daemon_started = 0;
                 info->daemon_ready = 0;
                 return;
@@ -1725,7 +1725,7 @@ void DB::do_async_commits()
         if (!is_same) {
 
 #ifdef REALM_ENABLE_LOGFILE
-            std::cerr << "Syncing from version " << m_read_lock_info.m_version << " to " << next_read_lock.m_version
+            std::cerr << "Syncing from version " << m_read_lock.m_version << " to " << next_read_lock.m_version
                       << std::endl;
 #endif
 /* FIXME
@@ -1739,8 +1739,8 @@ void DB::do_async_commits()
 
         // Now we can release the version that was previously commited
         // to disk and just keep the lock on the latest version.
-        release_read_lock(m_read_lock_info);
-        m_read_lock_info = next_read_lock;
+        release_read_lock(m_read_lock);
+        m_read_lock = next_read_lock;
 
         m_balancemutex.lock();
 
@@ -2119,13 +2119,13 @@ VersionID Transaction::commit_and_continue_as_read()
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    db->release_read_lock(m_read_lock_info);
-    m_read_lock_info = new_read_lock;
+    db->release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
 
     db->do_end_write();
 
     // Remap file if it has grown, and update refs in underlying node structure
-    remap_and_update_refs(m_read_lock_info.m_top_ref, m_read_lock_info.m_file_size, false); // Throws
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
 
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
@@ -2386,7 +2386,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, Group::ReadLockInfo& rli, 
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock_info.m_top_ref, m_read_lock_info.m_file_size, writable);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
 }
 
 void Transaction::close()
@@ -2411,7 +2411,7 @@ void Transaction::end_read()
 void Transaction::do_end_read() noexcept
 {
     detach();
-    db->release_read_lock(m_read_lock_info);
+    db->release_read_lock(m_read_lock);
     m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
@@ -2423,13 +2423,13 @@ TransactionRef Transaction::freeze()
 {
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
-    auto version = VersionID(m_read_lock_info.m_version, m_read_lock_info.m_reader_idx);
+    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);
 }
 
 TransactionRef Transaction::duplicate()
 {
-    auto version = VersionID(m_read_lock_info.m_version, m_read_lock_info.m_reader_idx);
+    auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     if (m_transact_stage == DB::transact_Reading)
         return db->start_read(version);
     if (m_transact_stage == DB::transact_Frozen)
@@ -2505,7 +2505,7 @@ DB::version_type Transaction::commit()
 
     DB::version_type new_version = db->do_commit(*this); // Throws
 
-    // We need to set m_read_lock_info in order for wait_for_change to work.
+    // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
@@ -2516,7 +2516,7 @@ DB::version_type Transaction::commit()
     db->do_end_write();
 
     do_end_read();
-    m_read_lock_info = lock_after_commit;
+    m_read_lock = lock_after_commit;
 
     return new_version;
 }
@@ -2535,24 +2535,24 @@ void Transaction::commit_and_continue_writing()
 
     db->do_commit(*this); // Throws
 
-    // We need to set m_read_lock_info in order for wait_for_change to work.
+    // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
     Group::ReadLockInfo lock_after_commit;
     db->grab_read_lock(lock_after_commit, version_id);
-    db->release_read_lock(m_read_lock_info);
-    m_read_lock_info = lock_after_commit;
+    db->release_read_lock(m_read_lock);
+    m_read_lock = lock_after_commit;
 
     bool writable = true;
-    remap_and_update_refs(m_read_lock_info.m_top_ref, m_read_lock_info.m_file_size, writable); // Throws
+    remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws
 }
 
 void Transaction::initialize_replication()
 {
     if (m_transact_stage == DB::transact_Writing) {
         if (Replication* repl = get_replication()) {
-            auto current_version = m_read_lock_info.m_version;
+            auto current_version = m_read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(*this, current_version, history_updated); // Throws
         }
@@ -2568,7 +2568,7 @@ Transaction::~Transaction()
 
 DB::VersionID Transaction::get_version_of_current_transaction()
 {
-    return VersionID(m_read_lock_info.m_version, m_read_lock_info.m_reader_idx);
+    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
 }
 
 

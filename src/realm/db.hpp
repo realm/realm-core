@@ -538,7 +538,7 @@ public:
 
     DB::version_type get_version() const noexcept
     {
-        return m_read_lock_info.m_version;
+        return m_read_lock.m_version;
     }
     DB::version_type get_version_of_latest_snapshot()
     {
@@ -814,22 +814,22 @@ class DB::ReadLockGuard {
 public:
     ReadLockGuard(DB& shared_group, Group::ReadLockInfo& read_lock) noexcept
         : m_shared_group(shared_group)
-        , m_read_lock_info(&read_lock)
+        , m_read_lock(&read_lock)
     {
     }
     ~ReadLockGuard() noexcept
     {
-        if (m_read_lock_info)
-            m_shared_group.release_read_lock(*m_read_lock_info);
+        if (m_read_lock)
+            m_shared_group.release_read_lock(*m_read_lock);
     }
     void release() noexcept
     {
-        m_read_lock_info = 0;
+        m_read_lock = 0;
     }
 
 private:
     DB& m_shared_group;
-    Group::ReadLockInfo* m_read_lock_info;
+    Group::ReadLockInfo* m_read_lock;
 };
 
 template <class O>
@@ -839,7 +839,7 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
         throw LogicError(LogicError::wrong_transact_state);
 
     // It is an error if the new version precedes the currently bound one.
-    if (version_id.version < m_read_lock_info.m_version)
+    if (version_id.version < m_read_lock.m_version)
         throw LogicError(LogicError::bad_version);
 
     auto hist = get_history(); // Throws
@@ -874,7 +874,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
         bool history_updated = internal_advance_read(observer, version, *m_history, true); // Throws
 
         REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
-        DB::version_type current_version = m_read_lock_info.m_version;
+        DB::version_type current_version = m_read_lock.m_version;
         m_alloc.init_mapping_management(current_version);
         repl->initiate_transact(*this, current_version, history_updated); // Throws
 
@@ -923,8 +923,8 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Mark all managed space (beyond the attached file) as free.
     db->reset_free_space_tracking(); // Throws
 
-    ref_type top_ref = m_read_lock_info.m_top_ref;
-    size_t file_size = m_read_lock_info.m_file_size;
+    ref_type top_ref = m_read_lock.m_top_ref;
+    size_t file_size = m_read_lock.m_file_size;
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
@@ -943,8 +943,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 {
     Group::ReadLockInfo new_read_lock;
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    REALM_ASSERT(new_read_lock.m_version >= m_read_lock_info.m_version);
-    if (new_read_lock.m_version == m_read_lock_info.m_version) {
+    REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
+    if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);
         // _impl::History::update_early_from_top_ref() was not called
         // update allocator wrappers merely to update write protection
@@ -952,7 +952,7 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
         return false;
     }
 
-    DB::version_type old_version = m_read_lock_info.m_version;
+    DB::version_type old_version = m_read_lock.m_version;
     DB::ReadLockGuard g(*db, new_read_lock);
     DB::version_type new_version = new_read_lock.m_version;
     size_t new_file_size = new_read_lock.m_file_size;
@@ -987,8 +987,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     _impl::ChangesetInputStream in(hist, old_version, new_version);
     advance_transact(new_top_ref, in, writable); // Throws
     g.release();
-    db->release_read_lock(m_read_lock_info);
-    m_read_lock_info = new_read_lock;
+    db->release_read_lock(m_read_lock);
+    m_read_lock = new_read_lock;
 
     return true; // _impl::History::update_early_from_top_ref() was called
 }

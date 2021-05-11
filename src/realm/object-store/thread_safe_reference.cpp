@@ -39,14 +39,14 @@ class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-        // A read-only realm (which means that the configuration's schema mode `is_immutable()`) does not have a
+        // A read-only realm (which means that the configuration's schema mode `immutable()`) does not have a
         // transaction. For this special case we instead need to check if a group was created, which is sufficient to
         // create a duplicate of the realm.
-        : m_transaction(realm.is_in_any_transaction() || (realm.config().is_immutable() && realm.has_group())
+        : m_transaction(realm.is_in_read_transaction() || (realm.config().immutable() && realm.has_group())
                             ? realm.duplicate()
                             : nullptr)
         , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
-        , m_created_in_write_transaction(realm.is_in_write_transaction())
+        , m_created_in_write_transaction(realm.is_in_transaction())
     {
     }
 
@@ -62,14 +62,14 @@ private:
 
 void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
-    if (!realm.is_in_any_transaction()) {
+    if (!realm.is_in_read_transaction()) {
         if (m_created_in_write_transaction)
-            realm.get_group();
+            realm.read_group();
         else
             Realm::Internal::begin_read(realm, m_transaction->get_version_of_current_transaction());
     }
     else {
-        auto version = realm.get_version_of_current_transaction();
+        auto version = realm.read_transaction_version();
         auto target_version = m_transaction->get_version_of_current_transaction();
         if (version < target_version || (version == target_version && m_created_in_write_transaction))
             realm.refresh();
@@ -89,7 +89,7 @@ public:
 
     List import_into(std::shared_ptr<Realm> const& r)
     {
-        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
         return List(r, obj, m_col_key);
     }
 
@@ -112,7 +112,7 @@ public:
 
     object_store::Set import_into(std::shared_ptr<Realm> const& r)
     {
-        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
         return object_store::Set(r, obj, m_col_key);
     }
 
@@ -135,7 +135,7 @@ public:
 
     OsDict import_into(const std::shared_ptr<Realm>& r)
     {
-        Obj obj = r->get_group().get_table(m_table_key)->get_object(m_key);
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
         return OsDict(r, obj, m_col_key);
     }
 
@@ -179,7 +179,7 @@ public:
         }
         else {
             Query q(r.get_query());
-            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_write_transaction()) {
+            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_transaction()) {
                 // FIXME: This is overly restrictive. It's only a problem if
                 // the parent of the List or LinkingObjects was created in this
                 // write transaction, but Query doesn't expose a way to check
@@ -195,7 +195,7 @@ public:
     {
         if (m_key) {
             CollectionBasePtr collection;
-            auto table = r->get_group().get_table(m_table_key);
+            auto table = r->read_group().get_table(m_table_key);
             try {
                 collection = table->get_object(m_key).get_collection_ptr(m_col_key);
             }
@@ -259,7 +259,7 @@ template <typename T>
 ThreadSafeReference::ThreadSafeReference(T const& value)
 {
     auto realm = value.get_realm();
-    realm->verify_is_on_thread();
+    realm->verify_thread();
     m_payload.reset(new PayloadImpl<T>(value));
 }
 
@@ -279,7 +279,7 @@ template <typename T>
 T ThreadSafeReference::resolve(std::shared_ptr<Realm> const& realm)
 {
     REALM_ASSERT(realm);
-    realm->verify_is_on_thread();
+    realm->verify_thread();
 
     REALM_ASSERT(m_payload);
     auto& payload = static_cast<PayloadImpl<T>&>(*m_payload);
