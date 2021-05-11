@@ -644,16 +644,6 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     size_t m_total_rows;
 
-    class TableRecycler : public std::vector<Table*> {
-    public:
-        ~TableRecycler()
-        {
-            for (auto t : *this) {
-                delete t;
-            }
-        }
-    };
-
     static constexpr size_t s_table_name_ndx = 0;
     static constexpr size_t s_table_refs_ndx = 1;
     static constexpr size_t s_file_size_ndx = 2;
@@ -667,18 +657,6 @@ private:
     static constexpr size_t s_sync_file_id_ndx = 10;
 
     static constexpr size_t s_group_max_size = 11;
-
-    // We use the classic approach to construct a FIFO from two LIFO's,
-    // insertion is done into recycler_1, removal is done from recycler_2,
-    // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
-    // this i O(1) for each entry.
-    static TableRecycler g_table_recycler_1;
-    static TableRecycler g_table_recycler_2;
-    // number of tables held back before being recycled. We hold back recycling
-    // the latest to increase the probability of detecting race conditions
-    // without crashing.
-    const static int g_table_recycling_delay = 100;
-    static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {
     };
