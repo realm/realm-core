@@ -8,6 +8,7 @@
 * Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
   TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
 * Calling Realm::get_synchronized_realm() while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
+* Opening a metadata realm with the wrong encryption key or different encryption configuration will remove that metadata realm and create a new metadata realm using the new key or configuration. [#4285](https://github.com/realm/realm-core/pull/4285)
 
 ### Breaking changes
 * None.
