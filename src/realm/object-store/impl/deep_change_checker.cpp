@@ -267,7 +267,6 @@ bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
         for (auto&& key_path : key_path_array) {
             auto next_object_key_to_check = object_key;
             for (size_t i = 0; i < key_path.size(); i++) {
-
                 // Check for a change on the current depth.
                 auto table_key = key_path[i].first;
                 auto column_key = key_path[i].second;
