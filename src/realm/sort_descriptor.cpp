@@ -309,7 +309,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         int c;
 
         if (t == 0) {
-            c = i.cached_value.compare_utf8(j.cached_value);
+            c = i.cached_value.compare(j.cached_value);
         }
         else {
             if (m_cache[t - 1].empty()) {
@@ -336,7 +336,7 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 cache_j.key = key_j;
             }
 
-            c = val_i.compare_utf8(cache_j.value);
+            c = val_i.compare(cache_j.value);
         }
         // if c is negative i comes before j
         if (c) {

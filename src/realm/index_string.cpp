@@ -1013,7 +1013,7 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
             if (index_data == index_data_2 || suboffset > s_max_offset) {
                 // These strings have the same prefix up to this point but we
                 // don't want to recurse further, create a list in sorted order.
-                bool row_ndx_first = value < v2;
+                bool row_ndx_first = value.compare_signed(v2) < 0;
                 Array row_list(alloc);
                 row_list.create(Array::type_Normal); // Throws
                 row_list.add(row_ndx_first ? obj_key.value : obj_key2.value);
@@ -1335,11 +1335,11 @@ bool SortedListComparator::operator()(int64_t key_value, Mixed needle) // used i
     if (a == needle)
         return false;
 
-    // The StringData::operator< uses a lexicograpical comparison, therefore we
+    // The Mixed::operator< uses a lexicograpical comparison, therefore we
     // cannot use our utf8_compare here because we need to be consistent with
     // using the same compare method as how these strings were they were put
     // into this ordered column in the first place.
-    return a < needle;
+    return a.compare_signed(needle) < 0;
 }
 
 
@@ -1403,7 +1403,7 @@ void StringIndex::verify() const
                     while (it != it_end) {
                         Mixed it_data = get(ObjKey(*it));
                         size_t it_row = to_size_t(*it);
-                        REALM_ASSERT(previous <= it_data);
+                        REALM_ASSERT(previous.compare_signed(it_data) <= 0);
                         if (it != sub.cbegin() && previous == it_data) {
                             REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
                         }
