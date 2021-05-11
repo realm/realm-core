@@ -201,8 +201,11 @@ protected:
     void set_table(ConstTableRef table);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
+    // signal that the underlying source object of the collection has been deleted
+    // but only report this to the notifiers the first time this is reported
+    void report_collection_root_is_deleted();
 
-    bool all_related_tables_covered(const TableVersions& versions);
+    bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
     std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
                                                                                  ConstTableRef);
 
@@ -226,14 +229,29 @@ private:
 
     bool m_has_run = false;
     bool m_error = false;
+    bool m_has_delivered_root_deletion_event = false;
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     struct Callback {
+        // The actual callback to invoke
         CollectionChangeCallback fn;
+        // The pending changes accumulated on the worker thread. This field is
+        // guarded by m_callback_mutex and is written to on the worker thread,
+        // then read from on the target thread.
         CollectionChangeBuilder accumulated_changes;
-        CollectionChangeSet changes_to_deliver;
+        // The changeset which will actually be passed to `fn`. This field is
+        // not guarded by a lock and can only be accessed on the notifier's
+        // target thread.
+        CollectionChangeBuilder changes_to_deliver;
+        // A unique-per-notifier identifier used to unregister the callback.
         uint64_t token;
+        // We normally want to skip calling the callback if there's no changes,
+        // but only if we've sent the initial notification (to support the
+        // async query use-case). Not guarded by a mutex and is only readable
+        // on the target thread.
         bool initial_delivered;
+        // Set within a write transaction on the target thread if this callback
+        // should not be called with changes for that write. requires m_callback_mutex.
         bool skip_next;
     };
 
@@ -248,17 +266,21 @@ private:
     // some extra work.
     std::atomic<bool> m_have_callbacks = {false};
 
-    // Iteration variable for looping over callbacks
-    // remove_callback() updates this when needed
+    // Iteration variable for looping over callbacks. remove_callback() will
+    // sometimes update this to ensure that removing a callback while iterating
+    // over the callbacks will not skip an unrelated callback.
     size_t m_callback_index = -1;
     // The number of callbacks which were present when the notifier was packaged
     // for delivery which are still present.
-    // Updated by packaged_for_delivery and removd_callback(), and used in
+    // Updated by packaged_for_delivery and remove_callback(), and used in
     // for_each_callback() to avoid calling callbacks registered during delivery.
     size_t m_callback_count = -1;
 
     uint64_t m_next_token = 0;
 
+    // Iterate over m_callbacks and call the given function on each one. This
+    // does fancy locking things to allow fn to drop the lock before invoking
+    // the callback (which must be done to avoid deadlocks).
     template <typename Fn>
     void for_each_callback(Fn&& fn) REQUIRES(!m_callback_mutex);
 
@@ -324,20 +346,21 @@ public:
     NotifierPackage(std::exception_ptr error, std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                     RealmCoordinator* coordinator);
 
-    explicit operator bool()
+    explicit operator bool() const noexcept
     {
         return !m_notifiers.empty();
     }
 
     // Get the version which this package can deliver into, or VersionID{} if
     // it has not yet been packaged
-    util::Optional<VersionID> version()
+    util::Optional<VersionID> version() const noexcept
     {
         return m_version;
     }
 
-    // Package the notifiers for delivery, blocking if they aren't ready for
-    // the given version.
+    // If a version is given, block until notifications are ready for that
+    // version, and then regardless of whether or not a version was given filter
+    // the notifiers to just the ones which have anything to deliver.
     // No-op if called multiple times
     void package_and_wait(util::Optional<VersionID::version_type> target_version);
 
@@ -348,8 +371,6 @@ public:
     // Send the after-change notifications
     void after_advance();
 
-    void add_notifier(std::shared_ptr<CollectionNotifier> notifier);
-
 private:
     util::Optional<VersionID> m_version;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
@@ -357,23 +378,6 @@ private:
     RealmCoordinator* m_coordinator = nullptr;
     std::exception_ptr m_error;
 };
-
-// Find which column of the row in the table contains the given container.
-//
-// LinkViews and Subtables know what row of their parent they're in, but not
-// what column, so we have to just check each one.
-template <typename Table, typename T, typename U>
-size_t find_container_column(Table& table, size_t row_ndx, T const& expected, int type,
-                             U (Table::*getter)(size_t, size_t))
-{
-    for (size_t i = 0, count = table.get_column_count(); i != count; ++i) {
-        if (table.get_column_type(i) == type && (table.*getter)(i, row_ndx) == expected) {
-            return i;
-        }
-    }
-    REALM_UNREACHABLE();
-}
-
 
 } // namespace _impl
 } // namespace realm

@@ -20,8 +20,6 @@
 #define REALM_OS_LIST_HPP
 
 #include <realm/object-store/collection.hpp>
-#include <realm/object-store/collection_notifications.hpp>
-#include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/object.hpp>
 
 #include <realm/decimal128.hpp>
@@ -40,10 +38,6 @@ class ThreadSafeReference;
 struct ColKey;
 struct ObjKey;
 
-namespace _impl {
-class ListNotifier;
-}
-
 class List : public object_store::Collection {
 public:
     List() noexcept;
@@ -57,6 +51,7 @@ public:
     List& operator=(List&&);
 
     Query get_query() const;
+    ConstTableRef get_table() const;
 
     void move(size_t source_ndx, size_t dest_ndx);
     void remove(size_t list_ndx);
@@ -80,6 +75,11 @@ public:
     template <typename T>
     void set(size_t row_ndx, T value);
 
+    void insert_any(size_t list_ndx, Mixed value);
+    void set_any(size_t list_ndx, Mixed value);
+    Mixed get_any(size_t list_ndx) const final;
+    size_t find_any(Mixed value) const final;
+
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
     Results filter(Query q) const;
@@ -101,8 +101,6 @@ public:
     Mixed sum(ColKey column = {}) const;
 
     bool operator==(List const& rgt) const noexcept;
-
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     template <typename Context>
     auto get(Context&, size_t row_ndx) const;
@@ -133,7 +131,6 @@ public:
     };
 
 private:
-    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<LstBase> m_list_base;
     bool m_is_embedded = false;
 

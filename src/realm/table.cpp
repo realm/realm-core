@@ -25,6 +25,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/miscellaneous.hpp>
+#include <realm/util/serializer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/exceptions.hpp>
 #include <realm/table.hpp>
@@ -294,7 +295,7 @@ const char* get_data_type_name(DataType type) noexcept
         case type_Timestamp:
             return "timestamp";
         case type_ObjectId:
-            return "ObjectId";
+            return "objectId";
         case type_Decimal:
             return "decimal128";
         case type_UUID:
@@ -305,16 +306,34 @@ const char* get_data_type_name(DataType type) noexcept
             return "link";
         case type_LinkList:
             return "linklist";
-        case type_OldTable:
-            return "oldTable";
-        case type_OldDateTime:
-            return "oldDateTime";
         case type_TypedLink:
             return "typedLink";
+        default:
+            if (type == type_TypeOfValue)
+                return "@type";
     }
     return "unknown";
 }
 } // namespace realm
+
+void LinkChain::add(ColKey ck)
+{
+    // Link column can be a single Link, LinkList, or BackLink.
+    REALM_ASSERT(m_current_table->valid_column(ck));
+    ColumnType type = ck.get_type();
+    if (ck.is_dictionary()) {
+    }
+    else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+        m_current_table = m_current_table->get_opposite_table(ck);
+    }
+    else {
+        // Only last column in link chain is allowed to be non-link
+        throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
+                                              m_current_table->get_column_name(ck)));
+    }
+    m_link_cols.push_back(ck);
+}
+
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -425,11 +444,13 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key_type)
+ColKey Table::add_column_dictionary(DataType type, StringData name, bool nullable, DataType key_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
@@ -828,8 +849,8 @@ void Table::add_search_index(ColKey col_key)
         return;
 
     if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
-        // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
-        // should probably be a type mismatch exception instead.
+        // Not ideal, but this is what we used to throw, so keep throwing that for compatibility reasons, even though
+        // it should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
     }
 
@@ -962,13 +983,6 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     m_clusters.insert_column(col_key);
     if (m_tombstones) {
         m_tombstones->insert_column(col_key);
-        /*
-          FIXME: fails
-        if (col_key == get_primary_key_column())
-            m_tombstones->insert_column(col_key);
-        else if (col_key.get_type() == col_type_BackLink)
-            m_tombstones->insert_column(col_key);
-        */
     }
 
     bump_storage_version();
@@ -1007,42 +1021,51 @@ void Table::do_erase_root_column(ColKey col_key)
     bump_storage_version();
 }
 
-bool Table::set_embedded(bool embedded)
+void Table::set_embedded(bool embedded)
 {
-    if (embedded == m_is_embedded)
-        return true;
+    if (embedded == m_is_embedded) {
+        return;
+    }
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error("Cannot change embedded property in sync client");
+            throw std::logic_error("Cannot change table to embedded when using Sync.");
         }
     }
 
-    if (get_primary_key_column()) {
-        return false;
+    if (embedded == false) {
+        do_set_embedded(false);
+        return;
     }
-    if (size() > 0) {
-        // Check if the table has any backlink columns. If not, it is not required
-        // to check all objects for backlinks.
-        bool has_backlink_columns = false;
-        for_each_backlink_column([&has_backlink_columns](ColKey) {
-            has_backlink_columns = true;
-            return true; // Done
-        });
 
-        if (has_backlink_columns) {
-            for (auto o : *this) {
-                // each object should be owned by one and only one parent
-                if (o.get_backlink_count() != 1) {
-                    return false;
-                }
+    // Embedded objects cannot have a primary key.
+    if (get_primary_key_column()) {
+        throw std::logic_error("Cannot change table to embedded when using a primary key.");
+    }
+
+    // `has_backlink_columns` indicates if the table is embedded in any other table.
+    bool has_backlink_columns = false;
+    for_each_backlink_column([&has_backlink_columns](ColKey) {
+        has_backlink_columns = true;
+        return true;
+    });
+    if (!has_backlink_columns) {
+        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in "
+                               "at least one other table.");
+    }
+    else if (size() > 0) {
+        for (auto object : *this) {
+            size_t backlink_count = object.get_backlink_count();
+            if (backlink_count == 0) {
+                throw std::logic_error("At least one object does not have a backlink (data would get lost).");
+            }
+            else if (backlink_count > 1) {
+                throw std::logic_error("At least one object does have multiple backlinks.");
             }
         }
     }
 
     do_set_embedded(embedded);
-
-    return true;
 }
 
 void Table::do_set_embedded(bool embedded)
@@ -1358,8 +1381,15 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-        case col_type_String:
-            return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
+        case col_type_String: {
+            auto str = static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx);
+            // This is a workaround for a bug where the length could be -1
+            // Seen when upgrading very old file.
+            if (str.size() == size_t(-1)) {
+                return Mixed("");
+            }
+            return Mixed{str};
+        }
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
         default:
@@ -1612,7 +1642,6 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     /*************************** Create objects ******************************/
 
-    int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
     ColKey orig_row_ndx_col;
@@ -1645,13 +1674,16 @@ bool Table::migrate_objects(ColKey pk_col_key)
             // Generate key from pk value
             GlobalKey object_id{pk_val};
             obj_key = global_to_local_object_id_hashed(object_id);
+            // Check for collision
+            if (is_valid(obj_key)) {
+                Obj existing_obj = m_clusters.get(obj_key);
+                auto existing_pk_value = existing_obj.get_any(pk_col_key);
+                GlobalKey existing_id{existing_pk_value};
+                obj_key = allocate_local_id_after_hash_collision(object_id, existing_id, obj_key);
+            }
         }
         else {
             obj_key = ObjKey(row_ndx);
-        }
-
-        if (obj_key.value > max_key_value) {
-            max_key_value = obj_key.value;
         }
 
         // Create object with the initial values
@@ -1706,13 +1738,15 @@ bool Table::migrate_objects(ColKey pk_col_key)
         col_refs.set(ndx, 0);
     }
 
-    // We need to be sure that the stored 'next sequence number' is bigger than
-    // the biggest ObjKey currently used.
-    RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
-    uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
-    if (uint64_t(max_key_value) >= sn) {
-        rot = RefOrTagged::make_tagged(max_key_value + 1);
-        m_top.set(top_position_for_sequence_number, rot);
+    if (pk_col_key) {
+        // If we have a primary key column, the sequence number is used to generate unique
+        // keys after collision and must not be updated here.
+    }
+    else {
+        // We need to be sure that the stored 'next sequence number' is bigger than
+        // the biggest ObjKey currently used.
+        auto max_key_value = m_clusters.get_last_key_value();
+        this->set_sequence_number(uint64_t(max_key_value + 1));
     }
 
 #if 0
@@ -2014,14 +2048,14 @@ size_t Table::get_index_in_group() const noexcept
     return m_top.get_ndx_in_parent();
 }
 
-uint64_t Table::allocate_sequence_number()
+uint32_t Table::allocate_sequence_number()
 {
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
     uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
     rot = RefOrTagged::make_tagged(sn + 1);
     m_top.set(top_position_for_sequence_number, rot);
 
-    return sn;
+    return uint32_t(sn);
 }
 
 void Table::set_sequence_number(uint64_t seq)
@@ -2047,26 +2081,15 @@ size_t Table::count_int(ColKey col_key, int64_t value) const
         return index->count(value);
     }
 
-    size_t count;
-    if (is_nullable(col_key)) {
-        aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_key, value, &count);
-    }
-    else {
-        aggregate<act_Count, int64_t, int64_t>(col_key, value, &count);
-    }
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_float(ColKey col_key, float value) const
 {
-    size_t count;
-    aggregate<act_Count, float, float>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_double(ColKey col_key, double value) const
 {
-    size_t count;
-    aggregate<act_Count, double, double>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
 {
@@ -2094,59 +2117,39 @@ size_t Table::count_string(ColKey col_key, StringData value) const
     if (auto index = this->get_search_index(col_key)) {
         return index->count(value);
     }
-    size_t count;
-    aggregate<act_Count, StringData, StringData>(col_key, value, &count);
-    return count;
+    return where().equal(col_key, value).count();
 }
 
 // sum ----------------------------------------------
 
-template <>
-Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, Decimal128, size_t* resultcount,
-                                                             ObjKey*) const
-{
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 sum = Decimal128(0);
-    size_t count = 0;
-    auto f = [&leaf, column_key, &sum, &count](const Cluster* cluster) {
-        // direct aggregate on the leaf
-        cluster->init_leaf(column_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            if (!leaf.is_null(i)) {
-                sum = sum + leaf.get(i);
-                count++;
-            }
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-    if (resultcount) {
-        *resultcount = count;
-    }
-
-    return sum;
-}
-
 int64_t Table::sum_int(ColKey col_key) const
 {
+    QueryStateSum<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(col_key);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Sum, int64_t, int64_t>(col_key);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    return st.m_state;
 }
 double Table::sum_float(ColKey col_key) const
 {
-    return aggregate<act_Sum, float, double>(col_key);
+    QueryStateSum<float> st;
+    aggregate<float>(st, col_key);
+    return st.m_state;
 }
 double Table::sum_double(ColKey col_key) const
 {
-    return aggregate<act_Sum, double, double>(col_key);
+    QueryStateSum<double> st;
+    aggregate<double>(st, col_key);
+    return st.m_state;
 }
 Decimal128 Table::sum_decimal(ColKey col_key) const
 {
-    return aggregate<act_Sum, Decimal128, Decimal128>(col_key);
+    QueryStateSum<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
+    return st.m_state;
 }
 
 // average ----------------------------------------------
@@ -2168,13 +2171,14 @@ double Table::average_double(ColKey col_key, size_t* value_count) const
 }
 Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 {
-    size_t count;
-    auto sum = aggregate<act_Sum, Decimal128, Decimal128>(col_key, {}, &count);
+    QueryStateSum<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
+    auto sum = st.m_state;
     Decimal128 avg(0);
-    if (count != 0)
-        avg = sum / count;
+    if (st.m_match_count != 0)
+        avg = sum / st.m_match_count;
     if (value_count)
-        *value_count = count;
+        *value_count = st.m_match_count;
     return avg;
 }
 
@@ -2184,72 +2188,94 @@ Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 
 int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
 {
+    QueryStateMin<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Min, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, float, float>(col_key, 0.f, nullptr, return_ndx);
+    QueryStateMin<float> st;
+    aggregate<float>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, double, double>(col_key, 0., nullptr, return_ndx);
+    QueryStateMin<double> st;
+    aggregate<double>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
 {
-    ArrayDecimal128 leaf(get_alloc());
-    Decimal128 min("+Inf");
-    ObjKey ret_key;
-    auto f = [&min, &ret_key, &leaf, col_key](const Cluster* cluster) {
-        // direct aggregate on the leaf
-        cluster->init_leaf(col_key, &leaf);
-        auto sz = leaf.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto val = leaf.get(i);
-            if (!val.is_null() && val < min) {
-                min = val;
-                ret_key = cluster->get_real_key(i);
-            }
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
+    QueryStateMin<Decimal128> st;
+    aggregate<Decimal128>(st, col_key);
     if (return_ndx) {
-        *return_ndx = ret_key;
+        *return_ndx = st.m_minmax_key;
     }
-
-    return min;
+    return st.get_min();
 }
 
 Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Min, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
+    QueryStateMin<Timestamp> st;
+    aggregate<Timestamp>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_min();
 }
 
 // maximum ----------------------------------------------
 
 int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
 {
+    QueryStateMax<int64_t> st;
     if (is_nullable(col_key)) {
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        aggregate<util::Optional<int64_t>>(st, col_key);
     }
-    return aggregate<act_Max, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
+    else {
+        aggregate<int64_t>(st, col_key);
+    }
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, float, float>(col_key, 0.f, nullptr, return_ndx);
+    QueryStateMax<float> st;
+    aggregate<float>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, double, double>(col_key, 0., nullptr, return_ndx);
+    QueryStateMax<double> st;
+    aggregate<double>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.m_state;
 }
 
 Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
@@ -2280,7 +2306,12 @@ Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
 
 Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
-    return aggregate<act_Max, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
+    QueryStateMax<Timestamp> st;
+    aggregate<Timestamp>(st, col_key);
+    if (return_ndx) {
+        *return_ndx = st.m_minmax_key;
+    }
+    return st.get_max();
 }
 
 template <class T>
@@ -2478,13 +2509,11 @@ ConstTableView Table::find_all_string(ColKey col_key, StringData value) const
 
 TableView Table::find_all_binary(ColKey, BinaryData)
 {
-    // FIXME: Implement this!
     throw util::runtime_error("Not implemented");
 }
 
 ConstTableView Table::find_all_binary(ColKey, BinaryData) const
 {
-    // FIXME: Implement this!
     throw util::runtime_error("Not implemented");
 }
 
@@ -2556,7 +2585,6 @@ void Table::update_from_parent() noexcept
                 index->update_from_parent();
             }
         }
-        // FIXME: REMOVE CONDITIONAL CHECKS?
         if (m_top.size() > top_position_for_opposite_table)
             m_opposite_table.update_from_parent();
         if (m_top.size() > top_position_for_opposite_column)
@@ -2692,17 +2720,6 @@ bool Table::compare_objects(const Table& t) const
     return true;
 }
 
-
-void Table::check_lists_are_empty(size_t) const
-{
-    // FIXME: Due to a limitation in Sync, it is not legal to change the primary
-    // key of a row that contains lists (including linklists) after those lists
-    // have been populated. This limitation may be lifted in the future, but for
-    // now it is necessary to ensure that all lists are empty before setting a
-    // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
-
-    REALM_ASSERT(false); // FIXME: Unimplemented
-}
 
 void Table::flush_for_commit()
 {
@@ -3181,7 +3198,7 @@ ObjKey Table::global_to_local_object_id_hashed(GlobalKey object_id) const
 ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                      ObjKey colliding_local_id)
 {
-    // FIXME: Cache these accessors
+    // Possible optimization: Cache these accessors
     Allocator& alloc = m_top.get_alloc();
     Array collision_map{alloc};
     Array hi{alloc};
@@ -3240,7 +3257,7 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
         ++num_entries;
     };
 
-    uint64_t sequence_number_for_local_id = allocate_sequence_number();
+    auto sequence_number_for_local_id = allocate_sequence_number();
     ObjKey new_local_id = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
     insert_collision(incoming_id, new_local_id);
     insert_collision(colliding_id, colliding_local_id);
@@ -3268,7 +3285,7 @@ Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
 void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
-        // FIXME: Cache these accessors
+        // Possible optimization: Cache these accessors
         Array collision_map{m_alloc};
         Array local_id{m_alloc};
 
@@ -3429,7 +3446,6 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
 {
     REALM_ASSERT(!attr.test(col_attr_Indexed));
     REALM_ASSERT(!attr.test(col_attr_Unique)); // Must not be encoded into col_key
-    // FIXME: Change this to be random number mixed with the TableKey.
     int64_t col_seq_number = m_top.get_as_ref_or_tagged(top_position_for_column_key).get_as_int();
     unsigned upper = unsigned(col_seq_number ^ get_key().value);
 
@@ -3445,8 +3461,8 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
-    noexcept
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
+                                                  StringData origin_col_name) const noexcept
 {
     BacklinkOrigin ret;
     auto f = [&](ColKey backlink_col_key) {
@@ -3546,7 +3562,7 @@ void Table::rebuild_table_with_pk_column()
             // new PK column.
             // Create temporary object to hold the values of the current object,
             // and then we'll move the object to its final key in a second pass.
-            uint64_t sequence_number_for_local_id = allocate_sequence_number();
+            auto sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
             auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
@@ -3773,9 +3789,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_TypedLink:
             case type_LinkList:
                 // Can't have lists of these types
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
@@ -3833,9 +3847,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 // Always nullable, so can't convert
             case type_LinkList:
                 // Never nullable, so can't convert
-            case type_OldTable:
             case type_Mixed:
-            case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;

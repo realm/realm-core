@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <iostream>
+#include <iomanip>
 #include <set>
 #include <sstream>
 #include <set>
@@ -1142,7 +1143,7 @@ struct BenchmarkQueryNotChainedOrStrings : BenchmarkWithStringsTableForIn {
         query.Not();
         query.group();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         query.end_group();
         TableView results = query.find_all();
@@ -1666,6 +1667,92 @@ struct BenchmarkInitiatorOpen : public BenchmarkNonInitiatorOpen {
     }
 };
 
+struct IterateTableByIterator : Benchmark {
+    const char* name() const override
+    {
+        return "IterateTableByIterator";
+    }
+
+    static const int row_count = 100'000;
+
+    void before_all(DBRef db) override
+    {
+        WrtTrans tr(db);
+        TableRef t = tr.add_table(name());
+#ifdef REALM_CLUSTER_IF
+        for (int i = 0; i < row_count; ++i)
+            t->create_object();
+#else
+        t->add_column(type_Int, "dummy");
+        t->add_empty_row(row_count);
+#endif
+        tr.commit();
+
+        m_tr.reset(new WrtTrans(db));
+        m_table = m_tr->get_table(name());
+    }
+    void after_all(DBRef) override
+    {
+        m_tr.reset();
+    }
+    void before_each(DBRef) override {}
+    void after_each(DBRef) override {}
+
+    void operator()(DBRef) override
+    {
+#ifdef REALM_CLUSTER_IF
+        for (auto& obj : *m_table)
+            static_cast<void>(obj.get_key());
+#else
+        // not applicable
+#endif
+    }
+};
+
+struct IterateTableByIteratorIndex : Benchmark {
+    const char* name() const override
+    {
+        return "IterateTableByIteratorIndex";
+    }
+
+    static const int row_count = 100'000;
+
+    void before_all(DBRef db) override
+    {
+        WrtTrans tr(db);
+        TableRef t = tr.add_table(name());
+#ifdef REALM_CLUSTER_IF
+        for (int i = 0; i < row_count; ++i)
+            t->create_object();
+#else
+        t->add_column(type_Int, "dummy");
+        t->add_empty_row(row_count);
+#endif
+        tr.commit();
+
+        m_tr.reset(new WrtTrans(db));
+        m_table = m_tr->get_table(name());
+    }
+    void after_all(DBRef) override
+    {
+        m_tr.reset();
+    }
+    void before_each(DBRef) override {}
+    void after_each(DBRef) override {}
+
+    void operator()(DBRef) override
+    {
+#ifdef REALM_CLUSTER_IF
+        auto it = m_table->begin();
+        for (size_t i = 0; i < m_table->size(); ++i) {
+            it.go(i);
+            static_cast<void>(it->get_key());
+        }
+#else
+        // not applicable
+#endif
+    }
+};
 
 struct IterateTableByIndexNoPrimaryKey : Benchmark {
     const char* name() const override
@@ -1889,7 +1976,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
 
         benchmark.after_all(group);
 
-        results.finish(ident, lead_text_ss.str());
+        results.finish(ident, lead_text_ss.str(), "runtime_secs");
     }
     std::cout << std::endl;
 }
@@ -1901,7 +1988,7 @@ extern "C" int benchmark_common_tasks_main();
 int benchmark_common_tasks_main()
 {
     std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
-    BenchmarkResults results(40, results_file_stem.c_str());
+    BenchmarkResults results(40, "benchmark-common-tasks", results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)
 #define BENCH2(B, mode) run_benchmark<B>(results, mode)
@@ -1916,6 +2003,8 @@ int benchmark_common_tasks_main()
     BENCH(IterateTableByIndexNoPrimaryKey);
     BENCH(IterateTableByIndexIntPrimaryKey);
     BENCH(IterateTableByIndexStringPrimaryKey);
+    BENCH(IterateTableByIterator);
+    BENCH(IterateTableByIteratorIndex);
 
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);

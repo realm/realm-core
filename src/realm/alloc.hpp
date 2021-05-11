@@ -1,4 +1,4 @@
-﻿/*************************************************************************
+/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -152,6 +152,11 @@ public:
 #endif
 
     struct MappedFile;
+
+    static constexpr size_t section_size() noexcept
+    {
+        return 1 << section_shift;
+    }
 
 protected:
     constexpr static int section_shift = 26;
@@ -346,13 +351,18 @@ public:
         m_alloc = &underlying_allocator;
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_debug_watch = 0;
-        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
+        refresh_ref_translation();
     }
 
     void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);
         set_read_only(!writable);
+    }
+
+    void refresh_ref_translation()
+    {
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
 protected:
@@ -428,8 +438,8 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-    //    FIXME: Enable once we get clang warning flags correct
-    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    int64_t res = static_cast<int64_t>(value);
+    REALM_ASSERT_DEBUG(res >= 0);
     return static_cast<int64_t>(value);
 }
 

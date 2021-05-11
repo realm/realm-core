@@ -114,9 +114,6 @@ public:
 private:
     Bid128 m_value;
 
-    enum class ParseError { None, Invalid, TooLongBeforeRadix, TooLong };
-
-    ParseError from_string(const char* ps) noexcept;
     void from_int64_t(int64_t val);
 };
 

@@ -67,11 +67,12 @@ enum Instruction {
     instr_ListClear = 36, // Remove all entries from a list
 
     instr_DictionaryInsert = 37,
-    instr_DictionaryErase = 38,
+    instr_DictionarySet = 38,
+    instr_DictionaryErase = 39,
 
-    instr_SetInsert = 39, // Insert value into set
-    instr_SetErase = 40,  // Erase value from set
-    instr_SetClear = 41,  // Remove all values in a set
+    instr_SetInsert = 40, // Insert value into set
+    instr_SetErase = 41,  // Erase value from set
+    instr_SetClear = 42,  // Remove all values in a set
 };
 
 class TransactLogStream {
@@ -169,11 +170,15 @@ public:
         return true;
     }
 
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -274,8 +279,9 @@ public:
     bool set_erase(size_t set_ndx);
     bool set_clear(size_t set_ndx);
 
-    bool dictionary_insert(Mixed key);
-    bool dictionary_erase(Mixed key);
+    bool dictionary_insert(size_t dict_ndx, Mixed key);
+    bool dictionary_set(size_t dict_ndx, Mixed key);
+    bool dictionary_erase(size_t dict_ndx, Mixed key);
 
     /// End of methods expected by parser.
 
@@ -375,8 +381,9 @@ public:
     virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
     virtual void set_clear(const CollectionBase& set);
 
-    virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
-    virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
+    virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
+    virtual void dictionary_set(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
+    virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -1048,17 +1055,28 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_DictionaryInsert: {
             int type = read_int<int>(); // Throws
-            REALM_ASSERT(type == type_String);
+            REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
-            if (!handler.dictionary_insert(key)) // Throws
+            size_t dict_ndx = read_int<size_t>();          // Throws
+            if (!handler.dictionary_insert(dict_ndx, key)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_DictionarySet: {
+            int type = read_int<int>(); // Throws
+            REALM_ASSERT(type == int(type_String));
+            Mixed key = Mixed(read_string(m_string_buffer));
+            size_t dict_ndx = read_int<size_t>();       // Throws
+            if (!handler.dictionary_set(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryErase: {
             int type = read_int<int>(); // Throws
-            REALM_ASSERT(type == type_String);
+            REALM_ASSERT(type == int(type_String));
             Mixed key = Mixed(read_string(m_string_buffer));
-            if (!handler.dictionary_erase(key)) // Throws
+            size_t dict_ndx = read_int<size_t>();         // Throws
+            if (!handler.dictionary_erase(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
@@ -1295,15 +1313,21 @@ public:
         return true;
     }
 
-    bool dictionary_insert(Mixed key)
+    bool dictionary_insert(size_t dict_ndx, Mixed key)
     {
-        m_encoder.dictionary_erase(key);
+        m_encoder.dictionary_erase(dict_ndx, key);
         return true;
     }
 
-    bool dictionary_erase(Mixed key)
+    bool dictionary_set(size_t dict_ndx, Mixed key)
     {
-        m_encoder.dictionary_insert(key);
+        m_encoder.dictionary_set(dict_ndx, key);
+        return true;
+    }
+
+    bool dictionary_erase(size_t dict_ndx, Mixed key)
+    {
+        m_encoder.dictionary_insert(dict_ndx, key);
         return true;
     }
 

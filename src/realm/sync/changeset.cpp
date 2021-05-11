@@ -60,11 +60,11 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overload{
-        [&](InternString str) -> PrimaryKey {
+    const auto& get = overload{
+        [this](InternString str) -> PrimaryKey {
             return get_string(str);
         },
-        [&](auto&& otherwise) -> PrimaryKey {
+        [](auto otherwise) -> PrimaryKey {
             return otherwise;
         },
     };
@@ -420,7 +420,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("type", p.type);
     }
     else {
-        m_tracer.field("type", "Mixed");
+        m_tracer.field("type", Instruction::Payload::Type::Null);
     }
     m_tracer.field("nullable", p.nullable);
     m_tracer.field("collection_type", p.collection_type);

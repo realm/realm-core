@@ -22,6 +22,8 @@
 #include <realm/column_type_traits.hpp>
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
+#include <realm/query_value.hpp>
+#include <realm/util/serializer.hpp>
 
 namespace realm {
 
@@ -198,6 +200,9 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
         (r_type == type_ObjectId && l_type == type_Timestamp)) {
         return true;
     }
+    if (l_type == type_Mixed || r_type == type_Mixed) {
+        return true; // Mixed is comparable with any type
+    }
     return false;
 }
 
@@ -210,7 +215,8 @@ int Mixed::compare(const Mixed& b) const
         return 1;
 
     // None is null
-    switch (get_type()) {
+    auto type = get_type();
+    switch (type) {
         case type_Bool: {
             int64_t i_val = bool_val ? 1 : 0;
             switch (b.get_type()) {
@@ -333,6 +339,11 @@ int Mixed::compare(const Mixed& b) const
             }
             break;
         default:
+            if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
+                return TypeOfValue(int_val).matches(TypeOfValue(b.int_val))
+                           ? 0
+                           : _impl::compare_generic(int_val, b.int_val);
+            }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
@@ -417,8 +428,6 @@ size_t Mixed::hash() const
             hash = murmur2_or_cityhash(unsigned_data, 12);
             break;
         }
-        case type_OldDateTime:
-        case type_OldTable:
         case type_Mixed:
         case type_Link:
         case type_LinkList:
@@ -432,7 +441,6 @@ size_t Mixed::hash() const
 // LCOV_EXCL_START
 std::ostream& operator<<(std::ostream& out, const Mixed& m)
 {
-    out << "Mixed(";
     if (m.is_null()) {
         out << "null";
     }
@@ -445,27 +453,26 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << (m.bool_val ? "true" : "false");
                 break;
             case type_Float:
-                out << m.float_val << 'f';
+                out << m.float_val;
                 break;
             case type_Double:
                 out << m.double_val;
                 break;
             case type_String:
-                out << m.string_val;
+                out << util::serializer::print_value(m.string_val);
                 break;
             case type_Binary:
-                out << m.binary_val;
+                out << util::serializer::print_value(m.binary_val);
                 break;
             case type_Timestamp:
-                out << m.date_val;
+                out << util::serializer::print_value(m.date_val);
                 break;
             case type_Decimal:
                 out << m.decimal_val;
                 break;
-            case type_ObjectId: {
-                out << m.get<ObjectId>();
+            case type_ObjectId:
+                out << util::serializer::print_value(m.id_val);
                 break;
-            }
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;
@@ -473,16 +480,13 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << m.link_val;
                 break;
             case type_UUID:
-                out << m.get<UUID>();
+                out << util::serializer::print_value(m.uuid_val);
                 break;
-            case type_OldDateTime:
-            case type_OldTable:
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);
         }
     }
-    out << ")";
     return out;
 }
 // LCOV_EXCL_STOP

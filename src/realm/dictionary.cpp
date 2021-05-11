@@ -23,7 +23,21 @@
 #include <realm/replication.hpp>
 #include <algorithm>
 
+
 namespace realm {
+
+namespace {
+void validate_key_value(const Mixed& key)
+{
+    if (key.get_type() == type_String) {
+        const char* str = key.get_string().data();
+        if (str[0] == '$')
+            throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+        if (strchr(str, '.'))
+            throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+    }
+}
+} // namespace
 
 // Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
 static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
@@ -39,6 +53,149 @@ DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_ty
 }
 
 DictionaryClusterTree::~DictionaryClusterTree() {}
+
+Mixed DictionaryClusterTree::min(size_t* return_ndx) const
+{
+    Mixed m;
+    size_t ndx = realm::npos;
+    ArrayMixed leaf(m_alloc);
+    size_t start_ndx = 0;
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            if (m.is_null() || val < m) {
+                m = val;
+                ndx = i + start_ndx;
+            }
+        }
+        start_ndx += e;
+        // Continue
+        return false;
+    });
+
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return m;
+}
+
+Mixed DictionaryClusterTree::max(size_t* return_ndx) const
+{
+    Mixed m;
+    size_t ndx = realm::npos;
+    ArrayMixed leaf(m_alloc);
+    size_t start_ndx = 0;
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            if (m.is_null() || val > m) {
+                m = val;
+                ndx = i + start_ndx;
+            }
+        }
+        start_ndx += e;
+        // Continue
+        return false;
+    });
+
+    if (return_ndx)
+        *return_ndx = ndx;
+
+    return m;
+}
+
+Mixed DictionaryClusterTree::sum(size_t* return_cnt) const
+{
+    Mixed s;
+    size_t cnt = 0;
+    ArrayMixed leaf(m_alloc);
+
+    traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            auto val = leaf.get(i);
+            if (val.is_null())
+                continue;
+
+            cnt++;
+
+            if (s.is_null()) {
+                auto type = val.get_type();
+                if (type != type_Int && type != type_Float && type != type_Double && type != type_Decimal) {
+                    throw std::runtime_error(util::format("Sum not defined for %1s", get_data_type_name(type)));
+                }
+                s = val;
+            }
+            else {
+                if (s.get_type() != val.get_type()) {
+                    throw std::runtime_error(util::format("Cannot add %1 and %2", get_data_type_name(s.get_type()),
+                                                          get_data_type_name(val.get_type())));
+                }
+                switch (s.get_type()) {
+                    case type_Int:
+                        s = Mixed(s.get_int() + val.get_int());
+                        break;
+                    case type_Float:
+                        s = Mixed(s.get_float() + val.get_float());
+                        break;
+                    case type_Double:
+                        s = Mixed(s.get_double() + val.get_double());
+                        break;
+                    case type_Decimal:
+                        s = Mixed(s.get<Decimal128>() + val.get<Decimal128>());
+                        break;
+                    default:
+                        REALM_UNREACHABLE();
+                        break;
+                }
+            }
+        }
+        // Continue
+        return false;
+    });
+
+    if (return_cnt)
+        *return_cnt = cnt;
+
+    return s;
+}
+
+Mixed DictionaryClusterTree::avg(size_t* return_cnt) const
+{
+    size_t cnt = 0;
+    auto s = sum(&cnt);
+    if (return_cnt)
+        *return_cnt = cnt;
+    if (cnt && !s.is_null()) {
+        switch (s.get_type()) {
+            case type_Int:
+                return Mixed(double(s.get_int()) / cnt);
+            case type_Float:
+                return Mixed(double(s.get_float()) / cnt);
+            case type_Double:
+                return Mixed(s.get_double() / cnt);
+            case type_Decimal:
+                return Mixed(s.get<Decimal128>() / cnt);
+            default:
+                throw std::runtime_error("Average not supported");
+                break;
+        }
+    }
+    return {};
+}
 
 /******************************** Dictionary *********************************/
 
@@ -94,6 +251,7 @@ bool Dictionary::is_null(size_t ndx) const
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
+    update_if_needed();
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
@@ -101,113 +259,83 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
-Mixed Dictionary::min(size_t* return_ndx) const
+std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
-    size_t i = realm::npos;
+    update_if_needed();
+    if (ndx >= size()) {
+        throw std::out_of_range("ndx out of range");
+    }
+    ObjKey k;
+    return do_get_pair(m_clusters->get(ndx, k));
+}
 
-    for (auto&& elem : *this) {
-        i++;
-        if (elem.second.is_null())
-            continue;
+size_t Dictionary::find_any(Mixed value) const
+{
+    size_t ret = realm::not_found;
+    if (is_attached()) {
+        update_if_needed();
+        ArrayMixed leaf(m_obj.get_alloc());
+        size_t start_ndx = 0;
 
-        if (m.is_null() || elem.second < m) {
-            m = elem.second;
-            ndx = i;
-        }
+        m_clusters->traverse([&](const Cluster* cluster) {
+            size_t e = cluster->node_size();
+            cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+            for (size_t i = 0; i < e; i++) {
+                if (leaf.get(i) == value) {
+                    ret = start_ndx + i;
+                    return true;
+                }
+            }
+            start_ndx += e;
+            // Continue
+            return false;
+        });
     }
 
-    if (return_ndx)
-        *return_ndx = ndx;
+    return ret;
+}
 
-    return m;
+Mixed Dictionary::min(size_t* return_ndx) const
+{
+    update_if_needed();
+    if (m_clusters) {
+        return m_clusters->min(return_ndx);
+    }
+    if (return_ndx)
+        *return_ndx = realm::npos;
+    return {};
 }
 
 Mixed Dictionary::max(size_t* return_ndx) const
 {
-    Mixed m;
-    size_t ndx = realm::npos;
-    size_t i = realm::npos;
-
-    for (auto&& elem : *this) {
-        i++;
-        if (elem.second.is_null())
-            continue;
-
-        if (m.is_null() || elem.second > m) {
-            m = elem.second;
-            ndx = i;
-        }
+    update_if_needed();
+    if (m_clusters) {
+        return m_clusters->max(return_ndx);
     }
-
     if (return_ndx)
-        *return_ndx = ndx;
-
-    return m;
+        *return_ndx = realm::npos;
+    return {};
 }
 
 Mixed Dictionary::sum(size_t* return_cnt) const
 {
-    Mixed s;
-    size_t cnt = 0;
-    for (auto&& elem : *this) {
-        if (elem.second.is_null())
-            continue;
-
-        cnt++;
-
-        if (s.is_null()) {
-            s = elem.second;
-        }
-        else {
-            if (s.get_type() != elem.second.get_type()) {
-                throw std::runtime_error("Sum not supported");
-            }
-            switch (s.get_type()) {
-                case type_Int:
-                    s = Mixed(s.get_int() + elem.second.get_int());
-                    break;
-                case type_Float:
-                    s = Mixed(s.get_float() + elem.second.get_float());
-                    break;
-                case type_Double:
-                    s = Mixed(s.get_double() + elem.second.get_double());
-                    break;
-                case type_Decimal:
-                    s = Mixed(s.get<Decimal128>() + elem.second.get<Decimal128>());
-                    break;
-                default:
-                    throw std::runtime_error("Average not supported");
-                    break;
-            }
-        }
+    update_if_needed();
+    if (m_clusters) {
+        return m_clusters->sum(return_cnt);
     }
-
     if (return_cnt)
-        *return_cnt = cnt;
-
-    return s;
+        *return_cnt = 0;
+    return {};
 }
 
 Mixed Dictionary::avg(size_t* return_cnt) const
 {
-    auto s = sum(return_cnt);
-    if (*return_cnt && !s.is_null()) {
-        switch (s.get_type()) {
-            case type_Int:
-                return Mixed(double(s.get_int()) / *return_cnt);
-            case type_Float:
-                return Mixed(double(s.get_float()) / *return_cnt);
-            case type_Double:
-                return Mixed(s.get_double() / *return_cnt);
-            case type_Decimal:
-                return Mixed(s.get<Decimal128>() / *return_cnt);
-            default:
-                throw std::runtime_error("Average not supported");
-                break;
-        }
+    update_if_needed();
+    if (m_clusters) {
+        return m_clusters->avg(return_cnt);
     }
+    if (return_cnt)
+        *return_cnt = 0;
     return {};
 }
 
@@ -292,52 +420,71 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
-    if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
-        if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-            throw std::runtime_error("Dictionary::insert: Wrong object type");
+    if (value.is_null()) {
+        if (!m_col_key.is_nullable()) {
+            throw LogicError(LogicError::type_mismatch);
         }
     }
-    else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-        throw LogicError(LogicError::collection_type_mismatch);
+    else {
+        if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
+            if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
+                throw std::runtime_error("Dictionary::insert: Wrong object type");
+            }
+        }
+        else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
+            throw LogicError(LogicError::type_mismatch);
+        }
     }
 
+    validate_key_value(key);
     update_if_needed();
 
     ObjLink new_link;
-    if (value.get_type() == type_TypedLink) {
-        new_link = value.get<ObjLink>();
-        m_obj.get_table()->get_parent_group()->validate(new_link);
-    }
-    else if (value.get_type() == type_Link) {
-        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
-        auto key = value.get<ObjKey>();
-        if (!target_table->is_valid(key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+    if (!value.is_null()) {
+        if (value.get_type() == type_TypedLink) {
+            new_link = value.get<ObjLink>();
+            m_obj.get_table()->get_parent_group()->validate(new_link);
         }
+        else if (value.get_type() == type_Link) {
+            auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+            auto key = value.get<ObjKey>();
+            if (!target_table->is_valid(key)) {
+                throw LogicError(LogicError::target_row_index_out_of_range);
+            }
 
-        new_link = ObjLink(target_table->get_key(), key);
-        value = Mixed(new_link);
+            new_link = ObjLink(target_table->get_key(), key);
+            value = Mixed(new_link);
+        }
     }
 
     create();
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
+    bool old_entry = false;
+    ClusterNode::State state;
+    try {
+        // We assume that we will most likely insert new values, so we try this first
+        state = m_clusters->insert(k, key, value);
+    }
+    catch (const KeyAlreadyUsed&) {
+        state = m_clusters->get(k);
+        old_entry = true;
+    }
+
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->dictionary_insert(*this, key, value);
+        if (old_entry) {
+            repl->dictionary_set(*this, state.index, key, value);
+        }
+        else {
+            repl->dictionary_insert(*this, state.index, key, value);
+        }
     }
 
     bump_content_version();
-    try {
-        ClusterNode::State state = m_clusters->insert(k, key, value);
 
-        if (new_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, ObjLink(), new_link, cascade_state);
-        }
-        return {Iterator(this, state.index), true};
-    }
-    catch (const KeyAlreadyUsed&) {
+    ObjLink old_link;
+    if (old_entry) {
         auto state = m_clusters->get(k);
         Array fallback(m_obj.get_alloc());
         Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
@@ -346,19 +493,18 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.init_from_parent();
 
         Mixed old_value = values.get(state.index);
-        ObjLink old_link;
         if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
             old_link = old_value.get<ObjLink>();
         }
-
-        if (new_link != old_link) {
-            CascadeState cascade_state;
-            m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
-        }
-
         values.set(state.index, value);
-        return {Iterator(this, state.index), false};
     }
+
+    if (new_link != old_link) {
+        CascadeState cascade_state;
+        m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
+    }
+
+    return {Iterator(this, state.index), !old_entry};
 }
 
 const Mixed Dictionary::operator[](Mixed key)
@@ -379,6 +525,19 @@ const Mixed Dictionary::operator[](Mixed key)
     return ret;
 }
 
+bool Dictionary::contains(Mixed key)
+{
+    update_if_needed();
+    if (m_clusters) {
+        auto hash = key.hash();
+        ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+        auto state = m_clusters->try_get(k);
+        if (state.index != realm::npos)
+            return true;
+    }
+    return false;
+}
+
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
     if (m_clusters) {
@@ -395,16 +554,19 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 
 void Dictionary::erase(Mixed key)
 {
+    validate_key_value(key);
     update_if_needed();
 
     if (m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-        CascadeState state;
+        auto state = m_clusters->get(k);
+
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, key);
+            repl->dictionary_erase(*this, state.index, key);
         }
-        m_clusters->erase(k, state);
+        CascadeState dummy;
+        m_clusters->erase(k, dummy);
         bump_content_version();
     }
 }
@@ -433,8 +595,10 @@ void Dictionary::clear()
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
         if (Replication* repl = this->m_obj.get_replication()) {
+            size_t n = 0;
             for (auto&& elem : *this) {
-                repl->dictionary_erase(*this, elem.first);
+                repl->dictionary_erase(*this, n, elem.first);
+                n++;
             }
         }
         // Just destroy the whole cluster
@@ -469,7 +633,7 @@ bool Dictionary::init_from_parent() const
     return valid;
 }
 
-Mixed Dictionary::do_get(ClusterNode::State&& s) const
+Mixed Dictionary::do_get(const ClusterNode::State& s) const
 {
     ArrayMixed values(m_obj.get_alloc());
     ref_type ref = to_ref(Array::get(s.mem.get_addr(), 2));
@@ -490,9 +654,35 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
     return val;
 }
 
+std::pair<Mixed, Mixed> Dictionary::do_get_pair(const ClusterNode::State& s) const
+{
+    Mixed key;
+    switch (m_key_type) {
+        case type_String: {
+            ArrayString keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        case type_Int: {
+            ArrayInteger keys(m_obj.get_alloc());
+            ref_type ref = to_ref(Array::get(s.mem.get_addr(), 1));
+            keys.init_from_ref(ref);
+            key = Mixed(keys.get(s.index));
+            break;
+        }
+        default:
+            throw std::runtime_error("Not implemented");
+            break;
+    }
+    Mixed val = do_get(std::move(s));
+
+    return std::make_pair(key, val);
+}
 /************************* Dictionary::Iterator *************************/
 
-CollectionIterator<Dictionary>::CollectionIterator(const Dictionary* dict, size_t pos)
+Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {
@@ -521,7 +711,6 @@ auto Dictionary::Iterator::operator*() const -> value_type
             throw std::runtime_error("Not implemented");
             break;
     }
-
     ArrayMixed values(m_tree.get_alloc());
     ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 2));
     values.init_from_ref(ref);

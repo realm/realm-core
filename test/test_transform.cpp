@@ -935,20 +935,20 @@ TEST(Transform_EraseSelectedLinkView)
     auto transact_1 = [](WriteTransaction& tr) {
         TableRef origin = tr.get_table("class_origin");
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
-        auto target_table_it = link_list.get_target_table()->begin();
-        link_list.set(0, target_table_it[2].get_key()); // Select the link list of the 2nd row
+        auto target_table = link_list.get_target_table();
+        link_list.set(0, target_table->get_object(2).get_key()); // Select the link list of the 2nd row
         origin->remove_object(origin->begin() + 0);     // Move that link list
         if (link_list.size() > 1) {
-            link_list.set(1, target_table_it[3].get_key()); // Now modify it again
+            link_list.set(1, target_table->get_object(3).get_key()); // Now modify it again
         }
     };
     auto transact_2 = [](WriteTransaction& tr) {
         TableRef origin = tr.get_table("class_origin");
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
-        auto target_table_it = link_list.get_target_table()->begin();
+        auto target_table = link_list.get_target_table();
         if (link_list.size() > 1) {
-            link_list.set(0, target_table_it[4].get_key()); // Select the link list of the 2nd row
-            link_list.set(1, target_table_it[5].get_key()); // Now modify it again
+            link_list.set(0, target_table->get_object(4).get_key()); // Select the link list of the 2nd row
+            link_list.set(1, target_table->get_object(5).get_key()); // Now modify it again
         }
     };
 
@@ -981,7 +981,7 @@ TEST(Transform_Randomized)
 
     // FIXME: Unfortunately these rounds are terribly slow, presumable due to
     // sync-to-disk. Can we use "in memory" mode too boost them?
-    int num_major_rounds = 1;
+    int num_major_rounds = 100;
     int num_minor_rounds = 1;
 
     Random random(unit_test_random_seed); // Seed from slow global generator

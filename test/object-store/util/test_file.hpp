@@ -162,7 +162,7 @@ struct SyncTestFile : TestFile {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
         this->sync_config->stop_policy = stop_policy;
         this->sync_config->error_handler = std::forward<ErrorHandler>(error_handler);
-        schema_mode = realm::SchemaMode::Additive;
+        schema_mode = realm::SchemaMode::AdditiveExplicit;
     }
 
     SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
@@ -191,6 +191,8 @@ struct TestSyncManager {
     {
         return m_sync_server;
     }
+
+    std::function<std::unique_ptr<realm::app::GenericNetworkTransport>()> transport_generator;
 
 private:
     std::shared_ptr<realm::app::App> m_app;

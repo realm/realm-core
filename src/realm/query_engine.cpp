@@ -85,86 +85,6 @@ bool ParentNode::match(const Obj& obj)
     });
 }
 
-template <Action action>
-void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
-{
-    switch (col_id) {
-        case type_Int: {
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayInteger>;
-            break;
-        }
-        case type_Float:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayFloat>;
-            break;
-        case type_Double:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDouble>;
-            break;
-        case type_Decimal:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
-            break;
-        default:
-            REALM_ASSERT(false);
-            break;
-    }
-}
-
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
-{
-    switch (TAction) {
-        case act_ReturnFirst: {
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
-            break;
-        }
-        case act_FindAll: {
-            // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
-            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
-            // false simply by convention. FIXME: Clean up all this.
-            REALM_ASSERT(!nullable);
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
-            break;
-        }
-        case act_Count: {
-            // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
-            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
-            // false simply by convention. FIXME: Clean up all this.
-            REALM_ASSERT(!nullable);
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
-            break;
-        }
-        case act_Sum: {
-            aggregate_local_prepare<act_Sum>(col_id, nullable);
-            break;
-        }
-        case act_Min: {
-            aggregate_local_prepare<act_Min>(col_id, nullable);
-            break;
-        }
-        case act_Max: {
-            aggregate_local_prepare<act_Max>(col_id, nullable);
-            break;
-        }
-        case act_CallbackIdx: {
-            // Future features where for each query match, you want to perform an action that only requires knowlege
-            // about the row index, and not the payload there. Examples could be find_all(), however, this code path
-            // below is for new features given in a callback method and not yet supported by core.
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
-            break;
-        }
-        default:
-            REALM_ASSERT(false);
-            break;
-    }
-}
-
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column)
 {
@@ -177,7 +97,12 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // data type array to make array call match() directly on each match, like for integers.
 
     m_state = st;
+    m_source_column = source_column;
     size_t local_matches = 0;
+
+    if (m_children.size() == 1) {
+        return find_all_local(start, end);
+    }
 
     size_t r = start - 1;
     for (;;) {
@@ -209,12 +134,35 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         // If index of first match in this node equals index of first match in all remaining nodes, we have a final
         // match
         if (m == r) {
-            bool cont = (this->*m_column_action_specializer)(st, source_column, r);
+            Mixed val;
+            if (source_column) {
+                val = source_column->get_any(r);
+            }
+            bool cont = st->match(r, val);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }
         }
     }
+}
+
+size_t ParentNode::find_all_local(size_t start, size_t end)
+{
+    while (start < end) {
+        start = find_first_local(start, end);
+        if (start != not_found) {
+            Mixed val;
+            if (m_source_column) {
+                val = m_source_column->get_any(start);
+            }
+            bool cont = m_state->match(start, val);
+            if (!cont) {
+                return static_cast<size_t>(-1);
+            }
+            start++;
+        }
+    }
+    return end;
 }
 
 void StringNodeEqualBase::init(bool will_query_ranges)
@@ -469,8 +417,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
         case col_type_TypedLink:
         case col_type_BackLink:
         case col_type_LinkList:
-        case col_type_OldDateTime:
-        case col_type_OldTable:
             break;
     };
     REALM_UNREACHABLE();
@@ -552,13 +498,11 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_OldTable:
         case col_type_Link:
         case col_type_BackLink:
-        case col_type_OldDateTime:
-            REALM_ASSERT(false);
+            break;
     }
-    return 0;
+    REALM_TERMINATE("Unsupported column type.");
 }
 
 } // namespace realm
@@ -697,7 +641,7 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 }
 
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
-: m_expression(std::move(expression))
+    : m_expression(std::move(expression))
 {
     m_dT = 50.0;
 }

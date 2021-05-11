@@ -287,11 +287,15 @@ public:
     {
         return true;
     }
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -447,6 +451,26 @@ public:
     {
         if (m_active_collection)
             m_active_collection->clear(old_size);
+        return true;
+    }
+    bool dictionary_insert(size_t index, Mixed)
+    {
+        if (m_active_collection) {
+            m_active_collection->insert(index);
+        }
+        return true;
+    }
+    bool dictionary_set(size_t index, Mixed)
+    {
+        if (m_active_collection) {
+            m_active_collection->modify(index);
+        }
+        return true;
+    }
+    bool dictionary_erase(size_t index, Mixed)
+    {
+        if (m_active_collection)
+            m_active_collection->erase(index);
         return true;
     }
 

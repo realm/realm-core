@@ -158,6 +158,17 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
+    SECTION("should produce the expected path for a UUID partition") {
+        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
+        const bson::Bson partition(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+        SyncConfig config(user, partition);
+        const auto expected =
+            base_path + "mongodb-realm/app_id/foobarbaz/u_3b241101-e2bb-4255-8caf-4136c566a961.realm";
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
+
     SECTION("should produce the expected path for a Null partition") {
         TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
         const bson::Bson partition;

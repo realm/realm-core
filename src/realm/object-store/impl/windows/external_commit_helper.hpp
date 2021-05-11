@@ -70,6 +70,11 @@ public:
         }
     }
 
+    T* operator->() const noexcept
+    {
+        return m_memory;
+    }
+
     T& get() const noexcept
     {
         return *m_memory;
@@ -107,14 +112,25 @@ private:
     RealmCoordinator& m_parent;
 
     // The listener thread
-    std::future<void> m_thread;
+    std::thread m_thread;
 
-    win32::SharedMemory<util::InterprocessCondVar::SharedPart, util::InterprocessCondVar::init_shared_part>
-        m_condvar_shared;
+    struct SharedPart {
+        util::InterprocessCondVar::SharedPart cv;
+        int64_t num_signals;
+
+        static void init(SharedPart& sp)
+        {
+            util::InterprocessCondVar::init_shared_part(sp.cv);
+            sp.num_signals = 0;
+        }
+    };
+
+    win32::SharedMemory<SharedPart, SharedPart::init> m_shared_part;
 
     util::InterprocessCondVar m_commit_available;
     util::InterprocessMutex m_mutex;
     bool m_keep_listening = true;
+    int64_t m_last_count;
 };
 
 } // namespace _impl

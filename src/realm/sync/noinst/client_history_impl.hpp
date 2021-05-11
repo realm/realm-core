@@ -106,6 +106,11 @@ public:
                                       sync::SaltedVersion server_version, uint_fast64_t downloaded_bytes,
                                       BinaryData uploadable_changeset);
 
+    /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
+    /// of local origin. This should only be used for testing and defaults to calling
+    /// sync::generate_changeset_timestamp().
+    void set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn);
+
     // Overriding member functions in realm::Replication
     void initialize(DB& sg) override final;
     void initiate_session(version_type) override final;
@@ -305,6 +310,8 @@ private:
     mutable std::unique_ptr<BinaryColumn> m_ch_changesets; // Not nullable
     mutable std::unique_ptr<IntegerBpTree> m_ch_server_versions;
 
+    std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
+
     version_type find_sync_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry,
                                          version_type& last_integrated_server_version) const noexcept;
     void do_get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>& buffer,
@@ -340,6 +347,7 @@ private:
     void set_oldest_bound_version(version_type) override final;
     BinaryData get_uncommitted_changes() const noexcept override final;
     void verify() const override final;
+    bool no_pending_local_changes(version_type version) const final;
 };
 
 

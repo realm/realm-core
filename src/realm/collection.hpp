@@ -58,6 +58,9 @@ public:
     /// the collection.
     virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
 
+    // Return index of the first occurrence of 'value'
+    virtual size_t find_any(Mixed value) const = 0;
+
     /// True if `size()` returns 0.
     virtual bool is_empty() const final
     {
@@ -300,7 +303,7 @@ protected:
     }
 
     // Overriding members of CollectionBase:
-    bool update_if_needed() const final
+    REALM_NOINLINE bool update_if_needed() const final
     {
         if (!m_obj.is_valid())
             return false;

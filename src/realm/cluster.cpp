@@ -202,6 +202,11 @@ MemRef Cluster::ensure_writeable(ObjKey)
     return get_mem();
 }
 
+void Cluster::update_ref_in_parent(ObjKey, ref_type)
+{
+    REALM_UNREACHABLE();
+}
+
 size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
 {
     auto rot = Array::get_as_ref_or_tagged(header, s_key_ref_or_size_index);
@@ -737,7 +742,7 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
 
     ObjKey key = values.get(ndx);
     if (key != null_key) {
-        remove_backlinks(get_real_key(ndx), col_key, {key}, state);
+        remove_backlinks(get_real_key(ndx), col_key, std::vector<ObjKey>{key}, state);
     }
     values.erase(ndx);
 }
@@ -1424,6 +1429,37 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
             }
             else {
                 state.enqueue_for_cascade(target_obj, strong_links, last_removed);
+            }
+        }
+    }
+}
+
+void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjLink>& links,
+                               CascadeState& state) const
+{
+    const Table* origin_table = m_tree_top.get_owning_table();
+    Group* group = origin_table->get_parent_group();
+    TableKey origin_table_key = origin_table->get_key();
+
+    for (auto link : links) {
+        if (link) {
+            bool is_unres = link.get_obj_key().is_unresolved();
+            Obj target_obj = group->get_object(link);
+            TableRef target_table = target_obj.get_table();
+            ColKey backlink_col_key = target_table->find_or_add_backlink_column(origin_col_key, origin_table_key);
+
+            bool last_removed = target_obj.remove_one_backlink(backlink_col_key, origin_key); // Throws
+            if (is_unres) {
+                if (last_removed) {
+                    // Check is there are more backlinks
+                    if (!target_obj.has_backlinks(false)) {
+                        // Tombstones can be erased right away - there is no cascading effect
+                        target_table->m_tombstones->erase(link.get_obj_key(), state);
+                    }
+                }
+            }
+            else {
+                state.enqueue_for_cascade(target_obj, false, last_removed);
             }
         }
     }

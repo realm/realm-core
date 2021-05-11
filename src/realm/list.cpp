@@ -103,12 +103,9 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
         case type_LinkList:
             return get_linklist_ptr(col_key);
         case type_Link:
-        case type_OldDateTime:
-        case type_OldTable:
-            REALM_ASSERT(false);
             break;
     }
-    return {};
+    REALM_TERMINATE("Unsupported column type");
 }
 
 /****************************** Lst aggregates *******************************/
@@ -406,6 +403,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
+        update_if_needed();
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
 }

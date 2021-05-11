@@ -116,10 +116,19 @@ enum class SchemaMode : uint8_t {
     // modes, the schema version is allowed to be less than the existing
     // one).
     // The migration function is not used.
+    // This should be used when including discovered user classes.
+    // Previously called Additive.
     //
     // This mode allows updating the schema with additive changes even
     // if the Realm is already open on another thread.
-    Additive,
+    AdditiveDiscovered,
+
+    // The same additive properties as AdditiveDiscovered, except
+    // in this mode, all classes in the schema have been explicitly
+    // included by the user. This means that stricter schema checks are
+    // run such as throwing an error when an embedded object type which
+    // is not linked from any top level object types is included.
+    AdditiveExplicit,
 
     // Verify that the schema version has increased, call the migraiton
     // function, and then verify that the schema now matches.
@@ -241,6 +250,9 @@ public:
         // Maximum number of active versions in the Realm file allowed before an exception
         // is thrown.
         uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
+
+        // Disable automatic backup at file format upgrade by setting to false
+        bool backup_at_file_format_change = true;
     };
 
     // Returns a thread-confined live Realm for the given configuration
@@ -303,7 +315,7 @@ public:
     // Returns true if the Realm is either in a read or frozen transaction
     bool is_in_read_transaction() const
     {
-        return m_group != nullptr;
+        return m_transaction != nullptr;
     }
     uint64_t last_seen_transaction_version()
     {
@@ -343,7 +355,9 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
+    // For synchronized realms, the file written will have the client file ident removed.
     void write_copy(StringData path, BinaryData encryption_key);
+    void write_copy_without_client_file_id(StringData path, BinaryData encryption_key, bool allow_overwrite = false);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;
@@ -361,7 +375,7 @@ public:
     void close();
     bool is_closed() const
     {
-        return !m_group && !m_coordinator;
+        return !m_transaction && !m_coordinator;
     }
 
     // returns the file format version upgraded from if an upgrade took place
@@ -428,7 +442,7 @@ private:
     std::shared_ptr<util::Scheduler> m_scheduler;
     bool m_auto_refresh = true;
 
-    std::shared_ptr<Group> m_group;
+    TransactionRef m_transaction;
 
     uint64_t m_schema_version;
     Schema m_schema;
@@ -439,9 +453,9 @@ private:
     // that's actually fully working
     bool m_dynamic_schema = true;
 
-    // True while sending the notifications caused by advancing the read
+    // Non-zero while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
-    bool m_is_sending_notifications = false;
+    size_t m_is_sending_notifications = 0;
 
     // True while we're performing a schema migration via this Realm instance
     // to allow for different behavior (such as allowing modifications to

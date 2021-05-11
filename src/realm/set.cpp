@@ -98,14 +98,9 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
             return std::make_unique<LnkSet>(*this, col_key);
         }
         case type_LinkList:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
-            REALM_ASSERT(false);
             break;
     }
-    return {};
+    REALM_TERMINATE("Unsupported column type.");
 }
 
 void SetBase::insert_repl(Replication* repl, size_t index, Mixed value) const
@@ -210,6 +205,57 @@ void Set<Mixed>::do_erase(size_t ndx)
     }
     else {
         m_tree->erase(ndx);
+    }
+}
+
+void LnkSet::remove_target_row(size_t link_ndx)
+{
+    // Deleting the object will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    ObjKey k = get(link_ndx);
+    get_target_table()->remove_object(k);
+}
+
+void LnkSet::remove_all_target_rows()
+{
+    if (is_attached()) {
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
+    }
+}
+
+bool LnkSet::is_subset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_subset_of(rhs.m_set);
+}
+
+bool LnkSet::is_strict_subset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_strict_subset_of(rhs.m_set);
+}
+
+bool LnkSet::is_superset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_superset_of(rhs.m_set);
+}
+
+bool LnkSet::is_strict_superset_of(const LnkSet& rhs) const
+{
+    return this->m_set.is_strict_superset_of(rhs.m_set);
+}
+
+bool LnkSet::intersects(const LnkSet& rhs) const
+{
+    return this->m_set.intersects(rhs.m_set);
+}
+
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
+{
+    indices.resize(sz);
+    if (ascending) {
+        std::iota(indices.begin(), indices.end(), 0);
+    }
+    else {
+        std::iota(indices.rbegin(), indices.rend(), 0);
     }
 }
 

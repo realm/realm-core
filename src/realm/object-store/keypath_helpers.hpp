@@ -24,7 +24,7 @@
 
 namespace realm {
 /// Populate the mapping from public name to internal name for queries.
-inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& realm)
+inline void populate_keypath_mapping(query_parser::KeyPathMapping& mapping, Realm& realm)
 {
     mapping.set_backlink_class_prefix("class_");
 
@@ -35,6 +35,10 @@ inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
                 table = realm.read_group().get_table(object_schema.table_key);
             return table;
         };
+
+        if (!object_schema.alias.empty()) {
+            mapping.add_table_mapping(get_table(), object_schema.alias);
+        }
 
         for (auto& property : object_schema.persisted_properties) {
             if (!property.public_name.empty() && property.public_name != property.name)
@@ -50,56 +54,4 @@ inline void populate_keypath_mapping(parser::KeyPathMapping& mapping, Realm& rea
     }
 }
 
-/// Generate an IncludeDescriptor from a list of key paths.
-///
-/// Each key path in the list is a period ('.') seperated property path, beginning
-/// at the class defined by `object_schema` and ending with a linkingObjects relationship.
-inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> const& paths, Realm& realm,
-                                                        ObjectSchema const& object_schema,
-                                                        parser::KeyPathMapping& mapping)
-{
-    auto base_table = realm.read_group().get_table(object_schema.table_key);
-    REALM_ASSERT(base_table);
-    // FIXME: the following is mostly copied from core's query_builder::apply_ordering
-    std::vector<std::vector<LinkPathPart>> properties;
-    for (size_t i = 0; i < paths.size(); ++i) {
-        StringData keypath = paths[i];
-        if (keypath.size() == 0) {
-            throw InvalidPathError("missing property name while generating INCLUDE from keypaths");
-        }
-
-        util::KeyPath path = util::key_path_from_string(keypath);
-        size_t index = 0;
-        std::vector<LinkPathPart> links;
-        ConstTableRef cur_table = base_table;
-
-        while (index < path.size()) {
-            parser::KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
-            // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-            if (!element.table->is_link_type(element.col_key.get_type()) &&
-                element.col_key.get_type() != col_type_BackLink) {
-                throw InvalidPathError(util::format(
-                    "Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
-                    element.table->get_column_name(element.col_key), util::get_printable_table_name(*element.table)));
-            }
-            if (element.table == cur_table) {
-                if (!element.col_key) {
-                    cur_table = element.table;
-                }
-                else {
-                    cur_table = element.table->get_link_target(element.col_key); // advance through forward link
-                }
-            }
-            else {
-                cur_table = element.table; // advance through backlink
-            }
-            LinkPathPart link = element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal
-                                    ? LinkPathPart(element.col_key, element.table)
-                                    : LinkPathPart(element.col_key);
-            links.emplace_back(std::move(link));
-        }
-        properties.push_back(std::move(links));
-    }
-    return IncludeDescriptor{base_table, properties};
-}
 } // namespace realm

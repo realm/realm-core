@@ -21,6 +21,8 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
+#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 namespace realm::object_store {
 
@@ -152,7 +154,30 @@ Results Collection::as_results() const
     if (auto link_list = std::dynamic_pointer_cast<LnkLst>(m_coll_base)) {
         return Results(m_realm, link_list);
     }
+    if (auto link_set = std::dynamic_pointer_cast<LnkSet>(m_coll_base)) {
+        return Results(m_realm, link_set);
+    }
     return Results(m_realm, m_coll_base);
 }
+
+NotificationToken Collection::add_notification_callback(CollectionChangeCallback cb) &
+{
+    verify_attached();
+    m_realm->verify_notifications_available();
+    // Adding a new callback to a notifier which had all of its callbacks
+    // removed does not properly reinitialize the notifier. Work around this by
+    // recreating it instead.
+    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
+    // from a notifier a zombie is left sitting around uselessly) and should be
+    // cleaned up.
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
+    if (!m_notifier) {
+        m_notifier = std::make_shared<_impl::ListNotifier>(m_realm, *m_coll_base, m_type);
+        _impl::RealmCoordinator::register_notifier(m_notifier);
+    }
+    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+}
+
 
 } // namespace realm::object_store

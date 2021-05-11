@@ -87,10 +87,6 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         }
         case type_Mixed:
             [[fallthrough]];
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
         case type_LinkList: {
             REALM_TERMINATE("Invalid payload type");
             break;
@@ -184,11 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::UUID;
         case type_Mixed:
             return Type::Null;
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            unsupported_instruction();
     }
+    unsupported_instruction();
     return Type::Int; // Make compiler happy
 }
 
@@ -610,10 +603,8 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
+void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
 {
-    TrivialReplication::dictionary_insert(dict, key, value);
-
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
         if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
@@ -636,9 +627,21 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     }
 }
 
-void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_erase(dict, key);
+    TrivialReplication::dictionary_insert(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
+}
+
+void SyncReplication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
+{
+    TrivialReplication::dictionary_set(dict, ndx, key, value);
+    dictionary_update(dict, key, value);
+}
+
+void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
+{
+    TrivialReplication::dictionary_erase(dict, ndx, key);
 
     if (select_collection(dict)) {
         Instruction::Update instr;

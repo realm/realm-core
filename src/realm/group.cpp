@@ -266,11 +266,10 @@ size_t Group::key2ndx_checked(TableKey key) const
         if (tbl && tbl->get_key() == key)
             return idx;
     }
-    // FIXME: This is a temporary hack we should revisit.
     // The notion of a const group as it is now, is not really
     // useful. It is linked to a distinction between a read
-    // and a write transaction. This distinction is likely to
-    // be moved from compile time to run time.
+    // and a write transaction. This distinction is no longer
+    // a compile time aspect (it's not const anymore)
     Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
     if (m_tables.is_attached() && idx < m_tables.size()) {
         RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
@@ -300,10 +299,19 @@ int Group::get_committed_file_format_version() const noexcept
     return m_alloc.get_committed_file_format_version();
 }
 
+std::optional<int> Group::fake_target_file_format;
+
+void _impl::GroupFriend::fake_target_file_format(const std::optional<int> format) noexcept
+{
+    Group::fake_target_file_format = format;
+}
 
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
+    if (Group::fake_target_file_format) {
+        return *Group::fake_target_file_format;
+    }
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
     // `current_file_format_version`, it will trigger a file format upgrade
@@ -372,9 +380,20 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+void Group::remove_sync_file_id()
+{
+    if (m_top.is_attached() && m_top.size() > s_sync_file_id_ndx) {
+        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(0));
+    }
+}
+
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
+    if (fake_target_file_format && *fake_target_file_format == target_file_format_version) {
+        // Testing, mockup scenario, not a real upgrade. Just pretend we're done!
+        return;
+    }
 
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
@@ -528,12 +547,11 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // NOTE: Additional future upgrade steps go here.
 }
 
-void Group::open(ref_type top_ref, const std::string& file_path)
-{
-    SlabAlloc::DetachGuard dg(m_alloc);
 
+int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path)
+{
     // Select file format if it is still undecided.
-    m_file_format_version = m_alloc.get_committed_file_format_version();
+    auto file_format_version = alloc.get_committed_file_format_version();
 
     bool file_format_ok = false;
     // It is not possible to open prior file format versions without an upgrade.
@@ -541,7 +559,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
-    switch (m_file_format_version) {
+    switch (file_format_version) {
         case 0:
             file_format_ok = (top_ref == 0);
             break;
@@ -551,7 +569,14 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", file_path);
+        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+    return file_format_version;
+}
+
+void Group::open(ref_type top_ref, const std::string& file_path)
+{
+    SlabAlloc::DetachGuard dg(m_alloc);
+    m_file_format_version = read_only_version_check(m_alloc, top_ref, file_path);
 
     Replication::HistoryType history_type = Replication::hist_None;
     int target_file_format_version = get_target_file_format_version_for_session(m_file_format_version, history_type);
@@ -585,6 +610,9 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    // Non-Transaction Groups always allow writing and simply don't allow
+    // committing when opened in read-only mode
+    m_alloc.set_read_only(false);
 
     open(top_ref, file_path);
 }
@@ -747,7 +775,7 @@ void Group::update_num_objects()
 {
 #if REALM_METRICS
     if (m_metrics) {
-        // FIXME: this is quite invasive and completely defeats the lazy loading mechanism
+        // This is quite invasive and completely defeats the lazy loading mechanism
         // where table accessors are only instantiated on demand, because they are all created here.
 
         m_total_rows = 0;
@@ -873,7 +901,6 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 
     // get new key and index
     // find first empty spot:
-    // FIXME: Optimize with rowing ptr or free list of some sort
     uint32_t j;
     RefOrTagged rot = RefOrTagged::make_tagged(0);
     for (j = 0; j < m_tables.size(); ++j) {
@@ -1133,8 +1160,6 @@ public:
             }
             info.type = history_type;
             info.version = history_schema_version;
-            // FIXME: It's ugly that we have to instantiate a new array here,
-            // but it isn't obvious that Group should have history as a member.
             Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
             history.init_from_ref(history_ref);
             info.ref = history.write(out, deep, only_if_modified); // Throws
@@ -1197,9 +1222,6 @@ BinaryData Group::write_to_mem() const
     REALM_ASSERT(is_attached());
 
     // Get max possible size of buffer
-    //
-    // FIXME: This size could potentially be vastly bigger that what
-    // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
@@ -1253,7 +1275,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         Array top(new_alloc);
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
-        // FIXME: We really need an alternative to Array::truncate() that is able to expand.
         int_fast64_t value_1 = from_ref(names_ref);
         int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
@@ -1648,11 +1669,15 @@ public:
         return true; // No-op
     }
 
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true; // No-op
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true; // No-op
     }
@@ -1682,7 +1707,6 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    // FIXME: We can't write protect at group level as the allocator is shared: m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {

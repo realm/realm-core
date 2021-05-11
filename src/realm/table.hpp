@@ -60,6 +60,7 @@ class SubQuery;
 class ColKeys;
 struct GlobalKey;
 class LinkChain;
+class Subexpr;
 
 struct Link {
 };
@@ -72,12 +73,17 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
-namespace query_builder {
+namespace query_parser {
 class Arguments;
-}
-namespace parser {
 class KeyPathMapping;
-}
+class ParserDriver;
+} // namespace query_parser
+
+enum class ExpressionComparisonType : unsigned char {
+    Any,
+    All,
+    None,
+};
 
 class Table {
 public:
@@ -142,7 +148,8 @@ public:
     ColKey add_column_list(Table& target, StringData name);
     ColKey add_column_set(DataType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(DataType type, StringData name, bool nullable = false,
+                                 DataType key_type = type_String);
     ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
@@ -154,9 +161,8 @@ public:
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have exactly 1 backlink. Return value
-    // indicates if the conversion was done
-    bool set_embedded(bool embedded);
+    // not have a primary key and all objects must have exactly 1 backlink.
+    void set_embedded(bool embedded);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -196,7 +202,7 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key) const; // FIXME: Should this one have been declared noexcept?
+    Columns<T> column(ColKey col_key, ExpressionComparisonType = ExpressionComparisonType::Any) const;
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
@@ -339,7 +345,7 @@ public:
     size_t get_index_in_group() const noexcept;
     TableKey get_key() const noexcept;
 
-    uint64_t allocate_sequence_number();
+    uint32_t allocate_sequence_number();
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
@@ -472,7 +478,7 @@ public:
     template <typename Func>
     bool for_each_backlink_column(Func func) const
     {
-        // FIXME: Optimize later - to not iterate through all non-backlink columns:
+        // Could be optimized - to not iterate through all non-backlink columns:
         for (auto col_key : m_leaf_ndx2colkey) {
             if (!col_key)
                 continue;
@@ -516,7 +522,6 @@ public:
         return Query(m_own_ref, tv);
     }
 
-    // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where(ConstTableView* tv = nullptr) const
     {
         return Query(m_own_ref, tv);
@@ -528,9 +533,17 @@ public:
         return Query(m_own_ref, list);
     }
 
+    // Perform queries on a LnkSet. The returned Query holds a reference to set.
+    Query where(const LnkSet& set) const
+    {
+        return Query(m_own_ref, set);
+    }
+
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
-    Query query(const std::string& query_string, query_builder::Arguments& arguments,
-                const parser::KeyPathMapping&) const;
+    Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                const query_parser::KeyPathMapping& mapping) const;
+    Query query(const std::string& query_string, query_parser::Arguments& arguments,
+                const query_parser::KeyPathMapping&) const;
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
@@ -612,8 +625,6 @@ protected:
     /// index (as expressed through the DataType enum).
     bool compare_objects(const Table&) const;
 
-    void check_lists_are_empty(size_t row_ndx) const;
-
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,
@@ -629,6 +640,10 @@ private:
     void update_allocator_wrapper(bool writable)
     {
         m_alloc.update_from_underlying_allocator(writable);
+    }
+    void refresh_allocator_wrapper() const noexcept
+    {
+        m_alloc.refresh_ref_translation();
     }
     Spec m_spec;                                    // 1st slot in m_top
     TableClusterTree m_clusters;                    // 3rd slot in m_top
@@ -669,16 +684,6 @@ private:
     /// non-checking nature of the low-level dynamically typed API
     /// makes it too risky to offer this feature as an
     /// operator.
-    ///
-    /// FIXME: assign() has not yet been implemented, but the
-    /// intention is that it will copy the rows of the argument table
-    /// into this table after clearing the original contents, and for
-    /// target tables without a shared spec, it would also copy the
-    /// spec. For target tables with shared spec, it would be an error
-    /// to pass an argument table with an incompatible spec, but
-    /// assign() would not check for spec compatibility. This would
-    /// make it ideal as a basis for implementing operator=() for
-    /// typed tables.
     Table& operator=(const Table&) = delete;
 
     /// Create an uninitialized accessor whose lifetime is managed by Group
@@ -773,8 +778,8 @@ private:
     void flush_for_commit();
 
     bool is_cross_table_link_target() const noexcept;
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey col_key, T value = {}, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey col_key) const;
     template <typename T>
     double average(ColKey col_key, size_t* resultcount) const;
 
@@ -906,30 +911,39 @@ private:
     const Table* m_table;
 };
 
-enum class ExpressionComparisonType : unsigned char {
-    Any,
-    All,
-    None,
-};
-
 // Class used to collect a chain of links when building up a Query following links.
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t, ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_current_table(t.unchecked_ptr())
+    LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
     {
     }
-    const Table* get_base_table()
+    ConstTableRef get_base_table()
     {
-        return m_base_table.unchecked_ptr();
+        return m_base_table;
+    }
+
+    ConstTableRef get_current_table() const
+    {
+        return m_current_table;
     }
 
     LinkChain& link(ColKey link_column)
     {
         add(link_column);
+        return *this;
+    }
+
+    LinkChain& link(std::string col_name)
+    {
+        auto ck = m_current_table->get_column_key(col_name);
+        if (!ck) {
+            throw std::runtime_error(util::format("%1 has no property %2", m_current_table->get_name(), col_name));
+        }
+        add(ck);
         return *this;
     }
 
@@ -939,6 +953,8 @@ public:
         return link(backlink_col_key);
     }
 
+    Subexpr* column(const std::string&);
+    Subexpr* subquery(Query subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -988,7 +1004,6 @@ public:
         return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
     }
 
-
     template <class T>
     BacklinkCount<T> get_backlink_count()
     {
@@ -997,25 +1012,19 @@ public:
 
 private:
     friend class Table;
+    friend class query_parser::ParserDriver;
 
     std::vector<ColKey> m_link_cols;
-    const Table* m_current_table;
+    ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
-    void add(ColKey ck)
+    void add(ColKey ck);
+
+    template <class T>
+    Subexpr* create_subexpr(ColKey col_key)
     {
-        // Link column can be a single Link, LinkList, or BackLink.
-        REALM_ASSERT(m_current_table->valid_column(ck));
-        ColumnType type = ck.get_type();
-        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
-        }
-        else {
-            // Only last column in link chain is allowed to be non-link
-            throw(LogicError::type_mismatch);
-        }
-        m_link_cols.push_back(ck);
+        return new Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
 };
 
@@ -1160,9 +1169,9 @@ inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writa
     m_own_ref = TableRef(this, m_alloc.get_instance_version());
 
     // since we're rebinding to a new table, we'll bump version counters
-    // FIXME
-    // this can be optimized if version counters are saved along with the
-    // table data.
+    // Possible optimization: save version counters along with the table data
+    // and restore them from there. Should decrease amount of non-necessary
+    // recomputations of any queries relying on this table.
     bump_content_version();
     bump_storage_version();
     // we assume all other accessors are detached, so we're done.
@@ -1175,9 +1184,9 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key) const
+inline Columns<T> Table::column(ColKey col_key, ExpressionComparisonType cmp_type) const
 {
-    LinkChain lc(m_own_ref);
+    LinkChain lc(m_own_ref, cmp_type);
     return lc.column<T>(col_key);
 }
 

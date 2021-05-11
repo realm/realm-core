@@ -6,8 +6,11 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
 endif()
 
+add_custom_target(benchmarks)
+
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
+add_subdirectory(benchmark-larger)
 # FIXME: Add other benchmarks
 
 set(CORE_TEST_SOURCES
@@ -69,9 +72,11 @@ set(CORE_TEST_SOURCES
     test_util_any.cpp
     test_util_backtrace.cpp
     test_util_base64.cpp
+    test_util_cli_args.cpp
     test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
+    test_util_from_chars.cpp
     test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
@@ -127,6 +132,10 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
+
+if (REALM_TEST_DURATION)
+    add_compile_definitions(TEST_DURATION=${REALM_TEST_DURATION})
+endif()
 
 # Resources required for running the tests copied to the target directory
 if(CMAKE_GENERATOR STREQUAL Xcode)

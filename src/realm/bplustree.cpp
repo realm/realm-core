@@ -38,6 +38,10 @@ void BPlusTreeNode::set_context_flag(bool cf) noexcept
         Array arr(m_tree->get_alloc());
         arr.init_from_mem(mem);
         arr.set_context_flag(cf);
+        if (auto new_ref = arr.get_ref(); new_ref != ref) {
+            init_from_ref(new_ref);
+            update_parent();
+        }
     }
 }
 
@@ -668,48 +672,18 @@ BPlusTreeBase::~BPlusTreeBase()
 {
 }
 
-BPlusTreeBase& BPlusTreeBase::operator=(const BPlusTreeBase& rhs)
-{
-    Allocator& rhs_alloc = rhs.get_alloc();
-
-    // Destroy current tree
-    destroy();
-
-    if (rhs.is_attached()) {
-        // Take copy of other tree
-        MemRef mem(rhs.get_ref(), rhs_alloc);
-        MemRef copy_mem = Array::clone(mem, rhs_alloc, m_alloc); // Throws
-
-        init_from_ref(copy_mem.get_ref());
-    }
-
-    return *this;
-}
-
-BPlusTreeBase& BPlusTreeBase::operator=(BPlusTreeBase&& rhs) noexcept
-{
-    // Destroy current tree
-    destroy();
-
-    m_root = std::move(rhs.m_root);
-    if (m_root)
-        m_root->change_owner(this);
-    m_size = rhs.m_size;
-
-    return *this;
-}
-
 void BPlusTreeBase::create()
 {
-    REALM_ASSERT(!is_attached());
-    m_root = create_leaf_node(); // Throws
-    if (m_parent) {
-        ref_type ref = get_ref();
-        _impl::DeepArrayRefDestroyGuard destroy_guard{ref, get_alloc()};
-        m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
-        destroy_guard.release();
+    if (!m_root) {                   // Idempotent
+        m_root = create_leaf_node(); // Throws
+        if (m_parent) {
+            ref_type ref = get_ref();
+            _impl::DeepArrayRefDestroyGuard destroy_guard{ref, get_alloc()};
+            m_parent->update_child_ref(m_ndx_in_parent, ref); // Throws
+            destroy_guard.release();
+        }
+        m_root->bp_set_parent(m_parent, m_ndx_in_parent);
     }
-    m_root->bp_set_parent(m_parent, m_ndx_in_parent);
 }
 
 void BPlusTreeBase::destroy()

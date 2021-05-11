@@ -20,11 +20,13 @@
 #define REALM_RESULTS_HPP
 
 #include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
@@ -34,7 +36,6 @@
 
 namespace realm {
 class Mixed;
-class ObjectSchema;
 
 namespace _impl {
 class ResultsNotifierBase;
@@ -53,6 +54,8 @@ public:
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
             SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkSet> list, util::Optional<Query> q = {},
+            SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -69,6 +72,9 @@ public:
 
     // Object schema describing the vendored object type
     const ObjectSchema& get_object_schema() const REQUIRES(!m_mutex);
+
+    // Get the table of the vendored object type
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
@@ -102,6 +108,11 @@ public:
     // Throws OutOfBoundsIndexException if index >= size()
     template <typename T = Obj>
     T get(size_t index) REQUIRES(!m_mutex);
+
+    // Get an element in a list
+    Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -152,7 +163,7 @@ public:
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
-    bool is_frozen() REQUIRES(!m_mutex);
+    bool is_frozen() const REQUIRES(!m_mutex);
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
@@ -182,12 +193,13 @@ public:
     }
 
     enum class Mode {
-        Empty,     // Backed by nothing (for missing tables)
-        Table,     // Backed directly by a Table
-        List,      // Backed by a list-of-primitives that is not a link list.
-        Query,     // Backed by a query that has not yet been turned into a TableView
-        LinkList,  // Backed directly by a LinkList
-        TableView, // Backed by a TableView created from a Query
+        Empty,      // Backed by nothing (for missing tables)
+        Table,      // Backed directly by a Table
+        Collection, // Backed by a list-of-primitives, set-of-primitives or dictionary
+        Query,      // Backed by a query that has not yet been turned into a TableView
+        LinkList,   // Backed directly by a LinkList
+        LinkSet,    // Backed directly by a LnkSet
+        TableView,  // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
     // Ideally this would not be public but it's needed for some KVO stuff
@@ -295,6 +307,7 @@ private:
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
+    std::shared_ptr<LnkSet> m_link_set;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
@@ -303,7 +316,7 @@ private:
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
 
-    bool update_linklist() REQUIRES(m_mutex);
+    bool update_link_collection() REQUIRES(m_mutex);
 
     void validate_read() const;
     void validate_write() const;
@@ -327,10 +340,7 @@ private:
     template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
-    template <typename T>
-    auto& list_as() const;
-
-    void evaluate_sort_and_distinct_on_list() REQUIRES(m_mutex);
+    void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
     void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);
 
     class IteratorWrapper {

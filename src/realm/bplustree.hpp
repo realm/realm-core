@@ -132,8 +132,6 @@ public:
     }
     virtual ~BPlusTreeBase();
 
-    BPlusTreeBase& operator=(const BPlusTreeBase& rhs);
-    BPlusTreeBase& operator=(BPlusTreeBase&& rhs) noexcept;
 
     Allocator& get_alloc() const
     {
@@ -332,32 +330,6 @@ public:
     {
     }
 
-    BPlusTree(const BPlusTree& other)
-        : BPlusTree(other.get_alloc())
-    {
-        *this = other;
-    }
-
-    BPlusTree(BPlusTree&& other) noexcept
-        : BPlusTree(other.get_alloc())
-    {
-        *this = std::move(other);
-    }
-
-    /********************* Assignment ********************/
-
-    BPlusTree& operator=(const BPlusTree& rhs)
-    {
-        this->BPlusTreeBase::operator=(rhs);
-        return *this;
-    }
-
-    BPlusTree& operator=(BPlusTree&& rhs) noexcept
-    {
-        this->BPlusTreeBase::operator=(std::move(rhs));
-        return *this;
-    }
-
     /************ Tree manipulation functions ************/
 
     static T default_value(bool nullable = false)
@@ -382,23 +354,30 @@ public:
         m_size++;
     }
 
-    T get(size_t n) const
+    inline T get(size_t n) const
     {
+        // Fast path
         if (m_cached_leaf_begin <= n && n < m_cached_leaf_end) {
             return m_leaf_cache.get(n - m_cached_leaf_begin);
         }
         else {
-            T value;
-
-            auto func = [&value](BPlusTreeNode* node, size_t ndx) {
-                LeafNode* leaf = static_cast<LeafNode*>(node);
-                value = leaf->get(ndx);
-            };
-
-            m_root->bptree_access(n, func);
-
-            return value;
+            // Slow path
+            return get_uncached(n);
         }
+    }
+
+    REALM_NOINLINE T get_uncached(size_t n) const
+    {
+        T value;
+
+        auto func = [&value](BPlusTreeNode* node, size_t ndx) {
+            LeafNode* leaf = static_cast<LeafNode*>(node);
+            value = leaf->get(ndx);
+        };
+
+        m_root->bptree_access(n, func);
+
+        return value;
     }
 
     std::vector<T> get_all() const
@@ -737,6 +716,6 @@ ColumnAverageType<T> bptree_average(const BPlusTree<T>& tree, size_t* return_cnt
         *return_cnt = cnt;
     return avg;
 }
-}
+} // namespace realm
 
 #endif /* REALM_BPLUSTREE_HPP */

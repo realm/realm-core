@@ -123,7 +123,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config->error_handler = [](auto, auto) {
         abort();
     };
-    schema_mode = SchemaMode::Additive;
+    schema_mode = SchemaMode::AdditiveExplicit;
 }
 
 // MARK: - SyncServer
@@ -222,8 +222,8 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport_generator) {
-        app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
-            REALM_ASSERT_RELEASE(false);
+        app_config.transport_generator = [this] {
+            return transport_generator();
         };
     }
 

@@ -262,6 +262,7 @@ public:
     template <typename U>
     Set<U> get_set(ColKey col_key) const;
     LnkSet get_linkset(ColKey col_key) const;
+    LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
@@ -335,6 +336,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
+    void sync(Array& arr);
     int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>

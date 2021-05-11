@@ -33,7 +33,6 @@ public:
 
     virtual ~SetBase() {}
     virtual SetBasePtr clone() const = 0;
-    virtual size_t find_any(Mixed) const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
@@ -58,6 +57,8 @@ public:
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
     Set& operator=(Set&& other) noexcept;
+    using Base::operator==;
+    using Base::operator!=;
 
     SetBasePtr clone() const final
     {
@@ -104,16 +105,34 @@ public:
     bool is_subset_of(It1, It2) const;
 
     template <class Rhs>
+    bool is_strict_subset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_strict_subset_of(It1, It2) const;
+
+    template <class Rhs>
     bool is_superset_of(const Rhs&) const;
 
     template <class It1, class It2>
     bool is_superset_of(It1, It2) const;
 
     template <class Rhs>
+    bool is_strict_superset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_strict_superset_of(It1, It2) const;
+
+    template <class Rhs>
     bool intersects(const Rhs&) const;
 
     template <class It1, class It2>
     bool intersects(It1, It2) const;
+
+    template <class Rhs>
+    bool set_equals(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool set_equals(It1, It2) const;
 
     template <class Rhs>
     void assign_union(const Rhs&);
@@ -192,14 +211,14 @@ private:
         m_valid = true;
     }
 
-    bool init_from_parent() const final
+    REALM_NOINLINE bool init_from_parent() const final
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
         return m_valid;
     }
 
-    void ensure_created()
+    REALM_NOINLINE void ensure_created()
     {
         if (!m_valid && m_obj.is_valid()) {
             create();
@@ -207,6 +226,8 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+
+    iterator find_impl(const T& value) const;
 
     friend class LnkSet;
 };
@@ -228,6 +249,8 @@ public:
     LnkSet(LnkSet&&) = default;
     LnkSet& operator=(const LnkSet&) = default;
     LnkSet& operator=(LnkSet&&) = default;
+    bool operator==(const LnkSet& other) const;
+    bool operator!=(const LnkSet& other) const;
 
     ObjKey get(size_t ndx) const;
     size_t find(ObjKey) const;
@@ -258,6 +281,12 @@ public:
 
     template <class It1, class It2>
     void assign_symmetric_difference(It1, It2);
+
+    bool is_subset_of(const LnkSet& rhs) const;
+    bool is_strict_subset_of(const LnkSet& rhs) const;
+    bool is_superset_of(const LnkSet& rhs) const;
+    bool is_strict_superset_of(const LnkSet& rhs) const;
+    bool intersects(const LnkSet& rhs) const;
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_key;
@@ -435,11 +464,7 @@ struct SetElementLessThan<Mixed> {
                 return a.get<UUID>() < b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() < b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];
@@ -491,11 +516,7 @@ struct SetElementEquals<Mixed> {
                 return a.get<UUID>() == b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() == b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];
@@ -597,13 +618,16 @@ inline LnkSet Obj::get_linkset(ColKey col_key) const
     return LnkSet{*this, col_key};
 }
 
+inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
+{
+    return std::make_unique<LnkSet>(*this, col_key);
+}
+
 template <class T>
 size_t Set<T>::find(T value) const
 {
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    auto it = find_impl(value);
+    if (it != end() && SetElementEquals<T>{}(*it, value)) {
         return it.index();
     }
     return npos;
@@ -629,17 +653,23 @@ size_t Set<T>::find_any(Mixed value) const
 }
 
 template <class T>
+REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
+{
+    auto b = this->begin();
+    auto e = this->end();
+    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+}
+
+template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
 
     ensure_created();
     this->ensure_writeable();
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it != e && SetElementEquals<T>{}(*it, value)) {
+    if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
         return {it.index(), false};
     }
 
@@ -677,11 +707,9 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     update_if_needed();
     this->ensure_writeable();
 
-    auto b = this->begin();
-    auto e = this->end();
-    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    auto it = find_impl(value);
 
-    if (it == e || !SetElementEquals<T>{}(*it, value)) {
+    if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
 
@@ -722,7 +750,7 @@ std::pair<size_t, bool> Set<T>::erase_null()
 }
 
 template <class T>
-size_t Set<T>::size() const
+REALM_NOINLINE size_t Set<T>::size() const
 {
     if (!is_attached())
         return 0;
@@ -761,63 +789,38 @@ inline void Set<T>::clear()
 template <class T>
 inline Mixed Set<T>::min(size_t* return_ndx) const
 {
-    if (size() != 0) {
-        if (return_ndx) {
-            *return_ndx = 0;
-        }
-        return *begin();
-    }
-    else {
-        if (return_ndx) {
-            *return_ndx = not_found;
-        }
-        return Mixed{};
-    }
+    update_if_needed();
+    return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::max(size_t* return_ndx) const
 {
-    auto sz = size();
-    if (sz != 0) {
-        if (return_ndx) {
-            *return_ndx = sz - 1;
-        }
-        auto e = end();
-        --e;
-        return *e;
-    }
-    else {
-        if (return_ndx) {
-            *return_ndx = not_found;
-        }
-        return Mixed{};
-    }
+    update_if_needed();
+    return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
 template <class T>
 inline Mixed Set<T>::sum(size_t* return_cnt) const
 {
+    update_if_needed();
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
 inline Mixed Set<T>::avg(size_t* return_cnt) const
 {
+    update_if_needed();
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
+
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending);
 
 template <class T>
 inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
-    indices.resize(sz);
-    if (ascending) {
-        std::iota(indices.begin(), indices.end(), 0);
-    }
-    else {
-        std::iota(indices.rbegin(), indices.rend(), 0);
-    }
+    set_sorted_indices(sz, indices, ascending);
 }
 
 template <class T>
@@ -855,6 +858,27 @@ bool Set<T>::is_subset_of(It1 first, It2 last) const
 
 template <class T>
 template <class Rhs>
+bool Set<T>::is_strict_subset_of(const Rhs& rhs) const
+{
+    if constexpr (std::is_same_v<Rhs, Set<T>>) {
+        return size() != rhs.size() && is_subset_of(rhs);
+    }
+    else {
+        return is_strict_subset_of(rhs.begin(), rhs.end());
+    }
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_strict_subset_of(It1 begin, It2 end) const
+{
+    if (size_t(std::distance(begin, end)) == size())
+        return false;
+    return is_subset_of(begin, end);
+}
+
+template <class T>
+template <class Rhs>
 bool Set<T>::is_superset_of(const Rhs& rhs) const
 {
     return is_superset_of(std::begin(rhs), std::end(rhs));
@@ -869,53 +893,78 @@ bool Set<T>::is_superset_of(It1 first, It2 last) const
 
 template <class T>
 template <class Rhs>
+bool Set<T>::is_strict_superset_of(const Rhs& rhs) const
+{
+    if constexpr (std::is_same_v<Rhs, Set<T>>) {
+        return size() != rhs.size() && is_superset_of(rhs);
+    }
+    else {
+        return is_strict_superset_of(rhs.begin(), rhs.end());
+    }
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_strict_superset_of(It1 begin, It2 end) const
+{
+    if (size_t(std::distance(begin, end)) == size())
+        return false;
+    return is_superset_of(begin, end);
+}
+
+template <class T>
+template <class Rhs>
 bool Set<T>::intersects(const Rhs& rhs) const
 {
     return intersects(std::begin(rhs), std::end(rhs));
 }
 
-namespace _impl {
-template <class T>
-struct CountingOutputIterator {
-    using iterator_category = std::output_iterator_tag;
-    using value_type = void;
-    using difference_type = void;
-    using pointer = void;
-    using reference = void;
-
-    explicit CountingOutputIterator(size_t& num)
-        : num(&num)
-    {
-    }
-
-    size_t* num = nullptr;
-
-    CountingOutputIterator& operator=(const T&)
-    {
-        ++*num;
-        return *this;
-    }
-
-    CountingOutputIterator& operator*()
-    {
-        return *this;
-    }
-
-    CountingOutputIterator& operator++()
-    {
-        return *this;
-    }
-};
-} // namespace _impl
-
 template <class T>
 template <class It1, class It2>
 bool Set<T>::intersects(It1 first, It2 last) const
 {
-    size_t count = 0;
-    std::set_intersection(begin(), end(), first, last, _impl::CountingOutputIterator<T>{count},
-                          SetElementLessThan<T>{});
-    return count != 0;
+    SetElementLessThan<T> less;
+    auto it = begin();
+    while (it != end() && first != last) {
+        if (less(*it, *first)) {
+            ++it;
+        }
+        else if (less(*first, *it)) {
+            ++first;
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
+}
+
+template <class T>
+template <class Rhs>
+bool Set<T>::set_equals(const Rhs& rhs) const
+{
+    if (size() != rhs.size())
+        return false;
+    return set_equals(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::set_equals(It1 begin2, It2 end2) const
+{
+    auto end1 = end();
+
+    auto it1 = begin();
+    auto it2 = begin2;
+
+    auto cmp = SetElementEquals<T>{};
+
+    for (; it1 != end1 && it2 != end2; ++it1, ++it2) {
+        if (!cmp(*it1, *it2)) {
+            return false;
+        }
+    }
+    return it1 == end1 && it2 == end2;
 }
 
 template <class T>
@@ -929,10 +978,11 @@ template <class T>
 template <class It1, class It2>
 void Set<T>::assign_union(It1 first, It2 last)
 {
-    std::vector<T> the_union;
-    std::set_union(begin(), end(), first, last, std::back_inserter(the_union), SetElementLessThan<T>{});
-    clear();
-    for (auto value : the_union) {
+    std::vector<T> the_diff;
+    std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<T>{});
+    // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
+    // Now insert those elements
+    for (auto value : the_diff) {
         insert(value);
     }
 }
@@ -949,8 +999,9 @@ template <class It1, class It2>
 void Set<T>::assign_intersection(It1 first, It2 last)
 {
     std::vector<T> intersection;
-    std::set_intersection(begin(), end(), first, last, std::back_inserter(intersection), SetElementLessThan<T>{});
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
     clear();
+    // Elements in intersection comes from foreign set, so ok to use here
     for (auto value : intersection) {
         insert(value);
     }
@@ -967,11 +1018,12 @@ template <class T>
 template <class It1, class It2>
 void Set<T>::assign_difference(It1 first, It2 last)
 {
-    std::vector<T> difference;
-    std::set_difference(begin(), end(), first, last, std::back_inserter(difference), SetElementLessThan<T>{});
-    clear();
-    for (auto value : difference) {
-        insert(value);
+    std::vector<T> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
+    // 'intersection' now contains all the elements that are in both foreign set and 'this'.
+    // Remove those elements. The elements comes from the foreign set, so ok to refer to.
+    for (auto value : intersection) {
+        erase(value);
     }
 }
 
@@ -987,14 +1039,27 @@ template <class It1, class It2>
 void Set<T>::assign_symmetric_difference(It1 first, It2 last)
 {
     std::vector<T> difference;
-    std::set_symmetric_difference(begin(), end(), first, last, std::back_inserter(difference),
-                                  SetElementLessThan<T>{});
-    clear();
+    std::set_difference(first, last, begin(), end(), std::back_inserter(difference), SetElementLessThan<T>{});
+    std::vector<T> intersection;
+    std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
+    // Now remove the common elements and add the differences
+    for (auto value : intersection) {
+        erase(value);
+    }
     for (auto value : difference) {
         insert(value);
     }
 }
 
+inline bool LnkSet::operator==(const LnkSet& other) const
+{
+    return m_set == other.m_set;
+}
+
+inline bool LnkSet::operator!=(const LnkSet& other) const
+{
+    return m_set != other.m_set;
+}
 
 inline ObjKey LnkSet::get(size_t ndx) const
 {

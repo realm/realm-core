@@ -44,18 +44,19 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
-    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
+    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties, name_alias)
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
                            std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
     : name(std::move(name))
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , is_embedded(is_embedded)
+    , alias(name_alias)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
@@ -136,13 +137,6 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
 
     for (auto col_key : table->get_column_keys()) {
         StringData column_name = table->get_column_name(col_key);
-
-#if REALM_ENABLE_SYNC
-        // The object ID column is an implementation detail, and is omitted from the schema.
-        // FIXME: this can go away once sync adopts stable ids?
-        if (column_name.begins_with("!"))
-            continue;
-#endif
 
         Property property;
         property.name = column_name;
@@ -237,6 +231,9 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     }
     else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
+    }
+    else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type) && !is_collection(prop.type)) {
+        exceptions.emplace_back("Property '%1.%2' of type 'Mixed' must be nullable.", object_name, prop.name);
     }
 
     // check primary keys

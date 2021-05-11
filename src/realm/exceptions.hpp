@@ -219,9 +219,6 @@ private:
 /// exception being thrown. The whole point of properly documenting "Undefined
 /// Behaviour" cases is to help the user know what the limits are, without
 /// constraining the database to handle every and any use-case thrown at it.
-///
-/// FIXME: This exception class should probably be moved to the `_impl`
-/// namespace, in order to avoid some confusion.
 class LogicError : public ExceptionWithBacktrace<std::exception> {
 public:
     enum ErrorKind {

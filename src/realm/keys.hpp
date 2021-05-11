@@ -81,13 +81,11 @@ inline std::string to_string(TableKey tk)
 {
     return to_string(tk.value);
 }
-}
+} // namespace util
 
 class TableVersions : public std::vector<std::pair<TableKey, uint64_t>> {
 public:
-    TableVersions()
-    {
-    }
+    TableVersions() {}
     TableVersions(TableKey key, uint64_t version)
     {
         emplace_back(key, version);
@@ -111,7 +109,7 @@ struct ColKey {
     {
     }
     constexpr ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, uint64_t tag) noexcept
-        : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
+        : ColKey((index.val & 0xFFFFUL) | ((int(type) & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
     }
@@ -131,7 +129,7 @@ struct ColKey {
     {
         return get_attrs().test(col_attr_Dictionary);
     }
-    bool is_collection()
+    bool is_collection() const
     {
         return get_attrs().test(col_attr_Collection);
     }
@@ -166,7 +164,7 @@ struct ColKey {
     }
     ColumnType get_type() const noexcept
     {
-        return ColumnType((static_cast<unsigned>(value) >> 16) & 0x3F);
+        return ColumnType(ColumnType::Type((static_cast<unsigned>(value) >> 16) & 0x3F));
     }
     ColumnAttrMask get_attrs() const noexcept
     {
@@ -259,9 +257,7 @@ public:
             emplace_back(i);
         }
     }
-    ObjKeys()
-    {
-    }
+    ObjKeys() {}
 };
 
 struct ObjLink {
