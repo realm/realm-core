@@ -1249,6 +1249,34 @@ TEST_CASE("object") {
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
     }
 
+    SECTION("get and set an unresolved object") {
+        r->begin_transaction();
+
+        auto table = r->read_group().get_table("class_all types");
+        ColKey link_col = table->get_column_key("object");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+
+        auto link_table = r->read_group().get_table("class_link target");
+        link_table->create_object_with_primary_key(0);
+        Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
+
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+        obj.set_property_value(d, "object", util::Any(linkobj));
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+                linkobj.obj().get_key());
+
+        REQUIRE(!obj.obj().is_unresolved(link_col));
+        linkobj.obj().invalidate();
+        REQUIRE(obj.obj().is_unresolved(link_col));
+
+        CHECK_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+
+        // setting a null on an unresolved link corrupts the memory in a way which causes an assertion on rollback
+        obj.set_property_value(d, "object", util::Any());
+        r->cancel_transaction();
+    }
+
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
