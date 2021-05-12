@@ -44,7 +44,6 @@
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/version.hpp>
 #endif
 
 using namespace realm;
@@ -504,13 +503,6 @@ void Realm::notify_schema_changed()
     }
 }
 
-static void check_can_create_any_transaction(const Realm* realm)
-{
-    if (realm->config().immutable()) {
-        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
-    }
-}
-
 static void check_can_create_write_transaction(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
@@ -572,14 +564,12 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
-    check_can_create_any_transaction(this);
     return m_transaction->get_version_of_current_transaction();
 }
 
 uint_fast64_t Realm::get_number_of_versions() const
 {
     verify_open();
-    check_can_create_any_transaction(this);
     return m_coordinator->get_number_of_versions();
 }
 
@@ -682,7 +672,6 @@ void Realm::invalidate()
 {
     verify_open();
     verify_thread();
-    check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
         // This was originally because closing the Realm during notification
@@ -723,6 +712,20 @@ void Realm::write_copy(StringData path, BinaryData key)
     verify_thread();
     try {
         read_group().write(path, key.data());
+    }
+    catch (...) {
+        _impl::translate_file_exception(path);
+    }
+}
+
+void Realm::write_copy_without_client_file_id(StringData path, BinaryData key, bool allow_overwrite)
+{
+    if (key.data() && key.size() != 64) {
+        throw InvalidEncryptionKeyException();
+    }
+    verify_thread();
+    try {
+        m_coordinator->write_copy(path, key, allow_overwrite);
     }
     catch (...) {
         _impl::translate_file_exception(path);
@@ -799,7 +802,6 @@ void Realm::notify()
 bool Realm::refresh()
 {
     verify_thread();
-    check_can_create_any_transaction(this);
     return do_refresh();
 }
 

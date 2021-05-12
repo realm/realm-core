@@ -10,7 +10,7 @@
 #include <realm/sync/noinst/client_file_access_cache.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/version.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
 
@@ -529,7 +529,7 @@ inline ClientImpl::ClientImpl(Client::Config config)
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
-    logger.debug("Realm sync client (%1, %2)", REALM_VER_CHUNK, REALM_SYNC_VER_CHUNK); // Throws
+    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
     logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
                  get_current_protocol_version()); // Throws
     logger.debug("Platform: %1", util::get_platform_info());

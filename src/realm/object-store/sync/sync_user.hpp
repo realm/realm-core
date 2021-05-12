@@ -59,9 +59,9 @@ struct RealmJWT {
     std::string token;
 
     // When the token expires.
-    long expires_at;
+    int64_t expires_at;
     // When the token was issued.
-    long issued_at;
+    int64_t issued_at;
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
@@ -218,6 +218,10 @@ public:
 
     /// Refreshes the custom data for this user
     void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
+
+    /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
+    /// true.
+    bool access_token_refresh_required() const;
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);

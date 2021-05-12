@@ -79,6 +79,8 @@ else()
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
     endif()
 
+    add_cxx_flag_if_supported(-Wpartial-availability)
+
     # This warning is too agressive. It warns about moves that are not redundant on older
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)

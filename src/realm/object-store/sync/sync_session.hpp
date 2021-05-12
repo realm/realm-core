@@ -44,6 +44,7 @@ namespace sync_session_states {
 struct Active;
 struct Dying;
 struct Inactive;
+struct WaitingForAccessToken;
 } // namespace sync_session_states
 } // namespace _impl
 
@@ -115,6 +116,7 @@ public:
         Active,
         Dying,
         Inactive,
+        WaitingForAccessToken,
     };
 
     enum class ConnectionState {
@@ -207,13 +209,12 @@ public:
     // longer be open on behalf of it.
     void shutdown_and_wait();
 
-    // Override the address and port of the server that this `SyncSession` is connected to. If the
-    // session is already connected, it will disconnect and then reconnect to the specified address.
-    // If it's not already connected, future connection attempts will be to the specified address.
-    //
-    // NOTE: This is intended for use only in very specific circumstances. Please check with the
-    // object store team before using it.
-    void override_server(std::string address, int port);
+    // The access token needs to periodically be refreshed and this is how to
+    // let the sync session know to update it's internal copy.
+    void update_access_token(std::string signed_token);
+
+    // Request an updated access token from this session's sync user.
+    void initiate_access_token_refresh();
 
     // Update the sync configuration used for this session. The new configuration must have the
     // same user and reference realm url as the old configuration. The session will immediately
@@ -285,6 +286,7 @@ private:
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
+    friend struct _impl::sync_session_states::WaitingForAccessToken;
 
     class ConnectionChangeNotifier {
     public:
@@ -342,6 +344,7 @@ private:
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
+    void do_create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
 

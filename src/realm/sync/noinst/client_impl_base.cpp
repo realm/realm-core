@@ -15,7 +15,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
@@ -134,7 +134,7 @@ std::string ClientImplBase::make_user_agent_string(Config& config)
     if (platform_info.empty())
         platform_info = util::get_platform_info(); // Throws
     std::ostringstream out;
-    out << "RealmSync/" REALM_SYNC_VER_STRING " (" << platform_info << ")"; // Throws
+    out << "RealmSync/" REALM_VERSION_STRING " (" << platform_info << ")"; // Throws
     if (!config.user_agent_application_info.empty())
         out << " " << config.user_agent_application_info; // Throws
     return out.str();                                     // Throws
