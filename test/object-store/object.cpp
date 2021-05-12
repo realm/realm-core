@@ -1272,8 +1272,9 @@ TEST_CASE("object") {
 
         CHECK_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
 
-        // setting a null on an unresolved link corrupts the memory in a way which causes an assertion on rollback
         obj.set_property_value(d, "object", util::Any());
+        // Cancelling a transaction in which the first tombstone was created, caused the program to crash
+        // because we tried to update m_tombstones on a null ref. Now fixed
         r->cancel_transaction();
     }
 

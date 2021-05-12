@@ -2571,7 +2571,8 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
     return table;
 }
 
-
+// Called after a commit. Table will effectively contain the same as before,
+// but now with new refs from the file
 void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
@@ -2585,10 +2586,8 @@ void Table::update_from_parent() noexcept
                 index->update_from_parent();
             }
         }
-        if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent();
-        if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent();
+        m_opposite_table.update_from_parent();
+        m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
@@ -2751,6 +2750,9 @@ void Table::refresh_content_version()
     }
 }
 
+
+// Called when Group is moved to another version - either a rollback or an advance.
+// The content of the table is potentially different, so make no assumptions.
 void Table::refresh_accessor_tree()
 {
     REALM_ASSERT(m_cookie == cookie_initialized);
@@ -2771,8 +2773,16 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
-    if (m_tombstones)
+    if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
+        // Tombstones exists
+        if (!m_tombstones) {
+            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        }
         m_tombstones->init_from_parent();
+    }
+    else {
+        m_tombstones = nullptr;
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();

@@ -112,7 +112,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         if (!policy.diff || !m_obj.is_null(col)) {
             if (property.type == PropertyType::Object) {
                 if (!is_default)
-                    m_obj.set_null(col); // FIXME: setting null on an unresolved link causes some bug
+                    m_obj.set_null(col);
             }
             else {
                 m_obj.set_null(col, is_default);
