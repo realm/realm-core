@@ -95,7 +95,8 @@ public:
     }
     bool is_null(size_t ndx) const
     {
-        return Array::get(ndx) == 0;
+        ObjKey key = get(ndx);
+        return !key || key.is_unresolved();
     }
     void move(ArrayKeyBase& dst, size_t ndx)
     {
