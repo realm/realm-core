@@ -141,11 +141,29 @@ Group::Group(SlabAlloc* alloc) noexcept
     init_array_parents();
 }
 
+class TableRecycler : public std::vector<Table*> {
+public:
+    ~TableRecycler()
+    {
+        REALM_UNREACHABLE();
+        // if ever enabled, remember to release Tables:
+        // for (auto t : *this) {
+        //    delete t;
+        //}
+    }
+};
 
-Group::TableRecycler Group::g_table_recycler_1;
-Group::TableRecycler Group::g_table_recycler_2;
-std::mutex Group::g_table_recycler_mutex;
-
+// We use the classic approach to construct a FIFO from two LIFO's,
+// insertion is done into recycler_1, removal is done from recycler_2,
+// and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
+// this i O(1) for each entry.
+auto& g_table_recycler_1 = *new TableRecycler;
+auto& g_table_recycler_2 = *new TableRecycler;
+// number of tables held back before being recycled. We hold back recycling
+// the latest to increase the probability of detecting race conditions
+// without crashing.
+const static int g_table_recycling_delay = 100;
+auto& g_table_recycler_mutex = *new std::mutex;
 
 TableKeyIterator& TableKeyIterator::operator++()
 {
