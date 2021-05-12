@@ -8242,8 +8242,8 @@ TEST(Sync_Set)
 
         CHECK_EQUAL(mixeds.size(), 3);
         CHECK_EQUAL(mixeds.find(123), 0);
-        CHECK_EQUAL(mixeds.find("a"), 1);
-        CHECK_EQUAL(mixeds.find(456.0), 2);
+        CHECK_EQUAL(mixeds.find(456.0), 1);
+        CHECK_EQUAL(mixeds.find("a"), 2);
 
         session_1.nonsync_transact_notify(wt.commit());
     }

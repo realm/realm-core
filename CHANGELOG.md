@@ -14,6 +14,8 @@
 * Changed the average of an empty set from 0 to null. ([#4678](https://github.com/realm/realm-core/issues/4678), since v11.0.0-beta.0)
 * Changed the sum of an empty dictionary from null to 0. ([#4678](https://github.com/realm/realm-core/issues/4678), since v11.0.0-beta.0)
 * Some way - used in realm-cocoa - of constructing a Query could result in a use-after-free violation ([#4670](https://github.com/realm/realm-core/pull/4670), since v11.0.0-beta.0)
+* Fix the order of a sorted set of mixed values. ([#4662](https://github.com/realm/realm-core/pull/4662), since v11.0.0-beta.0)
+* Use same rules for handling numeric values in sets as MongoDB uses. All numeric values are compared using the value irregardless of the type.  ([#4686](https://github.com/realm/realm-core/pull/4686), since v11.0.0-beta.0)
  
 ### Breaking changes
 * None.

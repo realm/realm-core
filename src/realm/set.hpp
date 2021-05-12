@@ -389,50 +389,30 @@ struct SetElementLessThan<Mixed> {
         // CAUTION: This routine is technically part of the file format, because
         // it determines the storage order of Set elements.
 
-        if (a.is_null() != b.is_null()) {
-            // If a is NULL but not b, a < b.
-            return a.is_null();
-        }
-        else if (a.is_null()) {
-            // NULLs are equal.
-            return false;
-        }
+        // These are the rules for comparison of Mixed types in a Set<Mixed>:
+        // - If both values are null they are equal
+        // - If only one value is null, that value is lesser than the other
+        // - All numeric types are compared as the corresponding real numbers
+        //   would compare. So integer 3 equals double 3.
+        // - String and binary types are compared using lexicographical comparison.
+        // - All other types are compared using the comparison operators defined
+        //   for the types.
+        // - If two values have different types, the rank of the types are compared.
+        //   the rank is as follows:
+        //       boolean
+        //       numeric
+        //       string/binary
+        //       Timestamp
+        //       ObjectId
+        //       UUID
+        //       TypedLink
+        //       Link
+        //
+        // The current Mixed::compare_utf8 function implements these rules. If that
+        // function is changed we should either implement the rules here or
+        // upgrade all Set<Mixed> columns.
 
-        if (a.get_type() != b.get_type()) {
-            return a.get_type() < b.get_type();
-        }
-
-        switch (a.get_type()) {
-            case type_Int:
-                return a.get<int64_t>() < b.get<int64_t>();
-            case type_Bool:
-                return a.get<bool>() < b.get<bool>();
-            case type_String:
-                return a.get<StringData>() < b.get<StringData>();
-            case type_Binary:
-                return a.get<BinaryData>() < b.get<BinaryData>();
-            case type_Timestamp:
-                return a.get<Timestamp>() < b.get<Timestamp>();
-            case type_Float:
-                return a.get<float>() < b.get<float>();
-            case type_Double:
-                return a.get<double>() < b.get<double>();
-            case type_Decimal:
-                return a.get<Decimal128>() < b.get<Decimal128>();
-            case type_ObjectId:
-                return a.get<ObjectId>() < b.get<ObjectId>();
-            case type_UUID:
-                return a.get<UUID>() < b.get<UUID>();
-            case type_TypedLink:
-                return a.get<ObjLink>() < b.get<ObjLink>();
-            case type_Mixed:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_LinkList:
-                REALM_TERMINATE("Invalid Mixed payload in Set.");
-        }
-        return false;
+        return a.compare(b) < 0;
     }
 };
 
@@ -443,48 +423,9 @@ struct SetElementEquals<Mixed> {
         // CAUTION: This routine is technically part of the file format, because
         // it determines the storage order of Set elements.
 
-        if (a.is_null() != b.is_null()) {
-            return false;
-        }
-        else if (a.is_null()) {
-            return true;
-        }
+        // See comments above
 
-        if (a.get_type() != b.get_type()) {
-            return false;
-        }
-
-        switch (a.get_type()) {
-            case type_Int:
-                return a.get<int64_t>() == b.get<int64_t>();
-            case type_Bool:
-                return a.get<bool>() == b.get<bool>();
-            case type_String:
-                return a.get<StringData>() == b.get<StringData>();
-            case type_Binary:
-                return a.get<BinaryData>() == b.get<BinaryData>();
-            case type_Timestamp:
-                return a.get<Timestamp>() == b.get<Timestamp>();
-            case type_Float:
-                return a.get<float>() == b.get<float>();
-            case type_Double:
-                return a.get<double>() == b.get<double>();
-            case type_Decimal:
-                return a.get<Decimal128>() == b.get<Decimal128>();
-            case type_ObjectId:
-                return a.get<ObjectId>() == b.get<ObjectId>();
-            case type_UUID:
-                return a.get<UUID>() == b.get<UUID>();
-            case type_TypedLink:
-                return a.get<ObjLink>() == b.get<ObjLink>();
-            case type_Mixed:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_LinkList:
-                REALM_TERMINATE("Invalid Mixed payload in Set.");
-        }
-        return false;
+        return a.compare(b) == 0;
     }
 };
 
