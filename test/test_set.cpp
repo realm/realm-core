@@ -120,9 +120,9 @@ TEST(Set_Mixed)
                                   56.f,
                                   88.,
                                   "Hello, World!",
-                                  "æbler",
-                                  "ørken",
-                                  "ådsel",
+                                  "æbler", // Apples
+                                  "ørken", // Dessert
+                                  "ådsel", // Carrion
                                   Timestamp(1, 2),
                                   ObjectId::gen(),
                                   UUID("01234567-9abc-4def-9012-3456789abcde"),

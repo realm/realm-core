@@ -122,9 +122,9 @@ inline Mixed TestValueGenerator::convert_for_test<Mixed>(int64_t v)
     static std::vector<Mixed> arr = {4, 5.6, Timestamp(5, 6), "Hello", false};
     switch (v & 0x7) {
         case 0:
-            return Mixed(v);
-        case 1:
             return Mixed(true);
+        case 1:
+            return Mixed(v);
         case 2:
             return Mixed(convert_for_test<StringData>(v));
         case 3:
