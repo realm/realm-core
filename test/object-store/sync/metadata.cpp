@@ -23,6 +23,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>
@@ -341,14 +342,65 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
+    const auto identity0 = "identity0";
+    const auto auth_url = "https://realm.example.org";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
-            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, make_test_encryption_key(11)));
+            {
+                // Open metadata realm, make metadata
+                std::vector<char> key0 = make_test_encryption_key(10);
+                SyncMetadataManager manager0(metadata_path, true, key0);
+
+                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0, auth_url);
+                REQUIRE(bool(user_metadata0));
+                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->provider_type() == auth_url);
+                CHECK(user_metadata0->access_token().empty());
+                CHECK(user_metadata0->is_valid());
+            }
+            // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
+            // Open new metadata realm at path with different key
+            std::vector<char> key1 = make_test_encryption_key(11);
+            SyncMetadataManager manager1(metadata_path, true, key1);
+
+            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
+            // Expect previous metadata to have been deleted
+            CHECK_FALSE(bool(user_metadata1));
+
+            // But new metadata can still be created
+            const auto identity1 = "identity1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1, auth_url);
+            CHECK(user_metadata2->identity() == identity1);
+            CHECK(user_metadata2->provider_type() == auth_url);
+            CHECK(user_metadata2->access_token().empty());
+            CHECK(user_metadata2->is_valid());
         }
         SECTION("different encryption settings") {
-            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
+            {
+                // Encrypt metadata realm at path, make metadata
+                SyncMetadataManager manager0(metadata_path, true, make_test_encryption_key(10));
+
+                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0, auth_url);
+                REQUIRE(bool(user_metadata0));
+                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->provider_type() == auth_url);
+                CHECK(user_metadata0->access_token().empty());
+                CHECK(user_metadata0->is_valid());
+            }
+            // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
+            // Open new metadata realm at path with different encryption configuration
+            SyncMetadataManager manager1(metadata_path, false);
+            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
+            // Expect previous metadata to have been deleted
+            CHECK_FALSE(bool(user_metadata1));
+
+            // But new metadata can still be created
+            const auto identity1 = "identity1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1, auth_url);
+            CHECK(user_metadata2->identity() == identity1);
+            CHECK(user_metadata2->provider_type() == auth_url);
+            CHECK(user_metadata2->access_token().empty());
+            CHECK(user_metadata2->is_valid());
         }
     }
 
