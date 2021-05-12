@@ -178,10 +178,10 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t object_
         }
 
         if (!link.is_list) {
-            if (obj.is_null(ColKey(link.col_key)))
+            ObjKey dst_key = obj.get<ObjKey>(ColKey(link.col_key));
+            if (!dst_key) // do not descend into a null or unresolved link
                 return false;
-            auto object_key = obj.get<ObjKey>(ColKey(link.col_key)).value;
-            return check_row(*table.get_link_target(ColKey(link.col_key)), object_key, filtered_columns, depth + 1);
+            return check_row(*table.get_link_target(ColKey(link.col_key)), dst_key.value, filtered_columns, depth + 1);
         }
 
         auto& target = *table.get_link_target(ColKey(link.col_key));

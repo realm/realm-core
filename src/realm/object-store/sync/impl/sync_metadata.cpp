@@ -157,7 +157,19 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         config.encryption_key = std::move(*encryption_key);
     }
 
-    SharedRealm realm = Realm::get_shared_realm(config);
+    m_metadata_config = std::move(config);
+
+    SharedRealm realm;
+    try {
+        realm = get_realm();
+    }
+    catch (const RealmFileException& e) {
+        if (e.kind() != RealmFileException::Kind::AccessError)
+            throw;
+
+        util::File::remove(m_metadata_config.path);
+        realm = get_realm();
+    }
 
     // Get data about the (hardcoded) schemas
     auto object_schema = realm->schema().find(c_sync_userMetadata);
@@ -195,8 +207,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key};
-
-    m_metadata_config = std::move(config);
 
     m_client_uuid = [&]() -> std::string {
         TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_clientMetadata);

@@ -1467,7 +1467,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             }
             // no index on best node (and likely no index at all), descend B+-tree
             node = pn;
-            QueryStateFindAll st(ret.m_key_values, limit);
+            QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
 
             auto f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
