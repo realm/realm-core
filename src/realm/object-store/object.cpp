@@ -142,7 +142,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(callback), key_path_array)};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 void Object::verify_attached() const

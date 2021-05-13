@@ -40,7 +40,7 @@ private:
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 
-    bool object_was_deleted(ObjectChangeSet object_change_set);
+    bool object_was_deleted(const ObjectChangeSet& object_change_set);
 };
 } // namespace _impl
 } // namespace realm

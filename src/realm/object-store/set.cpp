@@ -205,7 +205,7 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback callba
         m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
         RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(callback), key_path_array)};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \

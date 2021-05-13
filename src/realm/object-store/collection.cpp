@@ -177,7 +177,7 @@ NotificationToken Collection::add_notification_callback(CollectionChangeCallback
         m_notifier = std::make_shared<_impl::ListNotifier>(m_realm, *m_coll_base, m_type);
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(callback), key_path_array)};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 

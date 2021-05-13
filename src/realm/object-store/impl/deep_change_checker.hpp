@@ -88,7 +88,8 @@ public:
     };
 
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                      std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+                      std::vector<RelatedTable> const& related_tables,
+                      const std::vector<KeyPathArray>& key_path_arrays);
 
     /**
      * Check if the object identified by `object_key` was changed.
@@ -135,12 +136,12 @@ public:
      *                        `CollectionNotifier`.
      */
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                             std::vector<KeyPathArray> key_path_arrays);
+                                             const std::vector<KeyPathArray>& key_path_arrays);
 
     // This function is only used by `find_filtered_related_tables` internally.
     // It is however used in some tests and therefore exposed here.
     static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                        std::vector<TableKey> tables_in_filters);
+                                        const std::vector<TableKey>& tables_in_filters);
 
 protected:
     TransactionChangeInfo const& m_info;
@@ -182,7 +183,8 @@ private:
      *
      * @return True if the object was changed, false otherwise.
      */
-    bool check_row(Table const& table, ObjKeyType object_key, std::vector<ColKey> filtered_columns, size_t depth = 0);
+    bool check_row(Table const& table, ObjKeyType object_key, const std::vector<ColKey>& filtered_columns,
+                   size_t depth = 0);
 
     /**
      * Check the `table` within `m_related_tables` for changes in it's outgoing links.
@@ -195,7 +197,7 @@ private:
      *         False if the `table` is not contained in `m_related_tables` or the `table` does not have any
      *         outgoing links at all or the `table` does not have linked objects with changes.
      */
-    bool check_outgoing_links(Table const& table, int64_t object_key, std::vector<ColKey> filtered_columns,
+    bool check_outgoing_links(Table const& table, int64_t object_key, const std::vector<ColKey>& filtered_columns,
                               size_t depth = 0);
 };
 
@@ -207,7 +209,8 @@ private:
 class KeyPathChangeChecker : DeepChangeChecker {
 public:
     KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                         std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+                         std::vector<RelatedTable> const& related_tables,
+                         const std::vector<KeyPathArray>& key_path_arrays);
 
     /**
      * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided
@@ -231,7 +234,8 @@ public:
 class ObjectChangeChecker : DeepChangeChecker {
 public:
     ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                        std::vector<RelatedTable> const& related_tables, std::vector<KeyPathArray> key_path_arrays);
+                        std::vector<RelatedTable> const& related_tables,
+                        const std::vector<KeyPathArray>& key_path_arrays);
 
     /**
      * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided

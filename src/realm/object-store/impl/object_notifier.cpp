@@ -63,9 +63,8 @@ void ObjectNotifier::run()
         auto object_change_checker = get_object_modification_checker(*m_info, m_table);
         std::vector<int64_t> changed_columns = object_change_checker(m_obj.value);
 
-        auto it = m_info->tables.find(m_table->get_key().value);
-        if (it != m_info->tables.end()) {
-            auto& change = it->second;
+        if (auto it = m_info->tables.find(m_table->get_key().value); it != m_info->tables.end()) {
+            const auto& change = it->second;
             if (object_was_deleted(change)) {
                 return;
             }
@@ -88,7 +87,7 @@ void ObjectNotifier::run()
         // hence no further details have to be checked.
         return;
 
-    auto& change = it->second;
+    const auto& change = it->second;
     if (object_was_deleted(change)) {
         return;
     }
@@ -104,7 +103,7 @@ void ObjectNotifier::run()
     }
 }
 
-bool ObjectNotifier::object_was_deleted(ObjectChangeSet object_change_set)
+bool ObjectNotifier::object_was_deleted(const ObjectChangeSet& object_change_set)
 {
     if (object_change_set.deletions_contains(m_obj.value)) {
         // The object was deleted after adding the notifier.

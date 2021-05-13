@@ -93,17 +93,17 @@ void CollectionNotifier::recalculate_key_path_arrays()
     }
 }
 
-bool CollectionNotifier::any_callbacks_filtered()
+bool CollectionNotifier::any_callbacks_filtered() const noexcept
 {
-    return any_of(begin(m_callbacks), end(m_callbacks), [](auto& callback) {
+    return any_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
         return callback.key_path_array.size() > 0;
     });
 }
 
 
-bool CollectionNotifier::all_callbacks_filtered()
+bool CollectionNotifier::all_callbacks_filtered() const noexcept
 {
-    return all_of(begin(m_callbacks), end(m_callbacks), [](auto& callback) {
+    return all_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
         return callback.key_path_array.size() > 0;
     });
 }
@@ -132,7 +132,7 @@ uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, Key
 
     util::CheckedLockGuard lock(m_callback_mutex);
     auto token = m_next_token++;
-    m_callbacks.push_back({std::move(callback), {}, {}, key_path_array, token, false, false});
+    m_callbacks.push_back({std::move(callback), {}, {}, std::move(key_path_array), token, false, false});
     m_did_modify_callbacks = true;
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();

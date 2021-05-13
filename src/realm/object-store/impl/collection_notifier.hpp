@@ -53,28 +53,28 @@ using ObjKeyType = decltype(ObjKey::value);
 // to this collection.
 struct NotificationCallback {
     // The callback function being invoked when we notify for changes in this collection.
-    CollectionChangeCallback fn;
+    CollectionChangeCallback fn = CollectionChangeCallback();
     // The pending changes accumulated on the worker thread. This field is
     // guarded by m_callback_mutex and is written to on the worker thread,
     // then read from on the target thread.
-    CollectionChangeBuilder accumulated_changes;
+    CollectionChangeBuilder accumulated_changes = CollectionChangeBuilder();
     // The changeset which will actually be passed to `fn`. This field is
     // not guarded by a lock and can only be accessed on the notifier's
     // target thread.
-    CollectionChangeBuilder changes_to_deliver;
+    CollectionChangeBuilder changes_to_deliver = CollectionChangeBuilder();
     // The filter that this `NotificationCallback` is restricted to. Elements not part
     // of the `key_path_array` should not invoke a notification.
-    KeyPathArray key_path_array;
+    KeyPathArray key_path_array = {};
     // A unique-per-notifier identifier used to unregister the callback.
-    uint64_t token;
+    uint64_t token = 0;
     // We normally want to skip calling the callback if there's no changes,
     // but only if we've sent the initial notification (to support the
     // async query use-case). Not guarded by a mutex and is only readable
     // on the target thread.
-    bool initial_delivered;
+    bool initial_delivered = false;
     // Set within a write transaction on the target thread if this callback
     // should not be called with changes for that write. requires m_callback_mutex.
-    bool skip_next;
+    bool skip_next = false;
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
@@ -210,13 +210,16 @@ protected:
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
     void recalculate_key_path_arrays() REQUIRES(m_callback_mutex);
-    std::vector<KeyPathArray> m_key_path_arrays;
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
-    bool any_callbacks_filtered();
+    bool any_callbacks_filtered() const noexcept;
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to all of them.
-    bool all_callbacks_filtered();
+    bool all_callbacks_filtered() const noexcept;
+
+    // A summary of all `KeyPathArray`s attached to the `m_callbacks`.
+    std::vector<KeyPathArray> m_key_path_arrays;
+
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
 
@@ -239,6 +242,13 @@ private:
     {
         return true;
     }
+    // Iterate over m_callbacks and call the given function on each one. This
+    // does fancy locking things to allow fn to drop the lock before invoking
+    // the callback (which must be done to avoid deadlocks).
+    template <typename Fn>
+    void for_each_callback(Fn&& fn) REQUIRES(!m_callback_mutex);
+
+    std::vector<NotificationCallback>::iterator find_callback(uint64_t token);
 
     mutable std::mutex m_realm_mutex;
     std::shared_ptr<Realm> m_realm;
@@ -250,7 +260,7 @@ private:
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
 
-    // All `NotificationCallback`s added to this `ColellectionNotifier` via `add_callback()`.
+    // All `NotificationCallback`s added to this `CollectionNotifier` via `add_callback()`.
     std::vector<NotificationCallback> m_callbacks;
 
     // Cached value for if m_callbacks is empty, needed to avoid deadlocks in
@@ -270,14 +280,6 @@ private:
     size_t m_callback_count = -1;
 
     uint64_t m_next_token = 0;
-
-    // Iterate over m_callbacks and call the given function on each one. This
-    // does fancy locking things to allow fn to drop the lock before invoking
-    // the callback (which must be done to avoid deadlocks).
-    template <typename Fn>
-    void for_each_callback(Fn&& fn) REQUIRES(!m_callback_mutex);
-
-    std::vector<NotificationCallback>::iterator find_callback(uint64_t token);
 };
 
 // A smart pointer to a CollectionNotifier that unregisters the notifier when

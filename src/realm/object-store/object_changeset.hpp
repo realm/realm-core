@@ -66,7 +66,7 @@ public:
      * @return True if `obj` is contained in `m_modifications` and `filtered_col_keys` contains
      *         at least one changed column. False otherwise.
      */
-    bool modifications_contains(ObjectKeyType obj, std::vector<ColKey> filtered_col_keys) const;
+    bool modifications_contains(ObjectKeyType obj, const std::vector<ColKey>& filtered_col_keys) const;
     bool deletions_contains(ObjectKeyType obj) const;
     // if the specified object has not been modified, returns nullptr
     // if the object has been modified, returns a pointer to the ObjectSet
