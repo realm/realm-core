@@ -89,11 +89,24 @@ public:
         return "Reports test results in a format consumable by Evergreen.";
     }
     void noMatchingTestCases(std::string const& /*spec*/) override {}
-    using Base::assertionEnded;
     using Base::testGroupEnded;
     using Base::testGroupStarting;
     using Base::testRunStarting;
 
+    bool assertionEnded(AssertionStats const& assertionStats) override
+    {
+        if (!assertionStats.assertionResult.isOk()) {
+            std::cerr << "Assertion failure: " << assertionStats.assertionResult.getSourceInfo() << std::endl;
+            std::cerr << "\t from expresion: '" << assertionStats.assertionResult.getExpression() << "'" << std::endl;
+            std::cerr << "\t with expansion: '" << assertionStats.assertionResult.getExpandedExpression() << "'"
+                      << std::endl;
+            for (auto& message : assertionStats.infoMessages) {
+                std::cerr << "\t message: " << message.message << std::endl;
+            }
+            std::cerr << std::endl;
+        }
+        return true;
+    }
     void testCaseStarting(TestCaseInfo const& testCaseInfo) override
     {
         m_results.emplace(std::make_pair(testCaseInfo.name, TestResult{}));
