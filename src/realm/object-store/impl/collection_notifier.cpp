@@ -235,11 +235,10 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
         if (already_checking(outgoing_link_column))
             return false;
         if (!outgoing_link_column.is_collection()) {
-            if (obj.is_null(outgoing_link_column))
+            ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
+            if (!dst_key) // do not descend into a null or unresolved link
                 return false;
-            ObjKey dst = obj.get<ObjKey>(outgoing_link_column);
-            REALM_ASSERT(dst);
-            return check_row(*table.get_link_target(outgoing_link_column), dst.value, depth + 1);
+            return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, depth + 1);
         }
         auto collection_ptr = obj.get_collection_ptr(outgoing_link_column);
         return do_check_for_collection_modifications(std::move(collection_ptr), depth);

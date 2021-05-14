@@ -192,6 +192,8 @@ struct TestSyncManager {
         return m_sync_server;
     }
 
+    std::function<std::unique_ptr<realm::app::GenericNetworkTransport>()> transport_generator;
+
 private:
     std::shared_ptr<realm::app::App> m_app;
     SyncServer m_sync_server;

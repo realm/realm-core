@@ -1369,6 +1369,35 @@ TEST_CASE("object") {
         validate_change(AnyDict{{"_id", util::Any()}, {"mixed", object_id}}, util::Any(object_id.get_timestamp()));
     }
 
+    SECTION("get and set an unresolved object") {
+        r->begin_transaction();
+
+        auto table = r->read_group().get_table("class_all types");
+        ColKey link_col = table->get_column_key("object");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+
+        auto link_table = r->read_group().get_table("class_link target");
+        link_table->create_object_with_primary_key(0);
+        Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
+
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+        obj.set_property_value(d, "object", util::Any(linkobj));
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+                linkobj.obj().get_key());
+
+        REQUIRE(!obj.obj().is_unresolved(link_col));
+        linkobj.obj().invalidate();
+        REQUIRE(obj.obj().is_unresolved(link_col));
+
+        CHECK_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+
+        obj.set_property_value(d, "object", util::Any());
+        // Cancelling a transaction in which the first tombstone was created, caused the program to crash
+        // because we tried to update m_tombstones on a null ref. Now fixed
+        r->cancel_transaction();
+    }
+
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;

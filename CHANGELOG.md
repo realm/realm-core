@@ -23,10 +23,61 @@
 -----------
 
 ### Internals
+* Includes changes from versions 10.6.1, 10.7.0, 10.7.1 and 10.7.2.
+
+----------------------------------------------
+
+# 10.7.2 Release notes
+
+### Fixed
+* Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
+  TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
+* Calling `Realm::get_synchronized_realm()` while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
+* Fixed errors related to "uncaught exception in notifier thread: N5realm11KeyNotFoundE: No such object". This could happen in a sync'd app when a linked object was deleted by another client. ([realm-js#3611](https://github.com/realm/realm-js/issues/3611), since v6.1.0-alpha.5)
+* Changed the behaviour of `Object::get_property_value(Context)` when fetching an unresolved link from returning an empty Object, to returning null which is consistent with how this method behaves on a null link. ([#4687](https://github.com/realm/realm-core/pull/4687), since v6.1.0-alpha.5)
+* Opening a metadata realm with the wrong encryption key or different encryption configuration will remove that metadata realm and create a new metadata realm using the new key or configuration. [#4285](https://github.com/realm/realm-core/pull/4285)
+* A read-only Realm does not support `ThreadSafeReference` ([Cocoa #5475](https://github.com/realm/realm-cocoa/issues/5475)).
+
+----------------------------------------------
+
+# 10.7.1 Release notes
+
+### Fixed
+* Restored original behavior of Realm::write_copy() as it had breaking pre-conditions. New behavior now in Realm::write_copy_without_client_file_id(). ([#4674](https://github.com/realm/realm-core/pull/4674), since v10.7.0)
+* Realm::write_copy() of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
+
+----------------------------------------------
+
+# 10.7.0 Release notes
+
+### Enhancements
+* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
+
+### Fixed
+* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime ([#4614](https://github.com/realm/realm-core/pull/4614) Since v10.6.0).
+* Fixed the android scheduler not being supplied which could result in `[realm-core-10.6.1] No built-in scheduler implementation for this platform. Register your own with Scheduler::set_default_factory()` ([#4660](https://github.com/realm/realm-core/pull/4660) Since v10.6.1).
+* Fixed a crash that could happen adding a upload/download notification for a sync session. ([#4638](https://github.com/realm/realm-core/pull/4638#issuecomment-832227309) since v10.6.1).
+ 
+-----------
+
+### Internals
+* A separate sync version is removed.
+
+----------------------------------------------
+
+# 10.6.1 Release notes
+
+### Fixed
+* Proactively check the expiry time on the access token and refresh it before attempting to initiate a sync session. This prevents some error logs from appearing on the client such as: "ERROR: Connection[1]: Websocket: Expected HTTP response 101 Switching Protocols, but received: HTTP/1.1 401 Unauthorized" ([RCORE-473](https://jira.mongodb.org/browse/RCORE-473), since v10.0.0)
+* Fix a race condition which could result in a skipping notifications failing to skip if several commits using notification skipping were made in succession (since v6.0.0).
+ 
+-----------
+
+### Internals
 * The `util::Scheduler` interface was refactored to support multiple implementations existing in a single binary. This allows multiple SDKs targeting the same platform but different language runtimes to use the same build of Core. Current SDKs are not affected by this change.
 * The function `util::Scheduler::set_default_factory()` now works on all platforms, and can be used to override the platform-default scheduler implementation.
 * The function `util::Scheduler::get_frozen()` was deprecated in favor of `util::Scheduler::make_frozen()`, which has the same behavior.
-* The DB class now supports opening a realm file on a write-only file system.
+* The DB class now supports opening a realm file on a read-only file system.
   ([#4582](https://github.com/realm/realm-core/pull/4582))
 * The `ListColumnAggregate` has been renamed to `CollectionColumnAggregate` which now supports dictionaries instead of having a separate type `DictionaryAggregate` which is now removed. This allows `ColumnsCollection` min/max/sum/avg to work on dictionary column queries as well.
 

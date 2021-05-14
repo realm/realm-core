@@ -1013,7 +1013,7 @@ void Table::do_erase_root_column(ColKey col_key)
     build_column_mapping();
     while (m_index_accessors.size() > m_leaf_ndx2colkey.size()) {
         REALM_ASSERT(m_index_accessors.back() == nullptr);
-        m_index_accessors.erase(m_index_accessors.end() - 1);
+        m_index_accessors.pop_back();
     }
     bump_content_version();
     bump_storage_version();
@@ -1105,19 +1105,19 @@ void Table::fully_detach() noexcept
 
 Table::~Table() noexcept
 {
-    // If destroyed as a standalone table, destroy all memory allocated
-    if (m_top.get_parent() == nullptr) {
-        m_top.destroy_deep();
-    }
-
     if (m_top.is_attached()) {
+        // If destroyed as a standalone table, destroy all memory allocated
+        if (m_top.get_parent() == nullptr) {
+            m_top.destroy_deep();
+        }
         fully_detach();
     }
-
-    for (auto& index : m_index_accessors) {
-        delete index;
+    else {
+        for (auto e : m_index_accessors) {
+            REALM_ASSERT(e == nullptr);
+        }
+        REALM_ASSERT(m_index_accessors.size() == 0);
     }
-    m_index_accessors.clear();
     m_cookie = cookie_deleted;
 }
 
@@ -2613,7 +2613,8 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
     return table;
 }
 
-
+// Called after a commit. Table will effectively contain the same as before,
+// but now with new refs from the file
 void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
@@ -2792,6 +2793,9 @@ void Table::refresh_content_version()
     }
 }
 
+
+// Called when Group is moved to another version - either a rollback or an advance.
+// The content of the table is potentially different, so make no assumptions.
 void Table::refresh_accessor_tree()
 {
     REALM_ASSERT(m_cookie == cookie_initialized);
@@ -2812,8 +2816,16 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
-    if (m_tombstones)
+    if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
+        // Tombstones exists
+        if (!m_tombstones) {
+            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        }
         m_tombstones->init_from_parent();
+    }
+    else {
+        m_tombstones = nullptr;
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();

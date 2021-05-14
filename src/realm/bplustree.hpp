@@ -133,8 +133,6 @@ public:
     }
     virtual ~BPlusTreeBase();
 
-    BPlusTreeBase& operator=(const BPlusTreeBase& rhs);
-    BPlusTreeBase& operator=(BPlusTreeBase&& rhs) noexcept;
 
     Allocator& get_alloc() const
     {
@@ -331,32 +329,6 @@ public:
         : BPlusTreeBase(alloc)
         , m_leaf_cache(this)
     {
-    }
-
-    BPlusTree(const BPlusTree& other)
-        : BPlusTree(other.get_alloc())
-    {
-        *this = other;
-    }
-
-    BPlusTree(BPlusTree&& other) noexcept
-        : BPlusTree(other.get_alloc())
-    {
-        *this = std::move(other);
-    }
-
-    /********************* Assignment ********************/
-
-    BPlusTree& operator=(const BPlusTree& rhs)
-    {
-        this->BPlusTreeBase::operator=(rhs);
-        return *this;
-    }
-
-    BPlusTree& operator=(BPlusTree&& rhs) noexcept
-    {
-        this->BPlusTreeBase::operator=(std::move(rhs));
-        return *this;
     }
 
     /************ Tree manipulation functions ************/

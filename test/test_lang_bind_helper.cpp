@@ -3565,14 +3565,14 @@ TEST(LangBindHelper_HandoverNestedTableViews)
             writer->commit_and_continue_as_read();
             // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
             TableView tv1 = table->where().less_equal(col, 50).find_all();
-            TableView tv2 = tv1.get_parent()->where(&tv1).find_all();
+            TableView tv2 = tv1.get_parent()->where(&tv1).greater(col, 25).find_all();
             CHECK(tv2.is_in_sync());
             reader = writer->duplicate();
             tv = reader->import_copy_of(tv2, PayloadPolicy::Move);
         }
         CHECK(tv->is_in_sync());
         CHECK(tv->is_attached());
-        CHECK_EQUAL(51, tv->size());
+        CHECK_EQUAL(25, tv->size());
     }
 }
 

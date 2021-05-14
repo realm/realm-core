@@ -6,7 +6,7 @@
 #include <realm/util/features.h>
 #include <realm/util/scope_exit.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -367,6 +367,7 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
     prepare_for_write();           // Throws
 
     Array& root = m_arrays->root;
+    REALM_ASSERT(wt->get_sync_file_id() == 0);
     wt->set_sync_file_id(client_file_ident.ident);
     root.set(s_client_file_ident_salt_iip,
              RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
@@ -1231,6 +1232,19 @@ void ClientHistoryImpl::trim_sync_history()
     do_trim_sync_history(n); // Throws
 }
 
+bool ClientHistoryImpl::no_pending_local_changes(version_type version) const
+{
+    ensure_updated(version);
+    for (size_t i = 0; i < m_sync_history_size; i++) {
+        if (m_origin_file_idents->get(i) == 0) {
+            std::size_t pos = 0;
+            BinaryData chunk = m_changesets->get_at(i, pos);
+            if (chunk.size() > 0)
+                return false;
+        }
+    }
+    return true;
+}
 
 void ClientHistoryImpl::do_trim_sync_history(std::size_t n)
 {
@@ -1396,18 +1410,13 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
     REALM_ASSERT(client_file_ident != 0);
     using Instruction = realm::sync::Instruction;
-
-    auto promote_global_key = [&](GlobalKey& oid) {
-        REALM_ASSERT(oid.hi() == 0); // client_file_ident == 0
-        oid = GlobalKey{uint64_t(client_file_ident), oid.lo()};
-    };
-
-    auto promote_primary_key = [&](Instruction::PrimaryKey& pk) {
-        mpark::visit(util::overload{[&](GlobalKey& key) {
-                                        promote_global_key(key);
-                                    },
-                                    [](auto&&) {}},
-                     pk);
+    auto promote_global_key = [client_file_ident](GlobalKey* oid) {
+        if (oid->hi() == 0) {
+            // client_file_ident == 0
+            *oid = GlobalKey{uint64_t(client_file_ident), oid->lo()};
+            return true;
+        }
+        return false;
     };
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
@@ -1416,9 +1425,15 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
         return group.get_table(sync::class_name_to_table_name(class_name, buffer));
     };
 
-    // Fix up changesets. We know that all of these are of our own creation.
-    size_t uploadable_bytes = 0;
+    // Fix up changesets.
+    Array& root = m_arrays->root;
+    uint64_t uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
     for (size_t i = 0; i < m_changesets->size(); ++i) {
+        // We could have opened a pre-provisioned realm file. In this case we can skip the entries downloaded
+        // from the server.
+        if (m_origin_file_idents->get(i) != 0)
+            continue;
+
         // FIXME: We have to do this when transmitting/receiving changesets
         // over the network instead.
         ChunkedBinaryData changeset{*m_changesets, i};
@@ -1426,6 +1441,8 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
         sync::Changeset log;
         sync::parse_changeset(in, log);
 
+        size_t size_before = changeset.size();
+        bool did_modify = false;
         auto last_class_name = sync::InternString::npos;
         ConstTableRef selected_table;
         for (auto instr : log) {
@@ -1441,7 +1458,9 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
                 }
 
                 // Fix up instructions using GlobalKey to identify objects.
-                promote_primary_key(obj_instr->object);
+                if (auto global_key = mpark::get_if<GlobalKey>(&obj_instr->object)) {
+                    did_modify = promote_global_key(global_key);
+                }
 
                 // Fix up the payload for Set and ArrayInsert.
                 Instruction::Payload* payload = nullptr;
@@ -1453,19 +1472,22 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
                 }
 
                 if (payload && payload->type == Instruction::Payload::Type::Link) {
-                    promote_primary_key(payload->data.link.target);
+                    if (auto global_key = mpark::get_if<GlobalKey>(&payload->data.link.target)) {
+                        did_modify = promote_global_key(global_key);
+                    }
                 }
             }
         }
 
-        util::AppendBuffer<char> modified;
-        encode_changeset(log, modified);
-        BinaryData result = BinaryData{modified.data(), modified.size()};
-        m_changesets->set(i, result);
-        uploadable_bytes += modified.size();
+        if (did_modify) {
+            util::AppendBuffer<char> modified;
+            encode_changeset(log, modified);
+            BinaryData result = BinaryData{modified.data(), modified.size()};
+            m_changesets->set(i, result);
+            uploadable_bytes += (modified.size() - size_before);
+        }
     }
 
-    Array& root = m_arrays->root;
     root.set(s_progress_uploadable_bytes_iip, RefOrTagged::make_tagged(uploadable_bytes));
 }
 
@@ -1511,7 +1533,7 @@ void ClientHistoryImpl::record_current_schema_version(Array& schema_versions, ve
         Array sv_library_versions{alloc};
         sv_library_versions.set_parent(&schema_versions, s_sv_library_versions_iip);
         sv_library_versions.init_from_parent();
-        const char* library_version = REALM_SYNC_VER_STRING;
+        const char* library_version = REALM_VERSION_STRING;
         std::size_t size = std::strlen(library_version);
         Array value{alloc};
         bool context_flag = false;
@@ -1746,7 +1768,6 @@ BinaryData ClientHistoryImpl::get_uncommitted_changes() const noexcept
 {
     return TrivialReplication::get_uncommitted_changes();
 }
-
 
 // Overriding member function in realm::_impl::History
 void ClientHistoryImpl::verify() const

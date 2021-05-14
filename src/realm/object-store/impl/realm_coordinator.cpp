@@ -973,9 +973,15 @@ void RealmCoordinator::run_async_notifiers()
         // skipping to work. The skip logic assumes that the notifier can't be
         // running when suppress_next() is called because it can only be called
         // from within a write transaction, and starting the write transaction
-        // would have blocked until the notifier is done running. However,
-        // on_change() can be triggered by things other than writes, so we may
-        // be here even if the notifiers don't need to rerun.
+        // would have blocked until the notifier is done running. However, if we
+        // run the notifiers at a point where the version isn't changing, that
+        // could happen concurrently with a call to suppress_next(), and we
+        // could unset skip_next on a callback from that zero-version run
+        // rather than the intended one.
+        //
+        // Spurious wakeups can happen in a few ways: adding a new notifier,
+        // adding a new notifier in a different process sharing this Realm file,
+        // closing the Realm in a different process, and possibly some other cases.
         notifiers = m_notifiers;
     }
     else {
@@ -1027,7 +1033,14 @@ void RealmCoordinator::run_async_notifiers()
         lock.unlock();
     }
 
-    if (skip_version.version) {
+    // If the skip version is set and we have more than one version to process,
+    // we need to start with just the skip version so that any suppressed
+    // callbacks can ignore the changes from it without missing changes from
+    // later versions. If the skip version is set and there aren't any more
+    // versions after it, we just want to process with normal processing. See
+    // the above note about spurious wakeups for why this is required for
+    // correctness and not just a very minor optimization.
+    if (skip_version.version && skip_version != version) {
         REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version);
         IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
@@ -1222,4 +1235,9 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
 bool RealmCoordinator::compact()
 {
     return m_db->compact();
+}
+
+void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
+{
+    return m_db->write_copy(path, key.data(), allow_overwrite);
 }

@@ -11,7 +11,7 @@
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
@@ -540,7 +540,7 @@ public:
         m_clients.resize(num_clients);
         for (int i = 0; i < num_clients; ++i) {
             Client::Config config_2;
-            config_2.user_agent_application_info = "TestFixture/" REALM_SYNC_VER_STRING;
+            config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
             config_2.max_open_files = config.client_max_open_files;
             config_2.logger = &*m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;

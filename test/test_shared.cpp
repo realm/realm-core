@@ -4317,4 +4317,31 @@ TEST(Shared_MultipleDBInstances)
     CHECK_EQUAL(table->get_object(0).get<int64_t>("value"), 0);
 }
 
+TEST(Shared_WriteCopy)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+    SHARED_GROUP_TEST_PATH(path3);
+
+    {
+        auto hist = make_in_realm_history(path1);
+        DBRef db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto t = tr->add_table("foo");
+        t->create_object();
+        t->add_column(type_Int, "value");
+        tr->commit();
+
+        db->write_copy(path2.c_str());
+    }
+    {
+        auto hist = make_in_realm_history(path2);
+        DBRef db = DB::create(*hist);
+        db->write_copy(path3.c_str());
+    }
+    auto hist = make_in_realm_history(path3);
+    DBRef db = DB::create(*hist);
+    CHECK_EQUAL(db->start_read()->get_table("foo")->size(), 1);
+}
+
 #endif // TEST_SHARED

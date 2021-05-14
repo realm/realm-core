@@ -57,7 +57,7 @@
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/access_control.hpp>
 #include <realm/sync/server.hpp>
@@ -2413,7 +2413,7 @@ private:
 
     void add_common_http_response_headers(HTTPResponse& response)
     {
-        response.headers["Server"] = "RealmSync/" REALM_SYNC_VER_STRING; // Throws
+        response.headers["Server"] = "RealmSync/" REALM_VERSION_STRING; // Throws
     }
 
     void read_error(std::error_code ec)
@@ -5280,8 +5280,7 @@ ServerImpl::~ServerImpl() noexcept
 
 void ServerImpl::start()
 {
-    logger.info("Realm sync server started (%1, %2)", REALM_VER_CHUNK,
-                REALM_SYNC_VER_CHUNK); // Throws
+    logger.info("Realm sync server started (%1)", REALM_VER_CHUNK); // Throws
     logger.info("Supported protocol versions: %1-%2 (%3-%4 configured)",
                 ServerImplBase::get_oldest_supported_protocol_version(), get_current_protocol_version(),
                 m_protocol_version_range.first,
