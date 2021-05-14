@@ -54,7 +54,7 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
     size_t out_index = out.size();
     out.push_back({table_key, {}});
 
-    for (const auto& col_key : table.get_column_keys()) {
+    for (auto col_key : table.get_column_keys()) {
         auto type = table.get_column_type(col_key);
         // If a column within the `table` does link to another table it needs to be added to `table`'s
         // links.
