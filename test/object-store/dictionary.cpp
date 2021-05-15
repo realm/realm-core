@@ -1070,6 +1070,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
 
 TEST_CASE("dictionary nullify", "[dictionary]") {
     InMemoryTestFile config;
+    config.automatic_change_notifications = false;
     config.schema = Schema{
         {"DictionaryObject",
          {
@@ -1087,12 +1088,81 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
                                                                     {"1", Any(AnyDict{{"intCol", INT64_C(1)}})},
                                                                     {"2", Any(AnyDict{{"intCol", INT64_C(2)}})}}}}});
     r->commit_transaction();
+    TableRef dict_table = r->read_group().get_table("class_DictionaryObject");
+    TableRef int_table = r->read_group().get_table("class_IntObject");
+    ColKey col = dict_table->get_column_key("intDictionary");
+    object_store::Dictionary dict(r, obj.obj(), col);
 
-    r->begin_transaction();
-    // Before fix, we would crash here
-    r->read_group().get_table("class_IntObject")->clear();
-    r->commit_transaction();
-    // r->read_group().to_json(std::cout);
+    SECTION("clear linked objects") {
+        r->begin_transaction();
+        // Before fix, we would crash here
+        int_table->clear();
+        r->commit_transaction();
+    }
+
+    SECTION("with results notification") {
+        Results all_objects(r, dict_table->where());
+        REQUIRE(all_objects.size() == 1);
+        CollectionChangeSet local_changes;
+        auto token =
+            all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+                local_changes = c;
+            });
+        advance_and_notify(*r);
+        local_changes = {};
+
+        SECTION("remove one linked object") {
+            r->begin_transaction();
+            int_table->remove_object(int_table->begin());
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications, 0);
+            REQUIRE_INDICES(local_changes.deletions);
+        }
+
+        SECTION("remove all linked objects") {
+            r->begin_transaction();
+            while (int_table->size()) {
+                int_table->remove_object(int_table->begin());
+            }
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications, 0);
+            REQUIRE_INDICES(local_changes.deletions);
+        }
+
+        SECTION("clear linked objects") {
+            r->begin_transaction();
+            int_table->clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications, 0);
+            REQUIRE_INDICES(local_changes.deletions);
+        }
+
+        SECTION("remove object") {
+            r->begin_transaction();
+            dict_table->remove_object(dict_table->begin());
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications);
+            REQUIRE_INDICES(local_changes.deletions, 0);
+        }
+
+        SECTION("clear source table") {
+            r->begin_transaction();
+            dict_table->clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications);
+            REQUIRE_INDICES(local_changes.deletions, 0);
+        }
+    }
 }
 
 TEST_CASE("dictionary assign", "[dictionary]") {
