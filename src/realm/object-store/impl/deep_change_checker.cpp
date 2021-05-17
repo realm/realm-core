@@ -301,43 +301,53 @@ std::vector<int64_t> ObjectChangeChecker::operator()(ObjKeyType object_key)
 {
     std::vector<int64_t> changed_columns = {};
 
-    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
-    // anyway.
-    if (m_root_object_changes &&
-        m_root_object_changes->modifications_contains(object_key, m_filtered_columns_in_root_table)) {
-        auto changed_columns_for_object = m_root_object_changes->get_columns_modified(object_key);
-        for (const auto& column : *changed_columns_for_object) {
-            changed_columns.push_back(column);
-        }
-        return changed_columns;
-    }
-
-    // The `KeyPathChangeChecker` traverses along the given key path arrays and only those to check for changes
-    // along them.
-    for (auto&& key_path_array : m_key_path_arrays) {
-        for (auto&& key_path : key_path_array) {
-            auto next_object_key_to_check = object_key;
-            if (key_path.size() > 0) {
-                auto root_column_key = key_path[0].second;
-                for (size_t i = 0; i < key_path.size(); i++) {
-                    // Check for a change on the current depth.
-                    auto column_key = key_path[i].second;
-                    auto iterator = m_info.tables.find(key_path[i].first.value);
-                    if (iterator != m_info.tables.end() &&
-                        iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
-                        changed_columns.push_back(root_column_key.value);
-                    }
-
-                    // Advance one level deeper into the key path.
-                    auto column_type = column_key.get_type();
-                    if (column_type == col_type_Link) {
-                        const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
-                        next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
-                    }
-                }
-            }
+    for (const auto& key_path_array : m_key_path_arrays) {
+        for (const auto& key_path : key_path_array) {
+            check_key_path(changed_columns, key_path, 0, m_root_table, object_key);
         }
     }
 
     return changed_columns;
+}
+
+void ObjectChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
+                                         const Table& table, const ObjKeyType& object_key_value)
+{
+    if (depth >= key_path.size()) {
+        // We've reached the end of the key path.
+        return;
+    }
+
+    auto table_key = key_path[depth].first;
+    auto column_key = key_path[depth].second;
+
+    // Check for a change on the current depth level.
+    auto iterator = m_info.tables.find(table_key.value);
+    if (iterator != m_info.tables.end() && iterator->second.modifications_contains(object_key_value, {column_key})) {
+        // If an object linked to the root object was changed we only mark the
+        // property of the root objects as changed.
+        auto root_column_key = key_path[0].second;
+        changed_columns.push_back(root_column_key.value);
+    }
+
+    // Advance one level deeper into the key path.
+    auto column_type = column_key.get_type();
+    if (column_type == col_type_Link) {
+        // A forward link will only have one target object.
+        auto target_table = table.get_link_target(column_key);
+        auto object = table.get_object(ObjKey(object_key_value));
+        auto target_object_key_value = object.get<ObjKey>(ColKey(column_key)).value;
+        check_key_path(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
+    }
+    else if (column_type == col_type_BackLink) {
+        // A backlink can have multiple origin objects. We need to iterate over all of them.
+        auto origin_table = table.get_opposite_table(column_key);
+        auto origin_column_key = table.get_opposite_column(column_key);
+        auto object = table.get_object(ObjKey(object_key_value));
+        size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
+        for (size_t i = 0; i < backlink_count; i++) {
+            auto origin_object_key = object.get_backlink(*origin_table, origin_column_key, i);
+            check_key_path(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
+        }
+    }
 }

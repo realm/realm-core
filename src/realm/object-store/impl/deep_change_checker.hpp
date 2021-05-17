@@ -238,6 +238,20 @@ public:
      * @return A list of columns changed in the root object.
      */
     std::vector<int64_t> operator()(int64_t object_key);
+
+private:
+    /**
+     * Traverses down a given `KeyPath` and checks the objects along the way for changes.
+     *
+     * @param changed_columns The list of `ColKeyType`s that was changed in the root object.
+     *                        A key will be added to this list if it turns out to be changed.
+     * @param key_path The `KeyPath` used to traverse the given object with.
+     * @param depth The current depth in the key_path.
+     * @param table The `TableKey` for the current depth.
+     * @param object_key_value The `ObjKeyType` that is to be checked for changes.
+     */
+    void check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
+                        const Table& table, const ObjKeyType& object_key_value);
 };
 
 

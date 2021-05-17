@@ -397,6 +397,7 @@ TEST_CASE("object") {
             auto table_target = r->read_group().get_table("class_table");
             auto col_target_value1 = table_target->get_column_key("value 1");
             auto col_target_value2 = table_target->get_column_key("value 2");
+            auto col_target_backlink1 = table_origin->get_opposite_column(col_origin_link);
 
             r->begin_transaction();
 
@@ -415,6 +416,7 @@ TEST_CASE("object") {
             std::pair<TableKey, ColKey> pair_origin_value(table_origin->get_key(), col_origin_value);
             std::pair<TableKey, ColKey> pair_origin_link(table_origin->get_key(), col_origin_link);
             std::pair<TableKey, ColKey> pair_origin_link2(table_origin->get_key(), col_origin_link2);
+            std::pair<TableKey, ColKey> pair_target_backlink1(table_target->get_key(), col_target_backlink1);
             std::pair<TableKey, ColKey> pair_target_value1(table_target->get_key(), col_target_value1);
             std::pair<TableKey, ColKey> pair_target_value2(table_target->get_key(), col_target_value2);
 
@@ -425,6 +427,7 @@ TEST_CASE("object") {
 
             auto key_path_origin_to_target_value1 = {pair_origin_link, pair_target_value1};
             auto key_path_origin_to_target_value2 = {pair_origin_link, pair_target_value2};
+            auto key_path_target_to_origin_value = {pair_target_backlink1, pair_origin_value};
 
             KeyPathArray key_path_array_origin_value = {key_path_origin_value};
             KeyPathArray key_path_array_origin_link = {key_path_origin_link};
@@ -433,6 +436,7 @@ TEST_CASE("object") {
 
             KeyPathArray key_path_array_origin_to_target_value1 = {key_path_origin_to_target_value1};
             KeyPathArray key_path_array_origin_to_target_value2 = {key_path_origin_to_target_value2};
+            KeyPathArray key_path_array_target_to_origin_value = {key_path_target_to_origin_value};
 
             SECTION("callbacks on a single object") {
                 SECTION("modifying origin table 'table2', property 'value'"
@@ -679,6 +683,62 @@ TEST_CASE("object") {
                     write([&] {
                         object_depth6.set_column_value("value", 555);
                     });
+                }
+            }
+
+            SECTION("keypath filter with a backlink") {
+                SECTION("all callbacks filtered") {
+                    SECTION("modifying backlinked table 'table2', property 'value'"
+                            "while observing backlinked table 'table2', property 'value'"
+                            "-> DOES send a notification") {
+                        auto token_with_backlink =
+                            require_change(object_target, key_path_array_target_to_origin_value);
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink1.value], 0);
+                    }
+                    SECTION("modifying backlinked table 'table2', property 'link2'"
+                            "while observing backlinked table 'table2', property 'value'"
+                            "-> does NOT send a notification") {
+                        auto token_with_backlink =
+                            require_no_change(object_target, key_path_array_target_to_origin_value);
+                        write([&] {
+                            Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                            Object object_target2(r, obj_target2);
+                            object_origin.set_property_value(d, "link", util::Any(object_target2));
+                        });
+                    }
+                }
+
+                SECTION("some callbacks filtered") {
+                    SECTION("modifying backlinked table 'table2', property 'value'"
+                            "while observing backlinked table 'table2', property 'value'"
+                            "-> DOES send a notification") {
+                        auto token_with_backlink =
+                            require_change(object_target, key_path_array_target_to_origin_value);
+                        auto token_without_filter = require_change(object_target);
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink1.value], 0);
+                    }
+                    SECTION("modifying backlinked table 'table2', property 'link2'"
+                            "while observing backlinked table 'table2', property 'value'"
+                            "-> does NOT a notification") {
+                        auto token_with_backlink =
+                            require_no_change(object_target, key_path_array_target_to_origin_value);
+                        auto token_without_filter = require_no_change(object_target);
+                        write([&] {
+                            Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                            Object object_target2(r, obj_target2);
+                            object_origin.set_property_value(d, "link", util::Any(object_target2));
+                        });
+                    }
                 }
             }
 
