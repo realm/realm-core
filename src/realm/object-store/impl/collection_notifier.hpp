@@ -19,14 +19,11 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
-#include <realm/object-store/object_changeset.hpp>
-#include <realm/object-store/impl/collection_change_builder.hpp>
 #include <realm/object-store/impl/deep_change_checker.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
-#include <realm/keys.hpp>
 #include <realm/table_ref.hpp>
 
 #include <array>
@@ -34,19 +31,10 @@
 #include <exception>
 #include <functional>
 #include <mutex>
-#include <unordered_map>
 #include <unordered_set>
 
 namespace realm {
-class Realm;
-class Transaction;
-
 namespace _impl {
-class RealmCoordinator;
-
-// FIXME: this should be in core
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
 
 // A `NotificationCallback` is added to a collection when observing it.
 // It contains all information necessary in case we need to notify about changes

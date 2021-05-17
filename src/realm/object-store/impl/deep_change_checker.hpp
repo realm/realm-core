@@ -16,25 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef DEEP_CHANGE_CHECKER_HPP
+#define DEEP_CHANGE_CHECKER_HPP
+
 #include <realm/object-store/object_changeset.hpp>
 #include <realm/object-store/impl/collection_change_builder.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
-
-#include <realm/util/assert.hpp>
-#include <realm/version_id.hpp>
-#include <realm/keys.hpp>
-#include <realm/table_ref.hpp>
 
 #include <array>
-#include <atomic>
-#include <exception>
-#include <functional>
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace realm {
 class Realm;
+class Table;
 class Transaction;
 
 using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
@@ -251,3 +243,5 @@ public:
 
 } // namespace _impl
 } // namespace realm
+
+#endif /* DEEP_CHANGE_CHECKER_HPP */

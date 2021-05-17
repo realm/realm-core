@@ -17,11 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/impl/deep_change_checker.hpp>
-
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/shared_realm.hpp>
-
-#include <realm/db.hpp>
+#include <realm/table.hpp>
 #include <realm/list.hpp>
 
 using namespace realm;
