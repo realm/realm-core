@@ -1091,6 +1091,7 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
     TableRef dict_table = r->read_group().get_table("class_DictionaryObject");
     TableRef int_table = r->read_group().get_table("class_IntObject");
     ColKey col = dict_table->get_column_key("intDictionary");
+    ColKey int_col = int_table->get_column_key("intCol");
     object_store::Dictionary dict(r, obj.obj(), col);
 
     SECTION("clear linked objects") {
@@ -1101,24 +1102,35 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
     }
 
     SECTION("with results notification") {
+        auto link_view = std::make_shared<DictionaryLinkValues>(obj.obj(), col);
+        Results linked_objects(r, link_view, int_table->where().equal(int_col, 1));
         Results all_objects(r, dict_table->where());
         REQUIRE(all_objects.size() == 1);
-        CollectionChangeSet local_changes;
+        CollectionChangeSet local_changes, linked_changes;
         auto token =
             all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
                 local_changes = c;
             });
+        auto linked_token =
+            linked_objects.add_notification_callback([&linked_changes](CollectionChangeSet c, std::exception_ptr) {
+                linked_changes = c;
+            });
         advance_and_notify(*r);
         local_changes = {};
+        linked_changes = {};
 
         SECTION("remove one linked object") {
             r->begin_transaction();
-            int_table->remove_object(int_table->begin());
+            auto it = int_table->begin();
+            int_table->remove_object(it);
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications, 0);
             REQUIRE_INDICES(local_changes.deletions);
+            REQUIRE_INDICES(linked_changes.insertions);
+            REQUIRE_INDICES(linked_changes.modifications);
+            REQUIRE_INDICES(linked_changes.deletions);
         }
 
         SECTION("remove all linked objects") {
@@ -1143,7 +1155,7 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
             REQUIRE_INDICES(local_changes.deletions);
         }
 
-        SECTION("remove object") {
+        SECTION("remove source object") {
             r->begin_transaction();
             dict_table->remove_object(dict_table->begin());
             r->commit_transaction();
