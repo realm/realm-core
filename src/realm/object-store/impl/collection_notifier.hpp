@@ -19,13 +19,11 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
-#include <realm/object-store/object_changeset.hpp>
-#include <realm/object-store/impl/collection_change_builder.hpp>
+#include <realm/object-store/impl/deep_change_checker.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
-#include <realm/keys.hpp>
 #include <realm/table_ref.hpp>
 
 #include <array>
@@ -33,72 +31,10 @@
 #include <exception>
 #include <functional>
 #include <mutex>
-#include <unordered_map>
 #include <unordered_set>
 
 namespace realm {
-class Realm;
-class Transaction;
-
 namespace _impl {
-class RealmCoordinator;
-
-struct ListChangeInfo {
-    TableKey table_key;
-    int64_t row_key;
-    int64_t col_key;
-    CollectionChangeBuilder* changes;
-};
-
-// FIXME: this should be in core
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
-
-struct TransactionChangeInfo {
-    std::vector<ListChangeInfo> lists;
-    std::unordered_map<TableKeyType, ObjectChangeSet> tables;
-    bool track_all;
-    bool schema_changed;
-};
-
-class DeepChangeChecker {
-public:
-    struct OutgoingLink {
-        int64_t col_key;
-        bool is_list;
-    };
-    struct RelatedTable {
-        TableKey table_key;
-        std::vector<OutgoingLink> links;
-    };
-
-    DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                      std::vector<RelatedTable> const& related_tables);
-
-    bool operator()(int64_t obj_key);
-
-    // Recursively add `table` and all tables it links to to `out`, along with
-    // information about the links from them
-    static void find_related_tables(std::vector<RelatedTable>& out, Table const& table);
-
-private:
-    TransactionChangeInfo const& m_info;
-    Table const& m_root_table;
-    const TableKey m_root_table_key;
-    ObjectChangeSet const* const m_root_object_changes;
-    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
-    std::vector<RelatedTable> const& m_related_tables;
-
-    struct Path {
-        int64_t obj_key;
-        int64_t col_key;
-        bool depth_exceeded;
-    };
-    std::array<Path, 4> m_current_path;
-
-    bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
-    bool check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth = 0);
-};
 
 // A base class for a notifier that keeps a collection up to date and/or
 // generates detailed change notifications on a background thread. This manages
