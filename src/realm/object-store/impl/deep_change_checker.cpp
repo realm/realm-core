@@ -67,9 +67,11 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
         table.for_each_backlink_column([&](ColKey column_key) {
             auto target_table = table.get_link_target(column_key);
             auto target_table_key = target_table->get_key();
-            if (any_of(tables_in_filters.begin(), tables_in_filters.end(), [target_table_key](auto table_key) {
+            auto target_table_key_contained_in_filter =
+                any_of(tables_in_filters.begin(), tables_in_filters.end(), [target_table_key](auto table_key) {
                     return target_table_key == table_key;
-                })) {
+                });
+            if (target_table_key_contained_in_filter) {
                 // If this backlink is included in any of the filters we follow the path further.
                 out[out_index].links.push_back({column_key.value, false});
                 find_all_related_tables(out, *table.get_link_target(column_key), tables_in_filters);
