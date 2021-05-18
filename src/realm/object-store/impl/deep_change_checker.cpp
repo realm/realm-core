@@ -331,23 +331,34 @@ void ObjectChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, 
     }
 
     // Advance one level deeper into the key path.
-    auto column_type = column_key.get_type();
-    if (column_type == col_type_Link) {
-        // A forward link will only have one target object.
+    if (column_key.is_list()) {
         auto target_table = table.get_link_target(column_key);
         auto object = table.get_object(ObjKey(object_key_value));
-        auto target_object_key_value = object.get<ObjKey>(ColKey(column_key)).value;
-        check_key_path(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
+        auto lvr = object.get_linklist(ColKey(column_key));
+        auto sz = lvr.size();
+        for (size_t i = 0; i < sz; i++) {
+            check_key_path(changed_columns, key_path, depth + 1, *target_table, lvr.get(i).value);
+        }
     }
-    else if (column_type == col_type_BackLink) {
-        // A backlink can have multiple origin objects. We need to iterate over all of them.
-        auto origin_table = table.get_opposite_table(column_key);
-        auto origin_column_key = table.get_opposite_column(column_key);
-        auto object = table.get_object(ObjKey(object_key_value));
-        size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
-        for (size_t i = 0; i < backlink_count; i++) {
-            auto origin_object_key = object.get_backlink(*origin_table, origin_column_key, i);
-            check_key_path(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
+    else {
+        auto column_type = column_key.get_type();
+        if (column_type == col_type_Link) {
+            // A forward link will only have one target object.
+            auto target_table = table.get_link_target(column_key);
+            auto object = table.get_object(ObjKey(object_key_value));
+            auto target_object_key_value = object.get<ObjKey>(ColKey(column_key)).value;
+            check_key_path(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
+        }
+        else if (column_type == col_type_BackLink) {
+            // A backlink can have multiple origin objects. We need to iterate over all of them.
+            auto origin_table = table.get_opposite_table(column_key);
+            auto origin_column_key = table.get_opposite_column(column_key);
+            auto object = table.get_object(ObjKey(object_key_value));
+            size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
+            for (size_t i = 0; i < backlink_count; i++) {
+                auto origin_object_key = object.get_backlink(*origin_table, origin_column_key, i);
+                check_key_path(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
+            }
         }
     }
 }
