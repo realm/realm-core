@@ -192,7 +192,7 @@ std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(ui
 {
     REALM_ASSERT(m_error || m_callbacks.size() > 0);
 
-    auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
+    auto it = std::find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
         return c.token == token;
     });
     // We should only fail to find the callback if it was removed due to an error

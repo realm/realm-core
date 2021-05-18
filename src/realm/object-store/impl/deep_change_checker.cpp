@@ -137,7 +137,7 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t object_
     auto table_key = table.get_key();
 
     // First we create an iterator pointing at the table identified by `table_key` within the `m_related_tables`.
-    auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](const auto& tbl) {
+    auto it = std::find_if(begin(m_related_tables), end(m_related_tables), [&](const auto& tbl) {
         return tbl.table_key == table_key;
     });
     // If no iterator could be found the table is not contained in `m_related_tables` and we cannot check any
