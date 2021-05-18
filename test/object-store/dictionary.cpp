@@ -1070,6 +1070,7 @@ TEST_CASE("dictionary with mixed links", "[dictionary]") {
 
 TEST_CASE("dictionary nullify", "[dictionary]") {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"DictionaryObject",
@@ -1079,9 +1080,9 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
         {"IntObject", {{"intCol", PropertyType::Int}}},
     };
 
+
     auto r = Realm::get_shared_realm(config);
     CppContext ctx(r);
-
     r->begin_transaction();
     auto obj = Object::create(ctx, r, *r->schema().find("DictionaryObject"),
                               Any{AnyDict{{"intDictionary", AnyDict{{"0", Any(AnyDict{{"intCol", INT64_C(0)}})},
@@ -1103,34 +1104,45 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
 
     SECTION("with results notification") {
         auto link_view = std::make_shared<DictionaryLinkValues>(obj.obj(), col);
-        Results linked_objects(r, link_view, int_table->where().equal(int_col, 1));
+        Results linked_objects_with_query(r, link_view, int_table->where().equal(int_col, 1));
+        Results linked_object_view(r, link_view);
         Results all_objects(r, dict_table->where());
+        Results collection_objects = dict.as_results();
         REQUIRE(all_objects.size() == 1);
-        CollectionChangeSet local_changes, linked_changes;
+        CollectionChangeSet local_changes, linked_query_changes, linked_view_changes;
         auto token =
             all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
                 local_changes = c;
             });
-        auto linked_token =
-            linked_objects.add_notification_callback([&linked_changes](CollectionChangeSet c, std::exception_ptr) {
-                linked_changes = c;
+        auto linked_query_token = linked_objects_with_query.add_notification_callback(
+            [&linked_query_changes](CollectionChangeSet c, std::exception_ptr) {
+                linked_query_changes = c;
+            });
+        auto linked_view_token = linked_object_view.add_notification_callback(
+            [&linked_view_changes](CollectionChangeSet c, std::exception_ptr) {
+                linked_view_changes = c;
             });
         advance_and_notify(*r);
         local_changes = {};
-        linked_changes = {};
+        linked_query_changes = {};
+        linked_view_changes = {};
 
         SECTION("remove one linked object") {
             r->begin_transaction();
-            auto it = int_table->begin();
-            int_table->remove_object(it);
+            for (auto it = int_table->begin(); it != int_table->end(); ++it) {
+                if (it->get_any(int_col) == Mixed{1}) {
+                    int_table->remove_object(it);
+                    break;
+                }
+            }
             r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications, 0);
             REQUIRE_INDICES(local_changes.deletions);
-            REQUIRE_INDICES(linked_changes.insertions);
-            REQUIRE_INDICES(linked_changes.modifications);
-            REQUIRE_INDICES(linked_changes.deletions);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions, 0);
         }
 
         SECTION("remove all linked objects") {
@@ -1143,6 +1155,9 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications, 0);
             REQUIRE_INDICES(local_changes.deletions);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions, 0);
         }
 
         SECTION("clear linked objects") {
@@ -1153,6 +1168,9 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications, 0);
             REQUIRE_INDICES(local_changes.deletions);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions, 0);
         }
 
         SECTION("remove source object") {
@@ -1163,6 +1181,9 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications);
             REQUIRE_INDICES(local_changes.deletions, 0);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions);
         }
 
         SECTION("clear source table") {
@@ -1173,6 +1194,94 @@ TEST_CASE("dictionary nullify", "[dictionary]") {
             REQUIRE_INDICES(local_changes.insertions);
             REQUIRE_INDICES(local_changes.modifications);
             REQUIRE_INDICES(local_changes.deletions, 0);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions);
+        }
+
+        SECTION("clear linked results") {
+            r->begin_transaction();
+            linked_objects_with_query.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications, 0);
+            REQUIRE_INDICES(local_changes.deletions);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions, 0);
+        }
+
+        SECTION("clear collection results") {
+            r->begin_transaction();
+            collection_objects.clear();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(local_changes.insertions);
+            REQUIRE_INDICES(local_changes.modifications, 0);
+            REQUIRE_INDICES(local_changes.deletions);
+            REQUIRE_INDICES(linked_query_changes.insertions);
+            REQUIRE_INDICES(linked_query_changes.modifications);
+            REQUIRE_INDICES(linked_query_changes.deletions);
+        }
+
+        SECTION("clear linked results when out of sync") {
+            // force the query evaluation before clear
+            auto int_prop = int_table->get_object(linked_objects_with_query.get_any(0).get_link().get_obj_key())
+                                .get<Int>(int_col);
+            REQUIRE(int_prop == 1);
+            REQUIRE(linked_object_view.size() == 3);
+            int_prop = int_table->get_object(linked_object_view.get_any(0).get<ObjKey>()).get<Int>(int_col);
+            REQUIRE(int_prop == 0);
+
+            auto r2 = Realm::get_shared_realm(config);
+            TableRef int_table_r2 = r2->read_group().get_table("class_IntObject");
+            ColKey int_col2 = int_table_r2->get_column_key("intCol");
+            r2->begin_transaction();
+            for (auto it = int_table_r2->begin(); it != int_table_r2->end(); ++it) {
+                if (it->get<Int>(int_col2) == 0) {
+                    it->set(int_col2, 1); // add another match to the linkview query
+                    break;
+                }
+            }
+            r2->commit_transaction();
+            advance_and_notify(*r2);
+            advance_and_notify(*r);
+            local_changes = {};
+            linked_query_changes = {};
+            linked_view_changes = {};
+
+            SECTION("from linked query") {
+                r->begin_transaction();
+                linked_objects_with_query.clear();
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE_INDICES(local_changes.insertions);
+                REQUIRE_INDICES(local_changes.modifications, 0);
+                REQUIRE_INDICES(local_changes.deletions);
+                REQUIRE_INDICES(linked_query_changes.insertions);
+                REQUIRE_INDICES(linked_query_changes.modifications);
+                REQUIRE_INDICES(linked_query_changes.deletions, 0, 1);
+                REQUIRE_INDICES(linked_view_changes.insertions);
+                REQUIRE_INDICES(linked_view_changes.modifications);
+                REQUIRE_INDICES(linked_view_changes.deletions, 0, 1);
+            }
+
+            SECTION("from linked view") {
+                r->begin_transaction();
+                linked_object_view.clear();
+                r->commit_transaction();
+                advance_and_notify(*r);
+                REQUIRE_INDICES(local_changes.insertions);
+                REQUIRE_INDICES(local_changes.modifications, 0);
+                REQUIRE_INDICES(local_changes.deletions);
+                REQUIRE_INDICES(linked_view_changes.insertions);
+                REQUIRE_INDICES(linked_view_changes.modifications);
+                REQUIRE_INDICES(linked_view_changes.deletions, 0, 1);
+                REQUIRE_INDICES(linked_query_changes.insertions);
+                REQUIRE_INDICES(linked_query_changes.modifications);
+                REQUIRE_INDICES(linked_query_changes.deletions, 0, 1);
+            }
         }
     }
 }
