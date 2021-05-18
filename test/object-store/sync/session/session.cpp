@@ -708,7 +708,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
 }
 #endif
 
-TEST_CASE("sync: client resync") {
+TEST_CASE("sync: client reset") {
     using namespace std::literals::chrono_literals;
     if (!EventLoop::has_implementation())
         return;
@@ -831,36 +831,19 @@ TEST_CASE("sync: client resync") {
         });
     }
 
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
         FAIL("Error handler should not have been called");
     };
 
-    /* FIXME: Currently not working in Sync
     SECTION("should discard local changeset when mode is discard")
     {
         config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
         auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
         wait_for_download(*realm);
-        realm->refresh(); // FIXME: sync needs to notify
-
+        realm->refresh();
         CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 6);
     }
-
-    SECTION("should recover local changeset when mode is recover")
-    {
-        config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
-            FAIL("Error handler should not have been called");
-        };
-
-        auto realm = trigger_client_reset([](auto&){}, [](auto&){});
-        wait_for_download(*realm);
-        realm->refresh();
-
-        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 4);
-    }
-    */
 
     SECTION("should honor encryption key for downloaded Realm") {
         config.encryption_key.resize(64, 'a');
@@ -871,11 +854,10 @@ TEST_CASE("sync: client resync") {
         auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
         wait_for_download(*realm);
         realm->close();
-
-        REQUIRE_NOTHROW(Realm::get_shared_realm(config));
+        SharedRealm r_after;
+        REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
+        CHECK(ObjectStore::table_for_object_type(r_after->read_group(), "object")->begin()->get<Int>("value") == 6);
     }
-
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SECTION("add table in discarded transaction") {
         setup([&](auto& realm) {
@@ -899,14 +881,22 @@ TEST_CASE("sync: client resync") {
             [](auto&) {});
         wait_for_download(*realm);
         // test local realm that changes were persisted
-        REQUIRE_THROWS(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
         REQUIRE(table->size() == 1);
-        // test resync'd realm that changes were overwritten
+        REQUIRE_NOTHROW(realm->refresh());
+        // test reset realm that changes were overwritten
         realm = Realm::get_shared_realm(config);
         table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-        REQUIRE(!table);
+        REQUIRE(table);
+        REQUIRE(table->size() == 0);
+        realm->close();
+        // test the new instance
+        SharedRealm r_after;
+        REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
+        table = ObjectStore::table_for_object_type(r_after->read_group(), "object2");
+        REQUIRE(table);
+        REQUIRE(table->size() == 0);
     }
 
     SECTION("add column in discarded transaction") {
@@ -939,63 +929,9 @@ TEST_CASE("sync: client resync") {
         REQUIRE(!bool(table->get_column_key("value2")));
     }
 
-    config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
-    SECTION("add table pk in recovered transaction") {
-        auto realm = trigger_client_reset(
-            [](auto& realm) {
-                realm.update_schema(
-                    {
-                        {"object2",
-                         {
-                             {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
-                table->create_object_with_primary_key(Mixed());
-                table->create_object_with_primary_key(Mixed(1));
-            },
-            [](auto&) {});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-        REQUIRE(table);
-        ColKey pk_col_key = table->get_column_key("_id");
-        REQUIRE(bool(pk_col_key));
-        REQUIRE(table->get_column_attr(pk_col_key).test(col_attr_Nullable));
-        // FIXME: sync has object recovery disabled currently
-        // REQUIRE(table->size() == 2);
-    }
-
-    SECTION("add column in recovered transaction") {
-        auto realm = trigger_client_reset(
-            [](auto& realm) {
-                realm.update_schema(
-                    {
-                        {"object",
-                         {
-                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                             {"value2", PropertyType::Int},
-                             {"array", PropertyType::Int | PropertyType::Array},
-                             {"link", PropertyType::Object | PropertyType::Nullable, "object"},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
-                table->begin()->set(table->get_column_key("value2"), 123);
-            },
-            [](auto&) {});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->get_column_count() == 5);
-        REQUIRE(bool(table->get_column_key("value2")));
-        // FIXME: sync has object recovery disabled currently
-        // REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
-    }
-
-    SECTION("compatible schema changes in both remote and recovered transactions") {
+    SECTION("compatible schema changes in both remote and local transactions") {
         auto realm = trigger_client_reset(
             [](auto& realm) {
                 realm.update_schema(
@@ -1033,178 +969,7 @@ TEST_CASE("sync: client resync") {
         REQUIRE_NOTHROW(realm->refresh());
     }
 
-    /* FIXME: Currently not working in Sync
-    SECTION("incompatible schema changes in remote and recovered transactions") {
-        auto realm = trigger_client_reset([](auto& realm) {
-            realm.update_schema({
-                {"object", {
-                    {"value2", PropertyType::Float},
-                }},
-            }, 0, nullptr, nullptr, true);
-        }, [](auto& realm) {
-            realm.update_schema({
-                {"object", {
-                    {"value2", PropertyType::Int},
-                }},
-            }, 0, nullptr, nullptr, true);
-        });
-        wait_for_download(*realm);
-        REQUIRE_THROWS_WITH(realm->refresh(), Catch::Matchers::Contains(
-                                                  "Property 'object.value2' has been changed from 'float' to 'int'"));
-    }
-
-    SECTION("add object in recovered transaction") {
-        Obj obj;
-        auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
-            obj = table->create_object();
-
-            realm.update_schema({
-                {"object", {
-                    {"value2", PropertyType::Int},
-                }},
-            }, 0, nullptr, nullptr, true);
-            obj.set("value2", 123);
-        }, [](auto&){});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->get_column_count() == 2);
-        REQUIRE(table->begin()->get<Int>("value2") == 123);
-    }
-
-    SECTION("delete object in recovered transaction") {
-        auto realm = trigger_client_reset([&](auto& realm) {
-            ObjectStore::table_for_object_type(realm.read_group(), "object")->clear();
-        }, [](auto&){});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->size() == 0);
-    }
-
-    SECTION("list insertions in recovered transaction") {
-        ObjKey k0, k1, k2;
-        setup([&](auto& realm) {
-            k0 = create_object(realm, "link target").set("value", 1).get_key();
-            k1 = create_object(realm, "link target").set("value", 2).get_key();
-            k2 = create_object(realm, "link target").set("value", 3).get_key();
-
-            Obj o = create_object(realm, "link origin");
-            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
-            list.add(k0);
-            list.add(k1);
-            list.add(k2);
-        });
-
-        auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = get_table(realm, "link origin");
-            auto list = table->begin()->get_linklist(table->get_column_key("list"));
-            list.add(k0);
-            list.insert(0, k2);
-            list.insert(0, k1);
-        }, [](auto&){});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-
-        auto table = get_table(*realm, "link origin");
-        auto list = table->begin()->get_linklist(table->get_column_key("list"));
-        REQUIRE(list.size() == 6);
-        REQUIRE(list.get_object(0).get<Int>("value") == 2);
-        REQUIRE(list.get_object(1).get<Int>("value") == 3);
-        REQUIRE(list.get_object(2).get<Int>("value") == 1);
-        REQUIRE(list.get_object(3).get<Int>("value") == 2);
-        REQUIRE(list.get_object(4).get<Int>("value") == 3);
-        REQUIRE(list.get_object(5).get<Int>("value") == 1);
-    }
-
-    SECTION("list deletions in recovered transaction") {
-        ObjKey k0, k1, k2;
-        setup([&](auto& realm) {
-            k0 = create_object(realm, "link target").set("value", 1).get_key();
-            k1 = create_object(realm, "link target").set("value", 2).get_key();
-            k2 = create_object(realm, "link target").set("value", 3).get_key();
-
-            Obj o = create_object(realm, "link origin");
-            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
-            list.add(k0);
-            list.add(k1);
-            list.add(k2);
-        });
-
-        auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = get_table(realm, "link origin");
-            auto list = table->begin()->get_linklist(table->get_column_key("list"));
-            list.remove(1);
-        }, [](auto&){});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-
-        auto table = get_table(*realm, "link origin");
-        auto list = table->begin()->get_linklist(table->get_column_key("list"));
-        REQUIRE(list.size() == 2);
-        REQUIRE(list.get_object(0).get<Int>("value") == 1);
-        REQUIRE(list.get_object(1).get<Int>("value") == 3);
-    }
-
-    SECTION("list clear in recovered transaction") {
-        ObjKey k0, k1, k2;
-        setup([&](auto& realm) {
-            k0 = create_object(realm, "link target").set("value", 1).get_key();
-            k1 = create_object(realm, "link target").set("value", 2).get_key();
-            k2 = create_object(realm, "link target").set("value", 3).get_key();
-
-            Obj o = create_object(realm, "link origin");
-            auto list = o.get_linklist(o.get_table()->get_column_key("list"));
-            list.add(k0);
-            list.add(k1);
-            list.add(k2);
-        });
-
-        auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = get_table(realm, "link origin");
-            auto list = table->begin()->get_linklist(table->get_column_key("list"));
-            list.clear();
-        }, [&](auto& realm){
-            auto key = get_table(realm, "link target")->begin()->get_key();
-            auto table = get_table(realm, "link origin");
-            auto list = table->begin()->get_linklist(table->get_column_key("list"));
-            list.add(key);
-        });
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-
-        auto table = get_table(*realm, "link origin");
-        auto list = table->begin()->get_linklist(table->get_column_key("list"));
-        REQUIRE(list.size() == 0);
-    }
-
-    SECTION("conflicting primary key creations") {
-        auto realm = trigger_client_reset([&](auto& realm) {
-            auto table = get_table(realm, "pk link target");
-            table->create_object_with_primary_key(1).set("value", 1);
-            table->create_object_with_primary_key(2).set("value", 2);
-            table->create_object_with_primary_key(3).set("value", 3);
-        }, [&](auto& realm){
-            auto table = get_table(realm, "pk link target");
-            table->create_object_with_primary_key(1).set("value", 1);
-            table->create_object_with_primary_key(2).set("value", 4);
-            table->create_object_with_primary_key(5).set("value", 5);
-        });
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-
-        auto table = get_table(*realm, "pk link target");
-        REQUIRE(table->size() == 4);
-        auto it = table->begin();
-        REQUIRE(it->get<Int>("value") == 1);
-        REQUIRE((++it)->get<Int>("value") == 2);
-        REQUIRE((++it)->get<Int>("value") == 3);
-        REQUIRE((++it)->get<Int>("value") == 5);
-    }
-    */
-
-    SECTION("link to remotely deleted object") {
+    SECTION("link to remotely deleted object is discarded") {
         setup([&](auto& realm) {
             auto k0 = create_object(realm, "link target").set("value", 1).get_key();
             create_object(realm, "link target").set("value", 2);
@@ -1227,15 +992,15 @@ TEST_CASE("sync: client resync") {
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
 
-        // Link set is discarded entirely (as opposed to being set to nil)
+        // Link set is set to the server's change
         auto origin = get_table(*realm, "link origin");
         auto target = get_table(*realm, "link target");
         auto key = origin->begin()->get<ObjKey>("link");
-        auto obj = target->get_object(key);
+        auto obj = target->get_object(key); // FIXME: verify
         REQUIRE(obj.get<Int>("value") == 1);
     }
 
-    SECTION("add remotely deleted object to list") {
+    SECTION("add remotely deleted object to list is discarded") {
         ObjKey k0, k1, k2;
         setup([&](auto& realm) {
             k0 = create_object(realm, "link target").set("value", 1).get_key();

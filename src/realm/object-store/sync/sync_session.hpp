@@ -310,18 +310,15 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                                               bool force_client_resync)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                              bool force_client_resync)
-                : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
+                : SyncSession(client, std::move(realm_path), std::move(config))
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
-                                                   force_client_resync);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config));
     }
     // }
 
@@ -364,7 +361,7 @@ private:
     size_t m_death_count = 0;
 
     SyncConfig m_config;
-
+    bool m_force_client_reset = false;
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 

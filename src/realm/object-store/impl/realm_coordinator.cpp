@@ -88,7 +88,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
     return {};
 }
 
-void RealmCoordinator::create_sync_session(bool force_client_resync)
+void RealmCoordinator::create_sync_session()
 {
 #if REALM_ENABLE_SYNC
     if (m_sync_session)
@@ -108,8 +108,7 @@ void RealmCoordinator::create_sync_session(bool force_client_resync)
             "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
     }
 
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config,
-                                                                             force_client_resync);
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(
@@ -333,7 +332,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
     if (realm->config().sync_config)
-        create_sync_session(false);
+        create_sync_session();
 
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
@@ -367,7 +366,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     set_config(config);
     // FIXME: Re-enable once the server reintroduces support for State Realms.
     // bool exists = File::exists(m_config.path);
-    create_sync_session(false /* exists */);
+    create_sync_session();
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -378,7 +377,7 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     set_config(config);
     // FIXME: Re-enable once the server reintroduces support for State Realms.
     // bool exists = File::exists(m_config.path);
-    create_sync_session(false /* exists */);
+    create_sync_session();
 }
 
 #endif
@@ -1227,7 +1226,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
-    create_sync_session(false);
+    create_sync_session();
     util::CheckedLockGuard lock(m_transaction_callback_mutex);
     m_transaction_callback = std::move(fn);
 }

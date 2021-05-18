@@ -447,8 +447,7 @@ void SyncSession::handle_error(SyncError error)
         switch (m_config.client_resync_mode) {
             case ClientResyncMode::Manual:
                 break;
-            case ClientResyncMode::DiscardLocal:
-            case ClientResyncMode::Recover: {
+            case ClientResyncMode::DiscardLocal: {
                 // Performing a client resync requires tearing down our current
                 // sync session and creating a new one with a forced client
                 // reset. This will result in session completion handlers firing
@@ -460,6 +459,7 @@ void SyncSession::handle_error(SyncError error)
                 // when the session becomes active again.
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
+                    m_force_client_reset = true;
                     CompletionCallbacks callbacks;
                     std::swap(m_completion_callbacks, callbacks);
                     advance_state(lock, State::inactive);
@@ -695,6 +695,14 @@ void SyncSession::do_create_sync_session()
         session_config.authorization_header_name = *m_config.authorization_header_name;
     }
     session_config.custom_http_headers = m_config.custom_http_headers;
+
+    if (m_force_client_reset) {
+        std::string metadata_dir = m_realm_path + ".resync";
+        util::try_make_dir(metadata_dir);
+        sync::Session::Config::ClientReset config;
+        config.metadata_dir = metadata_dir;
+        session_config.client_reset_config = config;
+    }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
 
