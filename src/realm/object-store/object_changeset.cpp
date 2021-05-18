@@ -82,7 +82,7 @@ bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vecto
     }
 
     // If a filter was set we need to addionally check if the changed column is part of this filter.
-    std::unordered_set<ColKeyType> changed_columns_for_object = m_modifications.at(obj);
+    const std::unordered_set<ColKeyType>& changed_columns_for_object = m_modifications.at(obj);
     for (const auto& column_key_in_filter : filtered_column_keys) {
         for (const auto& column_key_in_modifications : changed_columns_for_object) {
             if (column_key_in_modifications == column_key_in_filter.value) {
