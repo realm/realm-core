@@ -102,7 +102,7 @@ TEST_CASE("object") {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              {"link", PropertyType::Object | PropertyType::Nullable, "table"},
-             {"link2", PropertyType::Object | PropertyType::Nullable, "table2"},
+             {"link2", PropertyType::Object | PropertyType::Array, "table2"},
          }},
         {"all types",
          {
@@ -630,27 +630,27 @@ TEST_CASE("object") {
                 Obj obj_depth5 = table_origin->create_object_with_primary_key(500);
                 Object object_depth5(r, obj_depth5);
                 object_depth5.set_column_value("value", 501);
-                object_depth5.set_property_value(d, "link2", util::Any(object_depth6));
+                object_depth5.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth6)}));
 
                 Obj obj_depth4 = table_origin->create_object_with_primary_key(400);
                 Object object_depth4(r, obj_depth4);
                 object_depth4.set_column_value("value", 401);
-                object_depth4.set_property_value(d, "link2", util::Any(object_depth5));
+                object_depth4.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth5)}));
 
                 Obj obj_depth3 = table_origin->create_object_with_primary_key(300);
                 Object object_depth3(r, obj_depth3);
                 object_depth3.set_column_value("value", 301);
-                object_depth3.set_property_value(d, "link2", util::Any(object_depth4));
+                object_depth3.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth4)}));
 
                 Obj obj_depth2 = table_origin->create_object_with_primary_key(200);
                 Object object_depth2(r, obj_depth2);
                 object_depth2.set_column_value("value", 201);
-                object_depth2.set_property_value(d, "link2", util::Any(object_depth3));
+                object_depth2.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth3)}));
 
                 Obj obj_depth1 = table_origin->create_object_with_primary_key(100);
                 Object object_depth1(r, obj_depth1);
                 object_depth1.set_column_value("value", 101);
-                object_depth1.set_property_value(d, "link2", util::Any(object_depth2));
+                object_depth1.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth2)}));
 
                 r->commit_transaction();
 
