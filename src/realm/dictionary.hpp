@@ -228,7 +228,7 @@ public:
     }
     bool is_null(size_t ndx) const final
     {
-        return m_source.is_null(ndx);
+        return m_source.is_null(ndx); // FIXME: check for invalidated links?
     }
     Mixed get_any(size_t ndx) const final
     {

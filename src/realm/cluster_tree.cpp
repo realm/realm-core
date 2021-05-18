@@ -1003,6 +1003,8 @@ void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
 {
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
+    bump_content_version();
+    bump_storage_version();
 }
 
 /**************************  ClusterTree::Iterator  **************************/

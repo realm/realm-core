@@ -632,6 +632,9 @@ void Dictionary::erase(Iterator it)
 
 void Dictionary::nullify(Mixed key)
 {
+    validate_key_value(key);
+    update_if_needed();
+
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
     auto state = m_clusters->get(k);
@@ -652,6 +655,7 @@ void Dictionary::nullify(Mixed key)
     if (fields.has_missing_parent_update()) {
         m_clusters->update_ref_in_parent(k, fields.get_ref());
     }
+    bump_content_version();
 }
 
 void Dictionary::remove_backlinks(CascadeState& state) const
@@ -673,7 +677,8 @@ void Dictionary::clear()
             if (clear_backlink(elem.second, cascade_state))
                 recurse = true;
             if (repl)
-                repl->dictionary_erase(*this, n, elem.first);
+                repl->dictionary_erase(
+                    *this, n, elem.first); // FIXME: is this reporting the correct index or should we loop backwards?
             n++;
         }
 

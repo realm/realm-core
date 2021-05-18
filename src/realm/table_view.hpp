@@ -398,10 +398,9 @@ protected:
     ObjKey m_linked_obj_key;
     ConstTableRef m_linked_table;
 
-    // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
-    mutable LnkLstPtr m_linklist_source;
-    // If this TableView was created from a LnkSet, then this reference points to it. Otherwise it's 0
-    mutable LnkSetPtr m_linkset_source;
+    // If this TableView was created from a LnkLst/LnkSet/DictionaryLinkValues, then this reference points to it.
+    // Otherwise it's 0
+    mutable LinkCollectionPtr m_source_collection;
 
     // Stores the ordering criteria of applied sort and distinct operations.
     DescriptorOrdering m_descriptor_ordering;
@@ -555,9 +554,9 @@ inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column
 
 inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
     : m_table(parent) // Throws
-    , m_linklist_source(std::move(link_list))
+    , m_source_collection(std::move(link_list))
 {
-    REALM_ASSERT(m_linklist_source);
+    REALM_ASSERT(m_source_collection);
     m_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
@@ -566,9 +565,9 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
 
 inline ConstTableView::ConstTableView(ConstTableRef parent, LnkSetPtr link_set)
     : m_table(parent) // Throws
-    , m_linkset_source(std::move(link_set))
+    , m_source_collection(std::move(link_set))
 {
-    REALM_ASSERT(m_linkset_source);
+    REALM_ASSERT(m_source_collection);
     m_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
@@ -580,8 +579,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
-    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{})
-    , m_linkset_source(tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{})
+    , m_source_collection(tv.m_source_collection ? tv.m_source_collection->clone_obj_list() : nullptr)
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
@@ -598,8 +596,7 @@ inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
-    , m_linklist_source(std::move(tv.m_linklist_source))
-    , m_linkset_source(std::move(tv.m_linkset_source))
+    , m_source_collection(std::move(tv.m_source_collection))
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
     , m_start(tv.m_start)
@@ -627,8 +624,7 @@ inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
-    m_linklist_source = std::move(tv.m_linklist_source);
-    m_linkset_source = std::move(tv.m_linkset_source);
+    m_source_collection = std::move(tv.m_source_collection);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
 
     return *this;
@@ -650,8 +646,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
-    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{};
-    m_linkset_source = tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{};
+    m_source_collection = tv.m_source_collection ? tv.m_source_collection->clone_obj_list() : nullptr;
     m_descriptor_ordering = tv.m_descriptor_ordering;
 
     return *this;
