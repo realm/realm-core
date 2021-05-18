@@ -50,8 +50,9 @@ struct NotificationCallback {
     // not guarded by a lock and can only be accessed on the notifier's
     // target thread.
     CollectionChangeBuilder changes_to_deliver = CollectionChangeBuilder();
-    // The filter that this `NotificationCallback` is restricted to. Elements not part
-    // of the `key_path_array` should not invoke a notification.
+    // The filter that this `NotificationCallback` is restricted to.
+    // If not empty, modifications of elements not part of the `key_path_array`
+    // will not invoke a notification.
     KeyPathArray key_path_array = {};
     // A unique-per-notifier identifier used to unregister the callback.
     uint64_t token = 0;
