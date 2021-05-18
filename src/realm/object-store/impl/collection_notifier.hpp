@@ -206,6 +206,8 @@ protected:
     // filter is attached to all of them.
     bool all_callbacks_filtered() const noexcept;
 
+    void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
+
     // A summary of all `KeyPathArray`s attached to the `m_callbacks`.
     std::vector<KeyPathArray> m_key_path_arrays;
 

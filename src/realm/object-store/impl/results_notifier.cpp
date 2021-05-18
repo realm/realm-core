@@ -104,10 +104,7 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks) {
-        m_related_tables.clear();
-        recalculate_key_path_arrays();
-        DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(m_query->get_table()), m_key_path_arrays);
-        m_did_modify_callbacks = false;
+        update_related_tables(*(m_query->get_table()));
     }
 
     return m_query->get_table() && has_run() && have_callbacks();

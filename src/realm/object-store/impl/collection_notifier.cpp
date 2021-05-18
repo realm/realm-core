@@ -237,6 +237,16 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
         info.tables[tbl.table_key.value];
 }
 
+void CollectionNotifier::update_related_tables(Table const& table)
+{
+    m_related_tables.clear();
+    recalculate_key_path_arrays();
+    DeepChangeChecker::find_filtered_related_tables(m_related_tables, table, m_key_path_arrays);
+    // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
+    // necessary.
+    m_did_modify_callbacks = false;
+}
+
 void CollectionNotifier::prepare_handover()
 {
     REALM_ASSERT(m_sg);
