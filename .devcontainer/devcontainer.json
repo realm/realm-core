@@ -13,8 +13,10 @@
         "cmake.configureSettings": {
             "REALM_ENABLE_AUTH_TESTS": "ON",
             "REALM_MONGODB_ENDPOINT": "http://mongodb-realm:9090",
-            "REALM_STITCH_CONFIG": "/realm-core/test/mongodb/config.json",
-        }
+            "REALM_STITCH_CONFIG": "/realm-core/test/object-store/mongodb/config.json",
+        },
+        "cmake.cmakePath": "cmake",
+        "cmake.generator": "Ninja"
     },
 
     // Add the IDs of extensions you want installed when the container is created.
