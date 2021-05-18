@@ -97,8 +97,7 @@ public:
      * @param key_path_array A filter that can be applied to make sure the `CollectionChangeCallback` is only executed
      * when the property in the filter is changed but not otherwise.
      *
-     * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
-     * callback via `remove_callback`.
+     * @return A `NotificationToken` that is used to identify this callback.
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
