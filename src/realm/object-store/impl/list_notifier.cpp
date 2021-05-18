@@ -70,7 +70,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks && m_type == PropertyType::Object) {
-        m_related_tables = {};
+        m_related_tables.clear();
         auto& list = static_cast<LnkLst&>(*m_list);
         recalculate_key_path_arrays();
         DeepChangeChecker::find_filtered_related_tables(m_related_tables, *(list.get_target_table()),
