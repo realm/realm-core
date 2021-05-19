@@ -52,7 +52,7 @@ static constexpr ObjKey s_file_size(4);
 } // namespace
 
 ClientStateDownload::ClientStateDownload(util::Logger& logger, const std::string& realm_path,
-                                         const std::string& metadata_dir, bool recover_local_changes,
+                                         const std::string& metadata_dir,
                                          util::Optional<std::array<char, 64>> encryption_key)
     : logger{logger}
     , m_realm_path{realm_path}
@@ -60,7 +60,6 @@ ClientStateDownload::ClientStateDownload(util::Logger& logger, const std::string
     , m_meta_realm_path{util::File::resolve("meta.realm", m_versioned_metadata_dir)}
     , m_partially_downloaded_realm_path{util::File::resolve("partially_downloaded.realm", m_versioned_metadata_dir)}
     , m_encryption_key{encryption_key}
-    , m_recover_local_changes{recover_local_changes}
 {
     logger.debug("Create ClientStateDownload, realm_path = %1, metadata_dir = %2", realm_path, metadata_dir);
 #ifdef REALM_ENABLE_ENCRYPTION
@@ -80,11 +79,6 @@ ClientStateDownload::ClientStateDownload(util::Logger& logger, const std::string
 void ClientStateDownload::set_salted_file_ident(sync::SaltedFileIdent salted_file_ident)
 {
     m_salted_file_ident = salted_file_ident;
-}
-
-void ClientStateDownload::set_client_reset_client_version(sync::version_type client_version)
-{
-    m_client_reset_client_version = client_version;
 }
 
 bool ClientStateDownload::receive_state(sync::version_type server_version, sync::salt_type server_version_salt,
@@ -328,9 +322,9 @@ bool ClientStateDownload::finalize_client_reset()
     LocalVersionIDs local_version_ids;
     try {
         uint_fast64_t downloaded_bytes = m_max_offset;
-        local_version_ids = perform_client_reset_diff(
-            m_partially_downloaded_realm_path, m_realm_path, m_encryption_key, m_salted_file_ident, m_server_version,
-            downloaded_bytes, m_client_reset_client_version, m_recover_local_changes, logger);
+        local_version_ids =
+            perform_client_reset_diff(m_partially_downloaded_realm_path, m_realm_path, m_encryption_key,
+                                      m_salted_file_ident, m_server_version, downloaded_bytes, logger);
     }
     catch (util::File::AccessError& e) {
         logger.error("In finalize_client_reset, the client reset failed, "

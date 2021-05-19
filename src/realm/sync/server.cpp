@@ -1623,8 +1623,6 @@ public:
                                version_type scan_client_version, version_type latest_server_version,
                                salt_type latest_server_version_salt);
 
-    void receive_client_version_request_message(session_ident_type session_ident, SaltedFileIdent client_file_ident);
-
     void receive_state_request_message(session_ident_type session_ident,
                                        SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
                                        bool need_recent, std::int_fast32_t min_file_format_version,
@@ -2616,16 +2614,6 @@ public:
         return m_send_ident_message;
     }
 
-    bool must_send_client_version_message() const noexcept
-    {
-        return bool(m_client_version_request_ident);
-    }
-
-    bool state_request_message_received() const noexcept
-    {
-        return m_state_request_message_received;
-    }
-
     bool must_send_state_message() const noexcept
     {
         return bool(m_state_message_info);
@@ -2761,31 +2749,26 @@ public:
     {
         if (REALM_LIKELY(!unbind_message_received())) {
             if (REALM_LIKELY(!error_occurred())) {
-                if (REALM_LIKELY(!must_send_client_version_message())) {
-                    if (REALM_LIKELY(!must_send_state_message())) {
-                        if (REALM_LIKELY(ident_message_received())) {
-                            // State is WaitForUnbind.
-                            bool relayed_alloc = (m_allocated_file_ident.ident != 0);
-                            if (REALM_LIKELY(!relayed_alloc)) {
-                                // Send DOWNLOAD or MARK.
-                                continue_history_scan(); // Throws
-                                // Session object may have been
-                                // destroyed at this point (suicide)
-                                return;
-                            }
-                            send_alloc_message(); // Throws
+                if (REALM_LIKELY(!must_send_state_message())) {
+                    if (REALM_LIKELY(ident_message_received())) {
+                        // State is WaitForUnbind.
+                        bool relayed_alloc = (m_allocated_file_ident.ident != 0);
+                        if (REALM_LIKELY(!relayed_alloc)) {
+                            // Send DOWNLOAD or MARK.
+                            continue_history_scan(); // Throws
+                            // Session object may have been
+                            // destroyed at this point (suicide)
                             return;
                         }
-                        // State is SendIdent
-                        send_ident_message(); // Throws
+                        send_alloc_message(); // Throws
                         return;
                     }
-                    // FIXME: State is ???
-                    send_state_message();
+                    // State is SendIdent
+                    send_ident_message(); // Throws
                     return;
                 }
                 // FIXME: State is ???
-                send_client_version_message();
+                send_state_message();
                 return;
             }
             // State is SendError
@@ -3179,37 +3162,6 @@ public:
         return true;
     }
 
-    bool receive_client_version_request_message(SaltedFileIdent client_file_ident, ProtocolError& error)
-    {
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-        REALM_ASSERT(!m_error_message_sent);
-        REALM_ASSERT(!m_server_file->realm_deletion_is_ongoing());
-
-        logger.debug("Received: CLIENT_VERSION_REQUEST(client_file_ident=%1, "
-                     "client_file_ident_salt=%2)",
-                     client_file_ident.ident, client_file_ident.salt); // Throws
-
-        if (!m_access_token) {
-            logger.error("Permission denied (message_type='state_request', reason='not logged in')"); // Throws
-            metrics().increment("permission.denied");                                                 // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
-
-        if (expired()) {
-            logger.detail("Received STATE_REQUEST message while session token had expired"); // Throws
-            metrics().increment("authentication.failed");                                    // Throws
-            error = ProtocolError::token_expired;
-            return false;
-        }
-
-        m_client_version_request_ident = client_file_ident;
-
-        enlist_to_send();
-        return true;
-    }
-
     bool receive_state_request_message(SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
                                        bool need_recent, std::int_fast32_t min_file_format_version,
                                        std::int_fast32_t max_file_format_version,
@@ -3219,7 +3171,6 @@ public:
         // Protocol state must be WaitForStateRequest
         REALM_ASSERT(!need_client_file_ident());
         REALM_ASSERT(!m_send_ident_message);
-        REALM_ASSERT(!state_request_message_received());
         REALM_ASSERT(!ident_message_received());
         REALM_ASSERT(!unbind_message_received());
         REALM_ASSERT(!error_occurred());
@@ -3250,7 +3201,6 @@ public:
             return false;
         }
 
-        m_state_request_message_received = true;
         REALM_ASSERT(!m_state_message_info);
         m_state_message_info.reset(new StateMessageInfo{});
 
@@ -3697,12 +3647,6 @@ private:
     // Payload for next outgoing ALLOC message.
     SaltedFileIdent m_allocated_file_ident = {0, 0};
 
-    // Set at receipt of CLIENT_VERSION_REQUEST message.
-    Optional<SaltedFileIdent> m_client_version_request_ident;
-
-    // Set to true on receipt of a STATE_REQUEST message.
-    bool m_state_request_message_received = false;
-
     struct StateMessageInfo {
         // unused
         Optional<uint_fast64_t> descriptor;
@@ -3974,24 +3918,6 @@ private:
 
         m_allocated_file_ident.ident = 0; // Consumed
         m_send_ident_message = false;
-        // Protocol state is now WaitForStateRequest or WaitForIdent
-    }
-
-    void send_client_version_message()
-    {
-        REALM_ASSERT(m_client_version_request_ident);
-        version_type client_version = m_server_file->get_latest_client_version(*m_client_version_request_ident);
-        m_client_version_request_ident = none;
-
-        logger.debug("Sending: CLIENT_VERSION(client_version=%1)",
-                     client_version); // Throws
-
-        ServerProtocol& protocol = get_server_protocol();
-        OutputBuffer& out = m_connection.get_output_buffer();
-        protocol.make_client_version_message(out, m_session_ident,
-                                             client_version); // Throws
-
-        m_connection.initiate_write_output_buffer(); // Throws
         // Protocol state is now WaitForStateRequest or WaitForIdent
     }
 
@@ -6079,38 +6005,6 @@ void SyncConnection::receive_ident_message(session_ident_type session_ident, fil
         protocol_error(error, &sess);                 // Throws
 }
 
-void SyncConnection::receive_client_version_request_message(session_ident_type session_ident,
-                                                            SaltedFileIdent client_file_ident)
-{
-    auto i = m_sessions.find(session_ident);
-    if (REALM_UNLIKELY(i == m_sessions.end())) {
-        bad_session_ident("CLIENT_VERSION_REQUEST", session_ident); // Throws
-        return;
-    }
-    Session& sess = *i->second;
-    if (REALM_UNLIKELY(sess.unbind_message_received())) {
-        message_after_unbind("CLIENT_VERSION_REQUEST", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.error_occurred())) {
-        // Protocol state is SendError or WaitForUnbindErr. In these states, all
-        // messages, other than UNBIND, must be ignored.
-        return;
-    }
-    if (REALM_UNLIKELY(sess.ident_message_received())) {
-        logger.error("Received CLIENT_VERSION_REQUEST message after IDENT message for session"); // Throws
-        protocol_error(ProtocolError::bad_message_order);                                        // Throws
-        metrics().increment("protocol.violated");                                                // Throws
-        return;
-    }
-
-    ProtocolError error = {};
-    bool success = sess.receive_client_version_request_message(client_file_ident,
-                                                               error); // Throws
-    if (REALM_UNLIKELY(!success))
-        protocol_error(error, &sess); // Throws
-}
-
 void SyncConnection::receive_state_request_message(
     session_ident_type session_ident, SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
     bool need_recent, std::int_fast32_t min_file_format_version, std::int_fast32_t max_file_format_version,
@@ -6135,12 +6029,6 @@ void SyncConnection::receive_state_request_message(
         logger.error("Received STATE_REQUEST message before IDENT message was sent"); // Throws
         protocol_error(ProtocolError::bad_message_order);                             // Throws
         metrics().increment("protocol.violated");                                     // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.state_request_message_received())) {
-        logger.error("Received second STATE_REQUEST message for session"); // Throws
-        protocol_error(ProtocolError::bad_message_order);                  // Throws
-        metrics().increment("protocol.violated");                          // Throws
         return;
     }
     if (REALM_UNLIKELY(sess.ident_message_received())) {

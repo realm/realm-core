@@ -46,14 +46,6 @@ void ClientProtocol::make_ident_message(OutputBuffer& out, session_ident_type se
     REALM_ASSERT(!out.fail());
 }
 
-void ClientProtocol::make_client_version_request_message(OutputBuffer& out, session_ident_type session_ident,
-                                                         SaltedFileIdent client_file_ident)
-{
-    out << "client_version_request " << session_ident << " " << client_file_ident.ident << " "
-        << client_file_ident.salt << "\n"; // Throws
-    REALM_ASSERT(!out.fail());
-}
-
 void ClientProtocol::make_state_request_message(
     int protocol_version, OutputBuffer& out, session_ident_type session_ident,
     SaltedVersion partial_transfer_server_version, std::uint_fast64_t offset, bool need_recent,

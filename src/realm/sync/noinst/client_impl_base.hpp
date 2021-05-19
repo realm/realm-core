@@ -517,7 +517,6 @@ private:
     void receive_pong(milliseconds_type timestamp);
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_client_version_message(session_ident_type session_ident, version_type client_version);
     void receive_state_message(session_ident_type session_ident, version_type server_version,
                                salt_type server_version_salt, uint_fast64_t begin_offset, uint_fast64_t end_offset,
                                uint_fast64_t max_offset, BinaryData chunk);
@@ -938,7 +937,6 @@ private:
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
     bool m_bind_message_sent;                   // Sending of BIND message has been initiated
-    bool m_client_version_request_message_sent; // Sending of CLIENT_VERSION_REQUEST has been initiated
     bool m_state_request_message_sent;          // Sending of STATE_REQUEST message has been initiated
     bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
     bool m_alloc_message_sent;                  // See send_alloc_message()
@@ -952,9 +950,6 @@ private:
 
     // True if and only if the session is performing a client reset.
     bool m_client_reset = false;
-
-    // A client reset Config parameter.
-    bool m_client_reset_recover_local_changes = true;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1089,7 +1084,6 @@ private:
     void message_sent();
     void send_bind_message();
     void send_ident_message();
-    void send_client_version_request_message();
     void send_state_request_message();
     void send_upload_message();
     void send_mark_message();
@@ -1097,7 +1091,6 @@ private:
     void send_refresh_message();
     void send_unbind_message();
     std::error_code receive_ident_message(SaltedFileIdent);
-    void receive_client_version_message(version_type client_version);
     void receive_state_message(version_type server_version, salt_type server_version_salt, uint_fast64_t begin_offset,
                                uint_fast64_t end_offset, uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
@@ -1551,7 +1544,6 @@ inline void ClientImplBase::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
-    m_client_version_request_message_sent = false;
     m_state_request_message_sent = false;
     m_ident_message_sent = false;
     m_alloc_message_sent = false;

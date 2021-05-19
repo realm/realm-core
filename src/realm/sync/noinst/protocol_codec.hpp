@@ -73,9 +73,6 @@ public:
     void make_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                             const SyncProgress& progress);
 
-    void make_client_version_request_message(OutputBuffer&, session_ident_type session_ident,
-                                             SaltedFileIdent client_file_ident);
-
     void make_state_request_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
                                     SaltedVersion partial_transfer_server_version, std::uint_fast64_t offset,
                                     bool need_recent, std::int_fast32_t min_file_format_version,
@@ -399,20 +396,6 @@ public:
 
             SaltedFileIdent client_file_ident_2{client_file_ident, client_file_ident_salt};
             connection.receive_ident_message(session_ident, client_file_ident_2); // Throws
-            return;
-        }
-        if (message_type == "client_version") {
-            session_ident_type session_ident;
-            version_type client_version;
-            char sp_1, sp_2, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_version >> newline; // Throws
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax)
-                goto bad_syntax;
-
-            connection.receive_client_version_message(session_ident, client_version);
             return;
         }
         if (message_type == "state") {
@@ -809,23 +792,6 @@ public:
                 goto bad_syntax;
 
             connection.receive_alloc_message(session_ident); // Throws
-            return;
-        }
-        if (message_type == "client_version_request") {
-            session_ident_type session_ident;
-            SaltedFileIdent client_file_ident;
-            char sp_1, sp_2, sp_3, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident.ident >> sp_3 >> client_file_ident.salt >>
-                newline; // Throws
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size;
-            bool good_syntax =
-                (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax)
-                goto bad_syntax;
-
-            connection.receive_client_version_request_message(session_ident,
-                                                              client_file_ident); // Throws
             return;
         }
         if (message_type == "state_request") {

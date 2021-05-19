@@ -537,11 +537,6 @@ public:
         /// application can listen to change notifications from the client
         /// reset exactly as in a DOWNLOAD message.
         ///
-        /// The client reset will recover non-uploaded changes in the local
-        /// Realm if and only if 'recover_local_changes' is true. In case,
-        /// 'recover_local_changes' is false, the local Realm state will hence
-        /// be set to the server's state (server wins).
-        ///
         /// Async open and client reset require a private directory for
         /// metadata. This directory must be specified in the option
         /// 'metadata_dir'. The metadata_dir must not be touched during async
@@ -592,7 +587,6 @@ public:
         /// bool wait_for_download_complete_or_client_stopped().
         struct ClientReset {
             std::string metadata_dir;
-            bool recover_local_changes = true;
         };
         util::Optional<ClientReset> client_reset_config;
 

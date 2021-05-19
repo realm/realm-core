@@ -794,9 +794,6 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            // Setting recover_local_changes to false should prevent the schema being
-            // copied over
-            client_reset_config.recover_local_changes = false;
             client_reset_config.metadata_dir = std::string(metadata_dir_1);
             session_config.client_reset_config = client_reset_config;
         }

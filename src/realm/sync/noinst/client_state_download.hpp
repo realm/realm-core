@@ -18,17 +18,12 @@ public:
     util::Logger& logger;
 
     ClientStateDownload(util::Logger& logger, const std::string& realm_path, const std::string& metadata_dir,
-                        bool recover_local_changes, util::Optional<std::array<char, 64>> encryption_key);
+                        util::Optional<std::array<char, 64>> encryption_key);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientStateDownload object. The ident
     // will be inserted in the Realm after download.
     void set_salted_file_ident(sync::SaltedFileIdent salted_file_ident);
-
-    // When the client has obtained a client reset clent version from the
-    // CLIENT_VERSION meesage, it should deliver it to the ClientStateDownload
-    // object. The client version will be used for the client reset computation.
-    void set_client_reset_client_version(sync::version_type client_version);
 
     // receive_state receives the values received from a STATE message. The
     // return value is true if the values were compatible with prior values,
@@ -60,14 +55,6 @@ private:
     bool m_complete = false;
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
     sync::SaltedVersion m_server_version = {0, 0};
-
-    // m_client_reset_client_version is used in client reset.  It is the latest
-    // client version that the server has integrated before the client reset.
-    // This number is obtained from the server with a CLIENT_VERSION_REQUEST.
-    sync::version_type m_client_reset_client_version = 0;
-
-    // Recover local changes in client reset.
-    bool m_recover_local_changes = true;
 
     uint_fast64_t m_end_offset = 0;
     uint_fast64_t m_max_offset = 0;

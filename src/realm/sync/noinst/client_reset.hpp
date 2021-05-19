@@ -48,9 +48,7 @@ struct LocalVersionIDs {
 LocalVersionIDs perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
                                           const util::Optional<std::array<char, 64>>& encryption_key,
                                           sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
-                                          uint_fast64_t downloaded_bytes, sync::version_type client_version,
-                                          bool recover_local_changes, util::Logger& logger,
-                                          bool should_commit_remote = false);
+                                          uint_fast64_t downloaded_bytes, util::Logger& logger);
 
 } // namespace client_reset
 } // namespace _impl

@@ -609,18 +609,14 @@ client_reset::LocalVersionIDs
 client_reset::perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
                                         const util::Optional<std::array<char, 64>>& encryption_key,
                                         sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
-                                        uint_fast64_t downloaded_bytes, sync::version_type client_version,
-                                        bool recover_local_changes, util::Logger& logger, bool should_commit_remote)
+                                        uint_fast64_t downloaded_bytes, util::Logger& logger)
 {
     logger.info("Client reset, path_remote = %1, path_local = %2, "
                 "encryption = %3, client_file_ident.ident = %4, "
                 "client_file_ident.salt = %5, server_version.version = %6, "
-                "server_version.salt = %7, downloaded_bytes = %8, "
-                "client_version = %9, recover_local_changes = %10, "
-                "should_commit_remote = %11.",
+                "server_version.salt = %7, downloaded_bytes = %8, ",
                 path_remote, path_local, (encryption_key ? "on" : "off"), client_file_ident.ident,
-                client_file_ident.salt, server_version.version, server_version.salt, downloaded_bytes, client_version,
-                (recover_local_changes ? "true" : "false"), (should_commit_remote ? "true" : "false"));
+                client_file_ident.salt, server_version.version, server_version.salt, downloaded_bytes);
 
     DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
     ClientHistoryImpl history_local{path_local};
@@ -637,48 +633,6 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
     sync::version_type current_version_remote = wt_remote->get_version();
     history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
     history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
-
-    if (recover_local_changes) {
-        // Set the client file ident in the remote Realm to prepare it for creation of
-        // local changes.
-
-        // Copy tables and columns from local into remote to avoid destructive schema changes.
-        // The instructions that create tables and columns present in local but not
-        // remote will then be uploaded to the server.
-        // This needs to be done before the local changes are recovered otherwise we might loose
-        // modifications on a table, which creation has been integrated on the server but not yet
-        // present in the state file
-        recover_schema(*group_local, *wt_remote, logger);
-
-        // Recover the local changesets with client versions above 'client_version'.
-        // The recovered changeset will be in history_remote's instruction encoder
-        // when the function returns.
-
-        // FIXME: Re-enable
-        // bool recovered_local_changes = recover_local_changesets(current_version_local, history_local,
-        // client_version,
-        //                                                         *wt_remote, table_info_cache_remote, logger);
-        bool recovered_local_changes = false;
-
-        if (!recovered_local_changes) {
-            const char* msg = "The local data in the client Realm could not be recovered "
-                              // "due to a schema mismatch"; // FIXME
-                              "due to recovery not being supported";
-            logger.warn(msg);
-            // Reset the transaction.
-            wt_remote.reset(); // Rollback
-            sg_remote.reset(); // Close file
-
-            // Reopen
-            history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
-            sg_remote = DB::create(*history_remote, shared_group_options);
-            wt_remote = sg_remote->start_write();
-            current_version_remote = wt_remote->get_version();
-            history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
-            // Recover schema again. The previous changes were never comitted
-            recover_schema(*group_local, *wt_remote, logger);
-        }
-    }
 
     // Diff the content from remote into local.
     {
@@ -701,8 +655,6 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
 
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
                                                downloaded_bytes, recovered_changeset);
-    if (should_commit_remote)
-        wt_remote->commit();
 
     // Finally, the local Realm is committed.
     group_local->commit_and_continue_as_read();
