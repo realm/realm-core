@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* DB::write_copy will not use write transaction
 
 ----------------------------------------------
 
