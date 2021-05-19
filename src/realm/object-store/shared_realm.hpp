@@ -378,6 +378,22 @@ public:
         return !m_transaction && !m_coordinator;
     }
 
+    /**
+     * Deletes the following files for this Realm's configuration if they exist:
+     * - the Realm file itself
+     * - the .log file and its legacy versions: .log_a and .log_b
+     * - the .note file
+     * - the .management folder
+     *
+     * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
+     * If a different process / thread is accessing the realm at the same time a corrupt state
+     * could be the result and checking for a single process state is not possible here.
+     *
+     * @return Yes, if all files could either be deleted or did not exist.
+     *         No if at least one existing file coule not be deleted.
+     */
+    bool delete_files();
+
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
 

@@ -910,6 +910,22 @@ void Realm::close()
     m_coordinator = nullptr;
 }
 
+bool Realm::delete_files()
+{
+    if (!is_closed()) {
+        return false;
+    }
+
+    return DB::call_with_lock(m_config.path, [&](auto) {
+        util::File::try_remove(m_config.path);
+        util::File::try_remove(m_config.path + ".log");
+        util::File::try_remove(m_config.path + ".log_a");
+        util::File::try_remove(m_config.path + ".log_b");
+        util::File::try_remove(m_config.path + ".note");
+        util::try_remove_dir_recursive(m_config.path + ".management");
+    });
+}
+
 AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
