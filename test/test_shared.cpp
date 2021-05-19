@@ -4333,6 +4333,8 @@ TEST(Shared_WriteCopy)
         tr->commit();
 
         db->write_copy(path2.c_str());
+        CHECK_THROW_ANY(db->write_copy(path2.c_str())); // Not allowed to overwrite
+        db->write_copy(path2.c_str(), {}, true);        // Overwrite allowed
     }
     {
         auto hist = make_in_realm_history(path2);
