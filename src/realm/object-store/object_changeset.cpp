@@ -20,12 +20,12 @@
 
 using namespace realm;
 
-void ObjectChangeSet::insertions_add(ObjectKeyType obj)
+void ObjectChangeSet::insertions_add(ObjKey obj)
 {
     m_insertions.insert(obj);
 }
 
-void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
+void ObjectChangeSet::modifications_add(ObjKey obj, ColKey col)
 {
     // don't report modifications on new objects
     if (m_insertions.find(obj) == m_insertions.end()) {
@@ -33,7 +33,7 @@ void ObjectChangeSet::modifications_add(ObjectKeyType obj, ColKeyType col)
     }
 }
 
-void ObjectChangeSet::deletions_add(ObjectKeyType obj)
+void ObjectChangeSet::deletions_add(ObjKey obj)
 {
     m_modifications.erase(obj);
     size_t num_inserts_removed = m_insertions.erase(obj);
@@ -42,32 +42,32 @@ void ObjectChangeSet::deletions_add(ObjectKeyType obj)
     }
 }
 
-bool ObjectChangeSet::insertions_remove(ObjectKeyType obj)
+bool ObjectChangeSet::insertions_remove(ObjKey obj)
 {
     return m_insertions.erase(obj) > 0;
 }
 
-bool ObjectChangeSet::modifications_remove(ObjectKeyType obj)
+bool ObjectChangeSet::modifications_remove(ObjKey obj)
 {
     return m_modifications.erase(obj) > 0;
 }
 
-bool ObjectChangeSet::deletions_remove(ObjectKeyType obj)
+bool ObjectChangeSet::deletions_remove(ObjKey obj)
 {
     return m_deletions.erase(obj) > 0;
 }
 
-bool ObjectChangeSet::deletions_contains(ObjectKeyType obj) const
+bool ObjectChangeSet::deletions_contains(ObjKey obj) const
 {
     return m_deletions.count(obj) > 0;
 }
 
-bool ObjectChangeSet::insertions_contains(ObjectKeyType obj) const
+bool ObjectChangeSet::insertions_contains(ObjKey obj) const
 {
     return m_insertions.count(obj) > 0;
 }
 
-bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vector<ColKey>& filtered_column_keys) const
+bool ObjectChangeSet::modifications_contains(ObjKey obj, const std::vector<ColKey>& filtered_column_keys) const
 {
     // If there is no filter we just check if the object in question was changed which means its key (`obj`)
     // can be found within the `m_modifications`.
@@ -82,9 +82,9 @@ bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vecto
     }
 
     // If a filter was set we need to check if the changed column is part of this filter.
-    const std::unordered_set<ColKeyType>& changed_columns_for_object = m_modifications.at(obj);
+    const std::unordered_set<ColKey>& changed_columns_for_object = m_modifications.at(obj);
     for (const auto& column_key_in_filter : filtered_column_keys) {
-        if (changed_columns_for_object.count(column_key_in_filter.value)) {
+        if (changed_columns_for_object.count(column_key_in_filter)) {
             return true;
         }
     }
@@ -92,7 +92,7 @@ bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vecto
     return false;
 }
 
-const ObjectChangeSet::ObjectSet* ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const
+const ObjectChangeSet::ColumnSet* ObjectChangeSet::get_columns_modified(ObjKey obj) const
 {
     auto it = m_modifications.find(obj);
     if (it == m_modifications.end()) {
@@ -138,8 +138,8 @@ void ObjectChangeSet::verify()
 {
 #ifdef REALM_DEBUG
     for (auto it = m_deletions.begin(); it != m_deletions.end(); ++it) {
-        REALM_ASSERT_EX(m_modifications.find(*it) == m_modifications.end(), *it);
-        REALM_ASSERT_EX(m_insertions.find(*it) == m_insertions.end(), *it);
+        REALM_ASSERT(m_modifications.find(*it) == m_modifications.end());
+        REALM_ASSERT(m_insertions.find(*it) == m_insertions.end());
     }
 #endif
 }

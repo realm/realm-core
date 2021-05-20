@@ -42,11 +42,10 @@ public:
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
-    static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
-                                             std::vector<int64_t> const& new_rows,
-                                             std::function<bool(int64_t)> key_did_change, bool in_table_order);
+    static CollectionChangeBuilder calculate(const ObjKeys& old_rows, const ObjKeys& new_rows,
+                                             std::function<bool(ObjKey)> key_did_change, bool in_table_order);
     static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows, std::vector<size_t> const& new_rows,
-                                             std::function<bool(int64_t)> key_did_change);
+                                             std::function<bool(size_t)> key_did_change);
 
     // generic operations {
     CollectionChangeSet finalize() &&;

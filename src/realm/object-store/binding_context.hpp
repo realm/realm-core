@@ -156,7 +156,7 @@ public:
     struct ObserverState {
         // Table and row which is observed
         realm::TableKey table_key;
-        int64_t obj_key;
+        ObjKey obj_key;
 
         // Opaque userdata for the delegate's use
         void* info;

@@ -571,7 +571,7 @@ void verify_changeset(std::vector<T> const& prev_rows, std::vector<T> const& nex
 }
 
 void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std::vector<RowInfo> new_rows,
-               std::function<bool(int64_t)> key_did_change, bool in_table_order)
+               std::function<bool(int64_t)>&& key_did_change, bool in_table_order)
 {
     // Now that our old and new sets of rows are sorted by key, we can
     // iterate over them and either record old+new TV indices for rows present
@@ -622,12 +622,24 @@ void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std:
 }
 
 template <typename T>
+int64_t to_int64_t(T val)
+{
+    return static_cast<int64_t>(val);
+}
+
+template <>
+int64_t to_int64_t<ObjKey>(ObjKey val)
+{
+    return val.value;
+}
+
+template <typename T>
 std::vector<RowInfo> build_row_info(const std::vector<T>& rows)
 {
     std::vector<RowInfo> info;
     info.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); ++i)
-        info.push_back({static_cast<int64_t>(rows[i]), IndexSet::npos, i});
+        info.push_back({to_int64_t(rows[i]), IndexSet::npos, i});
     std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
         return lft.key < rgt.key;
     });
@@ -636,13 +648,17 @@ std::vector<RowInfo> build_row_info(const std::vector<T>& rows)
 
 } // Anonymous namespace
 
-CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> const& prev_rows,
-                                                           std::vector<int64_t> const& next_rows,
-                                                           std::function<bool(int64_t)> key_did_change,
+CollectionChangeBuilder CollectionChangeBuilder::calculate(const ObjKeys& prev_rows, const ObjKeys& next_rows,
+                                                           std::function<bool(ObjKey)> key_did_change,
                                                            bool in_table_order)
 {
     CollectionChangeBuilder ret;
-    ::calculate(ret, build_row_info(prev_rows), build_row_info(next_rows), std::move(key_did_change), in_table_order);
+    ::calculate(
+        ret, build_row_info(prev_rows), build_row_info(next_rows),
+        [&key_did_change](int64_t key) {
+            return key_did_change(ObjKey(key));
+        },
+        in_table_order);
     ret.verify();
     verify_changeset(prev_rows, next_rows, ret);
     return ret;
@@ -650,7 +666,7 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
 
 CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> const& prev_rows,
                                                            std::vector<size_t> const& next_rows,
-                                                           std::function<bool(int64_t)> key_did_change)
+                                                           std::function<bool(size_t)> key_did_change)
 {
     CollectionChangeBuilder ret;
     ::calculate(ret, build_row_info(prev_rows), build_row_info(next_rows), std::move(key_did_change), false);

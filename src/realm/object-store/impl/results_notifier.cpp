@@ -109,17 +109,17 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 void ResultsNotifier::calculate_changes()
 {
     if (has_run() && have_callbacks()) {
-        std::vector<int64_t> next_rows;
+        ObjKeys next_rows;
         next_rows.reserve(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            next_rows.push_back(m_run_tv.get_key(i).value);
+            next_rows.push_back(m_run_tv.get_key(i));
 
         auto table_key = m_query->get_table()->get_key();
-        if (auto it = m_info->tables.find(table_key.value); it != m_info->tables.end()) {
+        if (auto it = m_info->tables.find(table_key); it != m_info->tables.end()) {
             auto& changes = it->second;
             for (auto& key_val : m_previous_rows) {
                 if (changes.deletions_contains(key_val)) {
-                    key_val = -1;
+                    key_val = ObjKey();
                 }
             }
         }
@@ -133,7 +133,7 @@ void ResultsNotifier::calculate_changes()
     else {
         m_previous_rows.resize(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            m_previous_rows[i] = m_run_tv.get_key(i).value;
+            m_previous_rows[i] = m_run_tv.get_key(i);
     }
 }
 
@@ -168,7 +168,7 @@ void ResultsNotifier::run()
         REALM_ASSERT(m_change.empty());
         auto checker = get_modification_checker(*m_info, m_query->get_table());
         for (size_t i = 0; i < m_previous_rows.size(); ++i) {
-            if (checker(m_previous_rows[i])) {
+            if (checker(ObjKey(m_previous_rows[i]))) {
                 m_change.modifications.add(i);
             }
         }
@@ -277,8 +277,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
     if (!m_list->is_attached())
         return false; // origin row was deleted after the notification was added
 
-    info.lists.push_back(
-        {m_list->get_table()->get_key(), m_list->get_owner_key().value, m_list->get_col_key().value, &m_change});
+    info.lists.push_back({m_list->get_table()->get_key(), m_list->get_owner_key(), m_list->get_col_key(), &m_change});
 
     m_info = &info;
     return true;
@@ -314,8 +313,8 @@ void ListResultsNotifier::calculate_changes()
             }
         }
 
-        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](int64_t key) {
-            return m_change.modifications.contains(static_cast<size_t>(key));
+        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](size_t index) {
+            return m_change.modifications.contains(index);
         });
     }
 

@@ -71,7 +71,7 @@ private:
     TableVersions m_last_seen_version;
 
     // The rows from the previous run of the query, for calculating diffs
-    std::vector<int64_t> m_previous_rows;
+    ObjKeys m_previous_rows;
 
     TransactionChangeInfo* m_info = nullptr;
     bool m_results_were_used = true;
