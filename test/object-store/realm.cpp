@@ -1030,7 +1030,7 @@ TEST_CASE("SharedRealm: delete_files()") {
         REQUIRE_FALSE(util::File::exists(config.path + ".note"));
         REQUIRE_FALSE(util::File::exists(config.path + ".management"));
 
-        // Deleting the .lock file is not save. It must still exist.
+        // Deleting the .lock file is not safe. It must still exist.
         REQUIRE(util::File::exists(config.path + ".lock"));
     }
 
