@@ -386,11 +386,14 @@ public:
      * - the .management folder
      *
      * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
-     * If a different process / thread is accessing the realm at the same time a corrupt state
+     * If a different process / thread is accessing the Realm at the same time a corrupt state
      * could be the result and checking for a single process state is not possible here.
      *
      * @return Yes, if all files could either be deleted or did not exist.
-     *         No if at least one existing file coule not be deleted.
+     *         No if at least one existing file coule not be deleted or the Realm is still open.
+     *
+     * @throws PermissionDenied if the operation was not permitted.
+     * @throws AccessError for any other error while trying to delete the file or folder.
      */
     bool delete_files();
 
