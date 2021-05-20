@@ -202,6 +202,10 @@ struct ObjKey {
     {
         return ObjKey(-2 - value);
     }
+    ObjKey get_resolved() // symmetrical around -2, so same as get_unresolved()
+    {
+        return ObjKey(-2 - value);
+    }
     ObjKey& operator=(int64_t val) noexcept
     {
         value = val;

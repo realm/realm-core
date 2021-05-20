@@ -749,9 +749,9 @@ void Table::erase_from_search_indexes(ObjKey key)
 void Table::update_indexes(ObjKey key, const FieldValues& values)
 {
     // Tombstones do not use index - will crash if we try to insert values
-    if (key.is_unresolved()) {
-        return;
-    }
+    // if (key.is_unresolved()) {
+    //    return;
+    //}
 
     auto sz = m_index_accessors.size();
     // values are sorted by column index - there may be values missing
@@ -2948,41 +2948,38 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     if (did_create)
         *did_create = false;
 
-    // Generate local ObjKey
-    GlobalKey object_id{primary_key};
-    ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
-    // Check for collision
-    if (is_valid(object_key)) {
-        Obj existing_obj = get_object(object_key);
-        auto existing_pk_value = existing_obj.get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return existing_obj;
-        }
-
-        GlobalKey existing_id{existing_pk_value};
-        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
-    }
-
-    // Check for collision with tombstones
-    ObjKey unres_key = object_key.get_unresolved();
+    StringIndex* si = get_search_index(primary_key_col);
+    REALM_ASSERT(si);
+    auto object_key = si->find_first(primary_key);
     bool needs_resurrection = false;
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
-
-        // If the primary key is the same, the object should be resurrected below
-        if (existing_pk_value == primary_key) {
-            needs_resurrection = true;
+    if (object_key) {
+        if (!object_key.is_unresolved()) {
+            // already existing object!
+            return get_object(object_key);
         }
         else {
-            GlobalKey existing_id{existing_pk_value};
-            object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+            // it's a tombstone
+            REALM_ASSERT(m_tombstones);
+            auto stone = m_tombstones->get(object_key);
+            auto existing_pk_value = stone.get_any(primary_key_col);
+            // The primary key must be the same, and the object should be resurrected below
+            REALM_ASSERT(existing_pk_value == primary_key);
+            needs_resurrection = true;
+            si->erase(object_key);
+            object_key = object_key.get_resolved();
         }
     }
-
+    else {
+        // get a new ObjKey - skip potentially used ones
+        // FIXME: This could potentially take a while
+        do {
+            auto seq = allocate_sequence_number();
+            object_key = ObjKey{seq};
+        } while (is_valid(object_key) || (m_tombstones && m_tombstones->is_valid(object_key.get_unresolved())));
+    }
     if (auto repl = get_repl()) {
+        // obtain an object id for the benefit of Sync.
+        GlobalKey object_id{primary_key};
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
     if (did_create) {
@@ -2991,9 +2988,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     field_values.emplace_back(primary_key_col, primary_key);
     Obj ret = m_clusters.insert(object_key, field_values);
-
     // Check if unresolved exists
     if (needs_resurrection) {
+        auto unres_key = object_key.get_unresolved();
         auto tombstone = m_tombstones->get(unres_key);
         ret.assign_pk_and_backlinks(tombstone);
         // If tombstones had no links to it, it may still be alive
@@ -3013,30 +3010,21 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    // Generate local ObjKey
-    GlobalKey object_id{primary_key};
-    ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
-    // Check if existing
-    if (m_clusters.is_valid(object_key)) {
-        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return object_key;
-        }
-    }
-    return {};
+    StringIndex* si = get_search_index(primary_key_col);
+    REALM_ASSERT(si);
+    return si->find_first(primary_key);
 }
 
 ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
 {
+    // SYNC client only!
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
+    // check if it's already present
     // Generate local ObjKey
     GlobalKey object_id{primary_key};
     ObjKey object_key = global_to_local_object_id_hashed(object_id);
@@ -3069,6 +3057,7 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
 
 ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
 {
+    // SYNC client only!
     REALM_ASSERT(!m_primary_key_col);
     auto object_key = global_key.get_local_key(get_sync_file_id());
 
@@ -3114,18 +3103,7 @@ GlobalKey Table::get_object_id(ObjKey key) const
 
 Obj Table::get_object_with_primary_key(Mixed primary_key) const
 {
-    auto primary_key_col = get_primary_key_column();
-    REALM_ASSERT(primary_key_col);
-    DataType type = DataType(primary_key_col.get_type());
-    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
-                 primary_key.get_type() == type);
-
-    ObjKey object_key;
-    GlobalKey object_id{primary_key};
-
-    // Generate local ObjKey
-    object_key = global_to_local_object_id_hashed(object_id);
-
+    ObjKey object_key = find_primary_key(primary_key);
     return m_clusters.get(object_key);
 }
 
@@ -3385,6 +3363,11 @@ void Table::invalidate_object(ObjKey key)
         if (auto primary_key_col = get_primary_key_column()) {
             auto pk = obj.get_any(primary_key_col);
             init_values.emplace_back(primary_key_col, pk);
+            auto si = get_search_index(primary_key_col);
+            REALM_ASSERT(si);
+            auto val = obj.get_any(get_primary_key_column());
+            si->erase(key);
+            si->insert(key.get_unresolved(), val);
         }
         auto tombstone = get_or_create_tombstone(key, init_values);
         tombstone.assign_pk_and_backlinks(obj);
@@ -3534,9 +3517,6 @@ void Table::set_primary_key_column(ColKey col_key)
         check_column(col_key);
         validate_column_is_unique(col_key);
         do_set_primary_key_column(col_key);
-
-        remove_search_index(col_key);
-        rebuild_table_with_pk_column();
     }
     else {
         do_set_primary_key_column(col_key);
@@ -3545,6 +3525,9 @@ void Table::set_primary_key_column(ColKey col_key)
 
 void Table::rebuild_table_with_pk_column()
 {
+    // Disable until we get to fixing file format upgrade!
+    REALM_ASSERT(false);
+
     std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
     for (auto& obj : *this) {
         Mixed pk = obj.get_any(m_primary_key_col);
@@ -3595,13 +3578,19 @@ void Table::rebuild_table_with_pk_column()
 void Table::do_set_primary_key_column(ColKey col_key)
 {
     if (col_key) {
+        if (m_primary_key_col) {
+            REALM_ASSERT(col_key != m_primary_key_col);
+            remove_search_index(m_primary_key_col);
+        }
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
+        m_primary_key_col = col_key;
+        add_search_index(m_primary_key_col);
     }
     else {
         m_top.set(top_position_for_pk_col, 0);
+        remove_search_index(m_primary_key_col);
+        m_primary_key_col = ColKey();
     }
-
-    m_primary_key_col = col_key;
 }
 
 bool Table::contains_unique_values(ColKey col) const
@@ -3628,7 +3617,8 @@ void Table::validate_primary_column()
 {
     if (ColKey col = get_primary_key_column()) {
         validate_column_is_unique(col);
-        rebuild_table_with_pk_column();
+        // WTF ????
+        // rebuild_table_with_pk_column();
     }
 }
 

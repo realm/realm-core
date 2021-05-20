@@ -161,7 +161,9 @@ TEST(Dictionary_Links)
         CHECK_EQUAL(dict.get("Pet").get<ObjKey>(), lady.get_key());
         lady.remove();
         cmp(dict["Pet"], Mixed());
+        // why should this throw?
         CHECK_THROW_ANY(dict.insert("Pet", garfield));
+        // why should this?
         CHECK_THROW_ANY(dict.insert("Pet", garfield.get_key()));
 
         // Reinsert lady
