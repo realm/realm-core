@@ -529,6 +529,10 @@ StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
         }
         case type_Float: {
             auto v2 = get_float();
+            int i = int(v2);
+            if (i == v2) {
+                return Mixed(i).get_index_data(buffer);
+            }
             const char* src = reinterpret_cast<const char*>(&v2);
             realm::safe_copy_n(src, sizeof(float), buffer.data());
             return StringData{buffer.data(), sizeof(float)};
