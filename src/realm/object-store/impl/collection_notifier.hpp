@@ -53,17 +53,17 @@ struct NotificationCallback {
     // The filter that this `NotificationCallback` is restricted to.
     // If not empty, modifications of elements not part of the `key_path_array`
     // will not invoke a notification.
-    KeyPathArray key_path_array;
+    KeyPathArray key_path_array = {};
     // A unique-per-notifier identifier used to unregister the callback.
-    uint64_t token;
+    uint64_t token = 0;
     // We normally want to skip calling the callback if there's no changes,
     // but only if we've sent the initial notification (to support the
     // async query use-case). Not guarded by a mutex and is only readable
     // on the target thread.
-    bool initial_delivered;
+    bool initial_delivered = false;
     // Set within a write transaction on the target thread if this callback
     // should not be called with changes for that write. requires m_callback_mutex.
-    bool skip_next;
+    bool skip_next = false;
 };
 
 // A base class for a notifier that keeps a collection up to date and/or
