@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 11.0.0-beta.5 Release notes
 
 ### Enhancements
 * Added support for creating queries through a dictionary of links, in the same way of LnkLst and LnkSet. ([#4548](https://github.com/realm/realm-core/issues/4593))
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Added the names requested by .NET to match mixed type based querying. ([#4353](https://github.com/realm/realm-core/issues/4353))
 * Deleting objects pointed to by a Dictionary may result in a crash.  ([#4632](https://github.com/realm/realm-core/issues/4632), since v11.0.0-beta.0)
 * Comparing dictionaries from different realms could sometimes return equality ([#4629](https://github.com/realm/realm-core/issues/4629), since v11.0.0-beta.0)
@@ -17,9 +16,6 @@
 * Fix the order of a sorted set of mixed values. ([#4662](https://github.com/realm/realm-core/pull/4662), since v11.0.0-beta.0)
 * Use same rules for handling numeric values in sets as MongoDB uses. All numeric values are compared using the value irregardless of the type.  ([#4686](https://github.com/realm/realm-core/pull/4686), since v11.0.0-beta.0)
 * Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
-
-### Breaking changes
-* None.
 
 -----------
 
