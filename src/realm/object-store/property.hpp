@@ -116,7 +116,7 @@ struct Property {
 
     bool requires_index() const
     {
-        return is_indexed && !is_primary;
+        return is_indexed || is_primary;
     }
 
     bool type_is_indexable() const noexcept;
