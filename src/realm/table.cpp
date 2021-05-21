@@ -837,9 +837,8 @@ void Table::clear_indexes()
     }
 }
 
-void Table::add_search_index(ColKey col_key)
+void Table::do_add_search_index(ColKey col_key)
 {
-    check_column(col_key);
     size_t column_ndx = col_key.get_index().val;
 
     // Early-out if already indexed
@@ -865,13 +864,26 @@ void Table::add_search_index(ColKey col_key)
     index->set_parent(&m_index_refs, column_ndx);
     m_index_refs.set(column_ndx, index->get_ref()); // Throws
 
-    // Update spec
+    populate_search_index(col_key);
+}
+
+void Table::add_search_index(ColKey col_key)
+{
+    check_column(col_key);
+
+    // Check spec
     auto spec_ndx = leaf_ndx2spec_ndx(col_key.get_index());
     auto attr = m_spec.get_column_attr(spec_ndx);
+    if (attr.test(col_attr_Indexed)) {
+        REALM_ASSERT(has_search_index(col_key));
+        return;
+    }
+
+    do_add_search_index(col_key);
+
+    // Update spec
     attr.set(col_attr_Indexed);
     m_spec.set_column_attr(spec_ndx, attr); // Throws
-
-    populate_search_index(col_key);
 }
 
 void Table::remove_search_index(ColKey col_key)
@@ -2046,14 +2058,14 @@ size_t Table::get_index_in_group() const noexcept
     return m_top.get_ndx_in_parent();
 }
 
-uint32_t Table::allocate_sequence_number()
+uint64_t Table::allocate_sequence_number()
 {
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);
     uint64_t sn = rot.is_tagged() ? rot.get_as_int() : 0;
     rot = RefOrTagged::make_tagged(sn + 1);
     m_top.set(top_position_for_sequence_number, rot);
 
-    return uint32_t(sn);
+    return sn;
 }
 
 void Table::set_sequence_number(uint64_t seq)
@@ -2371,7 +2383,7 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         }
 
         if (col_key == m_primary_key_col) {
-            return this->find_primary_key(value);
+            return find_primary_key(value);
         }
     }
 
@@ -2991,52 +3003,42 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     if (did_create)
         *did_create = false;
 
-    // Generate local ObjKey
-    GlobalKey object_id{primary_key};
-    ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
-    // Check for collision
-    if (is_valid(object_key)) {
-        Obj existing_obj = get_object(object_key);
-        auto existing_pk_value = existing_obj.get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return existing_obj;
-        }
-
-        GlobalKey existing_id{existing_pk_value};
-        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    // Check for existing object
+    if (ObjKey key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
+        return m_clusters.get(key);
     }
 
-    // Check for collision with tombstones
-    ObjKey unres_key = object_key.get_unresolved();
-    bool needs_resurrection = false;
-    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
-        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
+    ObjKey unres_key;
+    if (m_tombstones) {
+        // Check for potential tombstone
+        GlobalKey object_id{primary_key};
+        ObjKey object_key = global_to_local_object_id_hashed(object_id);
 
-        // If the primary key is the same, the object should be resurrected below
-        if (existing_pk_value == primary_key) {
-            needs_resurrection = true;
-        }
-        else {
-            GlobalKey existing_id{existing_pk_value};
-            object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+        ObjKey key = object_key.get_unresolved();
+        if (m_tombstones->is_valid(key)) {
+            auto existing_pk_value = m_tombstones->get(key).get_any(primary_key_col);
+
+            // If the primary key is the same, the object should be resurrected below
+            if (existing_pk_value == primary_key) {
+                unres_key = key;
+            }
         }
     }
+
+    ObjKey key = get_next_valid_key();
 
     if (auto repl = get_repl()) {
-        repl->create_object_with_primary_key(this, object_id, primary_key);
+        repl->create_object_with_primary_key(this, key, primary_key);
     }
     if (did_create) {
         *did_create = true;
     }
 
     field_values.emplace_back(primary_key_col, primary_key);
-    Obj ret = m_clusters.insert(object_key, field_values);
+    Obj ret = m_clusters.insert(key, field_values);
 
     // Check if unresolved exists
-    if (needs_resurrection) {
+    if (unres_key) {
         auto tombstone = m_tombstones->get(unres_key);
         ret.assign_pk_and_backlinks(tombstone);
         // If tombstones had no links to it, it may still be alive
@@ -3056,20 +3058,8 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    // Generate local ObjKey
-    GlobalKey object_id{primary_key};
-    ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
-    // Check if existing
-    if (m_clusters.is_valid(object_key)) {
-        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return object_key;
-        }
-    }
-    return {};
+    auto key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
+    return key.is_unresolved() ? ObjKey{} : key;
 }
 
 ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
@@ -3080,24 +3070,14 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    // Generate local ObjKey
-    GlobalKey object_id{primary_key};
-    ObjKey object_key = global_to_local_object_id_hashed(object_id);
-
     // Check if existing
-    if (m_clusters.is_valid(object_key)) {
-        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
-
-        // It may just be the same object
-        if (existing_pk_value == primary_key) {
-            return object_key;
-        }
-
-        GlobalKey existing_id{existing_pk_value};
-        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    if (auto key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
+        return key;
     }
 
     // Object does not exist - create tombstone
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
     auto tombstone = get_or_create_tombstone(object_key, {{primary_key_col, primary_key}});
     auto existing_pk_value = tombstone.get_any(primary_key_col);
     // It may just be the same object
@@ -3126,14 +3106,10 @@ ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
 ObjKey Table::get_objkey(GlobalKey global_key) const
 {
     ObjKey key;
-    if (m_primary_key_col) {
-        key = global_to_local_object_id_hashed(global_key);
-    }
-    else {
-        uint32_t max = std::numeric_limits<uint32_t>::max();
-        if (global_key.hi() <= max && global_key.lo() <= max) {
-            key = global_key.get_local_key(get_sync_file_id());
-        }
+    REALM_ASSERT(!m_primary_key_col);
+    uint32_t max = std::numeric_limits<uint32_t>::max();
+    if (global_key.hi() <= max && global_key.lo() <= max) {
+        key = global_key.get_local_key(get_sync_file_id());
     }
     if (key && !is_valid(key)) {
         key = realm::null_key;
@@ -3163,13 +3139,7 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    ObjKey object_key;
-    GlobalKey object_id{primary_key};
-
-    // Generate local ObjKey
-    object_key = global_to_local_object_id_hashed(object_id);
-
-    return m_clusters.get(object_key);
+    return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 
 Mixed Table::get_primary_key(ObjKey key)
@@ -3414,26 +3384,32 @@ void Table::remove_object(ObjKey key)
     }
 }
 
-void Table::invalidate_object(ObjKey key)
+ObjKey Table::invalidate_object(ObjKey key)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
     REALM_ASSERT(!key.is_unresolved());
 
+    Obj tombstone;
     auto obj = get_object(key);
     if (obj.has_backlinks(false)) {
         // If the object has backlinks, we should make a tombstone
         // and make inward links point to it,
-        FieldValues init_values;
         if (auto primary_key_col = get_primary_key_column()) {
             auto pk = obj.get_any(primary_key_col);
-            init_values.emplace_back(primary_key_col, pk);
+            GlobalKey object_id{pk};
+            auto unres_key = global_to_local_object_id_hashed(object_id);
+            tombstone = get_or_create_tombstone(unres_key, {{primary_key_col, pk}});
         }
-        auto tombstone = get_or_create_tombstone(key, init_values);
+        else {
+            tombstone = get_or_create_tombstone(key, {{}});
+        }
         tombstone.assign_pk_and_backlinks(obj);
     }
 
     remove_object(key);
+
+    return tombstone.get_key();
 }
 
 void Table::remove_object_recursive(ObjKey key)
@@ -3591,68 +3567,27 @@ void Table::set_primary_key_column(ColKey col_key)
         check_column(col_key);
         validate_column_is_unique(col_key);
         do_set_primary_key_column(col_key);
-
-        remove_search_index(col_key);
-        rebuild_table_with_pk_column();
     }
     else {
         do_set_primary_key_column(col_key);
     }
 }
 
-void Table::rebuild_table_with_pk_column()
-{
-    std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
-    for (auto& obj : *this) {
-        Mixed pk = obj.get_any(m_primary_key_col);
-        GlobalKey object_id{pk};
-        ObjKey new_key = global_to_local_object_id_hashed(object_id);
-        if (new_key != obj.get_key())
-            changed_keys.emplace_back(obj.get_key(), new_key);
-    }
-    if (changed_keys.empty()) {
-        return;
-    }
-
-    ObjKeys tmp_keys;
-    for (auto& keypair : changed_keys) {
-        auto old_key = keypair.first;
-        auto new_key = keypair.second;
-        auto old_obj = get_object(old_key);
-
-        // Check if an object with the key already exists
-        if (is_valid(new_key)) {
-            // We can't just change the object's key to the new key because one
-            // already exists with that key and we don't want to overwrite that
-            // one. We know that that object will also be changing its key
-            // because we already verified that there are no duplicates in the
-            // new PK column.
-            // Create temporary object to hold the values of the current object,
-            // and then we'll move the object to its final key in a second pass.
-            auto sequence_number_for_local_id = allocate_sequence_number();
-            ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
-            auto tmp_obj = m_clusters.insert(temp_key, {});
-            tmp_obj.assign(old_obj);
-            tmp_keys.push_back(temp_key);
-        }
-        else {
-            m_clusters.insert(new_key, {}).assign(old_obj);
-        }
-        remove_object(old_key);
-    }
-    for (auto key : tmp_keys) {
-        auto old_obj = get_object(key);
-        Mixed pk(old_obj.get_any(m_primary_key_col));
-        auto new_obj = create_object_with_primary_key(pk);
-        new_obj.assign(old_obj);
-        remove_object(key);
-    }
-}
 
 void Table::do_set_primary_key_column(ColKey col_key)
 {
+    if (m_primary_key_col) {
+        // If the search index has not been set explicitly on current pk col, we remove it again
+        auto spec_ndx = leaf_ndx2spec_ndx(m_primary_key_col.get_index());
+        auto attr = m_spec.get_column_attr(spec_ndx);
+        if (!attr.test(col_attr_Indexed)) {
+            remove_search_index(m_primary_key_col);
+        }
+    }
+
     if (col_key) {
         m_top.set(top_position_for_pk_col, RefOrTagged::make_tagged(col_key.value));
+        do_add_search_index(col_key);
     }
     else {
         m_top.set(top_position_for_pk_col, 0);
@@ -3685,14 +3620,17 @@ void Table::validate_primary_column()
 {
     if (ColKey col = get_primary_key_column()) {
         validate_column_is_unique(col);
-        rebuild_table_with_pk_column();
     }
 }
 
-ObjKey Table::get_next_key()
+ObjKey Table::get_next_valid_key()
 {
-    auto next_key_value = allocate_sequence_number();
-    return ObjKey(next_key_value);
+    ObjKey key;
+    do {
+        key = ObjKey(allocate_sequence_number());
+    } while (m_clusters.is_valid(key));
+
+    return key;
 }
 
 namespace {
@@ -3958,7 +3896,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
     if (si)
-        add_search_index(new_col);
+        do_add_search_index(new_col);
 
     if (is_pk_col) {
         // If we go from non nullable to nullable, no values change,

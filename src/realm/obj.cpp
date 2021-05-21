@@ -136,8 +136,7 @@ void Obj::remove()
 
 void Obj::invalidate()
 {
-    m_table.cast_away_const()->invalidate_object(m_key);
-    m_key = m_key.get_unresolved();
+    m_key = m_table.cast_away_const()->invalidate_object(m_key);
 }
 
 ColKey Obj::get_column_key(StringData col_name) const
@@ -1400,7 +1399,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
         throw LogicError(LogicError::illegal_type);
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    StringIndex* index = m_table->get_search_index(col_key);
+    if (index && !m_key.is_unresolved()) {
         index->set<int64_t>(m_key, value);
     }
 
@@ -1704,7 +1704,8 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     check_range(value);
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    StringIndex* index = m_table->get_search_index(col_key);
+    if (index && !m_key.is_unresolved()) {
         index->set<T>(m_key, value);
     }
 
