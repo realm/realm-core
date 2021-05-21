@@ -2344,10 +2344,6 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         if (StringIndex* index = get_search_index(col_key)) {
             return index->find_first(value);
         }
-
-        if (col_key == m_primary_key_col) {
-            return find_primary_key(value);
-        }
     }
 
     ObjKey key;
@@ -3021,28 +3017,21 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    auto key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
-    return key.is_unresolved() ? ObjKey{} : key;
+    return m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
 }
 
 ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
 {
-    auto primary_key_col = get_primary_key_column();
-    REALM_ASSERT(primary_key_col);
-    DataType type = DataType(primary_key_col.get_type());
-    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
-                 primary_key.get_type() == type);
-
     // Check if existing
-    if (auto key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
+    if (auto key = find_primary_key(primary_key)) {
         return key;
     }
 
     // Object does not exist - create tombstone
     GlobalKey object_id{primary_key};
     ObjKey object_key = global_to_local_object_id_hashed(object_id);
-    auto tombstone = get_or_create_tombstone(object_key, {{primary_key_col, primary_key}});
-    auto existing_pk_value = tombstone.get_any(primary_key_col);
+    auto tombstone = get_or_create_tombstone(object_key, {{m_primary_key_col, primary_key}});
+    auto existing_pk_value = tombstone.get_any(m_primary_key_col);
     // It may just be the same object
     if (existing_pk_value == primary_key) {
         return tombstone.get_key();
@@ -3050,7 +3039,7 @@ ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
     // We have a collision - create new ObjKey
     GlobalKey existing_id{existing_pk_value};
     object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
-    return get_or_create_tombstone(object_key, {{primary_key_col, primary_key}}).get_key();
+    return get_or_create_tombstone(object_key, {{m_primary_key_col, primary_key}}).get_key();
 }
 
 ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)

@@ -1684,6 +1684,73 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+TEST_IF(Upgrade_Database_11, REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_11.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+    std::vector<std::string> names = {"adam", "bart", "carlo", "david", "eric", "frank", "gary"};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto wt = sg->start_write();
+
+    auto foo = wt->get_table("foo");
+    auto bar = wt->get_table("bar");
+    auto o = wt->get_table("origin");
+    auto col1 = o->get_column_key("link1");
+    auto col2 = o->get_column_key("link2");
+#else
+    // NOTE: This code must be executed from an old file-format-version 20
+    // core in order to create a file-format-version 20 test file!
+
+    Group g;
+    TableRef foo = g.add_table_with_primary_key("foo", type_Int, "id", false);
+    TableRef bar = g.add_table_with_primary_key("bar", type_String, "name", false);
+    TableRef o = g.add_table("origin");
+    auto col1 = o->add_column_link(type_Link, "link1", *foo);
+    auto col2 = o->add_column_link(type_Link, "link2", *bar);
+
+    for (auto id : ids) {
+        auto obj = foo->create_object_with_primary_key(id);
+        o->create_object().set(col1, obj.get_key());
+    }
+
+    for (auto name : names) {
+        auto obj = bar->create_object_with_primary_key(name);
+        o->create_object().set(col2, obj.get_key());
+    }
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
+    auto get_object = [](TableRef table, auto pk) {
+        auto col = table->get_primary_key_column();
+        auto key = table->find_first(col, pk);
+        return table->get_object(key);
+    };
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = get_object(foo, id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col1), obj.get_key());
+        ++it;
+    }
+    for (auto name : names) {
+        auto obj = get_object(bar, StringData(name));
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col2), obj.get_key());
+        ++it;
+    }
+}
+
 TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_20.realm";
