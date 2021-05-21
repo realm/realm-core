@@ -46,21 +46,6 @@ void ClientProtocol::make_ident_message(OutputBuffer& out, session_ident_type se
     REALM_ASSERT(!out.fail());
 }
 
-void ClientProtocol::make_state_request_message(
-    int protocol_version, OutputBuffer& out, session_ident_type session_ident,
-    SaltedVersion partial_transfer_server_version, std::uint_fast64_t offset, bool need_recent,
-    std::int_fast32_t min_file_format_version, std::int_fast32_t max_file_format_version,
-    std::int_fast32_t min_history_schema_version, std::int_fast32_t max_history_schema_version)
-{
-    static_cast<void>(protocol_version);
-    out << "state_request " << session_ident << " " << partial_transfer_server_version.version << " "
-        << partial_transfer_server_version.salt << " " << offset << " " << int(need_recent); // Throws
-    out << " " << min_file_format_version << " " << max_file_format_version << " " << min_history_schema_version
-        << " " << max_history_schema_version; // Throws
-    out << "\n";                              // Throws
-    REALM_ASSERT(!out.fail());
-}
-
 ClientProtocol::UploadMessageBuilder::UploadMessageBuilder(
     util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
     _impl::compression::CompressMemoryArena& compress_memory_arena)
@@ -180,18 +165,6 @@ void ServerProtocol::make_client_version_message(OutputBuffer& out, session_iden
 {
     out << "client_version " << session_ident << " " << client_version << "\n"; // Throws
     REALM_ASSERT(!out.fail());
-}
-
-void ServerProtocol::make_state_message(OutputBuffer& out, session_ident_type session_ident,
-                                        SaltedVersion server_version, std::uint_fast64_t begin_offset,
-                                        std::uint_fast64_t end_offset, std::uint_fast64_t max_offset,
-                                        BinaryData chunk)
-{
-    out << "state " << session_ident << " " << server_version.version << " " << server_version.salt << " "
-        << begin_offset << " " << end_offset << " " << max_offset << " " << chunk.size() << "\n"; // Throws
-    REALM_ASSERT(!out.fail());
-
-    out.write(chunk.data(), chunk.size()); // Throws
 }
 
 void ServerProtocol::make_alloc_message(OutputBuffer& out, session_ident_type session_ident,

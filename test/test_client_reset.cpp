@@ -667,7 +667,7 @@ TEST(ClientReset_ThreeClients)
     }
 }
 
-TEST(ClientReset_RecoverSchema)
+TEST(ClientReset_DoNotRecoverSchemaV1)
 {
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
@@ -747,15 +747,7 @@ TEST(ClientReset_RecoverSchema)
         CHECK(compare_groups(rt_2, rt_3));
 
         const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 1);
-        ConstTableRef table = group.get_table("class_table");
-        CHECK(table);
-        CHECK_EQUAL(table->get_column_count(), 1);
-        ColKey col_key = table->get_column_key("float");
-        CHECK(col_key);
-        DataType col_type = table->get_column_type(col_key);
-        CHECK_EQUAL(col_type, type_Float);
-        CHECK_EQUAL(table->size(), 0);
+        CHECK_EQUAL(group.size(), 0);
     }
 }
 

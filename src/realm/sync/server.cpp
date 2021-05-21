@@ -1623,13 +1623,6 @@ public:
                                version_type scan_client_version, version_type latest_server_version,
                                salt_type latest_server_version_salt);
 
-    void receive_state_request_message(session_ident_type session_ident,
-                                       SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
-                                       bool need_recent, std::int_fast32_t min_file_format_version,
-                                       std::int_fast32_t max_file_format_version,
-                                       std::int_fast32_t min_history_schema_version,
-                                       std::int_fast32_t max_history_schema_version);
-
     void receive_upload_message(session_ident_type, version_type progress_client_version,
                                 version_type progress_server_version, version_type locked_server_version,
                                 const UploadChangesets&);
@@ -2614,11 +2607,6 @@ public:
         return m_send_ident_message;
     }
 
-    bool must_send_state_message() const noexcept
-    {
-        return bool(m_state_message_info);
-    }
-
     bool ident_message_received() const noexcept
     {
         return m_client_file_ident != 0;
@@ -2749,26 +2737,21 @@ public:
     {
         if (REALM_LIKELY(!unbind_message_received())) {
             if (REALM_LIKELY(!error_occurred())) {
-                if (REALM_LIKELY(!must_send_state_message())) {
-                    if (REALM_LIKELY(ident_message_received())) {
-                        // State is WaitForUnbind.
-                        bool relayed_alloc = (m_allocated_file_ident.ident != 0);
-                        if (REALM_LIKELY(!relayed_alloc)) {
-                            // Send DOWNLOAD or MARK.
-                            continue_history_scan(); // Throws
-                            // Session object may have been
-                            // destroyed at this point (suicide)
-                            return;
-                        }
-                        send_alloc_message(); // Throws
+                if (REALM_LIKELY(ident_message_received())) {
+                    // State is WaitForUnbind.
+                    bool relayed_alloc = (m_allocated_file_ident.ident != 0);
+                    if (REALM_LIKELY(!relayed_alloc)) {
+                        // Send DOWNLOAD or MARK.
+                        continue_history_scan(); // Throws
+                        // Session object may have been
+                        // destroyed at this point (suicide)
                         return;
                     }
-                    // State is SendIdent
-                    send_ident_message(); // Throws
+                    send_alloc_message(); // Throws
                     return;
                 }
-                // FIXME: State is ???
-                send_state_message();
+                // State is SendIdent
+                send_ident_message(); // Throws
                 return;
             }
             // State is SendError
@@ -3158,77 +3141,6 @@ public:
         }
 
         // Protocol  state is now WaitForUnbind
-        enlist_to_send();
-        return true;
-    }
-
-    bool receive_state_request_message(SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
-                                       bool need_recent, std::int_fast32_t min_file_format_version,
-                                       std::int_fast32_t max_file_format_version,
-                                       std::int_fast32_t min_history_schema_version,
-                                       std::int_fast32_t max_history_schema_version, ProtocolError& error)
-    {
-        // Protocol state must be WaitForStateRequest
-        REALM_ASSERT(!need_client_file_ident());
-        REALM_ASSERT(!m_send_ident_message);
-        REALM_ASSERT(!ident_message_received());
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-        REALM_ASSERT(!m_error_message_sent);
-        REALM_ASSERT(!m_server_file->realm_deletion_is_ongoing());
-
-        logger.debug("Received: STATE_REQUEST(partial_transferred_server_version=%1, "
-                     "partial_transferred_server_version_salt=%2, "
-                     "offset=%3, need_recent=%4, min_file_format_version=%5, "
-                     "max_file_format_version=%6, min_history_schema_version=%7, "
-                     "max_history_schema_version=%8)",
-                     partial_transferred_server_version.version, partial_transferred_server_version.salt, offset,
-                     need_recent, min_file_format_version, max_file_format_version, min_history_schema_version,
-                     max_history_schema_version); // Throws
-
-        if (!m_access_token) {
-            logger.error("Permission denied (message_type='state_request', "
-                         "reason='not logged in')");  // Throws
-            metrics().increment("permission.denied"); // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
-
-        if (expired()) {
-            logger.detail("Received STATE_REQUEST message while session token had expired"); // Throws
-            metrics().increment("authentication.failed");                                    // Throws
-            error = ProtocolError::token_expired;
-            return false;
-        }
-
-        REALM_ASSERT(!m_state_message_info);
-        m_state_message_info.reset(new StateMessageInfo{});
-
-        int file_format_version;
-        int history_schema_version;
-        {
-            using gf = _impl::GroupFriend;
-            int current_file_format_version = 0;
-            int history_type = Replication::hist_SyncClient;
-            file_format_version =
-                gf::get_target_file_format_version_for_session(current_file_format_version, history_type);
-            history_schema_version = _impl::get_client_history_schema_version();
-        }
-        bool has_compatible_file_format =
-            (file_format_version >= min_file_format_version &&
-             file_format_version <= std::max(min_file_format_version, max_file_format_version) &&
-             history_schema_version >= min_history_schema_version &&
-             history_schema_version <= std::max(min_history_schema_version, max_history_schema_version));
-        if (REALM_UNLIKELY(!has_compatible_file_format)) {
-            logger.debug("Incompatible file format for Realm state transfer (%1, %2, %3, %4, %5, "
-                         "%6)",
-                         file_format_version, history_schema_version, min_file_format_version,
-                         max_file_format_version, min_history_schema_version, max_history_schema_version);
-            enlist_to_send();
-            return true;
-        }
-
-        logger.debug("Realm state transfer not supported on server, sending full history");
         enlist_to_send();
         return true;
     }
@@ -3647,18 +3559,6 @@ private:
     // Payload for next outgoing ALLOC message.
     SaltedFileIdent m_allocated_file_ident = {0, 0};
 
-    struct StateMessageInfo {
-        // unused
-        Optional<uint_fast64_t> descriptor;
-        // unused
-        std::string path;
-
-        // dummy values to produce an empty state message
-        uint_fast64_t offset = 0;
-        SaltedVersion server_version = {0, 0};
-    };
-    std::unique_ptr<StateMessageInfo> m_state_message_info;
-
     // Zero until the session receives an IDENT message from the client.
     file_ident_type m_client_file_ident = 0;
 
@@ -3921,43 +3821,8 @@ private:
         // Protocol state is now WaitForStateRequest or WaitForIdent
     }
 
-    void send_state_message()
-    {
-        // Protocol state is SendState
-        REALM_ASSERT(!need_client_file_ident());
-        REALM_ASSERT(must_send_state_message());
-        REALM_ASSERT(!ident_message_received());
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-        REALM_ASSERT(!m_error_message_sent);
-
-        std::unique_ptr<char[]> buf{};
-        uint_fast64_t next_offset = 0;
-        uint_fast64_t max_offset = 0;
-        size_t blocks_size = 0;
-
-        logger.debug("Sending: STATE(server_version=%1, server_version_salt=%2 "
-                     "begin_offset=%3, end_offset=%4, max_offset=%5, "
-                     " blocks_size=%6)",
-                     m_state_message_info->server_version.version, m_state_message_info->server_version.salt,
-                     m_state_message_info->offset, next_offset, max_offset, blocks_size); // Throws
-
-        BinaryData blocks{buf.get(), blocks_size};
-        ServerProtocol& protocol = get_server_protocol();
-        OutputBuffer& out = m_connection.get_output_buffer();
-        protocol.make_state_message(out, m_session_ident, m_state_message_info->server_version,
-                                    m_state_message_info->offset, next_offset, max_offset, blocks); // Throws
-
-        // Send an empty state message to the client.
-        m_connection.initiate_write_output_buffer(); // Throws
-
-        m_state_message_info->offset = next_offset;
-        m_state_message_info.reset();
-    }
-
     void send_download_message()
     {
-        REALM_ASSERT(!must_send_state_message());
         m_connection.initiate_write_output_buffer(); // Throws
     }
 
@@ -5990,12 +5855,6 @@ void SyncConnection::receive_ident_message(session_ident_type session_ident, fil
         metrics().increment("protocol.violated");                  // Throws
         return;
     }
-    if (REALM_UNLIKELY(sess.must_send_state_message())) {
-        logger.error("Received IDENT message before all STATE messages were sent"); // Throws
-        protocol_error(ProtocolError::bad_message_order);                           // Throws
-        metrics().increment("protocol.violated");                                   // Throws
-        return;
-    }
 
     ProtocolError error = {};
     bool success = sess.receive_ident_message(client_file_ident, client_file_ident_salt, scan_server_version,
@@ -6003,47 +5862,6 @@ void SyncConnection::receive_ident_message(session_ident_type session_ident, fil
                                               error); // Throws
     if (REALM_UNLIKELY(!success))                     // Throws
         protocol_error(error, &sess);                 // Throws
-}
-
-void SyncConnection::receive_state_request_message(
-    session_ident_type session_ident, SaltedVersion partial_transferred_server_version, uint_fast64_t offset,
-    bool need_recent, std::int_fast32_t min_file_format_version, std::int_fast32_t max_file_format_version,
-    std::int_fast32_t min_history_schema_version, std::int_fast32_t max_history_schema_version)
-{
-    auto i = m_sessions.find(session_ident);
-    if (REALM_UNLIKELY(i == m_sessions.end())) {
-        bad_session_ident("STATE_REQUEST", session_ident); // Throws
-        return;
-    }
-    Session& sess = *i->second;
-    if (REALM_UNLIKELY(sess.unbind_message_received())) {
-        message_after_unbind("STATE_REQUEST", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.error_occurred())) {
-        // Protocol state is SendError or WaitForUnbindErr. In these states, all
-        // messages, other than UNBIND, must be ignored.
-        return;
-    }
-    if (REALM_UNLIKELY(sess.must_send_ident_message())) {
-        logger.error("Received STATE_REQUEST message before IDENT message was sent"); // Throws
-        protocol_error(ProtocolError::bad_message_order);                             // Throws
-        metrics().increment("protocol.violated");                                     // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.ident_message_received())) {
-        logger.error("Received STATE_REQUEST message after IDENT message for session"); // Throws
-        protocol_error(ProtocolError::bad_message_order);                               // Throws
-        metrics().increment("protocol.violated");                                       // Throws
-        return;
-    }
-
-    ProtocolError error = {};
-    bool success = sess.receive_state_request_message(
-        partial_transferred_server_version, offset, need_recent, min_file_format_version, max_file_format_version,
-        min_history_schema_version, max_history_schema_version, error); // Throws
-    if (REALM_UNLIKELY(!success))
-        protocol_error(error, &sess); // Throws
 }
 
 void SyncConnection::receive_upload_message(session_ident_type session_ident, version_type progress_client_version,

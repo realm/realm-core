@@ -21,16 +21,9 @@ public:
                          util::Optional<std::array<char, 64>> encryption_key);
 
     // When the client has received the salted file ident from the server, it
-    // should deliver the ident to the ClientStateDownload object. The ident
+    // should deliver the ident to the ClientResetOperation object. The ident
     // will be inserted in the Realm after download.
-    void set_salted_file_ident(sync::SaltedFileIdent salted_file_ident);
-
-    // receive_state receives the values received from a STATE message. The
-    // return value is true if the values were compatible with prior values,
-    // false otherwise.
-    bool receive_state(sync::version_type server_version, sync::salt_type server_version_salt,
-                       uint_fast64_t begin_offset, uint_fast64_t end_offset, uint_fast64_t max_offset,
-                       BinaryData chunk);
+    bool finalize(sync::SaltedFileIdent salted_file_ident);
 
     sync::version_type get_server_version();
     sync::salt_type get_server_version_salt();
@@ -51,7 +44,6 @@ private:
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;
 
-    bool finalize();
 };
 
 // Implementation

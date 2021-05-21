@@ -517,9 +517,6 @@ private:
     void receive_pong(milliseconds_type timestamp);
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_state_message(session_ident_type session_ident, version_type server_version,
-                               salt_type server_version_salt, uint_fast64_t begin_offset, uint_fast64_t end_offset,
-                               uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
@@ -804,11 +801,6 @@ protected:
     // transfer from the server.
     virtual const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept;
 
-    /// on_state_download_progress() is called with progress information if
-    /// state download is employed. The default implementation does nothing.
-    virtual void on_state_download_progress(std::uint_fast64_t downloaded_bytes,
-                                            std::uint_fast64_t downloadable_bytes);
-
     /// \brief Initiate the integration of downloaded changesets.
     ///
     /// This function must provide for the passed changesets (if any) to
@@ -937,7 +929,6 @@ private:
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
     bool m_bind_message_sent;                   // Sending of BIND message has been initiated
-    bool m_state_request_message_sent;          // Sending of STATE_REQUEST message has been initiated
     bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
     bool m_alloc_message_sent;                  // See send_alloc_message()
     bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
@@ -1077,15 +1068,12 @@ private:
     void message_sent();
     void send_bind_message();
     void send_ident_message();
-    void send_state_request_message();
     void send_upload_message();
     void send_mark_message();
     void send_alloc_message();
     void send_refresh_message();
     void send_unbind_message();
     std::error_code receive_ident_message(SaltedFileIdent);
-    void receive_state_message(version_type server_version, salt_type server_version_salt, uint_fast64_t begin_offset,
-                               uint_fast64_t end_offset, uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
@@ -1537,7 +1525,6 @@ inline void ClientImplBase::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
-    m_state_request_message_sent = false;
     m_ident_message_sent = false;
     m_alloc_message_sent = false;
     m_unbind_message_sent = false;
