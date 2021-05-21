@@ -1504,7 +1504,7 @@ void Table::create_columns()
     }
 }
 
-bool Table::migrate_objects(ColKey pk_col_key)
+bool Table::migrate_objects()
 {
     size_t nb_public_columns = m_spec.get_public_column_count();
     size_t nb_columns = m_spec.get_column_count();
@@ -1652,16 +1652,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     /*************************** Create objects ******************************/
 
-    // Store old row ndx in a temporary column. Use this in next steps to find
-    // the right target for links
-    ColKey orig_row_ndx_col;
-    if (pk_col_key) {
-        orig_row_ndx_col = add_column(type_Int, "!ROW_INDEX");
-        add_search_index(orig_row_ndx_col);
-    }
-
     for (size_t row_ndx = 0; row_ndx < number_of_objects; row_ndx++) {
-        Mixed pk_val;
         // Build a vector of values obtained from the old columns
         FieldValues init_values;
         for (auto& it : column_accessors) {
@@ -1670,34 +1661,13 @@ bool Table::migrate_objects(ColKey pk_col_key)
             auto nullable = col_key.get_attrs().test(col_attr_Nullable);
             auto val = get_val_from_column(row_ndx, col_type, nullable, it.second.get());
             init_values.emplace_back(col_key, val);
-            if (col_key == pk_col_key) {
-                pk_val = val;
-            }
         }
         for (auto& it : ts_accessors) {
             init_values.emplace_back(it.first, Mixed(it.second->get(row_ndx)));
         }
 
-        ObjKey obj_key;
-        if (pk_col_key) {
-            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
-            // Generate key from pk value
-            GlobalKey object_id{pk_val};
-            obj_key = global_to_local_object_id_hashed(object_id);
-            // Check for collision
-            if (is_valid(obj_key)) {
-                Obj existing_obj = m_clusters.get(obj_key);
-                auto existing_pk_value = existing_obj.get_any(pk_col_key);
-                GlobalKey existing_id{existing_pk_value};
-                obj_key = allocate_local_id_after_hash_collision(object_id, existing_id, obj_key);
-            }
-        }
-        else {
-            obj_key = ObjKey(row_ndx);
-        }
-
         // Create object with the initial values
-        Obj obj = m_clusters.insert(obj_key, init_values);
+        Obj obj = m_clusters.insert(ObjKey(row_ndx), init_values);
 
         // Then update possible list types
         for (auto& it : list_accessors) {
@@ -1748,16 +1718,9 @@ bool Table::migrate_objects(ColKey pk_col_key)
         col_refs.set(ndx, 0);
     }
 
-    if (pk_col_key) {
-        // If we have a primary key column, the sequence number is used to generate unique
-        // keys after collision and must not be updated here.
-    }
-    else {
-        // We need to be sure that the stored 'next sequence number' is bigger than
-        // the biggest ObjKey currently used.
-        auto max_key_value = m_clusters.get_last_key_value();
-        this->set_sequence_number(uint64_t(max_key_value + 1));
-    }
+    // We need to be sure that the stored 'next sequence number' is bigger than
+    // the biggest ObjKey currently used.
+    this->set_sequence_number(uint64_t(number_of_objects));
 
 #if 0
     if (fastrand(100) < 20) {
