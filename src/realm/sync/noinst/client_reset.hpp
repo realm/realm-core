@@ -25,6 +25,8 @@ void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger
 // in dst into dst. Nothing is erased in dst.
 void recover_schema(const Transaction& group_src, Transaction& group_dst, util::Logger& logger);
 
+void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
+
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_remote' as the source of truth.
 // Local changes in 'path_local' with client version greater than
@@ -45,10 +47,10 @@ struct LocalVersionIDs {
     realm::VersionID old_version;
     realm::VersionID new_version;
 };
-LocalVersionIDs perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
+LocalVersionIDs perform_client_reset_diff(const std::string& path_local,
                                           const util::Optional<std::array<char, 64>>& encryption_key,
                                           sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
-                                          uint_fast64_t downloaded_bytes, util::Logger& logger);
+                                          util::Logger& logger);
 
 } // namespace client_reset
 } // namespace _impl

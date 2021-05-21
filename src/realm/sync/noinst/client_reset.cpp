@@ -181,6 +181,17 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
 
 } // namespace
 
+void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
+{
+    logger.debug("remove_all_tables, dst size = %1", tr_dst.size());
+    // Remove the tables to be removed.
+    for (auto table_key : tr_dst.get_table_keys()) {
+        TableRef table = tr_dst.get_table(table_key);
+        if (table->get_name().begins_with("class_")) {
+            sync::erase_table(tr_dst, table);
+        }
+    }
+}
 
 void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
@@ -605,18 +616,16 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
     }
 }
 
-client_reset::LocalVersionIDs
-client_reset::perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
-                                        const util::Optional<std::array<char, 64>>& encryption_key,
-                                        sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
-                                        uint_fast64_t downloaded_bytes, util::Logger& logger)
+client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
+    const std::string& path_local, const util::Optional<std::array<char, 64>>& encryption_key,
+    sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version, util::Logger& logger)
 {
-    logger.info("Client reset, path_remote = %1, path_local = %2, "
-                "encryption = %3, client_file_ident.ident = %4, "
-                "client_file_ident.salt = %5, server_version.version = %6, "
-                "server_version.salt = %7, downloaded_bytes = %8, ",
-                path_remote, path_local, (encryption_key ? "on" : "off"), client_file_ident.ident,
-                client_file_ident.salt, server_version.version, server_version.salt, downloaded_bytes);
+    logger.info("Client reset, path_local = %1, "
+                "encryption = %2, client_file_ident.ident = %3, "
+                "client_file_ident.salt = %4, server_version.version = %5, "
+                "server_version.salt = %6 ",
+                path_local, (encryption_key ? "on" : "off"), client_file_ident.ident, client_file_ident.salt,
+                server_version.version, server_version.salt);
 
     DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
     ClientHistoryImpl history_local{path_local};
@@ -627,24 +636,21 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
 
-    std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
-    DBRef sg_remote = DB::create(*history_remote, shared_group_options);
-    auto wt_remote = sg_remote->start_write();
-    sync::version_type current_version_remote = wt_remote->get_version();
-    history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+    //    std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
+    //    DBRef sg_remote = DB::create(*history_remote, shared_group_options);
+    //    auto wt_remote = sg_remote->start_write();
+    //    sync::version_type current_version_remote = wt_remote->get_version();
+    //    history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
+    //    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
 
-    // Diff the content from remote into local.
-    {
-        // Copy, by diffing, all group content from the remote to the local.
-        transfer_group(*wt_remote, *group_local, logger);
-    }
+    // make breaking changes in the local copy which cannot be advanced
+    remove_all_tables(*group_local, logger);
 
     // Extract the changeset produced in the remote Realm during recovery.
-    sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
-    const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
-    BinaryData recovered_changeset{buffer.data(), buffer.size()};
-
+    //    sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
+    //    const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
+    //    BinaryData recovered_changeset{buffer.data(), buffer.size()};
+    BinaryData recovered_changeset;
     //    {
     //        // Debug.
     //        ChunkedBinaryInputStream in{recovered_changeset};
@@ -652,7 +658,7 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
     //        sync::parse_changeset(in, log); // Throws
     //        log.print();
     //    }
-
+    uint_fast64_t downloaded_bytes = 0;
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
                                                downloaded_bytes, recovered_changeset);
 

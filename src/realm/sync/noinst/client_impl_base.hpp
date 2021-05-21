@@ -956,7 +956,7 @@ private:
 
     // m_client_state_download controls state download and is used for
     // async open and client reset.
-    std::unique_ptr<ClientStateDownload> m_client_state_download;
+    std::unique_ptr<ClientResetOperation> m_client_state_download;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in

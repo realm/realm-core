@@ -1883,9 +1883,9 @@ void Session::activate()
             logger.info("Client reset config, metadata_dir = '%1', ",
                         client_reset_config->metadata_dir); // Throws
             m_state_download_in_progress = true;
-            m_client_state_download.reset(new _impl::ClientStateDownload(logger, get_realm_path(),
-                                                                         client_reset_config->metadata_dir,
-                                                                         get_encryption_key())); // Throws
+            m_client_state_download.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
+                                                                          client_reset_config->metadata_dir,
+                                                                          get_encryption_key())); // Throws
         }
 
         if (!m_state_download_in_progress) {
@@ -2109,7 +2109,7 @@ void Session::send_state_request_message()
     SaltedVersion partial_transfer_server_version = {m_client_state_download->get_server_version(),
                                                      m_client_state_download->get_server_version_salt()};
 
-    uint_fast64_t end_offset = m_client_state_download->get_end_offset();
+    uint_fast64_t end_offset = 0;
     bool need_recent = m_client_reset;
 
     std::int_fast32_t min_file_format_version = 0;
@@ -2442,39 +2442,35 @@ void Session::receive_state_message(version_type server_version, salt_type serve
     realm::VersionID client_reset_old_version;
     realm::VersionID client_reset_new_version;
 
-    if (m_client_state_download->is_complete()) {
-        // The State Realm is complete and can be used.
-        logger.debug("Async open or client reset is completed, path=%1",
-                     get_realm_path()); // Throws
-        m_state_download_in_progress = false;
+    // The State Realm is complete and can be used.
+    logger.debug("Async open or client reset is completed, path=%1",
+                 get_realm_path()); // Throws
+    m_state_download_in_progress = false;
 
-        SaltedFileIdent client_file_ident;
-        const ClientHistoryBase& history = access_realm();                           // Throws
-        history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
-        REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
-        REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
-        REALM_ASSERT(m_progress.latest_server_version.version == server_version);
-        REALM_ASSERT(m_progress.latest_server_version.salt == server_version_salt);
-        REALM_ASSERT(m_progress.download.server_version == server_version);
-        REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
-        REALM_ASSERT(m_progress.upload.client_version == 0);
-        REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
-        logger.trace("last_version_available  = %1", m_last_version_available); // Throws
+    SaltedFileIdent client_file_ident;
+    const ClientHistoryBase& history = access_realm();                           // Throws
+    history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+    REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
+    REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
+    REALM_ASSERT(m_progress.latest_server_version.version == server_version);
+    REALM_ASSERT(m_progress.latest_server_version.salt == server_version_salt);
+    REALM_ASSERT(m_progress.download.server_version == server_version);
+    REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
+    REALM_ASSERT(m_progress.upload.client_version == 0);
+    REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
+    logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
-        m_upload_target_version = m_last_version_available;
-        m_upload_progress = m_progress.upload;
-        REALM_ASSERT(m_last_version_selected_for_upload == 0);
-        m_download_progress = {server_version, 0};
+    m_upload_target_version = m_last_version_available;
+    m_upload_progress = m_progress.upload;
+    REALM_ASSERT(m_last_version_selected_for_upload == 0);
+    m_download_progress = {server_version, 0};
 
-        if (m_client_state_download->is_client_reset()) {
-            client_reset_is_complete = true;
-            client_reset_old_version = m_client_state_download->get_client_reset_old_version();
-            client_reset_new_version = m_client_state_download->get_client_reset_new_version();
-        }
+    client_reset_is_complete = true;
+    client_reset_old_version = m_client_state_download->get_client_reset_old_version();
+    client_reset_new_version = m_client_state_download->get_client_reset_new_version();
 
-        m_client_state_download.reset();
-        enlist_to_send();
-    }
+    m_client_state_download.reset();
+    enlist_to_send();
 
     uint_fast64_t downloaded_bytes = end_offset;
     uint_fast64_t downloadable_bytes = max_offset;
