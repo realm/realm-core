@@ -1005,44 +1005,45 @@ TEST_CASE("SharedRealm: close()") {
     }
 }
 
-TEST_CASE("SharedRealm: delete_files()") {
+TEST_CASE("Realm::delete_files()") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
     auto realm = Realm::get_shared_realm(config);
+    auto path = config.path;
 
     // We need to create some additional files that might not be present
     // for a freshly opened realm but need to be tested for as the will
     // be created during a Realm's life cycle.
     // .log_a and .log_b are legacy versions of .log that might be present
     // for older Realms.
-    util::File(config.path + ".log", util::File::mode_Write);
-    util::File(config.path + ".log_a", util::File::mode_Write);
-    util::File(config.path + ".log_b", util::File::mode_Write);
+    util::File(path + ".log", util::File::mode_Write);
+    util::File(path + ".log_a", util::File::mode_Write);
+    util::File(path + ".log_b", util::File::mode_Write);
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
-        REQUIRE(Realm::delete_files(config));
-        REQUIRE_FALSE(util::File::exists(config.path));
-        REQUIRE_FALSE(util::File::exists(config.path + ".log"));
-        REQUIRE_FALSE(util::File::exists(config.path + ".log_a"));
-        REQUIRE_FALSE(util::File::exists(config.path + ".log_b"));
-        REQUIRE_FALSE(util::File::exists(config.path + ".note"));
-        REQUIRE_FALSE(util::File::exists(config.path + ".management"));
+        REQUIRE(Realm::delete_files(path));
+        REQUIRE_FALSE(util::File::exists(path));
+        REQUIRE_FALSE(util::File::exists(path + ".log"));
+        REQUIRE_FALSE(util::File::exists(path + ".log_a"));
+        REQUIRE_FALSE(util::File::exists(path + ".log_b"));
+        REQUIRE_FALSE(util::File::exists(path + ".note"));
+        REQUIRE_FALSE(util::File::exists(path + ".management"));
 
         // Deleting the .lock file is not safe. It must still exist.
-        REQUIRE(util::File::exists(config.path + ".lock"));
+        REQUIRE(util::File::exists(path + ".lock"));
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_FALSE(Realm::delete_files(config));
-        REQUIRE(util::File::exists(config.path));
-        REQUIRE(util::File::exists(config.path + ".log"));
-        REQUIRE(util::File::exists(config.path + ".log_a"));
-        REQUIRE(util::File::exists(config.path + ".log_b"));
-        REQUIRE(util::File::exists(config.path + ".note"));
-        REQUIRE(util::File::exists(config.path + ".management"));
-        REQUIRE(util::File::exists(config.path + ".lock"));
+        REQUIRE_FALSE(Realm::delete_files(path));
+        REQUIRE(util::File::exists(path));
+        REQUIRE(util::File::exists(path + ".log"));
+        REQUIRE(util::File::exists(path + ".log_a"));
+        REQUIRE(util::File::exists(path + ".log_b"));
+        REQUIRE(util::File::exists(path + ".note"));
+        REQUIRE(util::File::exists(path + ".management"));
+        REQUIRE(util::File::exists(path + ".lock"));
     }
 }
 
