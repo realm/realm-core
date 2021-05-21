@@ -5,7 +5,7 @@
 #include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
-#include <realm/sync/noinst/client_state_download.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 
 using namespace realm;
 using namespace _impl;

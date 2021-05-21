@@ -1860,7 +1860,7 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
-    REALM_ASSERT(!m_client_state_download);
+    REALM_ASSERT(!m_client_reset_operation);
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
@@ -1883,9 +1883,9 @@ void Session::activate()
             logger.info("Client reset config, metadata_dir = '%1', ",
                         client_reset_config->metadata_dir); // Throws
             m_state_download_in_progress = true;
-            m_client_state_download.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
-                                                                          client_reset_config->metadata_dir,
-                                                                          get_encryption_key())); // Throws
+            m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
+                                                                           client_reset_config->metadata_dir,
+                                                                           get_encryption_key())); // Throws
         }
 
         if (!m_state_download_in_progress) {
@@ -2003,7 +2003,7 @@ void Session::send_message()
                     }
                     if (have_client_file_ident()) {
                         if (m_state_download_in_progress) {
-                            REALM_ASSERT(m_client_state_download);
+                            REALM_ASSERT(m_client_reset_operation);
                             if (!m_state_request_message_sent)
                                 send_state_request_message(); // Throws
                         }
@@ -2101,13 +2101,13 @@ void Session::send_state_request_message()
     REALM_ASSERT(!m_state_request_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
-    REALM_ASSERT(m_client_state_download);
+    REALM_ASSERT(m_client_reset_operation);
     REALM_ASSERT(get_client_reset_config());
 
     session_ident_type session_ident = m_ident;
 
-    SaltedVersion partial_transfer_server_version = {m_client_state_download->get_server_version(),
-                                                     m_client_state_download->get_server_version_salt()};
+    SaltedVersion partial_transfer_server_version = {m_client_reset_operation->get_server_version(),
+                                                     m_client_reset_operation->get_server_version_salt()};
 
     uint_fast64_t end_offset = 0;
     bool need_recent = m_client_reset;
@@ -2370,8 +2370,8 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         if (m_state_download_in_progress) {
-            REALM_ASSERT(m_client_state_download);
-            m_client_state_download->set_salted_file_ident(client_file_ident);
+            REALM_ASSERT(m_client_reset_operation);
+            m_client_reset_operation->set_salted_file_ident(client_file_ident);
         }
         else {
             ClientHistoryBase& history = access_realm(); // Throws
@@ -2427,10 +2427,10 @@ void Session::receive_state_message(version_type server_version, salt_type serve
         return;
     }
 
-    REALM_ASSERT(m_client_state_download);
+    REALM_ASSERT(m_client_reset_operation);
 
-    bool legal_state_info = m_client_state_download->receive_state(server_version, server_version_salt, begin_offset,
-                                                                   end_offset, max_offset, chunk);
+    bool legal_state_info = m_client_reset_operation->receive_state(server_version, server_version_salt, begin_offset,
+                                                                    end_offset, max_offset, chunk);
 
     if (REALM_UNLIKELY(!legal_state_info)) {
         logger.error("Illegal state message content");
@@ -2466,10 +2466,10 @@ void Session::receive_state_message(version_type server_version, salt_type serve
     m_download_progress = {server_version, 0};
 
     client_reset_is_complete = true;
-    client_reset_old_version = m_client_state_download->get_client_reset_old_version();
-    client_reset_new_version = m_client_state_download->get_client_reset_new_version();
+    client_reset_old_version = m_client_reset_operation->get_client_reset_old_version();
+    client_reset_new_version = m_client_reset_operation->get_client_reset_new_version();
 
-    m_client_state_download.reset();
+    m_client_reset_operation.reset();
     enlist_to_send();
 
     uint_fast64_t downloaded_bytes = end_offset;

@@ -17,7 +17,7 @@
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/websocket.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/client_state_download.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/client.hpp>
@@ -954,9 +954,8 @@ private:
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
-    // m_client_state_download controls state download and is used for
-    // async open and client reset.
-    std::unique_ptr<ClientResetOperation> m_client_state_download;
+    // m_client_reset_operation stores state for the lifetime of a client reset
+    std::unique_ptr<ClientResetOperation> m_client_reset_operation;
 
     // The latest sync progress reported by the server via a DOWNLOAD
     // message. See struct SyncProgress for a description. The values stored in
