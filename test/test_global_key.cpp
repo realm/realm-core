@@ -76,6 +76,7 @@ TEST(GlobalKey_Compare)
     CHECK_LESS(GlobalKey(0, 0), GlobalKey(1, 0));
 }
 
+/*
 TEST(GlobalKey_PrimaryKey)
 {
     {
@@ -94,3 +95,4 @@ TEST(GlobalKey_PrimaryKey)
         CHECK_EQUAL(oid, "{495f44d153789d90-d2f64663ba17c5bc}");
     }
 }
+*/
