@@ -395,7 +395,7 @@ public:
      * @throws PermissionDenied if the operation was not permitted.
      * @throws AccessError for any other error while trying to delete the file or folder.
      */
-    bool delete_files();
+    static bool delete_files(const Config& config);
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;

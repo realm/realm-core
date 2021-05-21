@@ -1022,7 +1022,7 @@ TEST_CASE("SharedRealm: delete_files()") {
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
-        REQUIRE(realm->delete_files());
+        REQUIRE(Realm::delete_files(config));
         REQUIRE_FALSE(util::File::exists(config.path));
         REQUIRE_FALSE(util::File::exists(config.path + ".log"));
         REQUIRE_FALSE(util::File::exists(config.path + ".log_a"));
@@ -1035,20 +1035,7 @@ TEST_CASE("SharedRealm: delete_files()") {
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_FALSE(realm->delete_files());
-        REQUIRE(util::File::exists(config.path));
-        REQUIRE(util::File::exists(config.path + ".log"));
-        REQUIRE(util::File::exists(config.path + ".log_a"));
-        REQUIRE(util::File::exists(config.path + ".log_b"));
-        REQUIRE(util::File::exists(config.path + ".note"));
-        REQUIRE(util::File::exists(config.path + ".management"));
-        REQUIRE(util::File::exists(config.path + ".lock"));
-    }
-
-    SECTION("Trying to delete files of a closed Realm for which another reference exists fails.") {
-        auto realm2 = Realm::get_shared_realm(config);
-        realm->close();
-        REQUIRE_FALSE(realm->delete_files());
+        REQUIRE_FALSE(Realm::delete_files(config));
         REQUIRE(util::File::exists(config.path));
         REQUIRE(util::File::exists(config.path + ".log"));
         REQUIRE(util::File::exists(config.path + ".log_a"));

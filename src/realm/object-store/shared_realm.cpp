@@ -910,19 +910,15 @@ void Realm::close()
     m_coordinator = nullptr;
 }
 
-bool Realm::delete_files()
+bool Realm::delete_files(const Config& config)
 {
-    if (!is_closed()) {
-        return false;
-    }
-
-    return DB::call_with_lock(m_config.path, [&](auto) {
-        util::File::try_remove(m_config.path);
-        util::File::try_remove(m_config.path + ".log");
-        util::File::try_remove(m_config.path + ".log_a");
-        util::File::try_remove(m_config.path + ".log_b");
-        util::File::try_remove(m_config.path + ".note");
-        util::try_remove_dir_recursive(m_config.path + ".management");
+    return DB::call_with_lock(config.path, [&](auto) {
+        util::File::try_remove(config.path);
+        util::File::try_remove(config.path + ".log");
+        util::File::try_remove(config.path + ".log_a");
+        util::File::try_remove(config.path + ".log_b");
+        util::File::try_remove(config.path + ".note");
+        util::try_remove_dir_recursive(config.path + ".management");
     });
 }
 
