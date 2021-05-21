@@ -1866,15 +1866,11 @@ void Session::activate()
         const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
-        if (client_reset_config && file_exists) {
-            m_client_reset = true;
-        }
 
         logger.info("client_reset_config = %1, Realm exists = %2, "
-                    "async open = %3, client reset = %4",
+                    "client reset = %3",
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
-                    (client_reset_config && !file_exists) ? "true" : "false",
-                    m_client_reset ? "true" : "false"); // Throws
+                    (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config) {
             if (!util::File::exists(client_reset_config->metadata_dir)) {
                 logger.error("Client reset config requires an existing metadata directory"); // Throws
@@ -1882,13 +1878,12 @@ void Session::activate()
             }
             logger.info("Client reset config, metadata_dir = '%1', ",
                         client_reset_config->metadata_dir); // Throws
-            m_state_download_in_progress = true;
             m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
                                                                            client_reset_config->metadata_dir,
                                                                            get_encryption_key())); // Throws
         }
 
-        if (!m_state_download_in_progress) {
+        if (!m_client_reset_operation) {
             const ClientHistoryBase& history = access_realm();                             // Throws
             history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
@@ -2002,8 +1997,7 @@ void Session::send_message()
                         return;
                     }
                     if (have_client_file_ident()) {
-                        if (m_state_download_in_progress) {
-                            REALM_ASSERT(m_client_reset_operation);
+                        if (m_client_reset_operation) {
                             if (!m_state_request_message_sent)
                                 send_state_request_message(); // Throws
                         }
@@ -2110,7 +2104,7 @@ void Session::send_state_request_message()
                                                      m_client_reset_operation->get_server_version_salt()};
 
     uint_fast64_t end_offset = 0;
-    bool need_recent = m_client_reset;
+    bool need_recent = true;
 
     std::int_fast32_t min_file_format_version = 0;
     std::int_fast32_t max_file_format_version = 0;
@@ -2369,8 +2363,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return ClientError::bad_client_file_ident_salt;
     }
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        if (m_state_download_in_progress) {
-            REALM_ASSERT(m_client_reset_operation);
+        if (m_client_reset_operation) {
             m_client_reset_operation->set_salted_file_ident(client_file_ident);
         }
         else {
@@ -2403,7 +2396,7 @@ void Session::receive_state_message(version_type server_version, salt_type serve
         return;
     }
 
-    if (!m_state_download_in_progress) {
+    if (!m_client_reset_operation) {
         logger.error("Illegal: STATE message received without state download in progress."); // Throws
         m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
         return;
@@ -2445,7 +2438,6 @@ void Session::receive_state_message(version_type server_version, salt_type serve
     // The State Realm is complete and can be used.
     logger.debug("Async open or client reset is completed, path=%1",
                  get_realm_path()); // Throws
-    m_state_download_in_progress = false;
 
     SaltedFileIdent client_file_ident;
     const ClientHistoryBase& history = access_realm();                           // Throws
@@ -2796,7 +2788,7 @@ void Session::check_for_upload_completion()
     REALM_ASSERT(!m_deactivation_initiated);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
-    if (m_state_download_in_progress)
+    if (m_client_reset_operation)
         return;
 
     // Upload process must have reached end of history

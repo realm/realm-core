@@ -945,12 +945,6 @@ private:
     bool m_error_message_received;              // Session specific ERROR message received
     bool m_unbound_message_received;            // UNBOUND message received
 
-    // True if and only if state download is in progress.
-    bool m_state_download_in_progress = false;
-
-    // True if and only if the session is performing a client reset.
-    bool m_client_reset = false;
-
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
 
