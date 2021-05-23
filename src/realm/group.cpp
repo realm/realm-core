@@ -343,13 +343,13 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 11 || current_file_format_version == 20) {
+        if (current_file_format_version == 22) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
     }
 
-    return 21;
+    return g_current_file_format_version;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -418,7 +418,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 21, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -549,7 +549,8 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // Ensure we have search index on all primary key columns.
+    // Ensure we have search index on all primary key columns. This is idempotent so no
+    // need to check on current_file_format_version
     auto table_keys = get_table_keys();
     for (auto k : table_keys) {
         auto t = get_table(k);
@@ -577,9 +578,7 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 11:
-        case 20:
-        case 21:
+        case g_current_file_format_version:
             file_format_ok = true;
             break;
     }

@@ -810,9 +810,13 @@ private:
     ///
     ///  12 - 19 Room for new file formats in legacy code.
     ///
-    ///  20 New data types: Decimal128 and ObjectId. Embedded tables.
+    ///  20 New data types: Decimal128 and ObjectId. Embedded tables. Search index
+    ///     is removed from primary key columns.
     ///
     ///  21 New data types: UUID, Mixed, Set and Dictionary.
+    ///
+    ///  22 Object keys are no longer generated from primary key values. Search index
+    ///     reintroduced.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
@@ -820,6 +824,8 @@ private:
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
+
+    static constexpr int g_current_file_format_version = 22;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
