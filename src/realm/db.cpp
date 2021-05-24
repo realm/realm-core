@@ -2403,7 +2403,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path, uint64_t type)
 {
     std::vector<std::pair<std::string, bool>> files;
     files.emplace_back(std::make_pair(realm_path, false));

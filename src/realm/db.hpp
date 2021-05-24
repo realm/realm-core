@@ -357,12 +357,34 @@ public:
     using CallbackWithLock = std::function<void(const std::string& realm_path)>;
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
 
+    enum CoreFileExtensionType : uint64_t {
+        Log = 1,
+        LogA = 2,
+        LogB = 4,
+        Note = 8,
+        Management = 16,
+        Storage = 32,
+        Backup = 64,
+        Lock = 128,
+
+        TemporaryFiles = Log | LogA | LogB | Note,
+        StateFiles = Management | Storage,
+    };
     // Return a list of files/directories core may use of the given realm file path.
     // The first element of the pair in the returned list is the path string, the
     // second one is to indicate the path is a directory or not.
     // The temporary files are not returned by this function.
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
-    static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
+    // static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
+    static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path = "",
+                                                       uint64_t type = CoreFileExtensionType::StateFiles);
+
+    // enum CoreFileExtensionType {
+    //     Log, LogA, LogB, Note, Management, Backup, Lock
+    // };
+    // static std::map<DB::CoreFileExtensionType, std::pair<std::string, bool>> get_core_file_extensions();
+
+    // static std::pair<std::string, bool> get_core_file_extension(DB::CoreFileExtensionType file_extension_Type);
 
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
