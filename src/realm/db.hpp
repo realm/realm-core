@@ -363,8 +363,8 @@ public:
         Management = 4,
         Note = 8,
         Log = 16,
-        LogA = 32,
-        LogB = 64,
+        LogA = 32, // This is a legacy version of `Log`.
+        LogB = 64, // This is a legacy version of `Log`.
         Backup = 128,
 
         StateFiles = Storage | Management,
