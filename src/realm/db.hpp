@@ -371,21 +371,18 @@ public:
         TemporaryFiles = Note | Log | LogA | LogB | Backup,
         All = Lock | Storage | Management | Note | Log | LogA | LogB | Backup
     };
-    // Return a list of files/directories core may use of the given realm file path.
+    // Return a list of files and directories core may use of the given realm file path.
     // The first element of the pair in the returned list is the path string, the
     // second one is to indicate the path is a directory or not.
-    // The temporary files are not returned by this function.
-    // It is safe to delete those returned files/directories in the call_with_lock's callback.
-    // static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
+    // It is safe to delete those returned files/directories in the call_with_lock's callback except for the lock itself.
+    ///
+    /// \param realm_path If provided the full path including the given path will be returned by this function.
+    /// \param core_file_type A list of files that should be returned.
+    ///
+    /// \return A list of core files depending on the given `core_file_type` along with the information about
+    ///         this part being a folder or not (second part of the pair).
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path = "",
-                                                       uint64_t type = CoreFileType::StateFiles);
-
-    // enum CoreFileType {
-    //     Log, LogA, LogB, Note, Management, Backup, Lock
-    // };
-    // static std::map<DB::CoreFileType, std::pair<std::string, bool>> get_core_file_extensions();
-
-    // static std::pair<std::string, bool> get_core_file_extension(DB::CoreFileType file_extension_Type);
+                                                                    uint64_t core_file_type = CoreFileType::StateFiles);
 
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?

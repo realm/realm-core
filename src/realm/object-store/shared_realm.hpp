@@ -393,10 +393,11 @@ public:
      * @param realm_file_path The path to the Realm file. All other files will be derived from this.
      *
      * @return Yes, if all files could either be deleted or did not exist.
-     *         No if at least one existing file coule not be deleted or the Realm is still open.
+     *         No if at least one existing file coule not be deleted.
      *
      * @throws PermissionDenied if the operation was not permitted.
      * @throws AccessError for any other error while trying to delete the file or folder.
+     * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
      */
     static bool delete_files(const std::string& realm_file_path);
 
