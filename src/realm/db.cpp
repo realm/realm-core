@@ -2406,8 +2406,30 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
 std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path, uint64_t type)
 {
     std::vector<std::pair<std::string, bool>> files;
-    files.emplace_back(std::make_pair(realm_path, false));
-    files.emplace_back(std::make_pair(realm_path + ".management", true));
+    if ((DB::CoreFileType::Lock & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".lock", false));
+    }
+    if ((DB::CoreFileType::Storage & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path, false));
+    }
+    if ((DB::CoreFileType::Management & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".management", true));
+    }
+    if ((DB::CoreFileType::Note & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".note", false));
+    }
+    if ((DB::CoreFileType::Log & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".log", false));
+    }
+    if ((DB::CoreFileType::LogA & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".log_a", false));
+    }
+    if ((DB::CoreFileType::LogB & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".log_b", false));
+    }
+    if ((DB::CoreFileType::Backup & type) != 0) {
+        files.emplace_back(std::make_pair(realm_path + ".realm.backup", false));
+    }
     return files;
 }
 

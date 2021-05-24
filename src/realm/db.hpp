@@ -357,18 +357,19 @@ public:
     using CallbackWithLock = std::function<void(const std::string& realm_path)>;
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
 
-    enum CoreFileExtensionType : uint64_t {
-        Log = 1,
-        LogA = 2,
-        LogB = 4,
+    enum CoreFileType : uint64_t {
+        Lock = 1,
+        Storage = 2,
+        Management = 4,
         Note = 8,
-        Management = 16,
-        Storage = 32,
-        Backup = 64,
-        Lock = 128,
+        Log = 16,
+        LogA = 32,
+        LogB = 64,
+        Backup = 128,
 
-        TemporaryFiles = Log | LogA | LogB | Note,
-        StateFiles = Management | Storage,
+        StateFiles = Storage | Management,
+        TemporaryFiles = Note | Log | LogA | LogB | Backup,
+        All = Lock | Storage | Management | Note | Log | LogA | LogB | Backup
     };
     // Return a list of files/directories core may use of the given realm file path.
     // The first element of the pair in the returned list is the path string, the
@@ -377,14 +378,14 @@ public:
     // It is safe to delete those returned files/directories in the call_with_lock's callback.
     // static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
     static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path = "",
-                                                       uint64_t type = CoreFileExtensionType::StateFiles);
+                                                       uint64_t type = CoreFileType::StateFiles);
 
-    // enum CoreFileExtensionType {
+    // enum CoreFileType {
     //     Log, LogA, LogB, Note, Management, Backup, Lock
     // };
-    // static std::map<DB::CoreFileExtensionType, std::pair<std::string, bool>> get_core_file_extensions();
+    // static std::map<DB::CoreFileType, std::pair<std::string, bool>> get_core_file_extensions();
 
-    // static std::pair<std::string, bool> get_core_file_extension(DB::CoreFileExtensionType file_extension_Type);
+    // static std::pair<std::string, bool> get_core_file_extension(DB::CoreFileType file_extension_Type);
 
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
