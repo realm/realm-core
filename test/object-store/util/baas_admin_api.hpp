@@ -78,11 +78,22 @@ private:
 };
 
 struct AppCreateConfig {
-
     struct FunctionDef {
         std::string name;
         std::string source;
         bool is_private;
+    };
+
+    struct UserPassAuthConfig {
+        bool auto_confirm;
+        std::string confirm_email_subject;
+        std::string confirmation_function_name;
+        std::string email_confirmation_url;
+        std::string reset_function_name;
+        std::string reset_password_subject;
+        std::string reset_password_url;
+        bool run_confirmation_function;
+        bool run_reset_function;
     };
 
     std::string app_name;
@@ -98,6 +109,11 @@ struct AppCreateConfig {
     bool dev_mode_enabled;
 
     std::vector<FunctionDef> functions;
+
+    util::Optional<UserPassAuthConfig> user_pass_auth;
+    util::Optional<std::string> custom_function_auth;
+    bool enable_api_key_auth = false;
+    bool enable_anonymous_auth = false;
 };
 
 const AppCreateConfig& default_app_config();

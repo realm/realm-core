@@ -112,7 +112,7 @@ nlohmann::json property_to_jsonschema(const Property& prop, const Schema& schema
         }
 
         (*relationships)[prop.name] = {
-            {"ref", util::format("#/relationship/mongodb1/test_data/%1", target_obj->name)},
+            {"ref", util::format("#/relationship/BackingDB/test_data/%1", target_obj->name)},
             {"foreign_key", target_obj->primary_key_property()->name},
             {"is_list", is_array(prop.type)},
         };
@@ -304,7 +304,6 @@ app::Response AdminAPIEndpoint::do_request(app::Request request) const
     request.headers["Accept"] = "application/json";
     request.headers["Authorization"] = util::format("Bearer %1", m_access_token);
     auto resp = do_http_request(request);
-    std::cerr << "sent " << request.body << " to " << request.url << " and got " << resp.body << std::endl;
     return resp;
 }
 
@@ -414,7 +413,7 @@ const AppCreateConfig& default_app_config()
         constexpr const char* update_user_data_func = R"(
             exports = async function(data) {
                 const user = context.user;
-                const mongodb = context.services.get("mongodb1");
+                const mongodb = context.services.get("BackingDB");
                 const userDataCollection = mongodb.db("test_data").collection("UserData");
                 await userDataCollection.updateOne(
                                                    { "user_id": user.id },
@@ -427,12 +426,44 @@ const AppCreateConfig& default_app_config()
 
         constexpr const char* sum_func = R"(
             exports = function(...args) {
-                return parseInt(args.reduce((a,b) => a + b, 0));
+                return args.reduce((a,b) => a + b, 0);
             };
         )";
+
+        constexpr const char* confirm_func = R"(
+            exports = ({ token, tokenId, username }) => {
+                // process the confirm token, tokenId and username
+                if (username.includes("realm_tests_do_autoverify")) {
+                  return { status: 'success' }
+                }
+                // do not confirm the user
+                return { status: 'fail' };
+            };
+        )";
+
+        constexpr const char* auth_func = R"(
+            exports = (loginPayload) => {
+                return loginPayload["realmCustomAuthFuncUserId"];
+            };
+        )";
+
+        constexpr const char* reset_func = R"(
+            exports = ({ token, tokenId, username, password }) => {
+                // process the reset token, tokenId, username and password
+                if (password.includes("realm_tests_do_reset")) {
+                  return { status: 'success' };
+                }
+                // will not reset the password
+                return { status: 'fail' };
+            };
+        )";
+
         std::vector<AppCreateConfig::FunctionDef> funcs = {
             {"updateUserData", update_user_data_func, false},
-            {"sum", sum_func, false},
+            {"sumFunc", sum_func, false},
+            {"confirmFunc", confirm_func, false},
+            {"authFunc", auth_func, false},
+            {"resetFunc", reset_func, false},
         };
 
         const auto dog_schema =
@@ -451,9 +482,33 @@ const AppCreateConfig& default_app_config()
 
         Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
 
+        AppCreateConfig::UserPassAuthConfig user_pass_config{
+            false,
+            "",
+            "confirmFunc",
+            "http://localhost/confirmEmail",
+            "resetFunc",
+            "",
+            "http://localhost/resetPassword",
+            true,
+            true,
+        };
+
         return AppCreateConfig{
-            "test",      "http://localhost:9090",   "unique_user@domain.com", "password", "mongodb://localhost:26000",
-            "test_data", std::move(default_schema), std::move(partition_key), true,       std::move(funcs),
+            "test",
+            "http://localhost:9090",
+            "unique_user@domain.com",
+            "password",
+            "mongodb://localhost:26000",
+            "test_data",
+            std::move(default_schema),
+            std::move(partition_key),
+            true,
+            std::move(funcs),
+            std::move(user_pass_config),
+            std::string{"authFunc"},
+            true,
+            true,
         };
     }();
     return default_config;
@@ -468,27 +523,61 @@ std::string create_app(const AppCreateConfig& config)
 
     auto app = session.apps()[app_id];
 
-    auto auth_providers = app["auth_providers"];
-    auth_providers.post_json({{"type", "anon-user"}});
-    auth_providers.post_json({{"type", "local-userpass"},
-                              {"config",
-                               {
-                                   {"emailConfirmationUrl", "http://example.com/confirm_email"},
-                                   {"resetPasswordUrl", "http://example.com/reset_password"},
-                                   {"confirmEmailSubject", "Hi"},
-                                   {"resetPasswordSubject", "Bye"},
-                                   {"autoConfirm", true},
-                               }}});
-
-    auto all_auth_providers = auth_providers.get_json();
-    auto api_key_provider =
-        std::find_if(all_auth_providers.begin(), all_auth_providers.end(), [](const nlohmann::json& provider) {
-            return provider["type"] == "api-key";
+    auto functions = app["functions"];
+    std::unordered_map<std::string, std::string> function_name_to_id;
+    for (const auto& func : config.functions) {
+        auto create_func_resp = functions.post_json({
+            {"name", func.name},
+            {"private", func.is_private},
+            {"can_evaluate", nlohmann::json::object()},
+            {"source", func.source},
         });
-    REALM_ASSERT(api_key_provider != all_auth_providers.end());
-    std::string api_key_provider_id = (*api_key_provider)["_id"];
-    auto api_key_enable_resp = auth_providers[api_key_provider_id]["enable"].put("");
-    REALM_ASSERT(api_key_enable_resp.http_status_code >= 200 && api_key_enable_resp.http_status_code < 300);
+        function_name_to_id.insert({func.name, create_func_resp["_id"]});
+    }
+
+    auto auth_providers = app["auth_providers"];
+    if (config.enable_anonymous_auth) {
+        auth_providers.post_json({{"type", "anon-user"}});
+    }
+    if (config.user_pass_auth) {
+        const auto& confirm_func_name = config.user_pass_auth->confirmation_function_name;
+        const auto& reset_func_name = config.user_pass_auth->reset_function_name;
+        auth_providers.post_json({{"type", "local-userpass"},
+                                  {"config",
+                                   {
+                                       {"autoConfirm", config.user_pass_auth->auto_confirm},
+                                       {"confirmEmailSubject", config.user_pass_auth->confirm_email_subject},
+                                       {"confirmationFunctionName", confirm_func_name},
+                                       {"confirmationFunctionId", function_name_to_id[confirm_func_name]},
+                                       {"emailConfirmationUrl", config.user_pass_auth->email_confirmation_url},
+                                       {"resetFunctionName", reset_func_name},
+                                       {"resetFunctionId", function_name_to_id[reset_func_name]},
+                                       {"resetPasswordSubject", config.user_pass_auth->reset_password_subject},
+                                       {"resetPasswordUrl", config.user_pass_auth->reset_password_url},
+                                       {"runConfirmationFunction", config.user_pass_auth->run_confirmation_function},
+                                       {"runResetFunction", config.user_pass_auth->run_reset_function},
+                                   }}});
+    }
+    if (config.custom_function_auth) {
+        auth_providers.post_json({{"type", "custom-function"},
+                                  {"config",
+                                   {
+                                       {"authFunctionName", *config.custom_function_auth},
+                                       {"authFunctionId", function_name_to_id[*config.custom_function_auth]},
+                                   }}});
+    }
+
+    if (config.enable_api_key_auth) {
+        auto all_auth_providers = auth_providers.get_json();
+        auto api_key_provider =
+            std::find_if(all_auth_providers.begin(), all_auth_providers.end(), [](const nlohmann::json& provider) {
+                return provider["type"] == "api-key";
+            });
+        REALM_ASSERT(api_key_provider != all_auth_providers.end());
+        std::string api_key_provider_id = (*api_key_provider)["_id"];
+        auto api_key_enable_resp = auth_providers[api_key_provider_id]["enable"].put("");
+        REALM_ASSERT(api_key_enable_resp.http_status_code >= 200 && api_key_enable_resp.http_status_code < 300);
+    }
 
     auto secrets = app["secrets"];
     secrets.post_json({{"name", "BackingDB_uri"}, {"value", config.mongo_uri}});
@@ -496,7 +585,7 @@ std::string create_app(const AppCreateConfig& config)
 
     auto services = app["services"];
     auto create_mongo_service_resp = services.post_json({
-        {"name", "mongodb1"},
+        {"name", "BackingDB"},
         {"type", "mongodb"},
         {"config",
          {
@@ -554,16 +643,6 @@ std::string create_app(const AppCreateConfig& config)
     }
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
-
-    auto functions = app["functions"];
-    for (const auto& func : config.functions) {
-        functions.post_json({
-            {"name", func.name},
-            {"private", func.is_private},
-            {"can_evaluate", nlohmann::json::object()},
-            {"source", func.source},
-        });
-    }
 
     rules.post_json({
         {"database", config.mongo_dbname},
