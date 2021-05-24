@@ -61,7 +61,8 @@ TEST(DB_getCoreFiles_StateFiles)
     CHECK(core_files[1].second);
 }
 
-TEST(DB_getCoreFiles_TemporaryFiles) {
+TEST(DB_getCoreFiles_TemporaryFiles)
+{
     auto core_files = DB::get_core_files(path, DB::CoreFileType::TemporaryFiles);
     CHECK_EQUAL(core_files.size(), 5);
     CHECK_EQUAL(core_files[0].first, path + extension_note);
@@ -76,7 +77,8 @@ TEST(DB_getCoreFiles_TemporaryFiles) {
     CHECK_NOT(core_files[4].second);
 }
 
-TEST(DB_getCoreFiles_CombinedFlags) {
+TEST(DB_getCoreFiles_CombinedFlags)
+{
     auto core_files = DB::get_core_files(path, DB::CoreFileType::StateFiles | DB::CoreFileType::Lock);
     CHECK_EQUAL(core_files.size(), 3);
     CHECK_EQUAL(core_files[0].first, path + extension_lock);
@@ -87,7 +89,8 @@ TEST(DB_getCoreFiles_CombinedFlags) {
     CHECK(core_files[2].second);
 }
 
-TEST(DB_getCoreFiles_AllFiles) {
+TEST(DB_getCoreFiles_AllFiles)
+{
     auto core_files = DB::get_core_files(path, DB::CoreFileType::All);
     CHECK_EQUAL(core_files.size(), 8);
     CHECK_EQUAL(core_files[0].first, path + extension_lock);

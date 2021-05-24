@@ -389,7 +389,7 @@ public:
      * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
      * If a different process / thread is accessing the Realm at the same time a corrupt state
      * could be the result and checking for a single process state is not possible here.
-     * 
+     *
      * @param realm_file_path The path to the Realm file. All other files will be derived from this.
      *
      * @return Yes, if all files could either be deleted or did not exist.
