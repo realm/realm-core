@@ -5869,8 +5869,8 @@ TEST(LangBindHelper_getCoreFiles)
     CHECK(core_files.size() > 0);
 
     std::string file;
-    DirScanner scaner(dir);
-    while (scaner.next(file)) {
+    DirScanner scanner(dir);
+    while (scanner.next(file)) {
         const std::string lock_suffix = ".lock";
         if (file.size() >= lock_suffix.size() &&
             file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
