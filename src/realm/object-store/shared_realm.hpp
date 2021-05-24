@@ -381,9 +381,10 @@ public:
     /**
      * Deletes the following files for the given `realm_file_path` if they exist:
      * - the Realm file itself
-     * - the .log file and its legacy versions: .log_a and .log_b
-     * - the .note file
      * - the .management folder
+     * - the .note file
+     * - the .log file and its legacy versions: .log_a and .log_b
+     * - the backup file
      *
      * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
      * If a different process / thread is accessing the Realm at the same time a corrupt state

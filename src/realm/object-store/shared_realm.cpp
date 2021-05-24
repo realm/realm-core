@@ -912,13 +912,17 @@ void Realm::close()
 
 bool Realm::delete_files(const std::string& realm_file_path)
 {
+    auto core_files = DB::get_core_files(realm_file_path, DB::CoreFileType::StateFiles | DB::CoreFileType::TemporaryFiles);
     return DB::call_with_lock(realm_file_path, [&](auto) {
-        util::File::try_remove(realm_file_path);
-        util::File::try_remove(realm_file_path + ".log");
-        util::File::try_remove(realm_file_path + ".log_a");
-        util::File::try_remove(realm_file_path + ".log_b");
-        util::File::try_remove(realm_file_path + ".note");
-        util::try_remove_dir_recursive(realm_file_path + ".management");
+        for (const auto& file : core_files) {
+            auto file_path = file.first;
+            auto is_folder = file.second;
+            if (is_folder) {
+                util::try_remove_dir_recursive(file_path);
+            } else {
+                util::File::try_remove(file_path);
+            }
+        }
     });
 }
 
