@@ -29,6 +29,7 @@ set(SOURCES
     c_api/c_api.c
 
     util/event_loop.cpp
+    util/baas_admin_api.cpp
     util/test_file.cpp
     util/test_utils.cpp
 )

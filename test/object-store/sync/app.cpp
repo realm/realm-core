@@ -27,10 +27,10 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
-#include "util/event_loop.hpp"
 
 #include <external/json/json.hpp>
 #include <realm/sync/access_token.hpp>
@@ -59,17 +59,11 @@ using namespace std::string_view_literals;
 // When a stitch instance starts up and imports the app at this config location,
 // it will generate a new app_id and write it back to the config. This is why we
 // need to parse it at runtime after spinning up the instance.
-static std::string get_runtime_app_id(std::string config_path)
+static std::string get_runtime_app_id(std::string)
 {
     static std::string cached_app_id;
     if (cached_app_id.empty()) {
-        util::File config(config_path);
-        std::string contents;
-        contents.resize(config.get_size());
-        config.read(contents.data(), config.get_size());
-        nlohmann::json json;
-        json = nlohmann::json::parse(contents);
-        cached_app_id = json["app_id"].get<std::string>();
+        cached_app_id = create_app(default_app_config());
         std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
     }
     return cached_app_id;
@@ -77,110 +71,9 @@ static std::string get_runtime_app_id(std::string config_path)
 
 class IntTestTransport : public GenericNetworkTransport {
 public:
-    IntTestTransport()
-    {
-        curl_global_init(CURL_GLOBAL_ALL);
-    }
-
-    ~IntTestTransport()
-    {
-        curl_global_cleanup();
-    }
-
-    static size_t write(char* ptr, size_t size, size_t nmemb, std::string* data)
-    {
-        REALM_ASSERT(data);
-        size_t realsize = size * nmemb;
-        data->append(ptr, realsize);
-        return realsize;
-    }
-    static size_t header_callback(char* buffer, size_t size, size_t nitems,
-                                  std::map<std::string, std::string>* headers_storage)
-    {
-        REALM_ASSERT(headers_storage);
-        std::string combined(buffer, size * nitems);
-        if (auto pos = combined.find(':'); pos != std::string::npos) {
-            std::string key = combined.substr(0, pos);
-            std::string value = combined.substr(pos + 1);
-            while (value.size() > 0 && value[0] == ' ') {
-                value = value.substr(1);
-            }
-            while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
-                value = value.substr(0, value.size() - 1);
-            }
-            headers_storage->insert({key, value});
-        }
-        else {
-            if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...
-                std::cerr << "test transport skipping header: " << combined << std::endl;
-            }
-        }
-        return nitems * size;
-    }
-
     void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
     {
-        CURL* curl;
-        CURLcode response_code;
-        std::string response;
-        std::map<std::string, std::string> response_headers;
-
-        /* get a curl handle */
-        curl = curl_easy_init();
-
-        struct curl_slist* list = NULL;
-
-        if (curl) {
-            /* First set the URL that is about to receive our POST. This URL can
-             just as well be a https:// URL if that is what should receive the
-             data. */
-            curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-
-            /* Now specify the POST data */
-            if (request.method == HttpMethod::post) {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::put) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::del) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
-
-            for (auto header : request.headers) {
-                std::stringstream h;
-                h << header.first << ": " << header.second;
-                list = curl_slist_append(list, h.str().data());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
-            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
-
-            /* Perform the request, res will get the return code */
-            response_code = curl_easy_perform(curl);
-            int http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-            /* Check for errors */
-            if (response_code != CURLE_OK)
-                fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
-                        request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
-
-            /* always cleanup */
-            curl_easy_cleanup(curl);
-            curl_slist_free_all(list); /* free the list again */
-            int binding_response_code = 0;
-            completion_block(Response{http_code, binding_response_code, response_headers, response});
-        }
-
-        curl_global_cleanup();
+        completion_block(do_http_request(request));
     }
 };
 
