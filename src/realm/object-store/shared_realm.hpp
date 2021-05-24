@@ -594,6 +594,14 @@ public:
     }
 };
 
+class DeleteOnOpenRealmException : public std::logic_error {
+public:
+    DeleteOnOpenRealmException()
+        : std::logic_error("Cannot delete files of an open Realm.")
+    {
+    }
+};
+
 class UninitializedRealmException : public std::runtime_error {
 public:
     UninitializedRealmException(std::string message)

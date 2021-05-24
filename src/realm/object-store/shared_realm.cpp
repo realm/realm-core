@@ -912,18 +912,31 @@ void Realm::close()
 
 bool Realm::delete_files(const std::string& realm_file_path)
 {
-    auto core_files = DB::get_core_files(realm_file_path, DB::CoreFileType::StateFiles | DB::CoreFileType::TemporaryFiles);
-    return DB::call_with_lock(realm_file_path, [&](auto) {
+    const auto& core_files =
+        DB::get_core_files(realm_file_path, DB::CoreFileType::StateFiles | DB::CoreFileType::TemporaryFiles);
+    auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
         for (const auto& file : core_files) {
-            auto file_path = file.first;
-            auto is_folder = file.second;
+            const auto& file_path = file.first;
+            const auto& is_folder = file.second;
             if (is_folder) {
-                util::try_remove_dir_recursive(file_path);
-            } else {
-                util::File::try_remove(file_path);
+                // The return value can be ignored since non-existing folders do not matter here.
+                // We do need to use the `try_remove_dir_recursive` instead of `remove_dir_recursive` to
+                // not throw in that case.
+                util::try_remove_dir_recursive(file_path); // Throws
+            }
+            else {
+                // The return value can be ignored since non-existing files do not matter here.
+                // We do need to use the `try_remove_dir_recursive` instead of `remove_dir_recursive` to
+                // not throw in that case.
+                util::File::try_remove(file_path); // Throws
             }
         }
     });
+    if (!lock_successful) {
+        throw DeleteOnOpenRealmException();
+    }
+
+    return true;
 }
 
 AuditInterface* Realm::audit_context() const noexcept
