@@ -117,6 +117,7 @@ struct AppCreateConfig {
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);
+AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name);
 
 std::string create_app(const AppCreateConfig& config);
 

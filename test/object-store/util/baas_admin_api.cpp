@@ -537,6 +537,40 @@ AppCreateConfig default_app_config(const std::string& base_url)
     };
 }
 
+AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
+{
+    Property partition_key("partition", PropertyType::String | PropertyType::Nullable);
+
+    AppCreateConfig::UserPassAuthConfig user_pass_config{
+        true,
+        "Confirm",
+        "",
+        "http://example.com/confirmEmail",
+        "",
+        "Reset",
+        "http://exmaple.com/resetPassword",
+        false,
+        false,
+    };
+
+    return AppCreateConfig{
+        name,
+        base_url,
+        "unique_user@domain.com",
+        "password",
+        "mongodb://localhost:26000",
+        util::format("test_data_%1", name),
+        schema,
+        std::move(partition_key),
+        true, // dev_mode_enabled
+        {}, // no functions
+        std::move(user_pass_config), // enable basic user/pass auth
+        util::none, // disable custom auth
+        true, // enable api key auth
+        true, // enable anonymous auth
+    };
+}
+
 std::string create_app(const AppCreateConfig& config)
 {
     auto session = AdminAPISession::login(config.base_url, config.admin_username, config.admin_password);
@@ -563,23 +597,27 @@ std::string create_app(const AppCreateConfig& config)
         auth_providers.post_json({{"type", "anon-user"}});
     }
     if (config.user_pass_auth) {
-        const auto& confirm_func_name = config.user_pass_auth->confirmation_function_name;
-        const auto& reset_func_name = config.user_pass_auth->reset_function_name;
+        auto user_pass_config_obj = nlohmann::json{
+            {"autoConfirm", config.user_pass_auth->auto_confirm},
+            {"confirmEmailSubject", config.user_pass_auth->confirm_email_subject},
+            {"emailConfirmationUrl", config.user_pass_auth->email_confirmation_url},
+            {"resetPasswordSubject", config.user_pass_auth->reset_password_subject},
+            {"resetPasswordUrl", config.user_pass_auth->reset_password_url},
+        };
+        if (!config.user_pass_auth->confirmation_function_name.empty()) {
+            const auto& confirm_func_name = config.user_pass_auth->confirmation_function_name;
+            user_pass_config_obj.emplace("confirmationFunctionName", confirm_func_name);
+            user_pass_config_obj.emplace("confirmationFunctionId", function_name_to_id[confirm_func_name]);
+            user_pass_config_obj.emplace("runConfirmationFunction", config.user_pass_auth->run_confirmation_function);
+        }
+        if (!config.user_pass_auth->reset_function_name.empty()) {
+            const auto& reset_func_name = config.user_pass_auth->reset_function_name;
+            user_pass_config_obj.emplace("resetFunctionName", reset_func_name);
+            user_pass_config_obj.emplace("resetFunctionId", function_name_to_id[reset_func_name]);
+            user_pass_config_obj.emplace("runResetFunction", config.user_pass_auth->run_reset_function);
+        }
         auth_providers.post_json({{"type", "local-userpass"},
-                                  {"config",
-                                   {
-                                       {"autoConfirm", config.user_pass_auth->auto_confirm},
-                                       {"confirmEmailSubject", config.user_pass_auth->confirm_email_subject},
-                                       {"confirmationFunctionName", confirm_func_name},
-                                       {"confirmationFunctionId", function_name_to_id[confirm_func_name]},
-                                       {"emailConfirmationUrl", config.user_pass_auth->email_confirmation_url},
-                                       {"resetFunctionName", reset_func_name},
-                                       {"resetFunctionId", function_name_to_id[reset_func_name]},
-                                       {"resetPasswordSubject", config.user_pass_auth->reset_password_subject},
-                                       {"resetPasswordUrl", config.user_pass_auth->reset_password_url},
-                                       {"runConfirmationFunction", config.user_pass_auth->run_confirmation_function},
-                                       {"runResetFunction", config.user_pass_auth->run_reset_function},
-                                   }}});
+                                  {"config", std::move(user_pass_config_obj)}});
     }
     if (config.custom_function_auth) {
         auth_providers.post_json({{"type", "custom-function"},
