@@ -43,7 +43,6 @@ private:
 
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;
-
 };
 
 // Implementation
