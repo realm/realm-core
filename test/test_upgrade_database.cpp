@@ -1015,6 +1015,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 1000)
     }
 
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 5
     // core in order to create a file-format-version 5 test file!
     char leafsize[20];
@@ -1067,6 +1068,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 1000)
     t->set_string(null_str_ndx, 5, base2);
 
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
 }
 
@@ -1101,6 +1103,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 6
     // core in order to create a file-format-version 6 test file!
 
@@ -1110,6 +1113,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
 }
 
@@ -1143,6 +1147,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 7
     // core in order to create a file-format-version 7 test file!
 
@@ -1152,6 +1157,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
 }
 
@@ -1188,6 +1194,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<String>(col_str), validation_str);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 8
     // core in order to create a file-format-version 8 test file!
 
@@ -1200,6 +1207,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     t->set_string(str_col, row, validation_str);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
 }
 
@@ -1665,7 +1673,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     Group g;
     TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
     TableRef o = g.add_table("origin");
-    auto col = o->add_column_link(type_Link, "link", *t);
+    auto col = o->add_column(*t, "link");
 
     for (auto id : ids) {
         auto obj = t->create_object_with_primary_key(id);
@@ -1674,6 +1682,89 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+}
+
+TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_20.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+    std::vector<std::string> names = {"adam", "bart", "carlo", "david", "eric", "frank", "gary"};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto wt = sg->start_write();
+
+    auto foo = wt->get_table("foo");
+    auto bar = wt->get_table("bar");
+    auto o = wt->get_table("origin");
+    auto col1 = o->get_column_key("link1");
+    auto col2 = o->get_column_key("link2");
+    ObjKey bl1(4);
+    ObjKey bl2(11);
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 20
+    // core in order to create a file-format-version 20 test file!
+
+    Group g;
+    TableRef foo = g.add_table_with_primary_key("foo", type_Int, "id", false);
+    TableRef bar = g.add_table_with_primary_key("bar", type_String, "name", false);
+    TableRef o = g.add_table("origin");
+    auto col1 = o->add_column(*foo, "link1");
+    auto col2 = o->add_column(*bar, "link2");
+
+    for (auto id : ids) {
+        auto obj = foo->create_object_with_primary_key(id);
+        o->create_object().set(col1, obj.get_key());
+    }
+
+    for (auto name : names) {
+        auto obj = bar->create_object_with_primary_key(name);
+        o->create_object().set(col2, obj.get_key());
+    }
+
+    auto o1 = foo->get_object_with_primary_key(ids[4]);
+    auto bl1 = o1.get_backlink(*o, col1, 0);
+    o1.invalidate();
+    auto o2 = bar->get_object_with_primary_key(names[4]);
+    auto bl2 = o2.get_backlink(*o, col2, 0);
+    o2.invalidate();
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
+    CHECK_EQUAL(foo->nb_unresolved(), 1);
+    CHECK_EQUAL(bar->nb_unresolved(), 1);
+    CHECK_NOT(o->get_object(bl1).get<ObjKey>(col1));
+    CHECK_NOT(o->get_object(bl2).get<ObjKey>(col2));
+    // We test that we are able to identify the tombstones for these primary keys
+    foo->create_object_with_primary_key(ids[4]);
+    bar->create_object_with_primary_key(names[4]);
+    CHECK_EQUAL(foo->nb_unresolved(), 0);
+    CHECK_EQUAL(bar->nb_unresolved(), 0);
+    CHECK(o->get_object(bl1).get<ObjKey>(col1));
+    CHECK(o->get_object(bl2).get<ObjKey>(col2));
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = foo->get_object_with_primary_key(id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col1), obj.get_key());
+        ++it;
+    }
+    for (auto name : names) {
+        auto obj = bar->get_object_with_primary_key(name);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col2), obj.get_key());
+        ++it;
+    }
 }
 
 TEST(Upgrade_progress)
