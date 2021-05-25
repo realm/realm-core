@@ -123,8 +123,6 @@ void RealmCoordinator::create_sync_session()
                     self->m_notifier->notify_others();
             }
         });
-#else
-    static_cast<void>(force_client_resync);
 #endif
 }
 
