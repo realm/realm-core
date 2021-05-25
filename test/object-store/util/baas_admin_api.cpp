@@ -24,6 +24,7 @@
 #include <curl/curl.h>
 
 #include "realm/util/scope_exit.hpp"
+#include "realm/util/string_buffer.hpp"
 
 namespace realm {
 namespace {
@@ -85,6 +86,7 @@ private:
     const std::string& m_mongo_db_name;
     std::function<bool(const Property&)> m_include_prop;
     nlohmann::json m_relationships;
+    std::vector<std::string> m_current_path;
 };
 
 
@@ -100,6 +102,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
         if (!m_include_prop(prop)) {
             continue;
         }
+        m_current_path.clear();
         properties.emplace(prop.name, property_to_jsonschema(prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
@@ -114,47 +117,54 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
 
 nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 {
-    std::string type_str;
+    nlohmann::json type_output;
+
     if ((prop.type & ~PropertyType::Flags) == PropertyType::Object) {
         auto target_obj = m_schema.find(prop.object_type);
         REALM_ASSERT(target_obj != m_schema.end());
 
         if (target_obj->is_embedded) {
-            auto target_obj_jsonschema = object_schema_to_jsonschema(*target_obj);
-            target_obj_jsonschema["bsonType"] = "object";
+            m_current_path.push_back(prop.name);
             if (is_array(prop.type)) {
-                return {
-                    {"bsonType", "array"},
-                    {"items", target_obj_jsonschema},
-                };
+                m_current_path.push_back("[]");
             }
-            return target_obj_jsonschema;
-        }
 
-        m_relationships[prop.name] = {
-            {"ref", util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
-            {"foreign_key", target_obj->primary_key_property()->name},
-            {"is_list", is_array(prop.type)},
-        };
-        type_str = property_type_to_bson_type_str(target_obj->primary_key_property()->type);
+            type_output = object_schema_to_jsonschema(*target_obj);
+            type_output.emplace("bsonType", "object");
+        } else {
+            util::StringBuffer rel_name_buf;
+            for (const auto& path_elem: m_current_path) {
+                rel_name_buf.append(path_elem);
+                rel_name_buf.append(".", 1);
+            }
+            rel_name_buf.append(prop.name);
+            m_relationships[rel_name_buf.c_str()] = {
+                {"ref", util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
+                {"foreign_key", target_obj->primary_key_property()->name},
+                {"is_list", is_array(prop.type)},
+            };
+            type_output.emplace("bsonType", property_type_to_bson_type_str(target_obj->primary_key_property()->type));
+        }
     }
     else {
-        type_str = property_type_to_bson_type_str(prop.type);
+        type_output = {{"bsonType", property_type_to_bson_type_str(prop.type)}};
     }
 
     if (is_array(prop.type)) {
-        return nlohmann::json{{"bsonType", "array"}, {"items", nlohmann::json{{"bsonType", type_str}}}};
+        return nlohmann::json{{"bsonType", "array"}, {"items", type_output}};
     }
     if (is_set(prop.type)) {
-        return nlohmann::json{
-            {"bsonType", "array"}, {"uniqueItems", true}, {"items", nlohmann::json{{"bsonType", type_str}}}};
+        return nlohmann::json{{"bsonType", "array"}, {"uniqueItems", true}, {"items", type_output}};
     }
     if (is_dictionary(prop.type)) {
         return nlohmann::json{{"bsonType", "object"},
                               {"properties", nlohmann::json{}},
-                              {"additionalProperties", nlohmann::json{{"bsonType", type_str}}}};
+                              {"additionalProperties", type_output}};
     }
-    return nlohmann::json{{"bsonType", type_str}};
+
+    // At this point we should have handled all the collection types and it's safe to return the prop_obj,
+    REALM_ASSERT(!is_collection(prop.type));
+    return type_output;
 }
 
 nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& obj_schema)
