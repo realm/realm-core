@@ -634,11 +634,6 @@ public:
 
     void initiate_deletion(std::int_fast64_t conn_id);
 
-    // get_latest_client_version() returns the client version of the latest
-    // changeset that originated from the client with the ident
-    // 'client_file_ident'.
-    version_type get_latest_client_version(SaltedFileIdent client_file_ident);
-
     bool realm_deletion_is_ongoing() const;
 
 private:
@@ -2509,26 +2504,23 @@ private:
 
 // ============================ Session ============================
 
-//                        Need cli-   Send     Send     STATE_REQUEST   IDENT     UNBIND              ERROR
-//   Protocol             ent file    IDENT    STATE    message         message   message   Error     message
-//   state                identifier  message  message  received        received  received  occurred  sent
-// ----------------------------------------------------------------------------------------------------------
-//   AllocatingIdent      yes         yes      no       no              no        no        no        no
-//   SendIdent            no          yes      no       no              no        no        no        no
-//   WaitForStateRequest  no          no       no       no              no        no        no        no
-//   SendState            no          no       yes      yes             no        no        no        no
-//   WaitForIdent         no          no       no       maybe           no        no        no        no
-//   WaitForUnbind        maybe       no       no       maybe           yes       no        no        no
-//   SendError            maybe       maybe    no       maybe           maybe     no        yes       no
-//   WaitForUnbindErr     maybe       maybe    no       maybe           maybe     no        yes       yes
-//   SendUnbound          maybe       maybe    no       maybe           maybe     yes       maybe     no
+//                        Need cli-   Send     IDENT     UNBIND              ERROR
+//   Protocol             ent file    IDENT    message   message   Error     message
+//   state                identifier  message  received  received  occurred  sent
+// ---------------------------------------------------------------------------------
+//   AllocatingIdent      yes         yes      no        no        no        no
+//   SendIdent            no          yes      no        no        no        no
+//   WaitForIdent         no          no       no        no        no        no
+//   WaitForUnbind        maybe       no       yes       no        no        no
+//   SendError            maybe       maybe    maybe     no        yes       no
+//   WaitForUnbindErr     maybe       maybe    maybe     no        yes       yes
+//   SendUnbound          maybe       maybe    maybe     yes       maybe     no
 //
 //
 //   Condition                      Expression
 // ----------------------------------------------------------
 //   Need client file identifier    need_client_file_ident()
 //   Send IDENT message             must_send_ident_message()
-//   Send STATE message             must_send_state_message()
 //   IDENT message received         ident_message_received()
 //   UNBIND message received        unbind_message_received()
 //   Error occurred                 error_occurred()
@@ -2540,9 +2532,6 @@ private:
 // -----------------------------------------------------------------------
 //   AllocatingIdent      none                   REFRESH, UNBIND
 //   SendIdent            IDENT                  REFRESH, UNBIND
-//   WaitForStateRequest  none                   STATE_REQUEST, IDENT,
-//                                               REFRESH, UNBIND
-//   SendState            STATE                  REFRESH, ALLOC, UNBIND
 //   WaitForIdent         none                   IDENT, REFRESH, UNBIND
 //   WaitForUnbind        DOWNLOAD, TRANSACT,    UPLOAD, TRANSACT, MARK,
 //                        MARK, ALLOC            REFRESH, ALLOC, UNBIND
@@ -4908,14 +4897,6 @@ version_type ServerFile::get_max_compactable_server_version()
 {
     return std::numeric_limits<version_type>::max();
 }
-
-
-version_type ServerFile::get_latest_client_version(SaltedFileIdent client_file_ident)
-{
-    const ServerHistory& history = access().history; // Throws
-    return history.get_latest_client_version(client_file_ident);
-}
-
 
 bool ServerFile::realm_deletion_is_ongoing() const
 {

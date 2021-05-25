@@ -160,13 +160,6 @@ void ServerProtocol::make_ident_message(int protocol_version, OutputBuffer& out,
     out << "ident " << session_ident << " " << client_file_ident << " " << client_file_ident_salt << "\n"; // Throws
 }
 
-void ServerProtocol::make_client_version_message(OutputBuffer& out, session_ident_type session_ident,
-                                                 version_type client_version)
-{
-    out << "client_version " << session_ident << " " << client_version << "\n"; // Throws
-    REALM_ASSERT(!out.fail());
-}
-
 void ServerProtocol::make_alloc_message(OutputBuffer& out, session_ident_type session_ident,
                                         file_ident_type file_ident)
 {

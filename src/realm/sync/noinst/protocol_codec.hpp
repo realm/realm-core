@@ -452,8 +452,6 @@ public:
     void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
                             file_ident_type client_file_ident, salt_type client_file_ident_salt);
 
-    void make_client_version_message(OutputBuffer&, session_ident_type session_ident, version_type client_version);
-
     void make_alloc_message(OutputBuffer&, session_ident_type session_ident, file_ident_type file_ident);
 
     void make_unbound_message(OutputBuffer&, session_ident_type session_ident);

@@ -1,6 +1,6 @@
 
-#ifndef REALM_NOINST_CLIENT_STATE_DOWNLOAD_HPP
-#define REALM_NOINST_CLIENT_STATE_DOWNLOAD_HPP
+#ifndef REALM_NOINST_CLIENT_RESET_OPERATION_HPP
+#define REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 
 #include <realm/binary_data.hpp>
 #include <realm/util/logger.hpp>
@@ -70,4 +70,4 @@ inline realm::VersionID ClientResetOperation::get_client_reset_new_version()
 } // namespace _impl
 } // namespace realm
 
-#endif // REALM_NOINST_CLIENT_STATE_DOWNLOAD_HPP
+#endif // REALM_NOINST_CLIENT_RESET_OPERATION_HPP
