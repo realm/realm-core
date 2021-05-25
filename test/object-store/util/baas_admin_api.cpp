@@ -19,6 +19,7 @@
 #include "baas_admin_api.hpp"
 
 #include <iostream>
+#include <mutex>
 
 #include <curl/curl.h>
 
@@ -60,25 +61,46 @@ std::string property_type_to_bson_type_str(PropertyType type)
     }
 }
 
-template <typename Cond>
-nlohmann::json property_to_jsonschema(const Property& prop, const Schema& schema, nlohmann::json* relationships,
-                                      Cond&& include_prop);
+class BaasRuleBuilder {
+public:
+    using IncludePropCond = std::function<bool(const Property&)>;
+    BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
+                      const std::string& db_name, IncludePropCond include_prop)
+        : m_schema(schema)
+        , m_partition_key(partition_key)
+        , m_mongo_service_name(service_name)
+        , m_mongo_db_name(db_name)
+        , m_include_prop(std::move(include_prop))
+    {
+    }
+
+    nlohmann::json property_to_jsonschema(const Property& prop);
+    nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema);
+    nlohmann::json object_schema_to_baas_rule(const ObjectSchema& obj_schema);
+
+private:
+    const Schema& m_schema;
+    const Property& m_partition_key;
+    const std::string& m_mongo_service_name;
+    const std::string& m_mongo_db_name;
+    std::function<bool(const Property&)> m_include_prop;
+    nlohmann::json m_relationships;
+};
+
 
 static const auto include_all_props = [](const Property&) -> bool {
     return true;
 };
 
-template <typename Cond>
-nlohmann::json objectschema_to_jsonschema(const ObjectSchema& obj_schema, const Schema& schema,
-                                          nlohmann::json* relationships, Cond&& include_prop)
+nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& obj_schema)
 {
     nlohmann::json required = nlohmann::json::array();
     nlohmann::json properties;
     for (const auto& prop : obj_schema.persisted_properties) {
-        if (!include_prop(prop)) {
+        if (!m_include_prop(prop)) {
             continue;
         }
-        properties.emplace(prop.name, property_to_jsonschema(prop, schema, relationships, include_prop));
+        properties.emplace(prop.name, property_to_jsonschema(prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
         }
@@ -90,17 +112,15 @@ nlohmann::json objectschema_to_jsonschema(const ObjectSchema& obj_schema, const 
     };
 }
 
-template <typename Cond>
-nlohmann::json property_to_jsonschema(const Property& prop, const Schema& schema, nlohmann::json* relationships,
-                                      Cond&& include_prop)
+nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 {
     std::string type_str;
     if ((prop.type & ~PropertyType::Flags) == PropertyType::Object) {
-        auto target_obj = schema.find(prop.object_type);
-        REALM_ASSERT(target_obj != schema.end());
+        auto target_obj = m_schema.find(prop.object_type);
+        REALM_ASSERT(target_obj != m_schema.end());
 
         if (target_obj->is_embedded) {
-            auto target_obj_jsonschema = objectschema_to_jsonschema(*target_obj, schema, relationships, include_prop);
+            auto target_obj_jsonschema = object_schema_to_jsonschema(*target_obj);
             target_obj_jsonschema["bsonType"] = "object";
             if (is_array(prop.type)) {
                 return {
@@ -111,8 +131,8 @@ nlohmann::json property_to_jsonschema(const Property& prop, const Schema& schema
             return target_obj_jsonschema;
         }
 
-        (*relationships)[prop.name] = {
-            {"ref", util::format("#/relationship/BackingDB/test_data/%1", target_obj->name)},
+        m_relationships[prop.name] = {
+            {"ref", util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
             {"foreign_key", target_obj->primary_key_property()->name},
             {"is_list", is_array(prop.type)},
         };
@@ -137,25 +157,21 @@ nlohmann::json property_to_jsonschema(const Property& prop, const Schema& schema
     return nlohmann::json{{"bsonType", type_str}};
 }
 
-template <typename Cond>
-nlohmann::json schema_to_baas_rule(const ObjectSchema& obj_schema, const Schema& schema,
-                                   const Property& partition_key, Cond&& include_prop)
+nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& obj_schema)
 {
-    nlohmann::json relationships;
-    auto schema_json = objectschema_to_jsonschema(obj_schema, schema, &relationships, include_prop);
+    auto schema_json = object_schema_to_jsonschema(obj_schema);
     schema_json.emplace("title", obj_schema.name);
     auto& prop_sub_obj = schema_json["properties"];
-    if (include_prop(partition_key) && prop_sub_obj.find(partition_key.name) == prop_sub_obj.end()) {
-        prop_sub_obj.emplace(partition_key.name,
-                             property_to_jsonschema(partition_key, schema, &relationships, include_prop));
-        if (!partition_key.type_is_nullable()) {
-            schema_json["required"].push_back(partition_key.name);
+    if (m_include_prop(m_partition_key) && prop_sub_obj.find(m_partition_key.name) == prop_sub_obj.end()) {
+        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
+        if (!m_partition_key.type_is_nullable()) {
+            schema_json["required"].push_back(m_partition_key.name);
         }
     }
     return {
         {"database", "test_data"},
         {"collection", obj_schema.name},
-        {"relationships", relationships},
+        {"relationships", m_relationships},
         {"schema", schema_json},
         {"roles", nlohmann::json::array({{{"name", "default"},
                                           {"apply_when", nlohmann::json::object()},
@@ -407,111 +423,108 @@ AdminAPIEndpoint AdminAPISession::apps() const
     return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
 }
 
-const AppCreateConfig& default_app_config()
+AppCreateConfig default_app_config(const std::string& base_url)
 {
-    static const AppCreateConfig default_config = [] {
-        constexpr const char* update_user_data_func = R"(
-            exports = async function(data) {
-                const user = context.user;
-                const mongodb = context.services.get("BackingDB");
-                const userDataCollection = mongodb.db("test_data").collection("UserData");
-                await userDataCollection.updateOne(
-                                                   { "user_id": user.id },
-                                                   { "$set": data },
-                                                   { "upsert": true }
-                                                   );
-                return true;
-            };
-        )";
-
-        constexpr const char* sum_func = R"(
-            exports = function(...args) {
-                return args.reduce((a,b) => a + b, 0);
-            };
-        )";
-
-        constexpr const char* confirm_func = R"(
-            exports = ({ token, tokenId, username }) => {
-                // process the confirm token, tokenId and username
-                if (username.includes("realm_tests_do_autoverify")) {
-                  return { status: 'success' }
-                }
-                // do not confirm the user
-                return { status: 'fail' };
-            };
-        )";
-
-        constexpr const char* auth_func = R"(
-            exports = (loginPayload) => {
-                return loginPayload["realmCustomAuthFuncUserId"];
-            };
-        )";
-
-        constexpr const char* reset_func = R"(
-            exports = ({ token, tokenId, username, password }) => {
-                // process the reset token, tokenId, username and password
-                if (password.includes("realm_tests_do_reset")) {
-                  return { status: 'success' };
-                }
-                // will not reset the password
-                return { status: 'fail' };
-            };
-        )";
-
-        std::vector<AppCreateConfig::FunctionDef> funcs = {
-            {"updateUserData", update_user_data_func, false},
-            {"sumFunc", sum_func, false},
-            {"confirmFunc", confirm_func, false},
-            {"authFunc", auth_func, false},
-            {"resetFunc", reset_func, false},
+    constexpr const char* update_user_data_func = R"(
+        exports = async function(data) {
+            const user = context.user;
+            const mongodb = context.services.get("BackingDB");
+            const userDataCollection = mongodb.db("test_data").collection("UserData");
+            await userDataCollection.updateOne(
+                                               { "user_id": user.id },
+                                               { "$set": data },
+                                               { "upsert": true }
+                                               );
+            return true;
         };
+    )";
 
-        const auto dog_schema =
-            ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-                                 realm::Property("breed", PropertyType::String | PropertyType::Nullable),
-                                 realm::Property("name", PropertyType::String),
-                                 realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-        const auto person_schema =
-            ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-                                    realm::Property("age", PropertyType::Int),
-                                    realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
-                                    realm::Property("firstName", PropertyType::String),
-                                    realm::Property("lastName", PropertyType::String),
-                                    realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
-        realm::Schema default_schema({dog_schema, person_schema});
-
-        Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
-
-        AppCreateConfig::UserPassAuthConfig user_pass_config{
-            false,
-            "",
-            "confirmFunc",
-            "http://localhost/confirmEmail",
-            "resetFunc",
-            "",
-            "http://localhost/resetPassword",
-            true,
-            true,
+    constexpr const char* sum_func = R"(
+        exports = function(...args) {
+            return args.reduce((a,b) => a + b, 0);
         };
+    )";
 
-        return AppCreateConfig{
-            "test",
-            "http://localhost:9090",
-            "unique_user@domain.com",
-            "password",
-            "mongodb://localhost:26000",
-            "test_data",
-            std::move(default_schema),
-            std::move(partition_key),
-            true,
-            std::move(funcs),
-            std::move(user_pass_config),
-            std::string{"authFunc"},
-            true,
-            true,
+    constexpr const char* confirm_func = R"(
+        exports = ({ token, tokenId, username }) => {
+            // process the confirm token, tokenId and username
+            if (username.includes("realm_tests_do_autoverify")) {
+              return { status: 'success' }
+            }
+            // do not confirm the user
+            return { status: 'fail' };
         };
-    }();
-    return default_config;
+    )";
+
+    constexpr const char* auth_func = R"(
+        exports = (loginPayload) => {
+            return loginPayload["realmCustomAuthFuncUserId"];
+        };
+    )";
+
+    constexpr const char* reset_func = R"(
+        exports = ({ token, tokenId, username, password }) => {
+            // process the reset token, tokenId, username and password
+            if (password.includes("realm_tests_do_reset")) {
+              return { status: 'success' };
+            }
+            // will not reset the password
+            return { status: 'fail' };
+        };
+    )";
+
+    std::vector<AppCreateConfig::FunctionDef> funcs = {
+        {"updateUserData", update_user_data_func, false},
+        {"sumFunc", sum_func, false},
+        {"confirmFunc", confirm_func, false},
+        {"authFunc", auth_func, false},
+        {"resetFunc", reset_func, false},
+    };
+
+    const auto dog_schema =
+        ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                             realm::Property("name", PropertyType::String),
+                             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    const auto person_schema =
+        ObjectSchema("Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                                realm::Property("age", PropertyType::Int),
+                                realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+                                realm::Property("firstName", PropertyType::String),
+                                realm::Property("lastName", PropertyType::String),
+                                realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+    realm::Schema default_schema({dog_schema, person_schema});
+
+    Property partition_key("realm_id", PropertyType::String | PropertyType::Nullable);
+
+    AppCreateConfig::UserPassAuthConfig user_pass_config{
+        false,
+        "",
+        "confirmFunc",
+        "http://localhost/confirmEmail",
+        "resetFunc",
+        "",
+        "http://localhost/resetPassword",
+        true,
+        true,
+    };
+
+    return AppCreateConfig{
+        "test",
+        base_url,
+        "unique_user@domain.com",
+        "password",
+        "mongodb://localhost:26000",
+        "test_data",
+        std::move(default_schema),
+        std::move(partition_key),
+        true,
+        std::move(funcs),
+        std::move(user_pass_config),
+        std::string{"authFunc"},
+        true,
+        true,
+    };
 }
 
 std::string create_app(const AppCreateConfig& config)
@@ -618,10 +631,11 @@ std::string create_app(const AppCreateConfig& config)
             continue;
         }
 
-        auto schema_to_create =
-            schema_to_baas_rule(obj_schema, config.schema, config.partition_key, [&](const Property& prop) {
-                return prop.name == "_id" || prop.name == config.partition_key.name;
-            });
+        BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
+                                       [&](const Property& prop) {
+                                           return prop.name == "_id" || prop.name == config.partition_key.name;
+                                       });
+        auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
 
         auto rule_create_resp = rules.post_json(schema_to_create);
         obj_schema_name_to_id.insert({obj_schema.name, rule_create_resp["_id"]});
@@ -634,9 +648,9 @@ std::string create_app(const AppCreateConfig& config)
 
         auto rule_id = obj_schema_name_to_id.find(obj_schema.name);
         REALM_ASSERT(rule_id != obj_schema_name_to_id.end());
-
-        auto schema_to_create =
-            schema_to_baas_rule(obj_schema, config.schema, config.partition_key, include_all_props);
+        BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
+                                       include_all_props);
+        auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
         schema_to_create["_id"] = rule_id->second;
 
         rules[rule_id->second].put_json(schema_to_create);

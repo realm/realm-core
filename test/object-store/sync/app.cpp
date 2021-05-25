@@ -54,18 +54,16 @@ using namespace std::string_view_literals;
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include <curl/curl.h>
-
-// When a stitch instance starts up and imports the app at this config location,
-// it will generate a new app_id and write it back to the config. This is why we
-// need to parse it at runtime after spinning up the instance.
-static std::string get_runtime_app_id(std::string)
+namespace {
+// This will create a new test app in the baas server at base_url to be used in tests throughout
+// tis file.
+std::string get_runtime_app_id(std::string base_url)
 {
-    static std::string cached_app_id;
-    if (cached_app_id.empty()) {
-        cached_app_id = create_app(default_app_config());
+    static const std::string cached_app_id = [&] {
+        auto cached_app_id = create_app(default_app_config(base_url));
         std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
-    }
+        return cached_app_id;
+    }();
     return cached_app_id;
 }
 
@@ -78,7 +76,7 @@ public:
 };
 
 #ifdef REALM_MONGODB_ENDPOINT
-static std::string get_base_url()
+std::string get_base_url()
 {
     // allows configuration with or without quotes
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
@@ -91,20 +89,8 @@ static std::string get_base_url()
     return base_url;
 }
 #endif
-#ifdef REALM_STITCH_CONFIG
-static std::string get_config_path()
-{
-    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
-    if (config_path.size() > 0 && config_path[0] == '"') {
-        config_path.erase(0, 1);
-    }
-    if (config_path.size() > 0 && config_path[config_path.size() - 1] == '"') {
-        config_path.erase(config_path.size() - 1);
-    }
-    return config_path;
-}
-#endif
 
+} // namespace
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
@@ -115,14 +101,11 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         };
 
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
-        std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
 
         // this app id is configured in tests/mongodb/config.json
-        auto config = App::Config{get_runtime_app_id(config_path),
+        auto config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,
@@ -184,10 +167,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -402,10 +383,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -729,10 +708,8 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -776,10 +753,8 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
-        auto config = App::Config{get_runtime_app_id(config_path),
+        auto config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,
@@ -836,10 +811,8 @@ TEST_CASE("app: call function", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -884,10 +857,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1557,10 +1528,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1674,10 +1643,8 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1739,11 +1706,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto app_config = App::Config{get_runtime_app_id(config_path),
+    auto app_config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,

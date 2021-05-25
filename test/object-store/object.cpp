@@ -1334,6 +1334,33 @@ TEST_CASE("object") {
 #endif
 }
 
+TEST_CASE("HELP-24751") {
+    Schema schema{
+        {"top", {{"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
+        {"location", ObjectSchema::IsEmbedded{true}, {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Automatic;
+    config.schema = schema;
+
+    auto realm = Realm::get_shared_realm(config);
+    CppContext ctx(realm);
+
+    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
+        realm->begin_transaction();
+        auto obj = Object::create(ctx, realm, *realm->schema().find("top"), value, policy);
+        realm->commit_transaction();
+        return obj;
+    };
+
+    auto obj = create(AnyDict{{"location", AnyDict{{"coordinates", AnyVector{double(1.0), double(2.0)}}}}});
+
+    realm->begin_transaction();
+    obj.set_property_value(ctx, "location", util::Any(AnyDict{{"coordinates", AnyVector{double(5.0), double(6.0)}}}));
+    realm->commit_transaction();
+}
+
 TEST_CASE("Embedded Object") {
     Schema schema{
         {"all types",

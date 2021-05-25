@@ -25,8 +25,8 @@
 
 #include "external/json/json.hpp"
 
+#ifdef REALM_ENABLE_AUTH_TESTS
 namespace realm {
-
 app::Response do_http_request(const app::Request& request);
 
 class AdminAPIEndpoint {
@@ -116,8 +116,10 @@ struct AppCreateConfig {
     bool enable_anonymous_auth = false;
 };
 
-const AppCreateConfig& default_app_config();
+AppCreateConfig default_app_config(const std::string& base_url);
 
 std::string create_app(const AppCreateConfig& config);
 
 } // namespace realm
+
+#endif // REALM_ENABLE_AUTH_TESTS

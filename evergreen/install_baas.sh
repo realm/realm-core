@@ -74,15 +74,42 @@ BASE_PATH=$(cd $(dirname "$0"); pwd)
 
 REALPATH=$BASE_PATH/abspath.sh
 
-if [[ -z $1 || -z $2 ]]; then
-    echo "Must specify working directory and stitch app"
+usage()
+{
+    echo "Usage: install_baas.sh -w <path to working dir>
+                       [-s <path to stitch app to import>]
+                       [-b <branch or git spec of baas to checkout/build]"
+    exit 0
+}
+
+PASSED_ARGUMENTS=$(getopt w:s:b: "$*")
+if [[ $? != 0 ]]; then
+    usage
+fi
+
+WORK_PATH=""
+STITCH_APP=""
+BAAS_VERSION=""
+
+set -- $PASSED_ARGUMENTS
+while :
+do
+    case "$1" in
+        -w) WORK_PATH=$($REALPATH "$2"); shift; shift;;
+        -s) STITCH_APP=$($REALPATH "$2"); shift; shift;;
+        -b) BAAS_VERSION="$2"; shift; shift;;
+        --) shift; break;;
+        *) echo "Unexpected option $1"; usage;;
+    esac
+done
+
+if [[ -z "$WORK_PATH" ]]; then
+    echo "Must specify working directory"
+    usage
     exit 1
 fi
-WORK_PATH=$($REALPATH $1)
-STITCH_APP=$($REALPATH $2)
-BAAS_VERSION=$3
 
-if [[ ! -f "$STITCH_APP/config.json" ]]; then
+if [[ -n "$STITCH_APP" && ! -f "$STITCH_APP/config.json" ]]; then
     echo "Invalid app to import: $STITCH_APP/config.json does not exist."
     exit 1
 fi
@@ -127,7 +154,10 @@ fi
 
 if [[ ! -d $WORK_PATH/baas/.git ]]; then
     git clone git@github.com:10gen/baas.git
-
+else
+    cd baas
+    git fetch
+    cd ..
 fi
 
 cd baas
@@ -260,57 +290,59 @@ $WORK_PATH/baas_server \
 echo $! > $WORK_PATH/baas_server.pid
 $BASE_PATH/wait_for_baas.sh $WORK_PATH/baas_server.pid
 
-APP_NAME=$(jq '.name' "$STITCH_APP/config.json" -r)
-echo "importing app $APP_NAME from $STITCH_APP"
+if [[ -n "$STITCH_APP" ]]; then
+    APP_NAME=$(jq '.name' "$STITCH_APP/config.json" -r)
+    echo "importing app $APP_NAME from $STITCH_APP"
 
-[[ -f $WORK_PATH/stitch-state ]] && rm $WORK_PATH/stitch-state
-realm-cli login \
-    --config-path=$WORK_PATH/stitch-state \
-    --base-url=http://localhost:9090 \
-    --auth-provider=local-userpass \
-    --username=unique_user@domain.com \
-    --password=password \
-    -y
+    [[ -f $WORK_PATH/stitch-state ]] && rm $WORK_PATH/stitch-state
+    realm-cli login \
+        --config-path=$WORK_PATH/stitch-state \
+        --base-url=http://localhost:9090 \
+        --auth-provider=local-userpass \
+        --username=unique_user@domain.com \
+        --password=password \
+        -y
 
-ACCESS_TOKEN=$(yq r $WORK_PATH/stitch-state "access_token")
-GROUP_ID=$($CURL \
-    --header "Authorization: Bearer $ACCESS_TOKEN" \
-    http://localhost:9090/api/admin/v3.0/auth/profile -s | jq '.roles[0].group_id' -r)
+    ACCESS_TOKEN=$(yq r $WORK_PATH/stitch-state "access_token")
+    GROUP_ID=$($CURL \
+        --header "Authorization: Bearer $ACCESS_TOKEN" \
+        http://localhost:9090/api/admin/v3.0/auth/profile -s | jq '.roles[0].group_id' -r)
 
-APP_ID_PARAM=""
-if [[ -f "$STITCH_APP/secrets.json" ]]; then
-    TEMP_APP_PATH=$(mktemp -d $WORK_PATH/$(basename $STITCH_APP)_XXXX)
-    mkdir -p $TEMP_APP_PATH && echo "{ \"name\": \"$APP_NAME\" }" > "$TEMP_APP_PATH/config.json"
+    APP_ID_PARAM=""
+    if [[ -f "$STITCH_APP/secrets.json" ]]; then
+        TEMP_APP_PATH=$(mktemp -d $WORK_PATH/$(basename $STITCH_APP)_XXXX)
+        mkdir -p $TEMP_APP_PATH && echo "{ \"name\": \"$APP_NAME\" }" > "$TEMP_APP_PATH/config.json"
+        realm-cli import \
+            --config-path=$WORK_PATH/stitch-state \
+            --base-url=http://localhost:9090 \
+            --path="$TEMP_APP_PATH" \
+            --project-id "$GROUP_ID" \
+            --strategy replace \
+            -y
+
+        APP_ID=$(jq '.app_id' "$TEMP_APP_PATH/config.json" -r)
+        APP_ID_PARAM="--app-id=$APP_ID"
+
+        while read -r SECRET VALUE; do
+            realm-cli secrets add \
+                --config-path=$WORK_PATH/stitch-state \
+                --base-url=http://localhost:9090 \
+                --app-id=$APP_ID \
+                --name="$SECRET" \
+                --value="$(echo $VALUE | sed 's/\\n/\n/g')"
+        done < <(jq 'to_entries[] | [.key, .value] | @tsv' "$STITCH_APP/secrets.json" -r)
+        rm -r $TEMP_APP_PATH
+    fi
+
     realm-cli import \
         --config-path=$WORK_PATH/stitch-state \
         --base-url=http://localhost:9090 \
-        --path="$TEMP_APP_PATH" \
-        --project-id "$GROUP_ID" \
-        --strategy replace \
+        --path="$STITCH_APP" \
+        $APP_ID_PARAM \
+        --project-id="$GROUP_ID" \
+        --strategy=replace \
         -y
-
-    APP_ID=$(jq '.app_id' "$TEMP_APP_PATH/config.json" -r)
-    APP_ID_PARAM="--app-id=$APP_ID"
-
-    while read -r SECRET VALUE; do
-        realm-cli secrets add \
-            --config-path=$WORK_PATH/stitch-state \
-            --base-url=http://localhost:9090 \
-            --app-id=$APP_ID \
-            --name="$SECRET" \
-            --value="$(echo $VALUE | sed 's/\\n/\n/g')"
-    done < <(jq 'to_entries[] | [.key, .value] | @tsv' "$STITCH_APP/secrets.json" -r)
-    rm -r $TEMP_APP_PATH
 fi
-
-realm-cli import \
-    --config-path=$WORK_PATH/stitch-state \
-    --base-url=http://localhost:9090 \
-    --path="$STITCH_APP" \
-    $APP_ID_PARAM \
-    --project-id="$GROUP_ID" \
-    --strategy=replace \
-    -y
 
 touch $WORK_PATH/baas_ready
 
