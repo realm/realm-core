@@ -67,7 +67,7 @@ class BaasRuleBuilder {
 public:
     using IncludePropCond = std::function<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
-                      const std::string& db_name, IncludePropCond include_prop)
+                    const std::string& db_name, IncludePropCond include_prop)
         : m_schema(schema)
         , m_partition_key(partition_key)
         , m_mongo_service_name(service_name)
@@ -134,16 +134,18 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 
             type_output = object_schema_to_jsonschema(*target_obj);
             type_output.emplace("bsonType", "object");
-        } else {
+        }
+        else {
             REALM_ASSERT(target_obj->primary_key_property());
             util::StringBuffer rel_name_buf;
-            for (const auto& path_elem: m_current_path) {
+            for (const auto& path_elem : m_current_path) {
                 rel_name_buf.append(path_elem);
                 rel_name_buf.append(".", 1);
             }
             rel_name_buf.append(prop.name);
             m_relationships[rel_name_buf.c_str()] = {
-                {"ref", util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
+                {"ref",
+                 util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
                 {"foreign_key", target_obj->primary_key_property()->name},
                 {"is_list", is_array(prop.type)},
             };
@@ -545,15 +547,8 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
     Property partition_key("partition", PropertyType::String | PropertyType::Nullable);
 
     AppCreateConfig::UserPassAuthConfig user_pass_config{
-        true,
-        "Confirm",
-        "",
-        "http://example.com/confirmEmail",
-        "",
-        "Reset",
-        "http://exmaple.com/resetPassword",
-        false,
-        false,
+        true,  "Confirm", "", "http://example.com/confirmEmail", "", "Reset", "http://exmaple.com/resetPassword",
+        false, false,
     };
 
     return AppCreateConfig{
@@ -565,12 +560,12 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::format("test_data_%1", name),
         schema,
         std::move(partition_key),
-        true, // dev_mode_enabled
-        {}, // no functions
+        true,                        // dev_mode_enabled
+        {},                          // no functions
         std::move(user_pass_config), // enable basic user/pass auth
-        util::none, // disable custom auth
-        true, // enable api key auth
-        true, // enable anonymous auth
+        util::none,                  // disable custom auth
+        true,                        // enable api key auth
+        true,                        // enable anonymous auth
     };
 }
 
@@ -619,8 +614,7 @@ std::string create_app(const AppCreateConfig& config)
             user_pass_config_obj.emplace("resetFunctionId", function_name_to_id[reset_func_name]);
             user_pass_config_obj.emplace("runResetFunction", config.user_pass_auth->run_reset_function);
         }
-        auth_providers.post_json({{"type", "local-userpass"},
-                                  {"config", std::move(user_pass_config_obj)}});
+        auth_providers.post_json({{"type", "local-userpass"}, {"config", std::move(user_pass_config_obj)}});
     }
     if (config.custom_function_auth) {
         auth_providers.post_json({{"type", "custom-function"},
@@ -683,9 +677,9 @@ std::string create_app(const AppCreateConfig& config)
         }
 
         BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
-                                       [&](const Property& prop) {
-                                           return prop.name == "_id" || prop.name == config.partition_key.name;
-                                       });
+                                     [&](const Property& prop) {
+                                         return prop.name == "_id" || prop.name == config.partition_key.name;
+                                     });
         auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
 
         auto rule_create_resp = rules.post_json(schema_to_create);
@@ -700,7 +694,7 @@ std::string create_app(const AppCreateConfig& config)
         auto rule_id = obj_schema_name_to_id.find(obj_schema.name);
         REALM_ASSERT(rule_id != obj_schema_name_to_id.end());
         BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
-                                       include_all_props);
+                                     include_all_props);
         auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
         schema_to_create["_id"] = rule_id->second;
 
