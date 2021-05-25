@@ -643,7 +643,8 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        const auto& core_files = DB::get_core_files(file, DB::CoreFileType::Log);
+        i = ::open((core_files[0].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -762,8 +763,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         dg.release();
         return;
     }
-    m_coordination_dir = path + ".management";
-    m_lockfile_path = path + ".lock";
+    const auto& core_files = DB::get_core_files(path, DB::CoreFileType::Lock | DB::CoreFileType::Management);
+    m_lockfile_path = core_files[0].first;
+    m_coordination_dir = core_files[1].first;
     try_make_dir(m_coordination_dir);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
@@ -2390,7 +2392,8 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto lockfile_path(realm_path + ".lock");
+    const auto& core_files = DB::get_core_files(realm_path, DB::CoreFileType::Lock);
+    auto lockfile_path(core_files[0].first);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
