@@ -82,10 +82,7 @@ usage()
     exit 0
 }
 
-PASSED_ARGUMENTS=$(getopt w:s:b: "$*")
-if [[ $? != 0 ]]; then
-    usage
-fi
+PASSED_ARGUMENTS=$(getopt w:s:b: "$*") || usage
 
 WORK_PATH=""
 STITCH_APP=""
