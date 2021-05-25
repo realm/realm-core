@@ -21,6 +21,7 @@
 #include <iostream>
 #include <mutex>
 
+#include <catch2/catch.hpp>
 #include <curl/curl.h>
 
 #include "realm/util/scope_exit.hpp"
@@ -76,7 +77,7 @@ public:
     }
 
     nlohmann::json property_to_jsonschema(const Property& prop);
-    nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema);
+    nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, bool clear_path = false);
     nlohmann::json object_schema_to_baas_rule(const ObjectSchema& obj_schema);
 
 private:
@@ -94,7 +95,7 @@ static const auto include_all_props = [](const Property&) -> bool {
     return true;
 };
 
-nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& obj_schema)
+nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& obj_schema, bool clear_path)
 {
     nlohmann::json required = nlohmann::json::array();
     nlohmann::json properties;
@@ -102,7 +103,9 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
         if (!m_include_prop(prop)) {
             continue;
         }
-        m_current_path.clear();
+        if (clear_path) {
+            m_current_path.clear();
+        }
         properties.emplace(prop.name, property_to_jsonschema(prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
@@ -132,6 +135,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
             type_output = object_schema_to_jsonschema(*target_obj);
             type_output.emplace("bsonType", "object");
         } else {
+            REALM_ASSERT(target_obj->primary_key_property());
             util::StringBuffer rel_name_buf;
             for (const auto& path_elem: m_current_path) {
                 rel_name_buf.append(path_elem);
@@ -157,9 +161,8 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
         return nlohmann::json{{"bsonType", "array"}, {"uniqueItems", true}, {"items", type_output}};
     }
     if (is_dictionary(prop.type)) {
-        return nlohmann::json{{"bsonType", "object"},
-                              {"properties", nlohmann::json{}},
-                              {"additionalProperties", type_output}};
+        return nlohmann::json{
+            {"bsonType", "object"}, {"properties", nlohmann::json::object()}, {"additionalProperties", type_output}};
     }
 
     // At this point we should have handled all the collection types and it's safe to return the prop_obj,
@@ -169,7 +172,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 
 nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& obj_schema)
 {
-    auto schema_json = object_schema_to_jsonschema(obj_schema);
+    auto schema_json = object_schema_to_jsonschema(obj_schema, true);
     schema_json.emplace("title", obj_schema.name);
     auto& prop_sub_obj = schema_json["properties"];
     if (m_include_prop(m_partition_key) && prop_sub_obj.find(m_partition_key.name) == prop_sub_obj.end()) {
@@ -179,7 +182,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& o
         }
     }
     return {
-        {"database", "test_data"},
+        {"database", m_mongo_db_name},
         {"collection", obj_schema.name},
         {"relationships", m_relationships},
         {"schema", schema_json},
@@ -745,5 +748,53 @@ std::string create_app(const AppCreateConfig& config)
 
     return client_app_id;
 }
+
+#ifdef REALM_MONGODB_ENDPOINT
+TEST_CASE("app: baas admin api", "[sync][app]") {
+    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
+    base_url.erase(std::remove(base_url.begin(), base_url.end(), '"'), base_url.end());
+    SECTION("embedded objects") {
+        Schema schema{{"top",
+                       {{"_id", PropertyType::String, true},
+                        {"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
+                      {"location",
+                       ObjectSchema::IsEmbedded{true},
+                       {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto app_id = create_app(test_app_config);
+    }
+
+    SECTION("embedded object with array") {
+        Schema schema{
+            {"a",
+             {{"_id", PropertyType::String, true},
+              {"b_link", PropertyType::Object | PropertyType::Array | PropertyType::Nullable, "b"}}},
+            {"b", ObjectSchema::IsEmbedded{true}, {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
+            {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
+        };
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto app_id = create_app(test_app_config);
+    }
+
+    SECTION("dictionaries") {
+        Schema schema{
+            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Dictionary | PropertyType::String}}},
+        };
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto app_id = create_app(test_app_config);
+    }
+
+    SECTION("set") {
+        Schema schema{
+            {"a", {{"_id", PropertyType::String, true}, {"b_dict", PropertyType::Set | PropertyType::String}}},
+        };
+
+        auto test_app_config = minimal_app_config(base_url, "test", schema);
+        auto app_id = create_app(test_app_config);
+    }
+}
+#endif
 
 } // namespace realm
