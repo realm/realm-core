@@ -75,24 +75,3 @@ TEST(GlobalKey_Compare)
     CHECK_LESS(GlobalKey(0, 0), GlobalKey(0, 1));
     CHECK_LESS(GlobalKey(0, 0), GlobalKey(1, 0));
 }
-
-/*
-TEST(GlobalKey_PrimaryKey)
-{
-    {
-        GlobalKey object_id(Mixed{});
-        auto oid = object_id.to_string();
-        CHECK_EQUAL(oid, "{0001-0000}");
-    }
-    {
-        GlobalKey object_id{123};
-        auto oid = object_id.to_string();
-        CHECK_EQUAL(oid, "{0000-007b}");
-    }
-    {
-        GlobalKey object_id{"Exactly!"};
-        auto oid = object_id.to_string();
-        CHECK_EQUAL(oid, "{495f44d153789d90-d2f64663ba17c5bc}");
-    }
-}
-*/
