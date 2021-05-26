@@ -441,8 +441,8 @@ TEST_CASE("object") {
             KeyPathArray key_path_array_target_to_origin_value = {key_path_target_to_origin_value};
 
             SECTION("callbacks on a single object") {
-                SECTION("modifying origin table 'table2', property 'value'"
-                        "while observing origin table 'table2', property 'value'"
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing origin table 'table2', property 'value' "
                         "-> DOES send a notification") {
                     auto token = require_change(object_origin, key_path_array_origin_value);
 
@@ -454,8 +454,8 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.columns[col_origin_value.value], 0);
                 }
 
-                SECTION("modifying related table 'table', property 'value 1'"
-                        "while observing related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_value);
 
@@ -464,8 +464,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying related table 'table', property 'value 2'"
-                        "while observing related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 2' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_origin, key_path_array_origin_value);
 
@@ -474,8 +474,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying origin table 'table2', property 'value'"
-                        "while observing related table 'table', property 'value 1'"
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 1' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value1);
 
@@ -484,8 +484,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying related table 'table', property 'value 1'"
-                        "while observing related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
                         "-> DOES send a notification") {
                     auto token = require_change(object_target, key_path_array_target_value1);
 
@@ -497,8 +497,8 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.columns[col_target_value1.value], 0);
                 }
 
-                SECTION("modifying related table 'table', property 'value 2'"
-                        "while observing related table 'table', property 'value 1'"
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 1' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value1);
 
@@ -507,8 +507,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying origin table 'table2', property 'value'"
-                        "while observing related table 'table', property 'value 2'"
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 2' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value2);
 
@@ -517,8 +517,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying related table 'table', property 'value 1'"
-                        "while observing related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 2' "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_target, key_path_array_target_value2);
 
@@ -527,8 +527,8 @@ TEST_CASE("object") {
                     });
                 }
 
-                SECTION("modifying related table 'table', property 'value 2'"
-                        "while observing related table 'table', property 'value 2'"
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 2' "
                         "-> DOES send a notification") {
                     auto token = require_change(object_target, key_path_array_target_value2);
 
@@ -543,8 +543,8 @@ TEST_CASE("object") {
 
             SECTION("callbacks on linked objects") {
                 SECTION("all callbacks filtered") {
-                    SECTION("modifying origin table 'table2', property 'value'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying origin table 'table2', property 'value' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> does NOT send a notification") {
                         auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
 
@@ -553,8 +553,8 @@ TEST_CASE("object") {
                         });
                     }
 
-                    SECTION("modifying related table 'table', property 'value 1'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying related table 'table', property 'value 1' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> DOES send a notification") {
                         auto token = require_change(object_origin, key_path_array_origin_to_target_value1);
 
@@ -566,8 +566,8 @@ TEST_CASE("object") {
                         REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
                     }
 
-                    SECTION("modifying related table 'table', property 'value 2'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying related table 'table', property 'value 2' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> does NOT send a notification") {
                         auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
 
@@ -578,8 +578,8 @@ TEST_CASE("object") {
                 }
 
                 SECTION("some callbacks filtered") {
-                    SECTION("modifying origin table 'table2', property 'value'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying origin table 'table2', property 'value' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> DOES send a notification") {
                         auto token_with_filter =
                             require_change(object_origin, key_path_array_origin_to_target_value1);
@@ -593,8 +593,8 @@ TEST_CASE("object") {
                         REQUIRE_INDICES(change.columns[col_origin_value.value], 0);
                     }
 
-                    SECTION("modifying related table 'table', property 'value 1'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying related table 'table', property 'value 1' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> DOES send a notification") {
                         auto token_with_filter =
                             require_change(object_origin, key_path_array_origin_to_target_value1);
@@ -608,8 +608,8 @@ TEST_CASE("object") {
                         REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
                     }
 
-                    SECTION("modifying related table 'table', property 'value 2'"
-                            "while observing related table 'table', property 'value 1'"
+                    SECTION("modifying related table 'table', property 'value 2' "
+                            "while observing related table 'table', property 'value 1' "
                             "-> does NOT send a notification") {
                         auto token_with_filter =
                             require_no_change(object_origin, key_path_array_origin_to_target_value1);
@@ -664,8 +664,8 @@ TEST_CASE("object") {
                 KeyPathArray key_path_array_to_depth_5 = {key_path_to_depth_5};
                 KeyPathArray key_path_array_to_depth_6 = {key_path_to_depth_6};
 
-                SECTION("modifying table 'table2', property 'link2' 5 levels deep"
-                        "while observing table 'table2', property 'link2' 5 levels deep"
+                SECTION("modifying table 'table2', property 'link2' 5 levels deep "
+                        "while observing table 'table2', property 'link2' 5 levels deep "
                         "-> DOES send a notification") {
                     auto token = require_change(object_depth1, key_path_array_to_depth_5);
 
@@ -677,8 +677,8 @@ TEST_CASE("object") {
                     REQUIRE_INDICES(change.columns[col_origin_link2.value], 0);
                 }
 
-                SECTION("modifying table 'table2', property 'link2' 6 depths deep"
-                        "while observing table 'table2', property 'link2' 5 depths deep"
+                SECTION("modifying table 'table2', property 'link2' 6 depths deep "
+                        "while observing table 'table2', property 'link2' 5 depths deep "
                         "-> does NOT send a notification") {
                     auto token = require_no_change(object_depth1, key_path_array_to_depth_5);
 
@@ -690,8 +690,8 @@ TEST_CASE("object") {
 
             SECTION("keypath filter with a backlink") {
                 SECTION("all callbacks filtered") {
-                    SECTION("modifying backlinked table 'table2', property 'value'"
-                            "while observing backlinked table 'table2', property 'value' on origin"
+                    SECTION("modifying backlinked table 'table2', property 'value' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
                             "-> DOES send a notification") {
                         auto token_with_backlink =
                             require_change(object_target, key_path_array_target_to_origin_value);
@@ -702,8 +702,8 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
-                    SECTION("modifying backlinked table 'table2', property 'link'"
-                            "while observing backlinked table 'table2', property 'value' on origin"
+                    SECTION("modifying backlinked table 'table2', property 'link' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
                             "-> does NOT send a notification") {
                         auto token_with_backlink =
                             require_no_change(object_target, key_path_array_target_to_origin_value);
@@ -713,8 +713,8 @@ TEST_CASE("object") {
                             object_origin.set_property_value(d, "link", util::Any(object_target2));
                         });
                     }
-                    SECTION("adding a new origin pointing to the target"
-                            "while observing target table 'table2's backlink"
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2's backlink "
                             "-> DOES send a notification") {
                         auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
                         write([&] {
@@ -726,8 +726,8 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
-                    SECTION("adding a new origin pointing to the target"
-                            "while observing target table 'table2', property 'value' on origin"
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2', property 'value' on origin "
                             "-> DOES send a notification") {
                         auto token_with_backlink =
                             require_change(object_target, key_path_array_target_to_origin_value);
@@ -743,8 +743,8 @@ TEST_CASE("object") {
                 }
 
                 SECTION("some callbacks filtered") {
-                    SECTION("modifying backlinked table 'table2', property 'value'"
-                            "while observing backlinked table 'table2', property 'value' on origin"
+                    SECTION("modifying backlinked table 'table2', property 'value' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
                             "-> DOES send a notification") {
                         auto token_with_backlink =
                             require_change(object_target, key_path_array_target_to_origin_value);
@@ -756,8 +756,8 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
-                    SECTION("modifying backlinked table 'table2', property 'link2'"
-                            "while observing backlinked table 'table2', property 'value' on origin"
+                    SECTION("modifying backlinked table 'table2', property 'link2' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
                             "-> does NOT a notification") {
                         auto token_with_backlink =
                             require_no_change(object_target, key_path_array_target_to_origin_value);
@@ -768,8 +768,8 @@ TEST_CASE("object") {
                             object_origin.set_property_value(d, "link", util::Any(object_target2));
                         });
                     }
-                    SECTION("adding a new origin pointing to the target"
-                            "while observing target table 'table2's backlink"
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2's backlink "
                             "-> DOES send a notification") {
                         auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
                         auto token_without_filter = require_no_change(object_target);
@@ -782,8 +782,8 @@ TEST_CASE("object") {
                         REQUIRE(change.columns.size() == 1);
                         REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
-                    SECTION("adding a new origin pointing to the target"
-                            "while observing target table 'table2', property 'value' on origin"
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2', property 'value' on origin "
                             "-> DOES send a notification") {
                         auto token_with_backlink =
                             require_change(object_target, key_path_array_target_to_origin_value);

@@ -2191,7 +2191,7 @@ TEST_CASE("notifications: results") {
             REQUIRE(notification_calls_with_filter_on_linked_to_value == 1);
             REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
 
-            SECTION("modifying root table 'object', property 'value'"
+            SECTION("modifying root table 'object', property 'value' "
                     "-> DOES send a notification") {
                 write([&] {
                     table->get_object(object_keys[1]).set(col_value, 3);
@@ -2213,7 +2213,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
             }
 
-            SECTION("modifying root table 'object', property 'link'"
+            SECTION("modifying root table 'object', property 'link' "
                     "-> DOES send a notification") {
                 write([&] {
                     table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
@@ -2235,7 +2235,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
             }
 
-            SECTION("modifying related table 'linked to object', property 'value'"
+            SECTION("modifying related table 'linked to object', property 'value' "
                     "-> DOES send a notification") {
                 write([&] {
                     table->get_object(object_keys[1])
@@ -2259,7 +2259,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
             }
 
-            SECTION("modifying related table 'linked to object', property 'value2'"
+            SECTION("modifying related table 'linked to object', property 'value2' "
                     "-> DOES send a notification") {
                 write([&] {
                     table->get_object(object_keys[1])
@@ -2283,7 +2283,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
             }
 
-            SECTION("modifying unrelated table 'other object', property 'value'"
+            SECTION("modifying unrelated table 'other object', property 'value' "
                     "-> does NOT send a notification") {
                 write([&] {
                     other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
@@ -2318,7 +2318,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE(notification_calls_with_filter_on_root_value == 1);
                 REQUIRE(collection_change_set_with_filter_on_root_value.empty());
 
-                SECTION("modifying root table 'object', property 'value'"
+                SECTION("modifying root table 'object', property 'value' "
                         "-> DOES send a notification") {
                     write([&] {
                         table->get_object(object_keys[1]).set(col_value, 3);
@@ -2330,7 +2330,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE_INDICES(collection_change_set_with_filter_on_root_value.modifications_new, 1);
                 }
 
-                SECTION("modifying root table 'object', property 'link'"
+                SECTION("modifying root table 'object', property 'link' "
                         "-> does NOT send a notification") {
                     write([&] {
                         table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
@@ -2340,7 +2340,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(collection_change_set_with_filter_on_root_value.empty());
                 }
 
-                SECTION("modifying related table 'linked to object', property 'value'"
+                SECTION("modifying related table 'linked to object', property 'value' "
                         "-> does NOT send a notification") {
                     write([&] {
                         table->get_object(object_keys[1])
@@ -2352,7 +2352,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(collection_change_set_with_filter_on_root_value.empty());
                 }
 
-                SECTION("modifying related table 'linked to object', property 'value2'"
+                SECTION("modifying related table 'linked to object', property 'value2' "
                         "-> does NOT send a notification") {
                     write([&] {
                         table->get_object(object_keys[1])
@@ -2364,7 +2364,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(collection_change_set_with_filter_on_root_value.empty());
                 }
 
-                SECTION("modifying unrelated table 'other object', property 'value'"
+                SECTION("modifying unrelated table 'other object', property 'value' "
                         "-> does NOT send a notification") {
                     write([&] {
                         other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
@@ -2389,7 +2389,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE(notification_calls_with_filter_on_linked_to_value == 1);
                 REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
 
-                SECTION("modifying root table 'object', property 'value'"
+                SECTION("modifying root table 'object', property 'value' "
                         "-> does NOT send a notification") {
                     write([&] {
                         table->get_object(object_keys[1]).set(col_value, 3);
@@ -2399,7 +2399,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
                 }
 
-                SECTION("modifying root table 'object', property 'link'"
+                SECTION("modifying root table 'object', property 'link' "
                         "-> DOES send a notification") {
                     write([&] {
                         table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
@@ -2411,7 +2411,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
                 }
 
-                SECTION("modifying related table 'linked to object', property 'value'"
+                SECTION("modifying related table 'linked to object', property 'value' "
                         "-> DOES send a notification") {
                     write([&] {
                         table->get_object(object_keys[1])
@@ -2425,7 +2425,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
                 }
 
-                SECTION("modifying related table 'linked to object', property 'value2'"
+                SECTION("modifying related table 'linked to object', property 'value2' "
                         "-> does NOT send a notification") {
                     write([&] {
                         table->get_object(object_keys[1])
@@ -2437,7 +2437,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
                 }
 
-                SECTION("modifying unrelated table 'other object', property 'value'"
+                SECTION("modifying unrelated table 'other object', property 'value' "
                         "-> does NOT send a notification") {
                     write([&] {
                         other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
@@ -2493,7 +2493,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(notification_calls_backlink_to_value == 1);
                     REQUIRE(collection_change_set_backlink_to_value.empty());
 
-                    SECTION("modifying backlinked table 'object', property 'value'"
+                    SECTION("modifying backlinked table 'object', property 'value' "
                             "-> DOES send a notification") {
                         write([&] {
                             table->get_object(object_keys[1]).set(col_value, 3);
@@ -2504,7 +2504,7 @@ TEST_CASE("notifications: results") {
                         REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
                     }
 
-                    SECTION("modifying backlinked table 'object', property 'link'"
+                    SECTION("modifying backlinked table 'object', property 'link' "
                             "-> DOES send a notification") {
                         write([&] {
                             table->get_object(object_keys[1])
@@ -2514,7 +2514,7 @@ TEST_CASE("notifications: results") {
                         REQUIRE(collection_change_set_backlink_to_value.empty());
                     }
 
-                    SECTION("adding new backlinked object 'object'"
+                    SECTION("adding new backlinked object 'object' "
                             "-> DOES send a notification") {
                         write([&] {
                             Obj obj = table->create_object();
@@ -2554,7 +2554,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(notification_calls_without_filter == 1);
                     REQUIRE(collection_change_set_without_filter.empty());
 
-                    SECTION("modifying backlinked table 'object', property 'value'"
+                    SECTION("modifying backlinked table 'object', property 'value' "
                             "-> DOES send a notification") {
                         write([&] {
                             table->get_object(object_keys[1]).set(col_value, 3);
@@ -2569,7 +2569,7 @@ TEST_CASE("notifications: results") {
                         REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 4);
                     }
 
-                    SECTION("modifying backlinked table 'object', property 'link'"
+                    SECTION("modifying backlinked table 'object', property 'link' "
                             "-> does NOT send a notification") {
                         write([&] {
                             table->get_object(object_keys[1])
@@ -2581,7 +2581,7 @@ TEST_CASE("notifications: results") {
                         REQUIRE(collection_change_set_without_filter.empty());
                     }
 
-                    SECTION("adding new backlinked object 'object'"
+                    SECTION("adding new backlinked object 'object' "
                             "-> DOES send a notification") {
                         write([&] {
                             Obj obj = table->create_object();
@@ -2613,7 +2613,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(notification_calls_backlink_to_value == 1);
                     REQUIRE(collection_change_set_backlink_to_value.empty());
 
-                    SECTION("adding new backlinked object 'object'"
+                    SECTION("adding new backlinked object 'object' "
                             "-> DOES send a notification") {
                         write([&] {
                             Obj obj = table->create_object();
@@ -2653,7 +2653,7 @@ TEST_CASE("notifications: results") {
                     REQUIRE(notification_calls_without_filter == 1);
                     REQUIRE(collection_change_set_without_filter.empty());
 
-                    SECTION("adding new backlinked object 'object'"
+                    SECTION("adding new backlinked object 'object' "
                             "-> DOES send a notification") {
                         write([&] {
                             Obj obj = table->create_object();
