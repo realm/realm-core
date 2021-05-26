@@ -18,6 +18,8 @@
 
 #include "baas_admin_api.hpp"
 
+#ifdef REALM_ENABLE_AUTH_TESTS
+
 #include <iostream>
 #include <mutex>
 
@@ -794,3 +796,5 @@ TEST_CASE("app: baas admin api", "[sync][app]") {
 #endif
 
 } // namespace realm
+
+#endif
