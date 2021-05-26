@@ -961,10 +961,8 @@ Query Results::do_get_query() const
                 return m_table->where(*list);
             if (auto set = dynamic_cast<LnkSet*>(m_collection.get()))
                 return m_table->where(*set);
-            if (auto dict = dynamic_cast<Dictionary*>(m_collection.get())) {
-                if (dict->get_value_data_type() == type_Link) {
-                    return m_table->where(*dict);
-                }
+            if (auto dict = dynamic_cast<DictionaryLinkValues*>(m_collection.get())) {
+                return m_table->where(*dict);
             }
             return m_query;
         case Mode::Table:

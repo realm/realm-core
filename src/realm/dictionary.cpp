@@ -181,7 +181,7 @@ Dictionary& Dictionary::operator=(const Dictionary& other)
 {
     Base::operator=(static_cast<const Base&>(other));
 
-    if (this != &other) {
+    if (this != &other && other.is_attached()) {
         init_from_parent();
     }
     return *this;
