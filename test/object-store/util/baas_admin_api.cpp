@@ -642,8 +642,10 @@ std::string create_app(const AppCreateConfig& config)
     secrets.post_json({{"name", "gcm"}, {"value", "gcm"}});
 
     auto services = app["services"];
+    static const std::string mongo_service_name = "BackingDB";
+
     auto create_mongo_service_resp = services.post_json({
-        {"name", "BackingDB"},
+        {"name", mongo_service_name},
         {"type", "mongodb"},
         {"config",
          {
@@ -676,7 +678,7 @@ std::string create_app(const AppCreateConfig& config)
             continue;
         }
 
-        BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
+        BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                      [&](const Property& prop) {
                                          return prop.name == "_id" || prop.name == config.partition_key.name;
                                      });
@@ -693,7 +695,7 @@ std::string create_app(const AppCreateConfig& config)
 
         auto rule_id = obj_schema_name_to_id.find(obj_schema.name);
         REALM_ASSERT(rule_id != obj_schema_name_to_id.end());
-        BaasRuleBuilder rule_builder(config.schema, config.partition_key, "BackingDB", config.mongo_dbname,
+        BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                      include_all_props);
         auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
         schema_to_create["_id"] = rule_id->second;
