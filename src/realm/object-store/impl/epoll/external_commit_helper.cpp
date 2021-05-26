@@ -62,6 +62,8 @@ void make_non_blocking(int fd)
 
 // Write a byte to a pipe to notify anyone waiting for data on the pipe.
 // But first consume all bytes in the pipe, since linux may only notify on transition from not ready to ready.
+// If a process dies after reading but before writing, it can consume a pending notification, and possibly prevent
+// other processes from observing it. This is a transient issue and the next notification will work correctly.
 void notify_fd(int fd, bool read_first = true)
 {
     while (true) {
