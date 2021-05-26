@@ -923,16 +923,13 @@ void Realm::delete_files(const std::string& realm_file_path)
             auto file_information = core_file.second;
             auto file_path = file_information.first;
             auto is_folder = file_information.second;
+            // For both files and folders we use the `try_remove` version to delete them because we want
+            // to avoid throwing in case the file does not exist.
+            // The return value can be ignored for the same reason (false if file or folder does not exist).
             if (is_folder) {
-                // The return value can be ignored since non-existing folders do not matter here.
-                // We do need to use the `try_remove_dir_recursive` instead of `remove_dir_recursive` to
-                // not throw in that case.
                 util::try_remove_dir_recursive(file_path); // Throws
             }
             else {
-                // The return value can be ignored since non-existing files do not matter here.
-                // We do need to use the `try_remove_dir_recursive` instead of `remove_dir_recursive` to
-                // not throw in that case.
                 util::File::try_remove(file_path); // Throws
             }
         }
