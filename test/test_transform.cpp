@@ -2199,6 +2199,7 @@ TEST(Transform_SetInsert_Clear_same_path)
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
         set.clear();
+        set.insert(1);
     });
 
     client_3->transaction([&](Peer& c) {
@@ -2221,7 +2222,9 @@ TEST(Transform_SetInsert_Clear_same_path)
         auto set =
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
-        CHECK_EQUAL(set.size(), size_t(0));
+        CHECK_EQUAL(set.size(), size_t(1));
+        CHECK_NOT_EQUAL(set.find(1), size_t(-1));
+        CHECK_EQUAL(set.find(2), size_t(-1));
     }
 }
 
@@ -2243,7 +2246,8 @@ TEST(Transform_SetInsert_Clear_different_paths)
         for (size_t i = 0; i < 2; ++i) {
             auto embedded_obj = obj.get_linklist(link_col_key).create_and_insert_linked_object(i);
             auto set = embedded_obj.get_set<Int>(set_col_key);
-            set.insert(i);
+            set.insert(1);
+            set.insert(2);
         }
     });
 
@@ -2257,6 +2261,7 @@ TEST(Transform_SetInsert_Clear_different_paths)
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
         set.clear();
+        set.insert(1);
     });
 
     client_3->transaction([&](Peer& c) {
@@ -2266,7 +2271,7 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto set =
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
                 .get_set<Int>("set");
-        set.insert(2);
+        set.insert(3);
     });
 
     server->integrate_next_changeset_from(*client_2);
@@ -2282,8 +2287,9 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto set_2 =
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
                 .get_set<Int>("set");
-        CHECK_EQUAL(set_1.size(), size_t(0));
-        CHECK_EQUAL(set_2.size(), size_t(2));
+        CHECK_NOT_EQUAL(set_1.find(1), size_t(-1));
+        CHECK_EQUAL(set_1.find(2), size_t(-1));
+        CHECK_EQUAL(set_2.size(), size_t(3));
     }
 }
 
@@ -2319,6 +2325,7 @@ TEST(Transform_SetErase_Clear_same_path)
                 .get_set<Int>("set");
         CHECK_EQUAL(set.size(), size_t(2));
         set.clear();
+        set.insert(2);
     });
 
     client_3->transaction([&](Peer& c) {
@@ -2343,7 +2350,9 @@ TEST(Transform_SetErase_Clear_same_path)
         auto set =
             embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
-        CHECK_EQUAL(set.size(), size_t(0));
+        CHECK_EQUAL(set.size(), size_t(1));
+        CHECK_NOT_EQUAL(set.find(2), size_t(-1));
+        CHECK_EQUAL(set.find(1), size_t(-1));
     }
 }
 
