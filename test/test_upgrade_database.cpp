@@ -945,8 +945,7 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 1000)
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 4 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1085,8 +1084,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 6 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1129,8 +1127,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 7 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1174,8 +1171,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 9 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1218,8 +1214,7 @@ TEST(Upgrade_Database_6_10)
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     DBRef sg = DB::create(*hist);
@@ -1261,8 +1256,7 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_pk_table.realm";
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
@@ -1311,8 +1305,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
 
@@ -1647,8 +1640,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
@@ -1694,8 +1686,7 @@ TEST_IF(Upgrade_Database_11, REALM_MAX_BPNODE_SIZE == 1000)
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
@@ -1761,8 +1752,7 @@ TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
