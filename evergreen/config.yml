@@ -209,6 +209,27 @@ tasks:
       local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
       content_type: '${content_type|application/x-gzip}'
 
+- name: swift-build-and-test
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        xcrun swift build
+        xcrun swift run ObjectStoreTests
+
 - name: bloaty
   commands:
   - func: "fetch source"
@@ -629,6 +650,7 @@ buildvariants:
   - name: compile_test
     distros:
     - macos-1014
+  - name: swift-build-and-test
 
 - name: macos-1014-release
   display_name: "MacOS 10.14 x86_64 (Release build)"
@@ -644,6 +666,7 @@ buildvariants:
   - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
+  - name: swift-build-and-test
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
