@@ -139,6 +139,10 @@ enum class SchemaMode : uint8_t {
     Manual
 };
 
+// forward decl apparently required for correct interpretation of friend decl
+// inside Realm::Internal class.
+DBRef get_db_from_realm(Realm&);
+std::shared_ptr<Replication>& get_history_from_realm(Realm&);
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
     // A callback function to be called during a migration for Automatic and
@@ -409,6 +413,8 @@ public:
         friend class _impl::RealmCoordinator;
         friend class TestHelper;
         friend class ThreadSafeReference;
+        friend DBRef get_db_from_realm(Realm&);
+        friend std::shared_ptr<Replication>& get_history_from_realm(Realm&);
 
         static Transaction& get_transaction(Realm& realm)
         {
@@ -428,6 +434,7 @@ public:
         }
 
         static std::shared_ptr<DB>& get_db(Realm& realm);
+        static std::shared_ptr<Replication>& get_history(Realm& realm);
         static void begin_read(Realm&, VersionID);
     };
 
@@ -490,6 +497,17 @@ public:
     Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
           MakeSharedTag);
 };
+
+// helper functions for some testcases and a few other uses...
+inline DBRef get_db_from_realm(Realm& realm)
+{
+    return Realm::Internal::get_db(realm);
+}
+
+inline std::shared_ptr<Replication>& get_history_from_realm(Realm& realm)
+{
+    return Realm::Internal::get_history(realm);
+}
 
 class RealmFileException : public std::runtime_error {
 public:

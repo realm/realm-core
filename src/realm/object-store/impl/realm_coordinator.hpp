@@ -208,7 +208,7 @@ public:
 private:
     friend Realm::Internal;
     Realm::Config m_config;
-    std::unique_ptr<Replication> m_history;
+    std::shared_ptr<Replication> m_history;
     std::shared_ptr<DB> m_db;
 
     mutable util::CheckedMutex m_schema_cache_mutex;

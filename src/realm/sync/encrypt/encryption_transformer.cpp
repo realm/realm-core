@@ -110,7 +110,7 @@ void do_transform(const std::string& file_name, const char* read_key, const char
             throw std::runtime_error("Could not transform Realm file with history type 'OutOfRealm' for " +
                                      file_name);
         case Replication::hist_SyncClient: {
-            std::unique_ptr<Replication> reference_history = realm::sync::make_client_replication(file_name);
+            std::shared_ptr<Replication> reference_history = realm::sync::make_client_replication(file_name);
             auto sg = DB::create(*reference_history, DBOptions(read_key));
             success = sg->compact(bump_version_number, write_key);
             break;

@@ -25,6 +25,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <sync/session/session_util.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
 
@@ -189,8 +190,8 @@ static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(st
     std::mutex wait_mutex;
     bool wait_flag(false);
     std::error_code ec;
-    auto& session = *realm.config().sync_config->user->sync_manager()->get_session(realm.config().path,
-                                                                                   *realm.config().sync_config);
+    auto& session = *realm.config().sync_config->user->sync_manager()->get_session(
+        realm.config().path, get_db_from_realm(realm), get_sync_history(realm), *realm.config().sync_config);
     (session.*fn)([&](std::error_code error) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;

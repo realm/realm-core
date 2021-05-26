@@ -69,6 +69,22 @@ inline void spin_runloop(int count = 2)
     });
 }
 
+// a little helper
+inline std::shared_ptr<sync::ClientReplication> get_sync_history(const std::shared_ptr<Realm>& realm)
+{
+    std::shared_ptr<Replication> repl = get_history_from_realm(*realm);
+    auto clr = std::dynamic_pointer_cast<sync::ClientReplication>(repl);
+    REALM_ASSERT(clr);
+    return clr;
+}
+inline std::shared_ptr<sync::ClientReplication> get_sync_history(Realm& realm)
+{
+    std::shared_ptr<Replication> repl = get_history_from_realm(realm);
+    auto clr = std::dynamic_pointer_cast<sync::ClientReplication>(repl);
+    REALM_ASSERT(clr);
+    return clr;
+}
+
 // Convenience function for creating and configuring sync sessions for test use.
 // Many of the optional arguments can be used to pass information about the
 // session back out to the test, or configure the session more precisely.
@@ -97,7 +113,8 @@ sync_session(std::shared_ptr<SyncUser> user, const std::string& path, ErrorHandl
     std::shared_ptr<SyncSession> session;
     {
         auto realm = Realm::get_shared_realm(config);
-        session = user->sync_manager()->get_session(config.path, *config.sync_config);
+        auto db = get_db_from_realm(*realm);
+        session = user->sync_manager()->get_session(db->get_path(), db, get_sync_history(realm), *config.sync_config);
     }
     return session;
 }

@@ -7,7 +7,6 @@
 #include <realm/util/uri.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_info.hpp>
-#include <realm/sync/noinst/client_file_access_cache.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/version.hpp>
 #include <realm/version.hpp>
@@ -21,7 +20,6 @@ using namespace realm::util;
 
 // clang-format off
 using ClientImplBase                  = _impl::ClientImplBase;
-using ClientFileAccessCache           = _impl::ClientFileAccessCache;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -81,8 +79,6 @@ public:
     void run();
 
 private:
-    _impl::ClientFileAccessCache m_file_access_cache;
-    const std::shared_ptr<ChangesetCooker> m_default_changeset_cooker;
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
     util::network::DeadlineTimer m_keep_running_timer;
@@ -236,7 +232,7 @@ public:
     const std::string& get_virt_path() const noexcept override final;
     const std::string& get_signed_access_token() const noexcept override final;
     const std::string& get_realm_path() const noexcept override final;
-    ClientHistoryBase& access_realm() override final;
+    std::shared_ptr<ClientHistoryBase> access_realm() override final;
     util::Optional<std::array<char, 64>> get_encryption_key() const noexcept override final;
     const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
     void on_state_download_progress(uint_fast64_t, uint_fast64_t) override final;
@@ -295,7 +291,7 @@ private:
 // in _impl::ClientImplBase::Connection.
 class SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, std::string realm_path, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<ClientReplication> replication, Session::Config);
 
     ClientImpl& get_client() noexcept;
 
@@ -330,7 +326,10 @@ public:
 
 private:
     ClientImpl& m_client;
-    ClientFileAccessCache::Slot m_file_slot;
+    DBRef m_db;
+    std::shared_ptr<ClientReplication> m_replication;
+
+    // ClientFileAccessCache::Slot m_file_slot;
 
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -423,8 +422,6 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    static auto choose_cooker(ClientImpl& client, const Session::Config& config) -> std::shared_ptr<ChangesetCooker>;
-
     static ClientImplBase::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
 
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
@@ -439,6 +436,7 @@ private:
     void on_connection_state_changed(ConnectionState, const ErrorInfo*);
 
     void report_progress();
+    std::shared_ptr<ClientReplication> get_replication();
     void change_server_endpoint(ServerEndpoint);
 
     friend class SessionWrapperQueue;
@@ -523,9 +521,7 @@ inline SessionWrapperQueue::~SessionWrapperQueue()
 // ################ ClientImpl ################
 
 inline ClientImpl::ClientImpl(Client::Config config)
-    : ClientImplBase{make_client_impl_base_config(config)}                            // Throws
-    , m_file_access_cache{config.max_open_files, config.disable_sync_to_disk, logger} // Throws
-    , m_default_changeset_cooker{std::move(config.changeset_cooker)}
+    : ClientImplBase{make_client_impl_base_config(config)} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -1057,12 +1053,12 @@ const std::string& SessionImpl::get_signed_access_token() const noexcept
 
 const std::string& SessionImpl::get_realm_path() const noexcept
 {
-    return m_wrapper.m_file_slot.realm_path;
+    return m_wrapper.m_db->get_path();
 }
 
-ClientReplicationBase& SessionImpl::access_realm()
+std::shared_ptr<ClientReplicationBase> SessionImpl::access_realm()
 {
-    return m_wrapper.m_file_slot.access().history;
+    return std::dynamic_pointer_cast<ClientReplicationBase>(m_wrapper.m_replication);
 }
 
 util::Optional<std::array<char, 64>> SessionImpl::get_encryption_key() const noexcept
@@ -1126,10 +1122,11 @@ void SessionImpl::on_resumed()
 
 // ################ SessionWrapper ################
 
-SessionWrapper::SessionWrapper(ClientImpl& client, std::string realm_path, Session::Config config)
+SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<ClientReplication> replication,
+                               Session::Config config)
     : m_client{client}
-    , m_file_slot{client.m_file_access_cache, std::move(realm_path), config.encryption_key,
-                  choose_cooker(client, config)}
+    , m_db(db)
+    , m_replication(replication)
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -1424,8 +1421,8 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         std::unique_ptr<SessionImpl> sess_2 =
             std::make_unique<SessionImpl>(*this, conn, m_session_impl_config); // Throws
         SessionImpl& sess = *sess_2;
-        sess.logger.detail("Binding '%1' to '%2'", m_file_slot.realm_path, m_virt_path); // Throws
-        conn.activate_session(std::move(sess_2));                                        // Throws
+        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path); // Throws
+        conn.activate_session(std::move(sess_2));                                  // Throws
 
         m_actualized = true;
         m_sess = &sess;
@@ -1467,7 +1464,7 @@ void SessionWrapper::finalize()
     // The Realm file can be closed now, as no access to the Realm file is
     // suppoed to happen on behalf of a session after initiation of
     // deactivation.
-    m_file_slot.proper_close(); // Throws
+    m_db.reset();
 
     // All outstanding wait operations must be canceled
     while (!m_upload_completion_handlers.empty()) {
@@ -1494,7 +1491,7 @@ void SessionWrapper::finalize()
 // Should only be called during destruction of the client object.
 void SessionWrapper::close_file_slot() noexcept
 {
-    m_file_slot.close();
+    m_db.reset();
 }
 
 
@@ -1511,15 +1508,6 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
 {
     if (m_sync_transact_handler)
         m_sync_transact_handler(old_version, new_version); // Throws
-}
-
-
-auto SessionWrapper::choose_cooker(ClientImpl& client, const Session::Config& config)
-    -> std::shared_ptr<ChangesetCooker>
-{
-    if (config.changeset_cooker)
-        return config.changeset_cooker;
-    return client.m_default_changeset_cooker;
 }
 
 
@@ -1653,6 +1641,10 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Er
     }
 }
 
+std::shared_ptr<ClientReplication> SessionWrapper::get_replication()
+{
+    return m_replication;
+}
 
 void SessionWrapper::report_progress()
 {
@@ -1666,9 +1658,9 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    ClientReplication& history = m_file_slot.access().history; // Throws
-    history.get_upload_download_bytes(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
-                                      snapshot_version);
+    auto history = get_replication(); // Throws
+    history->get_upload_download_bytes(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
+                                       snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total
     // size of the history. From protocol version 26, downloadable_bytes
@@ -1732,7 +1724,7 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
         std::unique_ptr<SessionImpl> new_sess_2 =
             std::make_unique<SessionImpl>(*this, new_conn, m_session_impl_config); // Throws
         SessionImpl& new_sess = *new_sess_2;
-        new_sess.logger.detail("Rebinding '%1' to '%2'", m_file_slot.realm_path,
+        new_sess.logger.detail("Rebinding '%1' to '%2'", m_db->get_path(),
                                m_virt_path);              // Throws
         new_conn.activate_session(std::move(new_sess_2)); // Throws
 
@@ -1863,15 +1855,16 @@ public:
 
 class Session::Impl : public SessionWrapper {
 public:
-    Impl(ClientImpl& client, std::string realm_path, Config config)
-        : SessionWrapper{client, std::move(realm_path), std::move(config)} // Throws
+    Impl(ClientImpl& client, std::shared_ptr<DB> db, std::shared_ptr<ClientReplication> replication, Config config)
+        : SessionWrapper{client, std::move(db), replication, std::move(config)} // Throws
     {
     }
 
-    static Impl* make_session(ClientImpl& client, std::string realm_path, Config config)
+    static Impl* make_session(ClientImpl& client, std::shared_ptr<DB> db,
+                              std::shared_ptr<ClientReplication> replication, Config config)
     {
         util::bind_ptr<Impl> sess;
-        sess.reset(new Impl{client, std::move(realm_path), std::move(config)}); // Throws
+        sess.reset(new Impl{client, std::move(db), replication, std::move(config)}); // Throws
         // The reference count passed back to the application is implicitly
         // owned by a naked pointer. This is done to avoid exposing
         // implementation details through the header file (that is, through the
@@ -1927,8 +1920,9 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, std::string realm_path, Config config)
-    : m_impl{Impl::make_session(*client.m_impl, std::move(realm_path), std::move(config))} // Throws
+Session::Session(Client& client, std::shared_ptr<DB> db, std::shared_ptr<ClientReplication> replication,
+                 Config config)
+    : m_impl{Impl::make_session(*client.m_impl, std::move(db), replication, std::move(config))} // Throws
 {
 }
 

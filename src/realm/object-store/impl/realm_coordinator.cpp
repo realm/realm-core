@@ -107,9 +107,10 @@ void RealmCoordinator::create_sync_session(bool force_client_resync)
         throw std::logic_error(
             "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
     }
-
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config,
-                                                                             force_client_resync);
+    std::shared_ptr<sync::ClientReplication> history = std::dynamic_pointer_cast<sync::ClientReplication>(m_history);
+    REALM_ASSERT(history);
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(
+        m_config.path, m_db, history, *m_config.sync_config, force_client_resync);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(
@@ -204,10 +205,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
-                                                config.path);
-            }
-            if (m_config.sync_config->transformer != config.sync_config->transformer) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.",
                                                 config.path);
             }
             if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {

@@ -1795,8 +1795,8 @@ void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_byte
     IntegrationError error = {};
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         VersionInfo version_info;
-        ClientHistoryBase& history = access_realm(); // Throws
-        success = integrate_changesets(history, m_progress, downloadable_bytes, received_changesets, version_info,
+        auto history = access_realm(); // Throws
+        success = integrate_changesets(*history, m_progress, downloadable_bytes, received_changesets, version_info,
                                        error); // Throws
         client_version = version_info.realm_version;
     }
@@ -1909,8 +1909,8 @@ void Session::activate()
         }
 
         if (!m_state_download_in_progress) {
-            const ClientHistoryBase& history = access_realm();                             // Throws
-            history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+            auto history = access_realm();                                                  // Throws
+            history->get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -2132,10 +2132,10 @@ void Session::send_client_version_request_message()
 
     SaltedFileIdent client_file_ident;
     {
-        version_type current_client_version;                                     // Dummy
-        SyncProgress progress;                                                   // Dummy
-        const ClientHistoryBase& history = access_realm();                       // Throws
-        history.get_status(current_client_version, client_file_ident, progress); // Throws
+        version_type current_client_version;                                      // Dummy
+        SyncProgress progress;                                                    // Dummy
+        auto history = access_realm();                                            // Throws
+        history->get_status(current_client_version, client_file_ident, progress); // Throws
     }
 
     m_client_version_request_message_sent = true;
@@ -2224,12 +2224,12 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    const ClientHistoryBase& history = access_realm(); // Throws
+    auto history = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    history.find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
-                                       locked_server_version); // Throws
+    history->find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+                                        locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
         if (REALM_UNLIKELY(m_disable_empty_upload))
@@ -2440,9 +2440,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
             m_client_state_download->set_salted_file_ident(client_file_ident);
         }
         else {
-            ClientHistoryBase& history = access_realm(); // Throws
+            auto history = access_realm(); // Throws
             bool fix_up_object_ids = true;
-            history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+            history->set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
         }
     }
 
@@ -2562,8 +2562,8 @@ void Session::receive_state_message(version_type server_version, salt_type serve
         m_state_download_in_progress = false;
 
         SaltedFileIdent client_file_ident;
-        const ClientHistoryBase& history = access_realm();                           // Throws
-        history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+        auto history = access_realm();                                                // Throws
+        history->get_status(m_last_version_available, client_file_ident, m_progress); // Throws
         REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
         REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
         REALM_ASSERT(m_progress.latest_server_version.version == server_version);
