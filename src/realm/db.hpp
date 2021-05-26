@@ -22,6 +22,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <unordered_map>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
