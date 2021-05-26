@@ -39,7 +39,7 @@ set(CORE_TEST_SOURCES
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
-	test_db.cpp
+    test_db.cpp
     test_decimal128.cpp
     test_destroy_guard.cpp
     test_dictionary.cpp
