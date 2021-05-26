@@ -1020,18 +1020,16 @@ TEST_CASE("Realm::delete_files()") {
     util::File(path + ".log", util::File::mode_Write);
     util::File(path + ".log_a", util::File::mode_Write);
     util::File(path + ".log_b", util::File::mode_Write);
-    util::File(path + ".realm.backup", util::File::mode_Write);
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
-        REQUIRE(Realm::delete_files(path));
+        Realm::delete_files(path);
         REQUIRE_FALSE(util::File::exists(path));
         REQUIRE_FALSE(util::File::exists(path + ".management"));
         REQUIRE_FALSE(util::File::exists(path + ".note"));
         REQUIRE_FALSE(util::File::exists(path + ".log"));
         REQUIRE_FALSE(util::File::exists(path + ".log_a"));
         REQUIRE_FALSE(util::File::exists(path + ".log_b"));
-        REQUIRE_FALSE(util::File::exists(path + ".realm.backup"));
 
         // Deleting the .lock file is not safe. It must still exist.
         REQUIRE(util::File::exists(path + ".lock"));
@@ -1046,7 +1044,6 @@ TEST_CASE("Realm::delete_files()") {
         REQUIRE(util::File::exists(path + ".log"));
         REQUIRE(util::File::exists(path + ".log_a"));
         REQUIRE(util::File::exists(path + ".log_b"));
-        REQUIRE(util::File::exists(path + ".realm.backup"));
     }
 }
 

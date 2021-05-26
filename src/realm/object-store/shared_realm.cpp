@@ -910,14 +910,19 @@ void Realm::close()
     m_coordinator = nullptr;
 }
 
-bool Realm::delete_files(const std::string& realm_file_path)
+void Realm::delete_files(const std::string& realm_file_path)
 {
-    const auto& core_files =
-        DB::get_core_files(realm_file_path, DB::CoreFileType::StateFiles | DB::CoreFileType::TemporaryFiles);
+    auto core_files = DB::get_core_files(realm_file_path);
     auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
-        for (const auto& file : core_files) {
-            const auto& file_path = file.first;
-            const auto& is_folder = file.second;
+        for (const auto& core_file : core_files) {
+            auto file_type = core_file.first;
+            if (file_type == DB::CoreFileType::Lock) {
+                // The lock cannot be safely deleted here since it is used by `call_with_lock` itself.
+                continue;
+            }
+            auto file_information = core_file.second;
+            auto file_path = file_information.first;
+            auto is_folder = file_information.second;
             if (is_folder) {
                 // The return value can be ignored since non-existing folders do not matter here.
                 // We do need to use the `try_remove_dir_recursive` instead of `remove_dir_recursive` to
@@ -935,8 +940,6 @@ bool Realm::delete_files(const std::string& realm_file_path)
     if (!lock_successful) {
         throw DeleteOnOpenRealmException();
     }
-
-    return true;
 }
 
 AuditInterface* Realm::audit_context() const noexcept

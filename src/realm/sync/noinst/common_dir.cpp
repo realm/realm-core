@@ -4,13 +4,15 @@
 
 using namespace realm;
 
-void _impl::remove_realm_file(const std::string& real_path)
+void _impl::remove_realm_file(const std::string& realm_path)
 {
-    const auto& core_files = DB::get_core_files(real_path, DB::CoreFileType::All);
-    for (const auto& pair : core_files) {
-        if (pair.second)
-            util::try_remove_dir_recursive(pair.first);
+    const auto& core_files = DB::get_core_files(realm_path);
+    for (const auto& file_information : core_files) {
+        const auto& is_folder = file_information.second.second;
+        const auto& file_path = file_information.second.first;
+        if (is_folder)
+            util::try_remove_dir_recursive(file_path);
         else
-            util::File::try_remove(pair.first);
+            util::File::try_remove(file_path);
     }
 }

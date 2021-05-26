@@ -358,32 +358,27 @@ public:
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
 
     enum CoreFileType : uint64_t {
-        Lock = 1,
-        Storage = 2,
-        Management = 4,
-        Note = 8,
-        Log = 16,
-        LogA = 32, // This is a legacy version of `Log`.
-        LogB = 64, // This is a legacy version of `Log`.
-        Backup = 128,
-
-        StateFiles = Storage | Management,
-        TemporaryFiles = Note | Log | LogA | LogB | Backup,
-        All = Lock | Storage | Management | Note | Log | LogA | LogB | Backup
+        Lock,
+        Storage,
+        Management,
+        Note,
+        Log,
+        LogA, // This is a legacy version of `Log`.
+        LogB, // This is a legacy version of `Log`.
     };
-    // Return a list of files and directories core may use of the given realm file path.
-    // The first element of the pair in the returned list is the path string, the
-    // second one is to indicate the path is a directory or not.
-    // It is safe to delete those returned files/directories in the call_with_lock's callback except for the lock
-    // itself.
+    /// Return a list of files and directories core may use in the given realm file path.
+    /// The first element of the pair in the returned list is the path as string,
+    /// the second one indicates if the path is a directory or not.
+    /// It is safe to delete those returned files/directories in the call_with_lock's callback except for the lock
+    /// itself.
     ///
-    /// \param realm_path If provided the full path including the given path will be returned by this function.
-    /// \param core_file_type A list of files that should be returned.
+    /// \param realm_path If provided the full path to the file including
+    ///                   the given path will be returned by this function.
     ///
-    /// \return A list of core files depending on the given `core_file_type` along with the information about
-    ///         this part being a folder or not (second part of the pair).
-    static std::vector<std::pair<std::string, bool>>
-    get_core_files(const std::string& realm_path = "", uint64_t core_file_type = CoreFileType::StateFiles);
+    /// \return A map of all core files, providing the path (first) and an indicator
+    ///         if they are a folder or not (second).
+    static std::unordered_map<CoreFileType, std::pair<std::string, bool>>
+    get_core_files(const std::string& realm_path = "");
 
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?

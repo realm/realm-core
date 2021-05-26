@@ -74,8 +74,8 @@ bool try_migrate_file(const std::string original_path, const std::string& new_pa
 void migrate_file_safely(const std::string& realm_file, const std::string& temp_file_1,
                          const std::string& temp_file_2, const std::string& backup_file, util::Logger& logger)
 {
-    const auto& core_files = DB::get_core_files(realm_file, DB::CoreFileType::Lock);
-    std::string lock_file = core_files[0].first;        // Throws
+    auto core_files = DB::get_core_files(realm_file);
+    std::string lock_file = core_files[DB::CoreFileType::Lock].first; // Throws
     util::File lock{lock_file, util::File::mode_Write}; // Throws
     lock.lock_exclusive();                              // Throws
     util::File::UnlockGuard ug{lock};

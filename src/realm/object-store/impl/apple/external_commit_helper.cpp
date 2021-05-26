@@ -121,17 +121,17 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     std::string path;
     std::string temp_dir = util::normalize_dir(parent.get_config().fifo_files_fallback_path);
     std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
-    const auto& core_files = DB::get_core_files("", DB::CoreFileType::Note);
-    path = parent.get_path() + core_files[0].first;
+    const auto& core_files = DB::get_core_files();
+    const auto& note_file = core_files[DB::CoreFileType::Note].first
+    path = parent.get_path() + note_file;
     bool fifo_created = realm::util::try_create_fifo(path);
     if (!fifo_created && !temp_dir.empty()) {
         path =
-            util::format("%1realm_%2%3", temp_dir, std::hash<std::string>()(parent.get_path()), core_files[0].first);
+            util::format("%1realm_%2%3", temp_dir, std::hash<std::string>()(parent.get_path()), note_file);
         fifo_created = realm::util::try_create_fifo(path);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path = util::format("%1realm_%2%3", sys_temp_dir, std::hash<std::string>()(parent.get_path()),
-                            core_files[0].first);
+        path = util::format("%1realm_%2%3", sys_temp_dir, std::hash<std::string>()(parent.get_path()), note_file);
         realm::util::create_fifo(path);
     }
 

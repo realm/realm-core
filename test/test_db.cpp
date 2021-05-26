@@ -29,84 +29,43 @@ auto extension_note = ".note";
 auto extension_log = ".log";
 auto extension_log_a = ".log_a";
 auto extension_log_b = ".log_b";
-auto extension_backup = ".realm.backup";
 
 TEST(DB_getCoreFiles_default)
 {
     auto core_files = DB::get_core_files();
-    CHECK_EQUAL(core_files.size(), 2);
-    CHECK_EQUAL(core_files[0].first, extension_storage);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, extension_management);
-    CHECK(core_files[1].second);
+    CHECK_EQUAL(core_files.size(), 7);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].first, extension_lock);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].first, extension_storage);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Management].first, extension_management);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Management].second, true);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Note].first, extension_note);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Note].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Log].first, extension_log);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Log].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].first, extension_log_a);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].first, extension_log_b);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].second, false);
 }
 
 TEST(DB_getCoreFiles_adding_path)
 {
     auto core_files = DB::get_core_files(path);
-    CHECK_EQUAL(core_files.size(), 2);
-    CHECK_EQUAL(core_files[0].first, path + extension_storage);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, path + extension_management);
-    CHECK(core_files[1].second);
-}
-
-TEST(DB_getCoreFiles_StateFiles)
-{
-    auto core_files = DB::get_core_files(path, DB::CoreFileType::StateFiles);
-    CHECK_EQUAL(core_files.size(), 2);
-    CHECK_EQUAL(core_files[0].first, path + extension_storage);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, path + extension_management);
-    CHECK(core_files[1].second);
-}
-
-TEST(DB_getCoreFiles_TemporaryFiles)
-{
-    auto core_files = DB::get_core_files(path, DB::CoreFileType::TemporaryFiles);
-    CHECK_EQUAL(core_files.size(), 5);
-    CHECK_EQUAL(core_files[0].first, path + extension_note);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, path + extension_log);
-    CHECK_NOT(core_files[1].second);
-    CHECK_EQUAL(core_files[2].first, path + extension_log_a);
-    CHECK_NOT(core_files[2].second);
-    CHECK_EQUAL(core_files[3].first, path + extension_log_b);
-    CHECK_NOT(core_files[3].second);
-    CHECK_EQUAL(core_files[4].first, path + extension_backup);
-    CHECK_NOT(core_files[4].second);
-}
-
-TEST(DB_getCoreFiles_CombinedFlags)
-{
-    auto core_files = DB::get_core_files(path, DB::CoreFileType::StateFiles | DB::CoreFileType::Lock);
-    CHECK_EQUAL(core_files.size(), 3);
-    CHECK_EQUAL(core_files[0].first, path + extension_lock);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, path + extension_storage);
-    CHECK_NOT(core_files[1].second);
-    CHECK_EQUAL(core_files[2].first, path + extension_management);
-    CHECK(core_files[2].second);
-}
-
-TEST(DB_getCoreFiles_AllFiles)
-{
-    auto core_files = DB::get_core_files(path, DB::CoreFileType::All);
-    CHECK_EQUAL(core_files.size(), 8);
-    CHECK_EQUAL(core_files[0].first, path + extension_lock);
-    CHECK_NOT(core_files[0].second);
-    CHECK_EQUAL(core_files[1].first, path + extension_storage);
-    CHECK_NOT(core_files[1].second);
-    CHECK_EQUAL(core_files[2].first, path + extension_management);
-    CHECK(core_files[2].second);
-    CHECK_EQUAL(core_files[3].first, path + extension_note);
-    CHECK_NOT(core_files[3].second);
-    CHECK_EQUAL(core_files[4].first, path + extension_log);
-    CHECK_NOT(core_files[4].second);
-    CHECK_EQUAL(core_files[5].first, path + extension_log_a);
-    CHECK_NOT(core_files[5].second);
-    CHECK_EQUAL(core_files[6].first, path + extension_log_b);
-    CHECK_NOT(core_files[6].second);
-    CHECK_EQUAL(core_files[7].first, path + extension_backup);
-    CHECK_NOT(core_files[7].second);
+    CHECK_EQUAL(core_files.size(), 7);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].first, path + extension_lock);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].first, path + extension_storage);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Management].first, path + extension_management);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Management].second, true);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Note].first, path + extension_note);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Note].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Log].first, path + extension_log);
+    CHECK_EQUAL(core_files[DB::CoreFileType::Log].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].first, path + extension_log_a);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].second, false);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].first, path + extension_log_b);
+    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].second, false);
 }

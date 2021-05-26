@@ -554,8 +554,8 @@ private:
 
 void save_workdir_locking_debug_info(const std::string& lockfile_path, bool could_lock)
 {
-    const auto& core_files = DB::get_core_files(lockfile_path, DB::CoreFileType::Log);
-    std::string path = core_files[0].first;
+    auto core_files = DB::get_core_files(lockfile_path);
+    std::string path = core_files[DB::CoreFileType::Log].first;
     util::File file{path, util::File::mode_Append}; // Throws
     util::File::Streambuf streambuf{&file};         // Throws
     std::ostream out{&streambuf};                   // Throws
@@ -576,8 +576,8 @@ void save_workdir_locking_debug_info(const std::string& lockfile_path, bool coul
 
 std::string load_workdir_locking_debug_info(const std::string& lockfile_path)
 {
-    const auto& core_files = DB::get_core_files(lockfile_path, DB::CoreFileType::Log);
-    std::string path = core_files[0].first;
+    auto core_files = DB::get_core_files(lockfile_path);
+    std::string path = core_files[DB::CoreFileType::Log].first;
     util::File file{path};                     // Throws
     ReadAheadBuffer read_ahead_buffer;         // Throws
     std::vector<std::string> lines;
