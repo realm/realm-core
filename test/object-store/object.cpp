@@ -713,33 +713,6 @@ TEST_CASE("object") {
                             object_origin.set_property_value(d, "link", util::Any(object_target2));
                         });
                     }
-                    SECTION("adding a new origin pointing to the target "
-                            "while observing target table 'table2's backlink "
-                            "-> DOES send a notification") {
-                        auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
-                        write([&] {
-                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
-                            Object object_origin2(r, obj_origin2);
-                            object_origin2.set_property_value(d, "link", util::Any(object_target));
-                        });
-                        REQUIRE_INDICES(change.modifications, 0);
-                        REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
-                    }
-                    SECTION("adding a new origin pointing to the target "
-                            "while observing target table 'table2', property 'value' on origin "
-                            "-> DOES send a notification") {
-                        auto token_with_backlink =
-                            require_change(object_target, key_path_array_target_to_origin_value);
-                        write([&] {
-                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
-                            Object object_origin2(r, obj_origin2);
-                            object_origin2.set_property_value(d, "link", util::Any(object_target));
-                        });
-                        REQUIRE_INDICES(change.modifications, 0);
-                        REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
-                    }
                 }
 
                 SECTION("some callbacks filtered") {
@@ -767,35 +740,6 @@ TEST_CASE("object") {
                             Object object_target2(r, obj_target2);
                             object_origin.set_property_value(d, "link", util::Any(object_target2));
                         });
-                    }
-                    SECTION("adding a new origin pointing to the target "
-                            "while observing target table 'table2's backlink "
-                            "-> DOES send a notification") {
-                        auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
-                        auto token_without_filter = require_no_change(object_target);
-                        write([&] {
-                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
-                            Object object_origin2(r, obj_origin2);
-                            object_origin2.set_property_value(d, "link", util::Any(object_target));
-                        });
-                        REQUIRE_INDICES(change.modifications, 0);
-                        REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
-                    }
-                    SECTION("adding a new origin pointing to the target "
-                            "while observing target table 'table2', property 'value' on origin "
-                            "-> DOES send a notification") {
-                        auto token_with_backlink =
-                            require_change(object_target, key_path_array_target_to_origin_value);
-                        auto token_without_filter = require_no_change(object_target);
-                        write([&] {
-                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
-                            Object object_origin2(r, obj_origin2);
-                            object_origin2.set_property_value(d, "link", util::Any(object_target));
-                        });
-                        REQUIRE_INDICES(change.modifications, 0);
-                        REQUIRE(change.columns.size() == 1);
-                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
                     }
                 }
             }

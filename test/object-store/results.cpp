@@ -2513,20 +2513,6 @@ TEST_CASE("notifications: results") {
                         REQUIRE(notification_calls_backlink_to_value == 1);
                         REQUIRE(collection_change_set_backlink_to_value.empty());
                     }
-
-                    SECTION("adding new backlinked object 'object' "
-                            "-> DOES send a notification") {
-                        write([&] {
-                            Obj obj = table->create_object();
-                            Object object(r, obj);
-                            object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
-                        });
-                        REQUIRE(notification_calls_backlink_to_value == 2);
-                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
-                    }
                 }
 
                 SECTION("some callbacks have filters") {
@@ -2579,92 +2565,6 @@ TEST_CASE("notifications: results") {
                         REQUIRE(collection_change_set_backlink_to_value.empty());
                         REQUIRE(notification_calls_without_filter == 1);
                         REQUIRE(collection_change_set_without_filter.empty());
-                    }
-
-                    SECTION("adding new backlinked object 'object' "
-                            "-> DOES send a notification") {
-                        write([&] {
-                            Obj obj = table->create_object();
-                            Object object(r, obj);
-                            object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
-                        });
-                        REQUIRE(notification_calls_backlink_to_value == 2);
-                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
-                    }
-                }
-            }
-
-            SECTION("keypath filter on related table 'linked to object's backlink to 'object'") {
-                SECTION("all callbacks have filters") {
-                    auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
-                            collection_change_set_backlink_to_value = collection_change_set;
-                            notification_calls_backlink_to_value++;
-                        },
-                        key_path_array_backlink);
-                    // We advance and notify once to have a clean start.
-                    advance_and_notify(*r);
-                    // Check the initial state after notifying once since this it what we're comparing against
-                    // later.
-                    REQUIRE(notification_calls_backlink_to_value == 1);
-                    REQUIRE(collection_change_set_backlink_to_value.empty());
-
-                    SECTION("adding new backlinked object 'object' "
-                            "-> DOES send a notification") {
-                        write([&] {
-                            Obj obj = table->create_object();
-                            Object object(r, obj);
-                            object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
-                        });
-                        REQUIRE(notification_calls_backlink_to_value == 2);
-                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
-                    }
-                }
-
-                SECTION("some callbacks have filters") {
-                    auto token_backlink_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
-                            collection_change_set_backlink_to_value = collection_change_set;
-                            notification_calls_backlink_to_value++;
-                        },
-                        key_path_array_backlink);
-                    int notification_calls_without_filter = 0;
-                    CollectionChangeSet collection_change_set_without_filter;
-                    auto token_backlink_second_value = results_linked_to.add_notification_callback(
-                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
-                            REQUIRE_FALSE(error);
-                            collection_change_set_without_filter = collection_change_set;
-                            notification_calls_without_filter++;
-                        });
-                    // We advance and notify once to have a clean start.
-                    advance_and_notify(*r);
-                    // Check the initial state after notifying once since this it what we're comparing against
-                    // later.
-                    REQUIRE(notification_calls_backlink_to_value == 1);
-                    REQUIRE(collection_change_set_backlink_to_value.empty());
-                    REQUIRE(notification_calls_without_filter == 1);
-                    REQUIRE(collection_change_set_without_filter.empty());
-
-                    SECTION("adding new backlinked object 'object' "
-                            "-> DOES send a notification") {
-                        write([&] {
-                            Obj obj = table->create_object();
-                            Object object(r, obj);
-                            object.set_property_value(test_context, "link",
-                                                      util::Any(linked_to_table->get_object(target_keys[0])));
-                        });
-                        REQUIRE(notification_calls_backlink_to_value == 2);
-                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
                     }
                 }
             }
