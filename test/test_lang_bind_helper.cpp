@@ -5853,38 +5853,6 @@ TEST(LangBindHelper_callWithLock)
     CHECK(DB::call_with_lock(path, callback));
 }
 
-TEST(LangBindHelper_getCoreFiles)
-{
-    TEST_DIR(dir);
-    std::string realm_path = std::string(dir) + "/test.realm";
-
-    {
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(realm_path));
-        DBRef sg_w = DB::create(*hist_w);
-        WriteTransaction wt(sg_w);
-        wt.commit();
-    }
-
-    auto core_files = DB::get_core_files(realm_path);
-    CHECK(core_files.size() > 0);
-
-    std::string file;
-    DirScanner scanner(dir);
-    while (scanner.next(file)) {
-        const std::string lock_suffix = ".lock";
-        if (file.size() >= lock_suffix.size() &&
-            file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
-            continue;
-        }
-        std::string path(std::string(dir) + "/" + file);
-        auto file_pair = std::make_pair(path, File::is_dir(path));
-        CHECK(core_files.size() != 0);
-        core_files.erase(std::remove(core_files.begin(), core_files.end(), file_pair), core_files.end());
-    }
-
-    CHECK(core_files.size() == 0);
-}
-
 TEST(LangBindHelper_AdvanceReadCluster)
 {
     SHARED_GROUP_TEST_PATH(path);
