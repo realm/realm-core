@@ -1443,7 +1443,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            tr->write(file, write_key, info->latest_version_number + incr, true); // Throws
+            Group::DefaultTableWriter writer;
+            tr->write(file, write_key, info->latest_version_number + incr, writer); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
@@ -1500,24 +1501,35 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
 void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
 {
-    // group::write() will throw if the file already exists.
-    // To prevent this, we have to remove the file (should it exist)
-    // before calling group::write().
-    if (allow_overwrite)
-        File::try_remove(path);
-
     SharedInfo* info = m_file_map.get_addr();
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
 
-    auto tr = start_write();
+    auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
             throw std::runtime_error("Could not write file as not all client changes are integrated in server");
         }
-        tr->remove_sync_file_id();
     }
-    tr->write(path, write_key, info->latest_version_number, true);
-    tr->rollback();
+
+    class NoClientFileIdWriter : public Group::DefaultTableWriter {
+    public:
+        NoClientFileIdWriter()
+            : Group::DefaultTableWriter(true)
+        {
+        }
+        HistoryInfo write_history(_impl::OutputStream& out) override
+        {
+            auto hist = Group::DefaultTableWriter::write_history(out);
+            hist.sync_file_id = 0;
+            return hist;
+        }
+    } writer;
+
+    File file;
+    file.open(path, File::access_ReadWrite, allow_overwrite ? File::create_Auto : File::create_Must, 0);
+    file.resize(0);
+
+    tr->write(file, write_key, info->latest_version_number, writer);
 }
 
 uint_fast64_t DB::get_number_of_versions()

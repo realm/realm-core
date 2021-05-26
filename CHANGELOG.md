@@ -8,6 +8,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
+* Fixed build failure with gcc-11
 
 ### Breaking changes
 * None.
@@ -15,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* DB::write_copy will not use write transaction
 
 ----------------------------------------------
 
