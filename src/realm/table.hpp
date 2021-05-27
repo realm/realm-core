@@ -247,6 +247,7 @@ public:
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return ObjKey for object identified by id. If objects does not exist, return null key
+    // Important: This function must not be called for tables with primary keys.
     ObjKey get_objkey(GlobalKey id) const;
     // Return key for existing object or return unresolved key.
     // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
@@ -303,7 +304,7 @@ public:
     // Invalidate object. To be used by the Sync client.
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
-    void invalidate_object(ObjKey key);
+    ObjKey invalidate_object(ObjKey key);
     Obj get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
@@ -346,7 +347,7 @@ public:
     size_t get_index_in_group() const noexcept;
     TableKey get_key() const noexcept;
 
-    uint32_t allocate_sequence_number();
+    uint64_t allocate_sequence_number();
     // Used by upgrade
     void set_sequence_number(uint64_t seq);
     void set_collision_map(ref_type ref);
@@ -685,7 +686,7 @@ private:
     void migrate_indexes(ColKey pk_col_key);
     void migrate_subspec();
     void create_columns();
-    bool migrate_objects(ColKey pk_col_key); // Returns true if there are no links to migrate
+    bool migrate_objects(); // Returns true if there are no links to migrate
     void migrate_links();
     void finalize_migration(ColKey pk_col_key);
 
@@ -716,6 +717,7 @@ private:
     void erase_root_column(ColKey col_key);
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
+    void do_add_search_index(ColKey col_key);
 
     bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
@@ -723,9 +725,8 @@ private:
     ColKey find_or_add_backlink_column(ColKey origin_col_key, TableKey origin_table);
     void do_set_primary_key_column(ColKey col_key);
     void validate_column_is_unique(ColKey col_key) const;
-    void rebuild_table_with_pk_column();
 
-    ObjKey get_next_key();
+    ObjKey get_next_valid_key();
     /// Some Object IDs are generated as a tuple of the client_file_ident and a
     /// local sequence number. This function takes the next number in the
     /// sequence for the given table and returns an appropriate globally unique

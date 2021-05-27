@@ -48,10 +48,10 @@ void TransactLogConvenientEncoder::create_object(const Table* t, GlobalKey id)
     m_encoder.create_object(id.get_local_key(0)); // Throws
 }
 
-void TransactLogConvenientEncoder::create_object_with_primary_key(const Table* t, GlobalKey id, Mixed)
+void TransactLogConvenientEncoder::create_object_with_primary_key(const Table* t, ObjKey key, Mixed)
 {
     select_table(t);                                                                       // Throws
-    m_encoder.create_object(_impl::TableFriend::global_to_local_object_id_hashed(*t, id)); // Throws
+    m_encoder.create_object(key);                                                          // Throws
 }
 
 bool TransactLogEncoder::select_table(TableKey key)

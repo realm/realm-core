@@ -173,7 +173,7 @@ TEST(Dictionary_Links)
         lady.remove();
         cmp(dict["Pet"], Mixed());
         CHECK_THROW_ANY(dict.insert("Pet", garfield));
-        CHECK_THROW_ANY(dict.insert("Pet", garfield.get_key()));
+        CHECK_THROW_ANY(dict.insert("Pet", Mixed(ObjKey(27))));
 
         // Reinsert lady
         lady = dogs->create_object_with_primary_key("lady");

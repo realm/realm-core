@@ -3248,13 +3248,6 @@ TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFrom
 
     r->begin_transaction();
 
-    SECTION("front insertion") {
-        for (int i = 0; i < 1000; ++i) {
-            table->create_object_with_primary_key(1000 - i);
-            REQUIRE(results.get<Obj>(0).get<int64_t>(col_value) == 1000 - i);
-        }
-    }
-
     SECTION("append at end") {
         for (int i = 0; i < 1000; ++i) {
             table->create_object_with_primary_key(i);

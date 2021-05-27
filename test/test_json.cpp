@@ -475,8 +475,8 @@ TEST(Xjson_LinkList1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
     auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
     table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
@@ -531,8 +531,8 @@ TEST(Xjson_LinkSet1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
     auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
     table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
@@ -587,8 +587,8 @@ TEST(Xjson_LinkDictionary1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
     auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
     table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
@@ -645,8 +645,8 @@ TEST(Xjson_DictionaryEmbeddedObject1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
     auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
     ColKey col_dict = table1->add_column_dictionary(*table2, "linkA");
 

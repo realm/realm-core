@@ -343,13 +343,13 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 11 || current_file_format_version == 20) {
+        if (current_file_format_version == 22) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
     }
 
-    return 21;
+    return g_current_file_format_version;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -418,7 +418,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 21, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -486,7 +486,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
                 pk_table->migrate_column_info();
                 pk_table->migrate_indexes(ColKey());
                 pk_table->create_columns();
-                pk_table->migrate_objects(ColKey());
+                pk_table->migrate_objects();
                 pk_cols = get_primary_key_columns_from_pk_table(pk_table);
             }
 
@@ -523,7 +523,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_accessors) {
             auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
             if (!progress_status.get<bool>(col_objects)) {
-                bool no_links = k->migrate_objects(pk_cols[k]);
+                bool no_links = k->migrate_objects();
                 progress_status.set(col_objects, true);
                 progress_status.set(col_links, no_links);
                 commit_and_continue_writing();
@@ -549,18 +549,13 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // If we come from a file format version lower than 10, all objects with primary keys
-    // will be upgraded correctly by the above process. In file format 20 we don't have
-    // search index on primary key columns. We need to rebuild the tables to ensure that
-    // the ObjKeys matches the primary key value.
-    if (current_file_format_version > 9 && current_file_format_version < 20 && target_file_format_version >= 20) {
-        auto table_keys = get_table_keys();
-        for (auto k : table_keys) {
-            auto t = get_table(k);
-            if (auto col = t->get_primary_key_column()) {
-                t->remove_search_index(col);
-                t->rebuild_table_with_pk_column();
-            }
+    // Ensure we have search index on all primary key columns. This is idempotent so no
+    // need to check on current_file_format_version
+    auto table_keys = get_table_keys();
+    for (auto k : table_keys) {
+        auto t = get_table(k);
+        if (auto col = t->get_primary_key_column()) {
+            t->do_add_search_index(col);
         }
     }
 
@@ -586,6 +581,7 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 11:
         case 20:
         case 21:
+        case g_current_file_format_version:
             file_format_ok = true;
             break;
     }

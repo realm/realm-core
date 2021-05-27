@@ -277,7 +277,7 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
     }
 }
 
-void SyncReplication::create_object_with_primary_key(const Table* table, GlobalKey oid, Mixed value)
+void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey oid, Mixed value)
 {
     if (table->is_embedded()) {
         // Trying to create an object with a primary key in an embedded table.
