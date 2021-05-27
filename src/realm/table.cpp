@@ -2344,6 +2344,9 @@ ObjKey Table::find_first(ColKey col_key, T value) const
         if (StringIndex* index = get_search_index(col_key)) {
             return index->find_first(value);
         }
+        if (col_key == m_primary_key_col) {
+            return find_primary_key(value);
+        }
     }
 
     ObjKey key;
@@ -3017,7 +3020,24 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    return m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key);
+    if (auto index = m_index_accessors[primary_key_col.get_index().val]) {
+        return index->find_first(primary_key);
+    }
+
+    // This must be file format 11, 20 or 21 as those are the ones we can open in read-only mode
+    // so try the old algorithm
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
+    }
+    return {};
 }
 
 ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
