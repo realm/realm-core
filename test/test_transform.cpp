@@ -2177,13 +2177,14 @@ TEST(Transform_SetInsert_Clear_same_path)
     auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     // Create baseline
+    Mixed pk(1);
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
         auto embedded_table = tr.add_embedded_table("class_Embedded");
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
-        auto obj = table->create_object_with_primary_key(Mixed(1ll));
+        auto obj = table->create_object_with_primary_key(pk);
         auto embedded_obj = obj.get_linklist(link_col_key).create_and_insert_linked_object(0);
         auto set = embedded_obj.get_set<Int>(set_col_key);
         set.insert(1);
@@ -2195,9 +2196,8 @@ TEST(Transform_SetInsert_Clear_same_path)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         set.clear();
         set.insert(1);
     });
@@ -2206,9 +2206,8 @@ TEST(Transform_SetInsert_Clear_same_path)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         set.insert(2);
     });
 
@@ -2219,9 +2218,8 @@ TEST(Transform_SetInsert_Clear_same_path)
         ReadTransaction check_tr(server->shared_group);
         auto table = check_tr.get_table("class_Table");
         auto embedded_table = check_tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         CHECK_EQUAL(set.size(), size_t(1));
         CHECK_NOT_EQUAL(set.find(1), size_t(-1));
         CHECK_EQUAL(set.find(2), size_t(-1));
@@ -2235,6 +2233,7 @@ TEST(Transform_SetInsert_Clear_different_paths)
     auto client_2 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
+    Mixed pk(1);
     // Create baseline
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
@@ -2242,7 +2241,7 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto embedded_table = tr.add_embedded_table("class_Embedded");
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
-        auto obj = table->create_object_with_primary_key(Mixed(1ll));
+        auto obj = table->create_object_with_primary_key(pk);
         for (size_t i = 0; i < 2; ++i) {
             auto embedded_obj = obj.get_linklist(link_col_key).create_and_insert_linked_object(i);
             auto set = embedded_obj.get_set<Int>(set_col_key);
@@ -2257,9 +2256,8 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         set.clear();
         set.insert(1);
     });
@@ -2268,9 +2266,8 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(1))
+                       .get_set<Int>("set");
         set.insert(3);
     });
 
@@ -2282,10 +2279,10 @@ TEST(Transform_SetInsert_Clear_different_paths)
         auto table = check_tr.get_table("class_Table");
         auto embedded_table = check_tr.get_table("class_Embedded");
         auto set_1 =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
+            embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
         auto set_2 =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
+            embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(1))
                 .get_set<Int>("set");
         CHECK_NOT_EQUAL(set_1.find(1), size_t(-1));
         CHECK_EQUAL(set_1.find(2), size_t(-1));
@@ -2301,13 +2298,14 @@ TEST(Transform_SetErase_Clear_same_path)
     auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     // Create baseline
+    Mixed pk(1);
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
         auto embedded_table = tr.add_embedded_table("class_Embedded");
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
-        auto obj = table->create_object_with_primary_key(Mixed(1ll));
+        auto obj = table->create_object_with_primary_key(pk);
         auto embedded_obj = obj.get_linklist(link_col_key).create_and_insert_linked_object(0);
         auto set = embedded_obj.get_set<Int>(set_col_key);
         set.insert(1);
@@ -2320,9 +2318,8 @@ TEST(Transform_SetErase_Clear_same_path)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         CHECK_EQUAL(set.size(), size_t(2));
         set.clear();
         set.insert(2);
@@ -2332,9 +2329,8 @@ TEST(Transform_SetErase_Clear_same_path)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         auto [size, erased] = set.erase(2);
         CHECK_EQUAL(size, 1);
         CHECK(erased);
@@ -2347,9 +2343,8 @@ TEST(Transform_SetErase_Clear_same_path)
         ReadTransaction check_tr(server->shared_group);
         auto table = check_tr.get_table("class_Table");
         auto embedded_table = check_tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         CHECK_EQUAL(set.size(), size_t(1));
         CHECK_NOT_EQUAL(set.find(2), size_t(-1));
         CHECK_EQUAL(set.find(1), size_t(-1));
@@ -2364,13 +2359,14 @@ TEST(Transform_SetErase_Clear_different_paths)
     auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     // Create baseline
+    Mixed pk(1);
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
         auto embedded_table = tr.add_embedded_table("class_Embedded");
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
-        auto obj = table->create_object_with_primary_key(Mixed(1ll));
+        auto obj = table->create_object_with_primary_key(pk);
         for (size_t i = 0; i < 2; ++i) {
             auto embedded_obj = obj.get_linklist(link_col_key).create_and_insert_linked_object(i);
             auto set = embedded_obj.get_set<Int>(set_col_key);
@@ -2385,9 +2381,8 @@ TEST(Transform_SetErase_Clear_different_paths)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
+                       .get_set<Int>("set");
         CHECK_EQUAL(set.size(), size_t(2));
         set.clear();
     });
@@ -2396,9 +2391,8 @@ TEST(Transform_SetErase_Clear_different_paths)
         auto& tr = *c.group;
         auto table = tr.get_table("class_Table");
         auto embedded_table = tr.get_table("class_Embedded");
-        auto set =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
-                .get_set<Int>("set");
+        auto set = embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(1))
+                       .get_set<Int>("set");
         auto erased = set.erase(1).second;
         CHECK(erased);
     });
@@ -2411,10 +2405,10 @@ TEST(Transform_SetErase_Clear_different_paths)
         auto table = check_tr.get_table("class_Table");
         auto embedded_table = check_tr.get_table("class_Embedded");
         auto set_1 =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(0))
+            embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(0))
                 .get_set<Int>("set");
         auto set_2 =
-            embedded_table->get_object(table->get_object_with_primary_key(Mixed(1ll)).get_linklist("embedded").get(1))
+            embedded_table->get_object(table->get_object_with_primary_key(pk).get_linklist("embedded").get(1))
                 .get_set<Int>("set");
         CHECK_EQUAL(set_1.size(), size_t(0));
         CHECK_EQUAL(set_2.size(), size_t(1));
