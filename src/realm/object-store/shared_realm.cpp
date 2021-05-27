@@ -935,7 +935,8 @@ void Realm::delete_files(const std::string& realm_file_path)
         }
     });
     if (!lock_successful) {
-        throw DeleteOnOpenRealmException();
+        auto lock_file_path = core_files[DB::CoreFileType::Lock].first;
+        throw DeleteOnOpenRealmException(lock_file_path);
     }
 }
 

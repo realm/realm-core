@@ -594,8 +594,8 @@ public:
 
 class DeleteOnOpenRealmException : public std::logic_error {
 public:
-    DeleteOnOpenRealmException()
-        : std::logic_error("Cannot delete files of an open Realm.")
+    DeleteOnOpenRealmException(std::string lock_file_path)
+        : std::logic_error("Cannot delete files of an open Realm. " + lock_file_path + " is still in use.")
     {
     }
 };
