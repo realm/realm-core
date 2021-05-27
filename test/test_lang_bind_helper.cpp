@@ -5878,7 +5878,7 @@ TEST(LangBindHelper_getCoreFiles)
         }
         std::string path(std::string(dir) + "/" + file);
         CHECK(core_files.size() != 0);
-        auto is_included_in_core_files = std::any_of(core_files.begin(), core_files.end(), [&](auto core_file){
+        auto is_included_in_core_files = std::any_of(core_files.begin(), core_files.end(), [&](auto core_file) {
             return core_file.second.first == path;
         });
         CHECK(is_included_in_core_files);
