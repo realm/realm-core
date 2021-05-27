@@ -643,7 +643,8 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        auto core_files = DB::get_core_files(file);
+        i = ::open((core_files[DB::CoreFileType::Log].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -762,8 +763,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         dg.release();
         return;
     }
-    m_coordination_dir = path + ".management";
-    m_lockfile_path = path + ".lock";
+    auto core_files = DB::get_core_files(path);
+    m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
+    m_coordination_dir = core_files[DB::CoreFileType::Management].first;
     try_make_dir(m_coordination_dir);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
@@ -2390,7 +2392,8 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto lockfile_path(realm_path + ".lock");
+    auto core_files = DB::get_core_files(realm_path);
+    auto lockfile_path(core_files[DB::CoreFileType::Lock].first);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
@@ -2403,12 +2406,19 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::unordered_map<DB::CoreFileType, std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
 {
-    std::vector<std::pair<std::string, bool>> files;
-    files.emplace_back(std::make_pair(realm_path, false));
-    files.emplace_back(std::make_pair(realm_path + ".management", true));
-    return files;
+    std::unordered_map<CoreFileType, std::pair<std::string, bool>> core_files;
+
+    core_files[DB::CoreFileType::Lock] = std::make_pair(realm_path + ".lock", false);
+    core_files[DB::CoreFileType::Storage] = std::make_pair(realm_path, false);
+    core_files[DB::CoreFileType::Management] = std::make_pair(realm_path + ".management", true);
+    core_files[DB::CoreFileType::Note] = std::make_pair(realm_path + ".note", false);
+    core_files[DB::CoreFileType::Log] = std::make_pair(realm_path + ".log", false);
+    core_files[DB::CoreFileType::LogA] = std::make_pair(realm_path + ".log_a", false);
+    core_files[DB::CoreFileType::LogB] = std::make_pair(realm_path + ".log_b", false);
+
+    return core_files;
 }
 
 void TransactionDeleter(Transaction* t)

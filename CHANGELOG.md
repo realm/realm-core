@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added the functionality to delete files for a given SharedRealm, unlocking  ([realm-dotnet#386](https://github.com/realm/realm-dotnet/issues/386)).
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
