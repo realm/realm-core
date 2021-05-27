@@ -9,7 +9,7 @@
   with a primary key. ([#4522](https://github.com/realm/realm-core/issues/4522))
 
 ### Breaking changes
-* None.
+* The file format is changed in the way that we now - again - have search indexes on primary key columns. This is required as we now stop deriving the ObjKeys from the primary key values, but just use an increasing counter value. This has the effect that all new objects will be created in the same cluster and not be spread out as they would have been before. It also means that upgrading from file format version 11 and earlier formats will be much faster.
 
 -----------
 
