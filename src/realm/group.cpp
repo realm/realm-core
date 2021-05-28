@@ -426,7 +426,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 20,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 21,
                     current_file_format_version);
 
 
