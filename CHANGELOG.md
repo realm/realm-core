@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Setting a collection with a nullable value type to null would hit an assertion failure instead of clearing the collection.
+
 ### Breaking changes
 * None.
 

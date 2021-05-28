@@ -81,6 +81,12 @@ struct TestContext : CppContext {
     {
         return false;
     }
+
+    template <class T>
+    T get(Object& obj, const std::string& name)
+    {
+        return any_cast<T>(obj.get_property_value<util::Any>(*this, name));
+    }
 };
 
 class CreatePolicyRecordingContext {
@@ -981,38 +987,27 @@ TEST_CASE("object") {
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"_id", INT64_C(1)}}),
                            policy);
 
-            REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
-            REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
-            REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 2.2f);
-            REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
-            REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
-            REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
-                    ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
-            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
-                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<bool>(obj, "bool") == true);
+            REQUIRE(d.get<int64_t>(obj, "int") == 5);
+            REQUIRE(d.get<float>(obj, "float") == 2.2f);
+            REQUIRE(d.get<double>(obj, "double") == 3.3);
+            REQUIRE(d.get<std::string>(obj, "string") == "hello");
+            REQUIRE(d.get<Timestamp>(obj, "date") == Timestamp(10, 20));
+            REQUIRE(d.get<util::Optional<ObjectId>>(obj, "object id") == ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<Decimal128>(obj, "decimal") == Decimal128("1.23e45"));
+            REQUIRE(d.get<util::Optional<UUID>>(obj, "uuid") == UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                true);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                5);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == 3.3);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
-                    Decimal128("1.23e45"));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == true);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == 5);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == 1.1f);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == "a");
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) ==
+                    ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) ==
+                    UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
 
             // Set all properties to null
             AnyDict null_values{
@@ -1052,65 +1047,66 @@ TEST_CASE("object") {
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "decimal").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "uuid").has_value());
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                util::none);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                util::none);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) ==
-                    StringData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) ==
-                    BinaryData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) ==
-                    Timestamp());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) ==
-                    Decimal128(realm::null()));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                util::none);
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == StringData());
+            REQUIRE(d.get<List>(obj, "data array").get<BinaryData>(0) == BinaryData());
+            REQUIRE(d.get<List>(obj, "date array").get<Timestamp>(0) == Timestamp());
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal>(0) == Decimal128(realm::null()));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) == util::none);
+
+            // Set all lists to null
+            AnyDict null_arrays{{"_id", INT64_C(1)},
+                                {"bool array", util::Any()},
+                                {"int array", util::Any()},
+                                {"float array", util::Any()},
+                                {"double array", util::Any()},
+                                {"string array", util::Any()},
+                                {"data array", util::Any()},
+                                {"date array", util::Any()},
+                                {"object id array", util::Any()},
+                                {"decimal array", util::Any()},
+                                {"uuid array", util::Any()}};
+            Object::create(d, r, *r->schema().find("all optional types"), util::Any(null_arrays), policy);
+
+            REQUIRE(d.get<List>(obj, "bool array").size() == 0);
+            REQUIRE(d.get<List>(obj, "int array").size() == 0);
+            REQUIRE(d.get<List>(obj, "float array").size() == 0);
+            REQUIRE(d.get<List>(obj, "double array").size() == 0);
+            REQUIRE(d.get<List>(obj, "string array").size() == 0);
+            REQUIRE(d.get<List>(obj, "data array").size() == 0);
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").size() == 0);
+            REQUIRE(d.get<List>(obj, "decimal array").size() == 0);
+            REQUIRE(d.get<List>(obj, "uuid array").size() == 0);
 
             // Set all properties back to non-null
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values), policy);
-            REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
-            REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
-            REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 2.2f);
-            REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
-            REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
-            REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+            REQUIRE(d.get<bool>(obj, "bool") == true);
+            REQUIRE(d.get<int64_t>(obj, "int") == 5);
+            REQUIRE(d.get<float>(obj, "float") == 2.2f);
+            REQUIRE(d.get<double>(obj, "double") == 3.3);
+            REQUIRE(d.get<std::string>(obj, "string") == "hello");
+            REQUIRE(d.get<Timestamp>(obj, "date") == Timestamp(10, 20));
+            REQUIRE(d.get<util::Optional<ObjectId>>(obj, "object id").value() ==
                     ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
-            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
-                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<Decimal128>(obj, "decimal") == Decimal128("1.23e45"));
+            REQUIRE(d.get<util::Optional<UUID>>(obj, "uuid") == UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                true);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                5);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == 3.3);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
-                    Decimal128("1.23e45"));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == true);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == 5);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == 1.1f);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == "a");
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) ==
+                    ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) ==
+                    UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
         }
     }
 
