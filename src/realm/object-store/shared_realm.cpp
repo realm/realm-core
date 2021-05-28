@@ -910,6 +910,36 @@ void Realm::close()
     m_coordinator = nullptr;
 }
 
+void Realm::delete_files(const std::string& realm_file_path)
+{
+    auto core_files = DB::get_core_files(realm_file_path);
+    auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
+        for (const auto& core_file : core_files) {
+            auto file_type = core_file.first;
+            if (file_type == DB::CoreFileType::Lock) {
+                // The lock cannot be safely deleted here since it is used by `call_with_lock` itself.
+                continue;
+            }
+            auto file_information = core_file.second;
+            auto file_path = file_information.first;
+            auto is_folder = file_information.second;
+            // For both files and folders we use the `try_remove` version to delete them because we want
+            // to avoid throwing in case the file does not exist.
+            // The return value can be ignored for the same reason (false if file or folder does not exist).
+            if (is_folder) {
+                util::try_remove_dir_recursive(file_path); // Throws
+            }
+            else {
+                util::File::try_remove(file_path); // Throws
+            }
+        }
+    });
+    if (!lock_successful) {
+        auto lock_file_path = core_files[DB::CoreFileType::Lock].first;
+        throw DeleteOnOpenRealmException(lock_file_path);
+    }
+}
+
 AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
