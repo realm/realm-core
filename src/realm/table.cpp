@@ -42,6 +42,7 @@
 #include <realm/array_decimal128.hpp>
 #include <realm/array_fixed_bytes.hpp>
 #include <realm/table_tpl.hpp>
+#include <realm/dictionary.hpp>
 
 /// \page AccessorConsistencyLevels
 ///
@@ -1029,6 +1030,11 @@ void Table::do_erase_root_column(ColKey col_key)
     }
     bump_content_version();
     bump_storage_version();
+}
+
+Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
+{
+    return Query(m_own_ref, dictionary_of_links);
 }
 
 void Table::set_embedded(bool embedded)

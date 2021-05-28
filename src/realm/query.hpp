@@ -85,11 +85,8 @@ class Query final {
 public:
     Query(ConstTableRef table, ConstTableView* tv = nullptr);
     Query(ConstTableRef table, std::unique_ptr<ConstTableView>);
-    Query(ConstTableRef table, const LnkLst& list);
-    Query(ConstTableRef table, const LnkSet& set);
-    Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links);
-    Query(ConstTableRef table, LnkLstPtr&& list);
-    Query(ConstTableRef table, LnkSetPtr&& set);
+    Query(ConstTableRef table, const ObjList& list);
+    Query(ConstTableRef table, LinkCollectionPtr&& list_ptr);
     Query();
     Query(std::unique_ptr<Expression>);
     ~Query() noexcept;

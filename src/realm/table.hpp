@@ -533,23 +533,12 @@ public:
         return Query(m_own_ref, tv);
     }
 
-    // Perform queries on a LinkView. The returned Query holds a reference to list.
-    Query where(const LnkLst& list) const
+    // Perform queries on a Link Collection. The returned Query holds a reference to collection.
+    Query where(const ObjList& list) const
     {
         return Query(m_own_ref, list);
     }
-
-    // Perform queries on a LnkSet. The returned Query holds a reference to set.
-    Query where(const LnkSet& set) const
-    {
-        return Query(m_own_ref, set);
-    }
-
-    // Perform queries on a Dictionary containing values of links to a single table.
-    Query where(const DictionaryLinkValues& dictionary_of_links) const
-    {
-        return Query(m_own_ref, dictionary_of_links);
-    }
+    Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
