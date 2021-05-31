@@ -39,9 +39,9 @@ Query::Query()
     create();
 }
 
-Query::Query(ConstTableRef table, const LnkLst& list)
+Query::Query(ConstTableRef table, const ObjList& list)
     : m_table(table.cast_away_const())
-    , m_source_collection(list.clone_linklist())
+    , m_source_collection(list.clone_obj_list())
 {
     m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
@@ -49,43 +49,13 @@ Query::Query(ConstTableRef table, const LnkLst& list)
     create();
 }
 
-Query::Query(ConstTableRef table, const LnkSet& set)
+Query::Query(ConstTableRef table, LinkCollectionPtr&& list_ptr)
     : m_table(table.cast_away_const())
-    , m_source_collection(set.clone_linkset())
+    , m_source_collection(std::move(list_ptr))
 {
     m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
-    REALM_ASSERT_DEBUG(set.get_target_table() == m_table);
-    create();
-}
-
-Query::Query(ConstTableRef table, const DictionaryLinkValues& dict_of_links)
-    : m_table(table.cast_away_const())
-    , m_source_collection(dict_of_links.clone_obj_list())
-{
-    m_view = m_source_collection.get();
-    REALM_ASSERT_DEBUG(m_view);
-    REALM_ASSERT_DEBUG(m_source_collection->get_target_table() == m_table);
-    create();
-}
-
-Query::Query(ConstTableRef table, LnkLstPtr&& ll)
-    : m_table(table.cast_away_const())
-    , m_source_collection(std::move(ll))
-{
-    m_view = m_source_collection.get();
-    REALM_ASSERT_DEBUG(m_view);
-    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
-    create();
-}
-
-Query::Query(ConstTableRef table, LnkSetPtr&& ll)
-    : m_table(table.cast_away_const())
-    , m_source_collection(std::move(ll))
-{
-    m_view = m_source_collection.get();
-    REALM_ASSERT_DEBUG(m_view);
-    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(list_ptr->get_target_table() == m_table);
     create();
 }
 

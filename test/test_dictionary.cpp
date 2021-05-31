@@ -79,6 +79,9 @@ TEST(Dictionary_Basics)
         CHECK_EQUAL(x, y);
     };
 
+    Dictionary dummy;
+    CHECK_THROW_ANY(dummy.insert("Hello", "world"));
+
     auto foo = g.add_table("foo");
     auto col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
 
@@ -136,9 +139,18 @@ TEST(Dictionary_Basics)
         CHECK_THROW_ANY(dict.erase("foo.bar")); // Must not contain '.'
     }
     {
-        Dictionary dict = obj2.get_dictionary(col_dict);
-        CHECK_EQUAL(dict.size(), 0);
-        CHECK_THROW_ANY(dict.get("Baa").get_string());
+        Dictionary dict1 = obj1.get_dictionary(col_dict);
+        Dictionary dict2 = obj2.get_dictionary(col_dict);
+        CHECK_EQUAL(dict2.size(), 0);
+        CHECK_THROW_ANY(dict2.get("Baa").get_string());
+
+        dict2.insert("Hello", "world");
+        dict1.insert("Hello", 9);
+        obj2.remove();
+        CHECK_NOT(dict2.is_attached());
+        CHECK_EQUAL(dict1.size(), 1);
+        dict1 = dict2;
+        CHECK_NOT(dict1.is_attached());
     }
 }
 

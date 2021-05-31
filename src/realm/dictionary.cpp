@@ -182,7 +182,13 @@ Dictionary& Dictionary::operator=(const Dictionary& other)
     Base::operator=(static_cast<const Base&>(other));
 
     if (this != &other) {
-        init_from_parent();
+        if (other.is_attached()) {
+            init_from_parent();
+        }
+        else {
+            delete m_clusters;
+            m_clusters = nullptr;
+        }
     }
     return *this;
 }
@@ -497,6 +503,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     create();
+    if (!m_clusters) {
+        throw LogicError(LogicError::detached_accessor);
+    }
+
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 

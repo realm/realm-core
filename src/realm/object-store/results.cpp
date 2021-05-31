@@ -957,10 +957,9 @@ Query Results::do_get_query() const
             return Query(m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
         }
         case Mode::Collection:
-            if (auto list = dynamic_cast<LnkLst*>(m_collection.get()))
+            if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
                 return m_table->where(*list);
-            if (auto set = dynamic_cast<LnkSet*>(m_collection.get()))
-                return m_table->where(*set);
+            }
             if (auto dict = dynamic_cast<Dictionary*>(m_collection.get())) {
                 if (dict->get_value_data_type() == type_Link) {
                     return m_table->where(*dict);
