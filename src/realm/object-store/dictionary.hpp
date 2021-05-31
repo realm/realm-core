@@ -26,8 +26,8 @@
 namespace realm {
 
 struct DictionaryChangeSet {
-    // Indexes which were removed from the _old_ dictionary
-    std::vector<size_t> deletions;
+    // Keys which were removed from the _old_ dictionary
+    std::vector<Mixed> deletions;
 
     // Keys in the _new_ dictionary which are new insertions
     std::vector<Mixed> insertions;
