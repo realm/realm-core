@@ -128,12 +128,13 @@ public:
      *                        `CollectionNotifier`.
      */
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                             const std::vector<KeyPathArray>& key_path_arrays);
+                                             std::vector<KeyPathArray>& key_path_arrays);
 
     // This function is only used by `find_filtered_related_tables` internally.
     // It is however used in some tests and therefore exposed here.
     static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                        const std::vector<TableKey>& tables_in_filters);
+                                        std::vector<TableKey>& tables_in_filters,
+                                        std::vector<KeyPathArray>& key_path_arrays);
 
 protected:
     TransactionChangeInfo const& m_info;
