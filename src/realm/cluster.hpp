@@ -266,7 +266,7 @@ public:
     void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void upgrade_string_to_enum(ColKey col, ArrayString& keys);
 
-    void init_leaf(ColKey col, ArrayPayload* leaf) const;
+    void init_leaf(ColKey col, ArrayPayload* leaf) const noexcept;
     void add_leaf(ColKey col, ref_type ref);
 
     void verify() const;

@@ -970,14 +970,9 @@ void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
     Array::destroy_deep(ref, m_alloc);
 }
 
-void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
+void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const noexcept
 {
     auto col_ndx = col_key.get_index();
-    // FIXME: Move this validation into callers.
-    // Currently, the query subsystem may call with an unvalidated key.
-    // once fixed, reintroduce the noexcept declaration :-D
-    if (auto t = m_tree_top.get_owning_table())
-        t->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
     if (leaf->need_spec()) {
         m_tree_top.set_spec(*leaf, col_ndx);
@@ -1033,7 +1028,7 @@ void verify_set(ArrayRef& arr, size_t sz)
             elements.set_parent(&arr, n);
             elements.verify();
 
-            // FIXME: Check uniqueness of elements.
+            // TODO: Check uniqueness of elements.
         }
     }
 }
@@ -1104,7 +1099,7 @@ void Cluster::verify() const
                     verify_list<ObjKey>(arr, *sz);
                     break;
                 default:
-                    // FIXME: Nullable primitives
+                    // TODO: Nullable primitives
                     break;
             }
             return false;
@@ -1181,7 +1176,7 @@ void Cluster::verify() const
                     verify_set<ObjKey>(arr, *sz);
                     break;
                 default:
-                    // FIXME: Nullable primitives
+                    // TODO: Nullable primitives
                     break;
             }
             return false;

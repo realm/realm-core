@@ -182,6 +182,8 @@ public:
     {
         m_dD = 100.0;
 
+        if (m_condition_column_key)
+            m_table->report_invalid_key(m_condition_column_key);
         if (m_child)
             m_child->init(will_query_ranges);
     }
@@ -596,7 +598,7 @@ public:
                    util::serializer::print_value(IntegerNodeBase<LeafType>::m_value);
         }
 
-        // FIXME: once the parser supports it, print something like "column IN {n1, n2, n3}"
+        // TODO: once the parser supports it, print something like "column IN {n1, n2, n3}"
         std::string desc = "(";
         bool is_first = true;
         for (auto it : m_needles) {
@@ -2256,7 +2258,7 @@ public:
     std::unique_ptr<ParentNode> m_condition;
 
 private:
-    // FIXME This heuristic might as well be reused for all condition nodes.
+    // TODO This heuristic might as well be reused for all condition nodes.
     size_t m_known_range_start;
     size_t m_known_range_end;
     size_t m_first_in_known_range;
@@ -2291,9 +2293,14 @@ public:
                                                       ParentNode::m_table->get_column_name(m_condition_column_key1),
                                                       ParentNode::m_table->get_column_name(m_condition_column_key2)));
             }
-            ParentNode::m_table->check_column(m_condition_column_key1);
-            ParentNode::m_table->check_column(m_condition_column_key2);
         }
+    }
+
+    void init(bool will_query_ranges)
+    {
+        ParentNode::init(will_query_ranges);
+        ParentNode::m_table->report_invalid_key(m_condition_column_key1);
+        ParentNode::m_table->report_invalid_key(m_condition_column_key2);
     }
 
     static std::unique_ptr<ArrayPayload> update_cached_leaf_pointers_for_column(Allocator& alloc,
