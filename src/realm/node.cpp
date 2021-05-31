@@ -44,13 +44,6 @@ size_t Node::calc_byte_len(size_t num_items, size_t width) const
 {
     REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
-    // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that calc_byte_len() is supposed to return
-    // the unaligned byte size. It is probably the case that no harm
-    // is done by returning the aligned version, and most callers of
-    // calc_byte_len() will actually benefit if calc_byte_len() was
-    // changed to always return the aligned byte size.
-
     size_t bits = num_items * width;
     size_t bytes = (bits + 7) / 8; // round up
     return bytes + header_size;    // add room for 8 byte header
@@ -110,7 +103,7 @@ void Node::alloc(size_t init_size, size_t new_width)
         // Update this accessor and its ancestors
         m_ref = mem_ref.get_ref();
         m_data = get_data_from_header(header);
-        // FIXME: Trouble when this one throws. We will then leave
+        // Trouble when this one throws. We will then leave
         // this array instance in a corrupt state
         update_parent(); // Throws
     }

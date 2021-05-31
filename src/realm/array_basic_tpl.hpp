@@ -213,12 +213,6 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 template <class T>
 size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
 {
-    // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that calc_byte_len() is supposed to return
-    // the unaligned byte size. It is probably the case that no harm
-    // is done by returning the aligned version, and most callers of
-    // calc_byte_len() will actually benefit if calc_byte_len() was
-    // changed to always return the aligned byte size.
     return header_size + for_size * sizeof(T);
 }
 

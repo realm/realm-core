@@ -57,7 +57,6 @@ public:
     T get(size_t ndx) const noexcept;
     bool is_null(size_t ndx) const noexcept
     {
-        // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
         static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
         auto x = BasicArray<T>::get(ndx);
         return null::is_null_float(x);
@@ -169,7 +168,6 @@ public:
 
     void set_null(size_t ndx)
     {
-        // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
         set(ndx, null::get_null_float<T>());
     }
 
