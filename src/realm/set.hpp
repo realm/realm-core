@@ -1159,7 +1159,7 @@ inline std::pair<size_t, bool> LnkSet::insert(ObjKey value)
 
     auto [ndx, inserted] = m_set.insert(value);
     if (inserted) {
-        update_unresolved();
+        update_unresolved(UpdateStatus::Updated);
     }
     return {real2virtual(ndx), inserted};
 }
@@ -1171,7 +1171,7 @@ inline std::pair<size_t, bool> LnkSet::erase(ObjKey value)
 
     auto [ndx, removed] = m_set.erase(value);
     if (removed) {
-        update_unresolved(UpdateStatus::Update);
+        update_unresolved(UpdateStatus::Updated);
         ndx = real2virtual(ndx);
     }
     return {ndx, removed};
@@ -1194,7 +1194,7 @@ inline std::pair<size_t, bool> LnkSet::insert_null()
     update_if_needed();
     auto [ndx, inserted] = m_set.insert_null();
     if (inserted) {
-        update_unresolved(UpdateStatus::Update);
+        update_unresolved(UpdateStatus::Updated);
     }
     return {real2virtual(ndx), inserted};
 }
@@ -1204,7 +1204,7 @@ inline std::pair<size_t, bool> LnkSet::erase_null()
     update_if_needed();
     auto [ndx, erased] = m_set.erase_null();
     if (erased) {
-        update_unresolved(UpdateStatus::Update);
+        update_unresolved(UpdateStatus::Updated);
         ndx = real2virtual(ndx);
     }
     return {ndx, erased};
@@ -1215,7 +1215,7 @@ inline std::pair<size_t, bool> LnkSet::insert_any(Mixed value)
     update_if_needed();
     auto [ndx, inserted] = m_set.insert_any(value);
     if (inserted) {
-        update_unresolved(UpdateStatus::Update);
+        update_unresolved(UpdateStatus::Updated);
     }
     return {real2virtual(ndx), inserted};
 }
@@ -1224,7 +1224,7 @@ inline std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
 {
     auto [ndx, erased] = m_set.erase_any(value);
     if (erased) {
-        update_unresolved(UpdateStatus::Update);
+        update_unresolved(UpdateStatus::Updated);
         ndx = real2virtual(ndx);
     }
     return {ndx, erased};
