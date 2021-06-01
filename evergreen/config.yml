@@ -384,7 +384,7 @@ tasks:
         export CURL=${curl|curl}
 
         if [[ -n "${run_tests_against_baas|}" ]]; then
-            ./evergreen/install_baas.sh ./baas-work-dir ./test/object-store/mongodb
+            ./evergreen/install_baas.sh -w ./baas-work-dir
         fi
 
   - command: shell.exec

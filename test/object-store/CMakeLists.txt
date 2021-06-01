@@ -33,6 +33,9 @@ set(SOURCES
     util/test_utils.cpp
 )
 
+if(REALM_ENABLE_AUTH_TESTS)
+    list(APPEND SOURCES util/baas_admin_api.cpp)
+endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
@@ -78,14 +81,9 @@ if(REALM_ENABLE_SYNC)
             message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
         endif()
 
-        if(NOT REALM_STITCH_CONFIG)
-            message(FATAL_ERROR "REALM_STITCH_CONFIG must be set when specifying REALM_ENABLE_AUTH_TESTS.")
-        endif()
-
         target_compile_definitions(ObjectStoreTests PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
             REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
-            REALM_STITCH_CONFIG="${REALM_STITCH_CONFIG}"
         )
 
         find_package(CURL REQUIRED)
