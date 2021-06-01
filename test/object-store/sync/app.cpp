@@ -39,6 +39,7 @@
 #include <realm/util/websocket.hpp>
 
 #include <chrono>
+#include <future>
 #include <thread>
 #include <iostream>
 
@@ -1702,6 +1703,142 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
 }
 
 // MARK: - Sync Tests
+
+TEST_CASE("app: set new embedded object", "[sync][app]") {
+    auto factory = []() -> std::unique_ptr<GenericNetworkTransport> {
+        return std::make_unique<IntTestTransport>();
+    };
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        ObjectSchema("TopLevel",
+                     {
+                         {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+                         {"embedded", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded"},
+                     }),
+        ObjectSchema("TopLevel_embedded", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
+    auto server_app_id = create_app(server_app_config);
+
+    auto app_config = App::Config{server_app_id,
+                                  factory,
+                                  base_url,
+                                  util::none,
+                                  Optional<std::string>("A Local App Version"),
+                                  util::none,
+                                  "Object Store Platform Tests",
+                                  "Object Store Platform Version Blah",
+                                  "An sdk version"};
+
+    auto base_path = util::make_temp_dir() + app_config.app_id;
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
+
+    auto make_realm_config = [&](const std::shared_ptr<SyncUser> user) {
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson("foo"));
+        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+            std::cout << error.message << std::endl;
+        };
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/default.realm";
+        realm_config.schema = server_app_config.schema;
+        return realm_config;
+    };
+
+    auto top_level_id = ObjectId::gen();
+    auto email = util::format("realm_tests_do_autoverify-test@example.com");
+    auto password = std::string{"password"};
+
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
+            email, password, [&](Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto obj = Object::create(c, realm, "TopLevel",
+                                  util::Any(AnyDict{
+                                      {valid_pk_name, top_level_id},
+                                      {"embedded", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
+                                  }),
+                                  CreatePolicy::ForceCreate);
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        obj.set_property_value(c, "embedded",
+                               util::Any(AnyDict{{
+                                   "array",
+                                   AnyVector{INT64_C(3), INT64_C(4)},
+                               }}),
+                               realm::CreatePolicy::UpdateAll);
+        realm->commit_transaction();
+
+        std::promise<void> promise;
+        auto future = promise.get_future();
+        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
+        session->wait_for_download_completion(
+            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
+                REALM_ASSERT(!ec);
+                shared_promise->set_value();
+            });
+
+        future.wait();
+    }
+
+    {
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        std::promise<void> promise;
+        auto future = promise.get_future();
+        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
+        session->wait_for_download_completion(
+            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
+                REALM_ASSERT(!ec);
+                shared_promise->set_value();
+            });
+
+        future.wait();
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{top_level_id});
+        auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded"));
+        auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+        CHECK(array_list.size() == 2);
+        CHECK(array_list.get<int64_t>(0) == int64_t(3));
+        CHECK(array_list.get<int64_t>(1) == int64_t(4));
+    }
+}
 
 TEST_CASE("app: sync integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
