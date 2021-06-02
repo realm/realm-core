@@ -34,7 +34,7 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     // deletions which were not linked to by any row in the linking table
     auto table_modified = [&](auto& tbl) {
         auto it = info.tables.find(tbl.table_key.value);
-        return it != info.tables.end() && !it->second.modifications_empty();
+        return it != info.tables.end() && (!it->second.modifications_empty() || !it->second.insertions_empty());
     };
     return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
 }
