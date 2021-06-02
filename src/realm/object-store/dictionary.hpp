@@ -25,7 +25,14 @@
 
 namespace realm {
 
+
+class Transaction;
+
 struct DictionaryChangeSet {
+    DictionaryChangeSet(std::shared_ptr<Transaction> tr = {})
+        : m_tr(std::move(tr))
+    {
+    }
     // Keys which were removed from the _old_ dictionary
     std::vector<Mixed> deletions;
 
@@ -34,6 +41,9 @@ struct DictionaryChangeSet {
 
     // Keys of objects/values which were modified
     std::vector<Mixed> modifications;
+
+private:
+    std::shared_ptr<Transaction> m_tr;
 };
 
 namespace object_store {
