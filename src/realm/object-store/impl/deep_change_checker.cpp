@@ -24,7 +24,8 @@ using namespace realm;
 using namespace realm::_impl;
 
 void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                                const std::vector<TableKey>& tables_in_filters)
+                                                std::vector<TableKey>& tables_in_filters,
+                                                std::vector<KeyPathArray>& key_path_arrays)
 {
     auto table_key = table.get_key();
     // If the currently looked at `table` is already part of the `std::vector<RelatedTable>` (possibly
@@ -58,31 +59,43 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
             out[out_index].links.push_back({col_key.value, type == type_LinkList});
             // Finally this function needs to be called again to traverse all linked tables using the
             // just found link.
-            find_all_related_tables(out, *table.get_link_target(col_key), tables_in_filters);
+            find_all_related_tables(out, *table.get_link_target(col_key), tables_in_filters, key_path_arrays);
         }
     }
     if (tables_in_filters.size() != 0) {
         // Backlinks can only come into consideration when added via key paths.
         // If there are not `tables_in_filter` we can skip this part.
         table.for_each_backlink_column([&](ColKey column_key) {
-            auto target_table = table.get_link_target(column_key);
-            auto target_table_key = target_table->get_key();
-            auto target_table_key_contained_in_filter =
-                any_of(tables_in_filters.begin(), tables_in_filters.end(), [target_table_key](auto table_key) {
-                    return target_table_key == table_key;
-                });
-            if (target_table_key_contained_in_filter) {
-                // If this backlink is included in any of the filters we follow the path further.
-                out[out_index].links.push_back({column_key.value, false});
-                find_all_related_tables(out, *table.get_link_target(column_key), tables_in_filters);
+            // If this backlink is included in any of the filters we follow the path further.
+            out[out_index].links.push_back({column_key.value, false});
+            const Table& origin_table = *table.get_link_target(column_key);
+
+            for (auto& key_path_array : key_path_arrays) {
+                for (auto& key_path : key_path_array) {
+                    auto key_path_size = key_path.size();
+                    if (key_path_size > 0) {
+                        auto last_key_path_element = key_path[key_path_size - 1];
+                        auto last_table_key = last_key_path_element.first;
+                        auto last_column_key = last_key_path_element.second;
+                        if (last_table_key == table_key && last_column_key == column_key) {
+                            auto origin_table_key = origin_table.get_key();
+                            auto origin_column_key = table.get_opposite_column(column_key);
+                            tables_in_filters.push_back(origin_table_key);
+                            std::pair new_pair(origin_table_key, origin_column_key);
+                            key_path.push_back(new_pair);
+                        }
+                    }
+                }
             }
+
+            find_all_related_tables(out, origin_table, tables_in_filters, key_path_arrays);
             return false;
         });
     }
 }
 
 void DeepChangeChecker::find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                                     const std::vector<KeyPathArray>& key_path_arrays)
+                                                     std::vector<KeyPathArray>& key_path_arrays)
 {
     std::vector<TableKey> tables_in_filters = {};
     for (const auto& key_path_array : key_path_arrays) {
@@ -92,7 +105,7 @@ void DeepChangeChecker::find_filtered_related_tables(std::vector<RelatedTable>& 
             }
         }
     }
-    find_all_related_tables(out, table, tables_in_filters);
+    find_all_related_tables(out, table, tables_in_filters, key_path_arrays);
 }
 
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
@@ -273,7 +286,8 @@ bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
                 auto column_key = key_path[i].second;
                 auto iterator = m_info.tables.find(table_key.value);
                 if (iterator != m_info.tables.end() &&
-                    iterator->second.modifications_contains(next_object_key_to_check, {column_key})) {
+                    (iterator->second.modifications_contains(next_object_key_to_check, {column_key}) ||
+                     iterator->second.insertions_contains(next_object_key_to_check))) {
                     return true;
                 }
 
@@ -325,7 +339,8 @@ void ObjectChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, 
 
     // Check for a change on the current depth level.
     auto iterator = m_info.tables.find(table_key.value);
-    if (iterator != m_info.tables.end() && iterator->second.modifications_contains(object_key_value, {column_key})) {
+    if (iterator != m_info.tables.end() && (iterator->second.modifications_contains(object_key_value, {column_key}) ||
+                                            iterator->second.insertions_contains(object_key_value))) {
         // If an object linked to the root object was changed we only mark the
         // property of the root objects as changed.
         auto root_column_key = key_path[0].second;

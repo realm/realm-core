@@ -1611,7 +1611,9 @@ TEST_CASE("DeepChangeChecker") {
     };
 
     std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
-    _impl::DeepChangeChecker::find_all_related_tables(tables, *table, {});
+    std::vector<realm::TableKey> tables_in_filter = {};
+    std::vector<KeyPathArray> key_path_arrays = {};
+    _impl::DeepChangeChecker::find_all_related_tables(tables, *table, tables_in_filter, key_path_arrays);
 
     auto cols = table->get_column_keys();
     SECTION("direct changes are tracked") {
