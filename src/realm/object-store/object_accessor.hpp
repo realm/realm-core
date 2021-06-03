@@ -119,7 +119,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
     ctx.will_change(*this, property);
 
     ColKey col{property.column_key};
-    if (is_nullable(property.type) && ctx.is_null(value)) {
+    if (!is_collection(property.type) && is_nullable(property.type) && ctx.is_null(value)) {
         if (!policy.diff || !m_obj.is_null(col)) {
             if (property.type == PropertyType::Object) {
                 if (!is_default)
