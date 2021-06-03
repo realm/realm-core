@@ -400,13 +400,6 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
-void Group::remove_sync_file_id()
-{
-    if (m_top.is_attached() && m_top.size() > s_sync_file_id_ndx) {
-        m_top.set(s_sync_file_id_ndx, RefOrTagged::make_tagged(0));
-    }
-}
-
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
@@ -1138,81 +1131,61 @@ void Group::validate(ObjLink link) const
     }
 }
 
-class Group::DefaultTableWriter : public Group::TableWriter {
-public:
-    DefaultTableWriter(const Group& group, bool should_write_history)
-        : m_group(group)
-        , m_should_write_history(should_write_history)
-    {
-    }
-    ref_type write_names(_impl::OutputStream& out) override
-    {
-        bool deep = true;                                                // Deep
-        bool only_if_modified = false;                                   // Always
-        return m_group.m_table_names.write(out, deep, only_if_modified); // Throws
-    }
-    ref_type write_tables(_impl::OutputStream& out) override
-    {
-        bool deep = true;                                           // Deep
-        bool only_if_modified = false;                              // Always
-        return m_group.m_tables.write(out, deep, only_if_modified); // Throws
-    }
+ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
+{
+    bool deep = true;                                                 // Deep
+    bool only_if_modified = false;                                    // Always
+    return m_group->m_table_names.write(out, deep, only_if_modified); // Throws
+}
+ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
+{
+    bool deep = true;                                            // Deep
+    bool only_if_modified = false;                               // Always
+    return m_group->m_tables.write(out, deep, only_if_modified); // Throws
+}
 
-    HistoryInfo write_history(_impl::OutputStream& out) override
-    {
-        bool deep = true;              // Deep
-        bool only_if_modified = false; // Always
-        ref_type history_ref = _impl::GroupFriend::get_history_ref(m_group);
-        HistoryInfo info;
-        if (history_ref) {
-            _impl::History::version_type version;
-            int history_type, history_schema_version;
-            _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(m_group),
-                                                             m_group.m_top.get_ref(), version, history_type,
-                                                             history_schema_version);
-            REALM_ASSERT(history_type != Replication::hist_None);
-            if (!m_should_write_history ||
-                (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
-                return info; // Only sync history should be preserved when writing to a new file
-            }
-            info.type = history_type;
-            info.version = history_schema_version;
-            Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
-            history.init_from_ref(history_ref);
-            info.ref = history.write(out, deep, only_if_modified); // Throws
+auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
+{
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
+    HistoryInfo info;
+    if (history_ref) {
+        _impl::History::version_type version;
+        int history_type, history_schema_version;
+        _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(*m_group),
+                                                         m_group->m_top.get_ref(), version, history_type,
+                                                         history_schema_version);
+        REALM_ASSERT(history_type != Replication::hist_None);
+        if (!m_should_write_history ||
+            (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
+            return info; // Only sync history should be preserved when writing to a new file
         }
-        info.sync_file_id = m_group.get_sync_file_id();
-        return info;
+        info.type = history_type;
+        info.version = history_schema_version;
+        Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(*m_group))};
+        history.init_from_ref(history_ref);
+        info.ref = history.write(out, deep, only_if_modified); // Throws
     }
-
-private:
-    const Group& m_group;
-    bool m_should_write_history;
-};
+    info.sync_file_id = m_group->get_sync_file_id();
+    return info;
+}
 
 void Group::write(std::ostream& out, bool pad) const
 {
-    write(out, pad, 0, true);
+    DefaultTableWriter table_writer;
+    write(out, pad, 0, table_writer);
 }
 
-void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, bool write_history) const
+void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(is_attached());
-    DefaultTableWriter table_writer(*this, write_history);
+    writer.set_group(this);
     bool no_top_array = !m_top.is_attached();
-    write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
+    write(out, m_file_format_version, writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
-                  bool write_history) const
-{
-    File file;
-    int flags = 0;
-    file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    write(file, encryption_key, version_number, write_history);
-}
-
-void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const
+void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(file.get_size() == 0);
 
@@ -1229,10 +1202,21 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
 
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    write(out, encryption_key != 0, version_number, write_history);
+    write(out, encryption_key != 0, version_number, writer);
     int sync_status = streambuf.pubsync();
     REALM_ASSERT(sync_status == 0);
 }
+
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
+                  bool write_history) const
+{
+    File file;
+    int flags = 0;
+    file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    DefaultTableWriter table_writer(write_history);
+    write(file, encryption_key, version_number, table_writer);
+}
+
 
 BinaryData Group::write_to_mem() const
 {

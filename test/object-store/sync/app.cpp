@@ -27,10 +27,10 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
-#include "util/event_loop.hpp"
 
 #include <external/json/json.hpp>
 #include <realm/sync/access_token.hpp>
@@ -54,138 +54,29 @@ using namespace std::string_view_literals;
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include <curl/curl.h>
-
-// When a stitch instance starts up and imports the app at this config location,
-// it will generate a new app_id and write it back to the config. This is why we
-// need to parse it at runtime after spinning up the instance.
-static std::string get_runtime_app_id(std::string config_path)
+namespace {
+// This will create a new test app in the baas server at base_url to be used in tests throughout
+// tis file.
+std::string get_runtime_app_id(std::string base_url)
 {
-    static std::string cached_app_id;
-    if (cached_app_id.empty()) {
-        util::File config(config_path);
-        std::string contents;
-        contents.resize(config.get_size());
-        config.read(contents.data(), config.get_size());
-        nlohmann::json json;
-        json = nlohmann::json::parse(contents);
-        cached_app_id = json["app_id"].get<std::string>();
+    static const std::string cached_app_id = [&] {
+        auto cached_app_id = create_app(default_app_config(base_url));
         std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
-    }
+        return cached_app_id;
+    }();
     return cached_app_id;
 }
 
 class IntTestTransport : public GenericNetworkTransport {
 public:
-    IntTestTransport()
-    {
-        curl_global_init(CURL_GLOBAL_ALL);
-    }
-
-    ~IntTestTransport()
-    {
-        curl_global_cleanup();
-    }
-
-    static size_t write(char* ptr, size_t size, size_t nmemb, std::string* data)
-    {
-        REALM_ASSERT(data);
-        size_t realsize = size * nmemb;
-        data->append(ptr, realsize);
-        return realsize;
-    }
-    static size_t header_callback(char* buffer, size_t size, size_t nitems,
-                                  std::map<std::string, std::string>* headers_storage)
-    {
-        REALM_ASSERT(headers_storage);
-        std::string combined(buffer, size * nitems);
-        if (auto pos = combined.find(':'); pos != std::string::npos) {
-            std::string key = combined.substr(0, pos);
-            std::string value = combined.substr(pos + 1);
-            while (value.size() > 0 && value[0] == ' ') {
-                value = value.substr(1);
-            }
-            while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
-                value = value.substr(0, value.size() - 1);
-            }
-            headers_storage->insert({key, value});
-        }
-        else {
-            if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...
-                std::cerr << "test transport skipping header: " << combined << std::endl;
-            }
-        }
-        return nitems * size;
-    }
-
     void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
     {
-        CURL* curl;
-        CURLcode response_code;
-        std::string response;
-        std::map<std::string, std::string> response_headers;
-
-        /* get a curl handle */
-        curl = curl_easy_init();
-
-        struct curl_slist* list = NULL;
-
-        if (curl) {
-            /* First set the URL that is about to receive our POST. This URL can
-             just as well be a https:// URL if that is what should receive the
-             data. */
-            curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-
-            /* Now specify the POST data */
-            if (request.method == HttpMethod::post) {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::put) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::del) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
-
-            for (auto header : request.headers) {
-                std::stringstream h;
-                h << header.first << ": " << header.second;
-                list = curl_slist_append(list, h.str().data());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
-            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
-
-            /* Perform the request, res will get the return code */
-            response_code = curl_easy_perform(curl);
-            int http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-            /* Check for errors */
-            if (response_code != CURLE_OK)
-                fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
-                        request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
-
-            /* always cleanup */
-            curl_easy_cleanup(curl);
-            curl_slist_free_all(list); /* free the list again */
-            int binding_response_code = 0;
-            completion_block(Response{http_code, binding_response_code, response_headers, response});
-        }
-
-        curl_global_cleanup();
+        completion_block(do_http_request(request));
     }
 };
 
 #ifdef REALM_MONGODB_ENDPOINT
-static std::string get_base_url()
+std::string get_base_url()
 {
     // allows configuration with or without quotes
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
@@ -198,20 +89,8 @@ static std::string get_base_url()
     return base_url;
 }
 #endif
-#ifdef REALM_STITCH_CONFIG
-static std::string get_config_path()
-{
-    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
-    if (config_path.size() > 0 && config_path[0] == '"') {
-        config_path.erase(0, 1);
-    }
-    if (config_path.size() > 0 && config_path[config_path.size() - 1] == '"') {
-        config_path.erase(config_path.size() - 1);
-    }
-    return config_path;
-}
-#endif
 
+} // namespace
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
@@ -222,14 +101,11 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         };
 
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
-        std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
 
         // this app id is configured in tests/mongodb/config.json
-        auto config = App::Config{get_runtime_app_id(config_path),
+        auto config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,
@@ -291,10 +167,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -509,10 +383,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -836,10 +708,8 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -883,10 +753,8 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
-        auto config = App::Config{get_runtime_app_id(config_path),
+        auto config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,
@@ -943,10 +811,8 @@ TEST_CASE("app: call function", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -991,10 +857,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1664,10 +1528,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1781,10 +1643,8 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto config = App::Config{get_runtime_app_id(base_url),
                               factory,
                               base_url,
                               util::none,
@@ -1846,11 +1706,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto app_config = App::Config{get_runtime_app_id(config_path),
+    auto app_config = App::Config{get_runtime_app_id(base_url),
                                   factory,
                                   base_url,
                                   util::none,
@@ -2117,8 +1975,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
         config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-            CHECK(error.message ==
-                  "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            CHECK(error.message.find(
+                      "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid") !=
+                  std::string::npos);
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);

@@ -2204,8 +2204,19 @@ DEFINE_MERGE(Instruction::Clear, Instruction::Clear)
     }
 }
 
-DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Clear);
-DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Clear);
+DEFINE_MERGE(Instruction::SetInsert, Instruction::Clear)
+{
+    if (same_path(left, right)) {
+        left_side.discard();
+    }
+}
+
+DEFINE_MERGE(Instruction::SetErase, Instruction::Clear)
+{
+    if (same_path(left, right)) {
+        left_side.discard();
+    }
+}
 
 
 /// SetInsert rules

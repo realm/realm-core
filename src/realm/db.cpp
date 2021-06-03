@@ -643,7 +643,8 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        auto core_files = DB::get_core_files(file);
+        i = ::open((core_files[DB::CoreFileType::Log].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -762,8 +763,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         dg.release();
         return;
     }
-    m_coordination_dir = path + ".management";
-    m_lockfile_path = path + ".lock";
+    auto core_files = DB::get_core_files(path);
+    m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
+    m_coordination_dir = core_files[DB::CoreFileType::Management].first;
     try_make_dir(m_coordination_dir);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
@@ -1443,7 +1445,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            tr->write(file, write_key, info->latest_version_number + incr, true); // Throws
+            Group::DefaultTableWriter writer;
+            tr->write(file, write_key, info->latest_version_number + incr, writer); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
@@ -1500,24 +1503,35 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
 
 void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
 {
-    // group::write() will throw if the file already exists.
-    // To prevent this, we have to remove the file (should it exist)
-    // before calling group::write().
-    if (allow_overwrite)
-        File::try_remove(path);
-
     SharedInfo* info = m_file_map.get_addr();
     const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
 
-    auto tr = start_write();
+    auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
             throw std::runtime_error("Could not write file as not all client changes are integrated in server");
         }
-        tr->remove_sync_file_id();
     }
-    tr->write(path, write_key, info->latest_version_number, true);
-    tr->rollback();
+
+    class NoClientFileIdWriter : public Group::DefaultTableWriter {
+    public:
+        NoClientFileIdWriter()
+            : Group::DefaultTableWriter(true)
+        {
+        }
+        HistoryInfo write_history(_impl::OutputStream& out) override
+        {
+            auto hist = Group::DefaultTableWriter::write_history(out);
+            hist.sync_file_id = 0;
+            return hist;
+        }
+    } writer;
+
+    File file;
+    file.open(path, File::access_ReadWrite, allow_overwrite ? File::create_Auto : File::create_Must, 0);
+    file.resize(0);
+
+    tr->write(file, write_key, info->latest_version_number, writer);
 }
 
 uint_fast64_t DB::get_number_of_versions()
@@ -2378,7 +2392,8 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto lockfile_path(realm_path + ".lock");
+    auto core_files = DB::get_core_files(realm_path);
+    auto lockfile_path(core_files[DB::CoreFileType::Lock].first);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
@@ -2391,12 +2406,19 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::unordered_map<DB::CoreFileType, std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
 {
-    std::vector<std::pair<std::string, bool>> files;
-    files.emplace_back(std::make_pair(realm_path, false));
-    files.emplace_back(std::make_pair(realm_path + ".management", true));
-    return files;
+    std::unordered_map<CoreFileType, std::pair<std::string, bool>> core_files;
+
+    core_files[DB::CoreFileType::Lock] = std::make_pair(realm_path + ".lock", false);
+    core_files[DB::CoreFileType::Storage] = std::make_pair(realm_path, false);
+    core_files[DB::CoreFileType::Management] = std::make_pair(realm_path + ".management", true);
+    core_files[DB::CoreFileType::Note] = std::make_pair(realm_path + ".note", false);
+    core_files[DB::CoreFileType::Log] = std::make_pair(realm_path + ".log", false);
+    core_files[DB::CoreFileType::LogA] = std::make_pair(realm_path + ".log_a", false);
+    core_files[DB::CoreFileType::LogB] = std::make_pair(realm_path + ".log_b", false);
+
+    return core_files;
 }
 
 void TransactionDeleter(Transaction* t)
