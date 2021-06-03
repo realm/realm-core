@@ -439,7 +439,8 @@ public:
     void clear() noexcept;
     OperQueue() noexcept = default;
     OperQueue(OperQueue&&) noexcept;
-    ~OperQueue() noexcept {
+    ~OperQueue() noexcept
+    {
         clear();
     }
 
