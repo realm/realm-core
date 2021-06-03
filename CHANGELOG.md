@@ -8,7 +8,7 @@
 * Setting a collection with a nullable value type to null would hit an assertion failure instead of clearing the collection.
 
 ### Breaking changes
-* None.
+* The key-based notifications for Dictionary is changed so that the deletions are also reported by their keys. ([#4723](https://github.com/realm/realm-core/pull/4723))
 
 -----------
 
