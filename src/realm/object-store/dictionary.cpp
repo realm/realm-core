@@ -226,31 +226,47 @@ class NotificationHandler {
 public:
     NotificationHandler(realm::Dictionary& dict, Dictionary::CBFunc cb)
         : m_dict(dict)
+        , m_prev_rt(static_cast<Transaction*>(dict.get_table()->get_parent_group())->duplicate())
+        , m_prev_dict(static_cast<realm::Dictionary*>(m_prev_rt->import_copy_of(dict).release()))
         , m_cb(cb)
     {
     }
+
     void before(CollectionChangeSet const&) {}
+
     void after(CollectionChangeSet const& c)
     {
-        DictionaryChangeSet changes;
-        for (auto ndx : c.deletions.as_indexes()) {
-            changes.deletions.push_back(ndx);
+        if (c.deletions.empty() && c.insertions.empty() && c.modifications.empty()) {
+            m_cb(DictionaryChangeSet(), {});
         }
-        for (auto ndx : c.insertions.as_indexes()) {
-            changes.insertions.push_back(m_dict.get_key(ndx));
+        else {
+            DictionaryChangeSet changes(m_prev_rt->duplicate());
+            for (auto ndx : c.deletions.as_indexes()) {
+                changes.deletions.push_back(m_prev_dict->get_key(ndx));
+            }
+            for (auto ndx : c.insertions.as_indexes()) {
+                changes.insertions.push_back(m_dict.get_key(ndx));
+            }
+            for (auto ndx : c.modifications_new.as_indexes()) {
+                changes.modifications.push_back(m_dict.get_key(ndx));
+            }
+
+            m_cb(std::move(changes), {});
         }
-        for (auto ndx : c.modifications_new.as_indexes()) {
-            changes.modifications.push_back(m_dict.get_key(ndx));
-        }
-        m_cb(changes, {});
+        m_prev_rt->advance_read(
+            static_cast<Transaction*>(m_dict.get_table()->get_parent_group())->get_version_of_current_transaction());
     }
+
     void error(std::exception_ptr ptr)
     {
+        m_prev_rt = nullptr;
         m_cb({}, ptr);
     }
 
 private:
     realm::Dictionary& m_dict;
+    TransactionRef m_prev_rt;
+    std::unique_ptr<realm::Dictionary> m_prev_dict;
     Dictionary::CBFunc m_cb;
 };
 
