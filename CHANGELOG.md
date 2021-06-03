@@ -9,6 +9,7 @@
 * Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
 * Fixed build failure with gcc-11
 * Added merge rule between SetInsert/SetErase and Clear to prevent diverging states after a Clear instruction on the same path. ([#4720](https://github.com/realm/realm-core/issues/4720))
+* Made Linux implementation of ExternalCommitHelper work with new versions of Linux that [changed epoll behavior](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6a965666b7e7475c2f8c8e724703db58b8a8a445), including Android 12 ([#4666](https://github.com/realm/realm-core/issues/4666))
 
 ### Breaking changes
 * The key-based notifications for Dictionary is changed so that the deletions are also reported by their keys. ([#4723](https://github.com/realm/realm-core/pull/4723))
