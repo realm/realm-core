@@ -39,7 +39,7 @@ case $(uname -s) in
         case $DISTRO_NAME in
             ubuntu)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-4.4.1.tgz"
-		STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/libmongo-ubuntu2004-x86_64.so"
+                STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/libmongo-ubuntu2004-x86_64.so"
                 STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-v4.4/stitch-support/ubuntu2004/03d22bb5884e280934d36702136d99a9363fb720/stitch-support-4.4.2-rc0-3-g03d22bb.tgz"
             ;;
             rhel)

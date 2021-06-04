@@ -114,11 +114,15 @@ functions:
             -C cmake_vars.txt ${extra_flags} \
             -G "${cmake_generator|Unix Makefiles}"
 
+          if [[ -n "${target_to_build|}" ]]; then
+              target=(--target "${target_to_build|}")
+          fi
+
           ${cmake_bindir}/cmake \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
-              --target ${target_to_build|}
+              ${target[@]}
 
   "run benchmark":
     - command: shell.exec
@@ -542,7 +546,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -559,7 +563,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     bloaty_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/bloaty-v1.1-39-gefc1c61-ubuntu2004-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     cmake_build_type: Release
@@ -583,7 +587,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -601,7 +605,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -619,7 +623,7 @@ buildvariants:
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
@@ -633,7 +637,7 @@ buildvariants:
   display_name: "Ubuntu 20.04 ARM64"
   run_on: ubuntu2004-arm64-small
   expansions:
-    cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     use_system_openssl: On
     fetch_missing_dependencies: On
@@ -645,31 +649,31 @@ buildvariants:
     distros:
     - ubuntu2004-arm64-large
 
-- name: macos-1014
-  display_name: "MacOS 10.14 x86_64"
-  run_on: macos-1014
+- name: macos-1100-arm64
+  display_name: "MacOS 11 arm64"
+  run_on: macos-1100-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test
     distros:
-    - macos-1014
+    - macos-1100-arm64
   - name: swift-build-and-test
 
-- name: macos-1014-release
-  display_name: "MacOS 10.14 x86_64 (Release build)"
-  run_on: macos-1014
+- name: macos-1100-arm64-release
+  display_name: "MacOS 11 arm64 (Release build)"
+  run_on: macos-1100-arm64
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
@@ -680,8 +684,8 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-64-vs2019-test
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
-    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     test_flags: "-C Debug"
@@ -699,8 +703,8 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 Release build)"
   run_on: windows-64-vs2019-test
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
-    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"
