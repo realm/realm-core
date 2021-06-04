@@ -627,6 +627,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(key_change.insertions[0].get_string() == keys[1]);
             REQUIRE(key_change.deletions[0].get_string() == keys[0]);
             REQUIRE(key_change.modifications.size() == 0);
+
+            r->begin_transaction();
+            dict.remove_all();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE(key_change.insertions.size() == 0);
+            REQUIRE(key_change.deletions.size() == values.size() - 1);
+            REQUIRE(key_change.modifications.size() == 0);
         }
 
         SECTION("clear list") {

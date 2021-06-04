@@ -676,15 +676,15 @@ void Dictionary::clear()
     if (size() > 0) {
         // TODO: Should we have a "dictionary_clear" instruction?
         Replication* repl = m_obj.get_replication();
-        size_t n = 0;
         bool recurse = false;
         CascadeState cascade_state(CascadeState::Mode::Strong);
         for (auto&& elem : *this) {
             if (clear_backlink(elem.second, cascade_state))
                 recurse = true;
-            if (repl)
-                repl->dictionary_erase(*this, n, elem.first);
-            n++;
+            if (repl) {
+                // Logically we always erase the first element
+                repl->dictionary_erase(*this, 0, elem.first);
+            }
         }
 
         // Just destroy the whole cluster
