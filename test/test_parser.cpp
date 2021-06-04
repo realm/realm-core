@@ -632,8 +632,8 @@ TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableInde
         t->add_search_index(col_key);
     }
     TestValueGenerator gen;
-    auto values = gen.values_from_int<underlying_type>({-1, 0, 1, 4294967295, -4294967295, 4294967296, -4294967296,
-                                                        std::numeric_limits<int64_t>::max(),
+    auto values = gen.values_from_int<underlying_type>({-1, 0, 1, 4294967295ll, -4294967295ll, 4294967296ll,
+                                                        -4294967296ll, std::numeric_limits<int64_t>::max(),
                                                         std::numeric_limits<int64_t>::lowest()});
     std::vector<Mixed> args;
     for (auto val : values) {
