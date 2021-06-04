@@ -5,7 +5,7 @@ set -o pipefail
 
 CURL=${CURL:=curl}
 STITCH_PID_FILE=$1
-RETRY_COUNT=${2:-36}
+RETRY_COUNT=${2:-60}
 
 WAIT_COUNTER=0
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
