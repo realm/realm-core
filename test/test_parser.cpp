@@ -2456,7 +2456,7 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "NONE values == NULL && values.@size > 0", 3);
     verify_query(test_context, t, "ANY values == 'one'", 1);
     verify_query(test_context, t, "ANY values CONTAINS[c] 'O'", 2);
-    verify_query(test_context, t, "values.length == 3", 2);  // string lengths
+    verify_query(test_context, t, "values.length == 3", 2); // string lengths
     verify_query(test_context, t, "ANY values == false", 1);
     verify_query(test_context, t, "ANY values == true", 1);
     verify_query(test_context, t, "values.@type == 'string'", 3);
