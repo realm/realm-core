@@ -1,19 +1,7 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 11.0.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Clearing a Dictionary with a key-based change listener attached will result in a crash. ([#4737](https://github.com/realm/realm-core/issues/4737), since v11.0.0)
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
@@ -48,7 +36,7 @@
 * Observing a dictionary holding links to objects would crash. ([#4711](https://github.com/realm/realm-core/issues/4711), since v11.0.0-beta.0)
 
 ### Breaking changes
-* The file format is changed in the way that we now - again - have search indexes on primary key columns. This is required as we now stop deriving the ObjKeys from the primary key values, but just use an increasing counter value. This has the effect that all new objects will be created in the same cluster and not be spread out as they would have been before. It also means that upgrading from file format version 11 and earlier formats will be much faster.
+* The file format version is bumped from 21 to 22. The file format is changed in the way that we now - again - have search indexes on primary key columns. This is required as we now stop deriving the ObjKeys from the primary key values, but just use an increasing counter value. This has the effect that all new objects will be created in the same cluster and not be spread out as they would have been before. It also means that upgrading from file format version 11 and earlier formats will be much faster.
 
 ----------------------------------------------
 
