@@ -13,15 +13,15 @@ case $(uname -s) in
     Darwin)
         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
         STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_ac073d06065af6e00103a8a3cf64672a3f875bea_20_12_01_19_47_16/assisted_agg"
-        GO_URL="https://golang.org/dl/go1.14.10.darwin-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.14.10.darwin-amd64.tar.gz"
         MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/osx/mongodb-macos-x86_64-enterprise-4.4.1.tgz"
-        YQ_DOWNLOAD_URL="https://github.com/mikefarah/yq/releases/download/3.4.1/yq_darwin_amd64"
-        JQ_DOWNLOAD_URL="https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64"
+        YQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/yq-3.4.1-darwin-amd64"
+        JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://golang.org/dl/go1.14.10.linux-amd64.tar.gz"
-        YQ_DOWNLOAD_URL="https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64"
-        JQ_DOWNLOAD_URL="https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.14.10.linux-amd64.tar.gz"
+        YQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/yq-3.4.1-linux-amd64"
+        JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
 
         # Detect what distro/versionf of Linux we are running on to download the right version of MongoDB to download
         # /etc/os-release covers debian/ubuntu/suse
