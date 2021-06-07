@@ -105,6 +105,10 @@ functions:
               set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
           fi
 
+          if [[ -n "${cmake_toolchain_file|}" ]]; then
+              set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
+          fi
+
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -396,6 +400,10 @@ tasks:
             export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
             export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
 
+            if [ -n "${xcode_developer_dir}" ]; then
+                export DEVELOPER_DIR="${xcode_developer_dir}"
+            fi
+
             ./evergreen/install_baas.sh -w ./baas-work-dir
         fi
 
@@ -649,12 +657,44 @@ buildvariants:
     distros:
     - ubuntu2004-arm64-large
 
+- name: macos-1015
+  display_name: "MacOS 10.15 x86_64"
+  run_on: macos-1015
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+  tasks:
+  - name: compile_test
+  - name: swift-build-and-test
+
+- name: macos-1015-release
+  display_name: "MacOS 10.15 x86_64 (Release build)"
+  run_on: macos-1015
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    cmake_build_type: Release
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+  tasks:
+  - name: compile_test_and_package
+  - name: benchmarks
+  - name: long-running-tests
+  - name: swift-build-and-test
+
 - name: macos-1100-arm64
   display_name: "MacOS 11 arm64"
   run_on: macos-1100-arm64
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
@@ -670,6 +710,7 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
