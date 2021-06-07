@@ -96,7 +96,7 @@ void on_change_but_no_notify(realm::Realm& realm);
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
-    void do_log(realm::util::Logger::Level, std::string) override {}
+    void do_log(realm::util::Logger::Level, std::string const&) override {}
     Level get() const noexcept override
     {
         return Level::off;

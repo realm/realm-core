@@ -25,6 +25,8 @@
 #include "realm/array_string.hpp"
 #include "realm/array_fixed_bytes.hpp"
 
+#include <iostream>
+
 /*
  * Node-splitting is done in the way that if the new element comes after all the
  * current elements, then the new element is added to the new node as the only

@@ -25,6 +25,8 @@
 
 #include <external/json/json.hpp>
 
+#include <iostream>
+
 namespace realm {
 
 bool create_dummy_realm(std::string path)
