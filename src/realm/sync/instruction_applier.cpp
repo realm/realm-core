@@ -6,6 +6,26 @@
 
 namespace realm::sync {
 
+namespace {
+REALM_NORETURN void throw_bad_transaction_log(std::string msg)
+{
+    throw BadChangesetError{std::move(msg)};
+}
+REALM_NORETURN void bad_transaction_log(const char* msg)
+{
+    throw_bad_transaction_log(msg);
+}
+
+template <class... Params>
+REALM_NORETURN void bad_transaction_log(const char* msg, Params&&... params)
+{
+    // FIXME: Avoid throwing in normal program flow (since changesets can come
+    // in over the network, defective changesets are part of normal program
+    // flow).
+    throw_bad_transaction_log(util::format(msg, std::forward<Params>(params)...));
+}
+} // namespace
+
 StringData InstructionApplier::get_string(InternString str) const
 {
     auto string = m_log->try_get_intern_string(str);
@@ -159,7 +179,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                     bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), GlobalKey{%2, %3});",
-                    table->get_name(), key, key.hi(), key.lo());
+                    table->get_name(), key.hi(), key.lo());
                 table->create_object(key);
             },
         },

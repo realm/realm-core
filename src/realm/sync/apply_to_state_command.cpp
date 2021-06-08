@@ -1,9 +1,3 @@
-#include <algorithm>
-#include <string>
-#include <type_traits>
-
-#include <external/mpark/variant.hpp>
-
 #include "realm/db.hpp"
 #include "realm/sync/history.hpp"
 #include "realm/sync/instruction_applier.hpp"
@@ -18,6 +12,14 @@
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 #include "realm/util/string_view.hpp"
+
+#include <external/mpark/variant.hpp>
+
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <type_traits>
+
 
 using namespace realm::util;
 

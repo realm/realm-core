@@ -836,7 +836,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 ret = new Value<Decimal128>(Decimal128(text));
             }
             else {
-                ret = new Value<int64_t>(strtol(text.c_str(), nullptr, 0));
+                ret = new Value<int64_t>(strtoll(text.c_str(), nullptr, 0));
             }
             break;
         }

@@ -399,6 +399,43 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     return q2;
 }
 
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      const util::Any* arg_list, size_t num_args, size_t num_results)
+{
+    query_parser::AnyContext ctx;
+    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
+
+    Query q = t->query(query_string, args, {});
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
+
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      std::vector<Mixed> args, size_t num_results)
+{
+    Query q = t->query(query_string, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
 
 TEST(Parser_empty_input)
 {
@@ -583,6 +620,44 @@ TEST(Parser_basic_serialisation)
                        CHECK(std::string(e.what()).find("missing_property") != std::string::npos));
 }
 
+TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableIndexed<Int>, Prop<Decimal128>,
+           Nullable<Decimal128>)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    constexpr bool nullable = TEST_TYPE::is_nullable;
+    constexpr bool indexed = TEST_TYPE::is_indexed;
+    auto col_key = t->add_column(TEST_TYPE::data_type, "values", nullable);
+    if (indexed) {
+        t->add_search_index(col_key);
+    }
+    TestValueGenerator gen;
+    auto values = gen.values_from_int<underlying_type>({-1, 0, 1, 4294967295ll, -4294967295ll, 4294967296ll,
+                                                        -4294967296ll, std::numeric_limits<int64_t>::max(),
+                                                        std::numeric_limits<int64_t>::lowest()});
+    std::vector<Mixed> args;
+    for (auto val : values) {
+        args.push_back(Mixed{val});
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        t->create_object(ObjKey{}, {{col_key, values[i]}});
+    }
+    if (nullable) {
+        t->create_object(ObjKey{}, {{col_key, realm::null{}}});
+    }
+    for (size_t i = 0; i < values.size(); ++i) {
+        std::stringstream out;
+        out << "values == ";
+        out.precision(100);
+        out << values[i];
+        verify_query(test_context, t, out.str(), 1);
+        verify_query_sub(test_context, t, util::format("values == $%1", i), args, 1);
+    }
+    verify_query(test_context, t, "values == null", nullable ? 1 : 0);
+}
 
 TEST(Parser_LinksToSameTable)
 {
@@ -1271,47 +1346,6 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, items, "discount.promotion BEGINSWITH[c] name", 1);
     verify_query(test_context, items, "discount.promotion ENDSWITH[c] name", 0);
     verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
-}
-
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      const util::Any* arg_list, size_t num_args, size_t num_results)
-{
-    query_parser::AnyContext ctx;
-    std::string empty_string;
-    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
-
-    Query q = t->query(query_string, args, {});
-
-    size_t q_count = q.count();
-    CHECK_EQUAL(q_count, num_results);
-    std::string description = q.get_description();
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
-    Query q2 = t->query(description, args, {});
-
-    size_t q2_count = q2.count();
-    CHECK_EQUAL(q2_count, num_results);
-    if (q_count != num_results || q2_count != num_results) {
-        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
-    }
-}
-
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      std::vector<Mixed> args, size_t num_results)
-{
-    std::string empty_string;
-    Query q = t->query(query_string, args, {});
-
-    size_t q_count = q.count();
-    CHECK_EQUAL(q_count, num_results);
-    std::string description = q.get_description();
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
-    Query q2 = t->query(description, args, {});
-
-    size_t q2_count = q2.count();
-    CHECK_EQUAL(q2_count, num_results);
-    if (q_count != num_results || q2_count != num_results) {
-        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
-    }
 }
 
 TEST(Parser_substitution)
