@@ -21,7 +21,7 @@ public:
     explicit ReopeningFileLogger(std::string path, volatile std::sig_atomic_t& reopen_log_file, TimestampConfig = {});
 
 protected:
-    void do_log(util::Logger::Level, std::string message) override;
+    void do_log(util::Logger::Level, const std::string& message) override;
 
 private:
     const std::string m_path;
@@ -31,7 +31,7 @@ private:
     volatile std::sig_atomic_t& m_reopen_log_file;
     util::TimestampFormatter m_timestamp_formatter;
 
-    void do_log_2(util::Logger::Level level, std::string message);
+    void do_log_2(util::Logger::Level level, const std::string& message);
 };
 
 } // namespace _impl

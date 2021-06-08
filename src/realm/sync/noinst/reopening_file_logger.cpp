@@ -18,7 +18,7 @@ ReopeningFileLogger::ReopeningFileLogger(std::string path, volatile std::sig_ato
 }
 
 
-void ReopeningFileLogger::do_log(util::Logger::Level level, std::string message)
+void ReopeningFileLogger::do_log(util::Logger::Level level, const std::string& message)
 {
     if (REALM_UNLIKELY(m_reopen_log_file)) {
         do_log_2(level, "Reopening log file");                // Throws
@@ -30,7 +30,7 @@ void ReopeningFileLogger::do_log(util::Logger::Level level, std::string message)
 }
 
 
-void ReopeningFileLogger::do_log_2(util::Logger::Level level, std::string message)
+void ReopeningFileLogger::do_log_2(util::Logger::Level level, const std::string& message)
 {
     auto now = std::chrono::system_clock::now();
     m_out << m_timestamp_formatter.format(now) << ": " << get_level_prefix(level) << message << '\n'; // Throws

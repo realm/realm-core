@@ -2,6 +2,7 @@
 #include <vector>
 #include <set>
 #include <sstream>
+#include <iostream>
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -19,7 +20,7 @@ namespace {
 
 class MuteLogger : public util::RootLogger {
 public:
-    void do_log(Level, std::string) override final {}
+    void do_log(Level, const std::string&) override final {}
 };
 
 
@@ -31,7 +32,7 @@ public:
         , m_base_logger{base_logger}
     {
     }
-    void do_log(Level level, std::string message) override final
+    void do_log(Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
         Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
@@ -60,7 +61,7 @@ public:
         , m_base_logger{base_logger}
     {
     }
-    void do_log(Level level, std::string message) override final
+    void do_log(Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
         Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
