@@ -21,13 +21,12 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <functional>
-#include <stdexcept>
-#include <string>
-#include <streambuf>
-#include <iostream>
 #include <ctime>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <streambuf>
+#include <string>
 
 #ifndef _WIN32
 #include <dirent.h> // POSIX.1-2001
@@ -1165,7 +1164,7 @@ inline File::Map<T>::Map() noexcept
 }
 
 template <class T>
-inline File::Map<T>::~Map<T>() noexcept
+inline File::Map<T>::~Map() noexcept
 {
 }
 

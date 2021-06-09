@@ -1,16 +1,72 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
+* None.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime (v10.6.0).
-* Fixed a crash that could happen adding a upload/download notification for a sync session. ([#4638](https://github.com/realm/realm-core/pull/4638#issuecomment-832227309) since v10.6.1).
+* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
  
 ### Breaking changes
 * None.
 
+-----------
+
+### Internals
+* Releases for Apple platforms are now built with Xcode 12.2.
+
+----------------------------------------------
+
+# 10.8.0 Release notes
+
+### Enhancements
+* Added the functionality to delete files for a given SharedRealm, unlocking  ([realm-dotnet#386](https://github.com/realm/realm-dotnet/issues/386)).
+
+### Fixed
+* Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
+* Fixed build failure with gcc-11
+* Added merge rule between SetInsert/SetErase and Clear to prevent diverging states after a Clear instruction on the same path. ([#4720](https://github.com/realm/realm-core/issues/4720))
+* Made Linux implementation of ExternalCommitHelper work with new versions of Linux that [changed epoll behavior](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6a965666b7e7475c2f8c8e724703db58b8a8a445), including Android 12 ([#4666](https://github.com/realm/realm-core/issues/4666))
+
+-----------
+
+### Internals
+* DB::write_copy will not use write transaction
+* Refactor the string formatting logic for logging, reducing the compiled size of the library.
+
+----------------------------------------------
+
+# 10.7.2 Release notes
+
+### Fixed
+* Destruction of the TableRecycler at exit  was unordered compared to other threads running. This could lead to crashes, some with the
+  TableRecycler at the top of the stack ([#4600](https://github.com/realm/realm-core/issues/4600), since v6)
+* Calling `Realm::get_synchronized_realm()` while the session was waiting for an access token would crash ([PR #4677](https://github.com/realm/realm-core/pull/4677), since v10.6.1).
+* Fixed errors related to "uncaught exception in notifier thread: N5realm11KeyNotFoundE: No such object". This could happen in a sync'd app when a linked object was deleted by another client. ([realm-js#3611](https://github.com/realm/realm-js/issues/3611), since v6.1.0-alpha.5)
+* Changed the behaviour of `Object::get_property_value(Context)` when fetching an unresolved link from returning an empty Object, to returning null which is consistent with how this method behaves on a null link. ([#4687](https://github.com/realm/realm-core/pull/4687), since v6.1.0-alpha.5)
+* Opening a metadata realm with the wrong encryption key or different encryption configuration will remove that metadata realm and create a new metadata realm using the new key or configuration. [#4285](https://github.com/realm/realm-core/pull/4285)
+* A read-only Realm does not support `ThreadSafeReference` ([Cocoa #5475](https://github.com/realm/realm-cocoa/issues/5475)).
+
+----------------------------------------------
+
+# 10.7.1 Release notes
+
+### Fixed
+* Restored original behavior of Realm::write_copy() as it had breaking pre-conditions. New behavior now in Realm::write_copy_without_client_file_id(). ([#4674](https://github.com/realm/realm-core/pull/4674), since v10.7.0)
+* Realm::write_copy() of a copy would fail on a non-synced realm ([#4672](https://github.com/realm/realm-core/pull/4672), since v10.7.0)
+
+----------------------------------------------
+
+# 10.7.0 Release notes
+
+### Enhancements
+* Realm::write_copy() will now exclude client file identification from the file written. The file can be used as a starting point for synchronizing a new client. The function will throw if client is not fully synced  with the server. The function will need to be able to make a write transaction. ([#4659](https://github.com/realm/realm-core/issues/4659))
+
+### Fixed
+* Building for Apple platforms gave availability warnings for clock_gettime(). The code giving the warning is currently used only on Windows, so this could not actually cause crashes at runtime ([#4614](https://github.com/realm/realm-core/pull/4614) Since v10.6.0).
+* Fixed the android scheduler not being supplied which could result in `[realm-core-10.6.1] No built-in scheduler implementation for this platform. Register your own with Scheduler::set_default_factory()` ([#4660](https://github.com/realm/realm-core/pull/4660) Since v10.6.1).
+* Fixed a crash that could happen adding a upload/download notification for a sync session. ([#4638](https://github.com/realm/realm-core/pull/4638#issuecomment-832227309) since v10.6.1).
+ 
 -----------
 
 ### Internals

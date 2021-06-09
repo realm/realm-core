@@ -2266,7 +2266,7 @@ void Session::send_upload_message()
                              _impl::clamped_hex_dump(changeset_data)); // Throws
             }
             else {
-                logger.trace("Changeset(comp): %1 % 2", changeset_data.size(),
+                logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
                              protocol.compressed_hex_dump(changeset_data));
             }
         }

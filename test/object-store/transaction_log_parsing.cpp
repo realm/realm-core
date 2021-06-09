@@ -33,6 +33,8 @@
 #include <realm.hpp>
 #include <realm/history.hpp>
 
+#include <iostream>
+
 using namespace realm;
 
 class CaptureHelper {
@@ -1723,6 +1725,35 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+    }
+
+    SECTION("changes from an object with an unresolved link") {
+        r->begin_transaction();
+        size_t obj_ndx_to_invalidate = 6;
+        ColKey col_link1 = cols[1];
+        objects[0].set(col_link1, objects[obj_ndx_to_invalidate].get_key());
+        ObjKey link = objects[0].get<ObjKey>(col_link1);
+        REQUIRE(!link.is_unresolved());
+        REQUIRE(link);
+
+        // Object invalidation can only happen if another sync client has deleted the object
+        // we simulate this by calling it directly here. The consequence is that links to this
+        // object are changed to the invalidated key, but not removed. This tests that the
+        // change checker doesn't try to descend down invalidated link paths.
+        objects[obj_ndx_to_invalidate].invalidate();
+
+        // the link is actually unresolved, but that is hidden by a null at this level of abstraction
+        link = objects[0].get<ObjKey>(col_link1);
+        REQUIRE(!link.is_unresolved());
+        REQUIRE(!link);
+        r->commit_transaction();
+
+        auto info = track_changes([&] {
+            objects[1].set(cols[0], 10);
+        });
+        // if the change checker iterates over an invalid link, it'll throw an exception
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
     }
 
     SECTION("cycles over links do not loop forever") {

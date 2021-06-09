@@ -322,8 +322,6 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
             if (include_table_removals)
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
-        else if (existing->is_embedded != target->is_embedded)
-            changes.emplace_back(schema_change::ChangeTableType{target});
     });
 
     // Modify columns
@@ -336,6 +334,14 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
         }
         // nothing for tables in existing but not target
     });
+
+    // Detect embedded table changes last, in case column property changes affect link counts
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+        if (existing && target && existing->is_embedded != target->is_embedded) {
+            changes.emplace_back(schema_change::ChangeTableType{target});
+        }
+    });
+
     return changes;
 }
 

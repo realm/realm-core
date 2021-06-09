@@ -222,8 +222,8 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport_generator) {
-        app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
-            REALM_ASSERT_RELEASE(false);
+        app_config.transport_generator = [this] {
+            return transport_generator();
         };
     }
 

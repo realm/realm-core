@@ -503,13 +503,6 @@ void Realm::notify_schema_changed()
     }
 }
 
-static void check_can_create_any_transaction(const Realm* realm)
-{
-    if (realm->config().immutable()) {
-        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
-    }
-}
-
 static void check_can_create_write_transaction(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
@@ -571,14 +564,12 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
-    check_can_create_any_transaction(this);
     return m_transaction->get_version_of_current_transaction();
 }
 
 uint_fast64_t Realm::get_number_of_versions() const
 {
     verify_open();
-    check_can_create_any_transaction(this);
     return m_coordinator->get_number_of_versions();
 }
 
@@ -681,7 +672,6 @@ void Realm::invalidate()
 {
     verify_open();
     verify_thread();
-    check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
         // This was originally because closing the Realm during notification
@@ -714,7 +704,21 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData key, bool allow_overwrite)
+void Realm::write_copy(StringData path, BinaryData key)
+{
+    if (key.data() && key.size() != 64) {
+        throw InvalidEncryptionKeyException();
+    }
+    verify_thread();
+    try {
+        read_group().write(path, key.data());
+    }
+    catch (...) {
+        _impl::translate_file_exception(path);
+    }
+}
+
+void Realm::write_copy_without_client_file_id(StringData path, BinaryData key, bool allow_overwrite)
 {
     if (key.data() && key.size() != 64) {
         throw InvalidEncryptionKeyException();
@@ -798,7 +802,6 @@ void Realm::notify()
 bool Realm::refresh()
 {
     verify_thread();
-    check_can_create_any_transaction(this);
     return do_refresh();
 }
 
@@ -910,6 +913,36 @@ void Realm::close()
     m_transaction = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
+}
+
+void Realm::delete_files(const std::string& realm_file_path)
+{
+    auto core_files = DB::get_core_files(realm_file_path);
+    auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
+        for (const auto& core_file : core_files) {
+            auto file_type = core_file.first;
+            if (file_type == DB::CoreFileType::Lock) {
+                // The lock cannot be safely deleted here since it is used by `call_with_lock` itself.
+                continue;
+            }
+            auto file_information = core_file.second;
+            auto file_path = file_information.first;
+            auto is_folder = file_information.second;
+            // For both files and folders we use the `try_remove` version to delete them because we want
+            // to avoid throwing in case the file does not exist.
+            // The return value can be ignored for the same reason (false if file or folder does not exist).
+            if (is_folder) {
+                util::try_remove_dir_recursive(file_path); // Throws
+            }
+            else {
+                util::File::try_remove(file_path); // Throws
+            }
+        }
+    });
+    if (!lock_successful) {
+        auto lock_file_path = core_files[DB::CoreFileType::Lock].first;
+        throw DeleteOnOpenRealmException(lock_file_path);
+    }
 }
 
 AuditInterface* Realm::audit_context() const noexcept

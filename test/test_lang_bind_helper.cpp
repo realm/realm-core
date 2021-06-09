@@ -5869,20 +5869,20 @@ TEST(LangBindHelper_getCoreFiles)
     CHECK(core_files.size() > 0);
 
     std::string file;
-    DirScanner scaner(dir);
-    while (scaner.next(file)) {
+    DirScanner scanner(dir);
+    while (scanner.next(file)) {
         const std::string lock_suffix = ".lock";
         if (file.size() >= lock_suffix.size() &&
             file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
             continue;
         }
         std::string path(std::string(dir) + "/" + file);
-        auto file_pair = std::make_pair(path, File::is_dir(path));
         CHECK(core_files.size() != 0);
-        core_files.erase(std::remove(core_files.begin(), core_files.end(), file_pair), core_files.end());
+        auto is_included_in_core_files = std::any_of(core_files.begin(), core_files.end(), [&](auto core_file) {
+            return core_file.second.first == path;
+        });
+        CHECK(is_included_in_core_files);
     }
-
-    CHECK(core_files.size() == 0);
 }
 
 TEST(LangBindHelper_AdvanceReadCluster)

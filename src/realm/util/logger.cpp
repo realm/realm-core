@@ -18,6 +18,8 @@
 
 #include <realm/util/logger.hpp>
 
+#include <iostream>
+
 namespace realm::util {
 
 const char* Logger::get_level_prefix(Level level) noexcept
@@ -41,21 +43,27 @@ const char* Logger::get_level_prefix(Level level) noexcept
     return "";
 }
 
-std::pair<std::string, size_t> Logger::subst_prepare(State& state)
+void StderrLogger::do_log(Level level, const std::string& message)
 {
-    state.m_formatter << "%" << state.m_param_num;
-    std::string key = state.m_formatter.str();
-    state.m_formatter.str(std::string());
-    size_t j = state.m_search.find(key);
-    return std::make_pair(std::move(key), j);
+    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
+    std::cerr.flush();                                       // Throws
 }
 
-void Logger::subst_finish(State& state, size_t j, const std::string& key)
+void StreamLogger::do_log(Level level, const std::string& message)
 {
-    std::string str = state.m_formatter.str();
-    state.m_formatter.str(std::string());
-    state.m_message.replace(j, key.size(), str);
-    state.m_search.replace(j, key.size(), std::string(str.size(), '\0'));
+    m_out << get_level_prefix(level) << message << '\n'; // Throws
+    m_out.flush();                                       // Throws
+}
+
+void ThreadSafeLogger::do_log(Level level, const std::string& message)
+{
+    LockGuard l(m_mutex);
+    Logger::do_log(m_base_logger, level, message); // Throws
+}
+
+void PrefixLogger::do_log(Level level, const std::string& message)
+{
+    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
 }
 
 } // namespace realm::util

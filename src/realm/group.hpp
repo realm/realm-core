@@ -242,7 +242,6 @@ public:
     /// GlobalKeys.
     uint64_t get_sync_file_id() const noexcept;
     void set_sync_file_id(uint64_t id);
-    void remove_sync_file_id();
 
     /// Returns the keys for all tables in this group.
     TableKeys get_table_keys() const;
@@ -372,7 +371,7 @@ public:
     /// overwriting a database file that is currently open, which
     /// would cause undefined behaviour.
     ///
-    /// \param file A filesystem path.
+    /// \param path A filesystem path to the file you want to write to.
     ///
     /// \param encryption_key 32-byte key used to encrypt the database file,
     /// or nullptr to disable encryption.
@@ -381,12 +380,14 @@ public:
     /// realm file with free list and history info. The version of the commit
     /// will be set to the value given here.
     ///
+    /// \param write_history Indicates if you want the Sync Client History to
+    /// be written to the file (only relevant for synchronized files).
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key = nullptr, uint64_t version = 0,
+    void write(const std::string& path, const char* encryption_key = nullptr, uint64_t version = 0,
                bool write_history = true) const;
 
     /// Write this database to a memory buffer.
@@ -644,16 +645,6 @@ private:
     std::shared_ptr<metrics::Metrics> m_metrics;
     size_t m_total_rows;
 
-    class TableRecycler : public std::vector<Table*> {
-    public:
-        ~TableRecycler()
-        {
-            for (auto t : *this) {
-                delete t;
-            }
-        }
-    };
-
     static constexpr size_t s_table_name_ndx = 0;
     static constexpr size_t s_table_refs_ndx = 1;
     static constexpr size_t s_file_size_ndx = 2;
@@ -667,18 +658,6 @@ private:
     static constexpr size_t s_sync_file_id_ndx = 10;
 
     static constexpr size_t s_group_max_size = 11;
-
-    // We use the classic approach to construct a FIFO from two LIFO's,
-    // insertion is done into recycler_1, removal is done from recycler_2,
-    // and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
-    // this i O(1) for each entry.
-    static TableRecycler g_table_recycler_1;
-    static TableRecycler g_table_recycler_2;
-    // number of tables held back before being recycled. We hold back recycling
-    // the latest to increase the probability of detecting race conditions
-    // without crashing.
-    const static int g_table_recycling_delay = 100;
-    static std::mutex g_table_recycler_mutex;
 
     struct shared_tag {
     };
@@ -752,8 +731,8 @@ private:
 
     void mark_all_table_accessors() noexcept;
 
-    void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const;
-    void write(std::ostream&, bool pad, uint_fast64_t version_numer, bool write_history) const;
+    void write(util::File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const;
+    void write(std::ostream&, bool pad, uint_fast64_t version_numer, TableWriter& writer) const;
 
     std::shared_ptr<metrics::Metrics> get_metrics() const noexcept;
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
@@ -1159,6 +1138,28 @@ public:
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
     virtual HistoryInfo write_history(_impl::OutputStream&) = 0;
     virtual ~TableWriter() noexcept {}
+
+    void set_group(const Group* g)
+    {
+        m_group = g;
+    }
+
+protected:
+    const Group* m_group = nullptr;
+};
+
+class Group::DefaultTableWriter : public Group::TableWriter {
+public:
+    DefaultTableWriter(bool should_write_history = true)
+        : m_should_write_history(should_write_history)
+    {
+    }
+    ref_type write_names(_impl::OutputStream& out) override;
+    ref_type write_tables(_impl::OutputStream& out) override;
+    HistoryInfo write_history(_impl::OutputStream& out) override;
+
+private:
+    bool m_should_write_history;
 };
 
 inline const Table* Group::do_get_table(size_t ndx) const
