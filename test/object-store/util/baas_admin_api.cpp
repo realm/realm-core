@@ -439,6 +439,15 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
 void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string app_id)
 {
     auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/logout", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
+void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
         util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
         m_access_token);
     auto response = endpoint.put("");
@@ -452,6 +461,32 @@ void AdminAPISession::enable_user_sessions(const std::string& user_id, const std
         m_access_token);
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
+}
+
+// returns false for an invalid/expired access token
+bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/verify_token", m_base_url, m_group_id, app_id),
+        m_access_token);
+    nlohmann::json request_body{
+        {"token", access_token},
+    };
+    auto response = endpoint.post(request_body.dump());
+    if (response.http_status_code == 200) {
+        auto resp_json = nlohmann::json::parse(response.body.empty() ? "{}" : response.body);
+        try {
+            // if these fields are found, then the token is valid according to the server.
+            // if it is invalid or expired then an error response is sent.
+            int64_t issued_at = resp_json["iat"];
+            int64_t expires_at = resp_json["exp"];
+            return issued_at != 0 && expires_at != 0;
+        }
+        catch (...) {
+            return false;
+        }
+    }
+    return false;
 }
 
 AdminAPIEndpoint AdminAPISession::apps() const

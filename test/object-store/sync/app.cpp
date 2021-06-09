@@ -104,6 +104,17 @@ struct AutoVerifiedEmailCredentials {
     std::string password;
 };
 
+void timed_wait_for(std::function<bool()> condition, size_t max_ms = 2000)
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > std::chrono::milliseconds(max_ms)) {
+            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms));
+        }
+        return condition();
+    });
+}
+
 } // namespace
 // MARK: - Login with Credentials Tests
 
@@ -1926,18 +1937,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        util::EventLoop::main().run_until([&] {
+        REQUIRE_NOTHROW(timed_wait_for([&] {
             return called.load();
-        });
+        }));
         REQUIRE(called);
         called.store(false);
         session->wait_for_download_completion([&](std::error_code err) {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        util::EventLoop::main().run_until([&] {
+        REQUIRE_NOTHROW(timed_wait_for([&] {
             return called.load();
-        });
+        }));
         return realm::Results(r, r->read_group().get_table("class_Dog"));
     };
 
@@ -2128,69 +2139,141 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
-    SECTION("Revoked Access Token results in an error") {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = sync_manager.app();
-        auto creds = create_user_and_login(sync_manager.app());
-        auto config = setup_and_get_config(app);
-        std::atomic<bool> sync_error_handler_called{false};
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            sync_error_handler_called.store(true);
-            REQUIRE(error.error_code == realm::sync::make_error_code(realm::sync::ProtocolError::permission_denied));
-            REQUIRE(error.message ==
-                    "Unable to refresh the user access token; has this user been disabled by an admin?");
+    SECTION("Invalid refresh token") {
+        auto verify_error_on_sync_with_invalid_refresh_token = [&](std::shared_ptr<SyncUser> user,
+                                                                   realm::Realm::Config config) {
+            REQUIRE(user);
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+
+            // requesting a new access token fails because the refresh token used for this request is revoked
+            user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(error);
+                REQUIRE(error->http_status_code == 401);
+                REQUIRE(error->error_code ==
+                        realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+            });
+
+            // Set a bad access token. This will force a request for a new access token when the sync session opens
+            // this is only necessary because the server doesn't actually revoke previously issued access tokens
+            // instead allowing their session to time out as normal. So this simulates the access token expiring.
+            // see:
+            // https://github.com/10gen/baas/blob/05837cc3753218dfaf89229c6930277ef1616402/api/common/auth.go#L1380-L1386
+            user->update_access_token(encode_fake_jwt("fake_access_token"));
+            REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+
+            std::atomic<bool> sync_error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                sync_error_handler_called.store(true);
+                REQUIRE(error.error_code ==
+                        realm::sync::make_error_code(realm::sync::ProtocolError::permission_denied));
+                REQUIRE(error.message == "Unable to refresh the user access token.");
+            };
+
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = user->session_for_on_disk_path(r->config().path);
+            REQUIRE(user->is_logged_in());
+            REQUIRE(!sync_error_handler_called.load());
+            {
+                std::atomic<bool> called{false};
+                session->wait_for_upload_completion([&](std::error_code err) {
+                    called.store(true);
+                    REQUIRE(err == realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+                });
+                REQUIRE_NOTHROW(timed_wait_for([&] {
+                    return called.load();
+                }));
+                REQUIRE(called);
+            }
+            REQUIRE_NOTHROW(timed_wait_for([&] {
+                return sync_error_handler_called.load();
+            }));
+
+            // the failed refresh logs out the user
+            REQUIRE(!user->is_logged_in());
         };
 
-        app_session.admin_api.revoke_user_sessions(app->current_user()->identity(), app_session.server_app_id);
+        SECTION("Disabled user results in a sync error") {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto user = app->current_user();
+            REQUIRE(user);
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+            app_session.admin_api.disable_user_sessions(app->current_user()->identity(), app_session.server_app_id);
 
-        auto r = realm::Realm::get_shared_realm(config);
-        auto user = app->current_user();
-        auto session = user->session_for_on_disk_path(r->config().path);
-        REQUIRE(user->is_logged_in());
-        REQUIRE(!sync_error_handler_called.load());
-        {
-            std::atomic<bool> called{false};
-            session->wait_for_upload_completion([&](std::error_code err) {
-                REQUIRE(err == realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
-                called.store(true);
-            });
-            util::EventLoop::main().run_until([&] {
-                return called.load();
-            });
-            REQUIRE(called);
+            verify_error_on_sync_with_invalid_refresh_token(user, config);
+
+            // logging in again doesn't fix things while the account is disabled
+            app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->error_code ==
+                            realm::app::make_error_code(realm::app::ServiceErrorCode::user_disabled));
+                });
+
+            // admin enables user sessions again which should allow the session to continue
+            app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
+
+            // logging in now works properly
+            app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                         [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                             REQUIRE(user);
+                                             REQUIRE(!error);
+                                         });
+            // still referencing the same user
+            REQUIRE(user == app->current_user());
+            REQUIRE(user->is_logged_in());
+
+            {
+                // check that there are no errors initiating a session now by making sure upload/download succeeds
+                auto r = realm::Realm::get_shared_realm(config);
+                auto session = user->session_for_on_disk_path(r->config().path);
+                Results dogs = get_dogs(r, session);
+            }
         }
-        REQUIRE(sync_error_handler_called.load());
 
-        // the failed refresh logs out the user
-        REQUIRE(!user->is_logged_in());
+        SECTION("Revoked refresh token results in a sync error") {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto user = app->current_user();
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+            app_session.admin_api.revoke_user_sessions(user->identity(), app_session.server_app_id);
+            // revoking a user session only affects the refresh token, so the access token should still continue to
+            // work.
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
 
-        // logging in again doesn't fix things while the account is disabled
-        app->log_in_with_credentials(
-            realm::app::AppCredentials::username_password(creds.email, creds.password),
-            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                REQUIRE(!user);
-                REQUIRE(error);
-                REQUIRE(error->error_code ==
-                        realm::app::make_error_code(realm::app::ServiceErrorCode::user_disabled));
+            verify_error_on_sync_with_invalid_refresh_token(user, config);
+
+            // logging in again succeeds and generates a new and valid refresh token
+            app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                         [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                             REQUIRE(!error);
+                                             REQUIRE(user);
+                                         });
+
+            // still referencing the same user and now the user is logged in
+            REQUIRE(user == app->current_user());
+            REQUIRE(user->is_logged_in());
+
+            // new requests for an access token succeed again
+            user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(!error);
             });
 
-        // admin enables user sessions again which should allow the session to continue
-        app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
-
-        // logging in now works properly
-        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
-                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                         REQUIRE(user);
-                                         REQUIRE(!error);
-                                     });
-        // still referencing the same user
-        REQUIRE(user == app->current_user());
-        REQUIRE(user->is_logged_in());
-
-        // check that there are no errors initiating a session by making sure upload/download succeeds
-        Results dogs = get_dogs(r, session);
+            {
+                // check that there are no errors initiating a new sync session by making sure upload/download
+                // succeeds
+                auto r = realm::Realm::get_shared_realm(config);
+                auto session = user->session_for_on_disk_path(r->config().path);
+                Results dogs = get_dogs(r, session);
+            }
+        }
     }
-
 
     SECTION("invalid partition error handling") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});

@@ -64,7 +64,9 @@ public:
 
     AdminAPIEndpoint apps() const;
     void revoke_user_sessions(const std::string& user_id, const std::string app_id);
+    void disable_user_sessions(const std::string& user_id, const std::string app_id);
     void enable_user_sessions(const std::string& user_id, const std::string app_id);
+    bool verify_access_token(const std::string& access_token, const std::string app_id);
 
 private:
     AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
