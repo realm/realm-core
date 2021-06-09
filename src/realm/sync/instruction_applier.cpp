@@ -256,7 +256,9 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
     }
 }
 
-
+#if _MSC_VER
+#pragma runtime_checks("", off)
+#endif
 void InstructionApplier::operator()(const Instruction::Update& instr)
 {
     auto setter = util::overload{
@@ -893,6 +895,9 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
     resolve_path(instr, "SetErase", callback);
 }
+#if _MSC_VER
+#pragma runtime_checks("", restore)
+#endif
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
 {

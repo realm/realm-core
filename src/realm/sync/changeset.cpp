@@ -74,7 +74,7 @@ PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
     return mpark::visit(get, key);
 }
 #if _MSC_VER
-#pragma runtime_checks("", off)
+#pragma runtime_checks("", restore)
 #endif
 
 bool Changeset::operator==(const Changeset& that) const noexcept
