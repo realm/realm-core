@@ -248,9 +248,6 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     util::try_make_dir(m_base_file_path);
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
-#if TEST_ENABLE_SYNC_LOGGING
-    config.verbose_sync_client_logging = true;
-#endif
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
 
     m_app = app::App::get_shared_app(app_config, sc_config);
