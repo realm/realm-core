@@ -306,6 +306,24 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
 
+    // Asynchronous (write)transaction.
+    // 'the_write_block' is scheduled for execution on the scheduler
+    // associated with the current realm. It will run after the write
+    // mutex has been acquired. it should end by calling commit_transaction(),
+    // cancel_transaction() or schedule_commit(). Returning without one of
+    // these calls will be equivalent to calling cancel_transaction().
+    // The call returns immediately allowing the caller to proceed
+    // while the write mutex is held by someone else.
+    void schedule_transaction(std::function<void()> the_write_block);
+
+    // Asynchronous commit.
+    // 'the_done_block' is scheduled for execution on the scheduler
+    // associated with the current realm. It will run after the commit
+    // has been completed. The call returns immediately allowing
+    // the caller to proceed while the I/O is performed on a dedicated
+    // background thread.
+    void schedule_commit(std::function<void()> the_done_block);
+
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
 
