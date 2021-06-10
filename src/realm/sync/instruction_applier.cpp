@@ -58,6 +58,11 @@ TableRef InstructionApplier::table_for_class_name(StringData class_name) const
     return m_transaction.get_table(class_name_to_table_name(class_name, buffer));
 }
 
+// TODO: https://github.com/realm/realm-core/issues/4624 remove the check disabling code once
+// we understand why MSVC reports stack corruption in this and the following methods.
+#if _MSC_VER
+#pragma runtime_checks("", off)
+#endif
 void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
@@ -255,7 +260,6 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
             return visitor(data.uuid);
     }
 }
-
 
 void InstructionApplier::operator()(const Instruction::Update& instr)
 {
@@ -893,6 +897,9 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
     resolve_path(instr, "SetErase", callback);
 }
+#if _MSC_VER
+#pragma runtime_checks("", restore)
+#endif
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
 {

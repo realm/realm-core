@@ -58,6 +58,8 @@ InternString Changeset::find_string(StringData string) const noexcept
     return InternString{};
 }
 
+// TODO: https://github.com/realm/realm-core/issues/4624 remove the check disabling code once
+// we understand why MSVC reports stack corruption in this method.
 #if _MSC_VER
 #pragma runtime_checks("", off)
 #endif
@@ -74,7 +76,7 @@ PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
     return mpark::visit(get, key);
 }
 #if _MSC_VER
-#pragma runtime_checks("", off)
+#pragma runtime_checks("", restore)
 #endif
 
 bool Changeset::operator==(const Changeset& that) const noexcept
