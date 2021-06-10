@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
+* Fixed issues around key-based dictionary notifications holding on to a transaction ([#4744](https://github.com/realm/realm-core/issues/4744), since v11.0.1)
  
 ### Breaking changes
 * None.
