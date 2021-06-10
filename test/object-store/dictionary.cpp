@@ -629,13 +629,14 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(key_change.modifications.size() == 0);
 
             r->begin_transaction();
-            dict.remove_all();
+            obj.remove();
             r->commit_transaction();
 
             advance_and_notify(*r);
             REQUIRE(key_change.insertions.size() == 0);
             REQUIRE(key_change.deletions.size() == values.size() - 1);
             REQUIRE(key_change.modifications.size() == 0);
+            REQUIRE(key_change.collection_root_was_deleted);
         }
 
         SECTION("clear list") {

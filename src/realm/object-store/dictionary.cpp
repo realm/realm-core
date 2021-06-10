@@ -122,6 +122,57 @@ private:
 };
 } // anonymous namespace
 
+void DictionaryChangeSet::add(std::vector<Mixed>& arr, const Mixed& key)
+{
+    arr.push_back(key);
+    if (key.is_type(type_String)) {
+        REALM_ASSERT(m_string_store.size() < m_string_store.capacity());
+        m_string_store.emplace_back();
+        arr.back().use_buffer(m_string_store.back());
+    }
+}
+
+DictionaryChangeSet::DictionaryChangeSet(const DictionaryChangeSet& other)
+{
+    m_string_store.reserve(other.m_string_store.size());
+    for (auto k : other.deletions) {
+        add(deletions, k);
+    }
+    for (auto k : other.insertions) {
+        add(insertions, k);
+    }
+    for (auto k : other.modifications) {
+        add(modifications, k);
+    }
+
+    collection_root_was_deleted = other.collection_root_was_deleted;
+}
+
+DictionaryChangeSet& DictionaryChangeSet::operator=(const DictionaryChangeSet& other)
+{
+    m_string_store.reserve(other.m_string_store.size());
+
+    m_string_store.clear();
+    deletions.clear();
+    insertions.clear();
+    modifications.clear();
+
+    for (auto k : other.deletions) {
+        add(deletions, k);
+    }
+    for (auto k : other.insertions) {
+        add(insertions, k);
+    }
+    for (auto k : other.modifications) {
+        add(modifications, k);
+    }
+
+    collection_root_was_deleted = other.collection_root_was_deleted;
+
+    return *this;
+}
+
+
 namespace object_store {
 
 bool Dictionary::operator==(const Dictionary& rgt) const noexcept
@@ -236,19 +287,32 @@ public:
 
     void after(CollectionChangeSet const& c)
     {
-        DictionaryChangeSet changes;
-        for (auto ndx : c.deletions.as_indexes()) {
-            changes.deletions.push_back(m_prev_dict->get_key(ndx));
+        size_t max_keys = c.deletions.count() + c.insertions.count() + c.modifications.count();
+        DictionaryChangeSet changes(max_keys);
+
+        if (max_keys) {
+            for (auto ndx : c.deletions.as_indexes()) {
+                changes.add_deletion(m_prev_dict->get_key(ndx));
+            }
+            for (auto ndx : c.insertions.as_indexes()) {
+                changes.add_insertion(m_dict.get_key(ndx));
+            }
+            for (auto ndx : c.modifications_new.as_indexes()) {
+                changes.add_modification(m_dict.get_key(ndx));
+            }
         }
-        for (auto ndx : c.insertions.as_indexes()) {
-            changes.insertions.push_back(m_dict.get_key(ndx));
+
+        if (c.collection_root_was_deleted) {
+            changes.collection_root_was_deleted = true;
+            m_prev_rt = nullptr;
         }
-        for (auto ndx : c.modifications_new.as_indexes()) {
-            changes.modifications.push_back(m_dict.get_key(ndx));
+        else {
+            REALM_ASSERT(m_dict.is_attached());
+            auto current_tr = static_cast<Transaction*>(m_dict.get_table()->get_parent_group());
+            m_prev_rt->advance_read(current_tr->get_version_of_current_transaction());
         }
-        m_cb(changes, {});
-        m_prev_rt->advance_read(
-            static_cast<Transaction*>(m_dict.get_table()->get_parent_group())->get_version_of_current_transaction());
+
+        m_cb(std::move(changes), {});
     }
 
     void error(std::exception_ptr ptr)
