@@ -105,6 +105,10 @@ functions:
               set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
           fi
 
+          if [ -n "${enable_logging|}" ]; then
+              set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
+          fi
+
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -370,6 +374,8 @@ tasks:
   tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
   commands:
   - func: "compile"
+    vars:
+      enable_logging: true
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec

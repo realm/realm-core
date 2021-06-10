@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix crashes when sync logging is set to trace or higher (since 11.0.2).
  
 ### Breaking changes
 * None.

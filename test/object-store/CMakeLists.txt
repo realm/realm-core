@@ -91,6 +91,12 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
+if(REALM_TEST_SYNC_LOGGING)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        TEST_ENABLE_SYNC_LOGGING=1
+    )
+endif()
+
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(VSCODE_TEST_RUNNER)
