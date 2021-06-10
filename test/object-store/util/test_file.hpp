@@ -181,6 +181,7 @@ struct TestSyncManager {
         std::string base_url;
         realm::SyncManager::MetadataMode metadata_mode;
         bool should_teardown_test_directory;
+        bool verbose_sync_client_logging = false;
     };
 
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
