@@ -384,6 +384,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             if (error->http_status_code && (*error->http_status_code == 401 || *error->http_status_code == 403)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions or the user has been disabled.
+                // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
                 std::unique_lock<std::mutex> lock(session->m_state_mutex);
                 session->cancel_pending_waits(lock, error->error_code);
                 if (session_user && session_user->is_logged_in()) {
