@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/sync/client.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/websocket.hpp>
@@ -417,6 +418,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, SyncManager* sync_manager)
     : m_state(&State::inactive)
     , m_config(std::move(config))
+    , m_session_realm_path(realm_path)
     , m_realm_path(std::move(realm_path))
     , m_client(client)
     , m_sync_manager(sync_manager)
@@ -481,6 +483,7 @@ void SyncSession::handle_error(SyncError error)
         switch (m_config.client_resync_mode) {
             case ClientResyncMode::Manual:
                 break;
+            case ClientResyncMode::SeamlessLoss:
             case ClientResyncMode::DiscardLocal: {
                 // Performing a client resync requires tearing down our current
                 // sync session and creating a new one with a forced client
@@ -496,11 +499,11 @@ void SyncSession::handle_error(SyncError error)
                     m_force_client_reset = true;
                     CompletionCallbacks callbacks;
                     std::swap(m_completion_callbacks, callbacks);
+                    // always swap back, even if advance_state throws
+                    auto guard = util::make_scope_exit([&]() noexcept {
+                        std::swap(callbacks, m_completion_callbacks);
+                    });
                     advance_state(lock, State::inactive);
-
-                    // FIXME This should be done in a scope guard so that we always do this, even if advance_state
-                    // throws.
-                    std::swap(callbacks, m_completion_callbacks);
                 }
                 revive_if_needed();
                 return;
@@ -731,11 +734,11 @@ void SyncSession::do_create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        std::string metadata_dir = m_realm_path + ".resync";
-        util::try_make_dir(metadata_dir);
         sync::Session::Config::ClientReset config;
-        config.metadata_dir = metadata_dir;
+        config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
         session_config.client_reset_config = config;
+        m_realm_path = _impl::ClientResetOperation::open_session_for_path(m_realm_path, config.seamless_loss,
+                                                                          m_config.realm_encryption_key);
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
@@ -871,7 +874,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_sync_manager->unregister_session(m_realm_path);
+    m_sync_manager->unregister_session(m_session_realm_path);
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,

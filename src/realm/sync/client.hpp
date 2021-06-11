@@ -564,7 +564,7 @@ public:
         /// or
         /// bool wait_for_download_complete_or_client_stopped().
         struct ClientReset {
-            std::string metadata_dir;
+            bool seamless_loss = false;
         };
         util::Optional<ClientReset> client_reset_config;
 

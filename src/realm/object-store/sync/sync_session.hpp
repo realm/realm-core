@@ -368,6 +368,7 @@ private:
 
     SyncConfig m_config;
     bool m_force_client_reset = false;
+    std::string m_session_realm_path;
     std::string m_realm_path;
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager = nullptr;
