@@ -93,7 +93,9 @@ void on_change_but_no_notify(realm::Realm& realm);
 
 #if REALM_ENABLE_SYNC
 
+#ifndef TEST_ENABLE_SYNC_LOGGING
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
+#endif
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
     void do_log(realm::util::Logger::Level, std::string const&) override {}
@@ -171,6 +173,11 @@ struct SyncTestFile : TestFile {
 
 struct TestSyncManager {
     struct Config {
+#if TEST_ENABLE_SYNC_LOGGING
+        static constexpr bool default_logging = true;
+#else
+        static constexpr bool default_logging = false;
+#endif
         Config();
         Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
         Config(std::string, std::string,
@@ -181,7 +188,7 @@ struct TestSyncManager {
         std::string base_url;
         realm::SyncManager::MetadataMode metadata_mode;
         bool should_teardown_test_directory;
-        bool verbose_sync_client_logging = false;
+        bool verbose_sync_client_logging = default_logging;
     };
 
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});

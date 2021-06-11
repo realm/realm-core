@@ -2162,7 +2162,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("too large sync message error handling") {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        TestSyncManager::Config test_config(app_config);
+
+        // Too much log output seems to create problems on Evergreen CI
+        test_config.verbose_sync_client_logging = false;
+
+        TestSyncManager sync_manager(test_config, {});
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
 
