@@ -162,7 +162,7 @@ has a mapped volume to the `tests/mongodb` directory.
 To run the [app] tests against the local image, you need to configure a build with some cmake options to tell the tests where to point to.
 ```
 mkdir build.sync.ninja
-cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090 -DREALM_STITCH_CONFIG=$(pwd)/test/object-store/mongodb/config.json
+cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090
 cmake --build build.sync.ninja --target tests
 ./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
 ```
