@@ -381,8 +381,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             }
         }
         else if (error) {
-            if (error->is_client_error() && static_cast<app::ClientErrorCode>(error->error_code.value()) ==
-                                                app::ClientErrorCode::app_deallocated) {
+            if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
                 return;
             }
             // 10 seconds is arbitrary, but it is to not swamp the server
@@ -418,6 +417,7 @@ std::shared_ptr<SyncManager> SyncSession::sync_manager() const
 void SyncSession::detach_from_sync_manager()
 {
     shutdown_and_wait();
+    std::lock_guard<std::mutex> lk(m_state_mutex);
     m_sync_manager = nullptr;
 }
 
