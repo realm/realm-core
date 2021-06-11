@@ -1,17 +1,9 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.8.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
 * When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
-* Fix crashes when sync logging is set to trace or higher (since 11.0.2).
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
