@@ -7,6 +7,7 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
 * Fix crashes when sync logging is set to trace or higher (since 11.0.2).
+* Fix crash when changing nullability of primary key column ([#4759](https://github.com/realm/realm-core/issues/4759), since v11.0.0-beta.6)
  
 ### Breaking changes
 * None.
