@@ -5255,6 +5255,35 @@ TEST(Table_Column_Conversions)
 
 }
 */
+
+TEST(Table_ChangePKNullability)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto wt = sg->start_write();
+    auto table = wt->add_table_with_primary_key("foo", type_String, "id", false);
+
+    table->create_object_with_primary_key("Paul");
+    table->create_object_with_primary_key("John");
+    table->create_object_with_primary_key("George");
+    table->create_object_with_primary_key("Ringo");
+
+    auto pk_col = table->get_primary_key_column();
+    pk_col = table->set_nullability(pk_col, true, true);
+    CHECK(pk_col.is_nullable());
+
+    table->create_object_with_primary_key("");
+    table->create_object_with_primary_key({});
+
+    CHECK_LOGIC_ERROR(table->set_nullability(pk_col, false, true), LogicError::column_not_nullable);
+
+    table->get_object_with_primary_key({}).remove();
+    table->set_nullability(pk_col, false, true);
+}
+
 TEST(Table_MultipleObjs) {
     SHARED_GROUP_TEST_PATH(path);
 
