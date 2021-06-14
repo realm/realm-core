@@ -3870,18 +3870,18 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         throw;
     }
 
-    erase_root_column(col_key);
-    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
-
-    if (si)
-        do_add_search_index(new_col);
-
     if (is_pk_col) {
         // If we go from non nullable to nullable, no values change,
         // so it is safe to preserve the pk column. Otherwise it is not
         // safe as a null entry might have been converted to default value.
         do_set_primary_key_column(nullable ? new_col : ColKey{});
     }
+
+    erase_root_column(col_key);
+    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
+
+    if (si)
+        do_add_search_index(new_col);
 
     return new_col;
 }
