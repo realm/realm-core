@@ -94,6 +94,7 @@ else
           -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
+          -D REALM_BUILD_LIB_ONLY=1 \
           -D REALM_VERSION="${VERSION}" \
           ${CMAKE_FLAGS} \
           -G Xcode ..

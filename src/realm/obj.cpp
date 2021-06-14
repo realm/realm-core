@@ -1622,9 +1622,21 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
     auto target_key = result.get_key();
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
-    if (!t.is_embedded() && old_key != ObjKey()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (old_key != ObjKey()) {
+        if (!t.is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+
+        // If this is an embedded object and there was already an embedded object here, then we need to
+        // emit an instruction to set the old embedded object to null to clear the old object on other
+        // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
+        // and then array operations will have a corrupted prior_size.
+        if (Replication* repl = get_replication()) {
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
     }
+
     if (target_key != old_key) {
         CascadeState state;
 

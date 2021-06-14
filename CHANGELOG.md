@@ -7,6 +7,8 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Destroying the SyncManager in ObjectStore no longer causes segfaults in async callbacks in SyncUser/SyncSession ([4615](https://github.com/realm/realm-core/issues/4615))
 * None.
+* When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
+* Fix crashes when sync logging is set to trace or higher (since 11.0.2).
  
 ### Breaking changes
 * None.
@@ -14,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Releases for Apple platforms are now built with Xcode 12.2.
 
 ----------------------------------------------
 
