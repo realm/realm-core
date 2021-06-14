@@ -215,6 +215,19 @@
 
 ----------------------------------------------
 
+# 10.8.1 Release notes
+
+### Fixed
+* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
+* When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
+ 
+-----------
+
+### Internals
+* Releases for Apple platforms are now built with Xcode 12.2.
+
+----------------------------------------------
+
 # 10.8.0 Release notes
 
 ### Enhancements
