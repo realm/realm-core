@@ -305,7 +305,7 @@ def doCheckInDocker(Map options = [:]) {
                 // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
                 // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
                 // if there's really a new feature you need from the latest stitch, upgrade this manually
-                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: []) { networkName ->
+                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG) { networkName ->
                     buildSteps("--network=${networkName}")
                 }
 
