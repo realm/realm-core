@@ -26,6 +26,7 @@
 #include <catch2/catch.hpp>
 #include <curl/curl.h>
 
+#include "realm/object_id.hpp"
 #include "realm/util/scope_exit.hpp"
 #include "realm/util/string_buffer.hpp"
 
@@ -526,13 +527,14 @@ AppCreateConfig default_app_config(const std::string& base_url)
         true,
     };
 
+    ObjectId id = ObjectId::gen();
     return AppCreateConfig{
         "test",
         base_url,
         "unique_user@domain.com",
         "password",
         "mongodb://localhost:26000",
-        "test_data",
+        util::format("test_data_%1", id.to_string()),
         std::move(default_schema),
         std::move(partition_key),
         true,
@@ -553,13 +555,14 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         false, false,
     };
 
+    ObjectId id = ObjectId::gen();
     return AppCreateConfig{
         name,
         base_url,
         "unique_user@domain.com",
         "password",
         "mongodb://localhost:26000",
-        util::format("test_data_%1", name),
+        util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
         true,                        // dev_mode_enabled
