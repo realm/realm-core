@@ -60,14 +60,14 @@ using namespace std::string_view_literals;
 namespace {
 // This will create a new test app in the baas server at base_url to be used in tests throughout
 // tis file.
-std::string get_runtime_app_id(std::string base_url)
+AppSession get_runtime_app_session(std::string base_url)
 {
-    static const std::string cached_app_id = [&] {
-        auto cached_app_id = create_app(default_app_config(base_url));
-        std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
-        return cached_app_id;
+    static const AppSession cached_app_session = [&] {
+        auto cached_app_session = create_app(default_app_config(base_url));
+        std::cout << "found app_id: " << cached_app_session.client_app_id << " in stitch config" << std::endl;
+        return cached_app_session;
     }();
-    return cached_app_id;
+    return cached_app_session;
 }
 
 class IntTestTransport : public GenericNetworkTransport {
@@ -106,9 +106,10 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         std::string base_url = get_base_url();
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
         REQUIRE(!base_url.empty());
+        auto app_session = get_runtime_app_session(base_url);
 
         // this app id is configured in tests/mongodb/config.json
-        auto config = App::Config{get_runtime_app_id(base_url),
+        auto config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -171,7 +172,9 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -387,7 +390,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -712,7 +716,8 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -757,7 +762,8 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
         };
         std::string base_url = get_base_url();
         REQUIRE(!base_url.empty());
-        auto config = App::Config{get_runtime_app_id(base_url),
+        auto app_session = get_runtime_app_session(base_url);
+        auto config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -815,7 +821,8 @@ TEST_CASE("app: call function", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -861,7 +868,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -888,7 +896,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                  });
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     auto person_collection = db["Person"];
 
@@ -918,23 +926,23 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument bad_document{{"bad", "value"}};
 
     dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(person_document2, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     SECTION("insert") {
@@ -1532,7 +1540,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -1647,7 +1656,8 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
     };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    auto config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -1679,7 +1689,7 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
                                  });
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
 
@@ -1725,9 +1735,9 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     };
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
-    auto server_app_id = create_app(server_app_config);
+    auto app_session = create_app(server_app_config);
 
-    auto app_config = App::Config{server_app_id,
+    auto app_config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -1847,7 +1857,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
-    auto app_config = App::Config{get_runtime_app_id(base_url),
+    auto app_session = get_runtime_app_session(base_url);
+    auto app_config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,

@@ -443,11 +443,14 @@ AdminAPIEndpoint AdminAPISession::apps() const
 
 AppCreateConfig default_app_config(const std::string& base_url)
 {
-    constexpr const char* update_user_data_func = R"(
+    ObjectId id = ObjectId::gen();
+    std::string db_name = util::format("test_data_%1", id.to_string());
+
+    std::string update_user_data_func = util::format(R"(
         exports = async function(data) {
             const user = context.user;
             const mongodb = context.services.get("BackingDB");
-            const userDataCollection = mongodb.db("test_data").collection("UserData");
+            const userDataCollection = mongodb.db("%1").collection("UserData");
             await userDataCollection.updateOne(
                                                { "user_id": user.id },
                                                { "$set": data },
@@ -455,7 +458,8 @@ AppCreateConfig default_app_config(const std::string& base_url)
                                                );
             return true;
         };
-    )";
+    )",
+                                                     db_name);
 
     constexpr const char* sum_func = R"(
         exports = function(...args) {
@@ -527,14 +531,13 @@ AppCreateConfig default_app_config(const std::string& base_url)
         true,
     };
 
-    ObjectId id = ObjectId::gen();
     return AppCreateConfig{
         "test",
         base_url,
         "unique_user@domain.com",
         "password",
         "mongodb://localhost:26000",
-        util::format("test_data_%1", id.to_string()),
+        db_name,
         std::move(default_schema),
         std::move(partition_key),
         true,
@@ -574,7 +577,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
     };
 }
 
-std::string create_app(const AppCreateConfig& config)
+AppSession create_app(const AppCreateConfig& config)
 {
     auto session = AdminAPISession::login(config.base_url, config.admin_username, config.admin_password);
     auto create_app_resp = session.apps().post_json(nlohmann::json{{"name", config.app_name}});
@@ -747,7 +750,7 @@ std::string create_app(const AppCreateConfig& config)
         {"version", 1},
     });
 
-    return client_app_id;
+    return {client_app_id, app_id, session, config};
 }
 
 #ifdef REALM_MONGODB_ENDPOINT

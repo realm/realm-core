@@ -119,7 +119,13 @@ struct AppCreateConfig {
 AppCreateConfig default_app_config(const std::string& base_url);
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema);
 
-std::string create_app(const AppCreateConfig& config);
+struct AppSession {
+    std::string client_app_id;
+    std::string server_app_id;
+    AdminAPISession admin_api;
+    AppCreateConfig config;
+};
+AppSession create_app(const AppCreateConfig& config);
 
 } // namespace realm
 
