@@ -67,7 +67,6 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
         // If there are not `tables_in_filter` we can skip this part.
         table.for_each_backlink_column([&](ColKey column_key) {
             // If this backlink is included in any of the filters we follow the path further.
-            out[out_index].links.push_back({column_key.value, false});
             const Table& origin_table = *table.get_link_target(column_key);
 
             for (auto& key_path_array : key_path_arrays) {
