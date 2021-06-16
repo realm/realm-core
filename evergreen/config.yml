@@ -71,7 +71,6 @@ functions:
           if [ -n "${run_tests_against_baas|}" ]; then
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
-              set_cmake_var baas_vars REALM_STITCH_CONFIG PATH $(pwd)/test/object-store/mongodb/config.json
           fi
 
           if [ -n "${enable_asan|}" ]; then
