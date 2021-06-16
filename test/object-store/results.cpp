@@ -2454,9 +2454,10 @@ TEST_CASE("notifications: results") {
             auto col_linked_to_backlink_to_object = table->get_opposite_column(col_link);
             auto col_second_linked_to_backlink_to_object = table->get_opposite_column(col_second_link);
 
-            std::pair<TableKey, ColKey> pair_linked_to_backlink(linked_to_table, col_linked_to_backlink_to_object);
+            std::pair<TableKey, ColKey> pair_linked_to_backlink(linked_to_table->get_key(),
+                                                                col_linked_to_backlink_to_object);
             std::pair<TableKey, ColKey> pair_table_second_link(table_key_origin, col_second_link);
-            std::pair<TableKey, ColKey> pair_second_linked_to_backlink(second_linked_to_table,
+            std::pair<TableKey, ColKey> pair_second_linked_to_backlink(second_linked_to_table->get_key(),
                                                                        col_second_linked_to_backlink_to_object);
 
             KeyPath key_path_backlink = {pair_linked_to_backlink};
