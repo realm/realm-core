@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Add more tests for Realm::delete_files ([#4765](https://github.com/realm/realm-core/pull/4765)).
 
 ----------------------------------------------
 
