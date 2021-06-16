@@ -436,6 +436,24 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
     return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
 }
 
+void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
+void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/enable", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
 AdminAPIEndpoint AdminAPISession::apps() const
 {
     return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);

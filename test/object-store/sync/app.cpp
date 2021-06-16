@@ -93,6 +93,17 @@ std::string get_base_url()
 }
 #endif
 
+struct AutoVerifiedEmailCredentials {
+    AutoVerifiedEmailCredentials()
+    {
+        // emails with this prefix will pass through the baas app due to the register function
+        email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        password = random_string(10);
+    }
+    std::string email;
+    std::string password;
+};
+
 } // namespace
 // MARK: - Login with Credentials Tests
 
@@ -1857,7 +1868,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
-    auto app_session = get_runtime_app_session(base_url);
+    auto app_session = create_app(default_app_config(base_url));
     auto app_config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
@@ -1871,25 +1882,19 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     auto base_path = util::make_temp_dir() + app_config.app_id;
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
-    // Heap allocate to control lifecycle.
-    // This is required so that we can reset the sync manager
-    // through deallocation without worrying about it being popped
-    // off the stack at the end of test case.
 
-
-    auto get_app_and_login = [&](SharedApp app) -> std::shared_ptr<App> {
-        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        auto password = random_string(10);
+    auto create_user_and_login = [&](SharedApp app) -> AutoVerifiedEmailCredentials {
+        AutoVerifiedEmailCredentials creds;
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, [&](Optional<app::AppError> error) {
+            creds.email, creds.password, [&](Optional<app::AppError> error) {
                 CHECK(!error);
             });
-        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          REQUIRE(user);
                                          CHECK(!error);
                                      });
-        return app;
+        return creds;
     };
     auto setup_and_get_config = [&base_path, &valid_pk_name](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
@@ -1940,7 +1945,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("Add Objects") {
         {
             TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(sync_manager.app());
+            auto app = sync_manager.app();
+            create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1972,10 +1978,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_path);
         {
             TestSyncManager reinit(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(reinit.app());
-            auto config = setup_and_get_config(app);
+            create_user_and_login(reinit.app());
+
+            auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            auto session = reinit.app()->current_user()->session_for_on_disk_path(r->config().path);
             Results dogs = get_dogs(r, session);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -1988,7 +1995,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("Invalid Access Token is Refreshed") {
         {
             TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(sync_manager.app());
+            auto app = sync_manager.app();
+            create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -2018,13 +2026,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_path);
         {
             TestSyncManager reinit(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(reinit.app());
+            create_user_and_login(reinit.app());
+            auto user = reinit.app()->current_user();
             // set a bad access token. this will trigger a refresh when the sync session opens
-            app->current_user()->update_access_token(encode_fake_jwt("fake_access_token"));
+            user->update_access_token(encode_fake_jwt("fake_access_token"));
 
-            auto config = setup_and_get_config(app);
+            auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            auto session = user->session_for_on_disk_path(r->config().path);
             Results dogs = get_dogs(r, session);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -2037,7 +2046,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         realm::sync::AccessToken token;
         {
             TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(sync_manager.app());
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -2078,7 +2088,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         util::try_make_dir(base_path);
         {
             std::function<void()> hook;
-            std::vector<SyncSession::PublicState> session_states_seen;
             std::function<std::unique_ptr<GenericNetworkTransport>()> hooked_factory = [&hook] {
                 if (hook) {
                     hook();
@@ -2088,7 +2097,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             app_config.transport_generator = hooked_factory;
 
             TestSyncManager reinit(TestSyncManager::Config(app_config), {});
-            auto app = get_app_and_login(reinit.app());
+            auto app = reinit.app();
+            create_user_and_login(app);
             REQUIRE(!app->current_user()->access_token_refresh_required());
             // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
             app->current_user()->update_access_token(
@@ -2118,9 +2128,74 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
+    SECTION("Revoked Access Token results in an error") {
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+        std::atomic<bool> sync_error_handler_called{false};
+        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            sync_error_handler_called.store(true);
+            REQUIRE(error.error_code == realm::sync::make_error_code(realm::sync::ProtocolError::permission_denied));
+            REQUIRE(error.message ==
+                    "Unable to refresh the user access token; has this user been disabled by an admin?");
+        };
+
+        app_session.admin_api.revoke_user_sessions(app->current_user()->identity(), app_session.server_app_id);
+
+        auto r = realm::Realm::get_shared_realm(config);
+        auto user = app->current_user();
+        auto session = user->session_for_on_disk_path(r->config().path);
+        REQUIRE(user->is_logged_in());
+        REQUIRE(!sync_error_handler_called.load());
+        {
+            std::atomic<bool> called{false};
+            session->wait_for_upload_completion([&](std::error_code err) {
+                REQUIRE(err == realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+                called.store(true);
+            });
+            util::EventLoop::main().run_until([&] {
+                return called.load();
+            });
+            REQUIRE(called);
+        }
+        REQUIRE(sync_error_handler_called.load());
+
+        // the failed refresh logs out the user
+        REQUIRE(!user->is_logged_in());
+
+        // logging in again doesn't fix things while the account is disabled
+        app->log_in_with_credentials(
+            realm::app::AppCredentials::username_password(creds.email, creds.password),
+            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                REQUIRE(!user);
+                REQUIRE(error);
+                REQUIRE(error->error_code ==
+                        realm::app::make_error_code(realm::app::ServiceErrorCode::user_disabled));
+            });
+
+        // admin enables user sessions again which should allow the session to continue
+        app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
+
+        // logging in now works properly
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         REQUIRE(!error);
+                                     });
+        // still referencing the same user
+        REQUIRE(user == app->current_user());
+        REQUIRE(user->is_logged_in());
+
+        // check that there are no errors initiating a session by making sure upload/download succeeds
+        Results dogs = get_dogs(r, session);
+    }
+
+
     SECTION("invalid partition error handling") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
@@ -2141,7 +2216,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("invalid pk schema error handling") {
         const std::string invalid_pk_name = "my_primary_key";
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");
         REQUIRE(it != config.schema->end());
@@ -2158,7 +2234,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("missing pk schema error handling") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");
         REQUIRE(it != config.schema->end());
@@ -2174,12 +2251,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("too large sync message error handling") {
         TestSyncManager::Config test_config(app_config);
-
         // Too much log output seems to create problems on Evergreen CI
         test_config.verbose_sync_client_logging = false;
 
-        TestSyncManager sync_manager(test_config, {});
-        auto app = get_app_and_login(sync_manager.app());
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
 
         std::mutex sync_error_mutex;

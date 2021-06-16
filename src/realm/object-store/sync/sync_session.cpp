@@ -381,10 +381,28 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             }
         }
         else if (error) {
-            // 10 seconds is arbitrary, but it is to not swamp the server
-            std::this_thread::sleep_for(milliseconds(10000));
-            if (session_user) {
-                session_user->refresh_custom_data(handle_refresh(session));
+            if (error->http_status_code && *error->http_status_code == 401 &&
+                error->error_code == realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session)) {
+                // a 401 response on a refresh request means that the token cannot be refreshed and we should not
+                // retry. this can be because an admin has revoked this user's sessions
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                session->cancel_pending_waits(lock, error->error_code);
+                if (session->m_config.error_handler) {
+                    auto user_facing_error = SyncError(
+                        realm::sync::ProtocolError::permission_denied,
+                        "Unable to refresh the user access token; has this user been disabled by an admin?", true);
+                    session->m_config.error_handler(session, user_facing_error);
+                }
+                if (session_user && session_user->is_logged_in()) {
+                    session_user->log_out();
+                }
+            }
+            else {
+                // 10 seconds is arbitrary, but it is to not swamp the server
+                std::this_thread::sleep_for(milliseconds(10000));
+                if (session_user) {
+                    session_user->refresh_custom_data(handle_refresh(session));
+                }
             }
         }
         else {
