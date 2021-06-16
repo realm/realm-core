@@ -146,13 +146,23 @@ These are the available variables:
 
 ## Running [app] tests against a local MongoDB Stitch
 
+Due to MongoDB security policies, running baas requires company issued AWS account credentials.
+If you do not have these, request some from Tim Sedgwick on the cloud team, or reach out to #realm-core.
+Once you have them, they need to be passed to the docker image below. We will do this through an
+environment file, placed at` ~/.docker_env_vars` (for example) with the following contents:
+
+```
+AWS_ACCESS_KEY_ID=<your-key-id>
+AWS_SECRET_ACCESS_KEY=<your-secret-key>
+```
+
 Stitch images are published to our private Github CI. Follow the steps here to
 set up authorization from docker to your Github account https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
 Once authorized, run the following docker command from the top directory to start a local instance:
 
 ```
 export MDBREALM_TEST_SERVER_TAG=$(grep MDBREALM_TEST_SERVER_TAG dependencies.list |cut -f 2 -d=)
-docker run --rm -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
+docker run --rm -p 9090:9090 --env-file ~/.docker_env_vars -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
