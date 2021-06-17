@@ -230,7 +230,7 @@ private:
      * @param table The `TableKey` for the current depth.
      * @param object_key_value The `ObjKeyType` that is to be checked for changes.
      */
-    void check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
+    void find_changed_columns(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
                         const Table& table, const ObjKeyType& object_key_value);
 };
 

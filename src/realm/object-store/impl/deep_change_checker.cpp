@@ -272,14 +272,14 @@ bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 
     for (const auto& key_path_array : m_key_path_arrays) {
         for (const auto& key_path : key_path_array) {
-            check_key_path(changed_columns, key_path, 0, m_root_table, object_key);
+            find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
         }
     }
 
     return changed_columns.size() > 0;
 }
 
-void CollectionKeyPathChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path,
+void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns, const KeyPath& key_path,
                                                     size_t depth, const Table& table,
                                                     const ObjKeyType& object_key_value)
 {
@@ -308,7 +308,7 @@ void CollectionKeyPathChangeChecker::check_key_path(std::vector<int64_t>& change
         auto lvr = object.get_linklist(ColKey(column_key));
         auto sz = lvr.size();
         for (size_t i = 0; i < sz; i++) {
-            check_key_path(changed_columns, key_path, depth + 1, *target_table, lvr.get(i).value);
+            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, lvr.get(i).value);
         }
     }
     else {
@@ -318,7 +318,7 @@ void CollectionKeyPathChangeChecker::check_key_path(std::vector<int64_t>& change
             auto target_table = table.get_link_target(column_key);
             auto object = table.get_object(ObjKey(object_key_value));
             auto target_object_key_value = object.get<ObjKey>(ColKey(column_key)).value;
-            check_key_path(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
+            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
         }
         else if (column_type == col_type_BackLink) {
             // A backlink can have multiple origin objects. We need to iterate over all of them.
@@ -328,7 +328,7 @@ void CollectionKeyPathChangeChecker::check_key_path(std::vector<int64_t>& change
             size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
             for (size_t i = 0; i < backlink_count; i++) {
                 auto origin_object_key = object.get_backlink(*origin_table, origin_column_key, i);
-                check_key_path(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
+                find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
             }
         }
     }
@@ -347,7 +347,7 @@ std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_ke
 
     for (const auto& key_path_array : m_key_path_arrays) {
         for (const auto& key_path : key_path_array) {
-            check_key_path(changed_columns, key_path, 0, m_root_table, object_key);
+            find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
         }
     }
 
