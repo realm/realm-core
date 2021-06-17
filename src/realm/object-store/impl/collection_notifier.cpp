@@ -230,7 +230,7 @@ void CollectionNotifier::set_table(ConstTableRef table)
     m_related_tables.clear();
     util::CheckedLockGuard lock(m_callback_mutex);
     recalculate_key_path_array();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_array);
+    DeepChangeChecker::find_related_tables(m_related_tables, *table, m_key_path_array);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
@@ -249,7 +249,7 @@ void CollectionNotifier::update_related_tables(Table const& table)
 {
     m_related_tables.clear();
     recalculate_key_path_array();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, table, m_key_path_array);
+    DeepChangeChecker::find_related_tables(m_related_tables, table, m_key_path_array);
     // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
     // necessary.
     m_did_modify_callbacks = false;

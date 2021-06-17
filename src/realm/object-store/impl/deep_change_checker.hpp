@@ -127,13 +127,7 @@ public:
      * @param key_path_array A collection of all `KeyPath`s passed to the `NotificationCallback`s for this
      *                        `CollectionNotifier`.
      */
-    static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                             KeyPathArray& key_path_array);
-
-    // This function is only used by `find_filtered_related_tables` internally.
-    // It is however used in some tests and therefore exposed here.
-    static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                        std::vector<TableKey>& tables_in_filters, KeyPathArray& key_path_array);
+    static void find_related_tables(std::vector<RelatedTable>& out, Table const& table, KeyPathArray& key_path_array);
 
 protected:
     friend class ObjectKeyPathChangeChecker;
