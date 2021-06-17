@@ -23,14 +23,15 @@
 using namespace realm;
 using namespace realm::_impl;
 
-void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table,
+void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_tables, Table const& table,
                                             KeyPathArray& key_path_array)
 {
     auto table_key = table.get_key();
+
     // If the currently looked at `table` is already part of the `std::vector<RelatedTable>` (possibly
     // due to another path involving it) we do not need to traverse further and can return.
-    if (any_of(begin(out), end(out), [&](const auto& tbl) {
-            return tbl.table_key == table_key;
+    if (any_of(begin(related_tables), end(related_tables), [&](const auto& related_table) {
+            return related_table.table_key == table_key;
         }))
         return;
 
@@ -51,22 +52,22 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
         }
     }
 
-    // We need to add this table to `out` before recurring so that the check
+    // We need to add this table to `related_tables` before recurring so that the check
     // above works, but we can't store a pointer to the thing being populated
-    // because the recursive calls may resize `out`, so instead look it up by
+    // because the recursive calls may resize `related_tables`, so instead look it up by
     // index every time.
-    size_t out_index = out.size();
-    out.push_back({table_key, {}});
+    size_t related_tables_size = related_tables.size();
+    related_tables.push_back({table_key, {}});
 
-    for (auto col_key : table.get_column_keys()) {
-        auto type = table.get_column_type(col_key);
+    for (auto column_key : table.get_column_keys()) {
+        auto column_type = table.get_column_type(column_key);
         // If a column within the `table` does link to another table it needs to be added to `table`'s
         // links.
-        if (type == type_Link || type == type_LinkList) {
-            out[out_index].links.push_back({col_key.value, type == type_LinkList});
+        if (column_type == type_Link || column_type == type_LinkList) {
+            related_tables[related_tables_size].links.push_back({column_key.value, column_type == type_LinkList});
             // Finally this function needs to be called again to traverse all linked tables using the
             // just found link.
-            find_related_tables(out, *table.get_link_target(col_key), key_path_array);
+            find_related_tables(related_tables, *table.get_link_target(column_key), key_path_array);
         }
     }
 
@@ -92,7 +93,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
                 }
             }
 
-            find_related_tables(out, origin_table, key_path_array);
+            find_related_tables(related_tables, origin_table, key_path_array);
 
             return false;
         });
@@ -136,8 +137,8 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, int64_t object_
     auto table_key = table.get_key();
 
     // First we create an iterator pointing at the table identified by `table_key` within the `m_related_tables`.
-    auto it = std::find_if(begin(m_related_tables), end(m_related_tables), [&](const auto& tbl) {
-        return tbl.table_key == table_key;
+    auto it = std::find_if(begin(m_related_tables), end(m_related_tables), [&](const auto& related_table) {
+        return related_table.table_key == table_key;
     });
     // If no iterator could be found the table is not contained in `m_related_tables` and we cannot check any
     // outgoing links.
