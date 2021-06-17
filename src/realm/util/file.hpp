@@ -372,7 +372,7 @@ public:
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
-    void set_fifo_path(const std::string& fifo_path);
+    void set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name);
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -617,6 +617,7 @@ private:
 #ifdef REALM_FILELOCK_EMULATION
     int m_pipe_fd = -1; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
+    std::string m_fifo_dir_path;
     std::string m_fifo_path;
 #endif
 #endif
@@ -1010,12 +1011,14 @@ inline File::~File() noexcept
     close();
 }
 
-inline void File::set_fifo_path(const std::string& fifo_path)
+inline void File::set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name)
 {
 #ifdef REALM_FILELOCK_EMULATION
-    m_fifo_path = fifo_path;
+    m_fifo_dir_path = fifo_dir_path;
+    m_fifo_path = fifo_dir_path + "/" + fifo_file_name;
 #else
-    static_cast<void>(fifo_path);
+    static_cast<void>(fifo_dir_path);
+    static_cast<void>(fifo_file_name);
 #endif
 }
 
@@ -1184,7 +1187,7 @@ inline void File::Map<T>::unmap() noexcept
 template <class T>
 inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
-    //MapBase::remap(f, a, size, map_flags);
+    // MapBase::remap(f, a, size, map_flags);
     // missing sync() here?
     unmap();
     map(f, a, size, map_flags);
