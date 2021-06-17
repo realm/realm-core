@@ -1024,7 +1024,9 @@ TEST_CASE("Realm::delete_files()") {
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
-        Realm::delete_files(path);
+        bool did_delete = false;
+        Realm::delete_files(path, &did_delete);
+        REQUIRE(did_delete);
         REQUIRE_FALSE(util::File::exists(path));
         REQUIRE_FALSE(util::File::exists(path + ".management"));
         REQUIRE_FALSE(util::File::exists(path + ".note"));
@@ -1057,6 +1059,18 @@ TEST_CASE("Realm::delete_files()") {
     SECTION("Calling delete on a folder that does not exist.") {
         auto fake_path = "/tmp/doesNotExist/realm.424242";
         Realm::delete_files(fake_path);
+    }
+
+    SECTION("passing did_delete is optional") {
+        realm->close();
+        Realm::delete_files(path, nullptr);
+    }
+
+    SECTION("Deleting a Realm which does not exist does not set did_delete") {
+        TestFile new_config;
+        bool did_delete = false;
+        Realm::delete_files(new_config.path, &did_delete);
+        REQUIRE_FALSE(did_delete);
     }
 }
 
