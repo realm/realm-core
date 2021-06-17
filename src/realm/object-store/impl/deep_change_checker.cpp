@@ -25,7 +25,7 @@ using namespace realm::_impl;
 
 void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
                                                 std::vector<TableKey>& tables_in_filters,
-                                                std::vector<KeyPathArray>& key_path_arrays)
+                                                KeyPathArray& key_path_array)
 {
     auto table_key = table.get_key();
     // If the currently looked at `table` is already part of the `std::vector<RelatedTable>` (possibly
@@ -59,7 +59,7 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
             out[out_index].links.push_back({col_key.value, type == type_LinkList});
             // Finally this function needs to be called again to traverse all linked tables using the
             // just found link.
-            find_all_related_tables(out, *table.get_link_target(col_key), tables_in_filters, key_path_arrays);
+            find_all_related_tables(out, *table.get_link_target(col_key), tables_in_filters, key_path_array);
         }
     }
     if (tables_in_filters.size() != 0) {
@@ -69,55 +69,52 @@ void DeepChangeChecker::find_all_related_tables(std::vector<RelatedTable>& out, 
             // If this backlink is included in any of the filters we follow the path further.
             const Table& origin_table = *table.get_link_target(column_key);
 
-            for (auto& key_path_array : key_path_arrays) {
-                for (auto& key_path : key_path_array) {
-                    auto key_path_size = key_path.size();
-                    if (key_path_size > 0) {
-                        auto last_key_path_element = key_path[key_path_size - 1];
-                        auto last_table_key = last_key_path_element.first;
-                        auto last_column_key = last_key_path_element.second;
-                        if (last_table_key == table_key && last_column_key == column_key) {
-                            auto origin_table_key = origin_table.get_key();
-                            auto origin_column_key = table.get_opposite_column(column_key);
-                            tables_in_filters.push_back(origin_table_key);
-                            std::pair new_pair(origin_table_key, origin_column_key);
-                            key_path.push_back(new_pair);
-                        }
+            for (KeyPath& key_path : key_path_array) {
+                auto key_path_size = key_path.size();
+                if (key_path_size > 0) {
+                    auto last_key_path_element = key_path[key_path_size - 1];
+                    auto last_table_key = last_key_path_element.first;
+                    auto last_column_key = last_key_path_element.second;
+                    if (last_table_key == table_key && last_column_key == column_key) {
+                        auto origin_table_key = origin_table.get_key();
+                        auto origin_column_key = table.get_opposite_column(column_key);
+                        tables_in_filters.push_back(origin_table_key);
+                        std::pair new_pair(origin_table_key, origin_column_key);
+                        key_path.push_back(new_pair);
                     }
                 }
             }
 
-            find_all_related_tables(out, origin_table, tables_in_filters, key_path_arrays);
+            find_all_related_tables(out, origin_table, tables_in_filters, key_path_array);
             return false;
         });
     }
 }
 
 void DeepChangeChecker::find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                                     std::vector<KeyPathArray>& key_path_arrays)
+                                                     KeyPathArray& key_path_array)
 {
     std::vector<TableKey> tables_in_filters = {};
-    for (const auto& key_path_array : key_path_arrays) {
-        for (const auto& key_path : key_path_array) {
-            for (const auto& key_path_element : key_path) {
-                tables_in_filters.push_back(key_path_element.first);
-            }
+    for (const auto& key_path : key_path_array) {
+        for (const auto& key_path_element : key_path) {
+            tables_in_filters.push_back(key_path_element.first);
         }
     }
-    find_all_related_tables(out, table, tables_in_filters, key_path_arrays);
+    find_all_related_tables(out, table, tables_in_filters, key_path_array);
 }
 
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                     std::vector<RelatedTable> const& related_tables,
-                                     const std::vector<KeyPathArray>& key_path_arrays)
+                                     std::vector<RelatedTable> const& related_tables, KeyPathArray& key_path_array,
+                                     bool all_callbacks_filtered)
     : m_info(info)
     , m_root_table(root_table)
-    , m_key_path_arrays(std::move(key_path_arrays))
+    , m_key_path_array(key_path_array)
     , m_root_object_changes([&] {
         auto it = info.tables.find(root_table.get_key().value);
         return it != info.tables.end() ? &it->second : nullptr;
     }())
     , m_related_tables(related_tables)
+    , m_all_callbacks_filtered(all_callbacks_filtered)
 {
     // If all callbacks do have a filter, every `KeyPathArray` will have entries.
     // In this case we need to check the `ColKey`s and pass the filtered columns
@@ -125,19 +122,13 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     // If at least one `NotificationCallback` does not have a filter we notify on any change.
     // This is signaled by leaving the `m_filtered_columns_in_root_table` and
     // `m_filtered_columns` empty.
-    auto all_callbacks_filtered =
-        all_of(begin(m_key_path_arrays), end(m_key_path_arrays), [](const auto& key_path_array) {
-            return key_path_array.size() > 0;
-        });
     if (all_callbacks_filtered) {
-        for (const auto& key_path_array : m_key_path_arrays) {
-            for (const auto& key_path : key_path_array) {
-                if (key_path.size() != 0) {
-                    m_filtered_columns_in_root_table.push_back(key_path[0].second);
-                }
-                for (const auto& key_path_element : key_path) {
-                    m_filtered_columns.push_back(key_path_element.second);
-                }
+        for (const auto& key_path : key_path_array) {
+            if (key_path.size() != 0) {
+                m_filtered_columns_in_root_table.push_back(key_path[0].second);
+            }
+            for (const auto& key_path_element : key_path) {
+                m_filtered_columns.push_back(key_path_element.second);
             }
         }
     }
@@ -261,8 +252,9 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
 CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChangeInfo const& info,
                                                                Table const& root_table,
                                                                std::vector<RelatedTable> const& related_tables,
-                                                               const std::vector<KeyPathArray>& key_path_arrays)
-    : DeepChangeChecker(info, root_table, related_tables, key_path_arrays)
+                                                               KeyPathArray& key_path_array,
+                                                               bool all_callbacks_filtered)
+    : DeepChangeChecker(info, root_table, related_tables, key_path_array, all_callbacks_filtered)
 {
 }
 
@@ -270,18 +262,16 @@ bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
     std::vector<int64_t> changed_columns = {};
 
-    for (const auto& key_path_array : m_key_path_arrays) {
-        for (const auto& key_path : key_path_array) {
-            find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
-        }
+    for (auto& key_path : m_key_path_array) {
+        find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
     }
 
     return changed_columns.size() > 0;
 }
 
-void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns, const KeyPath& key_path,
-                                                    size_t depth, const Table& table,
-                                                    const ObjKeyType& object_key_value)
+void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns, KeyPath& key_path,
+                                                          size_t depth, const Table& table,
+                                                          const ObjKeyType& object_key_value)
 {
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
@@ -336,8 +326,8 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
 
 ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                                                        std::vector<RelatedTable> const& related_tables,
-                                                       const std::vector<KeyPathArray>& key_path_arrays)
-    : CollectionKeyPathChangeChecker(info, root_table, related_tables, key_path_arrays)
+                                                       KeyPathArray& key_path_array, bool all_callbacks_filtered)
+    : CollectionKeyPathChangeChecker(info, root_table, related_tables, key_path_array, all_callbacks_filtered)
 {
 }
 
@@ -345,10 +335,8 @@ std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_ke
 {
     std::vector<int64_t> changed_columns = {};
 
-    for (const auto& key_path_array : m_key_path_arrays) {
-        for (const auto& key_path : key_path_array) {
-            find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
-        }
+    for (auto& key_path : m_key_path_array) {
+        find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
     }
 
     return changed_columns;

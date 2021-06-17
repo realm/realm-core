@@ -80,8 +80,8 @@ public:
     };
 
     DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                      std::vector<RelatedTable> const& related_tables,
-                      const std::vector<KeyPathArray>& key_path_arrays);
+                      std::vector<RelatedTable> const& related_tables, KeyPathArray& key_path_array,
+                      bool all_callbacks_filtered);
 
     /**
      * Check if the object identified by `object_key` was changed.
@@ -124,17 +124,16 @@ public:
      * @param out Return value containing all tables that can be reached from the given `table` including
      *            some additional information about those tables (see `OutgoingLink` in `RelatedTable`).
      * @param table The table that the related tables will be searched for.
-     * @param key_path_arrays A collection of all `KeyPathArray`s passed to the `NotificationCallback`s for this
+     * @param key_path_array A collection of all `KeyPath`s passed to the `NotificationCallback`s for this
      *                        `CollectionNotifier`.
      */
     static void find_filtered_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                             std::vector<KeyPathArray>& key_path_arrays);
+                                             KeyPathArray& key_path_array);
 
     // This function is only used by `find_filtered_related_tables` internally.
     // It is however used in some tests and therefore exposed here.
     static void find_all_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                        std::vector<TableKey>& tables_in_filters,
-                                        std::vector<KeyPathArray>& key_path_arrays);
+                                        std::vector<TableKey>& tables_in_filters, KeyPathArray& key_path_array);
 
 protected:
     friend class ObjectKeyPathChangeChecker;
@@ -146,7 +145,7 @@ protected:
 
     // The `m_key_path_array` contains all columns filtered for. We need this when checking for
     // changes in `operator()` to make sure only columns actually filtered for send notifications.
-    std::vector<KeyPathArray> m_key_path_arrays;
+    KeyPathArray& m_key_path_array;
 
     // The `ObjectChangeSet` for `root_table` if it is contained in `m_info`.
     ObjectChangeSet const* const m_root_object_changes;
@@ -157,6 +156,8 @@ protected:
 
 private:
     std::vector<RelatedTable> const& m_related_tables;
+
+    bool m_all_callbacks_filtered;
 
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
 
@@ -204,8 +205,8 @@ private:
 class CollectionKeyPathChangeChecker : DeepChangeChecker {
 public:
     CollectionKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                   std::vector<RelatedTable> const& related_tables,
-                                   const std::vector<KeyPathArray>& key_path_arrays);
+                                   std::vector<RelatedTable> const& related_tables, KeyPathArray& key_path_array,
+                                   bool all_callbacks_filtered);
 
     /**
      * Check if the `Object` identified by `object_key` was changed and it is included in the `KeyPathArray` provided
@@ -230,8 +231,8 @@ private:
      * @param table The `TableKey` for the current depth.
      * @param object_key_value The `ObjKeyType` that is to be checked for changes.
      */
-    void find_changed_columns(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
-                        const Table& table, const ObjKeyType& object_key_value);
+    void find_changed_columns(std::vector<int64_t>& changed_columns, KeyPath& key_path, size_t depth,
+                              const Table& table, const ObjKeyType& object_key_value);
 };
 
 /**
@@ -246,7 +247,7 @@ class ObjectKeyPathChangeChecker : CollectionKeyPathChangeChecker {
 public:
     ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                                std::vector<DeepChangeChecker::RelatedTable> const& related_tables,
-                               const std::vector<KeyPathArray>& key_path_arrays);
+                               KeyPathArray& key_path_array, bool all_callbacks_filtered);
 
     /**
      * Check if the `Object` identified by `object_key` was changed and it is included in the `KeyPathArray` provided

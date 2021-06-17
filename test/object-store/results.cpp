@@ -1671,7 +1671,9 @@ TEST_CASE("notifications: results") {
                         {"second link", PropertyType::Object | PropertyType::Nullable, "second linked to object"}}},
                       {"other object", {{"value", PropertyType::Int}}},
                       {"linking object", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
-                      {"linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
+                      {"linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int},
+                        {"link", PropertyType::Object | PropertyType::Nullable, "other linked to object"}}},
+                      {"other linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
                       {"second linked to object", {{"value", PropertyType::Int}}}});
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -2128,6 +2130,11 @@ TEST_CASE("notifications: results") {
         auto column_key_other_table_value = other_table->get_column_key("value");
         auto table_key_origin = table->get_key();
         auto table_key_linked_to = linked_to_table->get_key();
+        auto other_linked_to_table = r->read_group().get_table("class_other linked to object");
+        auto other_linked_to_table_key = other_linked_to_table->get_key();
+        auto column_key_linked_to_table_link = table->get_column_key("link");
+        auto column_key_other_linked_to_table_value = other_linked_to_table->get_column_key("value");
+        auto column_key_other_linked_to_table_value2 = other_linked_to_table->get_column_key("value2");
         r->begin_transaction();
         auto other_table_obj_key = ObjKey(1);
         other_table->create_object(other_table_obj_key).set_all(1);
@@ -2140,12 +2147,19 @@ TEST_CASE("notifications: results") {
         std::pair<TableKey, ColKey> pair_table_value(table_key_origin, col_value);
         std::pair<TableKey, ColKey> pair_table_link(table_key_origin, col_link);
         std::pair<TableKey, ColKey> pair_linked_to_value(table_key_linked_to, column_key_linked_to_table_value);
+        std::pair<TableKey, ColKey> pair_linked_to_link(table_key_linked_to, column_key_linked_to_table_link);
+        std::pair<TableKey, ColKey> pair_other_linked_to_value(other_linked_to_table_key, column_key_other_linked_to_table_value);
+        std::pair<TableKey, ColKey> pair_other_linked_to_value2(other_linked_to_table_key, column_key_other_linked_to_table_value2);
         // 2. Keypaths
         auto root_table_value_key_path = {pair_table_value};
         auto linked_to_value_key_path = {pair_table_link, pair_linked_to_value};
+        auto other_linked_to_value_key_path = {pair_table_link, pair_linked_to_link, pair_other_linked_to_value};
+        auto other_linked_to_value2_key_path = {pair_table_link, pair_linked_to_link, pair_other_linked_to_value2};
         // 3. Aggregated `KeyPathArray`
         KeyPathArray key_path_array_to_root_value = {root_table_value_key_path};
         KeyPathArray key_path_array_to_linked_to_value = {linked_to_value_key_path};
+        KeyPathArray key_path_array_to_other_linked_to_value = {other_linked_to_value_key_path};
+        KeyPathArray key_path_array_to_other_linked_to_value2 = {other_linked_to_value2_key_path};
 
         // For the keypath filtered notifications we need to check three scenarios:
         // - no callbacks have filters (this part is covered by other sections)
@@ -2154,9 +2168,13 @@ TEST_CASE("notifications: results") {
         int notification_calls_without_filter = 0;
         int notification_calls_with_filter_on_root_value = 0;
         int notification_calls_with_filter_on_linked_to_value = 0;
+        int notification_calls_with_filter_on_other_linked_to_value = 0;
+        int notification_calls_with_filter_on_other_linked_to_value2 = 0;
         CollectionChangeSet collection_change_set_without_filter;
         CollectionChangeSet collection_change_set_with_filter_on_root_value;
         CollectionChangeSet collection_change_set_with_filter_on_linked_to_value;
+        CollectionChangeSet collection_change_set_with_filter_on_other_linked_to_value;
+        CollectionChangeSet collection_change_set_with_filter_on_other_linked_to_value2;
 
         // Note that in case not all callbacks have filters we do accept false positive notifications by design.
         // Distinguishing between these two cases would be a big change for little value.
@@ -2181,6 +2199,15 @@ TEST_CASE("notifications: results") {
                     ++notification_calls_with_filter_on_linked_to_value;
                 },
                 key_path_array_to_linked_to_value);
+            // TODO:
+            // auto token_for_filter_on_other_linked_to_value =
+            //     results_for_notification_filter.add_notification_callback(
+            //         [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+            //             REQUIRE_FALSE(error);
+            //             collection_change_set_with_filter_on_other_linked_to_value = collection_change_set;
+            //             ++notification_calls_with_filter_on_other_linked_to_value;
+            //         },
+            //         key_path_array_to_other_linked_to_value);
             // We advance and notify once to have a clean start.
             advance_and_notify(*r);
             // Check the initial state after notifying once since this it what we're comparing against later.
@@ -2297,6 +2324,10 @@ TEST_CASE("notifications: results") {
 
                 REQUIRE(notification_calls_with_filter_on_linked_to_value == 1);
                 REQUIRE(collection_change_set_with_filter_on_linked_to_value.empty());
+            }
+
+            SECTION("Key path arrays with more than two elements") {
+                // TODO
             }
         }
 

@@ -198,7 +198,7 @@ protected:
     get_object_modification_checker(TransactionChangeInfo const&, ConstTableRef) REQUIRES(!m_callback_mutex);
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
-    void recalculate_key_path_arrays() REQUIRES(m_callback_mutex);
+    void recalculate_key_path_array() REQUIRES(m_callback_mutex);
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
     bool any_callbacks_filtered() const noexcept;
@@ -208,8 +208,12 @@ protected:
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
 
-    // A summary of all `KeyPathArray`s attached to the `m_callbacks`.
-    std::vector<KeyPathArray> m_key_path_arrays;
+    // A summary of all `KeyPath`s attached to the `m_callbacks`.
+    KeyPathArray m_key_path_array;
+
+    // When updating `m_key_path_array` we need to also check if all callbacks have a filter.
+    // This information is later used in `DeepChangeChecker`.
+    bool m_all_callbacks_filtered = false;
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;

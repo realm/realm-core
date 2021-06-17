@@ -63,33 +63,40 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     if (all_callbacks_filtered()) {
-        return CollectionKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+        return CollectionKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
     }
     else if (any_callbacks_filtered()) {
         // In case we have some callbacks, we need to combine the unfiltered `DeepChangeChecker` with
         // the filtered `CollectionKeyPathChangeChecker` to make sure we send all expected notifications.
-        CollectionKeyPathChangeChecker key_path_checker(info, *root_table, m_related_tables, m_key_path_arrays);
-        DeepChangeChecker deep_change_checker(info, *root_table, m_related_tables, m_key_path_arrays);
+        CollectionKeyPathChangeChecker key_path_checker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
+        DeepChangeChecker deep_change_checker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
         return [key_path_checker = std::move(key_path_checker), deep_change_checker = std::move(deep_change_checker)](
                    ObjectChangeSet::ObjectKeyType object_key) mutable {
             return key_path_checker(object_key) || deep_change_checker(object_key);
         };
     }
 
-    return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+    return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
 }
 
 std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
 CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
-    return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_arrays);
+    return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
 }
 
-void CollectionNotifier::recalculate_key_path_arrays()
+void CollectionNotifier::recalculate_key_path_array()
 {
-    m_key_path_arrays = {};
-    for (auto&& callback : m_callbacks) {
-        m_key_path_arrays.push_back(callback.key_path_array);
+    m_key_path_array = {};
+    m_all_callbacks_filtered = true;
+    for (const auto& callback : m_callbacks) {
+        const auto& key_path_array = callback.key_path_array;
+        if (key_path_array.size() == 0) {
+            m_all_callbacks_filtered = false;
+        }
+        for (const auto& key_path : key_path_array) {
+            m_key_path_array.push_back(key_path);
+        }
     }
 }
 
@@ -222,8 +229,8 @@ void CollectionNotifier::set_table(ConstTableRef table)
 {
     m_related_tables.clear();
     util::CheckedLockGuard lock(m_callback_mutex);
-    recalculate_key_path_arrays();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_arrays);
+    recalculate_key_path_array();
+    DeepChangeChecker::find_filtered_related_tables(m_related_tables, *table, m_key_path_array);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
@@ -241,8 +248,8 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
 void CollectionNotifier::update_related_tables(Table const& table)
 {
     m_related_tables.clear();
-    recalculate_key_path_arrays();
-    DeepChangeChecker::find_filtered_related_tables(m_related_tables, table, m_key_path_arrays);
+    recalculate_key_path_array();
+    DeepChangeChecker::find_filtered_related_tables(m_related_tables, table, m_key_path_array);
     // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
     // necessary.
     m_did_modify_callbacks = false;

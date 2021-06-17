@@ -1614,8 +1614,8 @@ TEST_CASE("DeepChangeChecker") {
 
     std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
     std::vector<realm::TableKey> tables_in_filter = {};
-    std::vector<KeyPathArray> key_path_arrays = {};
-    _impl::DeepChangeChecker::find_all_related_tables(tables, *table, tables_in_filter, key_path_arrays);
+    KeyPathArray key_path_array = {};
+    _impl::DeepChangeChecker::find_all_related_tables(tables, *table, tables_in_filter, key_path_array);
 
     auto cols = table->get_column_keys();
     SECTION("direct changes are tracked") {
@@ -1623,7 +1623,7 @@ TEST_CASE("DeepChangeChecker") {
             table->get_object(9).set(cols[0], 10);
         });
 
-        _impl::DeepChangeChecker checker(info, *table, tables, {});
+        _impl::DeepChangeChecker checker(info, *table, tables, key_path_array, false);
         REQUIRE_FALSE(checker(8));
         REQUIRE(checker(9));
     }
@@ -1679,10 +1679,10 @@ TEST_CASE("DeepChangeChecker") {
             });
 
             // link chain should cascade to all but #3 being marked as modified
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(1));
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(2));
-            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(3));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(3));
         });
     }
 
@@ -1699,8 +1699,8 @@ TEST_CASE("DeepChangeChecker") {
             objects[4].set(cols[0], 10);
         });
 
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(3));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(3));
     }
 
     SECTION("changes from an invalidated object") {
@@ -1723,10 +1723,10 @@ TEST_CASE("DeepChangeChecker") {
             objects[4].set(cols[0], 10);
         });
         // if the change checker iterates over an invalid link, it'll hit an assertion
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(1));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(2));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(3));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(3));
     }
 
     SECTION("changes from an object with an unresolved link") {
@@ -1754,8 +1754,8 @@ TEST_CASE("DeepChangeChecker") {
             objects[1].set(cols[0], 10);
         });
         // if the change checker iterates over an invalid link, it'll throw an exception
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, {})(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(1));
     }
 
     SECTION("cycles over links do not loop forever") {
@@ -1766,7 +1766,7 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[9].set(cols[0], 10);
         });
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
     }
 
     SECTION("cycles over linklists do not loop forever") {
@@ -1777,7 +1777,7 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[9].set(cols[0], 10);
         });
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, {})(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables, key_path_array, false)(0));
     }
 
     SECTION("link chains are tracked up to 4 levels deep") {
@@ -1792,7 +1792,7 @@ TEST_CASE("DeepChangeChecker") {
             objects[19].set(cols[0], -1);
         });
 
-        _impl::DeepChangeChecker checker(info, *table, tables, {});
+        _impl::DeepChangeChecker checker(info, *table, tables, key_path_array, false);
         CHECK(checker(19));
         CHECK(checker(18));
         CHECK(checker(16));
@@ -1800,13 +1800,13 @@ TEST_CASE("DeepChangeChecker") {
 
         // Check in other orders to make sure that the caching doesn't effect
         // the results
-        _impl::DeepChangeChecker checker2(info, *table, tables, {});
+        _impl::DeepChangeChecker checker2(info, *table, tables, key_path_array, false);
         CHECK_FALSE(checker2(15));
         CHECK(checker2(16));
         CHECK(checker2(18));
         CHECK(checker2(19));
 
-        _impl::DeepChangeChecker checker3(info, *table, tables, {});
+        _impl::DeepChangeChecker checker3(info, *table, tables, key_path_array, false);
         CHECK(checker3(16));
         CHECK_FALSE(checker3(15));
         CHECK(checker3(18));
@@ -1826,7 +1826,7 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[3].set(cols[0], 42);
         });
-        _impl::DeepChangeChecker checker(info, *table, tables, {});
+        _impl::DeepChangeChecker checker(info, *table, tables, key_path_array, false);
         REQUIRE(checker(1));
         REQUIRE(checker(2));
         REQUIRE(checker(3));
@@ -1836,7 +1836,7 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[0].get_linklist(cols[3]).add(objects[1].get_key());
         });
-        _impl::DeepChangeChecker checker(info, *table, tables, {});
+        _impl::DeepChangeChecker checker(info, *table, tables, key_path_array, false);
         REQUIRE(checker(0));
     }
 }
