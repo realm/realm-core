@@ -63,13 +63,16 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     if (all_callbacks_filtered()) {
-        return CollectionKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
+        return CollectionKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array,
+                                              m_all_callbacks_filtered);
     }
     else if (any_callbacks_filtered()) {
         // In case we have some callbacks, we need to combine the unfiltered `DeepChangeChecker` with
         // the filtered `CollectionKeyPathChangeChecker` to make sure we send all expected notifications.
-        CollectionKeyPathChangeChecker key_path_checker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
-        DeepChangeChecker deep_change_checker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
+        CollectionKeyPathChangeChecker key_path_checker(info, *root_table, m_related_tables, m_key_path_array,
+                                                        m_all_callbacks_filtered);
+        DeepChangeChecker deep_change_checker(info, *root_table, m_related_tables, m_key_path_array,
+                                              m_all_callbacks_filtered);
         return [key_path_checker = std::move(key_path_checker), deep_change_checker = std::move(deep_change_checker)](
                    ObjectChangeSet::ObjectKeyType object_key) mutable {
             return key_path_checker(object_key) || deep_change_checker(object_key);
@@ -82,7 +85,8 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
 CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
-    return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
+    return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array,
+                                      m_all_callbacks_filtered);
 }
 
 void CollectionNotifier::recalculate_key_path_array()

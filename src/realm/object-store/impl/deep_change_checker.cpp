@@ -37,7 +37,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Tabl
     auto has_filters = any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
         return key_path.size() > 0;
     });
-    
+
     // If the `table` is not part of the `key_path_array` we do not need to continue.
     if (has_filters) {
         auto table_in_key_path_array = any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {

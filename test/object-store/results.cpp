@@ -1671,7 +1671,9 @@ TEST_CASE("notifications: results") {
                         {"second link", PropertyType::Object | PropertyType::Nullable, "second linked to object"}}},
                       {"other object", {{"value", PropertyType::Int}}},
                       {"linking object", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
-                      {"linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int},
+                      {"linked to object",
+                       {{"value", PropertyType::Int},
+                        {"value2", PropertyType::Int},
                         {"link", PropertyType::Object | PropertyType::Nullable, "other linked to object"}}},
                       {"other linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
                       {"second linked to object", {{"value", PropertyType::Int}}}});
@@ -2148,8 +2150,10 @@ TEST_CASE("notifications: results") {
         std::pair<TableKey, ColKey> pair_table_link(table_key_origin, col_link);
         std::pair<TableKey, ColKey> pair_linked_to_value(table_key_linked_to, column_key_linked_to_table_value);
         std::pair<TableKey, ColKey> pair_linked_to_link(table_key_linked_to, column_key_linked_to_table_link);
-        std::pair<TableKey, ColKey> pair_other_linked_to_value(other_linked_to_table_key, column_key_other_linked_to_table_value);
-        std::pair<TableKey, ColKey> pair_other_linked_to_value2(other_linked_to_table_key, column_key_other_linked_to_table_value2);
+        std::pair<TableKey, ColKey> pair_other_linked_to_value(other_linked_to_table_key,
+                                                               column_key_other_linked_to_table_value);
+        std::pair<TableKey, ColKey> pair_other_linked_to_value2(other_linked_to_table_key,
+                                                                column_key_other_linked_to_table_value2);
         // 2. Keypaths
         auto root_table_value_key_path = {pair_table_value};
         auto linked_to_value_key_path = {pair_table_link, pair_linked_to_value};
