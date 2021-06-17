@@ -115,12 +115,13 @@ bool DeepChangeChecker::do_check_for_collection_of_mixed(T* coll, size_t depth)
     return std::any_of(coll->begin(), coll->end(), [&, this](auto value) {
         if (value.is_type(type_TypedLink)) {
             auto link = value.get_link();
-            REALM_ASSERT(link);
-            if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
-                REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+            if (!link.is_unresolved()) {
+                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                    cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
+                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+                }
+                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
             }
-            return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
         }
         return false;
     });
@@ -145,12 +146,14 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
             Mixed value = key_value_pair.second;
             if (value.is_type(type_TypedLink)) {
                 auto link = value.get_link();
-                REALM_ASSERT(link);
-                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                    cached_linked_table = dict->get_table()->get_parent_group()->get_table(link.get_table_key());
-                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+                if (!link.is_unresolved()) {
+                    REALM_ASSERT(link);
+                    if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                        cached_linked_table = dict->get_table()->get_parent_group()->get_table(link.get_table_key());
+                        REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+                    }
+                    return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
                 }
-                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
             }
             else if (value.is_type(type_Link)) {
                 REALM_ASSERT(target);
@@ -163,7 +166,7 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
         auto target = set->get_target_table();
         REALM_ASSERT(target);
         return std::any_of(set->begin(), set->end(), [&, this](auto obj_key) {
-            return obj_key && this->check_row(*target, obj_key.value);
+            return obj_key && this->check_row(*target, obj_key.value, depth + 1);
         });
     }
     else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
