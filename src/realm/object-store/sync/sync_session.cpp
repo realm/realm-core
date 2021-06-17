@@ -381,10 +381,27 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             }
         }
         else if (error) {
-            // 10 seconds is arbitrary, but it is to not swamp the server
-            std::this_thread::sleep_for(milliseconds(10000));
-            if (session_user) {
-                session_user->refresh_custom_data(handle_refresh(session));
+            if (error->http_status_code && (*error->http_status_code == 401 || *error->http_status_code == 403)) {
+                // A 401 response on a refresh request means that the token cannot be refreshed and we should not
+                // retry. This can be because an admin has revoked this user's sessions or the user has been disabled.
+                // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                session->cancel_pending_waits(lock, error->error_code);
+                if (session_user && session_user->is_logged_in()) {
+                    session_user->log_out();
+                }
+                if (session->m_config.error_handler) {
+                    auto user_facing_error = SyncError(realm::sync::ProtocolError::permission_denied,
+                                                       "Unable to refresh the user access token.", true);
+                    session->m_config.error_handler(session, user_facing_error);
+                }
+            }
+            else {
+                // 10 seconds is arbitrary, but it is to not swamp the server
+                std::this_thread::sleep_for(milliseconds(10000));
+                if (session_user) {
+                    session_user->refresh_custom_data(handle_refresh(session));
+                }
             }
         }
         else {
@@ -592,9 +609,10 @@ void SyncSession::handle_error(SyncError error)
         }
     }
     else {
-        // The server replies with '401: unauthorized' iff the access token is invalid or expired.
-        // If the access token is valid but was not authorized by the server a '403: forbidden' is sent.
-        // This means that if we did get the 401, the next step is always to request a new access token.
+        // The server replies with '401: unauthorized' if the access token is invalid, expired, revoked, or the user
+        // is disabled. In this scenario we attempt an automatic token refresh and if that succeeds continue as
+        // normal. If the refresh request also fails with 401 then we need to stop retrying and pass along the error;
+        // see handle_refresh().
         if (error_code == util::websocket::make_error_code(util::websocket::Error::bad_response_401_unauthorized)) {
             if (auto u = user()) {
                 u->refresh_custom_data(handle_refresh(shared_from_this()));
