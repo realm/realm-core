@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed an assertion failure when listening for changes to a list of primitive Mixed which contains links. ([#4767](https://github.com/realm/realm-core/issues/4767), since the beginning of Mixed v11.0.0)
  
 ### Breaking changes
 * None.

@@ -108,6 +108,24 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 {
 }
 
+template <typename T>
+bool DeepChangeChecker::do_check_for_collection_of_mixed(T* coll, size_t depth)
+{
+    TableRef cached_linked_table;
+    return std::any_of(coll->begin(), coll->end(), [&, this](auto value) {
+        if (value.is_type(type_TypedLink)) {
+            auto link = value.get_link();
+            REALM_ASSERT(link);
+            if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
+                REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+            }
+            return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
+        }
+        return false;
+    });
+}
+
 bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth)
 {
     REALM_ASSERT(coll);
@@ -116,6 +134,9 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
         return std::any_of(lst->begin(), lst->end(), [&, this](auto key) {
             return this->check_row(*target, key.value, depth + 1);
         });
+    }
+    else if (auto list = dynamic_cast<Lst<Mixed>*>(coll.get())) {
+        return do_check_for_collection_of_mixed(list, depth);
     }
     else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
         auto target = dict->get_target_table();
@@ -146,19 +167,7 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
         });
     }
     else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
-        TableRef cached_linked_table;
-        return std::any_of(set->begin(), set->end(), [&, this](auto value) {
-            if (value.is_type(type_TypedLink)) {
-                auto link = value.get_link();
-                REALM_ASSERT(link);
-                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                    cached_linked_table = set->get_table()->get_parent_group()->get_table(link.get_table_key());
-                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
-                }
-                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
-            }
-            return false;
-        });
+        return do_check_for_collection_of_mixed(set, depth);
     }
     // at this point, we have not handled all datatypes
     REALM_UNREACHABLE();
