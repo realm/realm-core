@@ -2203,7 +2203,6 @@ TEST_CASE("notifications: results") {
                     ++notification_calls_with_filter_on_linked_to_value;
                 },
                 key_path_array_to_linked_to_value);
-            // TODO:
             // auto token_for_filter_on_other_linked_to_value =
             //     results_for_notification_filter.add_notification_callback(
             //         [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {

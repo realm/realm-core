@@ -76,17 +76,16 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         // If there are not `tables_in_filter` we can skip this part.
         table.for_each_backlink_column([&](ColKey column_key) {
             // If this backlink is included in any of the filters we follow the path further.
-            const Table& origin_table = *table.get_link_target(column_key);
+            const Table& origin_table = *table.get_opposite_table(column_key);
+
             auto origin_table_key = origin_table.get_key();
+            auto origin_column_key = table.get_opposite_column(column_key);
 
             for (KeyPath& key_path : key_path_array) {
                 auto key_path_size = key_path.size();
                 if (key_path_size > 0) {
-                    auto last_key_path_element = key_path[key_path_size - 1];
-                    auto last_table_key = last_key_path_element.first;
-                    auto last_column_key = last_key_path_element.second;
+                    auto [last_table_key, last_column_key] = key_path.back();
                     if (last_table_key == table_key && last_column_key == column_key) {
-                        auto origin_column_key = table.get_opposite_column(column_key);
                         std::pair new_pair(origin_table_key, origin_column_key);
                         key_path.push_back(new_pair);
                     }
@@ -270,13 +269,13 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
                                                           size_t depth, const Table& table,
                                                           const ObjKeyType& object_key_value)
 {
+
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
         return;
     }
 
-    auto table_key = key_path[depth].first;
-    auto column_key = key_path[depth].second;
+    auto [table_key, column_key] = key_path.at(depth);
 
     // Check for a change on the current depth level.
     auto iterator = m_info.tables.find(table_key.value);
