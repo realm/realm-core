@@ -137,6 +137,8 @@ public:
                                         std::vector<KeyPathArray>& key_path_arrays);
 
 protected:
+    friend class ObjectKeyPathChangeChecker;
+
     TransactionChangeInfo const& m_info;
 
     // The `Table` this `DeepChangeChecker` is based on.
@@ -195,52 +197,29 @@ private:
 };
 
 /**
- * The `KeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a checks by traversing and
- * only traversing the given KeyPathArray. With this it supports any depth (as opposed to the maxium depth of 4 on the
- * `DeepChangeChecker`) and backlinks.
+ * The `CollectionKeyPathChangeChecker` is a specialised version of `DeepChangeChecker` that offers a check by
+ * traversing and only traversing the given `KeyPathArray`. With this it supports any depth (as opposed to the maxium
+ * depth of 4 on the `DeepChangeChecker`) and backlinks.
  */
-class KeyPathChangeChecker : DeepChangeChecker {
+class CollectionKeyPathChangeChecker : DeepChangeChecker {
 public:
-    KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                         std::vector<RelatedTable> const& related_tables,
-                         const std::vector<KeyPathArray>& key_path_arrays);
+    CollectionKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                                   std::vector<RelatedTable> const& related_tables,
+                                   const std::vector<KeyPathArray>& key_path_arrays);
 
     /**
-     * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided
-     * when construction this `KeyPathChangeChecker`.
+     * Check if the `Object` identified by `object_key` was changed and it is included in the `KeyPathArray` provided
+     * when construction this `CollectionKeyPathChangeChecker`.
      *
-     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
+     * @param object_key The `ObjKey::value` for the `Object` that is supposed to be checked.
      *
-     * @return True if the object was changed, false otherwise.
+     * @return True if the `Object` was changed, false otherwise.
      */
     bool operator()(int64_t object_key);
-};
-
-/**
- * The `ObjectChangeChecker` is a specialised version of `DeepChangeChecker` that offers a deep change check for
- * objects which is different from the checks done for `Collection`. Like `KeyPathChecker` it is only traversing the
- * given KeyPathArray and has no depth limit.
- *
- * This difference is mainly seen in the fact that for objects we notify about the specific columns that have been
- * changed
- */
-class ObjectChangeChecker : DeepChangeChecker {
-public:
-    ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                        std::vector<RelatedTable> const& related_tables,
-                        const std::vector<KeyPathArray>& key_path_arrays);
-
-    /**
-     * Check if the object identified by `object_key` was changed and it is included in the `KeyPathArray` provided
-     * when construction this `KeyPathChangeChecker`.
-     *
-     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
-     *
-     * @return A list of columns changed in the root object.
-     */
-    std::vector<int64_t> operator()(int64_t object_key);
 
 private:
+    friend class ObjectKeyPathChangeChecker;
+
     /**
      * Traverses down a given `KeyPath` and checks the objects along the way for changes.
      *
@@ -253,6 +232,31 @@ private:
      */
     void check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
                         const Table& table, const ObjKeyType& object_key_value);
+};
+
+/**
+ * The `ObjectKeyPathChangeChecker` is a specialised version of `CollectionKeyPathChangeChecker` that offers a deep
+ * change check for `Object` which is different from the checks done for `Collection`. Like
+ * `CollectionKeyPathChangeChecker` it is only traversing the given KeyPathArray and has no depth limit.
+ *
+ * This difference is mainly seen in the fact that for `Object` we notify about the specific columns that have been
+ * changed which we do not for `Collection`.
+ */
+class ObjectKeyPathChangeChecker : CollectionKeyPathChangeChecker {
+public:
+    ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                               std::vector<DeepChangeChecker::RelatedTable> const& related_tables,
+                               const std::vector<KeyPathArray>& key_path_arrays);
+
+    /**
+     * Check if the `Object` identified by `object_key` was changed and it is included in the `KeyPathArray` provided
+     * when construction this `ObjectKeyPathChangeChecker`.
+     *
+     * @param object_key The `ObjKey::value` for the `Object` that is supposed to be checked.
+     *
+     * @return A list of columns changed in the root `Object`.
+     */
+    std::vector<int64_t> operator()(int64_t object_key);
 };
 
 

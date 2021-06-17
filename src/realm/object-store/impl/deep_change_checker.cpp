@@ -258,61 +258,15 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
     return check_row(m_root_table, key, m_filtered_columns, 0);
 }
 
-KeyPathChangeChecker::KeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                           std::vector<RelatedTable> const& related_tables,
-                                           const std::vector<KeyPathArray>& key_path_arrays)
+CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChangeInfo const& info,
+                                                               Table const& root_table,
+                                                               std::vector<RelatedTable> const& related_tables,
+                                                               const std::vector<KeyPathArray>& key_path_arrays)
     : DeepChangeChecker(info, root_table, related_tables, key_path_arrays)
 {
 }
 
-bool KeyPathChangeChecker::operator()(ObjKeyType object_key)
-{
-    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
-    // anyway.
-    if (m_root_object_changes &&
-        m_root_object_changes->modifications_contains(object_key, m_filtered_columns_in_root_table)) {
-        return true;
-    }
-
-    // The `KeyPathChangeChecker` traverses along the given key path arrays and only those to check for changes
-    // along them.
-    for (const auto& key_path_array : m_key_path_arrays) {
-        for (const auto& key_path : key_path_array) {
-            auto next_object_key_to_check = object_key;
-            for (size_t i = 0; i < key_path.size(); i++) {
-                // Check for a change on the current depth.
-                auto table_key = key_path[i].first;
-                auto column_key = key_path[i].second;
-                auto iterator = m_info.tables.find(table_key.value);
-                if (iterator != m_info.tables.end() &&
-                    (iterator->second.modifications_contains(next_object_key_to_check, {column_key}) ||
-                     iterator->second.insertions_contains(next_object_key_to_check))) {
-                    return true;
-                }
-
-                // Advance one level deeper into the key path if possible.
-                if (i < key_path.size() - 1) {
-                    auto column_type = column_key.get_type();
-                    if (column_type == col_type_Link) {
-                        const Obj obj = m_root_table.get_object(ObjKey(next_object_key_to_check));
-                        next_object_key_to_check = obj.get<ObjKey>(ColKey(column_key)).value;
-                    }
-                }
-            }
-        }
-    }
-
-    return false;
-}
-
-ObjectChangeChecker::ObjectChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                         std::vector<RelatedTable> const& related_tables,
-                                         const std::vector<KeyPathArray>& key_path_arrays)
-    : DeepChangeChecker(info, root_table, related_tables, key_path_arrays)
-{
-}
-
-std::vector<int64_t> ObjectChangeChecker::operator()(ObjKeyType object_key)
+bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
     std::vector<int64_t> changed_columns = {};
 
@@ -322,11 +276,12 @@ std::vector<int64_t> ObjectChangeChecker::operator()(ObjKeyType object_key)
         }
     }
 
-    return changed_columns;
+    return changed_columns.size() > 0;
 }
 
-void ObjectChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path, size_t depth,
-                                         const Table& table, const ObjKeyType& object_key_value)
+void CollectionKeyPathChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, const KeyPath& key_path,
+                                                    size_t depth, const Table& table,
+                                                    const ObjKeyType& object_key_value)
 {
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
@@ -377,4 +332,24 @@ void ObjectChangeChecker::check_key_path(std::vector<int64_t>& changed_columns, 
             }
         }
     }
+}
+
+ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
+                                                       std::vector<RelatedTable> const& related_tables,
+                                                       const std::vector<KeyPathArray>& key_path_arrays)
+    : CollectionKeyPathChangeChecker(info, root_table, related_tables, key_path_arrays)
+{
+}
+
+std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_key)
+{
+    std::vector<int64_t> changed_columns = {};
+
+    for (const auto& key_path_array : m_key_path_arrays) {
+        for (const auto& key_path : key_path_array) {
+            check_key_path(changed_columns, key_path, 0, m_root_table, object_key);
+        }
+    }
+
+    return changed_columns;
 }

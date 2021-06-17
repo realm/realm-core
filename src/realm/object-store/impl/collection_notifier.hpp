@@ -192,7 +192,7 @@ protected:
                                                                                  ConstTableRef)
         REQUIRES(!m_callback_mutex);
 
-    // Creates and returns a `ObjectChangeChecker` which behaves slighty different that `DeepChangeChecker`
+    // Creates and returns a `ObjectKeyPathChangeChecker` which behaves slighty different that `DeepChangeChecker`
     // and `KeyPathChecker` which are used for `Collection`s.
     std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
     get_object_modification_checker(TransactionChangeInfo const&, ConstTableRef) REQUIRES(!m_callback_mutex);

@@ -2501,8 +2501,8 @@ TEST_CASE("notifications: results") {
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 1);
                     }
 
                     SECTION("modifying backlinked table 'object', property 'link' "
@@ -2561,12 +2561,12 @@ TEST_CASE("notifications: results") {
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 4);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 1);
                         REQUIRE(notification_calls_without_filter == 2);
                         REQUIRE_FALSE(collection_change_set_without_filter.empty());
-                        REQUIRE_INDICES(collection_change_set_without_filter.modifications, 4);
-                        REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 4);
+                        REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
                     }
 
                     SECTION("modifying backlinked table 'object', property 'link' "
