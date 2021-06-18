@@ -109,21 +109,27 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 }
 
 template <typename T>
+bool DeepChangeChecker::do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value, size_t depth)
+{
+    if (value.is_type(type_TypedLink)) {
+        auto link = value.get_link();
+        if (!link.is_unresolved()) {
+            if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+                cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
+                REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+            }
+            return check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
+        }
+    }
+    return false;
+}
+
+template <typename T>
 bool DeepChangeChecker::do_check_for_collection_of_mixed(T* coll, size_t depth)
 {
     TableRef cached_linked_table;
-    return std::any_of(coll->begin(), coll->end(), [&, this](auto value) {
-        if (value.is_type(type_TypedLink)) {
-            auto link = value.get_link();
-            if (!link.is_unresolved()) {
-                if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                    cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
-                    REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
-                }
-                return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
-            }
-        }
-        return false;
+    return std::any_of(coll->begin(), coll->end(), [&](auto value) {
+        return do_check_mixed_for_link(coll, cached_linked_table, value, depth);
     });
 }
 
@@ -132,41 +138,28 @@ bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<Co
     REALM_ASSERT(coll);
     if (auto lst = dynamic_cast<LnkLst*>(coll.get())) {
         TableRef target = lst->get_target_table();
-        return std::any_of(lst->begin(), lst->end(), [&, this](auto key) {
-            return this->check_row(*target, key.value, depth + 1);
+        return std::any_of(lst->begin(), lst->end(), [&](auto key) {
+            return check_row(*target, key.value, depth + 1);
         });
     }
     else if (auto list = dynamic_cast<Lst<Mixed>*>(coll.get())) {
         return do_check_for_collection_of_mixed(list, depth);
     }
     else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
-        auto target = dict->get_target_table();
         TableRef cached_linked_table;
-        return std::any_of(dict->begin(), dict->end(), [&, this](auto key_value_pair) {
+        return std::any_of(dict->begin(), dict->end(), [&](auto key_value_pair) {
             Mixed value = key_value_pair.second;
-            if (value.is_type(type_TypedLink)) {
-                auto link = value.get_link();
-                if (!link.is_unresolved()) {
-                    REALM_ASSERT(link);
-                    if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                        cached_linked_table = dict->get_table()->get_parent_group()->get_table(link.get_table_key());
-                        REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
-                    }
-                    return this->check_row(*cached_linked_table, link.get_obj_key().value, depth + 1);
-                }
-            }
-            else if (value.is_type(type_Link)) {
-                REALM_ASSERT(target);
-                return this->check_row(*target, value.get<ObjKey>().value, depth + 1);
-            }
-            return false;
+            // Here we rely on Dictionaries storing all links as a TypedLink
+            // even if the dictionary is set to a single object type.
+            REALM_ASSERT(!value.is_type(type_Link));
+            return do_check_mixed_for_link(dict, cached_linked_table, value, depth);
         });
     }
     else if (auto set = dynamic_cast<LnkSet*>(coll.get())) {
         auto target = set->get_target_table();
         REALM_ASSERT(target);
-        return std::any_of(set->begin(), set->end(), [&, this](auto obj_key) {
-            return obj_key && this->check_row(*target, obj_key.value, depth + 1);
+        return std::any_of(set->begin(), set->end(), [&](auto obj_key) {
+            return obj_key && check_row(*target, obj_key.value, depth + 1);
         });
     }
     else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {

@@ -1686,21 +1686,13 @@ struct DictionaryOfObjects {
                                "table"};
     void add_link(Obj from, ColKey col, ObjLink to)
     {
-        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to);
-        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
-        // In practice, this is triggered by the addition of backlink columns to any table.
-        if (m_relation_updater) {
-            m_relation_updater();
-        }
+        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to.get_obj_key());
     }
     size_t size_of_collection(Obj obj, ColKey col)
     {
         return obj.get_dictionary(col).size();
     }
-    void set_relation_updater(std::function<void()> updater)
-    {
-        m_relation_updater = updater;
-    }
+    void set_relation_updater(std::function<void()>) {}
     size_t count_unresolved_links(Obj obj, ColKey col)
     {
         Dictionary dict = obj.get_dictionary(col);
@@ -1796,7 +1788,6 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         _impl::DeepChangeChecker::find_related_tables(tables, *table);
     };
     relation_updater();
-    _impl::DeepChangeChecker::find_related_tables(tables, *table);
     test_type.set_relation_updater(relation_updater);
 
     auto cols = table->get_column_keys();

@@ -26,8 +26,10 @@
 
 namespace realm {
 class CollectionBase;
-class Table;
+class Mixed;
 class Realm;
+class Table;
+class TableRef;
 class Transaction;
 
 namespace _impl {
@@ -83,6 +85,8 @@ private:
     bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth);
     template <typename T>
     bool do_check_for_collection_of_mixed(T* coll, size_t depth);
+    template <typename T>
+    bool do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value, size_t depth);
 };
 
 } // namespace _impl
