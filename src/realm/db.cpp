@@ -850,14 +850,13 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #endif
         // The coordination/management dir is created as a side effect of the lock
         // operation above if needed for lock emulation. But it may also be needed
-        // for other purposes, so make sure it exists:
-        if (!util::File::is_dir(m_coordination_dir)) {
-            // in worst case there'll be a race on creating this directory.
-            // This should be safe but a waste of resources.
-            // Unfortunately it cannot be created at an earlier point, because
-            // it may then be deleted during the above lock_shared() operation.
-            try_make_dir(m_coordination_dir);
-        }
+        // for other purposes, so make sure it exists.
+        // in worst case there'll be a race on creating this directory.
+        // This should be safe but a waste of resources.
+        // Unfortunately it cannot be created at an earlier point, because
+        // it may then be deleted during the above lock_shared() operation.
+        try_make_dir(m_coordination_dir);
+
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or

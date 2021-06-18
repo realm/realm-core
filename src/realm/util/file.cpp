@@ -1095,22 +1095,24 @@ bool File::lock(bool exclusive, bool non_blocking)
             if (exclusive) {
                 return true;
             }
-            else {
-                // open shared:
-                // We need the fifo in order to make a shared lock. If we have it
-                // in a management directory, we may need to create that first:
-                if (!m_fifo_dir_path.empty())
-                    try_make_dir(m_fifo_dir_path);
-                // now we can try creating the FIFO again
-                status = mkfifo(m_fifo_path.c_str(), 0666);
-                if (status) {
-                    // If we fail it must be because it already exists, check further down
-                    err = errno;
-                }
+            // open shared:
+            // We need the fifo in order to make a shared lock. If we have it
+            // in a management directory, we may need to create that first:
+            if (!m_fifo_dir_path.empty())
+                try_make_dir(m_fifo_dir_path);
+            // now we can try creating the FIFO again
+            status = mkfifo(m_fifo_path.c_str(), 0666);
+            if (status) {
+                // If we fail it must be because it already exists
+                err = errno;
+                REALM_ASSERT_EX(err == EEXIST, err);
             }
         }
-        // if failed to create the fifo, it must be because it already exists!
-        REALM_ASSERT_EX(err == EEXIST, err);
+        else {
+            // if we failed to create the fifo and not because dir is missing,
+            // it must be because the fifo already exists!
+            REALM_ASSERT_EX(err == EEXIST, err);
+        }
     }
     if (exclusive) {
         // check if any shared locks are already taken by trying to open the pipe for writing
