@@ -24,7 +24,7 @@ using namespace realm;
 using namespace realm::_impl;
 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_tables, Table const& table,
-                                            KeyPathArray& key_path_array)
+                                            const KeyPathArray& key_path_array)
 {
     auto table_key = table.get_key();
 
@@ -69,8 +69,8 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
 }
 
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-                                     std::vector<RelatedTable> const& related_tables, KeyPathArray& key_path_array,
-                                     bool all_callbacks_filtered)
+                                     std::vector<RelatedTable> const& related_tables,
+                                     const KeyPathArray& key_path_array, bool all_callbacks_filtered)
     : m_info(info)
     , m_root_table(root_table)
     , m_key_path_array(key_path_array)
@@ -217,7 +217,7 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
 CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChangeInfo const& info,
                                                                Table const& root_table,
                                                                std::vector<RelatedTable> const& related_tables,
-                                                               KeyPathArray& key_path_array,
+                                                               const KeyPathArray& key_path_array,
                                                                bool all_callbacks_filtered)
     : DeepChangeChecker(info, root_table, related_tables, key_path_array, all_callbacks_filtered)
 {
@@ -234,8 +234,8 @@ bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
     return changed_columns.size() > 0;
 }
 
-void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns, KeyPath& key_path,
-                                                          size_t depth, const Table& table,
+void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns,
+                                                          const KeyPath& key_path, size_t depth, const Table& table,
                                                           const ObjKeyType& object_key_value)
 {
 
@@ -308,7 +308,8 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
 
 ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
                                                        std::vector<RelatedTable> const& related_tables,
-                                                       KeyPathArray& key_path_array, bool all_callbacks_filtered)
+                                                       const KeyPathArray& key_path_array,
+                                                       bool all_callbacks_filtered)
     : CollectionKeyPathChangeChecker(info, root_table, related_tables, key_path_array, all_callbacks_filtered)
 {
 }
