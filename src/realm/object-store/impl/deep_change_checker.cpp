@@ -35,7 +35,7 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         }))
         return;
 
-    auto has_filters = any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
+    auto has_key_paths = any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
         return key_path.size() > 0;
     });
 
@@ -58,8 +58,8 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         }
     }
 
-    if (has_filters) {
-        // Backlinks can only come into consideration when added via key paths (indicated by `has_filters`).
+    if (has_key_paths) {
+        // Backlinks can only come into consideration when added via key paths.
         table.for_each_backlink_column([&](ColKey column_key) {
             const Table& origin_table = *table.get_opposite_table(column_key);
             find_related_tables(related_tables, origin_table, key_path_array);
