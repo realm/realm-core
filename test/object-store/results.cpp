@@ -2657,8 +2657,8 @@ TEST_CASE("notifications: results") {
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 0);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 0);
+                        REQUIRE(collection_change_set_backlink_to_value.modifications.contains(0));
+                        REQUIRE(collection_change_set_backlink_to_value.modifications_new.contains(0));
                     }
                 }
 
@@ -2697,8 +2697,8 @@ TEST_CASE("notifications: results") {
                         });
                         REQUIRE(notification_calls_backlink_to_value == 2);
                         REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 0);
-                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 0);
+                        REQUIRE(collection_change_set_backlink_to_value.modifications.contains(0));
+                        REQUIRE(collection_change_set_backlink_to_value.modifications_new.contains(0));
                     }
                 }
             }

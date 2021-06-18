@@ -39,19 +39,6 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         return key_path.size() > 0;
     });
 
-    // If the `table` is not part of the `key_path_array` we do not need to continue.
-    if (has_filters) {
-        auto table_in_key_path_array = any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
-            auto table_in_key_path = any_of(begin(key_path), end(key_path), [&](auto key_path_element) {
-                return key_path_element.first == table_key;
-            });
-            return table_in_key_path;
-        });
-        if (!table_in_key_path_array) {
-            return;
-        }
-    }
-
     // We need to add this table to `related_tables` before recurring so that the check
     // above works, but we can't store a pointer to the thing being populated
     // because the recursive calls may resize `related_tables`, so instead look it up by
@@ -72,28 +59,10 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     }
 
     if (has_filters) {
-        // Backlinks can only come into consideration when added via key paths.
-        // If there are not `tables_in_filter` we can skip this part.
+        // Backlinks can only come into consideration when added via key paths (indicated by `has_filters`).
         table.for_each_backlink_column([&](ColKey column_key) {
-            // If this backlink is included in any of the filters we follow the path further.
             const Table& origin_table = *table.get_opposite_table(column_key);
-
-            auto origin_table_key = origin_table.get_key();
-            auto origin_column_key = table.get_opposite_column(column_key);
-
-            for (KeyPath& key_path : key_path_array) {
-                auto key_path_size = key_path.size();
-                if (key_path_size > 0) {
-                    auto [last_table_key, last_column_key] = key_path.back();
-                    if (last_table_key == table_key && last_column_key == column_key) {
-                        std::pair new_pair(origin_table_key, origin_column_key);
-                        key_path.push_back(new_pair);
-                    }
-                }
-            }
-
             find_related_tables(related_tables, origin_table, key_path_array);
-
             return false;
         });
     }
@@ -272,6 +241,20 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
 
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
+
+        // For the special case of having a backlink at the end of a key path we need to check this level too.
+        // Modifications to a backlink are found via the insertions on the origin table (which we are in right
+        // now).
+        auto last_key_path_element = key_path[key_path.size() - 1];
+        auto last_column_key = last_key_path_element.second;
+        if (last_column_key.get_type() == col_type_BackLink) {
+            auto iterator = m_info.tables.find(table.get_key().value);
+            if (iterator != m_info.tables.end() && !iterator->second.insertions_empty()) {
+                auto root_column_key = key_path[0].second;
+                changed_columns.push_back(root_column_key.value);
+            }
+        }
+
         return;
     }
 
@@ -283,8 +266,11 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
                                             iterator->second.insertions_contains(object_key_value))) {
         // If an object linked to the root object was changed we only mark the
         // property of the root objects as changed.
+        // This is also the reason why we can return right after doing so because we would only mark the same root
+        // property again in case we find another change.
         auto root_column_key = key_path[0].second;
         changed_columns.push_back(root_column_key.value);
+        return;
     }
 
     // Advance one level deeper into the key path.
