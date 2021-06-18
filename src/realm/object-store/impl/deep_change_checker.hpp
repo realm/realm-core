@@ -152,8 +152,6 @@ protected:
 private:
     std::vector<RelatedTable> const& m_related_tables;
 
-    bool m_all_callbacks_filtered;
-
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
 
     struct Path {

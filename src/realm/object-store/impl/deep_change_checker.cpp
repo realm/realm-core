@@ -79,7 +79,6 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
         return it != info.tables.end() ? &it->second : nullptr;
     }())
     , m_related_tables(related_tables)
-    , m_all_callbacks_filtered(all_callbacks_filtered)
 {
     // If all callbacks do have a filter, every `KeyPathArray` will have entries.
     // In this case we need to check the `ColKey`s and pass the filtered columns
