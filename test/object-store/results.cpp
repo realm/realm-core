@@ -2323,7 +2323,31 @@ TEST_CASE("notifications: results") {
             }
 
             SECTION("Key path arrays with more than two elements") {
-                // TODO
+                write([&] {
+                    table->get_object(object_keys[1])
+                        .get_linked_object(col_link)
+                        .set(column_key_linked_to_table_link, other_linked_to_table->create_object().get_key());
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_with_filter_on_root_value == 2);
+                REQUIRE_FALSE(collection_change_set_with_filter_on_root_value.empty());
+                REQUIRE_INDICES(collection_change_set_with_filter_on_root_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_root_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_with_filter_on_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_with_filter_on_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_linked_to_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_with_filter_on_other_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_with_filter_on_other_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_with_filter_on_other_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_with_filter_on_other_linked_to_value.modifications_new, 1);
             }
         }
 
