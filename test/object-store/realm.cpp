@@ -1045,6 +1045,18 @@ TEST_CASE("Realm::delete_files()") {
         REQUIRE(util::File::exists(path + ".log_a"));
         REQUIRE(util::File::exists(path + ".log_b"));
     }
+
+    SECTION("Deleting the same Realm multiple times.") {
+        realm->close();
+        Realm::delete_files(path);
+        Realm::delete_files(path);
+        Realm::delete_files(path);
+    }
+
+    SECTION("Calling delete on a folder that does not exist.") {
+        auto fake_path = "/tmp/doesNotExist/realm.424242";
+        Realm::delete_files(fake_path);
+    }
 }
 
 TEST_CASE("ShareRealm: in-memory mode from buffer") {
