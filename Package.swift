@@ -700,10 +700,10 @@ let package = Package(
     products: [
         .library(
             name: "RealmCore",
-            targets: ["Core"]),
+            targets: ["RealmCore"]),
         .library(
             name: "RealmQueryParser",
-            targets: ["QueryParser"]),
+            targets: ["RealmQueryParser"]),
         .library(
             name: "RealmCapi",
             targets: ["Capi"]),
@@ -719,7 +719,7 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
-            name: "Core",
+            name: "RealmCore",
             dependencies: ["Bid"],
             path: "src",
             exclude: ([
@@ -748,8 +748,8 @@ let package = Package(
                 .linkedLibrary("z"),
             ]),
         .target(
-            name: "QueryParser",
-            dependencies: ["Core"],
+            name: "RealmQueryParser",
+            dependencies: ["RealmCore"],
             path: "src/realm/parser",
             exclude: [
                 "CMakeLists.txt",
@@ -767,7 +767,7 @@ let package = Package(
             ] + cxxSettings),
         .target(
             name: "SyncServer",
-            dependencies: ["Core"],
+            dependencies: ["RealmCore"],
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
@@ -790,7 +790,7 @@ let package = Package(
             cxxSettings: cxxSettings),
         .target(
             name: "Capi",
-            dependencies: ["Core", "QueryParser"],
+            dependencies: ["RealmCore", "RealmQueryParser"],
             path: "src/realm/object-store/c_api",
             exclude: [
                 "CMakeLists.txt",
@@ -809,7 +809,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["Core", "SyncServer"],
+            dependencies: ["RealmCore", "SyncServer"],
             path: "test/object-store/util",
             exclude: [
                 "baas_admin_api.hpp",
@@ -825,7 +825,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["Core", "QueryParser", "ObjectStoreTestUtils"],
+            dependencies: ["RealmCore", "RealmQueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "CMakeLists.txt",
