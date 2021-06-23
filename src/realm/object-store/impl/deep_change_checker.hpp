@@ -26,8 +26,10 @@
 
 namespace realm {
 class CollectionBase;
-class Table;
+class Mixed;
 class Realm;
+class Table;
+class TableRef;
 class Transaction;
 
 namespace _impl {
@@ -81,6 +83,10 @@ private:
     bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
     bool check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth = 0);
     bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth);
+    template <typename T>
+    bool do_check_for_collection_of_mixed(T* coll, size_t depth);
+    template <typename T>
+    bool do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value, size_t depth);
 };
 
 } // namespace _impl

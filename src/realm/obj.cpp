@@ -2150,12 +2150,26 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                 REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
             }
+            else if (c.is_list()) {
+                if (c.get_type() == col_type_Mixed) {
+                    auto l = linking_obj.get_list<Mixed>(c);
+                    auto n = l.find_first(ObjLink{m_table->get_key(), other.get_key()});
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, ObjLink{m_table->get_key(), get_key()});
+                }
+                else if (c.get_type() == col_type_LinkList) {
+                    // Link list
+                    auto l = linking_obj.get_list<ObjKey>(c);
+                    auto n = l.find_first(other.get_key());
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, get_key());
+                }
+                else {
+                    REALM_UNREACHABLE(); // missing type handling
+                }
+            }
             else {
-                // Link list
-                auto l = linking_obj.get_list<ObjKey>(c);
-                auto n = l.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
+                REALM_UNREACHABLE(); // missing type handling
             }
         }
         return false;
