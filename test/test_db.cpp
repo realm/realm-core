@@ -21,51 +21,22 @@
 
 using namespace realm;
 
-std::string path = "path/to/realm/files/";
-auto extension_lock = ".lock";
-auto extension_storage = "";
-auto extension_management = ".management";
-auto extension_note = ".note";
-auto extension_log = ".log";
-auto extension_log_a = ".log_a";
-auto extension_log_b = ".log_b";
-
-TEST(DB_getCoreFiles_default)
-{
-    auto core_files = DB::get_core_files();
-    CHECK_EQUAL(core_files.size(), 7);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].first, extension_lock);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].first, extension_storage);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Management].first, extension_management);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Management].second, true);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Note].first, extension_note);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Note].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Log].first, extension_log);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Log].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].first, extension_log_a);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].first, extension_log_b);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].second, false);
-}
-
 TEST(DB_getCoreFiles_adding_path)
 {
-    auto core_files = DB::get_core_files(path);
-    CHECK_EQUAL(core_files.size(), 7);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].first, path + extension_lock);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Lock].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].first, path + extension_storage);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Storage].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Management].first, path + extension_management);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Management].second, true);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Note].first, path + extension_note);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Note].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Log].first, path + extension_log);
-    CHECK_EQUAL(core_files[DB::CoreFileType::Log].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].first, path + extension_log_a);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogA].second, false);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].first, path + extension_log_b);
-    CHECK_EQUAL(core_files[DB::CoreFileType::LogB].second, false);
+    std::string path = "path/to/realm/files/";
+    auto extension_lock = ".lock";
+    auto extension_storage = "";
+    auto extension_management = ".management";
+    auto extension_note = ".note";
+    auto extension_log = ".log";
+    auto extension_log_a = ".log_a";
+    auto extension_log_b = ".log_b";
+
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Lock), path + extension_lock);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Storage), path + extension_storage);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Management), path + extension_management);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Note), path + extension_note);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Log), path + extension_log);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::LogA), path + extension_log_a);
+    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::LogB), path + extension_log_b);
 }

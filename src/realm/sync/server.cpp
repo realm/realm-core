@@ -46,7 +46,6 @@
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/sync/noinst/file_descriptors.hpp>
-#include <realm/sync/noinst/common_dir.hpp>
 #include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
@@ -5048,8 +5047,9 @@ void ServerFile::perform_file_deletion_after_state_realm_deletion()
     REALM_ASSERT(m_realm_deletion_is_ongoing);
 
     // Remove the Realm file and its associates
-    _impl::remove_realm_file(m_file.realm_path); // Throws
-    logger.info("Realm file deleted");           // Throws
+    bool delete_lockfile = true;
+    DB::delete_files(m_file.realm_path, nullptr, delete_lockfile); // Throws
+    logger.info("Realm file deleted");                             // Throws
 
     // Remove the directories that would otherwise be left empty
     {
