@@ -256,7 +256,6 @@ tasks:
         #!/bin/bash
         set -o errexit
         set -o pipefail
-        set -o verbose
 
         mkdir bloaty-binaries && cd bloaty-binaries
         curl --silent -L ${bloaty_url} | tar -xz --strip-components=1
