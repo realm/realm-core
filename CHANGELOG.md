@@ -3,6 +3,7 @@
 ### Enhancements
 * Shift more of the work done when first initializing a collection notifier to the background worker thread rather than doing it on the main thread.
 * Report if Realm::delete_files() actually deleted the Realm file, separately from if any errors occurred.
+* Add Dictionary::try_erase(), which returns false if the key is not found rather than throwing.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
