@@ -591,6 +591,38 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(origin->read_group().get_table("class_object")->size() == 3);
     }
 
+    SECTION("Copying a non-synced Realm without a file id.") {
+        TestFile original_config;
+        original_config.schema = config.schema;
+        original_config.cache = false;
+        auto original_realm = Realm::get_shared_realm(original_config);
+        original_realm->begin_transaction();
+        original_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        original_realm->commit_transaction();
+        TestFile copied_config;
+        copied_config.schema = config.schema;
+        copied_config.cache = false;
+        original_realm->write_copy_without_client_file_id(copied_config.path, BinaryData());
+        auto copied_realm = Realm::get_shared_realm(copied_config);
+        REQUIRE(copied_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("Copying a non-synced Realm without a file id during a transaction does copy uncommitted data.") {
+        TestFile original_config;
+        original_config.schema = config.schema;
+        original_config.cache = false;
+        auto original_realm = Realm::get_shared_realm(original_config);
+        original_realm->begin_transaction();
+        original_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        TestFile copied_config;
+        copied_config.schema = config.schema;
+        copied_config.cache = false;
+        original_realm->write_copy_without_client_file_id(copied_config.path, BinaryData());
+        auto copied_realm = Realm::get_shared_realm(copied_config);
+        REQUIRE(copied_realm->read_group().get_table("class_object")->size() == 1);
+        original_realm->commit_transaction();
+    }
+
     SECTION("downloads Realms which exist on the server") {
         {
             auto realm = Realm::get_shared_realm(config2);
