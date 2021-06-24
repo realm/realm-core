@@ -266,6 +266,13 @@ inline void Logger::log(Level level, const char* message, Params&&... params)
 {
     if (would_log(level))
         do_log(level, message, std::forward<Params>(params)...); // Throws
+#if REALM_DEBUG
+    else {
+        // Do the string formatting even if it won't be logged to hopefully
+        // catch invalid format strings
+        static_cast<void>(format(message, std::forward<Params>(params)...)); // Throws
+    }
+#endif
 }
 
 inline bool Logger::would_log(Level level) const noexcept

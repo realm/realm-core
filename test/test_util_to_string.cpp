@@ -21,6 +21,9 @@
 
 #include <realm/util/to_string.hpp>
 
+#include <realm/column_type.hpp>
+#include <realm/data_type.hpp>
+
 #include "test.hpp"
 
 using namespace realm;
@@ -89,6 +92,89 @@ TEST(ToString_Basic)
         std::string s = ostr.str();
         CHECK_EQUAL(s, "");
     }
+}
+
+TEST(ToString_DataTypes)
+{
+#define CHECK_ENUM(type) CHECK_EQUAL(to_string(type), "\"" #type "\"")
+    CHECK_ENUM(type_Int);
+    CHECK_ENUM(type_Bool);
+    CHECK_ENUM(type_String);
+    CHECK_ENUM(type_Binary);
+    CHECK_ENUM(type_Mixed);
+    CHECK_ENUM(type_Timestamp);
+    CHECK_ENUM(type_Float);
+    CHECK_ENUM(type_Double);
+    CHECK_ENUM(type_Decimal);
+    CHECK_ENUM(type_Link);
+    CHECK_ENUM(type_LinkList);
+    CHECK_ENUM(type_ObjectId);
+    CHECK_ENUM(type_TypedLink);
+    CHECK_ENUM(type_UUID);
+    CHECK_ENUM(type_OldTable);
+    CHECK_ENUM(type_OldDateTime);
+    CHECK_ENUM(type_TypeOfValue);
+
+    CHECK_ENUM(col_type_Int);
+    CHECK_ENUM(col_type_Bool);
+    CHECK_ENUM(col_type_String);
+    CHECK_ENUM(col_type_Binary);
+    CHECK_ENUM(col_type_Mixed);
+    CHECK_ENUM(col_type_Timestamp);
+    CHECK_ENUM(col_type_Float);
+    CHECK_ENUM(col_type_Double);
+    CHECK_ENUM(col_type_Decimal);
+    CHECK_ENUM(col_type_Link);
+    CHECK_ENUM(col_type_LinkList);
+    CHECK_ENUM(col_type_BackLink);
+    CHECK_ENUM(col_type_ObjectId);
+    CHECK_ENUM(col_type_TypedLink);
+    CHECK_ENUM(col_type_UUID);
+    CHECK_ENUM(col_type_OldStringEnum);
+    CHECK_ENUM(col_type_OldTable);
+    CHECK_ENUM(col_type_OldDateTime);
+}
+
+struct StreamableType {
+};
+std::ostream& operator<<(std::ostream& os, StreamableType)
+{
+    return os << "Custom streamable type";
+}
+
+TEST(ToString_OStreamFallback)
+{
+    CHECK_EQUAL(to_string(StreamableType()), "Custom streamable type");
+}
+
+struct ImplicitlyConvertibleToPrintable {
+    operator util::Printable() const noexcept
+    {
+        return "printable";
+    }
+};
+struct ExplicitlyConvertibleToPrintable {
+    explicit operator util::Printable() const noexcept
+    {
+        return "printable";
+    }
+};
+struct ExplicitlyConvertibleToPrintableAndStreamable {
+    explicit operator util::Printable() const noexcept
+    {
+        return "conversion to printable";
+    }
+};
+std::ostream& operator<<(std::ostream&, const ExplicitlyConvertibleToPrintableAndStreamable&)
+{
+    throw std::runtime_error("called stream operator instead of conversion");
+}
+
+TEST(ToString_ConversionsToPrintable)
+{
+    CHECK_EQUAL(util::format("%1", ImplicitlyConvertibleToPrintable()), "printable");
+    CHECK_EQUAL(util::format("%1", ExplicitlyConvertibleToPrintable()), "printable");
+    CHECK_EQUAL(util::format("%1", ExplicitlyConvertibleToPrintableAndStreamable()), "conversion to printable");
 }
 
 #endif
