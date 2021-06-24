@@ -478,3 +478,100 @@ TEST(Dictionary_UseAfterFree)
     }
     CHECK_EQUAL(q.count(), 1);
 }
+
+TEST(Dictionary_HashCollision)
+{
+    auto mask = Dictionary::set_hash_mask(0xFF);
+    Group g;
+    auto foos = g.add_table("Foo");
+    ColKey col_dict = foos->add_column_dictionary(type_Int, "dict");
+
+    auto foo = foos->create_object();
+    auto dict = foo.get_dictionary(col_dict);
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        dict.insert(Mixed(key), i);
+    }
+
+    // g.to_json(std::cout);
+
+    // Check that values can be read back
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        CHECK_EQUAL(dict[key].get_int(), i);
+    }
+
+    // Check that a query can find matching key and value
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        Query q = (foos->column<Dictionary>(col_dict).key(key) == Mixed(i));
+        CHECK_EQUAL(q.count(), 1);
+    }
+
+    // Check that dict.find works
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        auto it = dict.find(key);
+        CHECK_EQUAL((*it).second.get_int(), i);
+    }
+
+    // Update with new values
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        dict.insert(Mixed(key), 100 - i);
+    }
+
+    // Check that values was updated properly
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        CHECK_EQUAL(dict[key].get_int(), 100 - i);
+    }
+
+    // Now erase one entry at a time and theck that the rest of the values are ok
+    for (int64_t i = 0; i < 100; i++) {
+        std::string key = "key" + util::to_string(i);
+        dict.erase(key);
+        CHECK_EQUAL(dict.size(), 100 - i - 1);
+
+        // Check that remaining entries still can be found
+        for (int64_t j = i + 1; j < 100; j++) {
+            std::string key_j = "key" + util::to_string(j);
+            CHECK_EQUAL(dict[key_j].get_int(), 100 - j);
+        }
+    }
+    Dictionary::set_hash_mask(mask);
+}
+
+TEST(Dictionary_HashCollisionTransaction)
+{
+    auto mask = Dictionary::set_hash_mask(0xFF);
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    {
+        auto tr = db->start_write();
+        auto foos = tr->add_table("Foo");
+        ColKey col_dict = foos->add_column_dictionary(type_Int, "dict");
+
+        auto foo = foos->create_object();
+        auto dict = foo.get_dictionary(col_dict);
+        for (int64_t i = 0; i < 100; i++) {
+            std::string key = "key" + util::to_string(i);
+            dict.insert(Mixed(key), i);
+        }
+        tr->commit();
+    }
+
+    {
+        auto rt = db->start_read();
+        auto foos = rt->get_table("Foo");
+        ColKey col_dict = foos->get_column_key("dict");
+        auto dict = foos->begin()->get_dictionary(col_dict);
+        for (int64_t i = 0; i < 100; i++) {
+            std::string key = "key" + util::to_string(i);
+            CHECK_EQUAL(dict[key].get_int(), i);
+        }
+    }
+    Dictionary::set_hash_mask(mask);
+}
