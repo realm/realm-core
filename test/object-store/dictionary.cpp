@@ -229,8 +229,21 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(dict.contains(key));
             dict.erase(key);
             REQUIRE(!dict.contains(key));
+            REQUIRE_THROWS(dict.erase(key));
         }
         REQUIRE(dict.size() == 0);
+        REQUIRE_THROWS(dict.erase(keys[0]));
+    }
+
+    SECTION("try_erase()") {
+        for (auto key : keys) {
+            REQUIRE(dict.contains(key));
+            REQUIRE(dict.try_erase(key));
+            REQUIRE(!dict.contains(key));
+            REQUIRE_FALSE(dict.try_erase(key));
+        }
+        REQUIRE(dict.size() == 0);
+        REQUIRE_FALSE(dict.try_erase(keys[0]));
     }
 
     SECTION("contains()") {
