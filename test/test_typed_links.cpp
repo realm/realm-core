@@ -198,3 +198,28 @@ TEST(TypedLinks_Clear)
     person->clear();
     g.verify();
 }
+
+TEST(TypedLinks_CollectionClear)
+{
+    Group g;
+    auto dog = g.add_table("dog");
+    auto person = g.add_table("person");
+    auto col_list_mixed = person->add_column_list(type_Mixed, "mixed_list");
+    auto col_set_mixed = person->add_column_set(type_Mixed, "mixed_set");
+
+    auto pluto = dog->create_object();
+    auto paul = person->create_object();
+
+    auto list = paul.get_list<Mixed>(col_list_mixed);
+    auto set = paul.get_set<Mixed>(col_set_mixed);
+    list.add(pluto);
+    set.insert(pluto);
+    CHECK_EQUAL(pluto.get_backlink_count(), 2);
+    list.clear();
+    set.clear();
+    CHECK_EQUAL(pluto.get_backlink_count(), 0);
+
+    pluto.remove();
+
+    g.verify();
+}

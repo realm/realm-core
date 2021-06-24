@@ -197,6 +197,8 @@ template <>
 void Lst<Mixed>::do_insert(size_t, Mixed);
 template <>
 void Lst<Mixed>::do_remove(size_t);
+template <>
+void Lst<Mixed>::do_clear();
 extern template class Lst<Mixed>;
 
 // Specialization of Lst<ObjLink>:

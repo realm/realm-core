@@ -351,6 +351,15 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
 }
 
+template <>
+void Lst<Mixed>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_remove(ndx);
+    }
+}
+
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
