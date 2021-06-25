@@ -49,10 +49,8 @@ void validate_key_value(const Mixed& key)
 static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
 
 #ifdef REALM_DEBUG
+// This will leave the upper bit 0. Reserves space for alternative keys in case of collision
 uint64_t Dictionary::s_hash_mask = 0x7FFFFFFFFFFFFFFFULL;
-static std::mt19937_64 generator(4); // 4 has been chosen randomly
-#else
-static std::mt19937_64 generator(std::chrono::system_clock::now().time_since_epoch().count());
 #endif
 
 /************************** DictionaryClusterTree ****************************/
@@ -92,7 +90,7 @@ Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
             break;
         }
         default:
-            throw std::runtime_error("Not implemented");
+            throw std::runtime_error("Dictionary keys can only be strings or integers");
             break;
     }
     return key;
@@ -652,12 +650,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 old_entry = true;
             }
             else {
-                // Create a random key and link it
-                ObjKey random_key;
-                do {
-                    // We generate a key with upper bit set. Will not collide with any hash values
-                    random_key = ObjKey(int64_t(generator() & s_hash_mask)).get_unresolved();
-                } while (m_clusters->is_valid(random_key));
+                // Create a key with upper bit set and link it
+                ObjKey alternative_key = k.get_unresolved();
+                while (m_clusters->is_valid(alternative_key)) {
+                    alternative_key = ObjKey(alternative_key.value + 1);
+                }
 
                 Array fallback(m_obj.get_alloc());
                 Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
@@ -673,13 +670,13 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 Array links(m_obj.get_alloc());
                 links.set_parent(&refs, state.index);
                 links.init_from_parent();
-                links.add(random_key.value);
+                links.add(alternative_key.value);
 
                 if (fields.has_missing_parent_update()) {
                     m_clusters->update_ref_in_parent(k, fields.get_ref());
                 }
 
-                state = m_clusters->insert(random_key, key, value);
+                state = m_clusters->insert(alternative_key, key, value);
             }
         }
     }

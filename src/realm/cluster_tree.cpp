@@ -596,7 +596,7 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
 
     size_t sz = node_size();
     while (child_ndx < sz) {
-        auto key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
+        uint64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
         ObjKey new_key(key_offset < uint64_t(key.value) ? key.value - key_offset : 0);
         state.m_key_offset += key_offset;
 
