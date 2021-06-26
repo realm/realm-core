@@ -25,8 +25,6 @@
 #include <realm/replication.hpp>
 
 #include <algorithm>
-#include <random>
-#include <chrono>
 
 namespace realm {
 
@@ -98,7 +96,7 @@ Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
 
 // Called when a given state represent an entry with no matching key
 // Check its potential siblings for a match
-bool DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const
+ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const
 {
     // Find alternatives
     Array fallback(m_alloc);
@@ -118,12 +116,12 @@ bool DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) c
             auto state2 = ClusterTree::get(sibling);
             if (get_key(state2).compare_signed(key) == 0) {
                 state = state2;
-                return true;
+                return sibling;
             }
         }
     }
 
-    return false;
+    return {};
 }
 
 ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) const
@@ -646,14 +644,19 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             // We have a collision
             m_clusters->create_collision_column();
 
-            if (m_clusters->find_sibling(state, key)) {
+            if (auto sibling = m_clusters->find_sibling(state, key)) {
                 old_entry = true;
+                k = sibling;
             }
             else {
                 // Create a key with upper bit set and link it
-                ObjKey alternative_key = k.get_unresolved();
-                while (m_clusters->is_valid(alternative_key)) {
-                    alternative_key = ObjKey(alternative_key.value + 1);
+                hash = k.value;
+                auto start = hash;
+                k = ObjKey(-2 - hash);
+                while (m_clusters->is_valid(k)) {
+                    hash = (hash + 1) & s_hash_mask;
+                    REALM_ASSERT(hash != start);
+                    k = ObjKey(-2 - hash);
                 }
 
                 Array fallback(m_obj.get_alloc());
@@ -670,13 +673,13 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 Array links(m_obj.get_alloc());
                 links.set_parent(&refs, state.index);
                 links.init_from_parent();
-                links.add(alternative_key.value);
+                links.add(k.value);
 
                 if (fields.has_missing_parent_update()) {
                     m_clusters->update_ref_in_parent(k, fields.get_ref());
                 }
 
-                state = m_clusters->insert(alternative_key, key, value);
+                state = m_clusters->insert(k, key, value);
             }
         }
     }
@@ -783,7 +786,7 @@ void Dictionary::erase(Mixed key)
                 if (do_get_key(state).compare_signed(key) == 0) {
                     // We are erasing main entry, swap last sibling over
                     ObjKey k2(links.get(sz - 1));
-                    if (links.size() == 1) {
+                    if (sz == 1) {
                         refs.set(links.get_ndx_in_parent(), 0);
                         links.destroy();
                     }
@@ -791,7 +794,7 @@ void Dictionary::erase(Mixed key)
                         links.erase(sz - 1);
                     }
                     auto state2 = m_clusters->get(k2);
-                    swap(state, state2);
+                    swap_content(state, state2);
 
                     // This will ensure that sibling is erased
                     k = k2;
@@ -816,8 +819,7 @@ void Dictionary::erase(Mixed key)
                             break;
                         }
                         i++;
-                        if (i == sz)
-                            throw std::logic_error("Dictionary corrupt");
+                        REALM_ASSERT_RELEASE(i < sz);
                     }
                 }
 
@@ -978,7 +980,7 @@ bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
     return false;
 }
 
-void Dictionary::swap(const ClusterNode::State& s1, const ClusterNode::State& s2)
+void Dictionary::swap_content(const ClusterNode::State& s1, const ClusterNode::State& s2)
 {
     std::string buf1, buf2;
     Array fallback1(m_obj.get_alloc());

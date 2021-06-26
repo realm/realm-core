@@ -51,7 +51,7 @@ public:
     }
 
     Mixed get_key(const ClusterNode::State& s) const;
-    bool find_sibling(ClusterNode::State&, Mixed key) const;
+    ObjKey find_sibling(ClusterNode::State&, Mixed key) const;
     ClusterNode::State try_get_with_key(ObjKey k, Mixed) const;
     size_t get_ndx_with_key(ObjKey k, Mixed);
 

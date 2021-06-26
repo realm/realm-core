@@ -481,6 +481,7 @@ TEST(Dictionary_UseAfterFree)
 
 TEST(Dictionary_HashCollision)
 {
+    constexpr int nb_entries = 100;
     auto mask = Dictionary::set_hash_mask(0xFF);
     Group g;
     auto foos = g.add_table("Foo");
@@ -488,7 +489,7 @@ TEST(Dictionary_HashCollision)
 
     auto foo = foos->create_object();
     auto dict = foo.get_dictionary(col_dict);
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
         dict.insert(Mixed(key), i);
     }
@@ -496,47 +497,47 @@ TEST(Dictionary_HashCollision)
     // g.to_json(std::cout);
 
     // Check that values can be read back
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
         CHECK_EQUAL(dict[key].get_int(), i);
     }
 
     // Check that a query can find matching key and value
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
         Query q = (foos->column<Dictionary>(col_dict).key(key) == Mixed(i));
         CHECK_EQUAL(q.count(), 1);
     }
 
     // Check that dict.find works
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
         auto it = dict.find(key);
         CHECK_EQUAL((*it).second.get_int(), i);
     }
 
     // Update with new values
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
-        dict.insert(Mixed(key), 100 - i);
+        dict.insert(Mixed(key), nb_entries - i);
     }
 
     // Check that values was updated properly
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
-        CHECK_EQUAL(dict[key].get_int(), 100 - i);
+        CHECK_EQUAL(dict[key].get_int(), nb_entries - i);
     }
 
-    // Now erase one entry at a time and theck that the rest of the values are ok
-    for (int64_t i = 0; i < 100; i++) {
+    // Now erase one entry at a time and check that the rest of the values are ok
+    for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
         dict.erase(key);
-        CHECK_EQUAL(dict.size(), 100 - i - 1);
+        CHECK_EQUAL(dict.size(), nb_entries - i - 1);
 
         // Check that remaining entries still can be found
-        for (int64_t j = i + 1; j < 100; j++) {
+        for (int64_t j = i + 1; j < nb_entries; j++) {
             std::string key_j = "key" + util::to_string(j);
-            CHECK_EQUAL(dict[key_j].get_int(), 100 - j);
+            CHECK_EQUAL(dict[key_j].get_int(), nb_entries - j);
         }
     }
     Dictionary::set_hash_mask(mask);
