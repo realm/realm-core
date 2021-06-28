@@ -355,6 +355,8 @@ template <>
 void Set<Mixed>::do_insert(size_t, Mixed);
 template <>
 void Set<Mixed>::do_erase(size_t);
+template <>
+void Set<Mixed>::do_clear();
 
 /// Compare set elements.
 ///
