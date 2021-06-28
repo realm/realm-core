@@ -574,5 +574,25 @@ TEST(Dictionary_HashCollisionTransaction)
             CHECK_EQUAL(dict[key].get_int(), i);
         }
     }
+
+    auto rt = db->start_read();
+    for (int64_t i = 0; i < 100; i++) {
+        rt->promote_to_write();
+
+        auto foos = rt->get_table("Foo");
+        ColKey col_dict = foos->get_column_key("dict");
+        auto dict = foos->begin()->get_dictionary(col_dict);
+
+        std::string key = "key" + util::to_string(i);
+        dict.erase(key);
+        CHECK_EQUAL(dict.size(), 100 - i - 1);
+
+        rt->commit_and_continue_as_read();
+
+        for (int64_t j = i + 1; j < 100; j++) {
+            std::string key_j = "key" + util::to_string(j);
+            CHECK_EQUAL(dict[key_j].get_int(), j);
+        }
+    }
     Dictionary::set_hash_mask(mask);
 }

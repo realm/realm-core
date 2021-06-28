@@ -781,11 +781,12 @@ void Dictionary::erase(Mixed key)
                 links.set_parent(&refs, state.index);
                 links.init_from_parent();
                 auto sz = links.size();
+                ObjKey k2;
                 REALM_ASSERT(sz > 0);
 
                 if (do_get_key(state).compare_signed(key) == 0) {
                     // We are erasing main entry, swap last sibling over
-                    ObjKey k2(links.get(sz - 1));
+                    k2 = ObjKey(links.get(sz - 1));
                     if (sz == 1) {
                         refs.set(links.get_ndx_in_parent(), 0);
                         links.destroy();
@@ -793,11 +794,25 @@ void Dictionary::erase(Mixed key)
                     else {
                         links.erase(sz - 1);
                     }
-                    auto state2 = m_clusters->get(k2);
-                    swap_content(state, state2);
+                    if (fields.has_missing_parent_update()) {
+                        auto new_ref = fields.get_ref();
+                        m_clusters->update_ref_in_parent(k, new_ref);
+                        state.mem = MemRef(new_ref, m_obj.get_alloc());
+                    }
 
-                    // This will ensure that sibling is erased
-                    k = k2;
+                    auto state2 = m_clusters->get(k2);
+                    Array fallback2(m_obj.get_alloc());
+                    Array& fields2 = m_clusters->get_fields_accessor(fallback2, state2.mem);
+
+                    swap_content(fields, fields2, state.index, state2.index);
+
+                    if (fields2.has_missing_parent_update()) {
+                        auto new_ref = fields2.get_ref();
+                        m_clusters->update_ref_in_parent(k2, new_ref);
+                        state2.mem = MemRef(new_ref, m_obj.get_alloc());
+                    }
+
+                    // 'state' should point to sibling
                     state = state2;
                 }
                 else {
@@ -805,8 +820,8 @@ void Dictionary::erase(Mixed key)
                     // Find the right one and erase from list in main entry
                     size_t i = 0;
                     for (;;) {
-                        k = ObjKey(links.get(i));
-                        state = m_clusters->get(k);
+                        k2 = ObjKey(links.get(i));
+                        state = m_clusters->get(k2);
                         if (do_get_key(state).compare_signed(key) == 0) {
                             // Erase this entry in the link array
                             if (links.size() == 1) {
@@ -821,11 +836,14 @@ void Dictionary::erase(Mixed key)
                         i++;
                         REALM_ASSERT_RELEASE(i < sz);
                     }
+                    if (fields.has_missing_parent_update()) {
+                        auto new_ref = fields.get_ref();
+                        m_clusters->update_ref_in_parent(k, new_ref);
+                        state.mem = MemRef(new_ref, m_obj.get_alloc());
+                    }
                 }
 
-                if (fields.has_missing_parent_update()) {
-                    m_clusters->update_ref_in_parent(k, fields.get_ref());
-                }
+                k = k2; // This will ensure that sibling is erased
             }
             else {
                 // No collisions on this hash
@@ -980,57 +998,42 @@ bool Dictionary::clear_backlink(Mixed value, CascadeState& state) const
     return false;
 }
 
-void Dictionary::swap_content(const ClusterNode::State& s1, const ClusterNode::State& s2)
+void Dictionary::swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2)
 {
     std::string buf1, buf2;
-    Array fallback1(m_obj.get_alloc());
-    Array fallback2(m_obj.get_alloc());
-    Array& fields1 = m_clusters->get_fields_accessor(fallback1, s1.mem);
-    Array& fields2 = m_clusters->get_fields_accessor(fallback2, s2.mem);
 
     // Swap keys
     REALM_ASSERT(m_key_type == type_String);
-    ArrayString keys1(m_obj.get_alloc());
-    keys1.set_parent(&fields1, 1);
-    keys1.init_from_parent();
-    buf1 = keys1.get(s1.index);
+    ArrayString keys(m_obj.get_alloc());
+    keys.set_parent(&fields1, 1);
+    keys.init_from_parent();
+    buf1 = keys.get(index1);
 
-    ArrayString keys2(m_obj.get_alloc());
-    keys2.set_parent(&fields2, 1);
-    keys2.init_from_parent();
-    buf2 = keys2.get(s2.index);
+    keys.set_parent(&fields2, 1);
+    keys.init_from_parent();
+    buf2 = keys.get(index2);
+    keys.set(index2, buf1);
 
-    keys2.set(s2.index, buf1);
-    keys1.set(s1.index, buf2);
+    keys.set_parent(&fields1, 1);
+    keys.init_from_parent();
+    keys.set(index1, buf2);
 
     // Swap values
-    ArrayMixed values1(m_obj.get_alloc());
-    values1.set_parent(&fields1, 2);
-    values1.init_from_parent();
-    Mixed val1 = values1.get(s1.index);
+    ArrayMixed values(m_obj.get_alloc());
+    values.set_parent(&fields1, 2);
+    values.init_from_parent();
+    Mixed val1 = values.get(index1);
     val1.use_buffer(buf1);
 
-    ArrayMixed values2(m_obj.get_alloc());
-    values2.set_parent(&fields2, 2);
-    values2.init_from_parent();
-    Mixed val2 = values2.get(s2.index);
+    values.set_parent(&fields2, 2);
+    values.init_from_parent();
+    Mixed val2 = values.get(index2);
     val2.use_buffer(buf2);
+    values.set(index2, val1);
 
-    values2.set(s2.index, val1);
-    values1.set(s1.index, val2);
-
-    if (fields1.has_missing_parent_update()) {
-        ArrayKey keys(m_obj.get_alloc());
-        keys.set_parent(&fields2, 0);
-        keys.init_from_parent();
-        m_clusters->update_ref_in_parent(keys.get(s1.index), fields1.get_ref());
-    }
-    if (fields2.has_missing_parent_update()) {
-        ArrayKey keys(m_obj.get_alloc());
-        keys.set_parent(&fields2, 0);
-        keys.init_from_parent();
-        m_clusters->update_ref_in_parent(keys.get(s2.index), fields2.get_ref());
-    }
+    values.set_parent(&fields1, 2);
+    values.init_from_parent();
+    values.set(index1, val2);
 }
 
 /************************* Dictionary::Iterator *************************/

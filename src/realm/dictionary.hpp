@@ -193,7 +193,7 @@ private:
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
     bool clear_backlink(Mixed value, CascadeState& state) const;
     void align_indices(std::vector<size_t>& indices) const;
-    void swap_content(const ClusterNode::State&, const ClusterNode::State&);
+    void swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2);
 
     friend struct CollectionIterator<Dictionary>;
 };
