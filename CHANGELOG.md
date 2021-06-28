@@ -9,6 +9,8 @@
 * Fixed an assertion failure when listening for changes to a dictionary or set which contains an invalidated link. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
 * Fixed an endless recursive loop that could cause a stack overflow when computing changes on a set of objects which contained cycles. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
 * Add collision handling to Dictionary implementation ([#4776](https://github.com/realm/realm-core/issues/4776), since the beginning of Dictionary v11.0.0)
+* Fixed a recursive loop which would eventually crash trying to refresh a user app token when it had been revoked by an admin. Now this situation logs the user out and reports an error. ([#4745](https://github.com/realm/realm-core/issues/4745), since v10.0.0).
+* Fixed a race between calling realm::delete_files and concurent opening of the realm file.([#4768](https://github.com/realm/realm-core/pull/4768)) 
 
 ### Breaking changes
 * None.
@@ -16,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Add more tests for Realm::delete_files ([#4765](https://github.com/realm/realm-core/pull/4765)).
 
 ----------------------------------------------
 
