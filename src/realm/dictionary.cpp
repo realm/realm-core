@@ -650,7 +650,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             }
             else {
                 // Create a key with upper bit set and link it
-                hash = k.value;
+                hash = size_t(k.value);
                 auto start = hash;
                 k = ObjKey(-2 - hash);
                 while (m_clusters->is_valid(k)) {
