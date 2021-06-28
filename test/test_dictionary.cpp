@@ -481,7 +481,7 @@ TEST(Dictionary_UseAfterFree)
 
 TEST(Dictionary_HashCollision)
 {
-    constexpr int nb_entries = 100;
+    constexpr int64_t nb_entries = 100;
     auto mask = Dictionary::set_hash_mask(0xFF);
     Group g;
     auto foos = g.add_table("Foo");
@@ -491,6 +491,8 @@ TEST(Dictionary_HashCollision)
     auto dict = foo.get_dictionary(col_dict);
     for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
+        dict.insert(Mixed(key), i);
+        dict.erase(key);
         dict.insert(Mixed(key), i);
     }
 
@@ -516,16 +518,48 @@ TEST(Dictionary_HashCollision)
         CHECK_EQUAL((*it).second.get_int(), i);
     }
 
+    auto check_aggregates = [&]() {
+        int64_t expected_sum = nb_entries * (nb_entries - 1) / 2;
+        size_t count = 0;
+        util::Optional<Mixed> actual_sum = dict.sum(&count);
+        CHECK(actual_sum);
+        CHECK(actual_sum && *actual_sum == Mixed{expected_sum});
+        CHECK_EQUAL(count, nb_entries);
+        Query q = (foos->column<Dictionary>(col_dict).sum() == Mixed(expected_sum));
+        CHECK_EQUAL(q.count(), 1);
+
+        util::Optional<Mixed> actual_min = dict.min();
+        CHECK(actual_min && *actual_min == Mixed{0});
+        q = (foos->column<Dictionary>(col_dict).min() == Mixed(0));
+        CHECK_EQUAL(q.count(), 1);
+
+        util::Optional<Mixed> actual_max = dict.max();
+        CHECK(actual_max && *actual_max == Mixed{nb_entries - 1});
+        q = (foos->column<Dictionary>(col_dict).max() == Mixed(nb_entries - 1));
+        CHECK_EQUAL(q.count(), 1);
+
+        util::Optional<Mixed> actual_avg = dict.avg(&count);
+        Mixed expected_avg{Decimal128(expected_sum) / nb_entries};
+        CHECK_EQUAL(count, nb_entries);
+        CHECK(actual_avg && *actual_avg == expected_avg);
+        q = (foos->column<Dictionary>(col_dict).average() == expected_avg);
+        CHECK_EQUAL(q.count(), 1);
+    };
+
+    check_aggregates();
+
     // Update with new values
     for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
-        dict.insert(Mixed(key), nb_entries - i);
+        dict.insert(Mixed(key), nb_entries - i - 1);
     }
+
+    check_aggregates();
 
     // Check that values was updated properly
     for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);
-        CHECK_EQUAL(dict[key].get_int(), nb_entries - i);
+        CHECK_EQUAL(dict[key].get_int(), nb_entries - i - 1);
     }
 
     // Now erase one entry at a time and check that the rest of the values are ok
@@ -537,7 +571,7 @@ TEST(Dictionary_HashCollision)
         // Check that remaining entries still can be found
         for (int64_t j = i + 1; j < nb_entries; j++) {
             std::string key_j = "key" + util::to_string(j);
-            CHECK_EQUAL(dict[key_j].get_int(), nb_entries - j);
+            CHECK_EQUAL(dict[key_j].get_int(), nb_entries - j - 1);
         }
     }
     Dictionary::set_hash_mask(mask);
