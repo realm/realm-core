@@ -642,11 +642,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 // Create a key with upper bit set and link it
                 auto hash = size_t(k.value);
                 auto start = hash;
-                k = ObjKey(-2 - hash);
-                while (m_clusters->is_valid(k)) {
+                ObjKey k2(-2 - hash);
+                while (m_clusters->is_valid(k2)) {
                     hash = (hash + 1) & s_hash_mask;
                     REALM_ASSERT(hash != start);
-                    k = ObjKey(-2 - hash);
+                    k2 = ObjKey(-2 - hash);
                 }
 
                 Array fallback(m_obj.get_alloc());
@@ -663,13 +663,14 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
                 Array links(m_obj.get_alloc());
                 links.set_parent(&refs, state.index);
                 links.init_from_parent();
-                links.add(k.value);
+                links.add(k2.value);
 
                 if (fields.has_missing_parent_update()) {
                     m_clusters->update_ref_in_parent(k, fields.get_ref());
                 }
 
-                state = m_clusters->insert(k, key, value);
+                state = m_clusters->insert(k2, key, value);
+                k = k2;
             }
         }
     }
@@ -808,7 +809,6 @@ ObjKey Dictionary::handle_collision_in_erase(const Mixed& key, ObjKey k, Cluster
             if (fields.has_missing_parent_update()) {
                 auto new_ref = fields.get_ref();
                 m_clusters->update_ref_in_parent(k, new_ref);
-                state.mem = MemRef(new_ref, m_obj.get_alloc());
             }
         }
         k = k2; // This will ensure that sibling is erased

@@ -585,13 +585,13 @@ public:
     {
         if (the_map.size() == 0)
             return std::string();
-        int idx = rnd() % the_map.size();
+        size_t idx = size_t(rnd()) % the_map.size();
         auto it = the_map.begin();
         while (idx--) {
             it++;
         }
         return it->first;
-    };
+    }
     std::string get_rnd_unused_key()
     {
         int64_t key_i;
@@ -673,11 +673,13 @@ NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
             random_op(dict2);
         }
         tr2->commit_and_continue_as_read();
+        tr2->verify();
         tr->promote_to_write();
         {
             random_op(dict);
         }
         tr->commit_and_continue_as_read();
+        tr->verify();
     }
     // restore
     Dictionary::set_hash_mask(mask);
