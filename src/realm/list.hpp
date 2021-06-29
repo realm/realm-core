@@ -626,9 +626,7 @@ void Lst<T>::clear()
 {
     static_assert(!std::is_same_v<T, ObjKey>);
 
-    ensure_writable(false);
-
-    if (m_tree->size() > 0) {
+    if (size() > 0) {
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_clear(*this);
         }
@@ -797,7 +795,6 @@ void Lst<T>::move(size_t from, size_t to)
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_move(*this, from, to);
         }
-        ensure_writable(false);
 
         if (to > from) {
             to++;
@@ -820,13 +817,12 @@ void Lst<T>::move(size_t from, size_t to)
 template <class T>
 void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
-    if (ndx1 != ndx2) {
-        ensure_writable(false);
+    auto sz = size();
+    if (ndx1 >= sz || ndx2 >= sz) {
+        throw std::out_of_range{"index out of bounds"};
+    }
 
-        auto sz = m_tree->size();
-        if (ndx1 >= sz || ndx2 >= sz) {
-            throw std::out_of_range{"index out of bounds"};
-        }
+    if (ndx1 != ndx2) {
 
         if (Replication* repl = this->m_obj.get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
@@ -842,8 +838,6 @@ T Lst<T>::set(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
-
-    ensure_writable(false);
 
     // `get()` will check for ndx out of bounds.
     T old = get(ndx);
