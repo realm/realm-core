@@ -57,7 +57,12 @@ public:
         int64_t split_key; // When a node is split, this variable holds the value of the
                            // first key in the new node. (Relative to the key offset)
         MemRef mem;        // MemRef to the Cluster holding the new/found object
-        size_t index;      // The index within the Cluster at which the object is stored.
+        size_t index = realm::npos; // The index within the Cluster at which the object is stored.
+
+        operator bool() const
+        {
+            return index != realm::npos;
+        }
     };
 
     struct IteratorState {

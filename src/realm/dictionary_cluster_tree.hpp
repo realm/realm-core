@@ -51,8 +51,8 @@ public:
     }
 
     Mixed get_key(const ClusterNode::State& s) const;
-    ObjKey find_sibling(ClusterNode::State&, Mixed key) const;
-    ClusterNode::State try_get_with_key(ObjKey k, Mixed) const;
+    ObjKey find_sibling(ClusterNode::State&, Mixed key) const noexcept;
+    ClusterNode::State try_get_with_key(ObjKey k, Mixed) const noexcept;
     size_t get_ndx_with_key(ObjKey k, Mixed);
 
     ColKey get_keys_column_key() const

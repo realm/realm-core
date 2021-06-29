@@ -101,7 +101,7 @@ public:
         return obj;
     }
 
-    bool contains(Mixed key);
+    bool contains(Mixed key) const noexcept;
     Iterator find(Mixed key);
 
     void erase(Mixed key);
@@ -194,6 +194,7 @@ private:
     bool clear_backlink(Mixed value, CascadeState& state) const;
     void align_indices(std::vector<size_t>& indices) const;
     void swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2);
+    ObjKey handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state);
 
     friend struct CollectionIterator<Dictionary>;
 };

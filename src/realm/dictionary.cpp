@@ -96,7 +96,7 @@ Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
 
 // Called when a given state represent an entry with no matching key
 // Check its potential siblings for a match
-ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const
+ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const noexcept
 {
     // Find alternatives
     Array fallback(m_alloc);
@@ -113,8 +113,8 @@ ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key)
         auto sz = links.size();
         for (size_t i = 0; i < sz; i++) {
             ObjKey sibling(links.get(i));
-            auto state2 = ClusterTree::get(sibling);
-            if (get_key(state2).compare_signed(key) == 0) {
+            auto state2 = ClusterTree::try_get(sibling);
+            if (state2 && get_key(state2).compare_signed(key) == 0) {
                 state = state2;
                 return sibling;
             }
@@ -124,7 +124,7 @@ ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key)
     return {};
 }
 
-ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) const
+ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) const noexcept
 {
     auto state = ClusterTree::try_get(k);
     // If we don't have any collisions yet, we don't need to check the key
@@ -397,9 +397,7 @@ size_t Dictionary::find_any_key(Mixed key) const
     if (size()) {
         update_if_needed();
         try {
-            auto hash = key.hash();
-            ObjKey k(int64_t(hash & s_hash_mask));
-            ret = m_clusters->get_ndx_with_key(k, key);
+            ret = m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
         }
         catch (...) {
             // ignored
@@ -537,12 +535,8 @@ Obj Dictionary::create_and_insert_linked_object(Mixed key)
 
 Mixed Dictionary::get(Mixed key) const
 {
-    if (size()) {
-        auto hash = key.hash();
-        ObjKey k(int64_t(hash & s_hash_mask));
-        auto state = m_clusters->try_get_with_key(k, key);
-        if (state.index != realm::npos)
-            return do_get(state);
+    if (auto opt_val = try_get(key)) {
+        return *opt_val;
     }
     throw realm::KeyNotFound("Dictionary::get");
     return {};
@@ -551,10 +545,7 @@ Mixed Dictionary::get(Mixed key) const
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 {
     if (size()) {
-        auto hash = key.hash();
-        ObjKey k(int64_t(hash & s_hash_mask));
-        auto state = m_clusters->try_get_with_key(k, key);
-        if (state.index != realm::npos)
+        if (auto state = m_clusters->try_get_with_key(get_internal_obj_key(key), key))
             return do_get(state);
     }
     return {};
@@ -626,12 +617,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw LogicError(LogicError::detached_accessor);
     }
 
-    auto hash = key.hash();
-    ObjKey k(int64_t(hash & s_hash_mask));
+    ObjKey k = get_internal_obj_key(key);
 
     bool old_entry = false;
     ClusterNode::State state = m_clusters->try_get(k);
-    if (state.index == realm::npos) {
+    if (!state) {
         // key does not already exist
         state = m_clusters->insert(k, key, value);
     }
@@ -650,7 +640,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             }
             else {
                 // Create a key with upper bit set and link it
-                hash = size_t(k.value);
+                auto hash = size_t(k.value);
                 auto start = hash;
                 k = ObjKey(-2 - hash);
                 while (m_clusters->is_valid(k)) {
@@ -735,16 +725,12 @@ const Mixed Dictionary::operator[](Mixed key)
     return *ret;
 }
 
-bool Dictionary::contains(Mixed key)
+bool Dictionary::contains(Mixed key) const noexcept
 {
-    if (size()) {
-        auto hash = key.hash();
-        ObjKey k(int64_t(hash & s_hash_mask));
-        auto state = m_clusters->try_get_with_key(k, key);
-        if (state.index != realm::npos)
-            return true;
+    if (size() == 0) {
+        return false;
     }
-    return false;
+    return m_clusters->try_get_with_key(get_internal_obj_key(key), key);
 }
 
 Dictionary::Iterator Dictionary::find(Mixed key)
@@ -756,119 +742,118 @@ Dictionary::Iterator Dictionary::find(Mixed key)
     return end();
 }
 
-void Dictionary::erase(Mixed key)
+ObjKey Dictionary::handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state)
 {
-    validate_key_value(key);
-
-    if (size()) {
-        auto hash = key.hash();
-        ObjKey k(int64_t(hash & s_hash_mask));
-        auto state = m_clusters->try_get(k);
-        if (state.index == realm::npos) {
-            throw KeyNotFound("Dictionary::erase");
+    Array fallback(m_obj.get_alloc());
+    Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
+    ArrayRef refs(m_obj.get_alloc());
+    refs.set_parent(&fields, 3);
+    refs.init_from_parent();
+    auto ref = refs.get(state.index);
+    if (ref) {
+        Array links(m_obj.get_alloc());
+        links.set_parent(&refs, state.index);
+        links.init_from_parent();
+        auto sz = links.size();
+        ObjKey k2;
+        REALM_ASSERT(sz > 0);
+        if (do_get_key(state).compare_signed(key) == 0) {
+            // We are erasing main entry, swap last sibling over
+            k2 = ObjKey(links.get(sz - 1));
+            if (sz == 1) {
+                refs.set(links.get_ndx_in_parent(), 0);
+                links.destroy();
+            }
+            else {
+                links.erase(sz - 1);
+            }
+            if (fields.has_missing_parent_update()) {
+                auto new_ref = fields.get_ref();
+                m_clusters->update_ref_in_parent(k, new_ref);
+                state.mem = MemRef(new_ref, m_obj.get_alloc());
+            }
+            auto state2 = m_clusters->get(k2);
+            Array fallback2(m_obj.get_alloc());
+            Array& fields2 = m_clusters->get_fields_accessor(fallback2, state2.mem);
+            swap_content(fields, fields2, state.index, state2.index);
+            if (fields2.has_missing_parent_update()) {
+                auto new_ref = fields2.get_ref();
+                m_clusters->update_ref_in_parent(k2, new_ref);
+                state2.mem = MemRef(new_ref, m_obj.get_alloc());
+            }
+            // 'state' should point to sibling
+            state = state2;
         }
-
-        if (m_clusters->has_collisions()) {
-            Array fallback(m_obj.get_alloc());
-            Array& fields = m_clusters->get_fields_accessor(fallback, state.mem);
-            ArrayRef refs(m_obj.get_alloc());
-            refs.set_parent(&fields, 3);
-            refs.init_from_parent();
-
-            auto ref = refs.get(state.index);
-            if (ref) {
-                Array links(m_obj.get_alloc());
-                links.set_parent(&refs, state.index);
-                links.init_from_parent();
-                auto sz = links.size();
-                ObjKey k2;
-                REALM_ASSERT(sz > 0);
-
+        else {
+            // We are erasing a sibling
+            // Find the right one and erase from list in main entry
+            size_t i = 0;
+            for (;;) {
+                k2 = ObjKey(links.get(i));
+                state = m_clusters->get(k2);
                 if (do_get_key(state).compare_signed(key) == 0) {
-                    // We are erasing main entry, swap last sibling over
-                    k2 = ObjKey(links.get(sz - 1));
-                    if (sz == 1) {
+                    // Erase this entry in the link array
+                    if (links.size() == 1) {
                         refs.set(links.get_ndx_in_parent(), 0);
                         links.destroy();
                     }
                     else {
-                        links.erase(sz - 1);
+                        links.erase(i);
                     }
-                    if (fields.has_missing_parent_update()) {
-                        auto new_ref = fields.get_ref();
-                        m_clusters->update_ref_in_parent(k, new_ref);
-                        state.mem = MemRef(new_ref, m_obj.get_alloc());
-                    }
-
-                    auto state2 = m_clusters->get(k2);
-                    Array fallback2(m_obj.get_alloc());
-                    Array& fields2 = m_clusters->get_fields_accessor(fallback2, state2.mem);
-
-                    swap_content(fields, fields2, state.index, state2.index);
-
-                    if (fields2.has_missing_parent_update()) {
-                        auto new_ref = fields2.get_ref();
-                        m_clusters->update_ref_in_parent(k2, new_ref);
-                        state2.mem = MemRef(new_ref, m_obj.get_alloc());
-                    }
-
-                    // 'state' should point to sibling
-                    state = state2;
+                    break;
                 }
-                else {
-                    // We are erasing a sibling
-                    // Find the right one and erase from list in main entry
-                    size_t i = 0;
-                    for (;;) {
-                        k2 = ObjKey(links.get(i));
-                        state = m_clusters->get(k2);
-                        if (do_get_key(state).compare_signed(key) == 0) {
-                            // Erase this entry in the link array
-                            if (links.size() == 1) {
-                                refs.set(links.get_ndx_in_parent(), 0);
-                                links.destroy();
-                            }
-                            else {
-                                links.erase(i);
-                            }
-                            break;
-                        }
-                        i++;
-                        REALM_ASSERT_RELEASE(i < sz);
-                    }
-                    if (fields.has_missing_parent_update()) {
-                        auto new_ref = fields.get_ref();
-                        m_clusters->update_ref_in_parent(k, new_ref);
-                        state.mem = MemRef(new_ref, m_obj.get_alloc());
-                    }
-                }
-
-                k = k2; // This will ensure that sibling is erased
+                i++;
+                REALM_ASSERT_RELEASE(i < sz);
             }
-            else {
-                // No collisions on this hash
-                REALM_ASSERT(do_get_key(state).compare_signed(key) == 0);
+            if (fields.has_missing_parent_update()) {
+                auto new_ref = fields.get_ref();
+                m_clusters->update_ref_in_parent(k, new_ref);
+                state.mem = MemRef(new_ref, m_obj.get_alloc());
             }
         }
-
-        ArrayMixed values(m_obj.get_alloc());
-        ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
-        values.init_from_ref(ref);
-        auto old_value = values.get(state.index);
-
-        CascadeState cascade_state(CascadeState::Mode::Strong);
-        bool recurse = clear_backlink(old_value, cascade_state);
-        if (recurse)
-            _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
-
-        if (Replication* repl = this->m_obj.get_replication()) {
-            auto ndx = m_clusters->get_ndx(k);
-            repl->dictionary_erase(*this, ndx, key);
-        }
-        CascadeState dummy;
-        m_clusters->erase(k, dummy);
-        bump_content_version();
+        k = k2; // This will ensure that sibling is erased
     }
+    else {
+        // No collisions on this hash
+        REALM_ASSERT(do_get_key(state).compare_signed(key) == 0);
+    }
+    return k;
+}
+
+void Dictionary::erase(Mixed key)
+{
+    validate_key_value(key);
+    ClusterNode::State state;
+    ObjKey k = get_internal_obj_key(key);
+
+    if (size()) {
+        state = m_clusters->try_get(k);
+    }
+    if (!state) {
+        throw KeyNotFound("Dictionary::erase");
+    }
+
+    if (m_clusters->has_collisions()) {
+        k = handle_collision_in_erase(key, k, state);
+    }
+
+    ArrayMixed values(m_obj.get_alloc());
+    ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
+    values.init_from_ref(ref);
+    auto old_value = values.get(state.index);
+
+    CascadeState cascade_state(CascadeState::Mode::Strong);
+    bool recurse = clear_backlink(old_value, cascade_state);
+    if (recurse)
+        _impl::TableFriend::remove_recursive(*m_obj.get_table(), cascade_state); // Throws
+
+    if (Replication* repl = this->m_obj.get_replication()) {
+        auto ndx = m_clusters->get_ndx(k);
+        repl->dictionary_erase(*this, ndx, key);
+    }
+    CascadeState dummy;
+    m_clusters->erase(k, dummy);
+    bump_content_version();
 }
 
 void Dictionary::erase(Iterator it)
@@ -878,8 +863,7 @@ void Dictionary::erase(Iterator it)
 
 void Dictionary::nullify(Mixed key)
 {
-    auto hash = key.hash();
-    ObjKey k(int64_t(hash & s_hash_mask));
+    ObjKey k = get_internal_obj_key(key);
     auto state = m_clusters->try_get_with_key(k, key);
     REALM_ASSERT(state.index != realm::npos);
 

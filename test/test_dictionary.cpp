@@ -135,6 +135,7 @@ TEST(Dictionary_Basics)
         CHECK_EQUAL(dict.size(), 1);
         dict.erase("Hello");
         CHECK_EQUAL(dict.size(), 0);
+        CHECK_THROW_ANY(dict.erase("Hello"));   // Dictionary empty
         CHECK_THROW_ANY(dict.erase("$foo"));    // Must not start with '$'
         CHECK_THROW_ANY(dict.erase("foo.bar")); // Must not contain '.'
     }
