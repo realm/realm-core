@@ -93,7 +93,7 @@ struct SyncClient {
     }
 #else
     {
-        static_cast<void>(sync_manager);
+        static_cast<void>(weak_sync_manager);
     }
 #endif
 
