@@ -584,8 +584,8 @@ public:
     std::string get_rnd_used_key()
     {
         if (the_map.size() == 0)
-            return std::string(nullptr);
-        int idx = rand() % the_map.size();
+            return std::string();
+        int idx = rnd() % the_map.size();
         auto it = the_map.begin();
         while (idx--) {
             it++;
@@ -597,19 +597,22 @@ public:
         int64_t key_i;
         std::string key;
         do {
-            key_i = rand();
+            key_i = rnd();
             key = std::to_string(key_i);
         } while (the_map.find(key) != the_map.end());
         return key;
     }
     Mixed get_rnd_value()
     {
-        return Mixed(rand());
+        int64_t v = rnd();
+        return Mixed(v);
     }
     // model access
     Mixed get_value_by_key(std::string key)
     {
-        return the_map[key];
+        auto it = the_map.find(key);
+        REALM_ASSERT(it != the_map.end());
+        return it->second;
     }
     bool insert(std::string key, Mixed value)
     {
@@ -623,6 +626,7 @@ public:
     }
 
     std::map<std::string, Mixed> the_map;
+    std::function<int64_t(void)> rnd = std::mt19937(unit_test_random_seed);
 };
 
 NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
@@ -647,7 +651,7 @@ NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
     auto tr2 = db->start_read();
     auto dict2 = tr2->get_table("Foo")->get_object(0).get_dictionary(col_dict);
     auto random_op = [&](Dictionary& dict) {
-        if (rand() % 3) { // 66%
+        if (model.rnd() % 3) { // 66%
             auto k = model.get_rnd_unused_key();
             auto v = model.get_rnd_value();
             model.insert(k, v);
