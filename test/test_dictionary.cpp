@@ -480,7 +480,7 @@ TEST(Dictionary_UseAfterFree)
     CHECK_EQUAL(q.count(), 1);
 }
 
-TEST(Dictionary_HashCollision)
+NONCONCURRENT_TEST(Dictionary_HashCollision)
 {
     constexpr int64_t nb_entries = 100;
     auto mask = Dictionary::set_hash_mask(0xFF);
@@ -578,7 +578,109 @@ TEST(Dictionary_HashCollision)
     Dictionary::set_hash_mask(mask);
 }
 
-TEST(Dictionary_HashCollisionTransaction)
+class ModelDict {
+public:
+    // random generators
+    std::string get_rnd_used_key()
+    {
+        if (the_map.size() == 0)
+            return std::string(nullptr);
+        int idx = rand() % the_map.size();
+        auto it = the_map.begin();
+        while (idx--) {
+            it++;
+        }
+        return it->first;
+    };
+    std::string get_rnd_unused_key()
+    {
+        int64_t key_i;
+        std::string key;
+        do {
+            key_i = rand();
+            key = std::to_string(key_i);
+        } while (the_map.find(key) != the_map.end());
+        return key;
+    }
+    Mixed get_rnd_value()
+    {
+        return Mixed(rand());
+    }
+    // model access
+    Mixed get_value_by_key(std::string key)
+    {
+        return the_map[key];
+    }
+    bool insert(std::string key, Mixed value)
+    {
+        the_map[key] = value;
+        return true;
+    }
+    bool erase(std::string key)
+    {
+        the_map.erase(key);
+        return true;
+    }
+
+    std::map<std::string, Mixed> the_map;
+};
+
+NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
+{
+    ModelDict model;
+    auto mask = Dictionary::set_hash_mask(0xFFFF);
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    auto tr = db->start_write();
+    ColKey col_dict;
+    Dictionary dict;
+    {
+        // initial setup
+        auto foos = tr->add_table("Foo");
+        col_dict = foos->add_column_dictionary(type_Int, "dict");
+
+        auto foo = foos->create_object();
+        dict = foo.get_dictionary(col_dict);
+        tr->commit_and_continue_as_read();
+    }
+    auto tr2 = db->start_read();
+    auto dict2 = tr2->get_table("Foo")->get_object(0).get_dictionary(col_dict);
+    auto random_op = [&](Dictionary& dict) {
+        if (rand() % 3) { // 66%
+            auto k = model.get_rnd_unused_key();
+            auto v = model.get_rnd_value();
+            model.insert(k, v);
+            dict.insert(k, v);
+        }
+        else { // 33%
+            auto k = model.get_rnd_used_key();
+            if (!k.empty()) {
+                auto v = model.get_value_by_key(k);
+                CHECK(dict.get(k) == v);
+                dict.erase(k);
+                model.erase(k);
+            }
+        }
+    };
+    for (int it = 0; it < 1000; it++) {
+        tr2->promote_to_write();
+        {
+            random_op(dict2);
+        }
+        tr2->commit_and_continue_as_read();
+        tr->promote_to_write();
+        {
+            random_op(dict);
+        }
+        tr->commit_and_continue_as_read();
+    }
+    // restore
+    Dictionary::set_hash_mask(mask);
+}
+
+
+NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
 {
     auto mask = Dictionary::set_hash_mask(0xFF);
     SHARED_GROUP_TEST_PATH(path);
