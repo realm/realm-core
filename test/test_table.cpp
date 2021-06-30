@@ -2855,13 +2855,14 @@ TEST(Table_list_basic)
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
 
-        size_t return_cnt = 0;
+        size_t return_cnt = 0, return_ndx = 0;
         list.sum(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
-        list.max(&return_cnt);
-        CHECK_EQUAL(return_cnt, 0);
-        list.min(&return_cnt);
-        CHECK_EQUAL(return_cnt, 0);
+        list.max(&return_ndx);
+        CHECK_EQUAL(return_ndx, not_found);
+        return_ndx = 0;
+        list.min(&return_ndx);
+        CHECK_EQUAL(return_ndx, not_found);
         list.avg(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
 

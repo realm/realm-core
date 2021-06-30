@@ -62,6 +62,24 @@ enum JSONOutputMode {
     output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
 };
 
+/// The status of an accessor after a call to `update_if_needed()`.
+enum class UpdateStatus {
+    /// The owning object or column no longer exist, and the accessor could
+    /// not be updated. The accessor should be left in a detached state
+    /// after this, and further calls to `update_if_needed()` are not
+    /// guaranteed to reattach the accessor.
+    Detached,
+
+    /// The underlying data of the accessor was changed since the last call
+    /// to `update_if_needed()`. The accessor is still valid.
+    Updated,
+
+    /// The underlying data of the accessor did not change since the last
+    /// call to `update_if_needed()`, and the accessor is still valid in its
+    /// current state.
+    NoChange,
+};
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
@@ -99,16 +117,16 @@ public:
         return m_table != nullptr;
     }
 
-    // Check if the object is still alive
+    /// Check if the object is still alive
     bool is_valid() const noexcept;
-    // Will throw if object is not valid
+    /// Will throw if object is not valid
     void check_valid() const;
-    // Delete object from table. Object is invalid afterwards.
+    /// Delete object from table. Object is invalid afterwards.
     void remove();
-    // Invalidate
-    //  - this turns the object into a tombstone if links to the object exist.
-    //  - deletes the object is no links to the object exist.
-    //  - To be used by the Sync client.
+    /// Invalidate
+    ///  - this turns the object into a tombstone if links to the object exist.
+    ///  - deletes the object is no links to the object exist.
+    ///  - To be used by the Sync client.
     void invalidate();
 
     template <typename U>
@@ -301,10 +319,19 @@ private:
     mutable bool m_valid;
 
     Allocator& _get_alloc() const noexcept;
+
+
+    /// Update the accessor. Returns true when the accessor was updated to
+    /// reflect new changes to the underlying state.
     bool update() const;
     // update if needed - with and without check of table instance version:
     bool update_if_needed() const;
     bool _update_if_needed() const; // no check, use only when already checked
+
+    /// Update the accessor (and return `UpdateStatus::Detached` if the Obj is
+    /// no longer valid, rather than throwing an exception).
+    UpdateStatus update_if_needed_with_status() const;
+
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 

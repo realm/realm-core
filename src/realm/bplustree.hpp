@@ -646,6 +646,8 @@ ColumnMinMaxType<T> bptree_maximum(const BPlusTree<T>& tree, size_t* return_ndx 
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType max = std::numeric_limits<ResultType>::lowest();
     if (tree.size() == 0) {
+        if (return_ndx)
+            *return_ndx = not_found;
         return max;
     }
 
@@ -678,6 +680,8 @@ ColumnMinMaxType<T> bptree_minimum(const BPlusTree<T>& tree, size_t* return_ndx 
     using ResultType = typename AggregateResultType<T, act_Max>::result_type;
     ResultType min = std::numeric_limits<ResultType>::max();
     if (tree.size() == 0) {
+        if (return_ndx)
+            *return_ndx = not_found;
         return min;
     }
 

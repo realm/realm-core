@@ -206,29 +206,25 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     if (!col_key.is_dictionary()) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
-    init_from_parent();
 }
 
-Dictionary::~Dictionary()
-{
-    delete m_clusters;
-}
+Dictionary::~Dictionary() {}
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
 {
     Base::operator=(static_cast<const Base&>(other));
 
     if (this != &other) {
-        init_from_parent();
+        m_clusters.reset();
+        reset_content_version();
     }
+
     return *this;
 }
+
 size_t Dictionary::size() const
 {
-    if (!is_attached())
-        return 0;
-    update_if_needed();
-    if (!m_clusters)
+    if (!update())
         return 0;
 
     return m_clusters->size();
@@ -251,7 +247,7 @@ bool Dictionary::is_null(size_t ndx) const
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
-    update_if_needed();
+    // Note: `size()` calls `update_if_needed()`.
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
@@ -261,7 +257,7 @@ Mixed Dictionary::get_any(size_t ndx) const
 
 std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
-    update_if_needed();
+    // Note: `size()` calls `update_if_needed()`.
     if (ndx >= size()) {
         throw std::out_of_range("ndx out of range");
     }
@@ -272,8 +268,7 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
-    if (is_attached()) {
-        update_if_needed();
+    if (update()) {
         ArrayMixed leaf(m_obj.get_alloc());
         size_t start_ndx = 0;
 
@@ -297,8 +292,7 @@ size_t Dictionary::find_any(Mixed value) const
 
 Mixed Dictionary::min(size_t* return_ndx) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         return m_clusters->min(return_ndx);
     }
     if (return_ndx)
@@ -308,8 +302,7 @@ Mixed Dictionary::min(size_t* return_ndx) const
 
 Mixed Dictionary::max(size_t* return_ndx) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         return m_clusters->max(return_ndx);
     }
     if (return_ndx)
@@ -319,8 +312,7 @@ Mixed Dictionary::max(size_t* return_ndx) const
 
 Mixed Dictionary::sum(size_t* return_cnt) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         return m_clusters->sum(return_cnt);
     }
     if (return_cnt)
@@ -330,8 +322,7 @@ Mixed Dictionary::sum(size_t* return_cnt) const
 
 Mixed Dictionary::avg(size_t* return_cnt) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         return m_clusters->avg(return_cnt);
     }
     if (return_cnt)
@@ -341,7 +332,7 @@ Mixed Dictionary::avg(size_t* return_cnt) const
 
 void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
 {
-    auto sz = size();
+    auto sz = size(); // Note: Calls `update_if_needed()`.
     auto sz2 = indices.size();
 
     indices.reserve(sz);
@@ -371,8 +362,7 @@ void Dictionary::distinct(std::vector<size_t>&, util::Optional<bool>) const {}
 
 Mixed Dictionary::get(Mixed key) const
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         return do_get(m_clusters->get(k));
@@ -383,8 +373,7 @@ Mixed Dictionary::get(Mixed key) const
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update() && m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -396,23 +385,15 @@ util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
 
 Dictionary::Iterator Dictionary::begin() const
 {
+    // Need an update because the `Dictionary::Iterator` constructor relies on
+    // `m_clusters` to determine if it was already at end.
+    update();
     return Iterator(this, 0);
 }
 
 Dictionary::Iterator Dictionary::end() const
 {
     return Iterator(this, size());
-}
-
-void Dictionary::create()
-{
-    if (!m_clusters && m_obj.is_valid()) {
-        MemRef mem = Cluster::create_empty_cluster(m_obj.get_alloc());
-        update_child_ref(0, mem.get_ref());
-        m_clusters = new DictionaryClusterTree(this, m_key_type, m_obj.get_alloc(), m_obj.get_row_ndx());
-        m_clusters->init_from_parent();
-        m_clusters->add_columns();
-    }
 }
 
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
@@ -437,7 +418,8 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     validate_key_value(key);
-    update_if_needed();
+
+    ensure_writable(true);
 
     ObjLink new_link;
     if (!value.is_null()) {
@@ -457,7 +439,6 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         }
     }
 
-    create();
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
@@ -515,7 +496,10 @@ const Mixed Dictionary::operator[](Mixed key)
         ret = get(key);
     }
     catch (const KeyNotFound&) {
-        create();
+        // FIXME: This may throw `KeyNotFound` again, but for a different
+        // reason: that the owning Obj was deleted.
+        ensure_writable(true);
+
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         bump_content_version();
@@ -527,8 +511,7 @@ const Mixed Dictionary::operator[](Mixed key)
 
 bool Dictionary::contains(Mixed key)
 {
-    update_if_needed();
-    if (m_clusters) {
+    if (update()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         auto state = m_clusters->try_get(k);
@@ -540,7 +523,7 @@ bool Dictionary::contains(Mixed key)
 
 Dictionary::Iterator Dictionary::find(Mixed key)
 {
-    if (m_clusters) {
+    if (update()) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         try {
@@ -555,20 +538,18 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 void Dictionary::erase(Mixed key)
 {
     validate_key_value(key);
-    update_if_needed();
+    ensure_writable(false);
 
-    if (m_clusters) {
-        auto hash = key.hash();
-        ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-        auto state = m_clusters->get(k);
+    auto hash = key.hash();
+    ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+    auto state = m_clusters->get(k);
 
-        if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_erase(*this, state.index, key);
-        }
-        CascadeState dummy;
-        m_clusters->erase(k, dummy);
-        bump_content_version();
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_erase(*this, state.index, key);
     }
+    CascadeState dummy;
+    m_clusters->erase(k, dummy);
+    bump_content_version();
 }
 
 void Dictionary::erase(Iterator it)
@@ -578,6 +559,8 @@ void Dictionary::erase(Iterator it)
 
 void Dictionary::nullify(Mixed key)
 {
+    ensure_writable(false);
+
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
@@ -592,7 +575,9 @@ void Dictionary::nullify(Mixed key)
 
 void Dictionary::clear()
 {
-    if (size() > 0) {
+    // We can be detached here if the dictionary had never been created in the
+    // database, but clearing it is still valid.
+    if (ensure_writable(false) != UpdateStatus::Detached) {
         // TODO: Should we have a "dictionary_clear" instruction?
         if (Replication* repl = this->m_obj.get_replication()) {
             size_t n = 0;
@@ -603,34 +588,31 @@ void Dictionary::clear()
         }
         // Just destroy the whole cluster
         m_clusters->destroy();
-        delete m_clusters;
-        m_clusters = nullptr;
+        m_clusters.reset();
 
         update_child_ref(0, 0);
     }
 }
 
-bool Dictionary::init_from_parent() const
+bool Dictionary::init_from_parent(bool allow_create) const
 {
-    bool valid = false;
-    auto ref = to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-
-    if (ref) {
-        if (!m_clusters)
-            m_clusters = new DictionaryClusterTree(const_cast<Dictionary*>(this), m_key_type, m_obj.get_alloc(),
-                                                   m_obj.get_row_ndx());
-
-        m_clusters->init_from_parent();
-        valid = true;
-    }
-    else {
-        delete m_clusters;
-        m_clusters = nullptr;
+    if (!m_clusters) {
+        m_clusters.reset(new DictionaryClusterTree(const_cast<Dictionary*>(this), m_key_type, m_obj.get_alloc(),
+                                                   m_obj.get_row_ndx()));
     }
 
-    update_content_version();
+    bool attached = m_clusters->init_from_parent();
 
-    return valid;
+    if (!attached && allow_create) {
+        MemRef mem = Cluster::create_empty_cluster(m_obj.get_alloc());
+        const_cast<Dictionary*>(this)->update_child_ref(0, mem.get_ref());
+        attached = m_clusters->init_from_parent();
+        REALM_ASSERT(attached);
+        m_clusters->add_columns();
+        return true;
+    }
+
+    return attached;
 }
 
 Mixed Dictionary::do_get(const ClusterNode::State& s) const

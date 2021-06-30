@@ -173,7 +173,7 @@ TableRef Obj::get_target_table(ObjLink link) const
 bool Obj::update() const
 {
     // Get a new object from key
-    Obj new_obj = get_tree_top()->get(m_key);
+    Obj new_obj = get_tree_top()->get(m_key); // Throws `KeyNotFound`
 
     bool changes = (m_mem.get_addr() != new_obj.m_mem.get_addr()) || (m_row_ndx != new_obj.m_row_ndx);
     if (changes) {
@@ -193,6 +193,23 @@ inline bool Obj::_update_if_needed() const
         return update();
     }
     return false;
+}
+
+UpdateStatus Obj::update_if_needed_with_status() const
+{
+    // FIXME: This check is pretty expensive (potential B-tree lookup if the
+    // object is valid).
+    if (!is_valid()) {
+        return UpdateStatus::Detached;
+    }
+
+    // This should not throw KeyNotFound because of the call to `is_valid()`.
+    if (update_if_needed()) {
+        return UpdateStatus::Updated;
+    }
+    else {
+        return UpdateStatus::NoChange;
+    }
 }
 
 template <class T>

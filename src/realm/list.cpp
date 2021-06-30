@@ -221,10 +221,11 @@ void Lst<ObjKey>::do_remove(size_t ndx)
 template <>
 void Lst<ObjKey>::clear()
 {
-    update_if_needed();
     auto sz = Lst<ObjKey>::size();
 
     if (sz > 0) {
+        ensure_writable(false);
+
         auto origin_table = m_obj.get_table();
         TableRef target_table = m_obj.get_target_table(m_col_key);
 
@@ -402,8 +403,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 
 void LnkLst::remove_all_target_rows()
 {
-    if (is_attached()) {
-        update_if_needed();
+    if (update_if_needed() != UpdateStatus::Detached) {
         _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
 }
