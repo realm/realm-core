@@ -1262,7 +1262,25 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         m_tree_top.for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
-                std::cout << ", list";
+                ref_type ref = Array::get_as_ref(j);
+                ArrayRef refs(m_alloc);
+                refs.init_from_ref(ref);
+                std::cout << ", {";
+                ref = refs.get(i);
+                if (ref) {
+                    if (col.get_type() == col_type_Int) {
+                        // This is easy to handle
+                        Array ints(m_alloc);
+                        ints.init_from_ref(ref);
+                        for (size_t n = 0; n < ints.size(); n++) {
+                            std::cout << ints.get(n) << ", ";
+                        }
+                    }
+                    else {
+                        std::cout << col.get_type();
+                    }
+                }
+                std::cout << "}";
                 return false;
             }
 

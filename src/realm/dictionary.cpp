@@ -632,7 +632,11 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         }
         else {
             // We have a collision
-            m_clusters->create_collision_column();
+            if (!m_clusters->has_collisions()) {
+                m_clusters->create_collision_column();
+                // cluster tree has changed - find entry again
+                state = m_clusters->try_get(k);
+            }
 
             if (auto sibling = m_clusters->find_sibling(state, key)) {
                 old_entry = true;
@@ -750,74 +754,80 @@ ObjKey Dictionary::handle_collision_in_erase(const Mixed& key, ObjKey k, Cluster
     ArrayRef refs(m_obj.get_alloc());
     refs.set_parent(&fields, 3);
     refs.init_from_parent();
-    auto ref = refs.get(state.index);
-    if (ref) {
-        Array links(m_obj.get_alloc());
-        links.set_parent(&refs, state.index);
-        links.init_from_parent();
-        auto sz = links.size();
-        ObjKey k2;
-        REALM_ASSERT(sz > 0);
-        if (do_get_key(state).compare_signed(key) == 0) {
-            // We are erasing main entry, swap last sibling over
-            k2 = ObjKey(links.get(sz - 1));
-            if (sz == 1) {
-                refs.set(links.get_ndx_in_parent(), 0);
-                links.destroy();
-            }
-            else {
-                links.erase(sz - 1);
-            }
-            if (fields.has_missing_parent_update()) {
-                auto new_ref = fields.get_ref();
-                m_clusters->update_ref_in_parent(k, new_ref);
-                state.mem = MemRef(new_ref, m_obj.get_alloc());
-            }
-            auto state2 = m_clusters->get(k2);
-            Array fallback2(m_obj.get_alloc());
-            Array& fields2 = m_clusters->get_fields_accessor(fallback2, state2.mem);
-            swap_content(fields, fields2, state.index, state2.index);
-            if (fields2.has_missing_parent_update()) {
-                auto new_ref = fields2.get_ref();
-                m_clusters->update_ref_in_parent(k2, new_ref);
-                state2.mem = MemRef(new_ref, m_obj.get_alloc());
-            }
-            // 'state' should point to sibling
-            state = state2;
-        }
-        else {
-            // We are erasing a sibling
-            // Find the right one and erase from list in main entry
-            size_t i = 0;
-            for (;;) {
-                k2 = ObjKey(links.get(i));
-                state = m_clusters->get(k2);
-                if (do_get_key(state).compare_signed(key) == 0) {
-                    // Erase this entry in the link array
-                    if (links.size() == 1) {
-                        refs.set(links.get_ndx_in_parent(), 0);
-                        links.destroy();
-                    }
-                    else {
-                        links.erase(i);
-                    }
-                    break;
-                }
-                i++;
-                REALM_ASSERT_RELEASE(i < sz);
-            }
-            if (fields.has_missing_parent_update()) {
-                auto new_ref = fields.get_ref();
-                m_clusters->update_ref_in_parent(k, new_ref);
-            }
-        }
-        k = k2; // This will ensure that sibling is erased
-    }
-    else {
+
+    if (!refs.get(state.index)) {
         // No collisions on this hash
         REALM_ASSERT(do_get_key(state).compare_signed(key) == 0);
+        return k;
     }
-    return k;
+
+    ObjKey k2;
+    Array links(m_obj.get_alloc());
+    links.set_parent(&refs, state.index);
+    links.init_from_parent();
+
+    auto sz = links.size();
+    REALM_ASSERT(sz > 0);
+    if (do_get_key(state).compare_signed(key) == 0) {
+        // We are erasing main entry, swap last sibling over
+        k2 = ObjKey(links.get(sz - 1));
+        if (sz == 1) {
+            refs.set(links.get_ndx_in_parent(), 0);
+            links.destroy();
+        }
+        else {
+            links.erase(sz - 1);
+        }
+        if (fields.has_missing_parent_update()) {
+            auto new_ref = fields.get_ref();
+            m_clusters->update_ref_in_parent(k, new_ref);
+        }
+
+        auto index1 = state.index;
+        state = m_clusters->get(k2);
+        Array fallback2(m_obj.get_alloc());
+        Array& fields2 = m_clusters->get_fields_accessor(fallback2, state.mem);
+
+        swap_content(fields, fields2, index1, state.index);
+
+        if (fields2.has_missing_parent_update()) {
+            auto new_ref = fields2.get_ref();
+            m_clusters->update_ref_in_parent(k2, new_ref);
+            // The content of the sibling has now been updated with the
+            // content of the master entry, so 'state' must point to this
+            // new writable cluster
+            state.mem = MemRef(new_ref, m_obj.get_alloc());
+        }
+    }
+    else {
+        // We are erasing a sibling
+        // Find the right one and erase from list in main entry
+        size_t i = 0;
+        for (;;) {
+            k2 = ObjKey(links.get(i));
+            state = m_clusters->get(k2);
+            if (do_get_key(state).compare_signed(key) == 0) {
+                // Erase this entry in the link array
+                if (links.size() == 1) {
+                    refs.set(links.get_ndx_in_parent(), 0);
+                    links.destroy();
+                }
+                else {
+                    links.erase(i);
+                }
+                break;
+            }
+            i++;
+            REALM_ASSERT_RELEASE(i < sz);
+        }
+        if (fields.has_missing_parent_update()) {
+            auto new_ref = fields.get_ref();
+            // This may COW the cluster 'state' points to, but it is still
+            // ok to use it for reading, so no need to update
+            m_clusters->update_ref_in_parent(k, new_ref);
+        }
+    }
+    return k2; // This will ensure that sibling is erased
 }
 
 void Dictionary::erase(Mixed key)
@@ -834,6 +844,7 @@ void Dictionary::erase(Mixed key)
     }
 
     if (m_clusters->has_collisions()) {
+        // State will be updated to refer to element that is going to be erased
         k = handle_collision_in_erase(key, k, state);
     }
 

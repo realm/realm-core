@@ -629,7 +629,7 @@ public:
     std::function<int64_t(void)> rnd = std::mt19937(unit_test_random_seed);
 };
 
-NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
+NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
 {
     ModelDict model;
     auto mask = Dictionary::set_hash_mask(0xFFFF);
@@ -685,10 +685,10 @@ NONCONCURRENT_TEST(Dictionary_RandomOpsTransaction)
     Dictionary::set_hash_mask(mask);
 }
 
-
-NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
+static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::TestContext& test_context,
+                                                   int64_t nb_entries, uint64_t mask)
 {
-    auto mask = Dictionary::set_hash_mask(0xFF);
+    mask = Dictionary::set_hash_mask(mask);
     SHARED_GROUP_TEST_PATH(path);
     auto hist = make_in_realm_history(path);
     DBRef db = DB::create(*hist);
@@ -700,7 +700,7 @@ NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
 
         auto foo = foos->create_object();
         auto dict = foo.get_dictionary(col_dict);
-        for (int64_t i = 0; i < 100; i++) {
+        for (int64_t i = 0; i < nb_entries; i++) {
             std::string key = "key" + util::to_string(i);
             dict.insert(Mixed(key), i);
         }
@@ -712,14 +712,14 @@ NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
         auto foos = rt->get_table("Foo");
         ColKey col_dict = foos->get_column_key("dict");
         auto dict = foos->begin()->get_dictionary(col_dict);
-        for (int64_t i = 0; i < 100; i++) {
+        for (int64_t i = 0; i < nb_entries; i++) {
             std::string key = "key" + util::to_string(i);
             CHECK_EQUAL(dict[key].get_int(), i);
         }
     }
 
     auto rt = db->start_read();
-    for (int64_t i = 0; i < 100; i++) {
+    for (int64_t i = 0; i < nb_entries; i++) {
         rt->promote_to_write();
 
         auto foos = rt->get_table("Foo");
@@ -728,14 +728,20 @@ NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
 
         std::string key = "key" + util::to_string(i);
         dict.erase(key);
-        CHECK_EQUAL(dict.size(), 100 - i - 1);
+        CHECK_EQUAL(dict.size(), nb_entries - i - 1);
 
         rt->commit_and_continue_as_read();
 
-        for (int64_t j = i + 1; j < 100; j++) {
+        for (int64_t j = i + 1; j < nb_entries; j++) {
             std::string key_j = "key" + util::to_string(j);
             CHECK_EQUAL(dict[key_j].get_int(), j);
         }
     }
     Dictionary::set_hash_mask(mask);
+}
+
+NONCONCURRENT_TEST(Dictionary_HashCollisionTransaction)
+{
+    do_Dictionary_HashCollisionTransaction(test_context, 100, 0xFF);  // One node cluster
+    do_Dictionary_HashCollisionTransaction(test_context, 500, 0x3FF); // Three node cluster
 }

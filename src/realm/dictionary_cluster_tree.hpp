@@ -73,10 +73,8 @@ public:
 
     void create_collision_column()
     {
-        if (!m_has_collision_column) {
-            m_has_collision_column = true;
-            insert_column(s_collision_col);
-        }
+        insert_column(s_collision_col);
+        m_has_collision_column = true;
     }
 
     ClusterNode::State insert(ObjKey k, Mixed key, Mixed value)
