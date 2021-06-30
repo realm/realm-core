@@ -1783,18 +1783,13 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         return info;
     };
 
-<<<<<<< HEAD
     std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
     KeyPathArray key_path_array = {};
-    _impl::DeepChangeChecker::find_related_tables(tables, *table, key_path_array);
-=======
-    _impl::DeepChangeChecker::RelatedTables tables;
     auto relation_updater = [&]() {
-        _impl::DeepChangeChecker::find_related_tables(tables, *table);
+        _impl::DeepChangeChecker::find_related_tables(tables, *table, key_path_array);
     };
     relation_updater();
     test_type.set_relation_updater(relation_updater);
->>>>>>> origin/v11
 
     auto cols = table->get_column_keys();
     SECTION("direct changes are tracked") {

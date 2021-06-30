@@ -171,10 +171,6 @@ Results Collection::as_results() const
     return Results(m_realm, m_coll_base);
 }
 
-<<<<<<< HEAD
-NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
-                                                        KeyPathArray key_path_array) &
-=======
 Results Collection::sort(SortDescriptor order) const
 {
     verify_attached();
@@ -192,8 +188,8 @@ Results Collection::snapshot() const
 }
 
 
-NotificationToken Collection::add_notification_callback(CollectionChangeCallback cb) &
->>>>>>> origin/v11
+NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
+                                                        KeyPathArray key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();

@@ -95,7 +95,12 @@ public:
     // Return a Results representing a live view of this Collection.
     Results as_results() const;
 
-<<<<<<< HEAD
+    // Return a Results representing a snapshot of this Collection.
+    Results snapshot() const;
+
+    Results sort(SortDescriptor order) const;
+    Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
+
     /**
      * Adds a `CollectionChangeCallback` to this `Collection`. The `CollectionChangeCallback` is exectuted when
      * insertions, modifications or deletions happen on this `Collection`.
@@ -109,15 +114,6 @@ public:
      */
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
-=======
-    // Return a Results representing a snapshot of this Collection.
-    Results snapshot() const;
-
-    Results sort(SortDescriptor order) const;
-    Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
-
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
->>>>>>> origin/v11
 
     // The object being added to the collection is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {

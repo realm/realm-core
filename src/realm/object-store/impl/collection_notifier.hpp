@@ -254,33 +254,6 @@ private:
     bool m_has_run = false;
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
-<<<<<<< HEAD
-=======
-    DeepChangeChecker::RelatedTables m_related_tables;
-
-    struct Callback {
-        // The actual callback to invoke
-        CollectionChangeCallback fn;
-        // The pending changes accumulated on the worker thread. This field is
-        // guarded by m_callback_mutex and is written to on the worker thread,
-        // then read from on the target thread.
-        CollectionChangeBuilder accumulated_changes;
-        // The changeset which will actually be passed to `fn`. This field is
-        // not guarded by a lock and can only be accessed on the notifier's
-        // target thread.
-        CollectionChangeBuilder changes_to_deliver;
-        // A unique-per-notifier identifier used to unregister the callback.
-        uint64_t token;
-        // We normally want to skip calling the callback if there's no changes,
-        // but only if we've sent the initial notification (to support the
-        // async query use-case). Not guarded by a mutex and is only readable
-        // on the target thread.
-        bool initial_delivered;
-        // Set within a write transaction on the target thread if this callback
-        // should not be called with changes for that write. requires m_callback_mutex.
-        bool skip_next;
-    };
->>>>>>> origin/v11
 
     // All `NotificationCallback`s added to this `CollectionNotifier` via `add_callback()`.
     std::vector<NotificationCallback> m_callbacks;

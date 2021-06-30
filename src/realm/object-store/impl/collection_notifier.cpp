@@ -16,15 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/impl/collection_notifier.hpp>
-
-#include <realm/object-store/impl/realm_coordinator.hpp>
-#include <realm/object-store/shared_realm.hpp>
-
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
+
+#include <realm/object-store/shared_realm.hpp>
+
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/deep_change_checker.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+
 
 using namespace realm;
 using namespace realm::_impl;
@@ -34,15 +36,9 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     // Check if any of the tables accessible from the root table were
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table
-<<<<<<< HEAD
-    auto table_modified = [&](auto& tbl) {
-        auto it = info.tables.find(tbl.table_key.value);
-        return it != info.tables.end() && (!it->second.modifications_empty() || !it->second.insertions_empty());
-=======
     auto table_modified = [&](auto& outgoing_linkset) {
         auto it = info.tables.find(outgoing_linkset.table_key.value);
-        return it != info.tables.end() && !it->second.modifications_empty();
->>>>>>> origin/v11
+        return it != info.tables.end() && (!it->second.modifications_empty() || !it->second.insertions_empty());
     };
     return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
 }
@@ -59,17 +55,12 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         };
     }
 
-<<<<<<< HEAD
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
     // In this case we do not need a `DeepChangeChecker` and check the modifications using the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
     if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
         auto root_table_key = m_related_tables[0].table_key;
         auto& object_change_set = info.tables.find(root_table_key.value)->second;
-=======
-    if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables.begin()->table_key.value)->second;
->>>>>>> origin/v11
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             return object_change_set.modifications_contains(object_key, {});
         };

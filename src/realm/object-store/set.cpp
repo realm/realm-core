@@ -148,22 +148,7 @@ Results Set::filter(Query q) const
 
 Set Set::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-<<<<<<< HEAD
-    return Set(frozen_realm, *frozen_realm->import_copy_of(*m_set_base));
-}
-
-NotificationToken Set::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
-{
-    if (m_notifier && !m_notifier->have_callbacks())
-        m_notifier.reset();
-    if (!m_notifier) {
-        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
-        RealmCoordinator::register_notifier(m_notifier);
-    }
-    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
-=======
     return Set(frozen_realm, frozen_realm->import_copy_of(*m_coll_base));
->>>>>>> origin/v11
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
