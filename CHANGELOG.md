@@ -7,8 +7,13 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed an assertion failure when listening for changes to a list of primitive Mixed which contains links. ([#4767](https://github.com/realm/realm-core/issues/4767), since the beginning of Mixed v11.0.0)
+* Fixed an assertion failure when listening for changes to a dictionary or set which contains an invalidated link. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
+* Fixed an endless recursive loop that could cause a stack overflow when computing changes on a set of objects which contained cycles. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
+* Fixed a crash after clearing a list or set of Mixed containing links to objects ([#4774](https://github.com/realm/realm-core/issues/4774), since the beginning of v11)
 * Fixed a recursive loop which would eventually crash trying to refresh a user app token when it had been revoked by an admin. Now this situation logs the user out and reports an error. ([#4745](https://github.com/realm/realm-core/issues/4745), since v10.0.0).
 * Fixed a race between calling realm::delete_files and concurent opening of the realm file.([#4768](https://github.com/realm/realm-core/pull/4768)) 
+
 ### Breaking changes
 * None.
 
@@ -17,6 +22,216 @@
 ### Internals
 * Add more tests for Realm::delete_files ([#4765](https://github.com/realm/realm-core/pull/4765)).
 * Renamed targets on SPM file from `Core`, `QueryParser` to `RealmCore` and `RealmQueryParser` to avoid conflicts with other libraries products. ([#4763](https://github.com/realm/realm-core/issues/4763), since v10.8.1)
+
+----------------------------------------------
+
+# 11.0.3 Release notes
+
+### Fixed
+* Destroying the SyncManager in ObjectStore no longer causes segfaults in async callbacks in SyncUser/SyncSession ([4615](https://github.com/realm/realm-core/issues/4615))
+* None.
+* When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
+* Fix crashes when sync logging is set to trace or higher (since 11.0.2).
+* Fix crash when changing nullability of primary key column ([#4759](https://github.com/realm/realm-core/issues/4759), since v11.0.0-beta.6)
+
+-----------
+
+### Internals
+* Releases for Apple platforms are now built with Xcode 12.2.
+
+----------------------------------------------
+
+# 11.0.2 Release notes
+
+### Fixed
+* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
+* Fixed issues around key-based dictionary notifications holding on to a transaction ([#4744](https://github.com/realm/realm-core/issues/4744), since v11.0.1)
+ 
+-----------
+
+### Internals
+* Refactor the string formatting logic for logging, reducing the compiled size of the library. May require adoption downstream.
+
+----------------------------------------------
+
+# 11.0.1 Release notes
+
+### Fixed
+* Clearing a Dictionary with a key-based change listener attached will result in a crash. ([#4737](https://github.com/realm/realm-core/issues/4737), since v11.0.0)
+
+----------------------------------------------
+
+# 11.0.0 Release notes
+
+### Enhancements
+* Added the functionality to delete files for a given SharedRealm, unlocking  ([realm-dotnet#386](https://github.com/realm/realm-dotnet/issues/386)).
+
+### Fixed
+* Setting a collection with a nullable value type to null would hit an assertion failure instead of clearing the collection.
+* Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
+* Fixed build failure with gcc-11
+* Added merge rule between SetInsert/SetErase and Clear to prevent diverging states after a Clear instruction on the same path. ([#4720](https://github.com/realm/realm-core/issues/4720))
+* Made Linux implementation of ExternalCommitHelper work with new versions of Linux that [changed epoll behavior](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6a965666b7e7475c2f8c8e724703db58b8a8a445), including Android 12 ([#4666](https://github.com/realm/realm-core/issues/4666))
+
+### Breaking changes
+* The key-based notifications for Dictionary is changed so that the deletions are also reported by their keys. ([#4723](https://github.com/realm/realm-core/pull/4723))
+
+-----------
+
+### Internals
+* DB::write_copy will not use write transaction
+
+----------------------------------------------
+
+# 11.0.0-beta.6 Release notes
+
+
+### Fixed
+* Performance regression for some scenarios of writing/creating objects 
+  with a primary key. ([#4522](https://github.com/realm/realm-core/issues/4522))
+* Observing a dictionary holding links to objects would crash. ([#4711](https://github.com/realm/realm-core/issues/4711), since v11.0.0-beta.0)
+
+### Breaking changes
+* The file format version is bumped from 21 to 22. The file format is changed in the way that we now - again - have search indexes on primary key columns. This is required as we now stop deriving the ObjKeys from the primary key values, but just use an increasing counter value. This has the effect that all new objects will be created in the same cluster and not be spread out as they would have been before. It also means that upgrading from file format version 11 and earlier formats will be much faster.
+
+----------------------------------------------
+
+# 11.0.0-beta.5 Release notes
+
+### Enhancements
+* Added support for creating queries through a dictionary of links, in the same way of LnkLst and LnkSet. ([#4548](https://github.com/realm/realm-core/issues/4593))
+
+### Fixed
+* Added the names requested by .NET to match mixed type based querying. ([#4353](https://github.com/realm/realm-core/issues/4353))
+* Deleting objects pointed to by a Dictionary may result in a crash.  ([#4632](https://github.com/realm/realm-core/issues/4632), since v11.0.0-beta.0)
+* Comparing dictionaries from different realms could sometimes return equality ([#4629](https://github.com/realm/realm-core/issues/4629), since v11.0.0-beta.0)
+* Calling Results::snapshot on dictionary values collection containing null returns incorrect results ([#4635](https://github.com/realm/realm-core/issues/4635), Not in any release)
+* Making a aggregate query on Set of Objects would cause a crash in the parser ([#4633](https://github.com/realm/realm-core/issues/4633), since v11.0.0-beta.0)
+* Copying a Query constrained by a Dictionary would crash ([#4640](https://github.com/realm/realm-core/issues/4640), since v11.0.0-beta.0)
+* Changed the average of an empty set from 0 to null. ([#4678](https://github.com/realm/realm-core/issues/4678), since v11.0.0-beta.0)
+* Changed the sum of an empty dictionary from null to 0. ([#4678](https://github.com/realm/realm-core/issues/4678), since v11.0.0-beta.0)
+* Some way - used in realm-cocoa - of constructing a Query could result in a use-after-free violation ([#4670](https://github.com/realm/realm-core/pull/4670), since v11.0.0-beta.0)
+* Fix the order of a sorted set of mixed values. ([#4662](https://github.com/realm/realm-core/pull/4662), since v11.0.0-beta.0)
+* Use same rules for handling numeric values in sets as MongoDB uses. All numeric values are compared using the value irregardless of the type.  ([#4686](https://github.com/realm/realm-core/pull/4686), since v11.0.0-beta.0)
+* Fixed an incorrect detection of multiple incoming links in a migration when changing a table to embedded and removing a link to it at the same time. ([#4694](https://github.com/realm/realm-core/issues/4694) since 10.0.0-beta.2)
+
+-----------
+
+### Internals
+* Includes changes from versions 10.6.1, 10.7.0, 10.7.1 and 10.7.2.
+* The `ListColumnAggregate` has been renamed to `CollectionColumnAggregate` which now supports dictionaries instead of having a separate type `DictionaryAggregate` which is now removed. This allows `ColumnsCollection` min/max/sum/avg to work on dictionary column queries as well.
+
+
+----------------------------------------------
+
+# 11.0.0-beta.4 Release notes
+
+### Enhancements
+* Support equal/not_equal on Query, where column is Link/LinkList and value is a Mixed containing a link.
+
+### Fixed
+* Dictionary key validation now works on strings without nul termination. ([#4589](https://github.com/realm/realm-core/issues/4589))
+* Fixed queries for min/max of a Mixed column not returning the expected value when using the Query::minimum_mixed(). ([#4571](https://github.com/realm/realm-core/issues/4571), since v11.0.0-beta.2)
+* Fix collection notification reporting for modifications. This could be observed by receiving the wrong indices of modifications on sorted or distinct results, or notification blocks sometimes not being called when only modifications have occured. ([#4573](https://github.com/realm/realm-core/pull/4573) since v6).
+ 
+----------------------------------------------
+
+# 11.0.0-beta.3 Release notes
+
+### Enhancements
+* Update the to_json() function to properly encode UUIDs, mixed types, dictionaries, and sets as MongoDB extended JSON. 
+* Remove type coercion on bool and ObjectId when doing queries.
+* Pass CreatePolicy to `unbox<T>` from the object accessor.
+* We now make a backup of the realm file prior to any file format upgrade. The backup is retained for 3 months.
+  Backups from before a file format upgrade allows for better analysis of any upgrade failure. We also restore
+  a backup, if a) an attempt is made to open a realm file whith a "future" file format and b) a backup file exist
+  that fits the current file format. ([#4166](https://github.com/realm/realm-core/pull/4166))
+* Make conversion of Decimal128 to/from string work for numbers with more than 19 significant digits. ([#4548](https://github.com/realm/realm-core/issues/4548))
+
+### Fixed
+* Query::links_to() took wrong argument for Mixed columns. ([#4585](https://github.com/realm/realm-core/issues/4585))
+* Clearing a set of links would result in crash when target objects are deleted.([#4579](https://github.com/realm/realm-core/issues/4579))
+ 
+-----------
+
+### Internals
+* Add additional debug validation to file map management that will hopefully catch cases where we unmap something which is still in use.
+
+----------------------------------------------
+
+# 11.0.0-beta.2 Release notes
+
+### Enhancements
+* Adding overloads of the set methods that operate on collections ([#4226](https://github.com/realm/realm-core/issues/4226))
+* Support 'add_int' on a mixed property.
+* UUID allowed as partition value ([#4500](https://github.com/realm/realm-core/issues/4500))
+* The error message when the intial steps of opening a Realm file fails is now more descriptive.
+* Allow UTF8 encoded characters in property names in query parser ([#4467](https://github.com/realm/realm-core/issues/4467))
+* Allow unresolved links to be inserted in Dictionary.
+
+### Fixed
+* Fixed queries of min/max/sum/avg on list of primitive mixed. ([#4472](https://github.com/realm/realm-core/pull/4472), never before working)
+* Fixed sort and distinct on dictionary keys, and distinct on dictionary values. ([#4496](https://github.com/realm/realm-core/pull/4496))
+* Fixed getting a dictionary value which is null via `object_store::Dictionary::get<T>(key)` for any type other than Mixed. ([#4496](https://github.com/realm/realm-core/pull/4496))
+* Fixed notifications tracking modifications across links in a dictionary or set containing Mixed(TypedLink) values. ([#4505](https://github.com/realm/realm-core/pull/4505)).
+* Fixed the notifiers causing an exception `KeyNotFound("No such object");` if a dictionary or set of links of a single type also had a link column in the linked table. ([#4465](https://github.com/realm/realm-core/issues/4465)).
+* Added missing stubs for Mixed aggregation: min/max/sum/avg at the Query level. ([4526](https://github.com/realm/realm-core/issues/4526))
+* Classes names "class_class_..." was not handled correctly in KeyPathMapping ([#4480](https://github.com/realm/realm-core/issues/4480))
+* Syncing large Decimal128 values will cause "Assertion failed: cx.w[1] == 0" ([#4519](https://github.com/realm/realm-core/issues/4519), since v10.0.0)
+* Fixed the query parser rejecting <,>,<=,>= queries on UUID types. ([#4475](https://github.com/realm/realm-core/issues/4475), since v10.0.0)
+* Fixed min/max/sum/avg not working on dictionaries of Mixed types when more than one type existed as values. ([#4546](https://github.com/realm/realm-core/issues/4546), since v11.0.0-beta.0)
+* Creating dictionaries with null links through SDK context would crash. ([#4537](https://github.com/realm/realm-core/issues/4537))
+* An exception is now thrown, if a null link is attempted inserted in a set of links ([#4540](https://github.com/realm/realm-core/issues/4540), since v10.0.0)
+* Equality queries between mixed and object was not supported in query parser ([#4531](https://github.com/realm/realm-core/issues/4531), since v10.0.0)
+* Syncing sets of objects was not supported ([#4538](https://github.com/realm/realm-core/issues/4538), since v10.0.0)
+* Potential/unconfirmed fix for crashes associated with failure to memory map (low on memory, low on virtual address space). For example ([#4514](https://github.com/realm/realm-core/issues/4514)).
+* Invoking Set<Binary>::clear() - directly or indirectly -  could sometimes leave the database in an inconsistent state leading to a crash.
+* Fixed name aliasing not working in sort/distinct clauses of the query parser. ([#4550](https://github.com/realm/realm-core/issues/4550), never before working).
+* Fix assertion failures such as "!m_notifier_skip_version.version" or "m_notifier_sg->get_version() + 1 == new_version.version" when performing writes inside change notification callbacks. Previously refreshing the Realm by beginning a write transaction would skip delivering notifications, leaving things in an inconsistent state. Notifications are now delivered recursively when needed instead. ([Cocoa #7165](https://github.com/realm/realm-cocoa/issues/7165)).
+
+-----------
+
+### Internals
+* Collection aggregates min/max/sum/avg have changed to return an optional Mixed value. This is to distinguish between returning a valid Mixed null value, and none indicating unsupported for this type. ([#4472](https://github.com/realm/realm-core/pull/4472))
+* Includes fixes merged from core v10.5.4.
+* Android: build with NDK r22. Make `-Wl,-gc-sections` an interface linker flag, which reduces code size because Core is compiled `-fdata-sections` and `-ffunction-sections`. Use `-Oz` even when we enable link-time optimization (previously we used with `-O2`). ([#4407](https://github.com/realm/realm-core/pull/4407))
+
+----------------------------------------------
+
+# 11.0.0-beta.1 Release notes
+
+### Enhancements
+* Dictionary can now contain embedded objects
+
+### Fixed
+* Mixed property can now be indexed ([#4342](https://github.com/realm/realm-core/issues/4342))
+* Dictionary of Objects need to have a nullable value part, but that would lead to inconsistency in schema and cause an exception ([#4344](https://github.com/realm/realm-core/issues/4344))
+* Subscribing for notifications on Dictionaries of Objects results in access violation ([#4346](https://github.com/realm/realm-core/issues/4346))
+* AccessViolationException on removing a key from dictionary of objects  ([#4358](https://github.com/realm/realm-core/issues/4358))
+* Mixed: crash when removing/setting a null-valued position of a Mixed list or set ([#4304](https://github.com/realm/realm-core/issues/4304))
+* Results based on dictionary keys will return wrong value from 'get_type'. ([#4365](https://github.com/realm/realm-core/issues/4365))
+* If a Dictionary contains Objects, those can not be returned by Results::get<Obj> ([#4374](https://github.com/realm/realm-core/issues/4374))
+* Change listeners not triggered on certain Mixed attribute changes ([#4404](https://github.com/realm/realm-core/issues/4404))
+* Calling Dictionary::find_any() on a virgin dictionary will crash (([#4438](https://github.com/realm/realm-core/issues/4438))
+* `Dictionary::as_results()` on a dictionary of links gave a Results which did not support most object operations.
+
+### Breaking changes
+* Sync protocol version increased to 3. This version adds support for the new data types introduced in file format version 21.
+
+-----------
+
+### Internals
+* object_store::Dictionary has now get_keys() and get_values() that will return a Results object giving access to the keys and values resp. ([#4233](https://github.com/realm/realm-core/issues/4233))
+
+----------------------------------------------
+
+# 11.0.0-beta.0 Release notes
+
+### Fixed
+* When updating a Dictionary value, wrong notifications are sent out. ([4318](https://github.com/realm/realm-core/issues/4318))
+
+### Breaking changes
+* File format version bumped to 21. In this version we support new basic datatypes 'UUID' and 'Mixed', and we support Set and Dictionary collections.
 
 ----------------------------------------------
 
@@ -48,7 +263,6 @@
 
 ### Internals
 * DB::write_copy will not use write transaction
-* Refactor the string formatting logic for logging, reducing the compiled size of the library.
 
 ----------------------------------------------
 

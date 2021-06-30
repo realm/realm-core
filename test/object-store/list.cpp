@@ -815,7 +815,7 @@ TEST_CASE("list") {
         auto results = list.sort({{{col_target_value}}, {false}});
 
         REQUIRE(&results.get_object_schema() == objectschema);
-        REQUIRE(results.get_mode() == Results::Mode::LinkList);
+        REQUIRE(results.get_mode() == Results::Mode::Collection);
         REQUIRE(results.size() == 10);
 
         // Aggregates don't inherently have to convert to TableView, but do
@@ -835,7 +835,7 @@ TEST_CASE("list") {
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
-        REQUIRE(results.get_mode() == Results::Mode::LinkList);
+        REQUIRE(results.get_mode() == Results::Mode::Collection);
     }
 
     SECTION("filter()") {

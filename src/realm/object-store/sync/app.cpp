@@ -142,6 +142,8 @@ App::App(const Config& config)
     m_sync_manager = std::make_shared<SyncManager>();
 }
 
+App::~App() {}
+
 void App::configure(const SyncClientConfig& sync_client_config)
 {
     // change the scheme in the base url to ws from http to satisfy the sync client

@@ -1528,9 +1528,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(table->size() == 11);
             REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
             for (int i = 0; i < 11; ++i) {
-                auto obj = table->get_object(i);
-                REQUIRE(obj.get<int64_t>("pk") == i + 1);
-                REQUIRE(obj.get<int64_t>("int") == i + 4);
+                auto obj = table->get_object_with_primary_key(i + 1);
+                REQUIRE(obj.get<int64_t>("pk") + 3 == obj.get<int64_t>("int"));
             }
         }
 

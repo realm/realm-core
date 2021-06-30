@@ -79,21 +79,31 @@ TEST(Dictionary_Basics)
         CHECK_EQUAL(x, y);
     };
 
+    Dictionary dummy;
+    CHECK_THROW_ANY(dummy.insert("Hello", "world"));
+
     auto foo = g.add_table("foo");
     auto col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
 
     Obj obj1 = foo->create_object();
     Obj obj2 = foo->create_object();
+    StringData foo_key("foo.bar", 3); // The '.' must not be considered part of the key
 
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
+
         CHECK_EQUAL(dict.size(), 0);
+        CHECK_EQUAL(dict.find_any(9), realm::npos);
+
         CHECK(dict.insert("Hello", 9).second);
         CHECK_EQUAL(dict.size(), 1);
         CHECK_EQUAL(dict.get("Hello").get_int(), 9);
         CHECK(dict.contains("Hello"));
         CHECK_NOT(dict.insert("Hello", 10).second);
         CHECK_EQUAL(dict.get("Hello").get_int(), 10);
+        CHECK_EQUAL(dict.find_any(9), realm::npos);
+        CHECK_EQUAL(dict.find_any(10), 0);
+
         dict.insert("Goodbye", "cruel world");
         CHECK_EQUAL(dict.size(), 2);
         CHECK_EQUAL(dict["Goodbye"].get_string(), "cruel world");
@@ -101,10 +111,11 @@ TEST(Dictionary_Basics)
         CHECK_THROW_ANY(dict.get("Foo").get_string()); // Outside range
         CHECK_THROW_ANY(dict.insert("$foo", ""));      // Must not start with '$'
         CHECK_THROW_ANY(dict.insert("foo.bar", ""));   // Must not contain '.'
+        CHECK(dict.insert(foo_key, 9).second);         // This should be ok
     }
     {
         Dictionary dict = obj1.get_dictionary(col_dict);
-        CHECK_EQUAL(dict.size(), 2);
+        CHECK_EQUAL(dict.size(), 3);
         cmp(dict.get("Hello"), 10);
         cmp(dict["Goodbye"], "cruel world");
         auto it = dict.find("puha");
@@ -112,8 +123,10 @@ TEST(Dictionary_Basics)
         it = dict.find("Goodbye");
         cmp((*it).second, "cruel world");
         dict.erase(it);
-        CHECK_EQUAL(dict.size(), 1);
+        CHECK_EQUAL(dict.size(), 2);
         cmp(dict["Goodbye"], Mixed());
+        CHECK_EQUAL(dict.size(), 3);
+        dict.erase("foo");
         CHECK_EQUAL(dict.size(), 2);
         dict.clear();
         CHECK_EQUAL(dict.size(), 0);
@@ -126,9 +139,18 @@ TEST(Dictionary_Basics)
         CHECK_THROW_ANY(dict.erase("foo.bar")); // Must not contain '.'
     }
     {
-        Dictionary dict = obj2.get_dictionary(col_dict);
-        CHECK_EQUAL(dict.size(), 0);
-        CHECK_THROW_ANY(dict.get("Baa").get_string());
+        Dictionary dict1 = obj1.get_dictionary(col_dict);
+        Dictionary dict2 = obj2.get_dictionary(col_dict);
+        CHECK_EQUAL(dict2.size(), 0);
+        CHECK_THROW_ANY(dict2.get("Baa").get_string());
+
+        dict2.insert("Hello", "world");
+        dict1.insert("Hello", 9);
+        obj2.remove();
+        CHECK_NOT(dict2.is_attached());
+        CHECK_EQUAL(dict1.size(), 1);
+        dict1 = dict2;
+        CHECK_NOT(dict1.is_attached());
     }
 }
 
@@ -145,6 +167,7 @@ TEST(Dictionary_Links)
     auto col_dict = persons->add_column_dictionary(*dogs, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
     Obj lady = dogs->create_object_with_primary_key("lady");
     Obj garfield = cats->create_object_with_primary_key("garfield");
@@ -162,7 +185,7 @@ TEST(Dictionary_Links)
         lady.remove();
         cmp(dict["Pet"], Mixed());
         CHECK_THROW_ANY(dict.insert("Pet", garfield));
-        CHECK_THROW_ANY(dict.insert("Pet", garfield.get_key()));
+        CHECK_THROW_ANY(dict.insert("Pet", Mixed(ObjKey(27))));
 
         // Reinsert lady
         lady = dogs->create_object_with_primary_key("lady");
@@ -175,6 +198,20 @@ TEST(Dictionary_Links)
         auto invalid_link = pluto.get_link();
         pluto.remove();
         CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+
+        dict = bernie.get_dictionary(col_dict);
+        dict.insert("Pet", lady);
+        CHECK_EQUAL(lady.get_backlink_count(), 2);
+        adam.remove();
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
+        dict.erase("Pet");
+        CHECK_EQUAL(lady.get_backlink_count(), 0);
+
+        dict.insert("Pet", dogs->get_objkey_from_primary_key("pongo"));
+        cmp(dict["Pet"], Mixed());
+        Obj pongo = dogs->create_object_with_primary_key("pongo");
+        CHECK_EQUAL(pongo.get_backlink_count(), 1);
+        cmp(dict["Pet"], Mixed(pongo.get_key()));
     }
 }
 
@@ -187,7 +224,7 @@ TEST(Dictionary_TypedLinks)
 
     auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
     auto persons = g.add_table_with_primary_key("person", type_String, "name");
-    auto col_dict = persons->add_column_dictionary(type_TypedLink, "dictionaries");
+    auto col_dict = persons->add_column_dictionary(type_Mixed, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
@@ -216,6 +253,12 @@ TEST(Dictionary_TypedLinks)
         auto invalid_link = pluto.get_link();
         pluto.remove();
         CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+
+        dict.insert("Pet", Mixed(ObjLink(dogs->get_key(), dogs->get_objkey_from_primary_key("pongo"))));
+        cmp(dict["Pet"], Mixed());
+        Obj pongo = dogs->create_object_with_primary_key("pongo");
+        CHECK_EQUAL(pongo.get_backlink_count(), 1);
+        cmp(dict["Pet"], Mixed(pongo.get_link()));
     }
 }
 
@@ -234,7 +277,11 @@ TEST(Dictionary_Clear)
     adam.get_dictionary(col_dict_typed).insert("Dog1", pluto);
     adam.get_dictionary(col_dict_implicit).insert("DOg2", lady.get_key());
 
+    CHECK_EQUAL(lady.get_backlink_count(), 1);
+    CHECK_EQUAL(pluto.get_backlink_count(), 1);
     persons->clear();
+    CHECK_EQUAL(lady.get_backlink_count(), 0);
+    CHECK_EQUAL(pluto.get_backlink_count(), 0);
     g.verify();
 }
 
@@ -328,19 +375,23 @@ TEST(Dictionary_Aggregate)
 
     size_t ndx;
     auto max = dict.max(&ndx);
-    CHECK_EQUAL(max.get_int(), 99);
+    CHECK(max);
+    CHECK_EQUAL(max->get_int(), 99);
 
     auto min = dict.min(&ndx);
-    CHECK_EQUAL(min.get_int(), 0);
+    CHECK(min);
+    CHECK_EQUAL(min->get_int(), 0);
 
     size_t cnt;
     auto sum = dict.sum(&cnt);
+    CHECK(sum);
     CHECK_EQUAL(cnt, 100);
-    CHECK_EQUAL(sum.get_int(), 50 * 99);
+    CHECK_EQUAL(sum->get_int(), 50 * 99);
 
     auto avg = dict.avg(&cnt);
+    CHECK(avg);
     CHECK_EQUAL(cnt, 100);
-    CHECK_EQUAL(avg.get_double(), double(50 * 99) / 100);
+    CHECK_EQUAL(avg->get_double(), double(50 * 99) / 100);
 }
 
 TEST(Dictionary_Performance)
@@ -383,15 +434,19 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict");
+    auto col_int = bars->add_column(type_Int, "value");
+    ColKey col_dict = foos->add_column_dictionary(*bars, "dict");
 
     auto foo = foos->create_object_with_primary_key(123);
-    auto a = bars->create_object_with_primary_key("a");
-    auto b = bars->create_object_with_primary_key("b");
+    auto a = bars->create_object_with_primary_key("a").set(col_int, 1);
+    auto b = bars->create_object_with_primary_key("b").set(col_int, 2);
 
     auto dict = foo.get_dictionary(col_dict);
     dict.insert("a", a);
     dict.insert("b", b);
+
+    auto q = bars->where(dict).equal(col_int, 1);
+    CHECK_EQUAL(q.count(), 1);
 
     a.invalidate();
 
@@ -399,4 +454,27 @@ TEST(Dictionary_Tombstones)
     CHECK((*dict.find("a")).second.is_unresolved_link());
 
     CHECK(dict.find("b") != dict.end());
+
+    CHECK_EQUAL(q.count(), 0);
+}
+
+TEST(Dictionary_UseAfterFree)
+{
+    Group g;
+    auto foos = g.add_table("Foo");
+    ColKey col_dict = foos->add_column_dictionary(type_String, "dict");
+
+    auto foo = foos->create_object();
+    auto dict = foo.get_dictionary(col_dict);
+    dict.insert("a", "monkey");
+    dict.insert("b", "lion");
+    dict.insert("c", "à");
+
+    Query q;
+    {
+        auto str = std::make_unique<std::string>("à");
+        auto col = foos->column<Dictionary>(col_dict);
+        q = col.equal(StringData(*str), true); // A copy of the string must be taken here
+    }
+    CHECK_EQUAL(q.count(), 1);
 }

@@ -113,7 +113,6 @@ const char* file_order[] = {
     "test_destroy_guard.cpp",
 
     // /realm/ (main API)
-    "test_version.cpp",
     "test_table*.cpp",
     "test_descriptor*.cpp",
     "test_group*.cpp",

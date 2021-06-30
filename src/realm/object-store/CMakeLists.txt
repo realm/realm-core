@@ -21,7 +21,6 @@ set(SOURCES
     impl/collection_notifier.cpp
     impl/deep_change_checker.cpp
     impl/list_notifier.cpp
-    impl/set_notifier.cpp
     impl/object_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
@@ -67,7 +66,6 @@ set(HEADERS
     impl/deep_change_checker.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
-    impl/set_notifier.hpp
     impl/notification_wrapper.hpp
     impl/object_accessor_impl.hpp
     impl/object_notifier.hpp

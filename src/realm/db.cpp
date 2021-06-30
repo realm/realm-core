@@ -1231,7 +1231,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << info->file_format_version << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
@@ -2788,6 +2788,19 @@ LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
         return obj.get_linkset_ptr(ck);
     }
     return std::make_unique<LnkSet>();
+}
+
+LinkCollectionPtr Transaction::import_copy_of(const LinkCollectionPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_owning_obj())) {
+        ColKey ck = original->get_owning_col_key();
+        return obj.get_linkcollection_ptr(ck);
+    }
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
+    return std::make_unique<LnkLst>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)

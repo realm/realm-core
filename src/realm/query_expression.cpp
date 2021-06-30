@@ -77,9 +77,24 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
+    ColKey column_key = m_link_column_keys[column];
     const Obj obj = m_tables[column]->get_object(key);
-    if (type == col_type_Link) {
-        if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
+    if (column_key.is_collection()) {
+        auto coll = obj.get_linkcollection_ptr(column_key);
+        size_t sz = coll->size();
+        for (size_t t = 0; t < sz; t++) {
+            if (ObjKey k = coll->get_key(t)) {
+                // Unresolved links are filtered out
+                if (last) {
+                    lm.consume(k);
+                }
+                else
+                    map_links(column + 1, k, lm);
+            }
+        }
+    }
+    else if (type == col_type_Link) {
+        if (ObjKey k = obj.get<ObjKey>(column_key)) {
             if (!k.is_unresolved()) {
                 if (last)
                     lm.consume(k);
@@ -88,30 +103,11 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
             }
         }
     }
-    else if (type == col_type_LinkList) {
-        auto linklist = obj.get_list<ObjKey>(m_link_column_keys[column]);
-        size_t sz = linklist.size();
-        for (size_t t = 0; t < sz; t++) {
-            ObjKey k = linklist.get(t);
-            if (!k.is_unresolved()) {
-                if (last) {
-                    bool continue2 = lm.consume(k);
-                    if (!continue2)
-                        return;
-                }
-                else
-                    map_links(column + 1, k, lm);
-            }
-        }
-    }
     else if (type == col_type_BackLink) {
-        auto backlink_column = m_link_column_keys[column];
-        auto backlinks = obj.get_all_backlinks(backlink_column);
+        auto backlinks = obj.get_all_backlinks(column_key);
         for (auto k : backlinks) {
             if (last) {
-                bool continue2 = lm.consume(k);
-                if (!continue2)
-                    return;
+                lm.consume(k);
             }
             else
                 map_links(column + 1, k, lm);
@@ -130,13 +126,47 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
     ColumnType type = m_link_types[column];
     ColKey column_key = m_link_column_keys[column];
     if (type == col_type_Link && !column_key.is_set()) {
-        REALM_ASSERT(!column_key.is_collection());
-        if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
-            if (!k.is_unresolved()) {
-                if (last)
-                    lm.consume(k);
-                else
-                    map_links(column + 1, k, lm);
+        if (column_key.is_dictionary()) {
+            auto leaf = static_cast<const ArrayInteger*>(m_leaf_ptr);
+            if (leaf->get(row)) {
+                auto key_type = m_tables[column]->get_dictionary_key_type(column_key);
+                DictionaryClusterTree dict_cluster(const_cast<ArrayInteger*>(leaf), key_type,
+                                                   get_base_table()->get_alloc(), row);
+                dict_cluster.init_from_parent();
+
+                // Iterate through cluster and insert all link values
+                ArrayMixed leaf(get_base_table()->get_alloc());
+                dict_cluster.traverse([&](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                    for (size_t i = 0; i < e; i++) {
+                        auto m = leaf.get(i);
+                        if (m.is_type(type_TypedLink)) {
+                            auto link = m.get_link();
+                            REALM_ASSERT(link.get_table_key() == this->m_tables[column + 1]->get_key());
+                            auto k = link.get_obj_key();
+                            if (!k.is_unresolved()) {
+                                if (last)
+                                    lm.consume(k);
+                                else
+                                    map_links(column + 1, k, lm);
+                            }
+                        }
+                    }
+                    // Continue
+                    return false;
+                });
+            }
+        }
+        else {
+            REALM_ASSERT(!column_key.is_collection());
+            if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
+                if (!k.is_unresolved()) {
+                    if (last)
+                        lm.consume(k);
+                    else
+                        map_links(column + 1, k, lm);
+                }
             }
         }
     }
@@ -150,9 +180,9 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
                 ObjKey k = links.get(t);
                 if (!k.is_unresolved()) {
                     if (last) {
-                        bool continue2 = lm.consume(k);
-                        if (!continue2)
+                        if (!lm.consume(k)) {
                             return;
+                        }
                     }
                     else
                         map_links(column + 1, k, lm);
@@ -191,21 +221,20 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     auto link_type = m_link_types[column];
     if (link_type == col_type_BackLink) {
         auto link_table = origin->get_opposite_table(origin_col);
-        ColKey link_col_ndx = origin->get_opposite_column(origin_col);
-        auto forward_type = link_table->get_column_type(link_col_ndx);
+        ColKey link_col_key = origin->get_opposite_column(origin_col);
 
         for (auto k : keys) {
             const Obj o = link_table.unchecked_ptr()->get_object(k);
-            if (forward_type == type_Link) {
-                ret.push_back(o.get<ObjKey>(link_col_ndx));
-            }
-            else {
-                REALM_ASSERT(forward_type == type_LinkList);
-                auto ll = o.get_linklist(link_col_ndx);
-                auto sz = ll.size();
+            if (link_col_key.is_collection()) {
+                auto coll = o.get_linkcollection_ptr(link_col_key);
+                auto sz = coll->size();
                 for (size_t i = 0; i < sz; i++) {
-                    ret.push_back(ll.get(i));
+                    if (ObjKey x = coll->get_key(i))
+                        ret.push_back(x);
                 }
+            }
+            else if (link_col_key.get_type() == col_type_Link) {
+                ret.push_back(o.get<ObjKey>(link_col_key));
             }
         }
     }
@@ -332,7 +361,7 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
             if (auto opt_val = dict.try_get(m_key)) {
                 val = *opt_val;
                 if (m_prop_list.size()) {
-                    if (val.get_type() == type_TypedLink) {
+                    if (val.is_type(type_TypedLink)) {
                         auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
                         val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
                     }
@@ -361,7 +390,7 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
                 values.init_from_ref(ref);
                 val = values.get(state.index);
                 if (m_prop_list.size()) {
-                    if (val.get_type() == type_TypedLink) {
+                    if (val.is_type(type_TypedLink)) {
                         auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
                         val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
                     }
@@ -400,130 +429,10 @@ public:
     }
 };
 
-class DictionaryAggregate : public Subexpr2<Mixed> {
-public:
-    using Func = std::function<Mixed(const DictionaryClusterTree&)>;
-    DictionaryAggregate(Columns<Dictionary> dict, Func fn, const char* descr)
-        : m_dict(std::move(dict))
-        , m_fn(fn)
-        , m_descr(descr)
-    {
-    }
-
-    DictionaryAggregate(const DictionaryAggregate& other) = default;
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return std::make_unique<DictionaryAggregate>(*this);
-    }
-
-    ConstTableRef get_base_table() const override
-    {
-        return m_dict.get_base_table();
-    }
-
-    void set_base_table(ConstTableRef table) override
-    {
-        m_dict.set_base_table(table);
-    }
-
-    void set_cluster(const Cluster* cluster) override
-    {
-        m_dict.set_cluster(cluster);
-    }
-
-    void collect_dependencies(std::vector<TableKey>& tables) const override
-    {
-        m_dict.collect_dependencies(tables);
-    }
-
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        if (m_dict.links_exist()) {
-            std::vector<ObjKey> links = m_dict.m_link_map.get_links(index);
-            auto sz = links.size();
-
-            destination.init_for_links(m_dict.m_link_map.only_unary_links(), sz);
-            for (size_t t = 0; t < sz; t++) {
-                const Obj obj = m_dict.m_link_map.get_target_table()->get_object(links[t]);
-                auto dict = obj.get_dictionary(m_dict.m_column_key);
-                if (dict.size() > 0) {
-                    destination.set(t, m_fn(*dict.m_clusters));
-                }
-                else {
-                    destination.set_null(t);
-                }
-            }
-        }
-        else {
-            if (m_dict.m_leaf_ptr->get(index)) {
-                Allocator& alloc = m_dict.get_base_table()->get_alloc();
-                DictionaryClusterTree dict_cluster(static_cast<Array*>(m_dict.m_leaf_ptr), m_dict.get_key_type(),
-                                                   alloc, index);
-                dict_cluster.init_from_parent();
-                destination.set(0, m_fn(dict_cluster));
-            }
-            else {
-                destination.set_null(0);
-            }
-        }
-    }
-
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return m_dict.description(state) + util::serializer::value_separator + m_descr;
-    }
-
-private:
-    Columns<Dictionary> m_dict;
-    Func m_fn;
-    std::string m_descr;
-};
-
 SizeOperator<int64_t> Columns<Dictionary>::size()
 {
     std::unique_ptr<Subexpr> ptr(new DictionarySize(*this));
     return SizeOperator<int64_t>(std::move(ptr));
-}
-
-std::unique_ptr<Subexpr> Columns<Dictionary>::max_of()
-{
-    return std::make_unique<DictionaryAggregate>(
-        *this,
-        [](const DictionaryClusterTree& dict) {
-            return dict.max();
-        },
-        "@max");
-}
-
-std::unique_ptr<Subexpr> Columns<Dictionary>::min_of()
-{
-    return std::make_unique<DictionaryAggregate>(
-        *this,
-        [](const DictionaryClusterTree& dict) {
-            return dict.min();
-        },
-        "@min");
-}
-
-std::unique_ptr<Subexpr> Columns<Dictionary>::sum_of()
-{
-    return std::make_unique<DictionaryAggregate>(
-        *this,
-        [](const DictionaryClusterTree& dict) {
-            return dict.sum();
-        },
-        "@sum");
-}
-
-std::unique_ptr<Subexpr> Columns<Dictionary>::avg_of()
-{
-    return std::make_unique<DictionaryAggregate>(
-        *this,
-        [](const DictionaryClusterTree& dict) {
-            return dict.avg();
-        },
-        "@avg");
 }
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
