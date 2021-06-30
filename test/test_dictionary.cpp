@@ -696,13 +696,19 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
     {
         auto tr = db->start_write();
         auto foos = tr->add_table("Foo");
-        ColKey col_dict = foos->add_column_dictionary(type_Int, "dict");
+        auto bars = tr->add_table("Bar");
+        ColKey col_dict = foos->add_column_dictionary(*bars, "dict");
+        ColKey col_int = bars->add_column(type_Int, "ints");
+
+        for (int64_t i = 0; i < nb_entries; i++) {
+            bars->create_object().set(col_int, i);
+        }
 
         auto foo = foos->create_object();
         auto dict = foo.get_dictionary(col_dict);
         for (int64_t i = 0; i < nb_entries; i++) {
             std::string key = "key" + util::to_string(i);
-            dict.insert(Mixed(key), i);
+            dict.insert(Mixed(key), bars->find_first_int(col_int, i));
         }
         tr->commit();
     }
@@ -710,11 +716,14 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
     {
         auto rt = db->start_read();
         auto foos = rt->get_table("Foo");
+        auto bars = rt->get_table("Bar");
         ColKey col_dict = foos->get_column_key("dict");
+        ColKey col_int = bars->get_column_key("ints");
         auto dict = foos->begin()->get_dictionary(col_dict);
         for (int64_t i = 0; i < nb_entries; i++) {
             std::string key = "key" + util::to_string(i);
-            CHECK_EQUAL(dict[key].get_int(), i);
+            auto obj_key = dict[key].get<ObjKey>();
+            CHECK_EQUAL(bars->get_object(obj_key).get<Int>(col_int), i);
         }
     }
 
@@ -723,18 +732,22 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
         rt->promote_to_write();
 
         auto foos = rt->get_table("Foo");
+        auto bars = rt->get_table("Bar");
         ColKey col_dict = foos->get_column_key("dict");
+        ColKey col_int = bars->get_column_key("ints");
         auto dict = foos->begin()->get_dictionary(col_dict);
 
         std::string key = "key" + util::to_string(i);
         dict.erase(key);
         CHECK_EQUAL(dict.size(), nb_entries - i - 1);
+        bars->remove_object(bars->find_first_int(col_int, i));
 
         rt->commit_and_continue_as_read();
 
         for (int64_t j = i + 1; j < nb_entries; j++) {
             std::string key_j = "key" + util::to_string(j);
-            CHECK_EQUAL(dict[key_j].get_int(), j);
+            auto obj_key = dict[key_j].get<ObjKey>();
+            CHECK_EQUAL(bars->get_object(obj_key).get<Int>("ints"), j);
         }
     }
     Dictionary::set_hash_mask(mask);
