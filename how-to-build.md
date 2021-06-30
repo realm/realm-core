@@ -147,7 +147,7 @@ These are the available variables:
 ## Running [app] tests against a local MongoDB Stitch
 
 Due to MongoDB security policies, running baas requires company issued AWS account credentials.
-If you do not have these, request some from Tim Sedgwick on the cloud team, or reach out to #realm-core.
+These are for MongoDB employees only, if you do not have these, reach out to #realm-core.
 Once you have them, they need to be passed to the docker image below. We will do this through an
 environment file, placed at` ~/.docker_env_vars` (for example) with the following contents:
 
