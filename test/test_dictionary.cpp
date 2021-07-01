@@ -525,6 +525,12 @@ NONCONCURRENT_TEST(Dictionary_HashCollision)
         CHECK_EQUAL((*it).second.get_int(), i);
     }
 
+    // And these keys should not be found
+    for (int64_t i = nb_entries; i < nb_entries + 20; i++) {
+        std::string key = "key" + util::to_string(i);
+        CHECK(dict.find(key) == dict.end());
+    }
+
     auto check_aggregates = [&]() {
         int64_t expected_sum = nb_entries * (nb_entries - 1) / 2;
         size_t count = 0;
