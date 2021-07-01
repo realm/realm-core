@@ -21,6 +21,7 @@
 
 ### Internals
 * Add more tests for Realm::delete_files ([#4765](https://github.com/realm/realm-core/pull/4765)).
+* Renamed targets on SPM file from `Core`, `QueryParser` to `RealmCore` and `RealmQueryParser` to avoid conflicts with other libraries products. ([#4763](https://github.com/realm/realm-core/issues/4763), since v10.8.1)
 
 ----------------------------------------------
 
