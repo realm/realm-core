@@ -141,7 +141,7 @@ ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) 
     return state;
 }
 
-size_t DictionaryClusterTree::get_ndx_with_key(ObjKey k, Mixed key)
+size_t DictionaryClusterTree::get_ndx_with_key(ObjKey k, Mixed key) const noexcept
 {
     size_t pos = ClusterTree::get_ndx(k);
     if (pos == realm::npos) {
@@ -372,7 +372,6 @@ size_t Dictionary::find_any(Mixed value) const
 {
     size_t ret = realm::not_found;
     if (size()) {
-        update_if_needed();
         ArrayMixed leaf(m_obj.get_alloc());
         size_t start_ndx = 0;
 
@@ -394,19 +393,12 @@ size_t Dictionary::find_any(Mixed value) const
     return ret;
 }
 
-size_t Dictionary::find_any_key(Mixed key) const
+size_t Dictionary::find_any_key(Mixed key) const noexcept
 {
-    size_t ret = realm::not_found;
-    if (size()) {
-        update_if_needed();
-        try {
-            ret = m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
-        }
-        catch (...) {
-            // ignored
-        }
+    if (size() == 0) {
+        return realm::not_found;
     }
-    return ret;
+    return m_clusters->get_ndx_with_key(get_internal_obj_key(key), key);
 }
 
 util::Optional<Mixed> Dictionary::min(size_t* return_ndx) const
@@ -741,7 +733,7 @@ bool Dictionary::contains(Mixed key) const noexcept
     return m_clusters->try_get_with_key(get_internal_obj_key(key), key);
 }
 
-Dictionary::Iterator Dictionary::find(Mixed key)
+Dictionary::Iterator Dictionary::find(Mixed key) const noexcept
 {
     auto ndx = find_any_key(key);
     if (ndx != realm::npos) {
