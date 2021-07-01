@@ -101,7 +101,7 @@ public:
         return obj;
     }
 
-    bool contains(Mixed key);
+    bool contains(Mixed key) const noexcept;
     Iterator find(Mixed key);
 
     void erase(Mixed key);
@@ -155,6 +155,25 @@ public:
     Iterator begin() const;
     Iterator end() const;
 
+    static ObjKey get_internal_obj_key(Mixed key)
+    {
+        return ObjKey{int64_t(key.hash() & s_hash_mask)};
+    }
+
+#ifdef REALM_DEBUG
+    static uint64_t set_hash_mask(uint64_t mask)
+    {
+        auto tmp = s_hash_mask;
+        s_hash_mask = mask;
+        return tmp;
+    }
+#else
+    static uint64_t set_hash_mask(uint64_t)
+    {
+        return 0;
+    }
+#endif
+
 private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
@@ -162,12 +181,20 @@ private:
     mutable DictionaryClusterTree* m_clusters = nullptr;
     DataType m_key_type = type_String;
 
+#ifdef REALM_DEBUG
+    static uint64_t s_hash_mask;
+#else
+    static constexpr uint64_t s_hash_mask = 0x7FFFFFFFFFFFFFFFULL;
+#endif
+
     bool init_from_parent() const final;
     Mixed do_get(const ClusterNode::State&) const;
     Mixed do_get_key(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
     bool clear_backlink(Mixed value, CascadeState& state) const;
     void align_indices(std::vector<size_t>& indices) const;
+    void swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2);
+    ObjKey handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state);
 
     friend struct CollectionIterator<Dictionary>;
 };
