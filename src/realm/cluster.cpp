@@ -744,19 +744,19 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.erase(ndx);
 }
 
-size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
+size_t Cluster::get_ndx(ObjKey k, size_t ndx) const noexcept
 {
     size_t index;
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw KeyNotFound("Key not found in get_ndx");
+            return realm::npos;
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw KeyNotFound("Key not found in get_ndx (compact)");
+            return realm::npos;
         }
     }
     return index + ndx;
@@ -765,6 +765,8 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::erase");
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -916,6 +918,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::nullify_incoming_links");
 
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before

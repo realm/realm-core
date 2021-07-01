@@ -93,7 +93,7 @@ public:
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
-    size_t get_ndx(ObjKey key, size_t ndx) const override;
+    size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
     size_t erase(ObjKey k, CascadeState& state) override;
     void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
@@ -158,7 +158,7 @@ private:
         return true;
     }
 
-    ref_type _get_child_ref(size_t ndx) const
+    ref_type _get_child_ref(size_t ndx) const noexcept
     {
         return Array::get_as_ref(ndx + s_first_node_index);
     }
@@ -383,11 +383,11 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
     return {};
 }
 
-size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
+size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const noexcept
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw KeyNotFound("Child not found in get_ndx");
+        return realm::npos;
     }
 
     // First figure out how many objects there are in nodes before actual one
@@ -938,7 +938,7 @@ ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
     return state;
 }
 
-size_t ClusterTree::get_ndx(ObjKey k) const
+size_t ClusterTree::get_ndx(ObjKey k) const noexcept
 {
     return m_root->get_ndx(k, 0);
 }
@@ -1068,12 +1068,11 @@ ClusterTree::Iterator::Iterator(const Iterator& other)
 
 size_t ClusterTree::Iterator::get_position()
 {
-    try {
-        return m_tree.get_ndx(m_key);
-    }
-    catch (...) {
+    auto ndx = m_tree.get_ndx(m_key);
+    if (ndx == realm::npos) {
         throw std::logic_error("Outdated iterator");
     }
+    return ndx;
 }
 
 ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
