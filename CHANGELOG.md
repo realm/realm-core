@@ -10,7 +10,8 @@
 * Fixed an endless recursive loop that could cause a stack overflow when computing changes on a set of objects which contained cycles. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
 * Fixed a crash after clearing a list or set of Mixed containing links to objects ([#4774](https://github.com/realm/realm-core/issues/4774), since the beginning of v11)
 * Fixed a recursive loop which would eventually crash trying to refresh a user app token when it had been revoked by an admin. Now this situation logs the user out and reports an error. ([#4745](https://github.com/realm/realm-core/issues/4745), since v10.0.0).
-* Fixed a race between calling realm::delete_files and concurent opening of the realm file.([#4768](https://github.com/realm/realm-core/pull/4768)) 
+* Fixed a race between calling realm::delete_files and concurent opening of the realm file.([#4768](https://github.com/realm/realm-core/pull/4768))
+* Fixed a retain cycle on Apple devices that would prevent the SyncClient from ever being stopped. This is likely only relevant for Unity applications which would observe that as the editor hanging on macOS after script recompilation. ([realm-dotnet#2482](https://github.com/realm/realm-dotnet/issues/2482))
 
 ### Breaking changes
 * None.
