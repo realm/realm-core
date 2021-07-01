@@ -144,32 +144,33 @@ ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) 
 size_t DictionaryClusterTree::get_ndx_with_key(ObjKey k, Mixed key)
 {
     size_t pos = ClusterTree::get_ndx(k);
-    if (pos == realm::npos || !m_has_collision_column) {
+    if (pos == realm::npos) {
         return pos;
     }
     auto state = get(pos, k);
     if (get_key(state).compare_signed(key) == 0) {
         return pos;
     }
-    // Find alternatives
-    Array fallback(m_alloc);
-    Array& fields = get_fields_accessor(fallback, state.mem);
-    ArrayRef refs(m_alloc);
-    refs.set_parent(&fields, 3);
-    refs.init_from_parent();
+    if (m_has_collision_column) {
+        // Find alternatives
+        Array fallback(m_alloc);
+        Array& fields = get_fields_accessor(fallback, state.mem);
+        ArrayRef refs(m_alloc);
+        refs.set_parent(&fields, 3);
+        refs.init_from_parent();
 
-    auto old_ref = refs.get(state.index);
-    REALM_ASSERT(old_ref); // There must be a collision detected
-    Array links(m_alloc);
-    links.set_parent(&refs, state.index);
-    links.init_from_parent();
+        if (auto ref = refs.get(state.index)) {
+            Array links(m_alloc);
+            links.init_from_ref(ref);
 
-    auto sz = links.size();
-    for (size_t i = 0; i < sz; i++) {
-        ObjKey sibling(links.get(i));
-        state = ClusterTree::get(sibling);
-        if (get_key(state).compare_signed(key) == 0) {
-            return ClusterTree::get_ndx(sibling);
+            auto sz = links.size();
+            for (size_t i = 0; i < sz; i++) {
+                ObjKey sibling(links.get(i));
+                state = ClusterTree::get(sibling);
+                if (get_key(state).compare_signed(key) == 0) {
+                    return ClusterTree::get_ndx(sibling);
+                }
+            }
         }
     }
     return realm::npos;
