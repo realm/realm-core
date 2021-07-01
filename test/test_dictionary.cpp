@@ -505,6 +505,12 @@ NONCONCURRENT_TEST(Dictionary_HashCollision)
         CHECK_EQUAL(dict[key].get_int(), i);
     }
 
+    // And these keys should not exist
+    for (int64_t i = nb_entries; i < nb_entries + 20; i++) {
+        std::string key = "key" + util::to_string(i);
+        CHECK_NOT(dict.contains(key));
+    }
+
     // Check that a query can find matching key and value
     for (int64_t i = 0; i < nb_entries; i++) {
         std::string key = "key" + util::to_string(i);

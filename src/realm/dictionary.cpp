@@ -95,7 +95,7 @@ Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
 }
 
 // Called when a given state represent an entry with no matching key
-// Check its potential siblings for a match
+// Check its potential siblings for a match. 'state' is only updated if match is found.
 ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key) const noexcept
 {
     // Find alternatives
@@ -127,13 +127,15 @@ ObjKey DictionaryClusterTree::find_sibling(ClusterNode::State& state, Mixed key)
 ClusterNode::State DictionaryClusterTree::try_get_with_key(ObjKey k, Mixed key) const noexcept
 {
     auto state = ClusterTree::try_get(k);
-    // If we don't have any collisions yet, we don't need to check the key
-    if (!m_has_collision_column || state.index == realm::npos) {
-        return state;
-    }
-    // Check if key matches.
-    if ((get_key(state).compare_signed(key) != 0) && !find_sibling(state, key)) {
-        state.index = realm::npos;
+    if (state) {
+        // Some entry found - Check if key matches.
+        if (get_key(state).compare_signed(key) != 0) {
+            // Key does not match - try looking for a sibling
+            if (!(m_has_collision_column && find_sibling(state, key))) {
+                // Not found
+                state.index = realm::npos;
+            }
+        }
     }
 
     return state;
