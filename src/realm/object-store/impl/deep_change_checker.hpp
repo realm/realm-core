@@ -45,14 +45,6 @@ struct ListChangeInfo {
     CollectionChangeBuilder* changes;
 };
 
-<<<<<<< HEAD
-// FIXME: this should be in core
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
-
-// A collection of all changes to all tables which we use to check against when the `DeepChangeChecker`.
-=======
->>>>>>> origin/v11
 struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
     std::unordered_map<TableKeyType, ObjectChangeSet> tables;
@@ -68,93 +60,25 @@ struct TransactionChangeInfo {
  */
 class DeepChangeChecker {
 public:
-<<<<<<< HEAD
-    struct OutgoingLink {
-        int64_t col_key;
-        bool is_list;
-    };
-
-    /**
-     * `RelatedTable` is used to describe the connections of a `Table` to other tables.
-     * Tables count as related if they can be reached via a forward link.
-     * A table counts as being related to itself.
-     */
-=======
->>>>>>> origin/v11
     struct RelatedTable {
         // The key of the table for which this struct holds all outgoing links.
         TableKey table_key;
-<<<<<<< HEAD
-        // All outgoing links to the table specified by `table_key`.
-        std::vector<OutgoingLink> links;
-=======
         std::vector<ColKey> links;
->>>>>>> origin/v11
     };
     typedef std::vector<RelatedTable> RelatedTables;
-    DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
-<<<<<<< HEAD
-                      std::vector<RelatedTable> const& related_tables, const KeyPathArray& key_path_array,
-                      bool all_callbacks_filtered);
-
-    /**
-     * Check if the object identified by `object_key` was changed.
-     *
-     * @param object_key The `ObjKey::value` for the object that is supposed to be checked.
-     *
-     * @return True if the object was changed, false otherwise.
-     */
-    bool operator()(int64_t object_key);
-
-    /**
-     * Search for related tables within the specified `table`.
-     * Related tables are all tables that can be reached via links from the `table`.
-     * A table is always related to itself.
-     *
-     * Example schema:
-     * {
-     *   {"root_table",
-     *       {
-     *           {"link", PropertyType::Object | PropertyType::Nullable, "linked_table"},
-     *       }
-     *   },
-     *   {"linked_table",
-     *       {
-     *           {"value", PropertyType::Int}
-     *       }
-     *   },
-     * }
-     *
-     * Asking for related tables for `root_table` based on this schema will result in a `std::vector<RelatedTable>`
-     * with two entries, one for `root_table` and one for `linked_table`. The function would be called once for
-     * each table involved until there are no further links.
-     *
-     * Likewise a search for related tables starting with `linked_table` would only return this table.
-     *
-     * Filter:
-     * Using a `key_path_array` that only consists of the table key for `root_table` would result
-     * in `out` just having this one entry.
-     *
-     * @param out Return value containing all tables that can be reached from the given `table` including
-     *            some additional information about those tables (see `OutgoingLink` in `RelatedTable`).
-     * @param table The table that the related tables will be searched for.
-     * @param key_path_array A collection of all `KeyPath`s passed to the `NotificationCallback`s for this
-     *                        `CollectionNotifier`.
-     */
-    static void find_related_tables(std::vector<RelatedTable>& out, Table const& table,
-                                    const KeyPathArray& key_path_array);
-
-protected:
-    friend class ObjectKeyPathChangeChecker;
-=======
-                      RelatedTables const& related_tables);
+    DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table, RelatedTables const& related_tables,
+                      const KeyPathArray& key_path_array, bool all_callbacks_filtered);
 
     bool operator()(ObjKeyType obj_key);
 
     // Recursively add `table` and all tables it links to to `out`, along with
     // information about the links from them
-    static void find_related_tables(RelatedTables& out, Table const& table);
->>>>>>> origin/v11
+    static void find_related_tables0(std::vector<RelatedTable>& out, Table const& table,
+                                     const KeyPathArray& key_path_array);
+    static void find_related_tables1(std::vector<RelatedTable>& out, Table const& table,
+                                     const KeyPathArray& key_path_array);
+    static void find_related_tables2(std::vector<RelatedTable>& out, Table const& table,
+                                     const KeyPathArray& key_path_array);
 
     TransactionChangeInfo const& m_info;
 
@@ -167,70 +91,31 @@ protected:
 
     // The `ObjectChangeSet` for `root_table` if it is contained in `m_info`.
     ObjectChangeSet const* const m_root_object_changes;
-<<<<<<< HEAD
-
-    // Contains all `ColKey`s that we filter for in the root table.
-    std::vector<ColKey> m_filtered_columns_in_root_table;
-    std::vector<ColKey> m_filtered_columns;
-
-private:
-    std::vector<RelatedTable> const& m_related_tables;
-=======
     std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
     RelatedTables const& m_related_tables;
->>>>>>> origin/v11
-
-    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
 
     struct Path {
-<<<<<<< HEAD
-        int64_t object_key;
-        int64_t col_key;
-=======
         ObjKey obj_key;
         ColKey col_key;
->>>>>>> origin/v11
         bool depth_exceeded;
     };
     std::array<Path, 4> m_current_path;
 
-<<<<<<< HEAD
-    /**
-     * Checks if a specific object, identified by it's `ObjKeyType` in a given `Table` was changed.
-     *
-     * @param table The `Table` that contains the `ObjKeyType` that will be checked.
-     * @param object_key The `ObjKeyType` identifying the object to be checked for changes.
-     * @param filtered_columns A `std::vector` of all `ColKey`s filtered in any of the `NotificationCallbacks`.
-     * @param depth Determines how deep the search will be continued if the change could not be found
-     *              on the first level.
-     *
-     * @return True if the object was changed, false otherwise.
-     */
-    bool check_row(Table const& table, ObjKeyType object_key, const std::vector<ColKey>& filtered_columns,
+    bool check_row(Table const& table, ObjKeyType obj_key, const std::vector<ColKey>& filtered_columns,
                    size_t depth = 0);
-
-    /**
-     * Check the `table` within `m_related_tables` for changes in it's outgoing links.
-     *
-     * @param table The table to check for changed links.
-     * @param object_key The key for the object to look for.
-     * @param depth The maximum depth that should be considered for this search.
-     *
-     * @return True if the specified `table` does have linked objects that have been changed.
-     *         False if the `table` is not contained in `m_related_tables` or the `table` does not have any
-     *         outgoing links at all or the `table` does not have linked objects with changes.
-     */
-    bool check_outgoing_links(Table const& table, int64_t object_key, const std::vector<ColKey>& filtered_columns,
+    bool check_outgoing_links(Table const& table, ObjKey obj_key, const std::vector<ColKey>& filtered_columns,
                               size_t depth = 0);
-=======
-    bool check_row(Table const& table, ObjKeyType obj_key, size_t depth = 0);
-    bool check_outgoing_links(TableKey table_key, Table const& table, ObjKey obj_key, size_t depth = 0);
-    bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll, size_t depth);
+    bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll,
+                                               const std::vector<ColKey>& filtered_columns, size_t depth);
     template <typename T>
-    bool do_check_for_collection_of_mixed(T* coll, size_t depth);
+    bool do_check_for_collection_of_mixed(T* coll, const std::vector<ColKey>& filtered_columns, size_t depth);
     template <typename T>
-    bool do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value, size_t depth);
->>>>>>> origin/v11
+    bool do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value,
+                                 const std::vector<ColKey>& filtered_columns, size_t depth);
+
+    // Contains all `ColKey`s that we filter for in the root table.
+    std::vector<ColKey> m_filtered_columns_in_root_table;
+    std::vector<ColKey> m_filtered_columns;
 };
 
 /**

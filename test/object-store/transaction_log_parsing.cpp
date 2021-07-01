@@ -1786,7 +1786,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
     std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
     KeyPathArray key_path_array = {};
     auto relation_updater = [&]() {
-        _impl::DeepChangeChecker::find_related_tables(tables, *table, key_path_array);
+        _impl::DeepChangeChecker::find_related_tables0(tables, *table, key_path_array);
     };
     relation_updater();
     test_type.set_relation_updater(relation_updater);
