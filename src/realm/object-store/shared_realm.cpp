@@ -36,6 +36,7 @@
 
 #include <realm/db.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -917,6 +918,10 @@ void Realm::close()
 
 void Realm::delete_files(const std::string& realm_file_path)
 {
+    if (!realm::util::File::exists(realm_file_path)) {
+        return;
+    }
+
     auto core_files = DB::get_core_files(realm_file_path);
     auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
         for (const auto& core_file : core_files) {

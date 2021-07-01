@@ -944,7 +944,9 @@ TEST(Shared_try_begin_write)
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
-    cv.wait(lock, [&] { return init_complete; });
+    cv.wait(lock, [&] {
+        return init_complete;
+    });
 
     // Try to also obtain a write lock. This should fail but not block.
     auto tr = sg->start_write(true);
@@ -1535,7 +1537,9 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &sg, i] { writer_threads_thread(test_context, sg, ObjKey(i)); });
+            threads[i].start([this, &sg, i] {
+                writer_threads_thread(test_context, sg, ObjKey(i));
+            });
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -2099,8 +2103,9 @@ void multiprocess_threaded(TestContext& test_context, std::string path, int64_t 
 
     // Start threads
     for (int64_t i = 0; i != num_threads; ++i) {
-        threads[i].start(
-            [&test_context, &path, base, i] { multiprocess_thread(test_context, path, ObjKey(base + i)); });
+        threads[i].start([&test_context, &path, base, i] {
+            multiprocess_thread(test_context, path, ObjKey(base + i));
+        });
     }
 
     // Wait for threads to finish
@@ -3504,7 +3509,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3569,7 +3574,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
 
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
 
         f.lock_shared();
         File::UnlockGuard ug(f);
@@ -3622,7 +3627,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3676,7 +3681,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
