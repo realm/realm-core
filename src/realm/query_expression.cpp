@@ -275,8 +275,7 @@ void ColumnDictionaryKey::init_key(Mixed key_value)
             m_buffer = std::string(m_key.get_string());
             m_key = Mixed(m_buffer);
         }
-        auto hash = m_key.hash();
-        m_objkey = ObjKey(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+        m_objkey = Dictionary::get_internal_obj_key(m_key);
     }
 }
 
@@ -383,7 +382,7 @@ void ColumnDictionaryKey::evaluate(size_t index, ValueBase& destination)
             dict_cluster.init_from_parent();
 
             Mixed val;
-            auto state = dict_cluster.try_get(m_objkey);
+            auto state = dict_cluster.try_get_with_key(m_objkey, m_key);
             if (state.index != realm::npos) {
                 ArrayMixed values(alloc);
                 ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));

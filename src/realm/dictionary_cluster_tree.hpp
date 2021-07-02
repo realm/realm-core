@@ -26,9 +26,19 @@ namespace realm {
 class DictionaryClusterTree : public ClusterTree {
 public:
     static constexpr ColKey s_values_col = ColKey(ColKey::Idx{1}, col_type_Mixed, ColumnAttrMask(), 0);
+    static constexpr ColKey s_collision_col = ColKey(
+        ColKey::Idx{2}, col_type_Int,
+        []() {
+            ColumnAttrMask m;
+            m.set(ColumnAttr::col_attr_List);
+            return m;
+        }(),
+        0);
 
     DictionaryClusterTree(ArrayParent* owner, DataType, Allocator& alloc, size_t ndx);
     ~DictionaryClusterTree() override;
+
+    void init_from_parent();
 
     void destroy()
     {
@@ -40,15 +50,31 @@ public:
         m_size = 0;
     }
 
+    Mixed get_key(const ClusterNode::State& s) const;
+    ObjKey find_sibling(ClusterNode::State&, Mixed key) const noexcept;
+    ClusterNode::State try_get_with_key(ObjKey k, Mixed) const noexcept;
+    size_t get_ndx_with_key(ObjKey k, Mixed);
+
     ColKey get_keys_column_key() const
     {
         return m_keys_col;
+    }
+
+    bool has_collisions() const
+    {
+        return m_has_collision_column;
     }
 
     void add_columns()
     {
         insert_column(m_keys_col);
         insert_column(s_values_col);
+    }
+
+    void create_collision_column()
+    {
+        insert_column(s_collision_col);
+        m_has_collision_column = true;
     }
 
     ClusterNode::State insert(ObjKey k, Mixed key, Mixed value)
@@ -64,6 +90,9 @@ public:
     {
         func(m_keys_col);
         func(s_values_col);
+        if (m_has_collision_column) {
+            func(s_collision_col);
+        }
     }
     void update_indexes(ObjKey, const FieldValues&) final {}
     void cleanup_key(ObjKey) final {}
@@ -92,6 +121,7 @@ private:
     ArrayParent* m_owner;
     size_t m_ndx_in_cluster;
     ColKey m_keys_col;
+    bool m_has_collision_column = false;
 };
 
 } // namespace realm

@@ -675,7 +675,7 @@ SyncClient& SyncManager::get_sync_client() const
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
-    return std::make_unique<SyncClient>(make_logger(), m_config, shared_from_this());
+    return std::make_unique<SyncClient>(make_logger(), m_config, weak_from_this());
 }
 
 std::string SyncManager::client_uuid() const
