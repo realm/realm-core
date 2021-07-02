@@ -82,8 +82,8 @@ public:
     size_t size() const noexcept;
 
     BinaryData get(size_t ndx) const noexcept;
-    StringData get_string(size_t ndx) const;
-    bool is_null(size_t ndx) const;
+    StringData get_string(size_t ndx) const noexcept;
+    bool is_null(size_t ndx) const noexcept;
 
     void add(BinaryData value, bool add_zero_term = false);
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -188,14 +188,14 @@ inline BinaryData ArraySmallBlobs::get(size_t ndx) const noexcept
     }
 }
 
-inline bool ArraySmallBlobs::is_null(size_t ndx) const
+inline bool ArraySmallBlobs::is_null(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_nulls.size());
 
     return m_nulls.get(ndx) != 0;
 }
 
-inline StringData ArraySmallBlobs::get_string(size_t ndx) const
+inline StringData ArraySmallBlobs::get_string(size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     if (bin.is_null())

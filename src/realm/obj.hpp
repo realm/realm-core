@@ -98,7 +98,7 @@ public:
     GlobalKey get_object_id() const;
     ObjLink get_link() const;
 
-    Replication* get_replication() const;
+    Replication* get_replication() const noexcept;
 
     // Check if this object is default constructed
     explicit operator bool() const noexcept
@@ -324,7 +324,7 @@ private:
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
-    const Spec& get_spec() const;
+    const Spec& get_spec() const noexcept;
 
     template <typename U>
     U _get(ColKey::Idx col_ndx) const;

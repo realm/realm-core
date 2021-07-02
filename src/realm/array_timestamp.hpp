@@ -72,12 +72,12 @@ public:
         m_seconds.set_null(ndx); // Throws
     }
     void insert(size_t ndx, Timestamp value);
-    Timestamp get(size_t ndx) const
+    Timestamp get(size_t ndx) const noexcept
     {
         util::Optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
-    Mixed get_any(size_t ndx) const final
+    Mixed get_any(size_t ndx) const noexcept final
     {
         return Mixed(get(ndx));
     }

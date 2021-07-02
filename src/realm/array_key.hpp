@@ -85,15 +85,15 @@ public:
     {
         Array::insert(ndx, value.value + adj);
     }
-    ObjKey get(size_t ndx) const
+    ObjKey get(size_t ndx) const noexcept
     {
         return ObjKey{Array::get(ndx) - adj};
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         ObjKey key = get(ndx);
         return !key || key.is_unresolved();

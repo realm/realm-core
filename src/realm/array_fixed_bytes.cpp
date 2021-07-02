@@ -184,7 +184,7 @@ void ArrayFixedBytesNull<ObjectType, ElementSize>::set_null(size_t ndx)
 }
 
 template <class ObjectType, int ElementSize>
-size_t ArrayFixedBytesNull<ObjectType, ElementSize>::find_first_null(size_t start, size_t end) const
+size_t ArrayFixedBytesNull<ObjectType, ElementSize>::find_first_null(size_t start, size_t end) const noexcept
 {
     auto sz = this->size();
     if (end == size_t(-1))

@@ -250,7 +250,7 @@ public:
         m_ndx_in_parent = ndx;
     }
 
-    void clear_missing_parent_update()
+    void clear_missing_parent_update() noexcept
     {
         m_missing_parent_update = false;
     }
@@ -353,12 +353,12 @@ public:
     virtual ~ArrayPayload();
     virtual void init_from_ref(ref_type) noexcept = 0;
     virtual void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept = 0;
-    virtual Mixed get_any(size_t ndx) const = 0;
-    virtual bool need_spec() const
+    virtual Mixed get_any(size_t ndx) const noexcept = 0;
+    virtual bool need_spec() const noexcept
     {
         return false;
     }
-    virtual void set_spec(Spec*, size_t) const {}
+    virtual void set_spec(Spec*, size_t) const noexcept {}
 };
 
 

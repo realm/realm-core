@@ -54,11 +54,11 @@ public:
         Array::insert(ndx, val);
     }
 
-    int64_t get(size_t ndx) const
+    int64_t get(size_t ndx) const noexcept
     {
         return Array::get(ndx);
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         REALM_ASSERT(false);
         return Mixed(get(ndx));
@@ -73,8 +73,8 @@ public:
     void add(size_t ndx, ObjKey key);
     bool remove(size_t ndx, ObjKey key);
     void erase(size_t ndx);
-    size_t get_backlink_count(size_t ndx) const;
-    ObjKey get_backlink(size_t ndx, size_t index) const;
+    size_t get_backlink_count(size_t ndx) const noexcept;
+    ObjKey get_backlink(size_t ndx, size_t index) const noexcept;
     void move(ArrayBacklink& dst, size_t ndx)
     {
         Array::move(dst, ndx);

@@ -58,7 +58,7 @@ void ArrayBinary::init_from_parent()
     init_from_ref(ref);
 }
 
-size_t ArrayBinary::size() const
+size_t ArrayBinary::size() const noexcept
 {
     if (!m_is_big) {
         return static_cast<ArraySmallBlobs*>(m_arr)->size();
@@ -101,7 +101,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value)
     }
 }
 
-BinaryData ArrayBinary::get(size_t ndx) const
+BinaryData ArrayBinary::get(size_t ndx) const noexcept
 {
     if (!m_is_big) {
         return static_cast<ArraySmallBlobs*>(m_arr)->get(ndx);
@@ -111,7 +111,7 @@ BinaryData ArrayBinary::get(size_t ndx) const
     }
 }
 
-BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const
+BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const noexcept
 {
     if (!m_is_big) {
         pos = 0;
@@ -122,7 +122,7 @@ BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const
     }
 }
 
-Mixed ArrayBinary::get_any(size_t ndx) const
+Mixed ArrayBinary::get_any(size_t ndx) const noexcept
 {
     return Mixed(get(ndx));
 }

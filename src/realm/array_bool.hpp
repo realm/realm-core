@@ -57,7 +57,7 @@ public:
     {
         Array::set_parent(parent, ndx_in_parent);
     }
-    bool is_null(size_t) const
+    bool is_null(size_t) const noexcept
     {
         return false;
     }
@@ -65,11 +65,11 @@ public:
     {
         Array::set(ndx, value ? 1 : 0);
     }
-    bool get(size_t ndx) const
+    bool get(size_t ndx) const noexcept
     {
         return Array::get(ndx) != 0;
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
@@ -133,7 +133,7 @@ public:
             Array::insert(ndx, null_value);
         }
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
@@ -141,11 +141,11 @@ public:
     {
         Array::set(ndx, null_value);
     }
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         return Array::get(ndx) == null_value;
     }
-    util::Optional<bool> get(size_t ndx) const
+    util::Optional<bool> get(size_t ndx) const noexcept
     {
         int64_t val = Array::get(ndx);
         return (val == null_value) ? util::none : util::make_optional(val != 0);
