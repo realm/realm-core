@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.8.1"
+let versionStr = "11.0.4"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -208,7 +208,6 @@ let bidExcludes: [String] = [
     "bid128_tgamma.c",
     "bid128_to_int16.c",
     "bid128_to_int32.c",
-    "bid128_to_int64.c",
     "bid128_to_int8.c",
     "bid128_to_uint16.c",
     "bid128_to_uint32.c",

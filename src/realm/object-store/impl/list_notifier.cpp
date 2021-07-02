@@ -31,11 +31,11 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_type(type)
     , m_table(list.get_table()->get_key())
     , m_col(list.get_col_key())
-    , m_obj(list.get_key())
+    , m_obj(list.get_owner_key())
     , m_prev_size(list.size())
 {
     if (m_type == PropertyType::Object) {
-        set_table(static_cast<const LnkLst&>(list).get_target_table());
+        set_table(list.get_target_table());
     }
 }
 
@@ -86,19 +86,19 @@ void ListNotifier::run()
     m_prev_size = m_list->size();
 
     if (m_type == PropertyType::Object) {
-        auto& list = static_cast<LnkLst&>(*m_list);
-        auto object_did_change = get_modification_checker(*m_info, list.get_target_table());
-        for (size_t i = 0; i < list.size(); ++i) {
+        auto object_did_change = get_modification_checker(*m_info, m_list->get_target_table());
+        for (size_t i = 0; i < m_prev_size; ++i) {
             if (m_change.modifications.contains(i))
                 continue;
-            if (object_did_change(list.get(i).value))
+            auto m = m_list->get_any(i);
+            if (!m.is_null() && object_did_change(m.get<ObjKey>().value))
                 m_change.modifications.add(i);
         }
 
         for (auto const& move : m_change.moves) {
             if (m_change.modifications.contains(move.to))
                 continue;
-            if (object_did_change(list.get(move.to).value))
+            if (object_did_change(m_list->get_any(move.to).get<ObjKey>().value))
                 m_change.modifications.add(move.to);
         }
     }

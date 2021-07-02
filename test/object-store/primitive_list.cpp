@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "collection_fixtures.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -42,352 +43,7 @@
 
 using namespace realm;
 using namespace realm::util;
-
-
-template <PropertyType prop_type, typename T>
-struct Base {
-    using Type = T;
-    using Wrapped = T;
-    using Boxed = T;
-    using AvgType = double;
-    enum { is_optional = false };
-
-    static PropertyType property_type()
-    {
-        return prop_type;
-    }
-    static util::Any to_any(T value)
-    {
-        return value;
-    }
-
-    template <typename Fn>
-    static auto unwrap(T value, Fn&& fn)
-    {
-        return fn(value);
-    }
-
-    static T min()
-    {
-        abort();
-    }
-    static T max()
-    {
-        abort();
-    }
-    static T sum()
-    {
-        abort();
-    }
-    static AvgType average()
-    {
-        abort();
-    }
-
-    static bool can_sum()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_average()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-    static bool can_minmax()
-    {
-        return std::is_arithmetic<T>::value;
-    }
-};
-
-struct Int : Base<PropertyType::Int, int64_t> {
-    static std::vector<int64_t> values()
-    {
-        return {3, 1, 2};
-    }
-    static int64_t min()
-    {
-        return 1;
-    }
-    static int64_t max()
-    {
-        return 3;
-    }
-    static int64_t sum()
-    {
-        return 6;
-    }
-    static double average()
-    {
-        return 2.0;
-    }
-};
-
-struct Bool : Base<PropertyType::Bool, bool> {
-    static std::vector<bool> values()
-    {
-        return {true, false};
-    }
-    static bool can_sum()
-    {
-        return false;
-    }
-    static bool can_average()
-    {
-        return false;
-    }
-    static bool can_minmax()
-    {
-        return false;
-    }
-};
-
-struct Float : Base<PropertyType::Float, float> {
-    static std::vector<float> values()
-    {
-        return {3.3f, 1.1f, 2.2f};
-    }
-    static float min()
-    {
-        return 1.1f;
-    }
-    static float max()
-    {
-        return 3.3f;
-    }
-    static auto sum()
-    {
-        return Approx(6.6f);
-    }
-    static auto average()
-    {
-        return Approx(2.2f);
-    }
-};
-
-struct Double : Base<PropertyType::Double, double> {
-    static std::vector<double> values()
-    {
-        return {3.3, 1.1, 2.2};
-    }
-    static double min()
-    {
-        return 1.1;
-    }
-    static double max()
-    {
-        return 3.3;
-    }
-    static auto sum()
-    {
-        return Approx(6.6);
-    }
-    static auto average()
-    {
-        return Approx(2.2);
-    }
-};
-
-struct String : Base<PropertyType::String, StringData> {
-    using Boxed = std::string;
-    static std::vector<StringData> values()
-    {
-        return {"c", "a", "b"};
-    }
-    static util::Any to_any(StringData value)
-    {
-        return value ? std::string(value) : util::Any();
-    }
-};
-
-struct Binary : Base<PropertyType::Data, BinaryData> {
-    using Boxed = std::string;
-    static util::Any to_any(BinaryData value)
-    {
-        return value ? std::string(value) : util::Any();
-    }
-    static std::vector<BinaryData> values()
-    {
-        return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
-    }
-};
-
-struct Date : Base<PropertyType::Date, Timestamp> {
-    static std::vector<Timestamp> values()
-    {
-        return {Timestamp(3, 3), Timestamp(1, 1), Timestamp(2, 2)};
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
-    static Timestamp min()
-    {
-        return Timestamp(1, 1);
-    }
-    static Timestamp max()
-    {
-        return Timestamp(3, 3);
-    }
-};
-
-struct OID : Base<PropertyType::ObjectId, ObjectId> {
-    static std::vector<ObjectId> values()
-    {
-        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
-    }
-};
-
-struct UUID : Base<PropertyType::UUID, realm::UUID> {
-    static std::vector<realm::UUID> values()
-    {
-        return {realm::UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
-                realm::UUID("3b241101-a2b3-4255-8caf-4136c566a999")};
-    }
-};
-
-struct Decimal : Base<PropertyType::Decimal, Decimal128> {
-    using AvgType = Decimal128;
-    static std::vector<Decimal128> values()
-    {
-        return {Decimal128("876.54e32"), Decimal128("123.45e6")};
-    }
-    static Decimal128 min()
-    {
-        return Decimal128("123.45e6");
-    }
-    static Decimal128 max()
-    {
-        return Decimal128("876.54e32");
-    }
-    static Decimal128 sum()
-    {
-        return Decimal128("123.45e6") + Decimal128("876.54e32");
-    }
-    static Decimal128 average()
-    {
-        return ((Decimal128("123.45e6") + Decimal128("876.54e32")) / Decimal128(2));
-    }
-    static bool can_sum()
-    {
-        return true;
-    }
-    static bool can_average()
-    {
-        return true;
-    }
-    static bool can_minmax()
-    {
-        return true;
-    }
-};
-
-template <typename BaseT>
-struct BoxedOptional : BaseT {
-    using Type = util::Optional<typename BaseT::Type>;
-    using Boxed = Type;
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
-    static std::vector<Type> values()
-    {
-        std::vector<Type> ret;
-        for (auto v : BaseT::values())
-            ret.push_back(Type(v));
-        ret.push_back(util::none);
-        return ret;
-    }
-    static auto unwrap(Type value)
-    {
-        return *value;
-    }
-    static util::Any to_any(Type value)
-    {
-        return value ? util::Any(*value) : util::Any();
-    }
-
-    template <typename Fn>
-    static auto unwrap(Type value, Fn&& fn)
-    {
-        return value ? fn(*value) : fn(null());
-    }
-};
-
-template <typename BaseT>
-struct UnboxedOptional : BaseT {
-    enum { is_optional = true };
-    static PropertyType property_type()
-    {
-        return BaseT::property_type() | PropertyType::Nullable;
-    }
-    static auto values() -> decltype(BaseT::values())
-    {
-        auto ret = BaseT::values();
-        ret.push_back(typename BaseT::Type());
-        return ret;
-    }
-};
-
-template <typename T>
-T get(Mixed)
-{
-    abort();
-}
-
-template <>
-int64_t get(Mixed m)
-{
-    return m.get_int();
-}
-template <>
-float get(Mixed m)
-{
-    return m.get_type() == type_Float ? m.get_float() : static_cast<float>(m.get_double());
-}
-template <>
-double get(Mixed m)
-{
-    return m.get_double();
-}
-template <>
-Timestamp get(Mixed m)
-{
-    return m.get_timestamp();
-}
-template <>
-Decimal128 get(Mixed m)
-{
-    return m.get<Decimal128>();
-}
-
-namespace realm {
-template <typename T>
-bool operator==(List const& list, std::vector<T> const& values)
-{
-    if (list.size() != values.size())
-        return false;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (list.get<T>(i) != values[i])
-            return false;
-    }
-    return true;
-}
-
-template <typename T>
-bool operator==(Results const& results, std::vector<T> const& values)
-{
-    // FIXME: this is only necessary because Results::size() and ::get() are not const
-    Results copy{results};
-    if (copy.size() != values.size())
-        return false;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (copy.get<T>(i) != values[i])
-            return false;
-    }
-    return true;
-}
-
-} // namespace realm
+namespace cf = realm::collection_fixtures;
 
 struct StringifyingContext {
     template <typename T>
@@ -455,45 +111,11 @@ struct StringMaker<util::None> {
 };
 } // namespace Catch
 
-struct less {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a < b;
-    }
-};
-struct greater {
-    template <class T, class U>
-    auto operator()(T&& a, U&& b) const noexcept
-    {
-        return a > b;
-    }
-};
-
-template <>
-auto less::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (b.is_null())
-        return false;
-    if (a.is_null())
-        return true;
-    return a < b;
-}
-
-template <>
-auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) const noexcept
-{
-    if (a.is_null())
-        return false;
-    if (b.is_null())
-        return true;
-    return a > b;
-}
-
-TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
-                   ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>,
-                   BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>, UnboxedOptional<::String>,
-                   UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
+TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
+                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
+                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -656,13 +278,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
 
     SECTION("remove()") {
-        if (list.size() < 3)
-            return;
-
-        list.remove(1);
-        values.erase(values.begin() + 1);
-        REQUIRE(list == values);
-        REQUIRE(results == values);
+        size_t pos = 1;
+        while (list.size()) {
+            size_t ndx = pos % list.size();
+            list.remove(ndx);
+            values.erase(values.begin() + ndx);
+            REQUIRE(list == values);
+            REQUIRE(results == values);
+            ++pos;
+        }
     }
 
     SECTION("remove_all()") {
@@ -677,6 +301,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         list.swap(0, 2);
         std::swap(values[0], values[2]);
+        REQUIRE(list == values);
+        REQUIRE(results == values);
+
+        if (list.size() < 4)
+            return;
+
+        list.swap(1, 3);
+        std::swap(values[1], values[3]);
         REQUIRE(list == values);
         REQUIRE(results == values);
     }
@@ -771,14 +403,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
     SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
         }
 
         sorted = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(sorted.index_of<T>(values[i]) == i);
@@ -802,13 +434,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         auto sorted = list.sort(SortDescriptor({{col}}, {true}));
         auto sorted2 = list.sort({{"self", true}});
-        std::sort(begin(values), end(values), less());
+        std::sort(begin(values), end(values), cf::less());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
         sorted = list.sort(SortDescriptor({{col}}, {false}));
         sorted2 = list.sort({{"self", false}});
-        std::sort(begin(values), end(values), greater());
+        std::sort(begin(values), end(values), cf::greater());
         REQUIRE(sorted == values);
         REQUIRE(sorted2 == values);
 
@@ -843,17 +475,16 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
                             util::format("Cannot sort array of '%1' on more than one key path",
                                          string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
     }
-
 #if 0
     SECTION("filter()") {
         T v = values.front();
         values.erase(values.begin());
 
-        auto q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
+        auto q = TestType::unwrap(v, [&] (auto v) { return table->column<Lst<W>>(col) != v; });
         Results filtered = list.filter(std::move(q));
         REQUIRE(filtered == values);
 
-        q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+        q = TestType::unwrap(v, [&] (auto v) { return table->column<Lst<W>>(col) == v; });
         filtered = list.filter(std::move(q));
         REQUIRE(filtered.size() == 1);
         REQUIRE(*filtered.first<T>() == v);
@@ -862,13 +493,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS(list.min());
-            REQUIRE_THROWS(results.min());
+            REQUIRE_THROWS_AS(list.min(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.min(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(*list.min()) == TestType::min());
-        REQUIRE(get<W>(*results.min()) == TestType::min());
+        REQUIRE(cf::get<W>(*list.min()) == TestType::min());
+        REQUIRE(cf::get<W>(*results.min()) == TestType::min());
         list.remove_all();
         REQUIRE(list.min() == util::none);
         REQUIRE(results.min() == util::none);
@@ -876,13 +507,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS(list.max());
-            REQUIRE_THROWS(results.max());
+            REQUIRE_THROWS_AS(list.max(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROWS_AS(results.max(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(*list.max()) == TestType::max());
-        REQUIRE(get<W>(*results.max()) == TestType::max());
+        REQUIRE(cf::get<W>(*list.max()) == TestType::max());
+        REQUIRE(cf::get<W>(*results.max()) == TestType::max());
         list.remove_all();
         REQUIRE(list.max() == util::none);
         REQUIRE(results.max() == util::none);
@@ -890,25 +521,25 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
-            REQUIRE_THROWS(list.sum());
+            REQUIRE_THROWS_AS(list.sum(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<W>(list.sum()) == TestType::sum());
-        REQUIRE(get<W>(*results.sum()) == TestType::sum());
+        REQUIRE(cf::get<W>(list.sum()) == TestType::sum());
+        REQUIRE(cf::get<W>(*results.sum()) == TestType::sum());
         list.remove_all();
-        REQUIRE(get<W>(list.sum()) == W{});
-        REQUIRE(get<W>(*results.sum()) == W{});
+        REQUIRE(cf::get<W>(list.sum()) == TestType::empty_sum_value());
+        REQUIRE(cf::get<W>(*results.sum()) == TestType::empty_sum_value());
     }
 
     SECTION("average()") {
         if (!TestType::can_average()) {
-            REQUIRE_THROWS(list.average());
+            REQUIRE_THROWS_AS(list.average(), Results::UnsupportedColumnTypeException);
             return;
         }
 
-        REQUIRE(get<typename TestType::AvgType>(*list.average()) == TestType::average());
-        REQUIRE(get<typename TestType::AvgType>(*results.average()) == TestType::average());
+        REQUIRE(cf::get<typename TestType::AvgType>(*list.average()) == TestType::average());
+        REQUIRE(cf::get<typename TestType::AvgType>(*results.average()) == TestType::average());
         list.remove_all();
         REQUIRE(list.average() == util::none);
         REQUIRE(results.average() == util::none);
@@ -1166,4 +797,141 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 #endif
+}
+
+TEST_CASE("list of mixed links", "[primitives]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
+        {"target1",
+         {{"value1", PropertyType::Int}, {"link1", PropertyType::Object | PropertyType::Nullable, "target1"}}},
+        {"target2",
+         {{"value2", PropertyType::Int}, {"link2", PropertyType::Object | PropertyType::Nullable, "target2"}}}};
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target1 = r->read_group().get_table("class_target1");
+    auto target2 = r->read_group().get_table("class_target2");
+    ColKey col_value1 = target1->get_column_key("value1");
+    ColKey col_value2 = target2->get_column_key("value2");
+    ColKey col_link1 = target1->get_column_key("link1");
+    r->begin_transaction();
+    Obj obj = table->create_object();
+    Obj obj1 = table->create_object(); // empty dictionary
+    Obj target1_obj = target1->create_object().set(col_value1, 100);
+    Obj target2_obj = target2->create_object().set(col_value2, 200);
+    ColKey col = table->get_column_key("value");
+
+    List list(r, obj, col);
+    CppContext ctx(r);
+
+    list.add(Mixed{ObjLink(target1->get_key(), target1_obj.get_key())});
+    list.add(Mixed{});
+    list.add(Mixed{});
+    list.add(Mixed{int64_t{42}});
+    r->commit_transaction();
+
+    Results all_objects(r, table->where());
+    REQUIRE(all_objects.size() == 2);
+    CollectionChangeSet local_changes;
+    auto x = all_objects.add_notification_callback([&local_changes](CollectionChangeSet c, std::exception_ptr) {
+        local_changes = c;
+    });
+    advance_and_notify(*r);
+    local_changes = {};
+
+    SECTION("insertion") {
+        r->begin_transaction();
+        table->create_object();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 1);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("add a normal item is a modification") {
+        r->begin_transaction();
+        list.add(Mixed{"hello"});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify an existing item is a modification") {
+        r->begin_transaction();
+        list.set(0, Mixed{});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object is a modification") {
+        r->begin_transaction();
+        target1_obj.set(col_value1, 1000);
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("modify a linked object once removed is a modification") {
+        r->begin_transaction();
+        auto target1_obj2 = target1->create_object().set(col_value1, 1000);
+        target1_obj.set(col_link1, target1_obj2.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        r->begin_transaction();
+        target1_obj2.set(col_value1, 2000);
+        r->commit_transaction();
+        local_changes = {};
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+    }
+    SECTION("adding a link to a new table is a modification") {
+        r->begin_transaction();
+        list.add(Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 1);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from the newly linked table is a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 1);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
+    }
+    SECTION("adding a link to a new table and rolling back is not a modification") {
+        r->begin_transaction();
+        list.add(Mixed{ObjLink(target2->get_key(), target2_obj.get_key())});
+        r->cancel_transaction();
+        advance_and_notify(*r);
+        REQUIRE(local_changes.insertions.count() == 0);
+        REQUIRE(local_changes.modifications.count() == 0);
+        REQUIRE(local_changes.deletions.count() == 0);
+
+        SECTION("changing a property from rollback linked table is not a modification") {
+            r->begin_transaction();
+            target2_obj.set(col_value2, 42);
+            r->commit_transaction();
+            local_changes = {};
+            advance_and_notify(*r);
+            REQUIRE(local_changes.insertions.count() == 0);
+            REQUIRE(local_changes.modifications.count() == 0);
+            REQUIRE(local_changes.deletions.count() == 0);
+        }
+    }
 }

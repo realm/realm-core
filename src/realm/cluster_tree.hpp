@@ -59,6 +59,11 @@ public:
         return m_size;
     }
 
+    size_t nb_columns() const
+    {
+        return m_root->nb_columns();
+    }
+
     static size_t size_from_ref(ref_type, Allocator& alloc);
 
     void destroy()

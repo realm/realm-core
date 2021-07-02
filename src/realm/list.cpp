@@ -181,7 +181,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     }
     else if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
 }
 
@@ -214,58 +214,47 @@ void Lst<ObjKey>::do_remove(size_t ndx)
     }
     if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
 }
 
 template <>
-void Lst<ObjKey>::clear()
+void Lst<ObjKey>::do_clear()
 {
-    update_if_needed();
-    auto sz = Lst<ObjKey>::size();
+    auto origin_table = m_obj.get_table();
+    TableRef target_table = m_obj.get_target_table(m_col_key);
 
-    if (sz > 0) {
-        auto origin_table = m_obj.get_table();
-        TableRef target_table = m_obj.get_target_table(m_col_key);
-
-        if (Replication* repl = m_obj.get_replication())
-            repl->list_clear(*this); // Throws
-
-        if (!target_table->is_embedded()) {
-            size_t ndx = sz;
-            while (ndx--) {
-                do_set(ndx, null_key);
-                m_tree->erase(ndx);
-            }
-            // m_obj.bump_both_versions();
-            m_obj.bump_content_version();
-            m_tree->set_context_flag(false);
-            return;
+    size_t sz = size();
+    if (!target_table->is_embedded()) {
+        size_t ndx = sz;
+        while (ndx--) {
+            do_set(ndx, null_key);
+            m_tree->erase(ndx);
         }
-
-        TableKey target_table_key = target_table->get_key();
-        ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
-
-        CascadeState state;
-
-        typedef _impl::TableFriend tf;
-        size_t num_links = size();
-        for (size_t ndx = 0; ndx < num_links; ++ndx) {
-            ObjKey target_key = m_tree->get(ndx);
-            Obj target_obj = target_table->get_object(target_key);
-            target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
-            size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
-            if (num_remaining == 0) {
-                state.m_to_be_deleted.emplace_back(target_table_key, target_key);
-            }
-        }
-
-        m_tree->clear();
-        m_obj.bump_both_versions();
         m_tree->set_context_flag(false);
-
-        tf::remove_recursive(*origin_table, state); // Throws
+        return;
     }
+
+    TableKey target_table_key = target_table->get_key();
+    ColKey backlink_col = origin_table->get_opposite_column(m_col_key);
+
+    CascadeState state;
+
+    typedef _impl::TableFriend tf;
+    for (size_t ndx = 0; ndx < sz; ++ndx) {
+        ObjKey target_key = m_tree->get(ndx);
+        Obj target_obj = target_table->get_object(target_key);
+        target_obj.remove_one_backlink(backlink_col, m_obj.get_key()); // Throws
+        size_t num_remaining = target_obj.get_backlink_count(*origin_table, m_col_key);
+        if (num_remaining == 0) {
+            state.m_to_be_deleted.emplace_back(target_table_key, target_key);
+        }
+    }
+
+    m_tree->clear();
+    m_tree->set_context_flag(false);
+
+    tf::remove_recursive(*origin_table, state); // Throws
 }
 
 template <>
@@ -313,10 +302,10 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     ObjLink target_link;
     Mixed old_value = get(ndx);
 
-    if (old_value.get_type() == type_TypedLink) {
+    if (old_value.is_type(type_TypedLink)) {
         old_link = old_value.get<ObjLink>();
     }
-    if (value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
     }
 
@@ -334,7 +323,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
-    if (!value.is_null() && value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         m_obj.set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
@@ -343,7 +332,7 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+    if (Mixed old_value = get(ndx); old_value.is_type(type_TypedLink)) {
         auto old_link = old_value.get<ObjLink>();
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
@@ -359,6 +348,15 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
     else {
         m_tree->erase(ndx);
+    }
+}
+
+template <>
+void Lst<Mixed>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_remove(ndx);
     }
 }
 

@@ -166,7 +166,7 @@ private:
     bool m_has_run = false;
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
-    std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
+    DeepChangeChecker::RelatedTables m_related_tables;
 
     struct Callback {
         // The actual callback to invoke

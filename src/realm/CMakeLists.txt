@@ -105,6 +105,7 @@ set(UTIL_SOURCES
 )
 
 set(REALM_INSTALL_HEADERS
+    aggregate_ops.hpp
     alloc.hpp
     alloc_slab.hpp
     array.hpp

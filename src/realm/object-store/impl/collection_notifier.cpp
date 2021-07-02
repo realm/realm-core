@@ -22,7 +22,9 @@
 #include <realm/object-store/shared_realm.hpp>
 
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -32,8 +34,8 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     // Check if any of the tables accessible from the root table were
     // actually modified. This can be false if there were only insertions, or
     // deletions which were not linked to by any row in the linking table
-    auto table_modified = [&](auto& tbl) {
-        auto it = info.tables.find(tbl.table_key.value);
+    auto table_modified = [&](auto& outgoing_linkset) {
+        auto it = info.tables.find(outgoing_linkset.table_key.value);
         return it != info.tables.end() && !it->second.modifications_empty();
     };
     return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
@@ -52,7 +54,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     }
 
     if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
+        auto& object_set = info.tables.find(m_related_tables.begin()->table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
             return object_set.modifications_contains(object_key);
         };
