@@ -29,8 +29,11 @@ void DeepChangeChecker::find_related_tables1(std::vector<RelatedTable>& related_
                                              const KeyPathArray& key_path_array)
 {
     struct LinkInfo {
-        std::vector<ColKey> link_columns;
-        std::vector<TableKey> connected_tables;
+        std::vector<ColKey> forward_links;
+        std::vector<TableKey> forward_tables;
+
+        std::vector<ColKey> backlink_columns;
+        std::vector<TableKey> backlink_tables;
     };
 
     // Build up the complete forward mapping from the back links.
@@ -51,8 +54,14 @@ void DeepChangeChecker::find_related_tables1(std::vector<RelatedTable>& related_
         for (auto& incoming_link : incoming_link_columns) {
             REALM_ASSERT(incoming_link.first);
             auto& links = complete_mapping[incoming_link.first];
-            links.link_columns.push_back(incoming_link.second);
-            links.connected_tables.push_back(cur_table->get_key());
+            links.forward_links.push_back(incoming_link.second);
+            links.forward_tables.push_back(cur_table->get_key());
+
+            auto& backlinks = complete_mapping[cur_table->get_key()];
+            backlinks.backlink_tables.push_back(incoming_link.first);
+            auto opposite_table = group->get_table(incoming_link.first);
+            auto backlink_column = opposite_table->get_opposite_column(incoming_link.second);
+            backlinks.backlink_columns.push_back(backlink_column);
         }
     }
 
@@ -60,36 +69,57 @@ void DeepChangeChecker::find_related_tables1(std::vector<RelatedTable>& related_
     // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
     // duplicates in connected_tables can occur when there are different link paths to the same table
     for (auto& kv_pair : complete_mapping) {
-        auto& cols = kv_pair.second.link_columns;
+        auto& cols = kv_pair.second.forward_links;
         std::sort(cols.begin(), cols.end());
         cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
-        auto& tables = kv_pair.second.connected_tables;
+        auto& tables = kv_pair.second.forward_tables;
         std::sort(tables.begin(), tables.end());
         tables.erase(std::unique(tables.begin(), tables.end()), tables.end());
     }
 
-    std::vector<TableKey> tables_to_check = {table.get_key()};
-    auto get_out_relationships_for = [&related_tables](TableKey key) -> std::vector<ColKey>& {
-        auto it = find_if(begin(related_tables), end(related_tables), [&](auto&& tbl) {
-            return tbl.table_key == key;
+    // auto position_in_related_tables = [&related_tables](TableKey table_key) -> bool {
+    //     auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
+    //         return related_table.table_key == table_key;
+    //     });
+    //     return it == related_tables.end();
+    // };
+
+    auto get_out_relationships_for = [&related_tables](TableKey table_key) -> std::vector<ColKey>& {
+        auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
+            return related_table.table_key == table_key;
         });
         if (it == related_tables.end()) {
-            it = related_tables.insert(related_tables.end(), {key, {}});
+            it = related_tables.insert(related_tables.end(), {table_key, {}});
         }
         return it->links;
     };
 
+    std::vector<TableKey> tables_to_check = {table.get_key()};
     while (tables_to_check.size()) {
         auto table_key_to_check = *tables_to_check.begin();
         tables_to_check.erase(tables_to_check.begin());
-        auto outgoing_links = complete_mapping[table_key_to_check];
+
+        auto link_info = complete_mapping[table_key_to_check];
         auto& out_relations = get_out_relationships_for(table_key_to_check);
-        auto& link_columns = complete_mapping[table_key_to_check].link_columns;
-        out_relations.insert(out_relations.end(), link_columns.begin(), link_columns.end());
-        for (auto linked_table_key : outgoing_links.connected_tables) {
-            if (std::find_if(begin(related_tables), end(related_tables), [&](auto&& relation) {
-                    return relation.table_key == linked_table_key;
-                }) == related_tables.end()) {
+        auto& forward_links = complete_mapping[table_key_to_check].forward_links;
+        out_relations.insert(out_relations.end(), forward_links.begin(), forward_links.end());
+
+        // Add all tables reachable via a forward link to the vector of tables that need to be checked
+        // if they have not been identified as a related table already.
+        for (auto linked_table_key : link_info.forward_tables) {
+            auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
+                return related_table.table_key == linked_table_key;
+            });
+            if (it == related_tables.end()) {
+                tables_to_check.push_back(linked_table_key);
+            }
+        }
+
+        for (auto linked_table_key : link_info.backlink_tables) {
+            auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
+                return related_table.table_key == linked_table_key;
+            });
+            if (it == related_tables.end()) {
                 tables_to_check.push_back(linked_table_key);
             }
         }
@@ -144,8 +174,11 @@ void DeepChangeChecker::find_related_tables2(std::vector<RelatedTable>& related_
 void DeepChangeChecker::find_related_tables0(std::vector<RelatedTable>& related_tables, Table const& table,
                                              const KeyPathArray& key_path_array)
 {
-    find_related_tables2(related_tables, table, key_path_array);
+    // std::vector<RelatedTable> kpa1 = {};
+    // std::vector<RelatedTable> kpa2 = {};
+    // find_related_tables2(kpa1, table, key_path_array);
     find_related_tables1(related_tables, table, key_path_array);
+    // auto foo = 1;
 }
 
 DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
