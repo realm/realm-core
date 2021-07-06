@@ -1682,10 +1682,6 @@ public:
     {
         return true; // No-op
     }
-    bool dictionary_clear(size_t)
-    {
-        return true; // No-op
-    }
 
     bool set_insert(size_t)
     {
