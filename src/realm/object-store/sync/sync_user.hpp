@@ -40,7 +40,6 @@ namespace app {
 struct AppError;
 class MongoClient;
 } // namespace app
-
 class SyncSession;
 class SyncManager;
 
@@ -75,30 +74,68 @@ struct RealmJWT {
 
 struct SyncUserProfile {
     // The full name of the user.
-    util::Optional<std::string> name;
+    util::Optional<std::string> name() const
+    {
+        return static_cast<std::string>(m_data.at("name"));
+    }
     // The email address of the user.
-    util::Optional<std::string> email;
+    util::Optional<std::string> email() const
+    {
+        return static_cast<std::string>(m_data.at("email"));
+    }
     // A URL to the user's profile picture.
-    util::Optional<std::string> picture_url;
+    util::Optional<std::string> picture_url() const
+    {
+        return static_cast<std::string>(m_data.at("picture_url"));
+    }
     // The first name of the user.
-    util::Optional<std::string> first_name;
+    util::Optional<std::string> first_name() const
+    {
+        return static_cast<std::string>(m_data.at("first_name"));
+    }
     // The last name of the user.
-    util::Optional<std::string> last_name;
+    util::Optional<std::string> last_name() const
+    {
+        return static_cast<std::string>(m_data.at("last_name"));
+    }
     // The gender of the user.
-    util::Optional<std::string> gender;
+    util::Optional<std::string> gender() const
+    {
+        return static_cast<std::string>(m_data.at("gender"));
+    }
     // The birthdate of the user.
-    util::Optional<std::string> birthday;
+    util::Optional<std::string> birthday() const
+    {
+        return static_cast<std::string>(m_data.at("birthday"));
+    }
     // The minimum age of the user.
-    util::Optional<std::string> min_age;
+    util::Optional<std::string> min_age() const
+    {
+        return static_cast<std::string>(m_data.at("min_age"));
+    }
     // The maximum age of the user.
-    util::Optional<std::string> max_age;
+    util::Optional<std::string> max_age() const
+    {
+        return static_cast<std::string>(m_data.at("max_age"));
+    }
 
-    SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
-                    util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
-                    util::Optional<std::string> last_name, util::Optional<std::string> gender,
-                    util::Optional<std::string> birthday, util::Optional<std::string> min_age,
-                    util::Optional<std::string> max_age);
+    bson::Bson operator[](const std::string& key) const
+    {
+        return m_data.at(key);
+    }
+
+    bson::BsonDocument data() const
+    {
+        return m_data;
+    }
+
+    SyncUserProfile(bson::BsonDocument&& data)
+    : m_data(std::move(data))
+    {
+    }
     SyncUserProfile() = default;
+private:
+    bson::BsonDocument m_data;
 };
 
 // A struct that represents an identity that a `User` is linked to
