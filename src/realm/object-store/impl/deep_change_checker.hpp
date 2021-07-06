@@ -83,7 +83,7 @@ public:
      *
      * @return True if the object was changed, false otherwise.
      */
-    bool operator()(ObjKeyType obj_key);
+    bool operator()(ObjKeyType object_key);
 
     /**
      * Search for related tables within the specified `table`.
@@ -165,7 +165,7 @@ private:
      *
      * @return True if the object was changed, false otherwise.
      */
-    bool check_row(Table const& table, ObjKeyType obj_key, const std::vector<ColKey>& filtered_columns,
+    bool check_row(Table const& table, ObjKeyType object_key, const std::vector<ColKey>& filtered_columns,
                    size_t depth = 0);
 
     /**
@@ -179,7 +179,7 @@ private:
      *         False if the `table` is not contained in `m_related_tables` or the `table` does not have any
      *         outgoing links at all or the `table` does not have linked objects with changes.
      */
-    bool check_outgoing_links(Table const& table, ObjKey obj_key, const std::vector<ColKey>& filtered_columns,
+    bool check_outgoing_links(Table const& table, ObjKey object_key, const std::vector<ColKey>& filtered_columns,
                               size_t depth = 0);
 
     bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll,
