@@ -154,10 +154,6 @@ void ArrayStringShort::insert(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <=, m_size);
     REALM_ASSERT(value.size() < max_width); // otherwise we have to use another column type
 
-    // FIXME: this performs up to 2 memcpy() operations. This could be improved
-    // by making the allocator make a gap for the new value for us, but it's a
-    // bit complex.
-
     // Allocate room for the new value
     const auto old_size = m_size;
     alloc(m_size + 1, m_width); // Throws

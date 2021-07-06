@@ -151,7 +151,7 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
 void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_offset, size_t begin,
                             size_t end) const
 {
-    // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
+    // Warning: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the
     // B+tree with the same result column, we also can't simply adjust indices after finding them
     // (because then the first indices would be adjusted multiple times for each subsequent leaf)
@@ -170,7 +170,6 @@ void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_
 
 void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
 {
-    // FIXME: Optimize this
     int64_t tmp[8];
     Array::get_chunk(ndx + 1, tmp);
     int64_t null = null_value();

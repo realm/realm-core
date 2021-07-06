@@ -194,10 +194,6 @@ void QueryStateBase::dyncast() {}
 
 size_t Array::bit_width(int64_t v)
 {
-    // FIXME: Assuming there is a 64-bit CPU reverse bitscan
-    // instruction and it is fast, then this function could be
-    // implemented as a table lookup on the result of the scan
-
     if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[int8_t(v)];
@@ -334,7 +330,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     }
 
     if (bits_per_elem < 8) {
-        // FIXME: Should be optimized
+        // Improvement: Should be optimized
         for (size_t i = begin; i != end; ++i) {
             int_fast64_t v = (this->*m_getter)(i);
             (this->*(m_vtable->setter))(dest_begin++, v);
@@ -466,11 +462,10 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
     else if (ndx != old_size) {
         // when byte sized and no expansion, use memmove
-        // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
-        size_t w = (old_width == 64) ? 8 : (old_width == 32) ? 4 : (old_width == 16) ? 2 : 1;
-        char* src_begin = m_data + ndx * w;
-        char* src_end = m_data + old_size * w;
-        char* dst_end = src_end + w;
+        size_t byte_w = old_width / 8;
+        char* src_begin = m_data + ndx * byte_w;
+        char* src_end = m_data + old_size * byte_w;
+        char* dst_end = src_end + byte_w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
 
@@ -494,7 +489,7 @@ void Array::truncate(size_t new_size)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
-    // FIXME: BasicArray<> currently does not work if the width is set
+    // TODO: BasicArray<> currently does not work if the width is set
     // to zero, so it must override Array::truncate(). In the future
     // it is expected that BasicArray<> will be improved by allowing
     // for width to be zero when all the values are known to be zero
@@ -529,7 +524,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
-    // FIXME: See FIXME in truncate().
+    // TODO: See TODO in truncate().
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 

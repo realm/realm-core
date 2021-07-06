@@ -65,9 +65,8 @@ public:
     void adjust(size_t begin, size_t end, int64_t diff)
     {
         if (diff != 0) {
-            // FIXME: Should be optimized
             for (size_t i = begin; i < end; ++i)
-                adjust(i, diff); // Throws
+                set(i, get(i) + diff); // Throws
         }
     }
 
@@ -88,13 +87,6 @@ private:
     {
         Node::init_from_mem(mem);
         set_width(get_width_from_header(get_header()));
-    }
-
-    void adjust(size_t ndx, int64_t diff)
-    {
-        if (diff != 0) {
-            set(ndx, get(ndx) + diff); // Throws
-        }
     }
 
     void alloc(size_t init_size, size_t new_width)

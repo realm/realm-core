@@ -410,7 +410,7 @@ public:
     /// We currently use binary search. See for example
     /// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
     ///
-    /// FIXME: It may be worth considering if overall efficiency can be improved
+    /// It may be worth considering if overall efficiency can be improved
     /// by doing a linear search for short sequences.
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
@@ -596,7 +596,6 @@ public:
     /// can be returned by get_byte_size().
     static size_t get_max_byte_size(size_t num_elems) noexcept;
 
-    /// FIXME: Belongs in IntegerArray
     static size_t calc_aligned_byte_size(size_t size, int width);
 
     class MemUsageHandler {
@@ -1050,7 +1049,7 @@ inline void Array::adjust(size_t ndx, int_fast64_t diff)
 {
     REALM_ASSERT_3(ndx, <=, m_size);
     if (diff != 0) {
-        // FIXME: Should be optimized
+        // Should be optimized
         int_fast64_t v = get(ndx);
         set(ndx, int64_t(v + diff)); // Throws
     }
@@ -1059,7 +1058,7 @@ inline void Array::adjust(size_t ndx, int_fast64_t diff)
 inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 {
     if (diff != 0) {
-        // FIXME: Should be optimized
+        // Should be optimized
         for (size_t i = begin; i != end; ++i)
             adjust(i, diff); // Throws
     }
@@ -1209,7 +1208,7 @@ such a pattern.
 */
 inline bool Array::find_action_pattern(size_t /*index*/, uint64_t /*pattern*/, QueryStateBase* /*st*/) const
 {
-    // return st->match_pattern(index, pattern); FIXME: Use for act_Count
+    // return st->match_pattern(index, pattern); TODO: Use for act_Count
     return false;
 }
 
@@ -1557,7 +1556,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryStateBase* state
 template <bool gt, size_t width, class Callback>
 bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryStateBase* state, size_t baseindex, Callback callback) const
 {
-    // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
+    // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'.
     if constexpr (width == 1) {
         for (size_t i = 0; i < 64; ++i) {
             int64_t v2 = static_cast<int64_t>(chunk & 0x1);
@@ -1810,8 +1809,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
             uint64_t upper = lower_bits<width / 8>() << (no0(width / 8) - 1);
             uint64_t pattern =
-                resmask &
-                upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
+                resmask & upper; // Info: bits at wrong offsets. Only OK because we only use them in 'count' aggregate
             if (find_action_pattern(s + baseindex, pattern, state))
                 break;
 
