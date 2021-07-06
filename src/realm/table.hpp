@@ -513,11 +513,11 @@ private:
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
     // as well as the full column key. A leaf_ndx can be obtained directly from the column key
-    size_t colkey2spec_ndx(ColKey key) const;
-    size_t leaf_ndx2spec_ndx(ColKey::Idx idx) const;
-    ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
-    ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
-    ColKey spec_ndx2colkey(size_t ndx) const;
+    size_t colkey2spec_ndx(ColKey key) const noexcept;
+    size_t leaf_ndx2spec_ndx(ColKey::Idx idx) const noexcept;
+    ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const noexcept;
+    ColKey leaf_ndx2colkey(ColKey::Idx idx) const noexcept;
+    ColKey spec_ndx2colkey(size_t ndx) const noexcept;
     void report_invalid_key(ColKey col_key) const;
 
     // Queries
@@ -1286,14 +1286,14 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
     m_top.set_ndx_in_parent(ndx_in_parent);
 }
 
-inline size_t Table::colkey2spec_ndx(ColKey key) const
+inline size_t Table::colkey2spec_ndx(ColKey key) const noexcept
 {
     auto leaf_idx = key.get_index();
     REALM_ASSERT(leaf_idx.val < m_leaf_ndx2spec_ndx.size());
     return m_leaf_ndx2spec_ndx[leaf_idx.val];
 }
 
-inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const
+inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const noexcept
 {
     REALM_ASSERT(spec_ndx < m_spec_ndx2leaf_ndx.size());
     return m_leaf_ndx2colkey[m_spec_ndx2leaf_ndx[spec_ndx].val];
@@ -1308,19 +1308,19 @@ inline void Table::report_invalid_key(ColKey col_key) const
         throw LogicError(LogicError::column_does_not_exist);
 }
 
-inline size_t Table::leaf_ndx2spec_ndx(ColKey::Idx leaf_ndx) const
+inline size_t Table::leaf_ndx2spec_ndx(ColKey::Idx leaf_ndx) const noexcept
 {
     REALM_ASSERT(leaf_ndx.val < m_leaf_ndx2colkey.size());
     return m_leaf_ndx2spec_ndx[leaf_ndx.val];
 }
 
-inline ColKey::Idx Table::spec_ndx2leaf_ndx(size_t spec_ndx) const
+inline ColKey::Idx Table::spec_ndx2leaf_ndx(size_t spec_ndx) const noexcept
 {
     REALM_ASSERT(spec_ndx < m_spec_ndx2leaf_ndx.size());
     return m_spec_ndx2leaf_ndx[spec_ndx];
 }
 
-inline ColKey Table::leaf_ndx2colkey(ColKey::Idx leaf_ndx) const
+inline ColKey Table::leaf_ndx2colkey(ColKey::Idx leaf_ndx) const noexcept
 {
     // this may be called with leaf indicies outside of the table. This can happen
     // when a column is removed from the mapping, but space for it is still reserved

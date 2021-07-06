@@ -61,25 +61,25 @@ public:
         Array::set_parent(parent, ndx_in_parent);
     }
 
-    size_t size() const
+    size_t size() const noexcept
     {
         auto data_bytes = m_size - div_round_up<s_block_size>(m_size); // remove one byte per block.
         return data_bytes / s_width;
     }
 
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         return this->get_width() == 0 || get_pos(ndx).is_null(this);
     }
 
-    ObjectType get(size_t ndx) const
+    ObjectType get(size_t ndx) const noexcept
     {
         REALM_ASSERT(is_valid_ndx(ndx));
         REALM_ASSERT(!is_null(ndx));
         return get_pos(ndx).get_value(this);
     }
 
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
@@ -125,7 +125,7 @@ protected:
         {
             reinterpret_cast<ObjectType*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset] = val;
         }
-        const ObjectType& get_value(const self_type* arr) const
+        const ObjectType& get_value(const self_type* arr) const noexcept
         {
             return reinterpret_cast<const ObjectType*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset];
         }
@@ -140,13 +140,13 @@ protected:
                 bitvec &= ~(1 << offset);
             }
         }
-        bool is_null(const self_type* arr) const
+        bool is_null(const self_type* arr) const noexcept
         {
             return arr->m_data[base_byte] & (1 << offset);
         }
     };
 
-    static Pos get_pos(size_t ndx)
+    static Pos get_pos(size_t ndx) noexcept
     {
 
         return Pos{(ndx / 8) * s_block_size, ndx % 8};
@@ -209,11 +209,11 @@ public:
         }
         return pos.get_value(this);
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
-    size_t find_first(const util::Optional<ObjectType>& value, size_t begin = 0, size_t end = npos) const
+    size_t find_first(const util::Optional<ObjectType>& value, size_t begin = 0, size_t end = npos) const noexcept
     {
         if (value) {
             return Base::find_first(*value, begin, end);
@@ -222,7 +222,7 @@ public:
             return find_first_null(begin, end);
         }
     }
-    size_t find_first_null(size_t begin = 0, size_t end = npos) const;
+    size_t find_first_null(size_t begin = 0, size_t end = npos) const noexcept;
 };
 
 typedef ArrayFixedBytes<ObjectId, ObjectId::num_bytes> ArrayObjectId;

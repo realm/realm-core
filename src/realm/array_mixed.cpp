@@ -96,7 +96,7 @@ Mixed ArrayMixed::get(size_t ndx) const
         switch (type) {
             case type_Int: {
                 if (val & s_payload_idx_mask) {
-                    ensure_int_array();
+                    update_int_array();
                     return Mixed(m_ints.get(payload_ndx));
                 }
                 return Mixed(int_val);
@@ -104,30 +104,30 @@ Mixed ArrayMixed::get(size_t ndx) const
             case type_Bool:
                 return Mixed(int_val != 0);
             case type_Float:
-                ensure_int_array();
+                update_int_array();
                 return Mixed(type_punning<float>(m_ints.get(payload_ndx)));
             case type_Double:
-                ensure_int_array();
+                update_int_array();
                 return Mixed(type_punning<double>(m_ints.get(payload_ndx)));
             case type_String: {
-                ensure_string_array();
+                update_string_array();
                 REALM_ASSERT(size_t(int_val) < m_strings.size());
                 return Mixed(m_strings.get(payload_ndx));
             }
             case type_Binary: {
-                ensure_string_array();
+                update_string_array();
                 REALM_ASSERT(size_t(int_val) < m_strings.size());
                 auto s = m_strings.get(payload_ndx);
                 return Mixed(BinaryData(s.data(), s.size()));
             }
             case type_Timestamp: {
-                ensure_int_pair_array();
+                update_int_pair_array();
                 payload_ndx <<= 1;
                 REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
                 return Mixed(Timestamp(m_int_pairs.get(payload_ndx), int32_t(m_int_pairs.get(payload_ndx + 1))));
             }
             case type_ObjectId: {
-                ensure_string_array();
+                update_string_array();
                 REALM_ASSERT(size_t(int_val) < m_strings.size());
                 auto s = m_strings.get(payload_ndx);
                 ObjectId id;
@@ -135,7 +135,7 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(id);
             }
             case type_Decimal: {
-                ensure_int_pair_array();
+                update_int_pair_array();
                 Decimal128::Bid128 raw;
                 payload_ndx <<= 1;
                 REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
@@ -144,10 +144,10 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(Decimal128(raw));
             }
             case type_Link:
-                ensure_int_array();
+                update_int_array();
                 return Mixed(ObjKey(m_ints.get(payload_ndx)));
             case type_TypedLink: {
-                ensure_int_pair_array();
+                update_int_pair_array();
                 payload_ndx <<= 1;
                 REALM_ASSERT(payload_ndx + 1 < m_int_pairs.size());
                 ObjLink ret{TableKey(uint32_t(m_int_pairs.get(payload_ndx))),
@@ -155,7 +155,7 @@ Mixed ArrayMixed::get(size_t ndx) const
                 return Mixed(ret);
             }
             case type_UUID: {
-                ensure_string_array();
+                update_string_array();
                 REALM_ASSERT(size_t(int_val) < m_strings.size());
                 auto s = m_strings.get(payload_ndx);
                 UUID::UUIDBytes bytes{};
@@ -230,7 +230,7 @@ void ArrayMixed::verify() const
     // TODO: Implement
 }
 
-void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
+void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent)
 {
     if (!arr.is_attached()) {
         ref_type ref = get_as_ref(ndx_in_parent);
@@ -245,17 +245,17 @@ void ArrayMixed::ensure_array_accessor(Array& arr, size_t ndx_in_parent) const
     }
 }
 
-void ArrayMixed::ensure_int_array() const
+void ArrayMixed::ensure_int_array()
 {
     ensure_array_accessor(m_ints, payload_idx_int);
 }
 
-void ArrayMixed::ensure_int_pair_array() const
+void ArrayMixed::ensure_int_pair_array()
 {
     ensure_array_accessor(m_int_pairs, payload_idx_pair);
 }
 
-void ArrayMixed::ensure_string_array() const
+void ArrayMixed::ensure_string_array()
 {
     if (!m_strings.is_attached()) {
         ref_type ref = get_as_ref(payload_idx_str);
@@ -267,6 +267,36 @@ void ArrayMixed::ensure_string_array() const
             m_strings.create();
             m_strings.update_parent();
         }
+    }
+}
+
+void ArrayMixed::update_array_accessor(Array& arr, size_t ndx_in_parent) const noexcept
+{
+    if (!arr.is_attached()) {
+        ref_type ref = get_as_ref(ndx_in_parent);
+        arr.set_parent(const_cast<ArrayMixed*>(this), ndx_in_parent);
+        REALM_ASSERT(ref);
+        arr.init_from_ref(ref);
+    }
+}
+
+void ArrayMixed::update_int_array() const noexcept
+{
+    update_array_accessor(m_ints, payload_idx_int);
+}
+
+void ArrayMixed::update_int_pair_array() const noexcept
+{
+    update_array_accessor(m_int_pairs, payload_idx_pair);
+}
+
+void ArrayMixed::update_string_array() const noexcept
+{
+    if (!m_strings.is_attached()) {
+        ref_type ref = get_as_ref(payload_idx_str);
+        m_strings.set_parent(const_cast<ArrayMixed*>(this), payload_idx_str);
+        REALM_ASSERT(ref);
+        m_strings.init_from_ref(ref);
     }
 }
 

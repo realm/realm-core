@@ -55,7 +55,7 @@ size_t round_up(size_t size)
 
 } // anonymous namespace
 
-bool ArrayStringShort::is_null(size_t ndx) const
+bool ArrayStringShort::is_null(size_t ndx) const noexcept
 {
     REALM_ASSERT_3(ndx, <, m_size);
     StringData sd = get(ndx);

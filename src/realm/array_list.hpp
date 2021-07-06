@@ -75,12 +75,12 @@ public:
     {
         return Array::get_as_ref(ndx);
     }
-    Mixed get_any(size_t) const override
+    Mixed get_any(size_t) const noexcept override
     {
         REALM_ASSERT_DEBUG(false);
         return {};
     }
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         return Array::get(ndx) == 0;
     }

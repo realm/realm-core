@@ -143,7 +143,7 @@ void ArrayBacklink::erase(size_t ndx)
     Array::erase(ndx);
 }
 
-size_t ArrayBacklink::get_backlink_count(size_t ndx) const
+size_t ArrayBacklink::get_backlink_count(size_t ndx) const noexcept
 {
     uint64_t value = Array::get(ndx);
     if (value == 0) {
@@ -161,7 +161,7 @@ size_t ArrayBacklink::get_backlink_count(size_t ndx) const
     return Array::get_size_from_header(mem.get_addr());
 }
 
-ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const
+ObjKey ArrayBacklink::get_backlink(size_t ndx, size_t index) const noexcept
 {
     uint64_t value = Array::get(ndx);
     REALM_ASSERT(value != 0);

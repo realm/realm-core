@@ -181,7 +181,7 @@ void ArrayString::insert(size_t ndx, StringData value)
     }
 }
 
-StringData ArrayString::get(size_t ndx) const
+StringData ArrayString::get(size_t ndx) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:
@@ -198,7 +198,7 @@ StringData ArrayString::get(size_t ndx) const
     return {};
 }
 
-StringData ArrayString::get_legacy(size_t ndx) const
+StringData ArrayString::get_legacy(size_t ndx) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:
@@ -215,12 +215,12 @@ StringData ArrayString::get_legacy(size_t ndx) const
     return {};
 }
 
-Mixed ArrayString::get_any(size_t ndx) const
+Mixed ArrayString::get_any(size_t ndx) const noexcept
 {
     return Mixed(get(ndx));
 }
 
-bool ArrayString::is_null(size_t ndx) const
+bool ArrayString::is_null(size_t ndx) const noexcept
 {
     switch (m_type) {
         case Type::small_strings:

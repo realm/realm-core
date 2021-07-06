@@ -45,7 +45,7 @@ public:
     }
     void create();
 
-    bool is_attached() const
+    bool is_attached() const noexcept
     {
         return m_arr->is_attached();
     }
@@ -66,11 +66,11 @@ public:
     {
         m_arr->set_parent(p, n);
     }
-    bool need_spec() const override
+    bool need_spec() const noexcept override
     {
         return true;
     }
-    void set_spec(Spec* spec, size_t col_ndx) const override
+    void set_spec(Spec* spec, size_t col_ndx) const noexcept override
     {
         m_spec = spec;
         m_col_ndx = col_ndx;
@@ -99,10 +99,10 @@ public:
         set(ndx, StringData{});
     }
     void insert(size_t ndx, StringData value);
-    StringData get(size_t ndx) const;
-    StringData get_legacy(size_t ndx) const;
-    Mixed get_any(size_t ndx) const override;
-    bool is_null(size_t ndx) const;
+    StringData get(size_t ndx) const noexcept;
+    StringData get_legacy(size_t ndx) const noexcept;
+    Mixed get_any(size_t ndx) const noexcept override;
+    bool is_null(size_t ndx) const noexcept;
     void erase(size_t ndx);
     void move(ArrayString& dst, size_t ndx);
     void clear();

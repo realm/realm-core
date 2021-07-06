@@ -69,12 +69,12 @@ public:
         init_from_ref(ref);
     }
 
-    size_t size() const
+    size_t size() const noexcept
     {
         return Array::size() >> 1;
     }
 
-    bool is_null(size_t ndx)
+    bool is_null(size_t ndx) noexcept
     {
         ndx <<= 1;
         return Array::get(ndx) == 0;
@@ -106,17 +106,17 @@ public:
         Array::insert(ndx, tk);
         Array::insert(ndx + 1, value.get_obj_key().value + 1);
     }
-    ObjLink get(size_t ndx) const
+    ObjLink get(size_t ndx) const noexcept
     {
         ndx <<= 1;
         uint32_t tk = uint32_t(Array::get(ndx) - 1) & 0x7FFFFFFF;
         return {TableKey(tk), ObjKey(Array::get(ndx + 1) - 1)};
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         return Array::get(ndx << 1) == 0;
     }

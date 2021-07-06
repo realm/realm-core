@@ -79,7 +79,7 @@ public:
     void set_null(size_t ndx);
     void insert(size_t ndx, Mixed value);
     Mixed get(size_t ndx) const;
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return get(ndx);
     }
@@ -126,10 +126,17 @@ private:
         return DataType((m_composite.get(ndx) & s_data_type_mask) - 1);
     }
     int64_t store(const Mixed&);
-    void ensure_array_accessor(Array& arr, size_t ndx_in_parent) const;
-    void ensure_int_array() const;
-    void ensure_int_pair_array() const;
-    void ensure_string_array() const;
+
+    void ensure_array_accessor(Array& arr, size_t ndx_in_parent);
+    void ensure_int_array();
+    void ensure_int_pair_array();
+    void ensure_string_array();
+
+    void update_array_accessor(Array& arr, size_t ndx_in_parent) const noexcept;
+    void update_int_array() const noexcept;
+    void update_int_pair_array() const noexcept;
+    void update_string_array() const noexcept;
+
     void replace_index(size_t old_ndx, size_t new_ndx, size_t payload_index);
     void erase_linked_payload(size_t ndx);
 };

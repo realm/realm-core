@@ -24,12 +24,12 @@
 
 using namespace realm;
 
-Mixed ArrayInteger::get_any(size_t ndx) const
+Mixed ArrayInteger::get_any(size_t ndx) const noexcept
 {
     return Mixed(get(ndx));
 }
 
-Mixed ArrayIntNull::get_any(size_t ndx) const
+Mixed ArrayIntNull::get_any(size_t ndx) const noexcept
 {
     return Mixed(get(ndx));
 }

@@ -59,19 +59,19 @@ public:
         Array::set_parent(parent, ndx_in_parent);
     }
 
-    bool is_null(size_t ndx) const
+    bool is_null(size_t ndx) const noexcept
     {
         return this->get_width() == 0 || get(ndx).is_null();
     }
 
-    Decimal128 get(size_t ndx) const
+    Decimal128 get(size_t ndx) const noexcept
     {
         REALM_ASSERT(ndx < m_size);
         auto values = reinterpret_cast<Decimal128*>(this->m_data);
         return values[ndx];
     }
 
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const noexcept override
     {
         return Mixed(get(ndx));
     }

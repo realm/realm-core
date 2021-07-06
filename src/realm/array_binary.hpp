@@ -59,7 +59,7 @@ public:
     }
     void init_from_parent();
 
-    size_t size() const;
+    size_t size() const noexcept;
 
     void add(BinaryData value);
     void set(size_t ndx, BinaryData value);
@@ -68,9 +68,9 @@ public:
         set(ndx, BinaryData{});
     }
     void insert(size_t ndx, BinaryData value);
-    BinaryData get(size_t ndx) const;
-    BinaryData get_at(size_t ndx, size_t& pos) const;
-    Mixed get_any(size_t ndx) const override;
+    BinaryData get(size_t ndx) const noexcept;
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
+    Mixed get_any(size_t ndx) const noexcept override;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
     void move(ArrayBinary& dst, size_t ndx);

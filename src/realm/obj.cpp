@@ -90,14 +90,14 @@ Allocator& Obj::_get_alloc() const noexcept
     return m_table.unchecked_ptr()->m_alloc;
 }
 
-const Spec& Obj::get_spec() const
+const Spec& Obj::get_spec() const noexcept
 {
     return m_table.unchecked_ptr()->m_spec;
 }
 
-Replication* Obj::get_replication() const
+Replication* Obj::get_replication() const noexcept
 {
-    return m_table->get_repl();
+    return m_table.unchecked_ptr()->get_repl();
 }
 
 
