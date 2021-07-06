@@ -140,7 +140,7 @@ public:
     /// Locate object identified by 'ndx' and update 'state' accordingly
     virtual ObjKey get(size_t ndx, State& state) const = 0;
     /// Return the index at which key is stored
-    virtual size_t get_ndx(ObjKey key, size_t ndx) const = 0;
+    virtual size_t get_ndx(ObjKey key, size_t ndx) const noexcept = 0;
 
     /// Erase element identified by 'key'
     virtual size_t erase(ObjKey key, CascadeState& state) = 0;
@@ -266,7 +266,7 @@ public:
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t, State& state) const override;
-    size_t get_ndx(ObjKey key, size_t ndx) const override;
+    size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
     size_t erase(ObjKey k, CascadeState& state) override;
     void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void upgrade_string_to_enum(ColKey col, ArrayString& keys);
