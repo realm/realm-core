@@ -48,9 +48,7 @@ const int num_failure_types = SimulatedFailure::_num_failure_types;
 
 struct PrimeMode {
     virtual bool check_trigger() noexcept = 0;
-    virtual ~PrimeMode() noexcept
-    {
-    }
+    virtual ~PrimeMode() noexcept {}
 };
 
 struct PrimeState {
@@ -170,7 +168,7 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
     return false;
 }
 
-static bool (*s_mmap_predicate)(size_t);
+thread_local bool (*s_mmap_predicate)(size_t);
 
 void SimulatedFailure::do_prime_mmap(bool (*predicate)(size_t))
 {
