@@ -307,22 +307,37 @@ public:
     bool is_in_transaction() const noexcept;
 
     // Asynchronous (write)transaction.
-    // 'the_write_block' is scheduled for execution on the scheduler
-    // associated with the current realm. It will run after the write
-    // mutex has been acquired. it should end by calling commit_transaction(),
-    // cancel_transaction() or schedule_commit(). Returning without one of
-    // these calls will be equivalent to calling cancel_transaction().
-    // The call returns immediately allowing the caller to proceed
-    // while the write mutex is held by someone else.
-    void schedule_transaction(std::function<void()> the_write_block);
+    // * 'the_write_block' is queued for execution on the scheduler
+    //   associated with the current realm. It will run after the write
+    //   mutex has been acquired.
+    // * 'the_write_block' should end by calling commit_transaction(),
+    //   cancel_transaction() or async_commit().
+    // * Returning without one of these calls will be equivalent to calling
+    //   cancel_transaction().
+    // * The call returns immediately allowing the caller to proceed
+    //   while the write mutex is held by someone else.
+    // * Write blocks from multiple calls to async_transaction() will be
+    //   executed in order.
+    // * A later call to begin_transaction() will wait for any earlier write blocks.
+    using async_handle = int;
+    async_handle async_transaction(const std::function<void()>& the_write_block);
 
     // Asynchronous commit.
-    // 'the_done_block' is scheduled for execution on the scheduler
-    // associated with the current realm. It will run after the commit
-    // has been completed. The call returns immediately allowing
-    // the caller to proceed while the I/O is performed on a dedicated
-    // background thread.
-    void schedule_commit(std::function<void()> the_done_block);
+    // * 'the_done_block' is queued for execution on the scheduler associated with
+    //   the current realm. It will run after the commit has reached stable storage.
+    // * The call returns immediately allowing the caller to proceed while
+    //   the I/O is performed on a dedicated background thread.
+    // * Callbacks to 'the_done_block' will occur in the order of async_commit()
+    // * If 'allow_grouping' is set, the next async_commit *may* run without an
+    //   intervening synchronization of stable storage.
+    // * Such a sequence of commits form a group. In case of a platform crash,
+    //   either none or all of the commits in a group will reach stable storage.
+    async_handle async_commit(const std::function<void()>& the_done_block, bool allow_grouping = false);
+
+    // Cancel a queued code block (either for an async_transaction or for an async_commit)
+    // * Cancelling a commit will not abort the commit, it will only cancel the callback
+    //   informing of commit completion.
+    void async_cancel(async_handle);
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -519,6 +534,9 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
+    std::vector<std::function<void()>> m_async_write_q;
+    std::vector<std::function<void()>> m_async_commit_q;
+
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

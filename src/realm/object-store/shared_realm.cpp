@@ -609,6 +609,49 @@ void Realm::wait_for_change_release()
     m_coordinator->wait_for_change_release();
 }
 
+// states:
+//   idle: no requests made (neither writes, nor commits)
+//   syncing: drive write block callbacks, unless the first request isolation.
+//   writing: drive write block callbacks.
+
+
+Realm::async_handle Realm::async_transaction(const std::function<void()>& the_write_block)
+{
+    m_async_write_q.push_back(std::move(the_write_block));
+    if (m_transaction->holds_write_mutex()) {
+        run_writes();
+    }
+    else {
+        m_transaction->async_request_write_mutex([&]() {
+            // must also hold inside "run_writes":
+            REALM_ASSERT(m_transaction->holds_write_mutex());
+            REALM_ASSERT(!m_transaction->is_dirty());
+            REALM_ASSERT(!m_transaction->is_synchronizing());
+            // callback happens on a different thread so...:
+            run_writes_on_proper_thread();
+        });
+    }
+    return 0;
+}
+
+Realm::async_handle Realm::async_commit(const std::function<void()>& the_done_block, bool allow_grouping)
+{
+    // grab a version lock on current version, push it along with the done block
+    DB::ReadLockInfo read_lock = m_transaction->m_read_lock;
+    // do in-buffer-cache commit_transaction();
+    m_transaction->commit_and_continue_with_lock_held();
+
+    m_async_commit_q.push_back(std::move(the_done_block));
+    if (m_async_write_q.empty() || !allow_grouping) {
+        //    capture current queue of done_blocks in scope, zero queue in object
+        //    do full fsync - but on a worker thread
+        //    then on ensuing callback:
+        //    release write mutex
+        //    run all in-scope queued done_blocks (and release for each its version lock)
+    }
+    return 0;
+}
+
 void Realm::begin_transaction()
 {
     verify_thread();

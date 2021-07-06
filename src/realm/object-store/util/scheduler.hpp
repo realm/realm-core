@@ -78,6 +78,8 @@ public:
     // This function is not thread-safe.
     virtual void set_notify_callback(std::function<void()>) = 0;
 
+    // virtual int enqueue_write(std::function<void()>& block) = 0;
+
     [[deprecated("Use Scheduler::make_frozen() instead")]] static std::shared_ptr<Scheduler>
     get_frozen(VersionID version);
 

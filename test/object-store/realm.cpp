@@ -746,6 +746,50 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
+TEST_CASE("SharedRealm: async_writes") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Int}}},
+    };
+    bool done = false;
+    auto realm = Realm::get_shared_realm(config);
+    int write_nr = 0;
+    int commit_nr = 0;
+    realm->async_transaction([&]() {
+        REQUIRE(write_nr == 0);
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 45);
+        realm->async_commit([&]() {
+            REQUIRE(commit_nr == 0);
+            ++commit_nr;
+        });
+    });
+    realm->async_transaction([&]() {
+        REQUIRE(write_nr == 1);
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        auto o = table->get_object(0);
+        o.set(col, o.get<int64_t>(col) + 37);
+        realm->async_commit([&]() {
+            REQUIRE(commit_nr == 1);
+            ++commit_nr;
+            done = true;
+        });
+    });
+    util::EventLoop::main().run_until([&] {
+        return done;
+    });
+    REQUIRE(done);
+}
+
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
         return;
