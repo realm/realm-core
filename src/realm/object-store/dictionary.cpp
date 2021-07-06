@@ -196,6 +196,12 @@ void Dictionary::erase(StringData key)
     dict().erase(key);
 }
 
+bool Dictionary::try_erase(StringData key)
+{
+    verify_in_transaction();
+    return dict().try_erase(key);
+}
+
 void Dictionary::remove_all()
 {
     verify_in_transaction();

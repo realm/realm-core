@@ -106,6 +106,7 @@ public:
 
     void erase(Mixed key);
     void erase(Iterator it);
+    bool try_erase(Mixed key);
 
     void nullify(Mixed);
     void remove_backlinks(CascadeState& state) const;
@@ -178,7 +179,7 @@ private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
-    mutable DictionaryClusterTree* m_clusters = nullptr;
+    mutable std::unique_ptr<DictionaryClusterTree> m_clusters;
     DataType m_key_type = type_String;
 
 #ifdef REALM_DEBUG

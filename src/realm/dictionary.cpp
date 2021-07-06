@@ -292,10 +292,7 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     init_from_parent();
 }
 
-Dictionary::~Dictionary()
-{
-    delete m_clusters;
-}
+Dictionary::~Dictionary() = default;
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
 {
@@ -306,8 +303,7 @@ Dictionary& Dictionary::operator=(const Dictionary& other)
             init_from_parent();
         }
         else {
-            delete m_clusters;
-            m_clusters = nullptr;
+            m_clusters.reset();
         }
     }
     return *this;
@@ -534,7 +530,6 @@ Mixed Dictionary::get(Mixed key) const
         return *opt_val;
     }
     throw realm::KeyNotFound("Dictionary::get");
-    return {};
 }
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
@@ -561,7 +556,8 @@ void Dictionary::create()
     if (!m_clusters && m_obj.is_valid()) {
         MemRef mem = Cluster::create_empty_cluster(m_obj.get_alloc());
         update_child_ref(0, mem.get_ref());
-        m_clusters = new DictionaryClusterTree(this, m_key_type, m_obj.get_alloc(), m_obj.get_row_ndx());
+        m_clusters = std::make_unique<DictionaryClusterTree>(static_cast<ArrayParent*>(this), m_key_type,
+                                                             m_obj.get_alloc(), m_obj.get_row_ndx());
         m_clusters->init_from_parent();
         m_clusters->add_columns();
     }
@@ -825,17 +821,16 @@ ObjKey Dictionary::handle_collision_in_erase(const Mixed& key, ObjKey k, Cluster
     return k2; // This will ensure that sibling is erased
 }
 
-void Dictionary::erase(Mixed key)
+bool Dictionary::try_erase(Mixed key)
 {
     validate_key_value(key);
     ClusterNode::State state;
     ObjKey k = get_internal_obj_key(key);
-
     if (size()) {
         state = m_clusters->try_get(k);
     }
     if (!state) {
-        throw KeyNotFound("Dictionary::erase");
+        return false;
     }
 
     if (m_clusters->has_collisions()) {
@@ -857,9 +852,20 @@ void Dictionary::erase(Mixed key)
         auto ndx = m_clusters->get_ndx(k);
         repl->dictionary_erase(*this, ndx, key);
     }
+
     CascadeState dummy;
     m_clusters->erase(k, dummy);
     bump_content_version();
+
+    return true;
+}
+
+
+void Dictionary::erase(Mixed key)
+{
+    if (!try_erase(key)) {
+        throw KeyNotFound("Dictionary::erase");
+    }
 }
 
 void Dictionary::erase(Iterator it)
@@ -916,8 +922,7 @@ void Dictionary::clear()
 
         // Just destroy the whole cluster
         m_clusters->destroy();
-        delete m_clusters;
-        m_clusters = nullptr;
+        m_clusters.reset();
 
         update_child_ref(0, 0);
 
@@ -932,16 +937,17 @@ bool Dictionary::init_from_parent() const
     auto ref = to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
 
     if (ref) {
-        if (!m_clusters)
-            m_clusters = new DictionaryClusterTree(const_cast<Dictionary*>(this), m_key_type, m_obj.get_alloc(),
-                                                   m_obj.get_row_ndx());
+        if (!m_clusters) {
+            auto parent = const_cast<ArrayParent*>(static_cast<const ArrayParent*>(this));
+            m_clusters =
+                std::make_unique<DictionaryClusterTree>(parent, m_key_type, m_obj.get_alloc(), m_obj.get_row_ndx());
+        }
 
         m_clusters->init_from_parent();
         valid = true;
     }
     else {
-        delete m_clusters;
-        m_clusters = nullptr;
+        m_clusters.reset();
     }
 
     update_content_version();
