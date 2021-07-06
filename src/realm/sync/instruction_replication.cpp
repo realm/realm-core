@@ -475,7 +475,8 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 {
     TrivialReplication::set(table, col, key, value, variant);
 
-    if (key.is_unresolved()) {
+    if (col == table->get_primary_key_column()) {
+        // Core emits Set instructions for PK values, but we don't want to record those.
         return;
     }
 
