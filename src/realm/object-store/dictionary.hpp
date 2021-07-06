@@ -64,6 +64,11 @@ struct DictionaryChangeSet {
     {
         add(modifications, key);
     }
+    std::pair<size_t, bool> insert_any(StringData key, Mixed value)
+    {
+        auto [it, inserted] = m_dict->insert(key, value);
+        return std::make_pair(it.get_position(), inserted);
+    }
 
 private:
     void add(std::vector<Mixed>& arr, const Mixed& key);

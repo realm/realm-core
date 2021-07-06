@@ -1597,37 +1597,271 @@ RLM_API void realm_collection_changes_get_ranges(
     realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
     realm_collection_move_t* out_moves, size_t max_moves);
 
+/**
+ * Get a set instance for the property of an object.
+ *
+ * Note: It is up to the caller to call `realm_release()` on the returned set.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_set_t* realm_get_set(realm_object_t*, realm_property_key_t);
+
+/**
+ * Create a `realm_set_t` from a pointer to a `realm::object_store::Set`,
+ * copy-constructing the internal representation.
+ *
+ * @param pset A pointer to an instance of `realm::object_store::Set`.
+ * @param n Must be equal to `sizeof(realm::object_store::Set)`.
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
+
+/**
+ * Create a `realm_set_t` from a pointer to a `realm::object_store::Set`,
+ * move-constructing the internal representation.
+ *
+ * @param pset A pointer to an instance of `realm::object_store::Set`.
+ * @param n Must be equal to `sizeof(realm::object_store::Set)`.
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
-RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_property_key_t);
-RLM_API size_t realm_set_size(const realm_set_t*);
+
+/**
+ * Get the size of a set, in number of unique elements.
+ *
+ * This function may fail if the object owning the set has been deleted.
+ *
+ * @param out_size Where to put the set size. May be NULL.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_size(const realm_set_t*, size_t* out_size);
+
+/**
+ * Get the property that this set came from.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_get_property(const realm_set_t*, realm_property_info_t* out_property_info);
+
+/**
+ * Get the value at @a index.
+ *
+ * Note that elements in a set move around arbitrarily when other elements are
+ * inserted/removed.
+ *
+ * @param out_value The resulting value, if no error occurred. May be NULL,
+ *                  though nonsensical.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_get(const realm_set_t*, size_t index, realm_value_t* out_value);
-RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index);
-RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t out_index);
+
+/**
+ * Find an element in a set.
+ *
+ * If @a value has a type that is incompatible with the set, it will be reported
+ * as not existing in the set.
+ *
+ * @param value The value to look for in the set.
+ * @param out_index If non-null, and the element is found, this will be
+ *                  populated with the index of the found element in the set.
+ * @param out_found If non-null, will be set to true if the element was found,
+ *                  otherwise will be set to false.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index, bool* out_found);
+
+/**
+ * Insert an element in a set.
+ *
+ * If the element is already in the set, this function does nothing (and does
+ * not report an error).
+ *
+ * @param value The value to insert.
+ * @param out_index If non-null, will be set to the index of the inserted
+ *                  element, or the index of the existing element.
+ * @param out_inserted If non-null, will be set to true if the element did not
+ *                     already exist in the set. Otherwise set to false.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t* out_index, bool* out_inserted);
+
+/**
+ * Erase an element from a set.
+ *
+ * If the element does not exist in the set, this function does nothing (and
+ * does not report an error).
+ *
+ * @param value The value to erase.
+ * @param out_erased If non-null, will be set to true if the element was found
+ *                   and erased, and otherwise set to false.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_erase(realm_set_t*, realm_value_t value, bool* out_erased);
+
+/**
+ * Clear a set of values.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_set_clear(realm_set_t*);
-RLM_API bool realm_set_assign(realm_set_t*, realm_value_t values, size_t num_values);
-RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_object_t*, void* userdata,
+
+/**
+ * In a set of objects, delete all objects in the set and clear the set. In a
+ * set of values, clear the set.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_remove_all(realm_set_t*);
+
+/**
+ * Replace the contents of a set with values.
+ *
+ * The provided values may contain duplicates, in which case the size of the set
+ * after calling this function will be less than @a num_values.
+ *
+ * @param values The list of values to insert.
+ * @param num_values The number of elements.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t num_values);
+
+/**
+ * Subscribe to notifications for this object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, void* userdata,
                                                                         realm_free_userdata_func_t free,
                                                                         realm_on_collection_change_func_t on_change,
                                                                         realm_callback_error_func_t on_error,
                                                                         realm_scheduler_t*);
 
+/**
+ * Get a dictionary instance for the property of an object.
+ *
+ * Note: It is up to the caller to call `realm_release()` on the returned dictionary.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t*, realm_property_key_t);
 
+/**
+ * Create a `realm_dictionary_t` from a pointer to a `realm::object_store::Dictionary`,
+ * copy-constructing the internal representation.
+ *
+ * @param pdict A pointer to an instance of `realm::object_store::Dictionary`.
+ * @param n Must be equal to `sizeof(realm::object_store::Dictionary)`.
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict, size_t n);
+
+/**
+ * Create a `realm_dictionary_t` from a pointer to a `realm::object_store::Dictionary`,
+ * move-constructing the internal representation.
+ *
+ * @param pdict A pointer to an instance of `realm::object_store::Dictionary`.
+ * @param n Must be equal to `sizeof(realm::object_store::Dictionary)`.
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_move(void* pdict, size_t n);
-RLM_API realm_dictionary_t* realm_get_dictionary(const realm_object_t*, realm_property_key_t);
-RLM_API size_t realm_dictionary_size(const realm_dictionary_t*);
-RLM_API bool realm_dictionary_get(const realm_dictionary_t*, realm_value_t key, realm_value_t* out_value,
-                                  bool* out_found);
-RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, realm_value_t value, bool* out_inserted,
-                                     size_t* out_index);
+
+/**
+ * Get the size of a dictionary (the number of unique keys).
+ *
+ * This function may fail if the object owning the dictionary has been deleted.
+ *
+ * @param out_size Where to put the dictionary size. May be NULL.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_size(const realm_dictionary_t*, size_t* out_size);
+
+
+/**
+ * Get the property that this dictionary came from.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_get_property(const realm_dictionary_t*, realm_property_info_t* out_info);
+
+/**
+ * Find an element in a dictionary.
+ *
+ * @param key The key to look for.
+ * @param out_value If non-null, the value for the corresponding key.
+ * @param out_found If non-null, will be set to true if the dictionary contained the key.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_find(const realm_dictionary_t*, realm_value_t key, realm_value_t* out_value,
+                                   bool* out_found);
+
+/**
+ * Get the key-value pair at @a index.
+ *
+ * Note that the indices of elements in the dictionary move around as other
+ * elements are inserted/removed.
+ *
+ * @param index The index in the dictionary.
+ * @param out_key If non-null, will be set to the key at the corresponding index.
+ * @param out_value If non-null, will be set to the value at the corresponding index.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_get(const realm_dictionary_t*, size_t index, realm_value_t* out_key,
+                                  realm_value_t* out_value);
+
+/**
+ * Insert or update an element in a dictionary.
+ *
+ * If the key already exists, the value will be overwritten.
+ *
+ * @param key The lookup key.
+ * @param value The value to insert.
+ * @param out_index If non-null, will be set to the index of the element after
+ *                  insertion/update.
+ * @param out_inserted If non-null, will be set to true if the key did not
+ *                     already exist.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, realm_value_t value, size_t* out_index,
+                                     bool* out_inserted);
+
+/**
+ * Erase a dictionary element.
+ *
+ * @param key The key of the element to erase.
+ * @param out_erased If non-null, will be set to true if the element was found
+ *                   and erased.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool* out_erased);
+
+/**
+ * Clear a dictionary.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
-typedef realm_value_t realm_key_value_pair_t[2];
-RLM_API bool realm_dictionary_assign(realm_dictionary_t*, const realm_key_value_pair_t* pairs, size_t num_pairs);
+
+/**
+ * Replace the contents of a dictionary with key/value pairs.
+ *
+ * The provided keys may contain duplicates, in which case the size of the
+ * dictionary after calling this function will be less than @a num_pairs.
+ *
+ * @param keys An array of keys of length @a num_pairs.
+ * @param values An array of values of length @a num_pairs.
+ * @param num_pairs The number of key-value pairs to assign.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, const realm_value_t* keys,
+                                     const realm_value_t* values);
+
+/**
+ * Subscribe to notifications for this object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_notification_token_t*
-realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, realm_free_userdata_func_t free,
+realm_dictionary_add_notification_callback(realm_dictionary_t*, void* userdata, realm_free_userdata_func_t free,
                                            realm_on_collection_change_func_t on_change,
                                            realm_callback_error_func_t on_error, realm_scheduler_t*);
 
