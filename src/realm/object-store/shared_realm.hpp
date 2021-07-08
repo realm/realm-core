@@ -27,6 +27,7 @@
 #include <realm/version_id.hpp>
 
 #include <memory>
+#include <deque>
 
 namespace realm {
 class AsyncOpenTask;
@@ -534,9 +535,22 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
-    std::vector<std::function<void()>> m_async_write_q;
-    std::vector<std::function<void()>> m_async_commit_q;
-
+    std::deque<std::function<void()>> m_async_write_q;
+    struct async_commit_desc {
+        DB::ReadLockInfo read_lock;
+        std::function<void()> when_completed;
+    };
+    std::vector<async_commit_desc> m_async_commit_q;
+    bool m_is_running_async_writes = false;
+    bool m_is_running_async_commit_completions = false;
+    bool m_has_requested_write_mutex = false;
+    bool m_async_commit_performed = false;
+    bool m_async_rollback_performed = false;
+    bool m_async_commit_barrier_requested = false;
+    void run_writes_on_proper_thread();
+    void run_writes();
+    void run_async_completions_on_proper_thread();
+    void run_async_completions();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

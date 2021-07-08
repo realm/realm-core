@@ -2171,7 +2171,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-VersionID Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool without_sync)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2180,6 +2180,8 @@ VersionID Transaction::commit_and_continue_as_read()
 
     flush_accessors_for_commit();
 
+    // FIXME: handle commit without sync to disk
+    static_cast<void>(without_sync);
     DB::version_type version = db->do_commit(*this); // Throws
 
     // advance read lock but dont update accessors:
@@ -2195,7 +2197,8 @@ VersionID Transaction::commit_and_continue_as_read()
     db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
 
-    db->do_end_write();
+    if (!with_held_lock)
+        db->do_end_write();
 
     // Remap file if it has grown, and update refs in underlying node structure
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws

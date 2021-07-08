@@ -98,7 +98,10 @@ Group& Realm::read_group()
 Transaction& Realm::transaction()
 {
     verify_open();
-
+    // for now: incompatible with async commits
+    REALM_ASSERT(!m_is_running_async_writes);
+    REALM_ASSERT(m_async_commit_q.empty());
+    REALM_ASSERT(m_async_write_q.empty());
     if (!m_transaction)
         begin_read(m_frozen_version.value_or(VersionID{}));
     return *m_transaction;
@@ -614,18 +617,76 @@ void Realm::wait_for_change_release()
 //   syncing: drive write block callbacks, unless the first request isolation.
 //   writing: drive write block callbacks.
 
+void Realm::run_writes_on_proper_thread()
+{
+    // ask scheduler to trigger callback on "run_writes"
+    REALM_ASSERT(false); // unimplemented
+}
+
+void Realm::run_async_completions_on_proper_thread()
+{
+    // ask scheduler to trigger callback on "run_async_completions"
+    REALM_ASSERT(false); // unimplemented
+}
+
+void Realm::run_async_completions()
+{
+    m_is_running_async_commit_completions = true;
+    for (auto& completion_desc : m_async_commit_q) {
+        m_transaction->release_read_lock(completion_desc.read_lock);
+        completion_desc.when_completed();
+    }
+    m_async_commit_q.clear();
+    m_is_running_async_commit_completions = false;
+    m_has_requested_write_mutex = false;
+}
+
+void Realm::run_writes()
+{
+    REALM_ASSERT(m_transaction->holds_write_mutex());
+    REALM_ASSERT(!m_transaction->is_synchronizing());
+    m_is_running_async_writes = true;
+    // this is tricky
+    //  - each pending call may itself add other async writes
+    //  - the 'run' will terminate as soon as a commit without grouping is requested
+    while (!m_async_write_q.empty() && !m_async_commit_barrier_requested) {
+        m_async_commit_performed = m_async_rollback_performed = false;
+        m_transaction->promote_to_write_with_lock_held();
+        // its unclear if we really, really need to copy out the closure while calling it,
+        // but the call may make additions to the queue which may cause relocation
+        auto write = m_async_write_q.front();
+        m_async_write_q.pop_front();
+        // FIXME: Handle any exceptions!
+        write();
+        // a commit or rollback should have been done during write(), but if not we roll back:
+        if (!m_async_commit_performed && !m_async_rollback_performed) {
+            m_transaction->rollback_with_lock_held();
+        }
+    }
+    m_is_running_async_writes = false;
+    if (m_async_commit_q.empty()) {
+        m_transaction->release_write_lock();
+    }
+    else {
+        m_transaction->async_request_sync_to_storage([&]() {
+            run_async_completions_on_proper_thread();
+        });
+    }
+}
 
 Realm::async_handle Realm::async_transaction(const std::function<void()>& the_write_block)
 {
+    REALM_ASSERT(!m_is_running_async_commit_completions);
+
     m_async_write_q.push_back(std::move(the_write_block));
-    if (m_transaction->holds_write_mutex()) {
-        run_writes();
-    }
-    else {
+    if (m_is_running_async_writes)
+        return 0;
+
+    if (!m_has_requested_write_mutex) {
+        m_has_requested_write_mutex = true;
         m_transaction->async_request_write_mutex([&]() {
             // must also hold inside "run_writes":
             REALM_ASSERT(m_transaction->holds_write_mutex());
-            REALM_ASSERT(!m_transaction->is_dirty());
             REALM_ASSERT(!m_transaction->is_synchronizing());
             // callback happens on a different thread so...:
             run_writes_on_proper_thread();
@@ -636,19 +697,18 @@ Realm::async_handle Realm::async_transaction(const std::function<void()>& the_wr
 
 Realm::async_handle Realm::async_commit(const std::function<void()>& the_done_block, bool allow_grouping)
 {
+    REALM_ASSERT(!m_is_running_async_commit_completions);
+    REALM_ASSERT(m_is_running_async_writes);
+    m_async_commit_performed = true;
+    if (!allow_grouping) {
+        m_async_commit_barrier_requested = true;
+    }
     // grab a version lock on current version, push it along with the done block
-    DB::ReadLockInfo read_lock = m_transaction->m_read_lock;
+    DB::ReadLockInfo read_lock = m_transaction->grab_read_lock();
     // do in-buffer-cache commit_transaction();
     m_transaction->commit_and_continue_with_lock_held();
 
-    m_async_commit_q.push_back(std::move(the_done_block));
-    if (m_async_write_q.empty() || !allow_grouping) {
-        //    capture current queue of done_blocks in scope, zero queue in object
-        //    do full fsync - but on a worker thread
-        //    then on ensuing callback:
-        //    release write mutex
-        //    run all in-scope queued done_blocks (and release for each its version lock)
-    }
+    m_async_commit_q.push_back({read_lock, std::move(the_done_block)});
     return 0;
 }
 
@@ -703,7 +763,9 @@ void Realm::cancel_transaction()
 {
     check_can_create_write_transaction(this);
     verify_thread();
-
+    // abort not supported yet for async transactions
+    REALM_ASSERT(!m_is_running_async_writes);
+    REALM_ASSERT(!m_is_running_async_commit_completions);
     if (!is_in_transaction()) {
         throw InvalidTransactionException("Can't cancel a non-existing write transaction");
     }
