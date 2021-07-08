@@ -201,10 +201,10 @@ protected:
     void recalculate_key_path_array() REQUIRES(m_callback_mutex);
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
-    bool any_callbacks_filtered() const noexcept;
+    bool any_callbacks_filtered() const noexcept REQUIRES(m_callback_mutex);
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to all of them.
-    bool all_callbacks_filtered() const noexcept;
+    bool all_callbacks_filtered() const noexcept REQUIRES(m_callback_mutex);
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
 
