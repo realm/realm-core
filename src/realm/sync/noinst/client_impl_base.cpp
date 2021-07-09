@@ -6,6 +6,7 @@
 #include <realm/util/random.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/http.hpp>
@@ -1837,8 +1838,6 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
-    REALM_ASSERT(!m_client_reset_operation);
-
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
@@ -1848,7 +1847,7 @@ void Session::activate()
                     "client reset = %3",
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
-        if (client_reset_config) {
+        if (client_reset_config && !m_client_reset_operation) {
             m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
                                                                            client_reset_config->seamless_loss,
                                                                            get_encryption_key())); // Throws
@@ -2281,9 +2280,15 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         auto client_reset_if_needed = [&]() -> bool {
-            bool did_client_reset = false;
-            if (m_client_reset_operation && m_client_reset_operation->finalize(client_file_ident)) {
-                did_client_reset = true;
+            if (!m_client_reset_operation || m_client_reset_operation->is_downloading_fresh_copy()) {
+                return false;
+            }
+            // this is the final stage of the reset operation and
+            // we need to clean it up regardless of if it succeeds or not
+            auto guard = util::make_scope_exit([&]() noexcept {
+                m_client_reset_operation.reset();
+            });
+            if (m_client_reset_operation->finalize(client_file_ident)) {
                 realm::VersionID client_reset_old_version;
                 realm::VersionID client_reset_new_version;
 
@@ -2311,9 +2316,9 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
                     m_sync_transact_reporter->report_sync_transact(client_reset_old_version,
                                                                    client_reset_new_version);
                 }
+                return true;
             }
-            m_client_reset_operation.reset();
-            return did_client_reset;
+            return false;
         };
         if (!client_reset_if_needed()) {
             ClientHistoryBase& history = access_realm(); // Throws
@@ -2641,6 +2646,7 @@ void Session::check_for_upload_completion()
     REALM_ASSERT(!m_deactivation_initiated);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
+    // during an ongoing client reset operation, we never upload anything
     if (m_client_reset_operation)
         return;
 
@@ -2672,6 +2678,21 @@ void Session::check_for_download_completion()
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
         return;
     m_last_triggering_download_mark = m_target_download_mark;
+    if (m_client_reset_operation) {
+        // At this point, we have successfully downloaded the fresh
+        // server copy of the Realm being reset. It is now ready for
+        // the diff operation to start.
+        m_client_reset_operation->download_complete();
+        // Synthesize an error in the client reset category.
+        // this will cause the session to do a soft reset and
+        // begin again on the local Realm.
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        std::error_code ec = make_error_code(ProtocolError::client_file_expired);
+        bool is_fatal = true;
+        std::string message = "continue client reset with fresh file downloaded";
+        on_suspended(ec, message, is_fatal); // Throws
+        return;
+    }
     if (REALM_UNLIKELY(!m_allow_upload)) {
         // Activate the upload process now, and enable immediate reactivation
         // after a subsequent fast reconnect.

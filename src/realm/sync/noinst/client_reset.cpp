@@ -543,10 +543,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     }
                 }
                 else {
+                    REALM_ASSERT(!col_key_src.is_collection()); // FIXME: support for set/dictionary
                     auto val_src = src.get_any(col_key_src);
                     auto val_dst = dst.get_any(col_key_dst);
                     if (val_src != val_dst) {
-                        dst.set(col_key_dst, val_src);
+                        dst.set_any(col_key_dst, val_src);
                         updated = true;
                     }
                 }
@@ -629,10 +630,10 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
 }
 
 client_reset::LocalVersionIDs
-client_reset::perform_client_reset_diff(const std::string& path_local,
+client_reset::perform_client_reset_diff(const std::string& path_local, const util::Optional<std::string> path_fresh,
                                         const util::Optional<std::array<char, 64>>& encryption_key,
-                                        sync::SaltedFileIdent client_file_ident, bool seamless_loss,
-                                        sync::SaltedVersion server_version, util::Logger& logger)
+                                        sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
+                                        util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
                 "encryption = %2, client_file_ident.ident = %3, "
@@ -650,19 +651,18 @@ client_reset::perform_client_reset_diff(const std::string& path_local,
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
 
-    //    std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
-    //    DBRef sg_remote = DB::create(*history_remote, shared_group_options);
-    //    auto wt_remote = sg_remote->start_write();
-    //    sync::version_type current_version_remote = wt_remote->get_version();
-    //    history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-    //    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
-
-    // make breaking changes in the local copy which cannot be advanced
     // changes made here are reflected in the notifier logs
-    if (seamless_loss) {
-        clear_all_tables(*group_local, logger);
+    if (path_fresh) { // seamless_loss mode
+        std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(*path_fresh);
+        DBRef sg_remote = DB::create(*history_remote, shared_group_options);
+        auto wt_remote = sg_remote->start_write();
+        sync::version_type current_version_remote = wt_remote->get_version();
+        history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+
+        transfer_group(*wt_remote, *group_local, logger);
     }
-    else {
+    else { // manual discard mode
         remove_all_tables(*group_local, logger);
     }
 

@@ -49,10 +49,10 @@ struct LocalVersionIDs {
     realm::VersionID old_version;
     realm::VersionID new_version;
 };
-LocalVersionIDs perform_client_reset_diff(const std::string& path_local,
+LocalVersionIDs perform_client_reset_diff(const std::string& path_local, const util::Optional<std::string> path_fresh,
                                           const util::Optional<std::array<char, 64>>& encryption_key,
-                                          sync::SaltedFileIdent client_file_ident, bool seamless_loss,
-                                          sync::SaltedVersion server_version, util::Logger& logger);
+                                          sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
+                                          util::Logger& logger);
 
 } // namespace client_reset
 } // namespace _impl

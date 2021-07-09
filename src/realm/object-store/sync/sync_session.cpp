@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/sync/client.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/websocket.hpp>
@@ -396,6 +397,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
     : m_state(&State::inactive)
     , m_config(std::move(config))
+    , m_session_realm_path(realm_path)
     , m_realm_path(std::move(realm_path))
     , m_client(client)
 {
@@ -701,6 +703,8 @@ void SyncSession::do_create_sync_session()
         sync::Session::Config::ClientReset config;
         config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
         session_config.client_reset_config = config;
+        m_realm_path = _impl::ClientResetOperation::open_session_for_path(m_realm_path, config.seamless_loss,
+                                                                          m_config.realm_encryption_key);
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
@@ -836,7 +840,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_config.user->sync_manager()->unregister_session(m_realm_path);
+    m_config.user->sync_manager()->unregister_session(m_session_realm_path);
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,

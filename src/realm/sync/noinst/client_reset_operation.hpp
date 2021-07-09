@@ -25,10 +25,18 @@ public:
     // will be inserted in the Realm after download.
     bool finalize(sync::SaltedFileIdent salted_file_ident);
 
+    void download_complete();
+    bool is_downloading_fresh_copy();
+
+    static std::string open_session_for_path(std::string realm_path, bool seamless_loss,
+                                             util::Optional<std::array<char, 64>> encryption_key);
+
     realm::VersionID get_client_reset_old_version();
     realm::VersionID get_client_reset_new_version();
 
 private:
+    bool has_fresh_copy();
+
     const std::string m_realm_path;
     bool m_seamless_loss;
     util::Optional<std::array<char, 64>> m_encryption_key;

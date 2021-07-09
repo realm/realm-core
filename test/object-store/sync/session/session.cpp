@@ -886,6 +886,7 @@ TEST_CASE("sync: client reset") {
             },
             [](auto&) {});
         wait_for_download(*realm);
+
         // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
@@ -970,12 +971,12 @@ TEST_CASE("sync: client reset") {
             CHECK(results.size() == 1);
             CHECK(results.get<Obj>(0).get<Int>("value") == 6);
             CHECK(object.obj().get<Int>("value") == 6);
-            REQUIRE_INDICES(results_changes.modifications); // FIXME: should this actually be a modification?
-            REQUIRE_INDICES(results_changes.insertions, 0);
-            REQUIRE_INDICES(results_changes.deletions, 0);
-            REQUIRE_INDICES(object_changes.modifications);
-            REQUIRE_INDICES(object_changes.insertions, 0);
-            REQUIRE_INDICES(object_changes.deletions, 0);
+            REQUIRE_INDICES(results_changes.modifications, 0);
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions);
+            REQUIRE_INDICES(object_changes.modifications, 0);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
         }
 
         SECTION("delete and insert new") {
@@ -1073,12 +1074,12 @@ TEST_CASE("sync: client reset") {
             CHECK(results.get<Obj>(0).get<Int>("value") == 6);
             CHECK(object.is_valid());
             CHECK(object.obj().get<Int>("value") == 6);
-            REQUIRE_INDICES(results_changes.modifications);
-            REQUIRE_INDICES(results_changes.insertions, 0);
-            REQUIRE_INDICES(results_changes.deletions, 0, 1);
-            REQUIRE_INDICES(object_changes.modifications);
-            REQUIRE_INDICES(object_changes.insertions, 0);
-            REQUIRE_INDICES(object_changes.deletions, 0);
+            REQUIRE_INDICES(results_changes.modifications, 0);
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions, 1);
+            REQUIRE_INDICES(object_changes.modifications, 0);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
         }
     }
 }
