@@ -310,21 +310,26 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+                                               SyncManager* sync_manager)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
-                : SyncSession(client, std::move(realm_path), std::move(config))
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
+                              SyncManager* sync_manager)
+                : SyncSession(client, std::move(realm_path), std::move(config), sync_manager)
             {
             }
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config));
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
+                                                   std::move(sync_manager));
     }
     // }
 
+    std::shared_ptr<SyncManager> sync_manager() const;
+
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, SyncManager* sync_manager);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
@@ -344,6 +349,7 @@ private:
     void do_create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
+    void detach_from_sync_manager();
 
     void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
                                  _impl::SyncProgressNotifier::NotifierType direction);
@@ -364,6 +370,7 @@ private:
     bool m_force_client_reset = false;
     std::string m_realm_path;
     _impl::SyncClient& m_client;
+    SyncManager* m_sync_manager = nullptr;
 
     int64_t m_completion_request_counter = 0;
     CompletionCallbacks m_completion_callbacks;

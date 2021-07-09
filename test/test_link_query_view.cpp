@@ -1130,6 +1130,38 @@ TEST(LinkList_QueryOnLinkListWithNonTableOrderThroughLinkWithIndex)
     CHECK_EQUAL(3, filtered.size());
 }
 
+TEST(LinkList_SameAsAboveButJustWithSet)
+{
+    Group group;
+
+    TableRef target = group.add_table("target");
+    auto int_col = target->add_column(type_Int, "col1");
+    target->add_search_index(int_col);
+    TableRef middle = group.add_table("middle");
+    auto link_col = middle->add_column(*target, "link");
+    TableRef origin = group.add_table("origin");
+    auto set_col = origin->add_column_set(*middle, "linkset");
+
+    auto target_obj = target->create_object().set_all(1);
+
+    std::vector<ObjKey> middle_keys;
+    middle->create_objects(3, middle_keys);
+    for (int i = 0; i < 3; ++i)
+        middle->get_object(middle_keys[i]).set_all(target_obj.get_key());
+
+    Obj origin_obj = origin->create_object();
+    auto set = origin_obj.get_linkset(set_col);
+
+    set.insert(middle_keys[1]);
+    set.insert(middle_keys[0]);
+    set.insert(middle_keys[2]);
+
+    auto unfiltered = middle->where(set).find_all();
+    CHECK_EQUAL(3, unfiltered.size());
+    auto filtered = middle->where(set).and_query(middle->link(link_col).column<Int>(int_col) == 1).find_all();
+    CHECK_EQUAL(3, filtered.size());
+}
+
 TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
 {
     Group group;

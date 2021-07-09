@@ -94,6 +94,9 @@ static std::vector<std::string> valid_queries = {
     "'\\uffFf' = '\\u0020'",
     "'\\u01111' = 'asdf\\u0111asdf'",
 
+    // utf8
+    "你好=5",
+
     // expressions (numbers, bools, keypaths, arguments)
     "-1 = 12",
     "0 = 001",
@@ -396,6 +399,43 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     return q2;
 }
 
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      const util::Any* arg_list, size_t num_args, size_t num_results)
+{
+    query_parser::AnyContext ctx;
+    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
+
+    Query q = t->query(query_string, args, {});
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
+
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      std::vector<Mixed> args, size_t num_results)
+{
+    Query q = t->query(query_string, args, {});
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, args, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
 
 TEST(Parser_empty_input)
 {
@@ -542,7 +582,6 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "licensed == true", 3);
     verify_query(test_context, t, "licensed == false", 2);
     verify_query(test_context, t, "licensed = true || licensed = true", 3);
-    verify_query(test_context, t, "licensed = 1 || licensed = 0", 5);
     verify_query(test_context, t, "licensed = true || licensed = false", 5);
     verify_query(test_context, t, "licensed == true || licensed == false", 5);
     verify_query(test_context, t, "licensed == true || buddy.licensed == true", 3);
@@ -581,6 +620,44 @@ TEST(Parser_basic_serialisation)
                        CHECK(std::string(e.what()).find("missing_property") != std::string::npos));
 }
 
+TEST_TYPES(Parser_Numerics, Prop<Int>, Nullable<Int>, Indexed<Int>, NullableIndexed<Int>, Prop<Decimal128>,
+           Nullable<Decimal128>)
+{
+    Group g;
+    std::string table_name = "table";
+    TableRef t = g.add_table(table_name);
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    constexpr bool nullable = TEST_TYPE::is_nullable;
+    constexpr bool indexed = TEST_TYPE::is_indexed;
+    auto col_key = t->add_column(TEST_TYPE::data_type, "values", nullable);
+    if (indexed) {
+        t->add_search_index(col_key);
+    }
+    TestValueGenerator gen;
+    auto values = gen.values_from_int<underlying_type>({-1, 0, 1, 4294967295ll, -4294967295ll, 4294967296ll,
+                                                        -4294967296ll, std::numeric_limits<int64_t>::max(),
+                                                        std::numeric_limits<int64_t>::lowest()});
+    std::vector<Mixed> args;
+    for (auto val : values) {
+        args.push_back(Mixed{val});
+    }
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        t->create_object(ObjKey{}, {{col_key, values[i]}});
+    }
+    if (nullable) {
+        t->create_object(ObjKey{}, {{col_key, realm::null{}}});
+    }
+    for (size_t i = 0; i < values.size(); ++i) {
+        std::stringstream out;
+        out << "values == ";
+        out.precision(100);
+        out << values[i];
+        verify_query(test_context, t, out.str(), 1);
+        verify_query_sub(test_context, t, util::format("values == $%1", i), args, 1);
+    }
+    verify_query(test_context, t, "values == null", nullable ? 1 : 0);
+}
 
 TEST(Parser_LinksToSameTable)
 {
@@ -1271,28 +1348,6 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      const util::Any* arg_list, size_t num_args, size_t num_results)
-{
-    query_parser::AnyContext ctx;
-    std::string empty_string;
-    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
-
-    Query q = t->query(query_string, args, {});
-
-    size_t q_count = q.count();
-    CHECK_EQUAL(q_count, num_results);
-    std::string description = q.get_description();
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
-    Query q2 = t->query(description, args, {});
-
-    size_t q2_count = q2.count();
-    CHECK_EQUAL(q2_count, num_results);
-    if (q_count != num_results || q2_count != num_results) {
-        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
-    }
-}
-
 TEST(Parser_substitution)
 {
     Group g;
@@ -1411,16 +1466,14 @@ TEST(Parser_substitution)
     // int
     verify_query_sub(test_context, t, "age > $1", args, num_args, 2);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $3", args, num_args, 0));
-    verify_query_sub(test_context, t, "age > $4", args, num_args, 3);
+    verify_query_sub(test_context, t, "age > $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $6", args, num_args, 0));
     verify_query_sub(test_context, t, "age > $7", args, num_args, 2);
     // double
     verify_query_sub(test_context, t, "fees > $0", args, num_args, 4);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $3", args, num_args, 0));
-    verify_query_sub(test_context, t, "fees > $4", args, num_args, 5);
+    verify_query_sub(test_context, t, "fees > $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $6", args, num_args, 0));
     verify_query_sub(test_context, t, "fees > $7", args, num_args, 1);
@@ -1428,8 +1481,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "floats > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "floats > $1", args, num_args, 1);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $2", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $3", args, num_args, 0));
-    verify_query_sub(test_context, t, "floats > $4", args, num_args, 2);
+    verify_query_sub(test_context, t, "floats > $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $6", args, num_args, 0));
     // string
@@ -1441,13 +1493,13 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "name == $6", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $7", args, num_args, 0));
     // bool
-    verify_query_sub(test_context, t, "paid == $0", args, num_args, 0);
-    verify_query_sub(test_context, t, "paid == $1", args, num_args, 0);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $2", args, num_args, 0));
     verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $6", args, num_args, 0));
-    verify_query_sub(test_context, t, "paid == $7", args, num_args, 0);
+    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $7", args, num_args, 0));
     // timestamp
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $1", args, num_args, 0));
@@ -2256,35 +2308,33 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_EQUAL(message, "Property 'values' in 'table' is not an Object");
 }
 
-TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
-           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
+TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>, Nullable<Bool>, Prop<Float>,
+           Nullable<Float>, Prop<Double>, Nullable<Double>, Prop<Decimal128>, Nullable<Decimal128>, Prop<ObjectId>,
+           Nullable<ObjectId>, Prop<UUID>, Nullable<UUID>, Prop<Timestamp>, Nullable<Timestamp>)
 {
     Group g;
     TableRef t = g.add_table("table");
     TestValueGenerator gen;
 
-    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
-    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    using type = typename TEST_TYPE::type;
+    constexpr bool is_nullable = TEST_TYPE::is_nullable;
+    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", is_nullable);
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<TEST_TYPE> values = gen.values_from_int<TEST_TYPE>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     auto obj2 = t->create_object(); // empty list
     auto obj3 = t->create_object(); // {1}
     underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
-    obj3.get_list<TEST_TYPE>(col).add(value_1);
+    obj3.get_list<type>(col).add(value_1);
     auto obj4 = t->create_object(); // {1, 1}
-    obj4.get_list<TEST_TYPE>(col).add(value_1);
-    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    obj4.get_list<type>(col).add(value_1);
+    obj4.get_list<type>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
-    if constexpr (is_optional) {
-        obj5.get_list<TEST_TYPE>(col).add(none);
-    }
-    else {
-        obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
-    }
+    obj5.get_list<type>(col).add(TEST_TYPE::default_value());
+
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
     }
@@ -2298,23 +2348,40 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);  // obj4
         verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);   // obj1, obj3, obj4, obj5
         verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
-        verify_query(test_context, t, util::format("%1values == NULL", path), (is_optional ? 1 : 0)); // obj5
+        verify_query(test_context, t, util::format("%1values == NULL", path), (is_nullable ? 1 : 0)); // obj5
 
         util::Any args[] = {value_1};
         size_t num_args = 1;
-        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args,
-                         3); // obj1, obj3, obj4
-        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args, 2); // obj1, obj5
+        size_t num_matching_value_1 = 3;                       // obj1, obj3, obj4
+        size_t num_not_matching_value_1 = 2;                   // obj1, obj5
+        size_t num_all_matching_value_1 = 3;                   // obj2, obj3, obj4
+        size_t num_all_not_matching_value_1 = 2;               // obj2, obj5
+        size_t num_none_matching_value_1 = 2;                  // obj2, obj5
+        size_t num_none_not_matching_value_1 = 3;              // obj2, obj3, obj4
+        if constexpr (std::is_same_v<underlying_type, bool>) { // bool reuses values
+            num_matching_value_1 = is_nullable ? 3 : 4;
+            num_not_matching_value_1 = is_nullable ? 2 : 1;
+            num_all_matching_value_1 = is_nullable ? 3 : 4;
+            num_all_not_matching_value_1 = is_nullable ? 2 : 1;
+            num_none_matching_value_1 = is_nullable ? 2 : 1;
+            num_none_not_matching_value_1 = is_nullable ? 3 : 4;
+        }
+        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args, num_matching_value_1);
+        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args,
+                         num_not_matching_value_1);
         verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args,
-                         3); // obj1, obj3, obj4
-        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args, 2); // obj1, obj5
+                         num_matching_value_1);
+        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args,
+                         num_not_matching_value_1);
 
         verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args,
-                         3); // obj2, obj3, obj4
-        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2);  // obj2, obj5
-        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
+                         num_all_matching_value_1);
+        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args,
+                         num_all_not_matching_value_1);
+        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args,
+                         num_none_matching_value_1);
         verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
-                         3); // obj2, obj3, obj4
+                         num_none_not_matching_value_1);
     }
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing.length == 2", 0), message);
@@ -2326,6 +2393,121 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
         CHECK_EQUAL(message, "Property 'values' in 'table' is not an Object");
     }
+}
+
+TEST(Parser_list_of_primitive_mixed)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    constexpr bool nullable = true;
+    auto col_list = t->add_column_list(type_Mixed, "values", nullable);
+    CHECK_THROW_ANY(t->add_search_index(col_list));
+
+    Obj obj_empty_list = t->create_object();
+    auto empty_list = obj_empty_list.get_list<Mixed>(col_list);
+    CHECK_EQUAL(empty_list.min(), Mixed{});
+    CHECK_EQUAL(empty_list.max(), Mixed{});
+    CHECK_EQUAL(empty_list.sum(), Mixed{0});
+    CHECK_EQUAL(empty_list.avg(), Mixed{});
+
+    Obj obj_with_null = t->create_object();
+    auto list_with_null = obj_with_null.get_list<Mixed>(col_list);
+    list_with_null.add(Mixed{});
+    CHECK_EQUAL(list_with_null.min(), Mixed{});
+    CHECK_EQUAL(list_with_null.max(), Mixed{});
+    CHECK_EQUAL(list_with_null.sum(), Mixed{0});
+    CHECK_EQUAL(list_with_null.avg(), Mixed{});
+
+    Obj obj_with_empty_string = t->create_object();
+    auto empty_string_list = obj_with_empty_string.get_list<Mixed>(col_list);
+    empty_string_list.add(Mixed{""});
+    CHECK_EQUAL(empty_string_list.min(), Mixed{""});
+    CHECK_EQUAL(empty_string_list.max(), Mixed{""});
+    CHECK_EQUAL(empty_string_list.sum(), Mixed{0});
+    CHECK_EQUAL(empty_string_list.avg(), Mixed{});
+
+    Obj obj_with_ints = t->create_object();
+    auto ints_list = obj_with_ints.get_list<Mixed>(col_list);
+    ints_list.add(Mixed{0});
+    ints_list.add(Mixed{1});
+    ints_list.add(Mixed{2});
+    CHECK_EQUAL(ints_list.min(), Mixed{0});
+    CHECK_EQUAL(ints_list.max(), Mixed{2});
+    CHECK_EQUAL(ints_list.sum(), Mixed{3});
+    CHECK_EQUAL(ints_list.avg(), Mixed{1});
+
+    Obj obj_with_numerics = t->create_object();
+    auto numeric_list = obj_with_numerics.get_list<Mixed>(col_list);
+    numeric_list.add(Mixed{1});
+    numeric_list.add(Mixed{Decimal128(2.2)});
+    numeric_list.add(Mixed{float(3.3f)});
+    numeric_list.add(Mixed{double(4.4)});
+    CHECK_EQUAL(numeric_list.min(), Mixed{1});
+    CHECK_EQUAL(numeric_list.max(), Mixed{4.4});
+    CHECK_EQUAL(numeric_list.sum(), Mixed{10.9});
+    CHECK_EQUAL(numeric_list.avg(), Mixed{2.725});
+
+    Obj obj_with_strings = t->create_object();
+    auto strings_list = obj_with_strings.get_list<Mixed>(col_list);
+    strings_list.add(Mixed{"one"});
+    strings_list.add(Mixed{"two"});
+    strings_list.add(Mixed{"three"});
+    strings_list.add(Mixed{""});
+    strings_list.add(Mixed{StringData{}});
+    CHECK_EQUAL(strings_list.min(), Mixed{""});
+    CHECK_EQUAL(strings_list.max(), Mixed{"two"});
+    CHECK_EQUAL(strings_list.sum(), Mixed(0));
+    CHECK_EQUAL(strings_list.avg(), Mixed());
+
+    Obj obj_with_mixed_types = t->create_object();
+    auto mixed_list = obj_with_mixed_types.get_list<Mixed>(col_list);
+    mixed_list.add(Mixed{"foo"});
+    mixed_list.add(Mixed{1});
+    mixed_list.add(Mixed{Timestamp(1, 0)});
+    mixed_list.add(Mixed{Decimal128(2.5)});
+    mixed_list.add(Mixed{float(3.7)});
+    mixed_list.add(Mixed{ObjectId::gen()});
+    mixed_list.add(Mixed{UUID()});
+    mixed_list.add(Mixed{});
+    mixed_list.add(Mixed{false});
+    mixed_list.add(Mixed{true});
+    mixed_list.add(Mixed{null::get_null_float<float>()});
+    mixed_list.add(Mixed{null::get_null_float<double>()});
+    mixed_list.add(Mixed{Decimal128{realm::null()}});
+    mixed_list.add(Mixed{Decimal128{StringData{}}}); // NaN
+    CHECK_EQUAL(mixed_list.min(), Mixed(false));
+    CHECK_EQUAL(mixed_list.max(), Mixed(UUID()));
+    CHECK_EQUAL(mixed_list.sum(), Mixed(7.2));
+    CHECK_EQUAL(mixed_list.avg(), Mixed(2.4));
+
+    verify_query(test_context, t, "values.@count == 0", 1);
+    verify_query(test_context, t, "values.@size == 1", 2);
+    verify_query(test_context, t, "ANY values == NULL", 3);
+    verify_query(test_context, t, "ALL values == NULL", 2);
+    verify_query(test_context, t, "ALL values == NULL && values.@size > 0", 1);
+    verify_query(test_context, t, "NONE values == NULL", 4);
+    verify_query(test_context, t, "NONE values == NULL && values.@size > 0", 3);
+    verify_query(test_context, t, "ANY values == 'one'", 1);
+    verify_query(test_context, t, "ANY values CONTAINS[c] 'O'", 2);
+    verify_query(test_context, t, "values.length == 3", 2); // string lengths
+    verify_query(test_context, t, "ANY values == false", 1);
+    verify_query(test_context, t, "ANY values == true", 1);
+    verify_query(test_context, t, "values.@type == 'string'", 3);
+    verify_query(test_context, t, "values == T1:0", 1);
+    verify_query(test_context, t, "values.@sum > 0", 3);
+    verify_query(test_context, t, "values.@sum == 0", 4);
+    verify_query(test_context, t, "values.@sum == 3", 1);
+    verify_query(test_context, t, "values.@sum == 10.9", 1);
+    verify_query(test_context, t, "values.@sum == 7.2", 1);
+    verify_query(test_context, t, "values.@avg == 1", 1);
+    verify_query(test_context, t, "values.@avg == 2.725", 1);
+    verify_query(test_context, t, "values.@avg == 2.4", 1);
+    verify_query(test_context, t, "values.@min == false", 1);
+    verify_query(test_context, t, "values.@min == 1", 1);
+    verify_query(test_context, t, "values.@max == 2", 1);
+    verify_query(test_context, t, "values.@max == 4.4", 1);
+    verify_query(test_context, t, "values.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
@@ -3091,6 +3273,47 @@ TEST(Parser_BacklinkCount)
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.@max.item_id == 1", -1));
 }
 
+TEST(Parser_BacklinksIndex)
+{
+    Group g;
+
+    TableRef items = g.add_table("items");
+    auto col_id = items->add_column(type_Int, "item_id");
+
+    std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
+    ObjKeys item_keys(item_ids);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        items->create_object(item_keys[i]).set(col_id, item_ids[i]);
+    }
+
+    auto person = g.add_table("person");
+    auto col_age = person->add_column(type_Int, "age");
+    person->add_search_index(col_age);
+    auto col_link = person->add_column_list(*items, "owns");
+    auto col_set = person->add_column_set(*items, "wish");
+    auto col_dict = person->add_column_dictionary(*items, "borrowed");
+
+    auto paul = person->create_object().set(col_age, 48);
+    auto list = paul.get_linklist(col_link);
+    list.add(item_keys[0]);
+    list.add(item_keys[1]);
+    auto set = paul.get_linkset(col_set);
+    set.insert(item_keys[2]);
+    set.insert(item_keys[3]);
+
+    auto peter = person->create_object().set(col_age, 25);
+    list = peter.get_linklist(col_link);
+    list.add(item_keys[0]);
+    list.add(item_keys[4]);
+    auto dict = peter.get_dictionary(col_dict);
+    dict.insert("Mary", Mixed(item_keys[3]));
+    dict.insert("Paul", Mixed());
+
+    verify_query(test_context, items, "@links.person.owns.age == 48", 2);
+    verify_query(test_context, items, "@links.person.wish.age == 48", 2);
+    verify_query(test_context, items, "@links.person.borrowed.age == 25", 1);
+}
+
 
 TEST(Parser_SubqueryVariableNames)
 {
@@ -3763,15 +3986,14 @@ TEST(Parser_TimestampNullable)
     CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
 }
 
-TEST(Parser_ObjectIdTimestamp)
+
+TEST(Parser_ObjectId)
 {
     using util::serializer::print_value;
     Group g;
     auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
     auto pk_col_key = table->get_primary_key_column();
     auto nullable_oid_col_key = table->add_column(type_ObjectId, "nid", true);
-    auto ts_col_key = table->add_column(type_Timestamp, "ts");
-    auto nullable_ts_col_key = table->add_column(type_Timestamp, "nts", true);
 
     auto now = std::chrono::system_clock::now();
 
@@ -3791,8 +4013,6 @@ TEST(Parser_ObjectIdTimestamp)
     for (size_t i = 0; i < times.size(); ++i) {
         auto obj = table->create_object_with_primary_key({ids[i]});
         obj.set(nullable_oid_col_key, ids[i]);
-        obj.set(ts_col_key, times[i]);
-        obj.set(nullable_ts_col_key, times[i]);
     }
     // add one object with default values, we assume time > now, and null
     auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
@@ -3802,32 +4022,23 @@ TEST(Parser_ObjectIdTimestamp)
     CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
 
-    //  id  |  nid  |  ts  |  nts  |
-    // -----------------------------
-    //  t1  |  t1   |  t1  |  t1   |
-    //  tNow|  tNow |  tNow|  tNow |
-    //  t25 |  t25  |  t25 |  t25  |
-    //  t00 |  t00  |  t00 |  t00  |
-    //  tNow|  null |  t00 |  null |
+    //  id  |  nid  |
+    // --------------
+    //  t1  |  t1   |
+    //  tNow|  tNow |
+    //  t25 |  t25  |
+    //  t00 |  t00  |
+    //  tNow|  null |
 
+    // g.to_json(std::cout);
     verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
     verify_query(test_context, table, "nid == NULL", 1);
-    verify_query(test_context, table, "ts == " + print_value(Timestamp(0, 0)), 2);
-    verify_query(test_context, table, "nts == NULL", 1);
 
     for (auto oid : ids) {
         verify_query(test_context, table, "id == oid(" + oid.to_string() + ")", 1);
         verify_query(test_context, table, "id != oid(" + oid.to_string() + ")", table->size() - 1);
         verify_query(test_context, table, "nid == oid(" + oid.to_string() + ")", 1);
         verify_query(test_context, table, "nid != oid(" + oid.to_string() + ")", table->size() - 1);
-    }
-
-    for (auto ts : times) {
-        verify_query(test_context, table, "ts == " + print_value(ts), ts == Timestamp(0, 0) ? 2 : 1);
-        verify_query(test_context, table, "ts != " + print_value(ts),
-                     table->size() - (ts == Timestamp(0, 0) ? 2 : 1));
-        verify_query(test_context, table, "nts == " + print_value(ts), 1);
-        verify_query(test_context, table, "nts != " + print_value(ts), table->size() - 1);
     }
 
     // everything should match >= 0, except for null
@@ -3843,8 +4054,8 @@ TEST(Parser_ObjectIdTimestamp)
 
     // argument substitution checks with an ObjectId
     util::Any args[] = {t1, tNow, t25, t00, realm::null()};
-    util::Any ts_args[] = {ts_t1, ts_now, ts_t25, ts_00, Timestamp{realm::null()}};
     size_t num_args = 5;
+
     verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
@@ -3856,242 +4067,47 @@ TEST(Parser_ObjectIdTimestamp)
     verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $4", args, num_args, 1);
 
-    verify_query_sub(test_context, table, "ts == $0", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "ts == $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "ts == $2", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "ts == $3", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "ts == $4", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nts == $0", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nts == $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nts == $2", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nts == $3", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nts == $4", ts_args, num_args, 1);
-
-    // ObjectId property queries against a Timestamp value
-    // null
-    verify_query_sub(test_context, table, "id == $4", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid == $4", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "id != $4", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "nid != $4", ts_args, num_args, table->size() - 1);
-
-    // equality
-    verify_query_sub(test_context, table, "id == $0", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id == $1", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id == $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id == $3", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nid == $0", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid == $1", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid == $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid == $3", ts_args, num_args, 1);
-    verify_query(test_context, table, util::format("id == %1", print_value(times[0])), 0);
-    verify_query(test_context, table, util::format("id == %1", print_value(times[1])), 0);
-    verify_query(test_context, table, util::format("id == %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("id == %1", print_value(times[3])), 1);
-    verify_query(test_context, table, util::format("nid == %1", print_value(times[0])), 0);
-    verify_query(test_context, table, util::format("nid == %1", print_value(times[1])), 0);
-    verify_query(test_context, table, util::format("nid == %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("nid == %1", print_value(times[3])), 1);
-
-    // inequality
-    verify_query_sub(test_context, table, "id != $0", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "id != $1", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "id != $2", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "id != $3", ts_args, num_args, table->size() - 1);
-    verify_query_sub(test_context, table, "nid != $0", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "nid != $1", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "nid != $2", ts_args, num_args, table->size());
-    verify_query_sub(test_context, table, "nid != $3", ts_args, num_args, table->size() - 1);
-    verify_query(test_context, table, util::format("id != %1", print_value(times[0])), table->size());
-    verify_query(test_context, table, util::format("id != %1", print_value(times[1])), table->size());
-    verify_query(test_context, table, util::format("id != %1", print_value(times[2])), table->size());
-    verify_query(test_context, table, util::format("id != %1", print_value(times[3])), table->size() - 1);
-    verify_query(test_context, table, util::format("nid != %1", print_value(times[0])), table->size());
-    verify_query(test_context, table, util::format("nid != %1", print_value(times[1])), table->size());
-    verify_query(test_context, table, util::format("nid != %1", print_value(times[2])), table->size());
-    verify_query(test_context, table, util::format("nid != %1", print_value(times[3])), table->size() - 1);
-
     // greater
-    verify_query_sub(test_context, table, "id > $0", ts_args, num_args, 3);
-    verify_query_sub(test_context, table, "id > $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "id > $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id > $3", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "nid > $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "nid > $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nid > $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid > $3", ts_args, num_args, 3);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[0])), 3);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[1])), 1);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("id > %1", print_value(times[3])), 4);
-    verify_query(test_context, table, util::format("nid > %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("nid > %1", print_value(times[1])), 1);
-    verify_query(test_context, table, util::format("nid > %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("nid > %1", print_value(times[3])), 3);
+    verify_query_sub(test_context, table, "id > $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "id > $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "id > $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "id > $3", args, num_args, 4);
+    verify_query_sub(test_context, table, "nid > $0", args, num_args, 2);
+    verify_query_sub(test_context, table, "nid > $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid > $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid > $3", args, num_args, 3);
 
     // greater equal
-    verify_query_sub(test_context, table, "id >= $0", ts_args, num_args, 3);
-    verify_query_sub(test_context, table, "id >= $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "id >= $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "id >= $3", ts_args, num_args, 5);
-    verify_query_sub(test_context, table, "nid >= $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "nid >= $1", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nid >= $2", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid >= $3", ts_args, num_args, 4);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[0])), 3);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[1])), 1);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("id >= %1", print_value(times[3])), 5);
-    verify_query(test_context, table, util::format("nid >= %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("nid >= %1", print_value(times[1])), 1);
-    verify_query(test_context, table, util::format("nid >= %1", print_value(times[2])), 0);
-    verify_query(test_context, table, util::format("nid >= %1", print_value(times[3])), 4);
+    verify_query_sub(test_context, table, "id >= $0", args, num_args, 4);
+    verify_query_sub(test_context, table, "id >= $1", args, num_args, 3);
+    verify_query_sub(test_context, table, "id >= $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "id >= $3", args, num_args, 5);
+    verify_query_sub(test_context, table, "nid >= $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "nid >= $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nid >= $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid >= $3", args, num_args, 4);
 
     // less
-    verify_query_sub(test_context, table, "id < $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "id < $1", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "id < $2", ts_args, num_args, 5);
-    verify_query_sub(test_context, table, "id < $3", ts_args, num_args, 0);
-    verify_query_sub(test_context, table, "nid < $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "nid < $1", ts_args, num_args, 3);
-    verify_query_sub(test_context, table, "nid < $2", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "nid < $3", ts_args, num_args, 0);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[1])), 4);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[2])), 5);
-    verify_query(test_context, table, util::format("id < %1", print_value(times[3])), 0);
-    verify_query(test_context, table, util::format("nid < %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("nid < %1", print_value(times[1])), 3);
-    verify_query(test_context, table, util::format("nid < %1", print_value(times[2])), 4);
-    verify_query(test_context, table, util::format("nid < %1", print_value(times[3])), 0);
+    verify_query_sub(test_context, table, "id < $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "id < $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "id < $2", args, num_args, 4);
+    verify_query_sub(test_context, table, "id < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid < $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid < $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nid < $2", args, num_args, 3);
+    verify_query_sub(test_context, table, "nid < $3", args, num_args, 0);
 
     // less equal
-    verify_query_sub(test_context, table, "id <= $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "id <= $1", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "id <= $2", ts_args, num_args, 5);
-    verify_query_sub(test_context, table, "id <= $3", ts_args, num_args, 1);
-    verify_query_sub(test_context, table, "nid <= $0", ts_args, num_args, 2);
-    verify_query_sub(test_context, table, "nid <= $1", ts_args, num_args, 3);
-    verify_query_sub(test_context, table, "nid <= $2", ts_args, num_args, 4);
-    verify_query_sub(test_context, table, "nid <= $3", ts_args, num_args, 1);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[1])), 4);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[2])), 5);
-    verify_query(test_context, table, util::format("id <= %1", print_value(times[3])), 1);
-    verify_query(test_context, table, util::format("nid <= %1", print_value(times[0])), 2);
-    verify_query(test_context, table, util::format("nid <= %1", print_value(times[1])), 3);
-    verify_query(test_context, table, util::format("nid <= %1", print_value(times[2])), 4);
-    verify_query(test_context, table, util::format("nid <= %1", print_value(times[3])), 1);
-
-    //
-    // Timestamp property queries against a ObjectId value
-    // equality
-    verify_query_sub(test_context, table, "ts == $0", args, num_args, 0);
-    verify_query_sub(test_context, table, "ts == $1", args, num_args, 0);
-    verify_query_sub(test_context, table, "ts == $2", args, num_args, 0);
-    verify_query_sub(test_context, table, "ts == $3", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts == $0", args, num_args, 0);
-    verify_query_sub(test_context, table, "nts == $1", args, num_args, 0);
-    verify_query_sub(test_context, table, "nts == $2", args, num_args, 0);
-    verify_query_sub(test_context, table, "nts == $3", args, num_args, 1);
-    verify_query(test_context, table, util::format("ts == %1", print_value(ids[0])), 0);
-    verify_query(test_context, table, util::format("ts == %1", print_value(ids[1])), 0);
-    verify_query(test_context, table, util::format("ts == %1", print_value(ids[2])), 0);
-    verify_query(test_context, table, util::format("ts == %1", print_value(ids[3])), 2);
-    verify_query(test_context, table, util::format("nts == %1", print_value(ids[0])), 0);
-    verify_query(test_context, table, util::format("nts == %1", print_value(ids[1])), 0);
-    verify_query(test_context, table, util::format("nts == %1", print_value(ids[2])), 0);
-    verify_query(test_context, table, util::format("nts == %1", print_value(ids[3])), 1);
-
-    // inequality
-    verify_query_sub(test_context, table, "ts != $0", args, num_args, table->size());
-    verify_query_sub(test_context, table, "ts != $1", args, num_args, table->size());
-    verify_query_sub(test_context, table, "ts != $2", args, num_args, table->size());
-    verify_query_sub(test_context, table, "ts != $3", args, num_args, table->size() - 2);
-    verify_query_sub(test_context, table, "nts != $0", args, num_args, table->size());
-    verify_query_sub(test_context, table, "nts != $1", args, num_args, table->size());
-    verify_query_sub(test_context, table, "nts != $2", args, num_args, table->size());
-    verify_query_sub(test_context, table, "nts != $3", args, num_args, table->size() - 1);
-    verify_query(test_context, table, util::format("ts != %1", print_value(ids[0])), table->size());
-    verify_query(test_context, table, util::format("ts != %1", print_value(ids[1])), table->size());
-    verify_query(test_context, table, util::format("ts != %1", print_value(ids[2])), table->size());
-    verify_query(test_context, table, util::format("ts != %1", print_value(ids[3])), table->size() - 2);
-    verify_query(test_context, table, util::format("nts != %1", print_value(ids[0])), table->size());
-    verify_query(test_context, table, util::format("nts != %1", print_value(ids[1])), table->size());
-    verify_query(test_context, table, util::format("nts != %1", print_value(ids[2])), table->size());
-    verify_query(test_context, table, util::format("nts != %1", print_value(ids[3])), table->size() - 1);
-
-    // greater
-    verify_query_sub(test_context, table, "ts > $0", args, num_args, 3);
-    verify_query_sub(test_context, table, "ts > $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "ts > $2", args, num_args, 1);
-    verify_query_sub(test_context, table, "ts > $3", args, num_args, 3);
-    verify_query_sub(test_context, table, "nts > $0", args, num_args, 3);
-    verify_query_sub(test_context, table, "nts > $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts > $2", args, num_args, 1);
-    verify_query_sub(test_context, table, "nts > $3", args, num_args, 3);
-    verify_query(test_context, table, util::format("ts > %1", print_value(ids[0])), 3);
-    verify_query(test_context, table, util::format("ts > %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("ts > %1", print_value(ids[2])), 1);
-    verify_query(test_context, table, util::format("ts > %1", print_value(ids[3])), 3);
-    verify_query(test_context, table, util::format("nts > %1", print_value(ids[0])), 3);
-    verify_query(test_context, table, util::format("nts > %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("nts > %1", print_value(ids[2])), 1);
-    verify_query(test_context, table, util::format("nts > %1", print_value(ids[3])), 3);
-
-    // greater equal
-    verify_query_sub(test_context, table, "ts >= $0", args, num_args, 3);
-    verify_query_sub(test_context, table, "ts >= $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "ts >= $2", args, num_args, 1);
-    verify_query_sub(test_context, table, "ts >= $3", args, num_args, 5);
-    verify_query_sub(test_context, table, "nts >= $0", args, num_args, 3);
-    verify_query_sub(test_context, table, "nts >= $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts >= $2", args, num_args, 1);
-    verify_query_sub(test_context, table, "nts >= $3", args, num_args, 4);
-    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[0])), 3);
-    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[2])), 1);
-    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[3])), 5);
-    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[0])), 3);
-    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[2])), 1);
-    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[3])), 4);
-
-    // less
-    verify_query_sub(test_context, table, "ts < $0", args, num_args, 2);
-    verify_query_sub(test_context, table, "ts < $1", args, num_args, 3);
-    verify_query_sub(test_context, table, "ts < $2", args, num_args, 4);
-    verify_query_sub(test_context, table, "ts < $3", args, num_args, 0);
-    verify_query_sub(test_context, table, "nts < $0", args, num_args, 1);
-    verify_query_sub(test_context, table, "nts < $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts < $2", args, num_args, 3);
-    verify_query_sub(test_context, table, "nts < $3", args, num_args, 0);
-    verify_query(test_context, table, util::format("ts < %1", print_value(ids[0])), 2);
-    verify_query(test_context, table, util::format("ts < %1", print_value(ids[1])), 3);
-    verify_query(test_context, table, util::format("ts < %1", print_value(ids[2])), 4);
-    verify_query(test_context, table, util::format("ts < %1", print_value(ids[3])), 0);
-    verify_query(test_context, table, util::format("nts < %1", print_value(ids[0])), 1);
-    verify_query(test_context, table, util::format("nts < %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("nts < %1", print_value(ids[2])), 3);
-    verify_query(test_context, table, util::format("nts < %1", print_value(ids[3])), 0);
-
-    // less equal
-    verify_query_sub(test_context, table, "ts <= $0", args, num_args, 2);
-    verify_query_sub(test_context, table, "ts <= $1", args, num_args, 3);
-    verify_query_sub(test_context, table, "ts <= $2", args, num_args, 4);
-    verify_query_sub(test_context, table, "ts <= $3", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts <= $0", args, num_args, 1);
-    verify_query_sub(test_context, table, "nts <= $1", args, num_args, 2);
-    verify_query_sub(test_context, table, "nts <= $2", args, num_args, 3);
-    verify_query_sub(test_context, table, "nts <= $3", args, num_args, 1);
-    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[0])), 2);
-    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[1])), 3);
-    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[2])), 4);
-    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[3])), 2);
-    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[0])), 1);
-    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[1])), 2);
-    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[2])), 3);
-    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[3])), 1);
+    verify_query_sub(test_context, table, "id <= $0", args, num_args, 2);
+    verify_query_sub(test_context, table, "id <= $1", args, num_args, 3);
+    verify_query_sub(test_context, table, "id <= $2", args, num_args, 5);
+    verify_query_sub(test_context, table, "id <= $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid <= $0", args, num_args, 2);
+    verify_query_sub(test_context, table, "nid <= $1", args, num_args, 3);
+    verify_query_sub(test_context, table, "nid <= $2", args, num_args, 4);
+    verify_query_sub(test_context, table, "nid <= $3", args, num_args, 1);
 }
+
 
 TEST(Parser_UUID)
 {
@@ -4129,14 +4145,30 @@ TEST(Parser_UUID)
         verify_query(test_context, table, "nid == uuid(" + id.to_string() + ")", 1);
         verify_query(test_context, table, "id != uuid(" + id.to_string() + ")", num_rows - 1);
         verify_query(test_context, table, "nid != uuid(" + id.to_string() + ")", num_rows - 1);
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid > uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid >= uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid < uuid(" + id.to_string() + ")", 0));
-        CHECK_THROW_ANY(verify_query(test_context, table, "nid <= uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid BEGINSWITH uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid ENDSWITH uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid CONTAINS uuid(" + id.to_string() + ")", 0));
         CHECK_THROW_ANY(verify_query(test_context, table, "nid LIKE uuid(" + id.to_string() + ")", 0));
+    }
+
+    UUID min;
+    UUID max("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    std::vector<std::string> props = {"id", "nid"};
+    for (auto prop_name : props) {
+        // a null value is neither greater nor less than any valid value
+        size_t num_valid_values = (prop_name == "nid" ? num_rows - 1 : num_rows);
+        verify_query(test_context, table, util::format("%1 > uuid(%2)", prop_name, min.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 >= uuid(%2)", prop_name, min.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 < uuid(%2)", prop_name, min.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 <= uuid(%2)", prop_name, min.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 > uuid(%2)", prop_name, max.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 >= uuid(%2)", prop_name, max.to_string()), 0);
+        verify_query(test_context, table, util::format("%1 < uuid(%2)", prop_name, max.to_string()),
+                     num_valid_values);
+        verify_query(test_context, table, util::format("%1 <= uuid(%2)", prop_name, max.to_string()),
+                     num_valid_values);
     }
 
     // argument substitution checks
@@ -4146,10 +4178,18 @@ TEST(Parser_UUID)
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id > $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id >= $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "id <= $3", args, num_args, 0);
     verify_query_sub(test_context, table, "nid == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid > $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid >= $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid <= $3", args, num_args, 1);
 }
 
 
@@ -4255,6 +4295,7 @@ TEST(Parser_Mixed)
     auto col_any = table->add_column(type_Mixed, "mixed");
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
+    auto col_mixed = origin->add_column(type_Mixed, "mixed");
     auto col_links = origin->add_column_list(*table, "links");
 
     size_t int_over_50 = 0;
@@ -4285,6 +4326,7 @@ TEST(Parser_Mixed)
         auto obj = origin->create_object();
         auto ll = obj.get_linklist(col_links);
         obj.set(col_link, it->get_key());
+        obj.set(col_mixed, Mixed(it->get_link()));
         for (int64_t j = 0; j < 10; j++) {
             ll.add(it->get_key());
             ++it;
@@ -4322,6 +4364,7 @@ TEST(Parser_Mixed)
     verify_query_sub(test_context, origin, "ANY links == $1", args, num_args, 1);
     verify_query_sub(test_context, origin, "ALL links == $1 && links.@size > 0", args, num_args, 0);
     verify_query_sub(test_context, origin, "NONE links == $1 && links.@size > 0", args, num_args, 9);
+    verify_query_sub(test_context, origin, "mixed == $1", args, num_args, 1);
 
     verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
     verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
@@ -4341,15 +4384,12 @@ TEST(Parser_Mixed)
     verify_query(test_context, table, "mixed == int", 71);
 
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, table, "mixed == $1", args, num_args, 1), message);
-    CHECK_EQUAL(message, "Unsupported comparison between property of type 'mixed' and constant value: argument $1 of "
-                         "type 'typedLink' which links to 'Foo' with primary key 'ObjKey(0)'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "link == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'link' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, origin, "links == $2", args, num_args, 0), message);
     CHECK_EQUAL(message, "The relationship 'links' which links to type 'Foo' cannot be compared to an argument of "
-                         "type 'Origin' with primary key 'ObjKey(0)'");
+                         "type 'Origin' with primary key 'O0'");
 }
 
 TEST(Parser_TypeOfValue)
@@ -4403,10 +4443,32 @@ TEST(Parser_TypeOfValue)
             ++it;
         }
     }
+    size_t nb_ints = 71;
     verify_query(test_context, table, "mixed.@type == 'string'", nb_strings);
     verify_query(test_context, table, "mixed.@type == 'double'", 2);
+    verify_query(test_context, table, "mixed.@type == 'float'", 0);
     verify_query(test_context, table, "mixed.@type == 'Decimal'", 1);
+    verify_query(test_context, table, "mixed.@type == 'decimal128'", 1);
     verify_query(test_context, table, "mixed.@type == 'binary'", 1);
+    verify_query(test_context, table, "mixed.@type == 'bytearray'", 1);
+    verify_query(test_context, table, "mixed.@type == 'byte[]'", 1);
+    verify_query(test_context, table, "mixed.@type == 'uuid'", 0);
+    verify_query(test_context, table, "mixed.@type == 'guid'", 0);
+    verify_query(test_context, table, "mixed.@type == 'bool'", 0);
+    verify_query(test_context, table, "mixed.@type == 'boolean'", 0);
+    verify_query(test_context, table, "mixed.@type == 'int'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'integer'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int16'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int32'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'int64'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'short'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'long'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'byte'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'char'", nb_ints);
+    verify_query(test_context, table, "mixed.@type == 'timestamp'", 0);
+    verify_query(test_context, table, "mixed.@type == 'datetimeoffset'", 0);
+    verify_query(test_context, table, "mixed.@type == 'object'", 0);
+
     verify_query(test_context, table,
                  "mixed.@type == 'binary' || mixed.@type == 'DECIMAL' || mixed.@type == 'Double'", 4);
     verify_query(test_context, table, "mixed.@type == 'null'", 1);
@@ -4541,20 +4603,25 @@ TEST(Parser_Dictionary)
         }
     }
 
-    verify_query(test_context, foo, "dict > 50", 50);
-    verify_query(test_context, foo, "dict.Value > 50", expected);
-    verify_query(test_context, foo, "ANY dict.keys == 'Foo'", 20);
-    verify_query(test_context, foo, "NONE dict.keys == 'Value'", 23);
-    verify_query(test_context, foo, "dict.Value.@type == 'int'", num_ints_for_value);
+    util::Any args[] = {String("Value")};
+    size_t num_args = 1;
+
+    verify_query(test_context, foo, "dict.@values > 50", 50);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query_sub(test_context, foo, "dict[$0] > 50", args, num_args, expected);
+    verify_query(test_context, foo, "dict['Value'] > 50", expected);
+    verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
+    verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
+    verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
     verify_query(test_context, foo, "NONE dict.@type == 'int'", 0);   // each object has Bar:i
     verify_query(test_context, foo, "ANY dict.@type == 'string'", 0); // no strings present
 
-    verify_query(test_context, origin, "link.dict.Value > 50", 3);
-    verify_query(test_context, origin, "links.dict.Value > 50", 5);
+    verify_query(test_context, origin, "link.dict['Value'] > 50", 3);
+    verify_query(test_context, origin, "links.dict['Value'] > 50", 5);
     verify_query(test_context, origin, "links.dict > 50", 6);
-    verify_query(test_context, origin, "links.dict.Value == NULL", 10);
+    verify_query(test_context, origin, "links.dict['Value'] == NULL", 10);
 
     verify_query(test_context, foo, "dict.@size == 3", 17);
     verify_query(test_context, foo, "dict.@max == 100", 2);
@@ -4564,17 +4631,65 @@ TEST(Parser_Dictionary)
 
     verify_query(test_context, origin, "links.dict.@max == 100", 2);
     verify_query(test_context, origin, "link.dict.@max == 100", 2);
+
     auto dict = foo->begin()->get_dictionary(col_dict);
+
+    dict.insert("some extra", 42);
+    verify_query(test_context, foo, "dict['some extra'] == 42", 1);
 
     dict.insert("Value", 4.5);
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Cannot add int and double");
 
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, origin, "link.dict.Value > 50", 3), message);
+    CHECK_EQUAL(message, "Property 'dict' in 'foo' is not an Object");
+
+    // aggregates still work with mixed types
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 2);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
     dict.insert("Bar", Timestamp(1234, 5678));
-    // g.to_json(std::cout);
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, foo, "dict.@sum >= 100", 9), message);
-    CHECK_EQUAL(message, "Sum not defined for timestamps");
+    verify_query(test_context, foo, "dict.@max == 100", 2);
+    verify_query(test_context, foo, "dict.@min < 2", 1);
+    verify_query(test_context, foo, "dict.@sum >= 100", 9);
+    verify_query(test_context, foo, "dict.@avg < 10", 15);
+}
+
+TEST(Parser_DictionaryObjects)
+{
+    Group g;
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto col_age = dogs->add_column(type_Int, "age");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*dogs, "pets");
+    auto col_friend = persons->add_column(*persons, "friend");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj bernie = persons->create_object_with_primary_key("bernie");
+
+    Obj astro = dogs->create_object_with_primary_key("astro", {{col_age, 4}});
+    Obj pluto = dogs->create_object_with_primary_key("pluto", {{col_age, 5}});
+    Obj lady = dogs->create_object_with_primary_key("lady", {{col_age, 5}});
+    Obj snoopy = dogs->create_object_with_primary_key("snoopy", {{col_age, 3}});
+
+    auto adam_pets = adam.get_dictionary(col_dict);
+    adam_pets.insert("dog1", pluto);
+    adam_pets.insert("dog2", lady);
+    adam_pets.insert("none", ObjKey());
+
+    auto bernie_pets = bernie.get_dictionary(col_dict);
+    bernie_pets.insert("dog1", astro);
+    bernie_pets.insert("dog2", snoopy);
+
+    adam.set(col_friend, bernie.get_key());
+    bernie.set(col_friend, adam.get_key());
+
+    auto q = persons->link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+    q = persons->link(col_friend).link(col_dict).column<Int>(col_age) > 4;
+    CHECK_EQUAL(q.count(), 1);
+
+    verify_query(test_context, persons, "pets.@values.age > 4", 1);
 }
 
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,
@@ -4681,7 +4796,7 @@ TEST(Parser_SetMixed)
     auto col_set = table->add_column_set(type_Mixed, "set", is_nullable);
     auto col_prop = table->add_column(type_Mixed, "value", is_nullable);
     std::vector<ObjKey> keys;
-    table->create_objects(4, keys);
+    table->create_objects(5, keys);
     auto set_values = [](Set<Mixed> set, const std::vector<Mixed>& value_list) {
         for (auto val : value_list)
             set.insert(val);
@@ -4697,25 +4812,177 @@ TEST(Parser_SetMixed)
                {{3.5f}, {"world"}, {data}, {ObjectId::gen()}, {UUID()}, {}});
     set_values(table->get_object(keys[2]).get_set<Mixed>(col_set), {same_value});
     // the fourth set is empty
+    set_values(table->get_object(keys[4]).get_set<Mixed>(col_set),
+               {int64_t(-1), Decimal128(StringData(/*NaN*/)), 4.4f, 7.6, 0, realm::null()});
+    auto list0 = table->get_object(keys[0]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list0.min(), 3);
+    CHECK_EQUAL(list0.max(), StringData("hello"));
+    CHECK_EQUAL(list0.sum(), 303);
+    CHECK_EQUAL(list0.avg(), 151.5);
+    auto list1 = table->get_object(keys[1]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list1.min(), 3.5);
+    CHECK_EQUAL(list1.max(), UUID());
+    CHECK_EQUAL(list1.sum(), 3.5);
+    CHECK_EQUAL(list1.avg(), 3.5);
+    auto list2 = table->get_object(keys[2]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list2.min(), 300);
+    CHECK_EQUAL(list2.max(), 300);
+    CHECK_EQUAL(list2.sum(), 300);
+    CHECK_EQUAL(list2.avg(), 300);
+    auto list3 = table->get_object(keys[3]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list3.min(), Mixed{});
+    CHECK_EQUAL(list3.max(), Mixed{});
+    CHECK_EQUAL(list3.sum(), 0);
+    CHECK_EQUAL(list3.avg(), Mixed{});
+    auto list4 = table->get_object(keys[4]).get_set<Mixed>(col_set);
+    CHECK_EQUAL(list4.min(), -1);
+    CHECK_EQUAL(list4.max(), 7.6);
+    CHECK_EQUAL(list4.sum(), 11);
+    CHECK_EQUAL(list4.avg(), 2.75);
+
+    verify_query(test_context, table, "set.@min == 3", 1);
+    verify_query(test_context, table, "set.@min == 3.5", 1);
+    verify_query(test_context, table, "set.@min == 300", 1);
+    verify_query(test_context, table, "set.@min == NULL", 1);
+    verify_query(test_context, table, "set.@min == -1", 1);
+    verify_query(test_context, table, "set.@max == 'hello'", 1);
+    verify_query(test_context, table, "set.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
+    verify_query(test_context, table, "set.@max == 7.6", 1);
+    verify_query(test_context, table, "set.@max == 300", 1);
+    verify_query(test_context, table, "set.@max == NULL", 1);
+    verify_query(test_context, table, "set.@max == 7.6", 1);
+    verify_query(test_context, table, "set.@sum == 303", 1);
+    verify_query(test_context, table, "set.@sum == 3.5", 1);
+    verify_query(test_context, table, "set.@sum == 300", 1);
+    verify_query(test_context, table, "set.@sum == 0", 1);
+    verify_query(test_context, table, "set.@sum == 11", 1);
+    verify_query(test_context, table, "set.@avg == 151.5", 1);
+    verify_query(test_context, table, "set.@avg == 3.5", 1);
+    verify_query(test_context, table, "set.@avg == 300", 1);
+    verify_query(test_context, table, "set.@avg == NULL", 1);
+    verify_query(test_context, table, "set.@avg == 2.75", 1);
 
     verify_query(test_context, table, "set.@count == 0", 1);
-    verify_query(test_context, table, "set.@size >= 1", 3);
-    verify_query(test_context, table, "set.@size == 6", 1);
+    verify_query(test_context, table, "set.@size >= 1", 4);
+    verify_query(test_context, table, "set.@size == 6", 2);
     verify_query(test_context, table, "3.5 IN set", 1);
     verify_query(test_context, table, "'WorLD' IN[c] set", 1);
     verify_query(test_context, table, "set == value", 2);
-    verify_query(test_context, table, "set < value", 2);
+    verify_query(test_context, table, "set < value", 3);
     verify_query(test_context, table, "ALL set < value", 1); // 3
     verify_query(test_context, table, "ALL set < value && set.@size > 0", 0);
     verify_query(test_context, table, "ALL set == value", 2);  // 2, 3
-    verify_query(test_context, table, "NONE set == value", 2); // 1, 3
-    verify_query(test_context, table, "set == NULL", 1);
+    verify_query(test_context, table, "NONE set == value", 3); // 1, 3, 5
+    verify_query(test_context, table, "set == NULL", 2);
     verify_query(test_context, table, "set beginswith[c] 'HE'", 1);
     verify_query(test_context, table, "set endswith[c] 'D'", 1);
     verify_query(test_context, table, "set LIKE[c] '*O*'", 2);
     verify_query(test_context, table, "set CONTAINS 'r'", 1);
     verify_query(test_context, table, "set.length == 5", 2);
     verify_query(test_context, table, "set.length == 3", 1);
+}
+
+TEST(Parser_CollectionsConsistency)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    bool is_nullable = true;
+    auto col_set = table->add_column_set(type_Mixed, "set", is_nullable);
+    auto col_list = table->add_column_list(type_Mixed, "list", is_nullable);
+    auto col_dict = table->add_column_dictionary(type_Mixed, "dict");
+    std::vector<ObjKey> keys;
+    table->create_objects(5, keys);
+    size_t key_ndx = 0;
+    auto set_values = [&](ObjKey key, const std::vector<Mixed>& value_list) {
+        auto obj = table->get_object(key);
+        auto set = obj.get_set<Mixed>(col_set);
+        auto list = obj.get_list<Mixed>(col_list);
+        auto dict = obj.get_dictionary(col_dict);
+        for (auto val : value_list) {
+            set.insert(val);
+            list.add(val);
+            dict.insert(util::format("key_%1", key_ndx++), val);
+        }
+    };
+    auto check_agg = [&](ObjKey key, Mixed min, Mixed max, Mixed sum, Mixed avg) {
+        auto obj = table->get_object(key);
+        auto set = obj.get_set<Mixed>(col_set);
+        auto list = obj.get_list<Mixed>(col_list);
+        auto dict = obj.get_dictionary(col_dict);
+        CHECK_EQUAL(set.min(), min);
+        CHECK_EQUAL(list.min(), min);
+        CHECK_EQUAL(dict.min(), min);
+        CHECK_EQUAL(set.max(), max);
+        CHECK_EQUAL(list.max(), max);
+        CHECK_EQUAL(dict.max(), max);
+        CHECK_EQUAL(set.sum(), sum);
+        CHECK_EQUAL(list.sum(), sum);
+        CHECK_EQUAL(dict.sum(), sum);
+        CHECK_EQUAL(set.avg(), avg);
+        CHECK_EQUAL(list.avg(), avg);
+        CHECK_EQUAL(dict.avg(), avg);
+
+        std::vector<Mixed> args = {min, max, sum, avg};
+        verify_query_sub(test_context, table, "set.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "list.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "dict.@min == $0", args, 1);
+        verify_query_sub(test_context, table, "set.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "list.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "dict.@max == $1", args, 1);
+        verify_query_sub(test_context, table, "set.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "list.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "dict.@sum == $2", args, 1);
+        verify_query_sub(test_context, table, "set.@avg == $3", args, 1);
+        verify_query_sub(test_context, table, "list.@avg == $3", args, 1);
+        verify_query_sub(test_context, table, "dict.@avg == $3", args, 1);
+    };
+    const Mixed same_value(300);
+
+    BinaryData data("foo", 3);
+    set_values(keys[0], {{3}, {"hello"}, same_value});
+    set_values(keys[1], {{3.5f}, {"world"}, {data}, {ObjectId::gen()}, {UUID()}, {}});
+    set_values(keys[2], {same_value});
+    // the collections at keys[3] are empty
+    set_values(keys[4], {int64_t(-1), Decimal128(StringData(/*NaN*/)), 4.4f, 7.6, 0, realm::null()});
+
+    check_agg(keys[0], 3, StringData("hello"), 303, 151.5);
+    check_agg(keys[1], 3.5, UUID(), 3.5, 3.5);
+    check_agg(keys[2], same_value, same_value, same_value, same_value);
+    check_agg(keys[3], Mixed{}, Mixed{}, 0, Mixed{});
+    check_agg(keys[4], -1, 7.6, 11, 2.75);
+}
+
+TEST(Parser_SetLinks)
+{
+    Group g;
+    auto origin = g.add_table("origin");
+    auto table = g.add_table("foo");
+    auto target = g.add_table("bar");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_set = table->add_column_set(*target, "set");
+    auto col_int = target->add_column(type_Int, "val");
+
+    ObjKeys target_keys;
+    for (int64_t i = 0; i < 10; i++) {
+        target_keys.push_back(target->create_object().set(col_int, i).get_key());
+    }
+    auto set = table->create_object().get_linkset(col_set);
+    for (size_t i = 0; i < 6; i++) {
+        set.insert(target_keys[i]);
+    }
+    origin->create_object().set(col_link, set.get_obj().get_key());
+    set = table->create_object().get_linkset(col_set);
+    for (size_t i = 4; i < 10; i++) {
+        set.insert(target_keys[i]);
+    }
+    origin->create_object().set(col_link, set.get_obj().get_key());
+
+    // g.to_json(std::cout);
+
+    verify_query(test_context, table, "set.@count == 6", 2);
+
+    verify_query(test_context, origin, "link.set.val == 3", 1);
+    verify_query(test_context, origin, "link.set.val == 5", 2);
 }
 
 namespace {
@@ -4783,6 +5050,24 @@ TEST(Parser_ClassPrefix)
         CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "id > 5", 0, mapping_with_prefix), message);
         CHECK_EQUAL(message, "'foo' has no property: 'id'");
     }
+}
+
+TEST(Parser_UTF8)
+{
+    Group g;
+    TableRef t = g.add_table("person");
+    ColKey col_dk = t->add_column(type_Int, "løbenummer");
+    ColKey col_ch = t->add_column(type_String, "姓名");
+
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
+    for (size_t i = 0; i < names.size(); ++i) {
+        Obj obj = t->create_object();
+        obj.set(col_dk, int64_t(i));
+        obj.set(col_ch, StringData(names[i]));
+    }
+
+    verify_query(test_context, t, "løbenummer > 2", 2);
+    verify_query(test_context, t, "姓名 == 'Bob'", 1);
 }
 
 #endif // TEST_PARSER

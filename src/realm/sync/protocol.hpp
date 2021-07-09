@@ -20,12 +20,14 @@ namespace sync {
 //
 //   2 Restored erase-always-wins OT behavior.
 //
+//   3 Support for Mixed, TypeLinks, Set, and Dictionary columns.
+//
 //  XX Changes:
-//     - Add support for Mixed and TypedLinks columns.
+//     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 2;
+    return 3;
 }
 
 constexpr const char* get_websocket_protocol_prefix() noexcept

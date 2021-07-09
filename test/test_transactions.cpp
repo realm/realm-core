@@ -165,8 +165,9 @@ TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
         util::File f(path, util::File::mode_Update);
         util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
         auto* header = headerMap.get_addr();
-        // at least one of the versions in the header must be 20.
-        CHECK(header->m_file_format[1] == 20 || header->m_file_format[0] == 20);
+        // at least one of the versions in the header must be 22.
+        // this is hard coded to current file format version, bump accordingly
+        CHECK(header->m_file_format[1] == 22 || header->m_file_format[0] == 22);
         header->m_file_format[1] = header->m_file_format[0] = 11; // downgrade (both) to previous version
         headerMap.sync();
     }

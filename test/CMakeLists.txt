@@ -39,6 +39,7 @@ set(CORE_TEST_SOURCES
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_db.cpp
     test_decimal128.cpp
     test_destroy_guard.cpp
     test_dictionary.cpp
@@ -86,8 +87,8 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
-    test_uuid.cpp
-    test_version.cpp)
+	test_uuid.cpp
+    test_mixed_null_assertions.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
 	list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
@@ -194,7 +195,6 @@ if(REALM_ENABLE_SYNC)
 	    util/crypt_key.cpp
 	    util/demangle.cpp
 	    util/dump_changesets.cpp
-	    util/jsmn.cpp
 	    util/misc.cpp
 	    util/mock_metrics.cpp
 	    util/quote.cpp
@@ -215,7 +215,6 @@ if(REALM_ENABLE_SYNC)
 	    util/check_system_error.hpp
 	    util/crypt_key.hpp
 	    util/demangle.hpp
-	    util/jsmn.hpp
 	    util/misc.hpp
 	    util/mock_metrics.hpp
 	    util/number_names.hpp

@@ -3760,7 +3760,7 @@ private:
             if (!disable_download_compaction) {
                 std::size_t saved = accum_original_size - accum_compacted_size;
                 double saved_2 = (accum_original_size == 0 ? 0 : std::round(saved * 100.0 / accum_original_size));
-                logger.detail("Download compaction: Saved %1 bytes (%2%)", saved, saved_2); // Throws
+                logger.detail("Download compaction: Saved %1 bytes (%2%%)", saved, saved_2); // Throws
             }
 
             m_download_progress = download_progress;

@@ -22,6 +22,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <unordered_map>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
@@ -357,12 +358,28 @@ public:
     using CallbackWithLock = std::function<void(const std::string& realm_path)>;
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
 
-    // Return a list of files/directories core may use of the given realm file path.
-    // The first element of the pair in the returned list is the path string, the
-    // second one is to indicate the path is a directory or not.
-    // The temporary files are not returned by this function.
-    // It is safe to delete those returned files/directories in the call_with_lock's callback.
-    static std::vector<std::pair<std::string, bool>> get_core_files(const std::string& realm_path);
+    enum CoreFileType : uint64_t {
+        Lock,
+        Storage,
+        Management,
+        Note,
+        Log,
+        LogA, // This is a legacy version of `Log`.
+        LogB, // This is a legacy version of `Log`.
+    };
+    /// Return a list of files and directories core may use in the given realm file path.
+    /// The first element of the pair in the returned list is the path as string,
+    /// the second one indicates if the path is a directory or not.
+    /// It is safe to delete those returned files/directories in the call_with_lock's callback except for the lock
+    /// itself.
+    ///
+    /// \param realm_path If provided the full path to the file including
+    ///                   the given path will be returned by this function.
+    ///
+    /// \return A map of all core files, providing the path (first) and an indicator
+    ///         if they are a folder or not (second).
+    static std::unordered_map<CoreFileType, std::pair<std::string, bool>>
+    get_core_files(const std::string& realm_path = "");
 
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
@@ -617,6 +634,7 @@ public:
     CollectionBasePtr import_copy_of(const CollectionBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
     LnkSetPtr import_copy_of(const LnkSetPtr& original);
+    LinkCollectionPtr import_copy_of(const LinkCollectionPtr& original);
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
