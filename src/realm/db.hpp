@@ -673,6 +673,7 @@ public:
         m_is_synchronizing = true;
         when_synchronized();
         m_is_synchronizing = false;
+        get_db()->do_end_write();
     };
     // release the write lock without any sync to disk
     void release_write_lock()

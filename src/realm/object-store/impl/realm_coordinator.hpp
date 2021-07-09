@@ -183,11 +183,11 @@ public:
 
     // Deliver notifications for the Realm, blocking if some aren't ready yet
     // The calling Realm must be in a write transaction
-    void promote_to_write(Realm& realm) REQUIRES(!m_notifier_mutex);
+    void promote_to_write(Realm& realm, bool with_lock_held = false) REQUIRES(!m_notifier_mutex);
 
     // Commit a Realm's current write transaction and send notifications to all
     // other Realm instances for that path, including in other processes
-    void commit_write(Realm& realm) REQUIRES(!m_notifier_mutex);
+    void commit_write(Realm& realm, bool with_lock_held = false) REQUIRES(!m_notifier_mutex);
 
     void enable_wait_for_change();
     bool wait_for_change(std::shared_ptr<Transaction> tr);

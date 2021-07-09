@@ -535,7 +535,11 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
-    std::deque<std::function<void()>> m_async_write_q;
+    struct async_write_desc {
+        SharedRealm retained_ref;
+        std::function<void()> writer;
+    };
+    std::deque<async_write_desc> m_async_write_q;
     struct async_commit_desc {
         DB::ReadLockInfo read_lock;
         std::function<void()> when_completed;
