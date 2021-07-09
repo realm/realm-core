@@ -17,6 +17,7 @@ unicode "\\u"{hex}{4}
 escape  "\\"[\"\'/bfnrt0\\]
 char1    [^\"\\]
 char2    [^\'\\]
+utf8    [\xC2-\xDF][\x80-\xBF]|[\xE0-\xEF][\x80-\xBF]{2}|[\xF0-\xF7][\x80-\xBF]{3}
 letter  [a-zA-Z_$]
 ws      "\\"[ nrt]
 id_char [a-zA-Z_\-$0-9]
@@ -36,7 +37,7 @@ blank   [ \t\r]
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
-[,(){}\.]                     return yytext[0];
+[\[\],(){}\.]                     return yytext[0];
 ("<="|"=<")                 return yy::parser::make_LESS_EQUAL ();
 (">="|"=>")                 return yy::parser::make_GREATER_EQUAL ();
 &&|(?i:and)                 return yy::parser::make_AND    ();
@@ -65,6 +66,8 @@ blank   [ \t\r]
 "@avg"                      return yy::parser::make_AVG    ();
 "@links"                    return yy::parser::make_BACKLINK();
 "@type"                     return yy::parser::make_TYPE    (yytext);
+"@keys"                     return yy::parser::make_KEY_VAL (yytext);
+"@values"                   return yy::parser::make_KEY_VAL (yytext);
 "[c]"                       return yy::parser::make_CASE    ();
 (true|TRUE)                 return yy::parser::make_TRUE    ();
 (false|FALSE)               return yy::parser::make_FALSE    ();
@@ -75,6 +78,7 @@ blank   [ \t\r]
 "oid("{hex}{24}")"          return yy::parser::make_OID(yytext); 
 ("T"{sint}":"{sint})|({int}"-"{int}"-"{int}[@T]{int}":"{int}":"{int}(":"{int})?) return yy::parser::make_TIMESTAMP(yytext);
 "O"{int}                    return yy::parser::make_LINK (yytext);
+"L"{int}":"{int}            return yy::parser::make_TYPED_LINK (yytext);
 {int}                       return yy::parser::make_NATURAL0 (yytext);
 "$"{int}                    return yy::parser::make_ARG(yytext); 
 [+-]?{int}                  return yy::parser::make_NUMBER (yytext);
@@ -84,7 +88,7 @@ blank   [ \t\r]
 ("B64\""[a-zA-Z0-9/\+=]*\")         return yy::parser::make_BASE64(yytext);
 (\"({char1}|{escape}|{unicode})*\") return yy::parser::make_STRING (yytext);
 ('({char2}|{escape}|{unicode})*')   return yy::parser::make_STRING (yytext);
-{letter}({id_char}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
+({letter}|{utf8})({id_char}|{utf8}|{ws})*           return yy::parser::make_ID (check_escapes(yytext));
 
 .          {
              throw yy::parser::syntax_error

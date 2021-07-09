@@ -13,7 +13,6 @@ set(TEST_UTIL_SOURCES
     verified_integer.cpp
     verified_string.cpp
     resource_limits.cpp
-    jsmn.cpp
 ) # TEST_UTIL_SOURCES
 
 add_library(TestUtil ${TEST_UTIL_SOURCES})

@@ -135,8 +135,9 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state, const std::string device_id,
-             std::shared_ptr<SyncManager> sync_manager);
+             std::string access_token, SyncUser::State state, const std::string device_id, SyncManager* sync_manager);
+
+    ~SyncUser();
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -226,14 +227,15 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<SyncManager> sync_manager() const
-    {
-        return m_sync_manager;
-    }
+    std::shared_ptr<SyncManager> sync_manager() const;
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name);
+
+protected:
+    friend class SyncManager;
+    void detach_from_sync_manager();
 
 private:
     static SyncUserContextFactory s_binding_context_factory;
@@ -277,7 +279,7 @@ private:
 
     const std::string m_device_id;
 
-    std::shared_ptr<SyncManager> m_sync_manager;
+    SyncManager* m_sync_manager;
 };
 
 } // namespace realm

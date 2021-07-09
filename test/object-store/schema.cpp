@@ -259,7 +259,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
         REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
-        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object | PropertyType::Nullable, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -689,6 +689,13 @@ TEST_CASE("Schema") {
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.link' of type 'object' must be nullable.");
         }
 
+        SECTION("rejects non-nullable dictionary properties") {
+            Schema schema = {{"object", {{"dictionary", PropertyType::Dictionary | PropertyType::Object, "target"}}},
+                             {"target", {{"value", PropertyType::Int}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                                      "Property 'object.dictionary' of type 'object' must be nullable.");
+        }
+
         SECTION("rejects nullable array properties") {
             Schema schema = {
                 {"object",
@@ -696,6 +703,13 @@ TEST_CASE("Schema") {
                 {"target", {{"value", PropertyType::Int}}}};
             REQUIRE_THROWS_CONTAINING(schema.validate(),
                                       "Property 'object.array' of type 'array' cannot be nullable.");
+        }
+
+        SECTION("rejects nullable set properties") {
+            Schema schema = {
+                {"object", {{"set", PropertyType::Set | PropertyType::Object | PropertyType::Nullable, "target"}}},
+                {"target", {{"value", PropertyType::Int}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.set' of type 'set' cannot be nullable.");
         }
 
         SECTION("rejects nullable linking objects") {

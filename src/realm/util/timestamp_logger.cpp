@@ -13,7 +13,7 @@ TimestampStderrLogger::TimestampStderrLogger(Config config)
 }
 
 
-void TimestampStderrLogger::do_log(Logger::Level level, std::string message)
+void TimestampStderrLogger::do_log(Logger::Level level, const std::string& message)
 {
     auto now = std::chrono::system_clock::now();
     std::cerr << m_formatter.format(now) << ": " << get_level_prefix(level) << message << '\n'; // Throws

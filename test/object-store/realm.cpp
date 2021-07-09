@@ -1005,6 +1005,60 @@ TEST_CASE("SharedRealm: close()") {
     }
 }
 
+TEST_CASE("Realm::delete_files()") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{{"object", {{"value", PropertyType::Int}}}};
+    auto realm = Realm::get_shared_realm(config);
+    auto path = config.path;
+
+    // We need to create some additional files that might not be present
+    // for a freshly opened realm but need to be tested for as the will
+    // be created during a Realm's life cycle.
+    // .log_a and .log_b are legacy versions of .log that might be present
+    // for older Realms.
+    util::File(path + ".log", util::File::mode_Write);
+    util::File(path + ".log_a", util::File::mode_Write);
+    util::File(path + ".log_b", util::File::mode_Write);
+
+    SECTION("Deleting files of a closed Realm succeeds.") {
+        realm->close();
+        Realm::delete_files(path);
+        REQUIRE_FALSE(util::File::exists(path));
+        REQUIRE_FALSE(util::File::exists(path + ".management"));
+        REQUIRE_FALSE(util::File::exists(path + ".note"));
+        REQUIRE_FALSE(util::File::exists(path + ".log"));
+        REQUIRE_FALSE(util::File::exists(path + ".log_a"));
+        REQUIRE_FALSE(util::File::exists(path + ".log_b"));
+
+        // Deleting the .lock file is not safe. It must still exist.
+        REQUIRE(util::File::exists(path + ".lock"));
+    }
+
+    SECTION("Trying to delete files of an open Realm fails.") {
+        REQUIRE_THROWS_AS(Realm::delete_files(path), DeleteOnOpenRealmException);
+        REQUIRE(util::File::exists(path + ".lock"));
+        REQUIRE(util::File::exists(path));
+        REQUIRE(util::File::exists(path + ".management"));
+        REQUIRE(util::File::exists(path + ".note"));
+        REQUIRE(util::File::exists(path + ".log"));
+        REQUIRE(util::File::exists(path + ".log_a"));
+        REQUIRE(util::File::exists(path + ".log_b"));
+    }
+
+    SECTION("Deleting the same Realm multiple times.") {
+        realm->close();
+        Realm::delete_files(path);
+        Realm::delete_files(path);
+        Realm::delete_files(path);
+    }
+
+    SECTION("Calling delete on a folder that does not exist.") {
+        auto fake_path = "/tmp/doesNotExist/realm.424242";
+        Realm::delete_files(fake_path);
+    }
+}
+
 TEST_CASE("ShareRealm: in-memory mode from buffer") {
     TestFile config;
     config.schema_version = 1;

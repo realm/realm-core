@@ -82,7 +82,7 @@ inline void check_value_assignable(const List& list, Mixed val)
 inline Mixed typed_link_to_objkey(Mixed val, ColKey col_key)
 {
     if (col_key.get_type() == col_type_Link || col_key.get_type() == col_type_LinkList) {
-        if (!val.is_null() && val.get_type() == type_TypedLink) {
+        if (val.is_type(type_TypedLink)) {
             auto link = val.get<ObjLink>();
             return link.get_obj_key();
         }

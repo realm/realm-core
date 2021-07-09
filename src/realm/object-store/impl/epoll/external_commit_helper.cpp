@@ -49,31 +49,53 @@ using namespace realm::_impl;
     } while (0)
 
 namespace {
-// Write a byte to a pipe to notify anyone waiting for data on the pipe
-void notify_fd(int fd)
+
+// Make writing to the pipe return -1 when there is no data to read, or no space in the buffer to write to, rather
+// than blocking.
+void make_non_blocking(int fd)
+{
+    int ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
+// Write a byte to a pipe to notify anyone waiting for data on the pipe.
+// But first consume all bytes in the pipe, since linux may only notify on transition from not ready to ready.
+// If a process dies after reading but before writing, it can consume a pending notification, and possibly prevent
+// other processes from observing it. This is a transient issue and the next notification will work correctly.
+void notify_fd(int fd, bool read_first = true)
 {
     while (true) {
+        if (read_first) {
+            while (true) {
+                uint8_t buff[1024];
+                ssize_t actual = read(fd, buff, sizeof(buff));
+                if (actual == 0) {
+                    break; // Not sure why we would see EOF here, but defer error handling to the writer.
+                }
+                if (actual < 0) {
+                    int err = errno;
+                    if (err == EWOULDBLOCK || err == EAGAIN)
+                        break;
+                    throw std::system_error(err, std::system_category());
+                }
+            }
+        }
+
         char c = 0;
         ssize_t ret = write(fd, &c, 1);
         if (ret == 1) {
             break;
         }
 
-        // If the pipe's buffer is full, we need to read some of the old data in
-        // it to make space. We don't just read in the code waiting for
-        // notifications so that we can notify multiple waiters with a single
-        // write.
-        if (ret != 0) {
-            int err = errno;
-            if (err != EAGAIN) {
-                throw std::system_error(err, std::system_category());
-            }
+        REALM_ASSERT_RELEASE(ret < 0);
+        int err = errno;
+        if (err == EWOULDBLOCK || err == EAGAIN) {
+            REALM_ASSERT_RELEASE(read_first); // otherwise this is just an infinite loop.
+            continue;
         }
-        std::vector<uint8_t> buff(1024);
-        auto actual = read(fd, buff.data(), buff.size());
-        if (actual == 0) {
-            throw std::runtime_error("Could not read from pipe");
-        }
+        throw std::system_error(err, std::system_category());
     }
 }
 } // anonymous namespace
@@ -156,12 +178,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
         throw std::system_error(errno, std::system_category());
     }
 
-    // Make writing to the pipe return -1 when the pipe's buffer is full
-    // rather than blocking until there's space available
-    int ret = fcntl(m_notify_fd, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
+    make_non_blocking(m_notify_fd);
 
     // Lock is inside add_commit_helper.
     DaemonThread::shared().add_commit_helper(this);
@@ -188,6 +205,9 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
 
     m_shutdown_read_fd = pipe_fd[0];
     m_shutdown_write_fd = pipe_fd[1];
+
+    make_non_blocking(m_shutdown_read_fd);
+    make_non_blocking(m_shutdown_write_fd);
 
     epoll_event event{};
     event.events = EPOLLIN;
@@ -216,7 +236,9 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
 
 ExternalCommitHelper::DaemonThread::~DaemonThread()
 {
-    notify_fd(m_shutdown_write_fd);
+    // Not reading first since we know we have never written, and it is illegal to read from the write-side of the
+    // pipe. Unlike a fifo, where in and out sides share an fd, with an anonymous pipe, they each have a dedicated fd.
+    notify_fd(m_shutdown_write_fd, /*read_first=*/false);
     m_thread.join(); // Wait for the thread to exit
 }
 

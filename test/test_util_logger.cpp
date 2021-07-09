@@ -119,12 +119,8 @@ TEST(Util_Logger_Formatting)
         out_2 << "Foo y bar 3\n";
         logger.info("%3 foo %1 bar %2", 4.1, 4, "z");
         out_2 << "z foo 4.1 bar 4\n";
-        logger.info("Foo %1");
-        out_2 << "Foo %1\n";
-        logger.info("Foo %1 bar %2", "x");
-        out_2 << "Foo x bar %2\n";
-        logger.info("Foo %2 bar %1", "x");
-        out_2 << "Foo %2 bar x\n";
+        logger.info("%1 foo %1 bar %1", "a");
+        out_2 << "a foo a bar a\n";
     }
     CHECK(out_1.str() == out_2.str());
 }
@@ -198,7 +194,7 @@ TEST(Util_Logger_ThreadSafe)
 {
     struct BalloonLogger : public util::RootLogger {
         std::vector<std::string> messages;
-        void do_log(util::Logger::Level, std::string message) override
+        void do_log(util::Logger::Level, std::string const& message) override
         {
             messages.push_back(std::move(message));
         }

@@ -152,7 +152,7 @@ Once authorized, run the following docker command from the top directory to star
 
 ```
 export MDBREALM_TEST_SERVER_TAG=$(grep MDBREALM_TEST_SERVER_TAG dependencies.list |cut -f 2 -d=)
-docker run --rm -v $(pwd)/test/object-store/mongodb:/apps/os-integration-tests -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
+docker run --rm -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
@@ -162,7 +162,7 @@ has a mapped volume to the `tests/mongodb` directory.
 To run the [app] tests against the local image, you need to configure a build with some cmake options to tell the tests where to point to.
 ```
 mkdir build.sync.ninja
-cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090 -DREALM_STITCH_CONFIG=$(pwd)/test/object-store/mongodb/config.json
+cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090
 cmake --build build.sync.ninja --target tests
 ./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
 ```

@@ -30,25 +30,29 @@ namespace realm {
 namespace _impl {
 
 static const int sorting_rank[19] = {
-    0, // null
-    0, // type_Int = 0,
-    0, // type_Bool = 1,
-    1, // type_String = 2,
+    // Observe! Changing these values breaks the file format for Set<Mixed>
+
+    -1, // null
+    1,  // type_Int = 0,
+    0,  // type_Bool = 1,
+    2,  // type_String = 2,
     -1,
-    1,  // type_Binary = 4,
+    2,  // type_Binary = 4,
     -1, // type_OldTable = 5,
     -1, // type_Mixed = 6,
     -1, // type_OldDateTime = 7,
-    2,  // type_Timestamp = 8,
-    0,  // type_Float = 9,
-    0,  // type_Double = 10,
-    0,  // type_Decimal = 11,
-    3,  // type_Link = 12,
-    4,  // type_LinkList = 13,
+    3,  // type_Timestamp = 8,
+    1,  // type_Float = 9,
+    1,  // type_Double = 10,
+    1,  // type_Decimal = 11,
+    7,  // type_Link = 12,
+    -1, // type_LinkList = 13,
     -1,
-    5, // type_ObjectId = 15,
+    4, // type_ObjectId = 15,
     6, // type_TypedLink = 16
-    7, // type_UUID = 17
+    5, // type_UUID = 17
+
+    // Observe! Changing these values breaks the file format for Set<Mixed>
 };
 
 inline int compare_string(StringData a, StringData b)
@@ -186,18 +190,12 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     if (l_type == r_type)
         return true;
 
-    bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
-                        l_type == type_Decimal;
-    bool r_is_numeric = r_type == type_Int || r_type == type_Bool || r_type == type_Float || r_type == type_Double ||
-                        r_type == type_Decimal;
+    bool l_is_numeric = l_type == type_Int || l_type == type_Float || l_type == type_Double || l_type == type_Decimal;
+    bool r_is_numeric = r_type == type_Int || r_type == type_Float || r_type == type_Double || r_type == type_Decimal;
     if (l_is_numeric && r_is_numeric) {
         return true;
     }
     if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
-        return true;
-    }
-    if ((l_type == type_ObjectId && r_type == type_Timestamp) ||
-        (r_type == type_ObjectId && l_type == type_Timestamp)) {
         return true;
     }
     if (l_type == type_Mixed || r_type == type_Mixed) {
@@ -206,8 +204,42 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     return false;
 }
 
+bool Mixed::accumulate_numeric_to(Decimal128& destination) const
+{
+    bool did_accumulate = false;
+    if (!is_null()) {
+        switch (get_type()) {
+            case type_Int:
+                destination += Decimal128(get_int());
+                did_accumulate = true;
+                break;
+            case type_Double:
+                destination += Decimal128(get_double());
+                did_accumulate = true;
+                break;
+            case type_Float:
+                destination += Decimal128(get_float());
+                did_accumulate = true;
+                break;
+            case type_Decimal: {
+                auto val = get_decimal();
+                if (!val.is_nan()) {
+                    destination += val;
+                    did_accumulate = true;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    return did_accumulate;
+}
+
 int Mixed::compare(const Mixed& b) const
 {
+    // Observe! Changing this function breaks the file format for Set<Mixed>
+
     if (is_null()) {
         return b.is_null() ? 0 : -1;
     }
@@ -218,20 +250,8 @@ int Mixed::compare(const Mixed& b) const
     auto type = get_type();
     switch (type) {
         case type_Bool: {
-            int64_t i_val = bool_val ? 1 : 0;
-            switch (b.get_type()) {
-                case type_Int:
-                    return _impl::compare_generic(i_val, b.int_val);
-                case type_Bool:
-                    return _impl::compare_generic(bool_val, b.bool_val);
-                case type_Float:
-                    return _impl::compare_long_to_double(i_val, b.float_val);
-                case type_Double:
-                    return _impl::compare_long_to_double(i_val, b.double_val);
-                case type_Decimal:
-                    return _impl::compare_decimals(Decimal128(i_val), b.decimal_val);
-                default:
-                    break;
+            if (b.get_type() == type_Bool) {
+                return _impl::compare_generic(bool_val, b.bool_val);
             }
             break;
         }
@@ -239,8 +259,6 @@ int Mixed::compare(const Mixed& b) const
             switch (b.get_type()) {
                 case type_Int:
                     return _impl::compare_generic(int_val, b.int_val);
-                case type_Bool:
-                    return _impl::compare_generic(int_val, int64_t(b.bool_val ? 1 : 0));
                 case type_Float:
                     return _impl::compare_long_to_double(int_val, b.float_val);
                 case type_Double:
@@ -263,8 +281,6 @@ int Mixed::compare(const Mixed& b) const
             switch (b.get_type()) {
                 case type_Int:
                     return -_impl::compare_long_to_double(b.int_val, float_val);
-                case type_Bool:
-                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, float_val);
                 case type_Float:
                     return _impl::compare_float(float_val, b.float_val);
                 case type_Double:
@@ -279,8 +295,6 @@ int Mixed::compare(const Mixed& b) const
             switch (b.get_type()) {
                 case type_Int:
                     return -_impl::compare_long_to_double(b.int_val, double_val);
-                case type_Bool:
-                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, double_val);
                 case type_Float:
                     return _impl::compare_float(double_val, double(b.float_val));
                 case type_Double:
@@ -295,24 +309,16 @@ int Mixed::compare(const Mixed& b) const
             if (b.get_type() == type_Timestamp) {
                 return _impl::compare_generic(date_val, b.date_val);
             }
-            else if (b.get_type() == type_ObjectId) {
-                return _impl::compare_generic(date_val, b.id_val.get_timestamp());
-            }
             break;
         case type_ObjectId:
             if (b.get_type() == type_ObjectId) {
                 return _impl::compare_generic(id_val, b.id_val);
-            }
-            else if (b.get_type() == type_Timestamp) {
-                return _impl::compare_generic(id_val.get_timestamp(), b.date_val);
             }
             break;
         case type_Decimal:
             switch (b.get_type()) {
                 case type_Int:
                     return _impl::compare_decimals(decimal_val, Decimal128(b.int_val));
-                case type_Bool:
-                    return _impl::compare_decimals(decimal_val, Decimal128(b.bool_val ? 1 : 0));
                 case type_Float:
                     return _impl::compare_decimal_to_double(decimal_val, double(b.float_val));
                 case type_Double:
@@ -329,7 +335,7 @@ int Mixed::compare(const Mixed& b) const
             }
             break;
         case type_TypedLink:
-            if (b.get_type() == type_TypedLink) {
+            if (b.is_type(type_TypedLink)) {
                 return _impl::compare_generic(link_val, b.link_val);
             }
             break;
@@ -348,11 +354,22 @@ int Mixed::compare(const Mixed& b) const
             break;
     }
 
-    // Comparing types as a fallback option makes it possible to make a sort of a list of Mixed
-    // This will also handle the case where null values are considered lower than all other values
+    // Comparing rank of types as a fallback makes it possible to sort of a list of Mixed
     REALM_ASSERT(_impl::sorting_rank[m_type] != _impl::sorting_rank[b.m_type]);
-    // Using rank table will ensure that all numeric values comes first
+    // Using rank table will ensure that all numeric values are kept together
     return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
+
+    // Observe! Changing this function breaks the file format for Set<Mixed>
+}
+
+int Mixed::compare_signed(const Mixed& b) const
+{
+    if (is_type(type_String) && b.is_type(type_String)) {
+        auto a_val = get_string();
+        auto b_val = b.get_string();
+        return a_val == b_val ? 0 : a_val < b_val ? -1 : 1;
+    }
+    return compare(b);
 }
 
 template <class T>
@@ -377,9 +394,65 @@ template int64_t Mixed::export_to_type<int64_t>() const noexcept;
 template float Mixed::export_to_type<float>() const noexcept;
 template double Mixed::export_to_type<double>() const noexcept;
 
+template <>
+util::Optional<int64_t> Mixed::get<util::Optional<int64_t>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<int64_t>();
+}
+
+template <>
+util::Optional<bool> Mixed::get<util::Optional<bool>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<bool>();
+}
+
+template <>
+util::Optional<float> Mixed::get<util::Optional<float>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<float>();
+}
+
+template <>
+util::Optional<double> Mixed::get<util::Optional<double>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<double>();
+}
+
+template <>
+util::Optional<ObjectId> Mixed::get<util::Optional<ObjectId>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<ObjectId>();
+}
+
+template <>
+util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
+{
+    if (is_null()) {
+        return {};
+    }
+    return get<UUID>();
+}
+
+
 size_t Mixed::hash() const
 {
-    REALM_ASSERT(!is_null());
+    if (is_null())
+        return 0;
 
     size_t hash = 0;
     switch (get_type()) {
@@ -438,6 +511,118 @@ size_t Mixed::hash() const
     return hash;
 }
 
+StringData Mixed::get_index_data(std::array<char, 16>& buffer) const
+{
+    if (is_null()) {
+        return {};
+    }
+    switch (get_type()) {
+        case type_Int: {
+            int64_t i = get_int();
+            const char* c = reinterpret_cast<const char*>(&i);
+            realm::safe_copy_n(c, sizeof(int64_t), buffer.data());
+            return StringData{buffer.data(), sizeof(int64_t)};
+        }
+        case type_Bool: {
+            int64_t i = get_bool() ? 1 : 0;
+            return Mixed(i).get_index_data(buffer);
+        }
+        case type_Float: {
+            auto v2 = get_float();
+            int i = int(v2);
+            if (i == v2) {
+                return Mixed(i).get_index_data(buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(float), buffer.data());
+            return StringData{buffer.data(), sizeof(float)};
+        }
+        case type_Double: {
+            auto v2 = get_double();
+            int i = int(v2);
+            if (i == v2) {
+                return Mixed(i).get_index_data(buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(double), buffer.data());
+            return StringData{buffer.data(), sizeof(double)};
+        }
+        case type_String:
+            return get_string();
+        case type_Binary: {
+            auto bin = get_binary();
+            return {bin.data(), bin.size()};
+        }
+        case type_Timestamp: {
+            auto dt = get<Timestamp>();
+            int64_t s = dt.get_seconds();
+            int32_t ns = dt.get_nanoseconds();
+            constexpr size_t index_size = sizeof(s) + sizeof(ns);
+            const char* s_buf = reinterpret_cast<const char*>(&s);
+            const char* ns_buf = reinterpret_cast<const char*>(&ns);
+            realm::safe_copy_n(s_buf, sizeof(s), buffer.data());
+            realm::safe_copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
+            return StringData{buffer.data(), index_size};
+        }
+        case type_ObjectId: {
+            auto id = get<ObjectId>();
+            memcpy(&buffer, &id, sizeof(ObjectId));
+            return StringData{buffer.data(), sizeof(ObjectId)};
+        }
+        case type_Decimal: {
+            auto v2 = this->get_decimal();
+            int64_t i;
+            if (v2.to_int(i)) {
+                return Mixed(i).get_index_data(buffer);
+            }
+            const char* src = reinterpret_cast<const char*>(&v2);
+            realm::safe_copy_n(src, sizeof(v2), buffer.data());
+            return StringData{buffer.data(), sizeof(v2)};
+        }
+        case type_UUID: {
+            auto id = get<UUID>();
+            const auto bytes = id.to_bytes();
+            std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+            return StringData{buffer.data(), bytes.size()};
+        }
+        case type_TypedLink: {
+            auto link = get<ObjLink>();
+            uint32_t k1 = link.get_table_key().value;
+            int64_t k2 = link.get_obj_key().value;
+            const char* src = reinterpret_cast<const char*>(&k1);
+            realm::safe_copy_n(src, sizeof(k1), buffer.data());
+            src = reinterpret_cast<const char*>(&k2);
+            realm::safe_copy_n(src, sizeof(k2), buffer.data() + sizeof(k1));
+            return StringData{buffer.data(), sizeof(k1) + sizeof(k2)};
+        }
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+            break;
+    }
+    REALM_ASSERT_RELEASE(false && "Index not supported for this column type");
+    return {};
+}
+
+void Mixed::use_buffer(std::string& buf)
+{
+    if (is_null()) {
+        return;
+    }
+    switch (get_type()) {
+        case type_String:
+            buf = std::string(string_val);
+            string_val = StringData(buf);
+            break;
+        case type_Binary:
+            buf = std::string(binary_val);
+            binary_val = BinaryData(buf);
+            break;
+        default:
+            break;
+    }
+}
+
 // LCOV_EXCL_START
 std::ostream& operator<<(std::ostream& out, const Mixed& m)
 {
@@ -474,10 +659,10 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << util::serializer::print_value(m.id_val);
                 break;
             case type_Link:
-                out << ObjKey(m.int_val);
+                out << util::serializer::print_value(ObjKey(m.int_val));
                 break;
             case type_TypedLink:
-                out << m.link_val;
+                out << util::serializer::print_value(m.link_val);
                 break;
             case type_UUID:
                 out << util::serializer::print_value(m.uuid_val);

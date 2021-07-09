@@ -139,6 +139,20 @@ bool Decimal128::is_nan() const
     return (m_value.w[1] & 0x7c00000000000000ull) == 0x7c00000000000000ull;
 }
 
+bool Decimal128::to_int(int64_t& i) const
+{
+    BID_SINT64 res;
+    unsigned flags = 0;
+    BID_UINT128 x = to_BID_UINT128(*this);
+    bid128_to_int64_int(&res, &x, &flags);
+    if (flags == 0) {
+        i = res;
+        return true;
+    }
+    return false;
+}
+
+
 bool Decimal128::operator==(const Decimal128& rhs) const
 {
     if (is_null() && rhs.is_null()) {

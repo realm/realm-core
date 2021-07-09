@@ -21,6 +21,7 @@
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
@@ -38,39 +39,23 @@ Query::Query()
     create();
 }
 
-Query::Query(ConstTableRef table, const LnkLst& list)
+Query::Query(ConstTableRef table, const ObjList& list)
     : m_table(table.cast_away_const())
-    , m_source_link_list(list.clone_linklist())
+    , m_source_collection(list.clone_obj_list())
 {
-    m_view = m_source_link_list.get();
+    m_view = m_source_collection.get();
+    REALM_ASSERT_DEBUG(m_view);
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
 
-Query::Query(ConstTableRef table, const LnkSet& set)
+Query::Query(ConstTableRef table, LinkCollectionPtr&& list_ptr)
     : m_table(table.cast_away_const())
-    , m_source_link_set(set.clone_linkset())
+    , m_source_collection(std::move(list_ptr))
 {
-    m_view = m_source_link_set.get();
-    REALM_ASSERT_DEBUG(set.get_target_table() == m_table);
-    create();
-}
-
-Query::Query(ConstTableRef table, LnkLstPtr&& ll)
-    : m_table(table.cast_away_const())
-    , m_source_link_list(std::move(ll))
-{
-    m_view = m_source_link_list.get();
-    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
-    create();
-}
-
-Query::Query(ConstTableRef table, LnkSetPtr&& ll)
-    : m_table(table.cast_away_const())
-    , m_source_link_set(std::move(ll))
-{
-    m_view = m_source_link_set.get();
-    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
+    m_view = m_source_collection.get();
+    REALM_ASSERT_DEBUG(m_view);
+    REALM_ASSERT_DEBUG(list_ptr->get_target_table() == m_table);
     create();
 }
 
@@ -110,19 +95,13 @@ Query::Query(const Query& source)
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
-        m_source_link_set = source.m_source_link_set ? source.m_source_link_set->clone_linkset() : LnkSetPtr{};
+        m_source_collection = source.m_source_collection ? source.m_source_collection->clone_obj_list() : nullptr;
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
     }
-    else {
-        if (m_source_link_list) {
-            m_view = m_source_link_list.get();
-        }
-        else if (m_source_link_set) {
-            m_view = m_source_link_set.get();
-        }
+    else if (m_source_collection) {
+        m_view = m_source_collection.get();
     }
 }
 
@@ -136,8 +115,7 @@ Query& Query::operator=(const Query& source)
             m_owned_source_table_view = source.m_owned_source_table_view->clone();
             m_source_table_view = m_owned_source_table_view.get();
 
-            m_source_link_list = nullptr;
-            m_source_link_set = nullptr;
+            m_source_collection = nullptr;
         }
         else {
             // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
@@ -145,20 +123,13 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_list =
-                source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
-            m_source_link_set = source.m_source_link_set ? source.m_source_link_set->clone_linkset() : LnkSetPtr{};
+            m_source_collection = source.m_source_collection ? source.m_source_collection->clone_obj_list() : nullptr;
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;
         }
-        else {
-            if (m_source_link_list) {
-                m_view = m_source_link_list.get();
-            }
-            else if (m_source_link_set) {
-                m_view = m_source_link_set.get();
-            }
+        else if (m_source_collection) {
+            m_view = m_source_collection.get();
         }
         m_ordering = source.m_ordering;
     }
@@ -180,13 +151,10 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     else {
         // nothing?
     }
-    if (source->m_source_link_list.get()) {
-        m_source_link_list = tr->import_copy_of(source->m_source_link_list);
-        m_view = m_source_link_list.get();
-    }
-    else if (source->m_source_link_set.get()) {
-        m_source_link_set = tr->import_copy_of(source->m_source_link_set);
-        m_view = m_source_link_set.get();
+    if (source->m_source_collection) {
+        m_source_collection = tr->import_copy_of(source->m_source_collection);
+        m_view = m_source_collection.get();
+        REALM_ASSERT_DEBUG(m_view);
     }
     m_groups = source->m_groups;
     if (source->m_table)
@@ -406,10 +374,29 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_UUID: {
             return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
-        default: {
-            throw_type_mismatch_error();
-        }
+        case type_Link:
+        case type_LinkList:
+            if constexpr (std::is_same_v<T, Mixed> && realm::is_any_v<Cond, Equal, NotEqual>) {
+                ObjKey key;
+                if (value.is_type(type_Link)) {
+                    key = value.template get<ObjKey>();
+                }
+                else if (value.is_type(type_TypedLink)) {
+                    ObjLink link = value.get_link();
+                    auto target_table = table.get_link_target(column_key);
+                    if (target_table->get_key() != link.get_table_key()) {
+                        // This will never match
+                        return std::unique_ptr<ParentNode>{new ExpressionNode(std::make_unique<FalseExpression>())};
+                    }
+                    key = link.get_obj_key();
+                }
+                return std::unique_ptr<ParentNode>{new LinksToNode<Cond>(column_key, key)};
+            }
+            break;
+        default:
+            break;
     }
+    throw_type_mismatch_error();
 }
 
 template <class Cond>
@@ -537,13 +524,19 @@ Query& Query::between(ColKey column_key, int from, int to)
 
 Query& Query::links_to(ColKey origin_column_key, ObjKey target_key)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column_key, target_key)));
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode<Equal>(origin_column_key, target_key)));
+    return *this;
+}
+
+Query& Query::links_to(ColKey origin_column_key, ObjLink target_link)
+{
+    add_condition<Equal>(origin_column_key, Mixed(target_link));
     return *this;
 }
 
 Query& Query::links_to(ColKey origin_column, const std::vector<ObjKey>& target_keys)
 {
-    add_node(std::unique_ptr<ParentNode>(new LinksToNode(origin_column, target_keys)));
+    add_node(std::unique_ptr<ParentNode>(new LinksToNode<Equal>(origin_column, target_keys)));
     return *this;
 }
 
@@ -940,7 +933,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 bool Query::eval_object(const Obj& obj) const
 {
     if (has_conditions())
-        return root_node()->match(obj);
+        return obj && root_node()->match(obj);
 
     // Query has no conditions, so all rows match, also the user given argument
     return true;
@@ -996,18 +989,18 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
             }
         }
         else {
-            for (size_t t = 0; t < m_view->size(); t++) {
-                const Obj obj = m_view->get_object(t);
+            m_view->for_each([&](const Obj& obj) {
                 if (eval_object(obj)) {
                     st.m_key_offset = obj.get_key().value;
                     st.match(realm::npos, obj.get<T>(column_key));
                 }
-            }
+                return false;
+            });
         }
     }
 
     if (resultcount) {
-        *resultcount = st.m_match_count;
+        *resultcount = st.match_count();
     }
 
     if (return_ndx) {
@@ -1077,7 +1070,7 @@ int64_t Query::sum_int(ColKey column_key) const
     else {
         aggregate<int64_t>(st, column_key);
     }
-    return st.m_state;
+    return st.result_sum();
 }
 double Query::sum_float(ColKey column_key) const
 {
@@ -1087,7 +1080,7 @@ double Query::sum_float(ColKey column_key) const
 
     QueryStateSum<float> st;
     aggregate<float>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
 }
 double Query::sum_double(ColKey column_key) const
 {
@@ -1096,7 +1089,7 @@ double Query::sum_double(ColKey column_key) const
 #endif
     QueryStateSum<double> st;
     aggregate<double>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
 }
 
 Decimal128 Query::sum_decimal128(ColKey column_key) const
@@ -1107,7 +1100,18 @@ Decimal128 Query::sum_decimal128(ColKey column_key) const
 
     QueryStateSum<Decimal128> st;
     aggregate<Decimal128>(st, column_key);
-    return st.m_state;
+    return st.result_sum();
+}
+
+Decimal128 Query::sum_mixed(ColKey column_key) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
+    QueryStateSum<Mixed> st;
+    aggregate<Mixed>(st, column_key);
+    return st.result_sum();
 }
 
 // Maximum
@@ -1125,7 +1129,7 @@ int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
     else {
         aggregate<int64_t>(st, column_key, nullptr, return_ndx);
     }
-    return st.m_state;
+    return st.get_max();
 }
 
 float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
@@ -1136,7 +1140,7 @@ float Query::maximum_float(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMax<float> st;
     aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_max();
 }
 double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1146,7 +1150,7 @@ double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMax<double> st;
     aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_max();
 }
 
 Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) const
@@ -1160,6 +1164,27 @@ Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) cons
     return st.get_max();
 }
 
+Mixed Query::maximum_mixed(ColKey column_key, ObjKey* return_ndx) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    QueryStateMax<Mixed> st;
+    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
+    return st.get_max();
+}
+
+Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    QueryStateMax<Timestamp> st;
+    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
+    return st.get_max();
+}
 
 // Minimum
 
@@ -1176,7 +1201,7 @@ int64_t Query::minimum_int(ColKey column_key, ObjKey* return_ndx) const
     else {
         aggregate<int64_t>(st, column_key, nullptr, return_ndx);
     }
-    return st.m_state;
+    return st.get_min();
 }
 float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1186,7 +1211,7 @@ float Query::minimum_float(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMin<float> st;
     aggregate<float>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_min();
 }
 double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
 {
@@ -1196,7 +1221,7 @@ double Query::minimum_double(ColKey column_key, ObjKey* return_ndx) const
 
     QueryStateMin<double> st;
     aggregate<double>(st, column_key, nullptr, return_ndx);
-    return st.m_state;
+    return st.get_min();
 }
 
 Timestamp Query::minimum_timestamp(ColKey column_key, ObjKey* return_ndx)
@@ -1221,17 +1246,16 @@ Decimal128 Query::minimum_decimal128(ColKey column_key, ObjKey* return_ndx) cons
     return st.get_min();
 }
 
-Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
+Mixed Query::minimum_mixed(ColKey column_key, ObjKey* return_ndx) const
 {
 #if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
 #endif
 
-    QueryStateMax<Timestamp> st;
-    aggregate<Timestamp>(st, column_key, nullptr, return_ndx);
-    return st.get_max();
+    QueryStateMin<Mixed> st;
+    aggregate<Mixed>(st, column_key, nullptr, return_ndx);
+    return st.get_min();
 }
-
 
 // Average
 
@@ -1244,7 +1268,7 @@ R Query::average(ColKey column_key, size_t* resultcount) const
     size_t resultcount2 = 0;
     QueryStateSum<typename util::RemoveOptional<T>::type> st;
     aggregate<T>(st, column_key, &resultcount2);
-    R sum1 = R(st.m_state);
+    R sum1 = R(st.result_sum());
     R avg1{};
     if (resultcount2 != 0)
         avg1 = sum1 / resultcount2;
@@ -1274,6 +1298,13 @@ Decimal128 Query::average_decimal128(ColKey column_key, size_t* resultcount) con
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
 #endif
     return average<Decimal128>(column_key, resultcount);
+}
+Decimal128 Query::average_mixed(ColKey column_key, size_t* resultcount) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
+#endif
+    return average<Mixed>(column_key, resultcount);
 }
 
 
@@ -1364,7 +1395,7 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            const Obj obj = m_view->get_object(i);
+            const Obj obj = m_view->try_get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1401,11 +1432,13 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
 
     init();
 
+    bool has_cond = has_conditions();
+
     if (m_view) {
         if (end == size_t(-1))
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
-            const Obj obj = m_view->get_object(t);
+            const Obj obj = m_view->try_get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
@@ -1414,7 +1447,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
     else {
         if (end == size_t(-1))
             end = m_table->size();
-        if (!has_conditions()) {
+        if (!has_cond) {
             KeyColumn& refs = ret.m_key_values;
 
             auto f = [&begin, &end, &limit, &refs](const Cluster* cluster) {
@@ -1486,7 +1519,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 }
                 end -= e;
                 // Stop if limit or end is reached
-                return end == 0 || st.m_match_count == st.m_limit;
+                return end == 0 || st.match_count() == st.limit();
             };
 
             m_table->traverse_clusters(f);
@@ -1528,13 +1561,12 @@ size_t Query::do_count(size_t limit) const
     size_t cnt = 0;
 
     if (m_view) {
-        size_t sz = m_view->size();
-        for (size_t t = 0; t < sz && cnt < limit; t++) {
-            const Obj obj = m_view->get_object(t);
+        m_view->for_each([&](const Obj& obj) {
             if (eval_object(obj)) {
                 cnt++;
             }
-        }
+            return false;
+        });
     }
     else {
         size_t counter = 0;
@@ -1563,7 +1595,7 @@ size_t Query::do_count(size_t limit) const
             st.m_key_values = cluster->get_key_array();
             aggregate_internal(node, &st, 0, e, nullptr);
             // Stop if limit or end is reached
-            return st.m_match_count == st.m_limit;
+            return st.match_count() == st.limit();
         };
 
         m_table->traverse_clusters(f);
@@ -1916,15 +1948,10 @@ Query& Query::and_query(Query&& q)
     if (q.root_node()) {
         add_node(std::move(q.m_groups[0].m_root_node));
 
-        if (q.m_source_link_list) {
-            REALM_ASSERT(!m_source_link_list || *m_source_link_list == *q.m_source_link_list);
-            m_source_link_list = std::move(q.m_source_link_list);
-            m_view = m_source_link_list.get();
-        }
-        if (q.m_source_link_set) {
-            REALM_ASSERT(!m_source_link_set || *m_source_link_set == *q.m_source_link_set);
-            m_source_link_set = std::move(q.m_source_link_set);
-            m_view = m_source_link_set.get();
+        if (q.m_source_collection) {
+            REALM_ASSERT(!m_source_collection || (m_source_collection->matches(*q.m_source_collection)));
+            m_source_collection = std::move(q.m_source_collection);
+            m_view = m_source_collection.get();
         }
     }
 

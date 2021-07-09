@@ -54,12 +54,13 @@ double Table::average(ColKey col_key, size_t* resultcount) const
 {
     QueryStateSum<typename util::RemoveOptional<T>::type> st;
     aggregate<T>(st, col_key);
-    auto sum = st.m_state;
+    auto sum = st.result_sum();
     double avg = 0;
-    if (st.m_match_count != 0)
-        avg = double(sum) / st.m_match_count;
+    size_t items_counted = st.result_count();
+    if (items_counted != 0)
+        avg = double(sum) / items_counted;
     if (resultcount)
-        *resultcount = st.m_match_count;
+        *resultcount = items_counted;
     return avg;
 }
 }

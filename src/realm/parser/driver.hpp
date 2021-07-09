@@ -102,6 +102,7 @@ public:
         UUID_T,
         OID,
         LINK,
+        TYPED_LINK,
         NULL_VAL,
         TRUE,
         FALSE,
@@ -269,7 +270,15 @@ public:
     std::string identifier;
     ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
     PostOpNode* post_op = nullptr;
+    ConstantNode* index = nullptr;
 
+    PropNode(PathNode* node, std::string id, ConstantNode* idx, PostOpNode* po_node)
+        : path(node)
+        , identifier(id)
+        , post_op(po_node)
+        , index(idx)
+    {
+    }
     PropNode(PathNode* node, std::string id, PostOpNode* po_node,
              ExpressionComparisonType ct = ExpressionComparisonType::Any)
         : path(node)

@@ -166,6 +166,19 @@ std::string print_value<>(realm::ObjKey k)
 }
 
 template <>
+std::string print_value<>(realm::ObjLink link)
+{
+    std::stringstream ss;
+    if (!link) {
+        ss << "NULL";
+    }
+    else {
+        ss << "L" << link.get_table_key().value << ":" << link.get_obj_key().value;
+    }
+    return ss.str();
+}
+
+template <>
 std::string print_value<>(realm::UUID uuid)
 {
     return "uuid(" + uuid.to_string() + ")";

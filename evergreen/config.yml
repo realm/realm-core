@@ -71,7 +71,6 @@ functions:
           if [ -n "${run_tests_against_baas|}" ]; then
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
-              set_cmake_var baas_vars REALM_STITCH_CONFIG PATH $(pwd)/test/object-store/mongodb/config.json
           fi
 
           if [ -n "${enable_asan|}" ]; then
@@ -105,6 +104,14 @@ functions:
               set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
           fi
 
+          if [[ -n "${cmake_toolchain_file|}" ]]; then
+              set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
+          fi
+
+          if [ -n "${enable_logging|}" ]; then
+              set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
+          fi
+
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -114,11 +121,15 @@ functions:
             -C cmake_vars.txt ${extra_flags} \
             -G "${cmake_generator|Unix Makefiles}"
 
+          if [[ -n "${target_to_build|}" ]]; then
+              target="--target ${target_to_build|}"
+          fi
+
           ${cmake_bindir}/cmake \
               --build build \
               --config ${cmake_build_type|Debug} \
               -j ${max_jobs|$(grep -c proc /proc/cpuinfo)} \
-              --target ${target_to_build|}
+              $target
 
   "run benchmark":
     - command: shell.exec
@@ -209,6 +220,128 @@ tasks:
       local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
       content_type: '${content_type|application/x-gzip}'
 
+- name: swift-build-and-test
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+        set -o verbose
+
+        if [ -n "${xcode_developer_dir}" ]; then
+            export DEVELOPER_DIR="${xcode_developer_dir}"
+        fi
+
+        xcrun swift build
+        xcrun swift run ObjectStoreTests
+
+- name: bloaty
+  commands:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  - func: "compile"
+    vars:
+      target_to_build: RealmFFI
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: /bin/bash
+      script: |-
+        #!/bin/bash
+        set -o errexit
+        set -o pipefail
+
+        mkdir bloaty-binaries && cd bloaty-binaries
+        curl --silent -L ${bloaty_url} | tar -xz --strip-components=1
+        BLOATY=$(pwd)/bin/bloaty
+        cd ..
+
+        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/librealm-ffi.so"
+
+        mkdir bloaty-results
+        for input_path in $FILES_TO_ANALYZE; do
+            input_file=$(basename $input_path)
+            $BLOATY -d shortsymbols $input_path -n 0 --csv > "bloaty-results/$input_file-shortsymbols.csv"
+            $BLOATY -d sections $input_path -n 0 --csv > "bloaty-results/$input_file-sections.csv"
+            $BLOATY -d shortsymbols $input_path -n 0 > "bloaty-results/$input_file-shortsymbols.txt"
+            $BLOATY -d sections $input_path -n 0 > "bloaty-results/$input_file-sections.txt"
+            $BLOATY -d compileunits $input_path -n 0 > "bloaty-results/$input_file-compileunits.txt"
+            $BLOATY -d compileunits $input_path -n 0 --csv > "bloaty-results/$input_file-compileunits.csv"
+
+            echo "Bloaty sections output for $input_file"
+            head -n 100 "bloaty-results/$input_file-sections.txt"
+            echo
+            echo "Bloaty compile units output for $input_file"
+            head -n 100 "bloaty-results/$input_file-compileunits.txt"
+            echo
+            echo "Bloaty short symbols output for $input_file"
+            head -n 100 "bloaty-results/$input_file-shortsymbols.txt"
+
+            ${python3|} ./evergreen/bloaty_to_json.py \
+                --short-symbols-input="bloaty-results/$input_file-shortsymbols.csv" \
+                --sections-input="bloaty-results/$input_file-sections.csv" \
+                --compileunits-input="bloaty-results/$input_file-compileunits.csv" \
+                --analyzed-file=$input_file \
+                --output "bloaty-results/$input_file-results.json" \
+                --project=${project} \
+                --execution=${execution} \
+                --is-patch=${is_patch} \
+                --build-variant=${build_variant} \
+                --branch=${branch_name} \
+                --revision=${revision} \
+                --task-id=${task_id} \
+                --task-name=${task_name} \
+                --revision-order-id=${revision_order_id} \
+                --version-id=${version_id}
+
+            # TODO(JBR) This is pointing to a test application for now. When we have charts configured we can create
+            # a real realm app to house them and this URL will change.
+            curl \
+                -H "Content-Type: application/json" \
+                -d "@bloaty-results/$input_file-results.json" \
+                https://us-east-1.aws.webhooks.mongodb-realm.com/api/client/v2.0/app/application-0-htnkr/service/http1/incoming_webhook/upload_bloaty_results?secret=${bloaty_secret}
+        done
+
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_files_include_filter:
+        - realm-core/bloaty-results/*.csv
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/csv
+      display_name: bloaty-results
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_files_include_filter:
+        - realm-core/bloaty-results/*.txt
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: bloaty-results
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_files_include_filter:
+        - realm-core/bloaty-results/*.json
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/bloaty-results-'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/json
+      display_name: bloaty-results
+
 - name: long-running-core-tests
   commands:
   - func: "run tests"
@@ -221,6 +354,7 @@ tasks:
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -228,6 +362,7 @@ tasks:
       test_filter: StorageTests
 
 - name: benchmark-common-tasks
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -235,6 +370,7 @@ tasks:
       path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
 
 - name: benchmark-crud
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -243,6 +379,7 @@ tasks:
 
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -251,8 +388,11 @@ tasks:
 
 - name: object-store-tests
   tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
+    vars:
+      enable_logging: true
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec
@@ -267,7 +407,19 @@ tasks:
         export CURL=${curl|curl}
 
         if [[ -n "${run_tests_against_baas|}" ]]; then
-            ./evergreen/install_baas.sh ./baas-work-dir ./test/object-store/mongodb
+            if [[ -z "${baas_secrets_aws_access_key|}" || -z "${baas_secrets_aws_secret_key|}" ]]; then
+                echo "Must supply baas secrets AWS key info to start baas server"
+                exit 1
+            fi
+
+            export AWS_ACCESS_KEY_ID="${baas_secrets_aws_access_key}"
+            export AWS_SECRET_ACCESS_KEY="${baas_secrets_aws_secret_key}"
+
+            if [ -n "${xcode_developer_dir}" ]; then
+                export DEVELOPER_DIR="${xcode_developer_dir}"
+            fi
+
+            ./evergreen/install_baas.sh -w ./baas-work-dir
         fi
 
   - command: shell.exec
@@ -417,7 +569,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -434,13 +586,15 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    bloaty_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/bloaty-v1.1-39-gefc1c61-ubuntu2004-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    cmake_build_type: Release
+    cmake_build_type: RelWithDebInfo
     fetch_missing_dependencies: On
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
+    python3: /opt/mongodbtoolchain/v3/bin/python3
   tasks:
   - name: compile_test_and_package
     distros:
@@ -449,13 +603,14 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: long-running-tests
+  - name: bloaty
 
 - name: ubuntu2004-asan
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 ASAN)"
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -473,7 +628,7 @@ buildvariants:
   run_on: ubuntu2004-small
   expansions:
     clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     run_tests_against_baas: On
@@ -491,7 +646,7 @@ buildvariants:
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Linux-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
@@ -505,7 +660,7 @@ buildvariants:
   display_name: "Ubuntu 20.04 ARM64"
   run_on: ubuntu2004-arm64-small
   expansions:
-    cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     use_system_openssl: On
     fetch_missing_dependencies: On
@@ -517,41 +672,76 @@ buildvariants:
     distros:
     - ubuntu2004-arm64-large
 
-- name: macos-1014
-  display_name: "MacOS 10.14 x86_64"
-  run_on: macos-1014
+- name: macos-1015
+  display_name: "MacOS 10.15 x86_64"
+  run_on: macos-1015
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test
-    distros:
-    - macos-1014
+  - name: swift-build-and-test
 
-- name: macos-1014-release
-  display_name: "MacOS 10.14 x86_64 (Release build)"
-  run_on: macos-1014
+- name: macos-1015-release
+  display_name: "MacOS 10.15 x86_64 (Release build)"
+  run_on: macos-1015
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-Darwin-x86_64.tar.gz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode11.3.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
   - name: long-running-tests
+  - name: swift-build-and-test
+
+- name: macos-1100-arm64
+  display_name: "MacOS 11 arm64"
+  run_on: macos-1100-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+  tasks:
+  - name: compile_test
+    distros:
+    - macos-1100-arm64
+  - name: swift-build-and-test
+
+- name: macos-1100-arm64-release
+  display_name: "MacOS 11 arm64 (Release build)"
+  run_on: macos-1100-arm64
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    cmake_build_type: Release
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+  tasks:
+  - name: compile_test_and_package
+  - name: benchmarks
+  - name: long-running-tests
+  - name: swift-build-and-test
 
 - name: windows-64-vs2019
   display_name: "Windows x86_64 (VS 2019)"
   run_on: windows-64-vs2019-test
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
-    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     test_flags: "-C Debug"
@@ -569,8 +759,8 @@ buildvariants:
   display_name: "Windows x86_64 (VS 2019 Release build)"
   run_on: windows-64-vs2019-test
   expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.19.1-win64-x64.zip"
-    cmake_bindir: "./cmake-3.19.1-win64-x64/bin"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"

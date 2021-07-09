@@ -190,8 +190,8 @@ TEST(Mixed_SortNumeric)
     tv.sort(col_data);
     std::ostringstream out;
     out.precision(8);
-    std::string expected = "null\n-278987.9\n-500\n-258\nfalse\n0.001\n"
-                           "true\n5\n7.5\n34.8\n42\n42.125\n100\n"
+    std::string expected = "null\nfalse\ntrue\n-278987.9\n-500\n-258\n0.001\n"
+                           "5\n7.5\n34.8\n42\n42.125\n100\n"
                            "129.85\n256.25\n500\n10000\n\"Hello\"\n";
     for (size_t i = 0; i < sz; i++) {
         Mixed val = tv.get(i).get<Mixed>(col_data);
@@ -221,8 +221,7 @@ TEST(Mixed_Compare)
     CHECK(Mixed(BinaryData("b")) < Mixed("c"));
     CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
-    CHECK(Mixed(ObjectId(Timestamp(1, 2), 0, 0)) < Mixed(Timestamp(2, 3)));
-    CHECK(Mixed(Timestamp(1, 2)) < Mixed(ObjectId(Timestamp(2, 3), 0, 0)));
+    CHECK(Mixed(Timestamp(2, 3)) < Mixed(ObjectId(Timestamp(1, 2), 0, 0))); // Not value comparable
 }
 
 #endif // TEST_ARRAY_VARIANT

@@ -378,6 +378,25 @@ public:
         return !m_transaction && !m_coordinator;
     }
 
+    /**
+     * Deletes the following files for the given `realm_file_path` if they exist:
+     * - the Realm file itself
+     * - the .management folder
+     * - the .note file
+     * - the .log file and its legacy versions: .log_a and .log_b
+     *
+     * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
+     * If a different process / thread is accessing the Realm at the same time a corrupt state
+     * could be the result and checking for a single process state is not possible here.
+     *
+     * @param realm_file_path The path to the Realm file. All files will be derived from this.
+     *
+     * @throws PermissionDenied if the operation was not permitted.
+     * @throws AccessError for any other error while trying to delete the file or folder.
+     * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
+     */
+    static void delete_files(const std::string& realm_file_path);
+
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
 
@@ -568,6 +587,14 @@ class ClosedRealmException : public std::logic_error {
 public:
     ClosedRealmException()
         : std::logic_error("Cannot access realm that has been closed.")
+    {
+    }
+};
+
+class DeleteOnOpenRealmException : public std::logic_error {
+public:
+    DeleteOnOpenRealmException(std::string lock_file_path)
+        : std::logic_error("Cannot delete files of an open Realm. " + lock_file_path + " is still in use.")
     {
     }
 };

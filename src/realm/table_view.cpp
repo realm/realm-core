@@ -100,6 +100,30 @@ ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPoli
 
 // Aggregates ----------------------------------------------------
 
+template <typename T, Action AggregateOpType>
+struct Aggregator {
+};
+
+template <typename T>
+struct Aggregator<T, act_Sum> {
+    using AggType = typename aggregate_operations::Sum<typename util::RemoveOptional<T>::type>;
+};
+
+template <typename T>
+struct Aggregator<T, act_Average> {
+    using AggType = typename aggregate_operations::Average<typename util::RemoveOptional<T>::type>;
+};
+
+template <typename T>
+struct Aggregator<T, act_Min> {
+    using AggType = typename aggregate_operations::Minimum<typename util::RemoveOptional<T>::type>;
+};
+
+template <typename T>
+struct Aggregator<T, act_Max> {
+    using AggType = typename aggregate_operations::Maximum<typename util::RemoveOptional<T>::type>;
+};
+
 template <Action action, typename T, typename R>
 R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
@@ -117,34 +141,8 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         return {};
     }
 
-    // typedef typename ColTypeTraits::leaf_type ArrType;
-
-    // FIXME: Optimization temporarely removed for stability
-    /*
-        if (m_num_detached_refs == 0 && m_table_view_key_values.size() == column->size()) {
-            // direct aggregate on the column
-            if (action == act_Count)
-                return static_cast<R>(column->count(count_target));
-            else
-                return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
-        }
-    */
-
-    // Array object instantiation must NOT allocate initial memory (capacity)
-    // with 'new' because it will lead to mem leak. The column keeps ownership
-    // of the payload in array and will free it itself later, so we must not call destroy() on array.
-    // ArrType arr(column->get_alloc());
-
-    // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
-
-    /*
-        const ArrType* arrp = nullptr;
-        size_t leaf_start = 0;
-        size_t leaf_end = 0;
-        size_t row_ndx;
-    */
-    R res = R{};
-    bool is_first = true;
+    typename Aggregator<T, action>::AggType agg;
+    ObjKey last_accumulated_key = null_key;
     for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
 
         ObjKey key(get_key(tv_index));
@@ -153,16 +151,6 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         if (key == realm::null_key)
             continue;
 
-        // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
-        /*
-                if (row_ndx < leaf_start || row_ndx >= leaf_end) {
-                    size_t ndx_in_leaf;
-                    typename ColType::LeafInfo leaf{&arrp, &arr};
-                    column->get_leaf(row_ndx, ndx_in_leaf, leaf);
-                    leaf_start = row_ndx - ndx_in_leaf;
-                    leaf_end = leaf_start + arrp->size();
-                }
-        */
         // aggregation must be robust in the face of stale keys:
         if (!m_table->is_valid(key))
             continue;
@@ -171,36 +159,30 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         auto v = obj.get<T>(column_key);
 
         if (!obj.is_null(column_key)) {
-            non_nulls++;
-            R unpacked = static_cast<R>(util::unwrap(v));
-
-            if (is_first) {
-                if (return_key) {
-                    *return_key = key;
+            if (agg.accumulate(v)) {
+                ++non_nulls;
+                if constexpr (action == act_Min || action == act_Max) {
+                    last_accumulated_key = key;
                 }
-                res = unpacked;
-                is_first = false;
-            }
-            else if (action == act_Sum || action == act_Average) {
-                res += unpacked;
-            }
-            else if ((action == act_Max && unpacked > res) || non_nulls == 1) {
-                res = unpacked;
-                if (return_key)
-                    *return_key = key;
-            }
-            else if ((action == act_Min && unpacked < res) || non_nulls == 1) {
-                res = unpacked;
-                if (return_key)
-                    *return_key = key;
             }
         }
     }
 
-    if (action == act_Average) {
-        if (result_count)
-            *result_count = non_nulls;
-        return res / (non_nulls == 0 ? 1 : non_nulls);
+    if (result_count)
+        *result_count = non_nulls;
+
+    R res{};
+    if constexpr (action == act_Max || action == act_Min) {
+        if (return_key) {
+            *return_key = last_accumulated_key;
+        }
+    }
+    else {
+        static_cast<void>(last_accumulated_key);
+    }
+
+    if (!agg.is_null()) {
+        res = agg.result();
     }
 
     return res;
@@ -286,6 +268,11 @@ Decimal128 ConstTableView::sum_decimal(ColKey column_key) const
     return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
 }
 
+Decimal128 ConstTableView::sum_mixed(ColKey column_key) const
+{
+    return aggregate<act_Sum, Mixed, Decimal128>(column_key);
+}
+
 // Maximum
 int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
@@ -309,6 +296,10 @@ Timestamp ConstTableView::maximum_timestamp(ColKey column_key, ObjKey* return_ke
 Decimal128 ConstTableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_key);
+}
+Mixed ConstTableView::maximum_mixed(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Max, Mixed, Mixed>(column_key, nullptr, return_key);
 }
 
 // Minimum
@@ -335,6 +326,10 @@ Decimal128 ConstTableView::minimum_decimal(ColKey column_key, ObjKey* return_key
 {
     return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_key);
 }
+Mixed ConstTableView::minimum_mixed(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Min, Mixed, Mixed>(column_key, nullptr, return_key);
+}
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
 double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
@@ -355,6 +350,10 @@ double ConstTableView::average_double(ColKey column_key, size_t* value_count) co
 Decimal128 ConstTableView::average_decimal(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, Decimal128, Decimal128>(column_key, value_count);
+}
+Decimal128 ConstTableView::average_mixed(ColKey column_key, size_t* value_count) const
+{
+    return aggregate<act_Average, Mixed, Decimal128>(column_key, value_count);
 }
 
 // Count
@@ -398,6 +397,12 @@ size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
 {
     return aggregate_count<Decimal128>(column_key, target);
 }
+
+size_t ConstTableView::count_mixed(ColKey column_key, Mixed target) const
+{
+    return aggregate_count<Mixed>(column_key, target);
+}
+
 
 void ConstTableView::to_json(std::ostream& out, size_t link_depth) const
 {

@@ -136,8 +136,7 @@ void Obj::remove()
 
 void Obj::invalidate()
 {
-    m_table.cast_away_const()->invalidate_object(m_key);
-    m_key = m_key.get_unresolved();
+    m_key = m_table.cast_away_const()->invalidate_object(m_key);
 }
 
 ColKey Obj::get_column_key(StringData col_name) const
@@ -392,18 +391,16 @@ Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<st
         ++path_start;
         if (path_start == path_end)
             return val;
-        if (!val.is_null()) {
-            if (val.get_type() == type_Link || val.get_type() == type_TypedLink) {
-                Obj obj;
-                if (val.get_type() == type_Link) {
-                    obj = get_target_table(col)->get_object(val.get<ObjKey>());
-                }
-                else {
-                    auto obj_link = val.get<ObjLink>();
-                    obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
-                }
-                return obj.get_any(path_start, path_end);
+        if (val.is_type(type_Link, type_TypedLink)) {
+            Obj obj;
+            if (val.get_type() == type_Link) {
+                obj = get_target_table(col)->get_object(val.get<ObjKey>());
             }
+            else {
+                auto obj_link = val.get<ObjLink>();
+                obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
+            }
+            return obj.get_any(path_start, path_end);
         }
     }
     return {};
@@ -709,13 +706,23 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
                 TableRef tr = m_table->get_opposite_table(col_key);
                 Obj obj = tr->get_object(backlinks[0]); // always the first (and only)
                 auto next_col_key = m_table->get_opposite_column(col_key);
-                size_t index = 0;
+                Mixed index;
                 if (next_col_key.get_attrs().test(col_attr_List)) {
                     auto ll = obj.get_linklist(next_col_key);
-                    while (ll.get(index) != get_key()) {
-                        index++;
-                        REALM_ASSERT(ll.size() > index);
+                    auto i = ll.find_first(get_key());
+                    REALM_ASSERT(i != realm::npos);
+                    index = Mixed(int64_t(i));
+                }
+                else if (next_col_key.get_attrs().test(col_attr_Dictionary)) {
+                    ObjLink link = get_link();
+                    auto dict = obj.get_dictionary(next_col_key);
+                    for (auto it : dict) {
+                        if (it.second.is_type(type_TypedLink) && it.second.get_link() == link) {
+                            index = it.first;
+                            break;
+                        }
                     }
+                    REALM_ASSERT(!index.is_null());
                 }
                 obj.traverse_path(v, ps, path_length + 1);
                 v(obj, next_col_key, index);
@@ -735,7 +742,7 @@ Obj::FatPath Obj::get_fat_path() const
     auto sizer = [&](size_t size) {
         result.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         result.push_back({o2, col, idx});
     };
     traverse_path(step, sizer);
@@ -749,7 +756,7 @@ Obj::Path Obj::get_path() const
     auto sizer = [&](size_t size) {
         result.path_from_top.reserve(size);
     };
-    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, Mixed idx) -> void {
         if (!top_done) {
             top_done = true;
             result.top_table = o2.get_table()->get_key();
@@ -918,10 +925,11 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             out << "\"}";
             break;
         case type_UUID:
-            out << "{\"$uuid\": \"";
-            out << val.get<UUID>();
-            out << "\"}";
+            out << "{\"$binary\": {\"base64\": \"";
+            out << val.get<UUID>().to_base64();
+            out << "\", \"subType\": \"04\"}}";
             break;
+
         case type_TypedLink: {
             out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
             break;
@@ -941,7 +949,7 @@ void out_mixed_xjson_plus(std::ostream& out, const Mixed& val)
     }
 
     // Special case for outputing a typedLink, otherwise just us out_mixed_xjson
-    if (val.get_type() == type_TypedLink) {
+    if (val.is_type(type_TypedLink)) {
         auto link = val.get<ObjLink>();
         out << "{ \"$link\": { \"table\": \"" << link.get_table_key() << "\", \"key\": ";
         out_mixed_xjson(out, link.get_obj_key());
@@ -1015,8 +1023,15 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     out << "]";
                 }
                 else if (output_mode == output_mode_xjson_plus && !target_table->is_embedded() && primary_key_coll) {
-                    out << "{ \"$linkList\": { \"table\": \"" << get_target_table(ck)->get_name()
-                        << "\", \"keys\": [";
+                    if (ck.is_set()) {
+                        out << "{ \"$linkSet\": { \"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"keys\": [";
+                    }
+                    else {
+                        out << "{ \"$linkList\": { \"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"keys\": [";
+                    }
+
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
@@ -1040,8 +1055,14 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 else {
 
                     if (output_mode == output_mode_xjson_plus) {
-                        out << "{ \"$embeddedList\": { \"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"values\": ";
+                        if (ck.is_set()) {
+                            out << "{ \"$embeddedSet\": { \"table\": \"" << get_target_table(ck)->get_name()
+                                << "\", \"values\": ";
+                        }
+                        else {
+                            out << "{ \"$embeddedList\": { \"table\": \"" << get_target_table(ck)->get_name()
+                                << "\", \"values\": ";
+                        }
                     }
 
                     out << "[";
@@ -1064,6 +1085,10 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 auto list = this->get_collection_ptr(ck);
                 auto sz = list->size();
 
+                if (output_mode == output_mode_xjson_plus && ck.is_set()) {
+                    out << "{ \"$set\": ";
+                }
+
                 out << "[";
                 for (size_t i = 0; i < sz; i++) {
                     if (i > 0)
@@ -1072,6 +1097,10 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     out_mixed(out, list->get_any(i), output_mode);
                 }
                 out << "]";
+
+                if (output_mode == output_mode_xjson_plus && ck.is_set()) {
+                    out << "}";
+                }
             }
         }
         else if (ck.get_attrs().test(col_attr_Dictionary)) {
@@ -1079,7 +1108,19 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
 
             out << "{";
             if (output_mode == output_mode_xjson_plus) {
-                out << "\"$dictionary\": {";
+                if (type == col_type_Link) {
+                    if (get_target_table(ck)->is_embedded()) {
+                        out << "\"$embeddedDictionary\": { \"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"values\": {";
+                    }
+                    else {
+                        out << "\"$linkDictionary\": { \"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"values\": {";
+                    }
+                }
+                else {
+                    out << "\"$dictionary\": {";
+                }
             }
 
             bool first = true;
@@ -1093,28 +1134,33 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 if (it.second.is_null()) {
                     out << "null";
                 }
-                else if (it.second.get_type() == type_TypedLink) {
+                else if (it.second.is_type(type_TypedLink)) {
                     auto obj_link = it.second.get<ObjLink>();
+                    auto obj_key = obj_link.get_obj_key();
                     auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
+                    auto primary_key_coll = target_table->get_primary_key_column();
 
-                    if (output_mode == output_mode_xjson && !target_table->is_embedded() &&
-                        !obj_link.is_unresolved()) {
-                        out_mixed_xjson(out, obj_link.get_obj_key());
-                    }
-                    else if (output_mode == output_mode_xjson_plus && !target_table->is_embedded() &&
-                             !obj_link.is_unresolved()) {
-                        out << "{ \"$link\": { \"table\": \"" << obj_link.get_table_key() << "\", \"key\": ";
-                        out_mixed_xjson(out, obj_link.get_obj_key());
-                        out << "}}";
-                    }
-                    else if (link_depth == 0 || link_depth == not_found) {
-                        out << "{\"table\": \"" << target_table->get_name()
-                            << "\", \"key\": " << obj_link.get_obj_key().value << "}";
-                    }
-                    else {
-                        auto obj = target_table->get_object(obj_link.get_obj_key());
+                    if (target_table->is_embedded()) {
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        obj.to_json(out, new_depth, renames, followed, output_mode);
+                        auto link = it.second.get<ObjKey>();
+                        target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
+                    }
+                    else if (primary_key_coll && output_mode == output_mode_xjson) {
+                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
+                    }
+                    else if (primary_key_coll && output_mode == output_mode_xjson_plus) {
+                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
+                    }
+                    else if (!obj_key.is_unresolved()) {
+                        if (link_depth == 0 || link_depth == not_found) {
+                            out << "{\"table\": \"" << target_table->get_name() << "\", \"key\": " << obj_key.value
+                                << "}";
+                        }
+                        else {
+                            auto obj = target_table->get_object(obj_key);
+                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                            obj.to_json(out, new_depth, renames, followed, output_mode);
+                        }
                     }
                 }
                 else {
@@ -1124,6 +1170,9 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             out << "}";
             if (output_mode == output_mode_xjson_plus) {
                 out << "}";
+                if (type == col_type_Link) {
+                    out << "}";
+                }
             }
         }
         else {
@@ -1235,12 +1284,15 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         }
         return set_null(col_key, is_default);
     }
+    if (value.is_type(type_Link)) {
+        throw LogicError(LogicError::illegal_combination);
+    }
 
-    if (value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;
-        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+        if (old_value.is_type(type_TypedLink)) {
             old_link = old_value.get<ObjLink>();
             if (new_link == old_link)
                 return *this;
@@ -1347,7 +1399,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
         throw LogicError(LogicError::illegal_type);
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    StringIndex* index = m_table->get_search_index(col_key);
+    if (index && !m_key.is_unresolved()) {
         index->set<int64_t>(m_key, value);
     }
 
@@ -1397,33 +1450,55 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
     Array fallback(alloc);
     Array& fields = get_tree_top()->get_fields_accessor(fallback, m_mem);
     REALM_ASSERT(col_ndx.val + 1 < fields.size());
-    auto attr = col_key.get_attrs();
-    if (attr.test(col_attr_Nullable)) {
-        ArrayIntNull values(alloc);
+
+    if (col_key.get_type() == col_type_Mixed) {
+        ArrayMixed values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
         values.init_from_parent();
-        util::Optional<int64_t> old = values.get(m_row_ndx);
-        if (old) {
-            auto new_val = add_wrap(*old, value);
+        Mixed old = values.get(m_row_ndx);
+        if (old.is_type(type_Int)) {
+            Mixed new_val = Mixed(add_wrap(old.get_int(), value));
             if (StringIndex* index = m_table->get_search_index(col_key)) {
-                index->set<int64_t>(m_key, new_val);
+                index->set<Mixed>(m_key, new_val);
             }
-            values.set(m_row_ndx, new_val);
+            values.set(m_row_ndx, Mixed(new_val));
         }
         else {
             throw LogicError{LogicError::illegal_combination};
         }
     }
     else {
-        ArrayInteger values(alloc);
-        values.set_parent(&fields, col_ndx.val + 1);
-        values.init_from_parent();
-        int64_t old = values.get(m_row_ndx);
-        auto new_val = add_wrap(old, value);
-        if (StringIndex* index = m_table->get_search_index(col_key)) {
-            index->set<int64_t>(m_key, new_val);
+        if (col_key.get_type() != col_type_Int)
+            throw LogicError(LogicError::illegal_type);
+
+        auto attr = col_key.get_attrs();
+        if (attr.test(col_attr_Nullable)) {
+            ArrayIntNull values(alloc);
+            values.set_parent(&fields, col_ndx.val + 1);
+            values.init_from_parent();
+            util::Optional<int64_t> old = values.get(m_row_ndx);
+            if (old) {
+                auto new_val = add_wrap(*old, value);
+                if (StringIndex* index = m_table->get_search_index(col_key)) {
+                    index->set<int64_t>(m_key, new_val);
+                }
+                values.set(m_row_ndx, new_val);
+            }
+            else {
+                throw LogicError{LogicError::illegal_combination};
+            }
         }
-        values.set(m_row_ndx, new_val);
+        else {
+            ArrayInteger values(alloc);
+            values.set_parent(&fields, col_ndx.val + 1);
+            values.init_from_parent();
+            int64_t old = values.get(m_row_ndx);
+            auto new_val = add_wrap(old, value);
+            if (StringIndex* index = m_table->get_search_index(col_key)) {
+                index->set<int64_t>(m_key, new_val);
+            }
+            values.set(m_row_ndx, new_val);
+        }
     }
 
     sync(fields);
@@ -1547,9 +1622,21 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
     auto target_key = result.get_key();
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
-    if (!t.is_embedded() && old_key != ObjKey()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (old_key != ObjKey()) {
+        if (!t.is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+
+        // If this is an embedded object and there was already an embedded object here, then we need to
+        // emit an instruction to set the old embedded object to null to clear the old object on other
+        // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
+        // and then array operations will have a corrupted prior_size.
+        if (Replication* repl = get_replication()) {
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
     }
+
     if (target_key != old_key) {
         CascadeState state;
 
@@ -1629,7 +1716,8 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     check_range(value);
 
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    StringIndex* index = m_table->get_search_index(col_key);
+    if (index && !m_key.is_unresolved()) {
         index->set<T>(m_key, value);
     }
 
@@ -1996,6 +2084,21 @@ CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
     return {};
 }
 
+LinkCollectionPtr Obj::get_linkcollection_ptr(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return get_linklist_ptr(col_key);
+    }
+    else if (col_key.is_set()) {
+        return get_linkset_ptr(col_key);
+    }
+    else if (col_key.is_dictionary()) {
+        auto dict = get_dictionary(col_key);
+        return std::make_unique<DictionaryLinkValues>(dict);
+    }
+    return {};
+}
+
 void Obj::assign_pk_and_backlinks(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
@@ -2047,12 +2150,26 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                 REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
             }
+            else if (c.is_list()) {
+                if (c.get_type() == col_type_Mixed) {
+                    auto l = linking_obj.get_list<Mixed>(c);
+                    auto n = l.find_first(ObjLink{m_table->get_key(), other.get_key()});
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, ObjLink{m_table->get_key(), get_key()});
+                }
+                else if (c.get_type() == col_type_LinkList) {
+                    // Link list
+                    auto l = linking_obj.get_list<ObjKey>(c);
+                    auto n = l.find_first(other.get_key());
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, get_key());
+                }
+                else {
+                    REALM_UNREACHABLE(); // missing type handling
+                }
+            }
             else {
-                // Link list
-                auto l = linking_obj.get_list<ObjKey>(c);
-                auto n = l.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
+                REALM_UNREACHABLE(); // missing type handling
             }
         }
         return false;

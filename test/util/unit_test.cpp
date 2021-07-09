@@ -428,7 +428,7 @@ public:
     {
     }
 
-    void do_log(Logger::Level level, std::string message) override final
+    void do_log(Logger::Level level, std::string const& message) override final
     {
         Logger::do_log(m_base_logger, level, message); // Throws
     }

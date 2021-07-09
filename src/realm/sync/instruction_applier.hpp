@@ -64,9 +64,6 @@ protected:
 
     TableRef table_for_class_name(StringData) const; // Throws
 
-    template <class... Params>
-    REALM_NORETURN void bad_transaction_log(const char*, Params&&...) const;
-
     Transaction& m_transaction;
 
     template <class... Args>
@@ -180,19 +177,6 @@ inline void InstructionApplier::apply(A& applier, Changeset& changeset, util::Lo
 inline void InstructionApplier::apply(const Changeset& log, util::Logger* logger)
 {
     apply(*this, log, logger); // Throws
-}
-
-template <class... Params>
-REALM_NORETURN void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
-{
-    // FIXME: Provide a way to format strings without going through a logger implementation.
-    std::stringstream ss;
-    util::StreamLogger logger{ss};
-    logger.error(msg, std::forward<Params>(params)...);
-    // FIXME: Avoid throwing in normal program flow (since changesets can come
-    // in over the network, defective changesets are part of normal program
-    // flow).
-    throw BadChangesetError{ss.str()};
 }
 
 } // namespace sync

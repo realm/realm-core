@@ -1,7 +1,3 @@
-#include <signal.h>
-#include <memory>
-#include <string>
-
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/logger.hpp>
@@ -12,6 +8,11 @@
 #include <realm/sync/metrics.hpp>
 #include <realm/sync/server.hpp>
 #include <realm/sync/server_configuration.hpp>
+
+#include <iostream>
+#include <memory>
+#include <signal.h>
+#include <string>
 
 using namespace realm;
 

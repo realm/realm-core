@@ -189,7 +189,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
-            REQUIRE(frozen_res.get_any(0).is_null());
+            REQUIRE_THROWS(frozen_res.get_any(0));
         });
     }
 
@@ -424,6 +424,80 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
             REQUIRE(object_list.is_frozen());
             REQUIRE(object_list.is_valid());
             REQUIRE(object_list.get(0).get<Int>(linked_object_value_col) == 10);
+        });
+    }
+
+    SECTION("release all locks") {
+        frozen_realm->close();
+        realm->close();
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
+}
+
+TEST_CASE("Freeze dictionary", "[freeze_dictionary]") {
+
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object",
+         {{"value", PropertyType::Int},
+          {"integers", PropertyType::Dictionary | PropertyType::Int},
+          {"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "linked to object"}}},
+        {"linked to object", {{"value", PropertyType::Int}}}
+
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto linked_table = realm->read_group().get_table("class_linked to object");
+    auto value_col = table->get_column_key("value");
+    auto object_col = table->get_column_key("links");
+    auto int_col = table->get_column_key("integers");
+    auto linked_object_value_col = linked_table->get_column_key("value");
+
+    {
+        realm->begin_transaction();
+        Obj obj = table->create_object();
+        obj.set(value_col, 100);
+        auto object_dict = obj.get_dictionary(object_col);
+        auto int_dict = obj.get_dictionary(int_col);
+        const char* keys[5] = {"a", "b", "c", "d", "e"};
+        for (int j = 0; j < 5; ++j) {
+            auto child_obj = linked_table->create_object();
+            child_obj.set(linked_object_value_col, j + 10);
+            object_dict.insert(keys[j], child_obj.get_key());
+            int_dict.insert(keys[j], static_cast<Int>(j + 42));
+        }
+        realm->commit_transaction();
+    }
+
+    Results results(realm, table);
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
+
+    auto obj_dict = results.get(0).get_dictionary(object_col);
+    auto frozen_obj_dict = object_store::Dictionary(realm, obj_dict).freeze(frozen_realm);
+    auto frozen_int_dict = object_store::Dictionary(realm, table->get_object(0), int_col).freeze(frozen_realm);
+
+    SECTION("is_frozen") {
+        REQUIRE(frozen_obj_dict.is_frozen());
+        REQUIRE(frozen_int_dict.is_frozen());
+        JoiningThread thread([&] {
+            REQUIRE(frozen_int_dict.is_frozen());
+            REQUIRE(frozen_obj_dict.is_frozen());
+        });
+    }
+
+    SECTION("add_notification throws") {
+        REQUIRE_THROWS(frozen_obj_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+        REQUIRE_THROWS(frozen_int_dict.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+    }
+
+    SECTION("read across threads") {
+        JoiningThread thread([&] {
+            REQUIRE(frozen_int_dict.size() == 5);
+            REQUIRE(frozen_obj_dict.size() == 5);
+            REQUIRE(frozen_int_dict.get<Int>("a") == 42);
+            REQUIRE(frozen_obj_dict.get_object("a").get<Int>(linked_object_value_col) == 10);
         });
     }
 

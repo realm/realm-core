@@ -122,9 +122,11 @@ void util::get_platform_info(PlatformInfo& info)
         case PROCESSOR_ARCHITECTURE_ARM:
             info_2.machine = "arm"; // Throws
             break;
+#if defined(PROCESSOR_ARCHITECTURE_ARM64)
         case PROCESSOR_ARCHITECTURE_ARM64:
             info_2.machine = "arm64"; // Throws
             break;
+#endif
         case PROCESSOR_ARCHITECTURE_INTEL:
             info_2.machine = "x86"; // Throws
             break;
