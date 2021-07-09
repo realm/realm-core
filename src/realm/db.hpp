@@ -671,9 +671,11 @@ public:
     {
         // TODO make async flush to disk
         m_is_synchronizing = true;
+        // we must release the write mutex before the callback, because the callback
+        // is allowed to re-request it.
+        get_db()->do_end_write();
         when_synchronized();
         m_is_synchronizing = false;
-        get_db()->do_end_write();
     };
     // release the write lock without any sync to disk
     void release_write_lock()

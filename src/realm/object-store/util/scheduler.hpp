@@ -56,6 +56,8 @@ public:
     //
     // This function can be called from any thread.
     virtual void notify() = 0;
+    virtual void schedule_writes() = 0;
+    virtual void schedule_completions() = 0;
     // Check if the caller is currently running on the scheduler's thread.
     //
     // This function can be called from any thread.
@@ -73,10 +75,14 @@ public:
     //
     // This function is not thread-safe.
     virtual bool can_deliver_notifications() const noexcept = 0;
+    virtual bool can_schedule_writes() const noexcept = 0;
+    virtual bool can_schedule_completions() const noexcept = 0;
     // Set the callback function which will be called by notify().
     //
     // This function is not thread-safe.
     virtual void set_notify_callback(std::function<void()>) = 0;
+    virtual void set_schedule_writes_callback(std::function<void()>) = 0;
+    virtual void set_schedule_completions_callback(std::function<void()>) = 0;
 
     // virtual int enqueue_write(std::function<void()>& block) = 0;
 

@@ -536,7 +536,7 @@ private:
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
     struct async_write_desc {
-        SharedRealm retained_ref;
+        SharedRealm retained_ref; // needed to keep the Realm object alive
         std::function<void()> writer;
     };
     std::deque<async_write_desc> m_async_write_q;

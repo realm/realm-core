@@ -611,13 +611,15 @@ void Realm::wait_for_change_release()
 void Realm::run_writes_on_proper_thread()
 {
     // TODO ask scheduler to trigger callback on "run_writes"
-    run_writes();
+    // run_writes();
+    m_scheduler->schedule_writes();
 }
 
 void Realm::run_async_completions_on_proper_thread()
 {
     // TODO: ask scheduler to trigger callback on "run_async_completions"
-    run_async_completions();
+    // run_async_completions();
+    m_scheduler->schedule_completions();
 }
 
 void Realm::run_async_completions()
@@ -630,6 +632,14 @@ void Realm::run_async_completions()
     m_async_commit_q.clear();
     m_is_running_async_commit_completions = false;
     m_has_requested_write_mutex = false;
+    if (!m_async_write_q.empty()) {
+        // more writes to run later, so re-request the write mutex:
+        m_has_requested_write_mutex = true;
+        m_transaction->async_request_write_mutex([&]() {
+            // callback happens on a different thread so...:
+            run_writes_on_proper_thread();
+        });
+    }
 }
 
 void Realm::run_writes()
@@ -689,6 +699,15 @@ Realm::async_handle Realm::async_transaction(const std::function<void()>& the_wr
     if (m_is_running_async_writes)
         return 0;
 
+    REALM_ASSERT(m_scheduler);
+    REALM_ASSERT(m_scheduler->can_schedule_writes());
+    // TODO: We should not do this so often:
+    m_scheduler->set_schedule_writes_callback([&]() {
+        run_writes();
+    });
+    m_scheduler->set_schedule_completions_callback([&]() {
+        run_async_completions();
+    });
     if (!m_has_requested_write_mutex) {
         m_has_requested_write_mutex = true;
         trans.async_request_write_mutex([&]() {
