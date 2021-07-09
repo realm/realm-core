@@ -19,6 +19,8 @@ namespace realm {
 
 namespace query_parser {
 
+class NodeVisitor;
+
 class ParserNode {
 public:
     virtual ~ParserNode();
@@ -28,6 +30,7 @@ class AtomPredNode : public ParserNode {
 public:
     ~AtomPredNode() override;
     virtual Query visit(ParserDriver*) = 0;
+    virtual void accept(NodeVisitor& visitor);
 };
 
 class AndNode : public ParserNode {
@@ -39,6 +42,7 @@ public:
         atom_preds.emplace_back(node);
     }
     Query visit(ParserDriver*);
+    void accept(NodeVisitor& visitor);
 };
 
 class OrNode : public ParserNode {
@@ -50,6 +54,7 @@ public:
         and_preds.emplace_back(node);
     }
     Query visit(ParserDriver*);
+    void accept(NodeVisitor& visitor);
 };
 
 class NotNode : public AtomPredNode {
@@ -61,6 +66,7 @@ public:
     {
     }
     Query visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class ParensNode : public AtomPredNode {
@@ -72,6 +78,7 @@ public:
     {
     }
     Query visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class CompareNode : public AtomPredNode {
@@ -87,6 +94,7 @@ public:
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
     static constexpr int IN = 10;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class ConstantNode : public ParserNode {
@@ -118,11 +126,13 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+    void accept(NodeVisitor& visitor);
 };
 
 class PropertyNode : public ParserNode {
 public:
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
+    virtual void accept(NodeVisitor& visitor);
 };
 
 class ValueNode : public ParserNode {
@@ -138,6 +148,7 @@ public:
         : prop(node)
     {
     }
+    void accept(NodeVisitor& visitor);
 };
 
 class EqualityNode : public CompareNode {
@@ -153,6 +164,7 @@ public:
         values.emplace_back(right);
     }
     Query visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class RelationalNode : public CompareNode {
@@ -167,6 +179,7 @@ public:
         values.emplace_back(right);
     }
     Query visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class StringOpsNode : public CompareNode {
@@ -182,6 +195,7 @@ public:
         values.emplace_back(right);
     }
     Query visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class TrueOrFalseNode : public AtomPredNode {
@@ -193,6 +207,7 @@ public:
     {
     }
     Query visit(ParserDriver*);
+    void accept(NodeVisitor& visitor) override;
 };
 
 class PostOpNode : public ParserNode {
@@ -206,6 +221,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
+    void accept(NodeVisitor& visitor);
 };
 
 class AggrNode : public ParserNode {
@@ -219,6 +235,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
+    void accept(NodeVisitor& visitor);
 };
 
 class PathNode : public ParserNode {
@@ -230,6 +247,7 @@ public:
     {
         path_elems.push_back(str);
     }
+    void accept(NodeVisitor& visitor);
 };
 
 class ListAggrNode : public PropertyNode {
@@ -245,6 +263,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class LinkAggrNode : public PropertyNode {
@@ -262,6 +281,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class PropNode : public PropertyNode {
@@ -294,6 +314,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class SubqueryNode : public PropertyNode {
@@ -309,6 +330,7 @@ public:
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    void accept(NodeVisitor& visitor) override;
 };
 
 class DescriptorNode : public ParserNode {
@@ -343,6 +365,7 @@ public:
         add(path, id);
         ascending.push_back(direction);
     }
+    void accept(NodeVisitor& visitor);
 };
 
 class DescriptorOrderingNode : public ParserNode {
@@ -356,6 +379,7 @@ public:
         orderings.push_back(n);
     }
     std::unique_ptr<DescriptorOrdering> visit(ParserDriver* drv);
+    void accept(NodeVisitor& visitor);
 };
 
 // Conducting the whole scanning and parsing of Calc++.
@@ -468,6 +492,30 @@ Query ParserDriver::simple_query(int op, ColKey col_key, T val)
 }
 
 std::string check_escapes(const char* str);
+
+class NodeVisitor {
+public:
+    virtual void visitAnd(const AndNode& and_node);
+    virtual void visitOr(const OrNode& or_node);
+    virtual void visitNot(const NotNode& not_node);
+    virtual void visitParens(const ParensNode& parens_node);
+    virtual void visitCompare(const CompareNode& compare_node);
+    virtual void visitConstant(const ConstantNode& constant_node);
+    virtual void visitValue(const ValueNode& value_node);
+    virtual void visitEquality(const EqualityNode& equality_node);
+    virtual void visitRelational(const RelationalNode& relational_node);
+    virtual void visitStringOps(const StringOpsNode& string_ops_node);
+    virtual void visitTrueOrFalse(const TrueOrFalseNode& true_or_false_node);
+    virtual void visitPostOp(const PostOpNode& post_op_node);
+    virtual void visitAggr(const AggrNode& aggr_node);
+    virtual void visitPath(const PathNode& path_node);
+    virtual void visitListAggr(const ListAggrNode& list_aggr_node);
+    virtual void visitLinkAggr(const LinkAggrNode& link_aggr_node);
+    virtual void visitProp(const PropNode& prop_node);
+    virtual void visitSubquery(const SubqueryNode& sub_query_node);
+    virtual void visitDescriptor(const DescriptorNode& descriptor_node);
+    virtual void visitDescriptorOrdering(const DescriptorOrderingNode& descriptor_ordering_node);
+};
 
 } // namespace query_parser
 } // namespace realm

@@ -303,6 +303,200 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
+void AtomPredNode::accept(NodeVisitor& visitor) {
+
+}
+
+void AndNode::accept(NodeVisitor& visitor) {
+    visitor.visitAnd(*this);
+}
+
+void NodeVisitor::visitAnd(const AndNode& node) {
+    for (auto pred : node.atom_preds) {
+        pred->accept(*this);
+    }
+}
+
+void OrNode::accept(NodeVisitor& visitor) {
+    visitor.visitOr(*this);
+}
+
+void NodeVisitor::visitOr(const OrNode& node) {
+    for (auto pred : node.and_preds) {
+        this->visitAnd(*pred);
+    }
+}
+
+void NotNode::accept(NodeVisitor& visitor) {
+    visitor.visitNot(*this);
+}
+
+void NodeVisitor::visitNot(const NotNode& node) {
+    node.atom_pred->accept(*this);
+}
+
+void TrueOrFalseNode::accept(NodeVisitor& visitor) {
+    visitor.visitTrueOrFalse(*this);
+}
+
+void NodeVisitor::visitTrueOrFalse(const TrueOrFalseNode& node) {
+    //leaf node, no further traversal
+}
+
+void ParensNode::accept(NodeVisitor& visitor) {
+    visitor.visitParens(*this);
+}
+
+void NodeVisitor::visitParens(const ParensNode& node) {
+    this->visitOr(*node.pred);
+}
+
+void CompareNode::accept(NodeVisitor& visitor) {
+    visitor.visitCompare(*this);
+}
+
+void NodeVisitor::visitCompare(const CompareNode& node) {
+    //leaf node, no further traversal
+}
+
+void ConstantNode::accept(NodeVisitor& visitor) {
+    visitor.visitConstant(*this);
+}
+
+void NodeVisitor::visitConstant(const ConstantNode& node) {
+    //leaf node, no further traversal
+}
+
+void PropertyNode::accept(NodeVisitor& visitor) {
+
+}
+
+void ValueNode::accept(NodeVisitor& visitor) {
+    visitor.visitValue(*this);
+}
+
+void NodeVisitor::visitValue(const ValueNode& node) {
+    if (node.constant != nullptr) {
+        this->visitConstant(*node.constant);
+    } else {
+        auto prop = node.prop;
+        prop->accept(*this);
+    }
+}
+
+void EqualityNode::accept(NodeVisitor& visitor) {
+    visitor.visitEquality(*this);
+}
+
+void NodeVisitor::visitEquality(const EqualityNode& node) {
+    for (auto value : node.values) {
+        this->visitValue(*value);
+    }
+}
+
+void RelationalNode::accept(NodeVisitor& visitor) {
+    visitor.visitRelational(*this);
+}
+
+void NodeVisitor::visitRelational(const RelationalNode& node) {
+    for (auto value : node.values) {
+        this->visitValue(*value);
+    }
+}
+
+void StringOpsNode::accept(NodeVisitor& visitor) {
+    visitor.visitStringOps(*this);
+}
+
+void NodeVisitor::visitStringOps(const StringOpsNode& node) {
+    for (auto value : node.values) {
+        this->visitValue(*value);
+    }
+}
+
+void PostOpNode::accept(NodeVisitor& visitor) {
+    visitor.visitPostOp(*this);
+}
+
+void NodeVisitor::visitPostOp(const PostOpNode& node) {
+    //leaf node, no further traversal
+}
+
+void AggrNode::accept(NodeVisitor& visitor) {
+    visitor.visitAggr(*this);
+}
+
+void NodeVisitor::visitAggr(const AggrNode& node) {
+    //leaf node, no further traversal
+}
+
+void PathNode::accept(NodeVisitor& visitor) {
+    visitor.visitPath(*this);
+}
+
+void NodeVisitor::visitPath(const PathNode& node) {
+    //leaf node, no further traversal
+}
+
+void ListAggrNode::accept(NodeVisitor& visitor) {
+    visitor.visitListAggr(*this);
+}
+
+void NodeVisitor::visitListAggr(const ListAggrNode& node) {
+    this->visitPath(*node.path);
+    this->visitAggr(*node.aggr_op);
+}
+
+void LinkAggrNode::accept(NodeVisitor& visitor) {
+    visitor.visitLinkAggr(*this);
+}
+
+void NodeVisitor::visitLinkAggr(const LinkAggrNode& node) {
+    this->visitPath(*node.path);
+    this->visitAggr(*node.aggr_op);
+}
+
+void PropNode::accept(NodeVisitor& visitor) {
+    visitor.visitProp(*this);
+}
+
+void NodeVisitor::visitProp(const PropNode& node) {
+    this->visitPath(*node.path);
+    if (node.post_op != nullptr) {
+        this->visitPostOp(*node.post_op);
+    }
+    if (node.index != nullptr) {
+        this->visitConstant(*node.index);
+    }
+}
+
+void SubqueryNode::accept(NodeVisitor& visitor) {
+    visitor.visitSubquery(*this);
+}
+
+void NodeVisitor::visitSubquery(const SubqueryNode& node) {
+    this->visitProp(*node.prop);
+    this->visitOr(*node.subquery);
+}
+
+void DescriptorNode::accept(NodeVisitor& visitor) {
+    visitor.visitDescriptor(*this);
+}
+
+void NodeVisitor::visitDescriptor(const DescriptorNode& node) {
+    //leaf node, no further traversal
+}
+
+void DescriptorOrderingNode::accept(NodeVisitor& visitor) {
+    visitor.visitDescriptorOrdering(*this);
+}
+
+void NodeVisitor::visitDescriptorOrdering(const DescriptorOrderingNode& node) {
+    for (auto ordering : node.orderings) {
+        this->visitDescriptor(*ordering);
+    }
+}
+
 void verify_only_string_types(DataType type, const std::string& op_string)
 {
     if (type != type_String && type != type_Binary && type != type_Mixed) {
