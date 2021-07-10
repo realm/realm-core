@@ -292,15 +292,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
-            if (!has_pk) {
-                sync::create_table(group_dst, table_name);
-            }
-            else {
-                auto pk_col_src = table_src->get_primary_key_column();
-                DataType pk_type = DataType(pk_col_src.get_type());
-                StringData pk_col_name = table_src->get_column_name(pk_col_src);
-                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
-            }
+            REALM_ASSERT(has_pk); // a sync table will have a pk
+            auto pk_col_src = table_src->get_primary_key_column();
+            DataType pk_type = DataType(pk_col_src.get_type());
+            StringData pk_col_name = table_src->get_column_name(pk_col_src);
+            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
         }
     }
 
@@ -406,6 +402,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             }
         }
     }
+    // FIXME: make sure that the pk columns are the same?
 
     // Now the schemas are identical.
 
@@ -456,20 +453,18 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         logger.debug("Adding objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
-        auto pk_col = table_src->get_primary_key_column();
+
+        // the following code relies on both tables having a pk
+        // which is true of a sync'd Realm
+        REALM_ASSERT(table_src->get_primary_key_column());
+        REALM_ASSERT(table_dst->get_primary_key_column());
 
         for (auto& obj : *table_src) {
-            auto oid = table_src->get_object_id(obj.get_key());
-            auto key_dst = table_dst->get_objkey(oid);
+            auto src_pk = obj.get_primary_key();
+            auto key_dst = table_dst->find_primary_key(src_pk);
             if (!key_dst || !table_dst->is_valid(key_dst)) {
-                logger.debug("  adding '%1'", oid);
-                if (pk_col) {
-                    auto pk = obj.get_any(pk_col);
-                    table_dst->create_object_with_primary_key(pk);
-                }
-                else {
-                    table_dst->create_object(oid);
-                }
+                logger.debug("  adding '%1'", src_pk);
+                table_dst->create_object_with_primary_key(src_pk);
             }
         }
     }
@@ -486,27 +481,22 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
-
-        if (auto pk_col = table_src->get_primary_key_column()) {
-            logger.debug("Updating values for table '%1', number of rows = %2, "
-                         "number of columns = %3, primary_key_col = %4, "
-                         "primary_key_type = %5",
-                         table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
-                         pk_col.get_type());
-        }
-        else {
-            logger.debug("Updating values for table '%1', number of rows = %2, number of columns = %3", table_name,
-                         table_src->size(), table_src->get_column_count());
-        }
+        auto pk_col = table_src->get_primary_key_column();
+        REALM_ASSERT(table_src->get_primary_key_column());
+        logger.debug("Updating values for table '%1', number of rows = %2, "
+                     "number of columns = %3, primary_key_col = %4, "
+                     "primary_key_type = %5",
+                     table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
+                     pk_col.get_type());
 
         for (const Obj& src : *table_src) {
-            auto oid = src.get_object_id();
-            auto dst = obj_for_object_id(*table_dst, oid);
+            auto src_pk = src.get_primary_key();
+            auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
             bool updated = false;
 
             for (ColKey col_key_src : table_src->get_column_keys()) {
-                if (col_key_src == table_src->get_primary_key_column())
+                if (col_key_src == pk_col)
                     continue;
                 StringData col_name = table_src->get_column_name(col_key_src);
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
@@ -568,7 +558,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 }
             }
             if (updated) {
-                logger.debug("  updating %1", oid);
+                logger.debug("  updating %1", src_pk);
             }
         }
     }

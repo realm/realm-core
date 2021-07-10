@@ -1038,13 +1038,12 @@ TEST_CASE("sync: client reset") {
 
             CHECK(results.size() == 1);
             CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
-            CHECK(object.is_valid());
-            CHECK(object.obj().get<Int>("value") == new_value);
+            CHECK(!object.is_valid());
             REQUIRE_INDICES(results_changes.modifications);
             REQUIRE_INDICES(results_changes.insertions, 0);
             REQUIRE_INDICES(results_changes.deletions, 0);
             REQUIRE_INDICES(object_changes.modifications);
-            REQUIRE_INDICES(object_changes.insertions, 0);
+            REQUIRE_INDICES(object_changes.insertions);
             REQUIRE_INDICES(object_changes.deletions, 0);
         }
 
