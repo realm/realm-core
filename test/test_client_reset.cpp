@@ -479,9 +479,7 @@ TEST(ClientReset_ThreeClients)
             CHECK(table_2);
             {
                 auto col = table_2->get_column_key("array_string");
-                GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
-                Obj obj = row_ndx ? table_2->get_object(row_ndx) : table_2->create_object_with_primary_key("aaa");
+                Obj obj = table_2->create_object_with_primary_key("aaa"); // get or create
                 auto list_string = obj.get_list<String>(col);
                 list_string.add("c");
                 list_string.add("d");
@@ -528,10 +526,9 @@ TEST(ClientReset_ThreeClients)
             CHECK(table_2);
             {
                 auto col = table_2->get_column_key("array_string");
-                GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
-                CHECK(row_ndx);
-                auto list_string = table_2->get_object(row_ndx).get_list<String>(col);
+                Obj obj = table_2->get_object_with_primary_key("aaa");
+                CHECK(obj.is_valid());
+                auto list_string = obj.get_list<String>(col);
                 list_string.insert(0, "e");
                 list_string.insert(1, "f");
             }
@@ -548,10 +545,9 @@ TEST(ClientReset_ThreeClients)
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
             {
-                GlobalKey oid("aaa");
-                ObjKey row_ndx = sync::row_for_object_id(*table_2, oid);
-                CHECK(row_ndx);
-                table_2->remove_object(row_ndx);
+                Obj obj = table_2->get_object_with_primary_key("aaa");
+                CHECK(obj.is_valid());
+                table_2->remove_object(obj.get_key());
             }
 
             wt.commit();
