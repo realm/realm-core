@@ -641,12 +641,13 @@ void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, No
         notifiers);
 }
 
-void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
+void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers,
+           bool with_lock_held)
 {
     advance_with_notifications(
         context, tr,
         [&](auto&&... args) {
-            tr->promote_to_write(std::move(args)...);
+            tr->promote_to_write(std::move(args)..., false, with_lock_held);
         },
         notifiers);
 }

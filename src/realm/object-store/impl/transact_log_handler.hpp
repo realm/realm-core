@@ -46,7 +46,8 @@ void advance(Transaction& sg, BindingContext* binding_context, VersionID);
 // Begin a write transaction
 // If the read transaction version is not up to date, will first advance to the
 // most recent read transaction and sent notifications to delegate
-void begin(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&);
+void begin(const std::shared_ptr<Transaction>& sg, BindingContext* binding_context, NotifierPackage&,
+           bool with_lock_held);
 
 // Cancel a write transaction and roll back all changes, with change notifications
 // for reverting to the old values sent to delegate
