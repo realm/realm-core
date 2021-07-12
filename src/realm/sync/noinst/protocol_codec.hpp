@@ -73,16 +73,6 @@ public:
     void make_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                             const SyncProgress& progress);
 
-    void make_client_version_request_message(OutputBuffer&, session_ident_type session_ident,
-                                             SaltedFileIdent client_file_ident);
-
-    void make_state_request_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
-                                    SaltedVersion partial_transfer_server_version, std::uint_fast64_t offset,
-                                    bool need_recent, std::int_fast32_t min_file_format_version,
-                                    std::int_fast32_t max_file_format_version,
-                                    std::int_fast32_t min_history_schema_version,
-                                    std::int_fast32_t max_history_schema_version);
-
     class UploadMessageBuilder {
     public:
         util::Logger& logger;
@@ -401,44 +391,6 @@ public:
             connection.receive_ident_message(session_ident, client_file_ident_2); // Throws
             return;
         }
-        if (message_type == "client_version") {
-            session_ident_type session_ident;
-            version_type client_version;
-            char sp_1, sp_2, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_version >> newline; // Throws
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax)
-                goto bad_syntax;
-
-            connection.receive_client_version_message(session_ident, client_version);
-            return;
-        }
-        if (message_type == "state") {
-            session_ident_type session_ident;
-            version_type server_version;
-            salt_type server_version_salt;
-            std::uint_fast64_t begin_offset;
-            std::uint_fast64_t end_offset;
-            std::uint_fast64_t max_offset;
-            std::size_t chunk_size;
-            char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> server_version >> sp_3 >> server_version_salt >> sp_4 >>
-                begin_offset >> sp_5 >> end_offset >> sp_6 >> max_offset >> sp_7 >> chunk_size >> newline; // Throws
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size + chunk_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
-                                sp_6 == ' ' && sp_7 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax)
-                goto bad_syntax;
-
-            BinaryData chunk{data + header_size, chunk_size};
-
-            connection.receive_state_message(session_ident, server_version, server_version_salt, begin_offset,
-                                             end_offset, max_offset, chunk);
-            return;
-        }
 
         logger.error("Unknown input message type '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::unknown_message);
@@ -499,12 +451,6 @@ public:
 
     void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
                             file_ident_type client_file_ident, salt_type client_file_ident_salt);
-
-    void make_client_version_message(OutputBuffer&, session_ident_type session_ident, version_type client_version);
-
-    void make_state_message(OutputBuffer&, session_ident_type session_ident, SaltedVersion server_version,
-                            std::uint_fast64_t begin_offset, std::uint_fast64_t end_offset,
-                            std::uint_fast64_t max_offset, BinaryData chunk);
 
     void make_alloc_message(OutputBuffer&, session_ident_type session_ident, file_ident_type file_ident);
 
@@ -809,52 +755,6 @@ public:
                 goto bad_syntax;
 
             connection.receive_alloc_message(session_ident); // Throws
-            return;
-        }
-        if (message_type == "client_version_request") {
-            session_ident_type session_ident;
-            SaltedFileIdent client_file_ident;
-            char sp_1, sp_2, sp_3, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident.ident >> sp_3 >> client_file_ident.salt >>
-                newline; // Throws
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size;
-            bool good_syntax =
-                (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax)
-                goto bad_syntax;
-
-            connection.receive_client_version_request_message(session_ident,
-                                                              client_file_ident); // Throws
-            return;
-        }
-        if (message_type == "state_request") {
-            session_ident_type session_ident;
-            SaltedVersion partial_transferred_server_version;
-            std::uint_fast64_t offset;
-            int need_recent;
-            std::int_fast32_t min_file_format_version;
-            std::int_fast32_t max_file_format_version;
-            std::int_fast32_t min_history_schema_version;
-            std::int_fast32_t max_history_schema_version;
-            char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, sp_8, sp_9, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> partial_transferred_server_version.version >> sp_3 >>
-                partial_transferred_server_version.salt >> sp_4 >> offset >> sp_5 >> need_recent;
-            in >> sp_6 >> min_file_format_version >> sp_7 >> max_file_format_version >> sp_8 >>
-                min_history_schema_version >> sp_9 >> max_history_schema_version;
-            in >> newline;
-            header_size = std::size_t(in.tellg());
-            std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
-                                sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' && sp_9 == ' ' && newline == '\n' &&
-                                expected_size == size && (need_recent == 0 || need_recent == 1));
-            if (!good_syntax)
-                goto bad_syntax;
-
-            connection.receive_state_request_message(session_ident, partial_transferred_server_version, offset,
-                                                     bool(need_recent), min_file_format_version,
-                                                     max_file_format_version, min_history_schema_version,
-                                                     max_history_schema_version); // Throws
             return;
         }
         if (message_type == "unbind") {

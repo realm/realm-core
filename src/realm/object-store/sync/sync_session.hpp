@@ -311,17 +311,17 @@ private:
     friend class realm::SyncManager;
     // Called by SyncManager {
     static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                                               bool force_client_resync, SyncManager* sync_manager)
+                                               SyncManager* sync_manager)
     {
         struct MakeSharedEnabler : public SyncSession {
             MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config,
-                              bool force_client_resync, SyncManager* sync_manager)
-                : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync, sync_manager)
+                              SyncManager* sync_manager)
+                : SyncSession(client, std::move(realm_path), std::move(config), sync_manager)
             {
             }
         };
         return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config),
-                                                   force_client_resync, std::move(sync_manager));
+                                                   std::move(sync_manager));
     }
     // }
 
@@ -329,8 +329,7 @@ private:
 
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync,
-                SyncManager* sync_manager);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, SyncManager* sync_manager);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
@@ -368,8 +367,7 @@ private:
     size_t m_death_count = 0;
 
     SyncConfig m_config;
-    bool m_force_client_resync;
-
+    bool m_force_client_reset = false;
     std::string m_realm_path;
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager = nullptr;

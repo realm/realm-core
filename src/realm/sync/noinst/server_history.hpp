@@ -461,8 +461,6 @@ public:
     // special conditions under which it can be called!
     SaltedVersion get_salted_server_version() const noexcept;
 
-    version_type get_latest_client_version(SaltedFileIdent client_file_ident) const;
-
     const ObjectIDHistoryState& get_object_id_history_state() const;
 
     // Overriding member functions in Replication

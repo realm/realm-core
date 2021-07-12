@@ -2333,49 +2333,6 @@ void ServerHistory::verify() const
 #endif // REALM_DEBUG
 }
 
-
-version_type ServerHistory::get_latest_client_version(SaltedFileIdent client_file_ident) const
-{
-    if (client_file_ident.ident == 0)
-        return 0;
-
-    // Only allow inquiry for direct clients
-    if (client_file_ident.salt == 0)
-        return 0;
-
-    auto rt = m_shared_group->start_read(); // Throws
-    version_type realm_version = rt->get_version();
-    const_cast<ServerHistory*>(this)->set_group(rt.get());
-    ensure_updated(realm_version); // Throws
-
-    std::size_t max = std::numeric_limits<std::size_t>::max();
-    if (REALM_UNLIKELY(std::uint_fast64_t(client_file_ident.ident) > max))
-        return 0;
-    std::size_t file_index = std::size_t(client_file_ident.ident);
-    if (file_index >= m_num_client_files)
-        return 0;
-
-    auto salt = salt_type(m_acc->cf_ident_salts.get(file_index));
-    if (salt != client_file_ident.salt)
-        return 0;
-
-    REALM_ASSERT(is_direct_client(ClientType(m_acc->cf_client_types.get(file_index))));
-
-    // Now, it is known that the client file ident is known by this Realm, and
-    // a reverse history traversal will be employed to find the last changeset from
-    // this client.
-
-    for (std::size_t i = 0; i < m_history_size; ++i) {
-        std::size_t j = m_history_size - 1 - i;
-        auto origin_file_ident = m_acc->sh_origin_files.get(j);
-        if (std::size_t(origin_file_ident) == file_index) {
-            version_type client_version = version_type(m_acc->sh_client_versions.get(j));
-            return client_version;
-        }
-    }
-    return 0;
-}
-
 void ServerHistory::discard_accessors() const noexcept
 {
     m_acc = util::none;

@@ -78,8 +78,6 @@ struct SyncError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ClientResyncMode : unsigned char {
-    // Enable automatic client resync with local transaction recovery
-    Recover = 0,
     // Enable automatic client resync without local transaction recovery
     DiscardLocal = 1,
     // Fire a client reset error
@@ -174,7 +172,7 @@ struct SyncConfig {
     // The name of the directory which Realms should be backed up to following
     // a client reset
     util::Optional<std::string> recovery_directory;
-    ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
+    ClientResyncMode client_resync_mode = ClientResyncMode::DiscardLocal;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
