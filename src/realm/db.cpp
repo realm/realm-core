@@ -1575,6 +1575,12 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
+    // make helper thread terminate
+    if (m_commit_helper_thread) {
+        m_commit_helper_terminated = true;
+        m_commit_helper_changed.notify_one();
+        m_commit_helper_thread->join();
+    }
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())
             return;

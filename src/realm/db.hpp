@@ -23,6 +23,9 @@
 #include <cstdint>
 #include <limits>
 #include <unordered_map>
+#include <thread>
+#include <deque>
+#include <condition_variable>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
@@ -548,6 +551,80 @@ private:
     }
 
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
+
+    std::unique_ptr<std::thread> m_commit_helper_thread;
+    std::mutex m_commit_helper_mx;
+    std::condition_variable m_commit_helper_changed;
+    std::deque<std::function<void()>> m_pending_writes;
+    std::optional<std::function<void()>> m_pending_sync;
+    std::optional<std::function<void()>> m_pending_mx_release;
+    bool m_commit_helper_terminated = true;
+
+    void async_begin_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_commit_helper_mx);
+        if (m_commit_helper_thread.get() == nullptr) {
+            m_commit_helper_terminated = false;
+            m_commit_helper_thread = std::make_unique<std::thread>([&]() {
+                while (true) {
+                    // idling:
+                    {
+                        std::unique_lock lg(m_commit_helper_mx);
+                        while (m_pending_writes.empty() && !m_commit_helper_terminated)
+                            m_commit_helper_changed.wait(lg);
+                    }
+                    if (m_commit_helper_terminated)
+                        break;
+                    {
+                        // acquire write mutex
+                        do_begin_write();
+                        std::function<void()> callback;
+                        {
+                            std::unique_lock lg(m_commit_helper_mx);
+                            REALM_ASSERT(!m_pending_writes.empty());
+                            callback = m_pending_writes.front();
+                            m_pending_writes.pop_front();
+                        }
+                        callback();
+                    }
+                    // wait for request for release of mutex or for sync to disk:
+                    std::unique_lock lg(m_commit_helper_mx);
+                    while (!m_pending_sync && !m_pending_mx_release && !m_commit_helper_terminated)
+                        m_commit_helper_changed.wait(lg);
+                    if (m_commit_helper_terminated)
+                        break;
+                    if (m_pending_sync) {
+                        // sync to disk here (currently no-op)
+                        std::function<void()> cb = m_pending_sync.value();
+                        m_pending_sync.reset();
+                        lg.unlock();
+                        cb();
+                    }
+                    else if (m_pending_mx_release) {
+                        do_end_write();
+                        std::function<void()> cb = m_pending_mx_release.value();
+                        m_pending_mx_release.reset();
+                        lg.unlock();
+                        cb();
+                    }
+                }
+            });
+        }
+        m_pending_writes.emplace_back(std::move(fn));
+        m_commit_helper_changed.notify_one();
+    }
+    void async_end_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_commit_helper_mx);
+        m_pending_mx_release.emplace(std::move(fn));
+        m_commit_helper_changed.notify_one();
+    }
+    void async_sync_to_disk(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_commit_helper_mx);
+        m_pending_sync.emplace(std::move(fn));
+        m_commit_helper_changed.notify_one();
+    }
     friend class Transaction;
 };
 
@@ -661,9 +738,10 @@ public:
     void async_request_write_mutex(std::function<void()> when_acquired)
     {
         // TODO make async
-        get_db()->do_begin_write();
-        m_holds_write_mutex = true;
-        when_acquired();
+        get_db()->async_begin_write([&, when_acquired]() {
+            m_holds_write_mutex = true;
+            when_acquired();
+        });
     };
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
@@ -671,17 +749,22 @@ public:
     {
         // TODO make async flush to disk
         m_is_synchronizing = true;
-        // we must release the write mutex before the callback, because the callback
-        // is allowed to re-request it.
-        get_db()->do_end_write();
-        when_synchronized();
-        m_is_synchronizing = false;
+        // start syncing dirty pages, callback when sync is complete and top-ptr
+        // has been updated and synced
+        get_db()->async_sync_to_disk([&, when_synchronized]() {
+            // we must release the write mutex before the callback, because the callback
+            // is allowed to re-request it.
+            db->do_end_write();
+            when_synchronized();
+            m_is_synchronizing = false;
+        });
     };
     // release the write lock without any sync to disk
     void release_write_lock()
     {
-        get_db()->do_end_write();
-        m_holds_write_mutex = false;
+        get_db()->async_end_write([&]() {
+            m_holds_write_mutex = false;
+        });
     };
 
     // true if sync to disk has been requested
