@@ -20,6 +20,7 @@
 #include <thread>
 #include <uv.h>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/util/assert.hpp>
 
 namespace realm::util {
 
@@ -54,6 +55,8 @@ public:
 
     void set_notify_callback(std::function<void()> fn) override
     {
+        // check for space leak due to multiple allocations without release
+        REALM_ASSERT(m_handle == nullptr);
         m_handle = new uv_async_t;
         m_handle->data = new Data{std::move(fn), {false}};
 
