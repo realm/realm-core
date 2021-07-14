@@ -1786,10 +1786,13 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
     std::vector<_impl::DeepChangeChecker::RelatedTable> related_tables;
     std::pair<TableKey, ColKey> pair_int(table->get_key(), table->get_column_key("int"));
     std::pair<TableKey, ColKey> pair_link(table->get_key(), table->get_column_key("link1"));
+    std::pair<TableKey, ColKey> pair_test_type(table->get_key(), table->get_column_key(test_type.property.name));
     KeyPath key_path_int = {pair_int};
     KeyPath key_path_link = {pair_link};
+    KeyPath key_path_test_type = {pair_test_type};
     KeyPathArray key_path_array_int = {key_path_int};
     KeyPathArray key_path_array_link = {key_path_link};
+    KeyPathArray key_path_array_test_type = {key_path_test_type};
     KeyPathArray key_path_array_empty = {};
     auto relation_updater = [&]() {
         _impl::DeepChangeChecker::find_related_tables(related_tables, *table, key_path_array_empty);
@@ -1820,6 +1823,12 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
 
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(8));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(8));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(9));
     }
 
     SECTION("changes over links are tracked") {
@@ -1902,6 +1911,16 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
             REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
             REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
             REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
         });
     }
 
@@ -1935,6 +1954,12 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
 
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
     }
 
     SECTION("changes from an invalidated object") {
@@ -1995,6 +2020,16 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
     }
 
     SECTION("changes from an object with an unresolved link") {
@@ -2039,6 +2074,12 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
 
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
     }
 
     SECTION("cycles over links do not loop forever") {
@@ -2055,6 +2096,8 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 
     SECTION("cycles over collections do not loop forever") {
@@ -2071,6 +2114,8 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 
     SECTION("link chains are tracked") {
@@ -2172,6 +2217,14 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
     }
 
     SECTION("changes made to lists mark the containing row as modified") {
@@ -2184,5 +2237,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
         REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 }
