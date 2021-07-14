@@ -32,14 +32,13 @@ using namespace realm::_impl;
 
 bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo const& info) const noexcept
 {
-    // Check if any of the tables accessible from the root table were
-    // actually modified. This can be false if there were only insertions, or
-    // deletions which were not linked to by any row in the linking table
-    auto table_modified = [&](auto& outgoing_linkset) {
-        auto it = info.tables.find(outgoing_linkset.table_key.value);
+    // Check if any of the tables accessible from the root table were actually modified.
+    // This includes insertions which need to be checked to catch modifications via a backlink.
+    auto check_related_table = [&](auto& related_table) {
+        auto it = info.tables.find(related_table.table_key.value);
         return it != info.tables.end() && (!it->second.modifications_empty() || !it->second.insertions_empty());
     };
-    return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
+    return any_of(begin(m_related_tables), end(m_related_tables), check_related_table);
 }
 
 std::function<bool(ObjectChangeSet::ObjectKeyType)>
