@@ -16,17 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <realm/object-store/impl/collection_notifier.hpp>
+
+#include <realm/object-store/impl/deep_change_checker.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/shared_realm.hpp>
+
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
-
-#include <realm/object-store/shared_realm.hpp>
-
-#include <realm/object-store/impl/collection_notifier.hpp>
-#include <realm/object-store/impl/deep_change_checker.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
-
 
 using namespace realm;
 using namespace realm::_impl;
