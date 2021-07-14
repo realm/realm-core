@@ -377,41 +377,95 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         // If an object linked to the root object was changed we only mark the
         // property of the root objects as changed.
         // This is also the reason why we can return right after doing so because we would only mark the same root
-        // property again in case we find another change.
+        // property again in case we find another change deeper down the same path.
         auto root_column_key = key_path[0].second;
         changed_columns.push_back(root_column_key.value);
         return;
     }
 
+    // Only continue for any kind of link.
+    auto column_type = column_key.get_type();
+    if (column_type != col_type_Link && column_type != col_type_LinkList && column_type != col_type_BackLink &&
+        column_type != col_type_TypedLink && column_type != col_type_Mixed) {
+        return;
+    }
+
+    auto check_mixed_object = [&](const Mixed& mixed_object) {
+        auto type = mixed_object.get_type();
+        if (type == type_Link || type == type_TypedLink) {
+            auto object_key = mixed_object.get<ObjKey>();
+            auto target_table_key = mixed_object.get_link().get_table_key();
+            Group* group = table.get_parent_group();
+            auto target_table = group->get_table(target_table_key);
+            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, object_key.value);
+        }
+    };
+
     // Advance one level deeper into the key path.
+    auto object = table.get_object(ObjKey(object_key_value));
+    auto target_table = table.get_link_target(column_key);
     if (column_key.is_list()) {
-        auto target_table = table.get_link_target(column_key);
-        auto object = table.get_object(ObjKey(object_key_value));
-        auto lvr = object.get_linklist(ColKey(column_key));
-        auto sz = lvr.size();
-        for (size_t i = 0; i < sz; i++) {
-            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, lvr.get(i).value);
+        if (column_type == col_type_Mixed) {
+            auto list = object.get_list<Mixed>(column_key);
+            for (size_t i = 0; i < list.size(); i++) {
+                auto target_object = list.get_any(i);
+                check_mixed_object(target_object);
+            }
+        }
+        else {
+            auto list = object.get_linklist(column_key);
+            for (size_t i = 0; i < list.size(); i++) {
+                auto target_object = list.get(i);
+                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+            }
         }
     }
-    else {
-        auto column_type = column_key.get_type();
-        if (column_type == col_type_Link) {
-            // A forward link will only have one target object.
-            auto target_table = table.get_link_target(column_key);
-            auto object = table.get_object(ObjKey(object_key_value));
-            auto target_object_key_value = object.get<ObjKey>(ColKey(column_key)).value;
-            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object_key_value);
-        }
-        else if (column_type == col_type_BackLink) {
-            // A backlink can have multiple origin objects. We need to iterate over all of them.
-            auto origin_table = table.get_opposite_table(column_key);
-            auto origin_column_key = table.get_opposite_column(column_key);
-            auto object = table.get_object(ObjKey(object_key_value));
-            size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
-            for (size_t i = 0; i < backlink_count; i++) {
-                auto origin_object_key = object.get_backlink(*origin_table, origin_column_key, i);
-                find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object_key.value);
+    else if (column_key.is_set()) {
+        if (column_type == col_type_Mixed) {
+            auto set = object.get_set<Mixed>(column_key);
+            for (size_t i = 0; i < set.size(); i++) {
+                auto target_object = set.get(i);
+                check_mixed_object(target_object);
             }
+        }
+        else {
+            auto set = object.get_linkset(column_key);
+            for (size_t i = 0; i < set.size(); i++) {
+                auto target_object = set.get(i);
+                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+            }
+        }
+    }
+    else if (column_key.is_dictionary()) {
+        if (column_type == col_type_Mixed) {
+            auto dictionary = object.get_dictionary(column_key);
+            for (size_t i = 0; i < dictionary.size(); i++) {
+                auto target_object = dictionary.get(dictionary.get_key(i));
+                check_mixed_object(target_object);
+            }
+        }
+        else {
+            auto dictionary = object.get_dictionary(column_key);
+            auto linked_dictionary = std::make_unique<DictionaryLinkValues>(dictionary);
+            for (size_t i = 0; i < linked_dictionary->size(); i++) {
+                auto target_object = linked_dictionary->get_key(i);
+                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+            }
+        }
+    }
+    else if (column_type == col_type_Link) {
+        // A forward link will only have one target object.
+        auto target_object = object.get<ObjKey>(column_key);
+        find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+    }
+    else if (column_type == col_type_BackLink) {
+        // A backlink can have multiple origin objects. We need to iterate over all of them.
+        auto origin_table = table.get_opposite_table(column_key);
+        auto origin_column_key = table.get_opposite_column(column_key);
+        size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
+        for (size_t i = 0; i < backlink_count; i++) {
+            auto origin_object = object.get_backlink(*origin_table, origin_column_key, i);
+            find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object.value);
         }
     }
 }
