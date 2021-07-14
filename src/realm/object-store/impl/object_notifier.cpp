@@ -87,7 +87,6 @@ void ObjectNotifier::run()
         if (all_callbacks_filtered()) {
             return;
         }
-        return;
     }
 
     if (it == m_info->tables.end())

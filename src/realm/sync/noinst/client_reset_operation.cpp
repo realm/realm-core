@@ -129,12 +129,11 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
         m_salted_file_ident = salted_file_ident;
         logger.debug("finalize_client_reset:discard, realm_path = %1, local_realm_exists = %2", m_realm_path,
                      local_realm_exists);
-        sync::SaltedVersion fake_server_version = {0, 0};
 
-        LocalVersionIDs local_version_ids;
+        client_reset::LocalVersionIDs local_version_ids;
         try {
-            local_version_ids = perform_client_reset_diff(m_realm_path, fresh_path, m_encryption_key,
-                                                          m_salted_file_ident, fake_server_version, logger);
+            local_version_ids = client_reset::perform_client_reset_diff(m_realm_path, fresh_path, m_encryption_key,
+                                                                        m_salted_file_ident, logger);
         }
         catch (util::File::AccessError& e) {
             logger.error("In finalize_client_reset, the client reset failed, "

@@ -3120,7 +3120,7 @@ Obj Table::get_object_with_primary_key(Mixed primary_key) const
     return m_clusters.get(m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key));
 }
 
-Mixed Table::get_primary_key(ObjKey key)
+Mixed Table::get_primary_key(ObjKey key) const
 {
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
