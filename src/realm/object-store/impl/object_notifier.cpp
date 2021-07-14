@@ -32,7 +32,7 @@ ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableRef table, Obj
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
-    // The object might have been deleted in the meantime.
+    // Check if the source Transaction has been closed.
     if (!m_table)
         return false;
 
