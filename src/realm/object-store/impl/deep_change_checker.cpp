@@ -391,8 +391,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     }
 
     auto check_mixed_object = [&](const Mixed& mixed_object) {
-        auto type = mixed_object.get_type();
-        if (type == type_Link || type == type_TypedLink) {
+        if (mixed_object.is_type(type_Link, type_TypedLink)) {
             auto object_key = mixed_object.get<ObjKey>();
             auto target_table_key = mixed_object.get_link().get_table_key();
             Group* group = table.get_parent_group();
