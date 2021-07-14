@@ -116,20 +116,18 @@ bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
             return _copy_list<Binary>(src_obj, src_col, dst_obj, dst_col);
         case col_type_Timestamp:
             return _copy_list<Timestamp>(src_obj, src_col, dst_obj, dst_col);
-        default:
+        default: // FIXME: add new types
             break;
     }
     REALM_ASSERT(false);
     return false;
 }
 
-bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_ndx)
+bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_object_keys)
 {
     // This function ensures that the link list in ll_dst is equal to the
     // link list in ll_src with equality defined by the conversion function
-    // convert_ndx.
-    //
-    // The function uses the same principle as copy_subtable() above.
+    // convert_object_keys.
 
     bool updated = false;
     size_t len_src = ll_src.size();
@@ -138,27 +136,27 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
     size_t prefix_len, suffix_len;
 
     for (prefix_len = 0; prefix_len < len_src && prefix_len < len_dst; ++prefix_len) {
-        auto ndx_src = ll_src.get(prefix_len);
-        auto ndx_dst = ll_dst.get(prefix_len);
-        auto ndx_converted = convert_ndx(ndx_src);
-        if (ndx_converted != ndx_dst)
+        auto key_src = ll_src.get(prefix_len);
+        auto key_dst = ll_dst.get(prefix_len);
+        auto key_converted = convert_object_keys(key_src);
+        if (key_converted != key_dst)
             break;
     }
 
     for (suffix_len = 0; prefix_len + suffix_len < len_src && prefix_len + suffix_len < len_dst; ++suffix_len) {
-        auto ndx_src = ll_src.get(len_src - 1 - suffix_len);
-        auto ndx_dst = ll_dst.get(len_dst - 1 - suffix_len);
-        auto ndx_converted = convert_ndx(ndx_src);
-        if (ndx_converted != ndx_dst)
+        auto key_src = ll_src.get(len_src - 1 - suffix_len);
+        auto key_dst = ll_dst.get(len_dst - 1 - suffix_len);
+        auto key_converted = convert_object_keys(key_src);
+        if (key_converted != key_dst)
             break;
     }
 
     if (len_src > len_dst) {
         // New elements must be inserted in ll_dst.
         for (size_t i = prefix_len; i < prefix_len + (len_src - len_dst); ++i) {
-            auto ndx_src = ll_src.get(i);
-            auto ndx_converted = convert_ndx(ndx_src);
-            ll_dst.insert(i, ndx_converted);
+            auto key_src = ll_src.get(i);
+            auto key_converted = convert_object_keys(key_src);
+            ll_dst.insert(i, key_converted);
             updated = true;
         }
     }
@@ -172,9 +170,9 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
 
     // Copy elements from ll_src to ll_dst.
     for (size_t i = prefix_len; i < len_src - suffix_len; ++i) {
-        auto ndx_src = ll_src.get(i);
-        auto ndx_converted = convert_ndx(ndx_src);
-        ll_dst.set(i, ndx_converted);
+        auto key_src = ll_src.get(i);
+        auto key_converted = convert_object_keys(key_src);
+        ll_dst.set(i, key_converted); // FIXME: updated should be set if this differs
     }
     return updated;
 }
@@ -189,6 +187,18 @@ void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
         TableRef table = tr_dst.get_table(table_key);
         if (table->get_name().begins_with("class_")) {
             sync::erase_table(tr_dst, table);
+        }
+    }
+}
+
+void client_reset::clear_all_tables(Transaction& tr_dst, util::Logger& logger)
+{
+    logger.debug("remove_all_tables, dst size = %1", tr_dst.size());
+    // Remove the tables to be removed.
+    for (auto table_key : tr_dst.get_table_keys()) {
+        TableRef table = tr_dst.get_table(table_key);
+        if (table->get_name().begins_with("class_")) {
+            table->clear();
         }
     }
 }
@@ -280,15 +290,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
-            if (!has_pk) {
-                sync::create_table(group_dst, table_name);
-            }
-            else {
-                auto pk_col_src = table_src->get_primary_key_column();
-                DataType pk_type = DataType(pk_col_src.get_type());
-                StringData pk_col_name = table_src->get_column_name(pk_col_src);
-                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
-            }
+            REALM_ASSERT(has_pk); // a sync table will have a pk
+            auto pk_col_src = table_src->get_primary_key_column();
+            DataType pk_type = DataType(pk_col_src.get_type());
+            StringData pk_col_name = table_src->get_column_name(pk_col_src);
+            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
         }
     }
 
@@ -394,13 +400,13 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             }
         }
     }
+    // FIXME: make sure that the pk columns are the same?
 
     // Now the schemas are identical.
 
     // Remove objects in dst that are absent in src.
     // We will also have to remove all objects created locally as they should have
     // new keys because the client file id is changed.
-    auto new_file_id = group_dst.get_sync_file_id();
     for (auto table_key : group_src.get_table_keys()) {
         auto table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -408,31 +414,19 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         logger.debug("Removing objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
-        if (auto pk_col = table_dst->get_primary_key_column()) {
-            std::vector<std::pair<Mixed, ObjKey>> objects_to_remove;
-            for (auto obj : *table_dst) {
-                auto pk = obj.get_any(pk_col);
-                if (!table_src->find_primary_key(pk)) {
-                    objects_to_remove.emplace_back(pk, obj.get_key());
-                }
-            }
-            for (auto& pair : objects_to_remove) {
-                logger.debug("  removing '%1'", pair.first);
-                table_dst->remove_object(pair.second);
+
+        auto pk_col = table_dst->get_primary_key_column();
+        REALM_ASSERT(pk_col); // sync realms always have a pk
+        std::vector<std::pair<Mixed, ObjKey>> objects_to_remove;
+        for (auto obj : *table_dst) {
+            auto pk = obj.get_any(pk_col);
+            if (!table_src->find_primary_key(pk)) {
+                objects_to_remove.emplace_back(pk, obj.get_key());
             }
         }
-        else {
-            std::vector<std::pair<GlobalKey, ObjKey>> objects_to_remove;
-            for (auto obj : *table_dst) {
-                auto oid = table_dst->get_object_id(obj.get_key());
-                auto key_src = table_src->get_objkey(oid);
-                if (oid.hi() == new_file_id || !key_src || !table_src->is_valid(key_src))
-                    objects_to_remove.emplace_back(oid, obj.get_key());
-            }
-            for (auto& pair : objects_to_remove) {
-                logger.debug("  removing '%1'", pair.first);
-                table_dst->remove_object(pair.second);
-            }
+        for (auto& pair : objects_to_remove) {
+            logger.debug("  removing '%1'", pair.first);
+            table_dst->remove_object(pair.second);
         }
     }
 
@@ -444,20 +438,18 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         logger.debug("Adding objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
-        auto pk_col = table_src->get_primary_key_column();
+
+        // the following code relies on both tables having a pk
+        // which is true of a sync'd Realm
+        REALM_ASSERT(table_src->get_primary_key_column());
+        REALM_ASSERT(table_dst->get_primary_key_column());
 
         for (auto& obj : *table_src) {
-            auto oid = table_src->get_object_id(obj.get_key());
-            auto key_dst = table_dst->get_objkey(oid);
+            auto src_pk = obj.get_primary_key();
+            auto key_dst = table_dst->find_primary_key(src_pk);
             if (!key_dst || !table_dst->is_valid(key_dst)) {
-                logger.debug("  adding '%1'", oid);
-                if (pk_col) {
-                    auto pk = obj.get_any(pk_col);
-                    table_dst->create_object_with_primary_key(pk);
-                }
-                else {
-                    table_dst->create_object(oid);
-                }
+                logger.debug("  adding '%1'", src_pk);
+                table_dst->create_object_with_primary_key(src_pk);
             }
         }
     }
@@ -474,27 +466,22 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
-
-        if (auto pk_col = table_src->get_primary_key_column()) {
-            logger.debug("Updating values for table '%1', number of rows = %2, "
-                         "number of columns = %3, primary_key_col = %4, "
-                         "primary_key_type = %5",
-                         table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
-                         pk_col.get_type());
-        }
-        else {
-            logger.debug("Updating values for table '%1', number of rows = %2, number of columns = %3", table_name,
-                         table_src->size(), table_src->get_column_count());
-        }
+        auto pk_col = table_src->get_primary_key_column();
+        REALM_ASSERT(table_src->get_primary_key_column());
+        logger.debug("Updating values for table '%1', number of rows = %2, "
+                     "number of columns = %3, primary_key_col = %4, "
+                     "primary_key_type = %5",
+                     table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
+                     pk_col.get_type());
 
         for (const Obj& src : *table_src) {
-            auto oid = src.get_object_id();
-            auto dst = obj_for_object_id(*table_dst, oid);
+            auto src_pk = src.get_primary_key();
+            auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
             bool updated = false;
 
             for (ColKey col_key_src : table_src->get_column_keys()) {
-                if (col_key_src == table_src->get_primary_key_column())
+                if (col_key_src == pk_col)
                     continue;
                 StringData col_name = table_src->get_column_name(col_key_src);
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
@@ -525,18 +512,18 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
                     TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
                     REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
-                    // convert_ndx converts the row index in table_target_src
-                    // to the row index in table_target_dst such that the
-                    // object ids are the same.
-                    auto convert_ndx = [&](ObjKey key_src) {
-                        auto oid = table_target_src->get_object_id(key_src);
-                        ObjKey key_dst = sync::row_for_object_id(*table_target_dst, oid);
+                    // convert_keys converts the object key in table_target_src
+                    // to the object key in table_target_dst such that the
+                    // primary keys are the same.
+                    auto convert_keys = [&](ObjKey key_src) {
+                        auto src_pk = table_target_src->get_primary_key(key_src);
+                        auto key_dst = table_target_dst->find_primary_key(src_pk);
                         REALM_ASSERT(key_dst);
                         return key_dst;
                     };
                     auto ll_src = src.get_linklist(col_key_src);
                     auto ll_dst = dst.get_linklist(col_key_dst);
-                    if (copy_linklist(ll_src, ll_dst, convert_ndx)) {
+                    if (copy_linklist(ll_src, ll_dst, convert_keys)) {
                         updated = true;
                     }
                 }
@@ -546,16 +533,17 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     }
                 }
                 else {
+                    REALM_ASSERT(!col_key_src.is_collection()); // FIXME: support for set/dictionary
                     auto val_src = src.get_any(col_key_src);
                     auto val_dst = dst.get_any(col_key_dst);
                     if (val_src != val_dst) {
-                        dst.set(col_key_dst, val_src);
+                        dst.set_any(col_key_dst, val_src);
                         updated = true;
                     }
                 }
             }
             if (updated) {
-                logger.debug("  updating %1", oid);
+                logger.debug("  updating %1", src_pk);
             }
         }
     }
@@ -631,16 +619,15 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
     }
 }
 
-client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
-    const std::string& path_local, const util::Optional<std::array<char, 64>>& encryption_key,
-    sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version, util::Logger& logger)
+client_reset::LocalVersionIDs
+client_reset::perform_client_reset_diff(const std::string& path_local, const util::Optional<std::string> path_fresh,
+                                        const util::Optional<std::array<char, 64>>& encryption_key,
+                                        sync::SaltedFileIdent client_file_ident, util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
                 "encryption = %2, client_file_ident.ident = %3, "
-                "client_file_ident.salt = %4, server_version.version = %5, "
-                "server_version.salt = %6 ",
-                path_local, (encryption_key ? "on" : "off"), client_file_ident.ident, client_file_ident.salt,
-                server_version.version, server_version.salt);
+                "client_file_ident.salt = %4,",
+                path_local, (encryption_key ? "on" : "off"), client_file_ident.ident, client_file_ident.salt);
 
     DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
     ClientHistoryImpl history_local{path_local};
@@ -650,31 +637,43 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
-
-    //    std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
-    //    DBRef sg_remote = DB::create(*history_remote, shared_group_options);
-    //    auto wt_remote = sg_remote->start_write();
-    //    sync::version_type current_version_remote = wt_remote->get_version();
-    //    history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-    //    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
-
-    // make breaking changes in the local copy which cannot be advanced
-    remove_all_tables(*group_local, logger);
-
-    // Extract the changeset produced in the remote Realm during recovery.
-    //    sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
-    //    const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
-    //    BinaryData recovered_changeset{buffer.data(), buffer.size()};
     BinaryData recovered_changeset;
-    //    {
-    //        // Debug.
-    //        ChunkedBinaryInputStream in{recovered_changeset};
-    //        sync::Changeset log;
-    //        sync::parse_changeset(in, log); // Throws
-    //        log.print();
-    //    }
-    uint_fast64_t downloaded_bytes = 0;
-    history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
+    sync::SaltedVersion fresh_server_version = {0, 0};
+
+    // changes made here are reflected in the notifier logs
+    if (path_fresh) { // seamless_loss mode
+        std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(*path_fresh);
+        DBRef sg_remote = DB::create(*history_remote, shared_group_options);
+        auto wt_remote = sg_remote->start_write();
+        sync::version_type current_version_remote = wt_remote->get_version();
+        history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+
+        sync::version_type remote_version;
+        SaltedFileIdent remote_ident;
+        SyncProgress remote_progress;
+        history_remote->get_status(remote_version, remote_ident, remote_progress);
+        fresh_server_version = remote_progress.latest_server_version;
+
+        transfer_group(*wt_remote, *group_local, logger);
+
+        // Extract the changeset produced in the remote Realm during recovery.
+        sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
+        const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
+        recovered_changeset = {buffer.data(), buffer.size()};
+        //        {
+        //            // Debug.
+        //            ChunkedBinaryInputStream in{recovered_changeset};
+        //            sync::Changeset log;
+        //            sync::parse_changeset(in, log); // Throws
+        //            log.print();
+        //        }
+    }
+    else { // manual discard mode
+        remove_all_tables(*group_local, logger);
+    }
+    uint_fast64_t downloaded_bytes = 0; // FIXME: check this
+    history_local.set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                downloaded_bytes, recovered_changeset);
 
     // Finally, the local Realm is committed.

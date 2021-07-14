@@ -26,7 +26,6 @@ TEST(ClientReset_NoLocalChanges)
     TEST_DIR(dir_2);                // The backup dir.
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
-    TEST_DIR(metadata_dir);         // The metadata directory used by the resetting client.
 
     util::Logger& logger = test_context.logger;
 
@@ -148,7 +147,6 @@ TEST(ClientReset_NoLocalChanges)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.metadata_dir = std::string(metadata_dir);
                 session_config.client_reset_config = client_reset_config;
             }
             Session session = fixture.make_session(path_2, session_config);
@@ -178,7 +176,6 @@ TEST(ClientReset_InitialLocalChanges)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
-    TEST_DIR(metadata_dir);         // The metadata directory used by the resetting client.
 
     const std::string server_path = "/data";
 
@@ -217,7 +214,6 @@ TEST(ClientReset_InitialLocalChanges)
     Session::Config session_config_2;
     {
         Session::Config::ClientReset client_reset_config;
-        client_reset_config.metadata_dir = std::string(metadata_dir);
         session_config_2.client_reset_config = client_reset_config;
     }
     Session session_2 = fixture.make_session(path_2, session_config_2);
@@ -292,7 +288,6 @@ TEST(ClientReset_LocalChangesWhenOffline)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    TEST_DIR(metadata_dir); // The metadata directory used by the resetting client.
     ColKey col_int;
 
     const std::string server_path = "/data";
@@ -309,7 +304,6 @@ TEST(ClientReset_LocalChangesWhenOffline)
         Session::Config session_config_1;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir);
             session_config_1.client_reset_config = client_reset_config;
         }
         Session session_1 = fixture.make_session(path_1, session_config_1);
@@ -352,7 +346,6 @@ TEST(ClientReset_LocalChangesWhenOffline)
     Session::Config session_config_3;
     {
         Session::Config::ClientReset client_reset_config;
-        client_reset_config.metadata_dir = std::string(metadata_dir);
         session_config_3.client_reset_config = client_reset_config;
     }
     Session session_3 = fixture.make_session(path_1, session_config_3);
@@ -388,9 +381,6 @@ TEST(ClientReset_ThreeClients)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
     SHARED_GROUP_TEST_PATH(path_3);
-    TEST_DIR(metadata_dir_1);
-    TEST_DIR(metadata_dir_2);
-    TEST_DIR(metadata_dir_3);
 
     util::Logger& logger = test_context.logger;
 
@@ -580,13 +570,11 @@ TEST(ClientReset_ThreeClients)
             Session::Config session_config_1;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.metadata_dir = std::string(metadata_dir_1);
                 session_config_1.client_reset_config = client_reset_config;
             }
             Session::Config session_config_2;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.metadata_dir = std::string(metadata_dir_2);
                 session_config_2.client_reset_config = client_reset_config;
             }
             Session session_1 = fixture.make_session(path_1, session_config_1);
@@ -636,7 +624,6 @@ TEST(ClientReset_ThreeClients)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.metadata_dir = std::string(metadata_dir_3);
                 session_config.client_reset_config = client_reset_config;
             }
             Session session = fixture.make_session(path_3, session_config);
@@ -669,8 +656,6 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
     SHARED_GROUP_TEST_PATH(path_3);
-    TEST_DIR(metadata_dir_1);
-    TEST_DIR(metadata_dir_2);
 
     const std::string server_path_1 = "/data_1";
     const std::string server_path_2 = "/data_2";
@@ -698,7 +683,6 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir_1);
             session_config.client_reset_config = client_reset_config;
         }
         Session session = fixture.make_session(path_1, session_config);
@@ -711,7 +695,6 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir_2);
             session_config.client_reset_config = client_reset_config;
         }
         Session session = fixture.make_session(path_2, session_config);
@@ -753,8 +736,6 @@ TEST(ClientReset_DoNotRecoverSchema)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    TEST_DIR(metadata_dir_1);
-    TEST_DIR(metadata_dir_2);
 
     const std::string server_path_1 = "/data_1";
     const std::string server_path_2 = "/data_2";
@@ -782,7 +763,6 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir_1);
             session_config.client_reset_config = client_reset_config;
         }
         Session session = fixture.make_session(path_1, session_config);
@@ -796,7 +776,6 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir_2);
             session_config.client_reset_config = client_reset_config;
         }
         Session session = fixture.make_session(path_2, session_config);
@@ -825,7 +804,6 @@ TEST(ClientReset_PinnedVersion)
 {
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
-    TEST_DIR(metadata_dir);
 
     const std::string server_path_1 = "/data_1";
     const std::string server_path_2 = "/data_2";
@@ -865,7 +843,6 @@ TEST(ClientReset_PinnedVersion)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.metadata_dir = std::string(metadata_dir);
             session_config.client_reset_config = client_reset_config;
         }
         Session session = fixture.make_session(path_1, session_config);

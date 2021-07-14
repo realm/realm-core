@@ -82,6 +82,8 @@ enum class ClientResyncMode : unsigned char {
     DiscardLocal = 1,
     // Fire a client reset error
     Manual = 2,
+    // Discard local changes, without disrupting accessors or closing the Realm
+    SeamlessLoss = 3,
 };
 
 enum class ReconnectMode {
@@ -172,7 +174,7 @@ struct SyncConfig {
     // The name of the directory which Realms should be backed up to following
     // a client reset
     util::Optional<std::string> recovery_directory;
-    ClientResyncMode client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
