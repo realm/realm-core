@@ -834,7 +834,7 @@ TEST_CASE("sync: client reset") {
     }
 
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession> s, SyncError err) {
         FAIL("Error handler should not have been called");
     };
 
@@ -938,17 +938,20 @@ TEST_CASE("sync: client reset") {
         CollectionChangeSet object_changes, results_changes;
         NotificationToken object_token, results_token;
         auto setup_listeners = [&](SharedRealm realm) {
-            results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"));
-            REQUIRE(results.size() >= 1);
-            REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
+            results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
+                          .sort({{{"value", true}}});
+            if (results.size() >= 1) {
+                REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
 
-            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
-            REQUIRE(obj.get<Int>("value") == 4);
-            object = Object(realm, obj);
-            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                object_changes = std::move(changes);
-            });
+                auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
+                REQUIRE(obj.get<Int>("value") == 4);
+                object = Object(realm, obj);
+                object_token =
+                    object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+                        REQUIRE_FALSE(err);
+                        object_changes = std::move(changes);
+                    });
+            }
             results_token =
                 results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
                     REQUIRE_FALSE(err);
@@ -1012,7 +1015,7 @@ TEST_CASE("sync: client reset") {
             REQUIRE_INDICES(object_changes.deletions, 0);
         }
 
-        SECTION("delete and insert same pk is reported as insert/delete") {
+        SECTION("delete and insert same pk is reported as modification") {
             constexpr int64_t new_value = 42;
             auto realm = trigger_client_reset([](auto&) {},
                                               [&](auto& remote) {
@@ -1038,13 +1041,14 @@ TEST_CASE("sync: client reset") {
 
             CHECK(results.size() == 1);
             CHECK(results.get<Obj>(0).get<Int>("value") == new_value);
-            CHECK(!object.is_valid());
-            REQUIRE_INDICES(results_changes.modifications);
-            REQUIRE_INDICES(results_changes.insertions, 0);
-            REQUIRE_INDICES(results_changes.deletions, 0);
-            REQUIRE_INDICES(object_changes.modifications);
+            CHECK(object.is_valid());
+            CHECK(object.obj().get<Int>("value") == new_value);
+            REQUIRE_INDICES(results_changes.modifications, 0);
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions);
+            REQUIRE_INDICES(object_changes.modifications, 0);
             REQUIRE_INDICES(object_changes.insertions);
-            REQUIRE_INDICES(object_changes.deletions, 0);
+            REQUIRE_INDICES(object_changes.deletions);
         }
 
         SECTION("insert in discarded transaction is deleted") {
@@ -1077,6 +1081,256 @@ TEST_CASE("sync: client reset") {
             REQUIRE_INDICES(results_changes.insertions);
             REQUIRE_INDICES(results_changes.deletions, 1);
             REQUIRE_INDICES(object_changes.modifications, 0);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
+        }
+
+        SECTION("delete in discarded transaction is recovered") {
+            auto realm = trigger_client_reset(
+                [&](auto& local) {
+                    auto table = get_table(local, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    table->clear();
+                    REQUIRE(table->size() == 0);
+                },
+                [&](auto&) {});
+            setup_listeners(realm);
+
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+            CHECK(results.size() == 0);
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+            CHECK(results.size() == 1);
+            CHECK(results.get<Obj>(0).get<Int>("value") == 6);
+            CHECK(!object.is_valid());
+            REQUIRE_INDICES(results_changes.modifications);
+            REQUIRE_INDICES(results_changes.insertions, 0);
+            REQUIRE_INDICES(results_changes.deletions);
+        }
+
+        SECTION("extra local table is removed") {
+            auto realm = trigger_client_reset(
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object2",
+                             {
+                                 {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                    auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
+                    table->create_object_with_primary_key(Mixed());
+                    table->create_object_with_primary_key(Mixed(1));
+                },
+                [](auto&) {});
+            wait_for_download(*realm);
+            REQUIRE_THROWS_CONTAINING(realm->refresh(),
+                                      "Unsupported schema changes were made by another client or process");
+        }
+
+        SECTION("extra local column is removed") {
+            auto realm = trigger_client_reset(
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::Int},
+                                 {"array", PropertyType::Int | PropertyType::Array},
+                                 {"link", PropertyType::Object | PropertyType::Nullable, "object"},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                    auto table = ObjectStore::table_for_object_type(realm.read_group(), "object");
+                    table->begin()->set(table->get_column_key("value2"), 123);
+                },
+                [](auto&) {});
+            wait_for_download(*realm);
+            REQUIRE_THROWS_CONTAINING(realm->refresh(),
+                                      "Unsupported schema changes were made by another client or process");
+        }
+
+        SECTION("compatible schema changes in both remote and local transactions") {
+            auto realm = trigger_client_reset(
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::Int},
+                             }},
+                            {"object2",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"link", PropertyType::Object | PropertyType::Nullable, "object"},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                },
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::Int},
+                             }},
+                            {"object2",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"link", PropertyType::Object | PropertyType::Nullable, "object"},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                });
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(realm->refresh());
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
+            REQUIRE(table->get_column_count() == 2);
+            REQUIRE(bool(table->get_column_key("link")));
+        }
+
+        SECTION("incompatible schema changes in remote and local transactions") {
+            auto realm = trigger_client_reset(
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::Float},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                },
+                [](auto& realm) {
+                    realm.update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::Int},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                });
+            wait_for_download(*realm);
+            REQUIRE_THROWS_WITH(
+                realm->refresh(),
+                Catch::Matchers::Contains("Property 'object.value2' has been changed from 'float' to 'int'"));
+        }
+
+        SECTION("list operations") {
+            ObjKey k0, k1, k2;
+            setup([&](auto& realm) {
+                k0 = create_object(realm, "link target").set("value", 1).get_key();
+                k1 = create_object(realm, "link target").set("value", 2).get_key();
+                k2 = create_object(realm, "link target").set("value", 3).get_key();
+                Obj o = create_object(realm, "link origin");
+                auto list = o.get_linklist(o.get_table()->get_column_key("list"));
+                list.add(k0);
+                list.add(k1);
+                list.add(k2);
+            });
+            auto check_links = [&](auto& realm) {
+                auto table = get_table(*realm, "link origin");
+                REQUIRE(table->size() == 1);
+                auto list = table->begin()->get_linklist(table->get_column_key("list"));
+                REQUIRE(list.size() == 3);
+                REQUIRE(list.get_object(0).template get<Int>("value") == 1);
+                REQUIRE(list.get_object(1).template get<Int>("value") == 2);
+                REQUIRE(list.get_object(2).template get<Int>("value") == 3);
+            };
+
+            SECTION("list insertions in local transaction") {
+                auto realm = trigger_client_reset(
+                    [&](auto& realm) {
+                        auto table = get_table(realm, "link origin");
+                        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+                        list.add(k0);
+                        list.insert(0, k2);
+                        list.insert(0, k1);
+                    },
+                    [](auto&) {});
+                wait_for_download(*realm);
+                REQUIRE_NOTHROW(realm->refresh());
+                check_links(realm);
+            }
+
+            SECTION("list deletions in local transaction") {
+                auto realm = trigger_client_reset(
+                    [&](auto& realm) {
+                        auto table = get_table(realm, "link origin");
+                        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+                        list.remove(1);
+                    },
+                    [](auto&) {});
+                wait_for_download(*realm);
+                REQUIRE_NOTHROW(realm->refresh());
+                check_links(realm);
+            }
+
+            SECTION("list clear in local transaction") {
+                auto realm = trigger_client_reset(
+                    [&](auto& realm) {
+                        auto table = get_table(realm, "link origin");
+                        auto list = table->begin()->get_linklist(table->get_column_key("list"));
+                        list.clear();
+                    },
+                    [&](auto&) {});
+                wait_for_download(*realm);
+                REQUIRE_NOTHROW(realm->refresh());
+                check_links(realm);
+            }
+        }
+
+        SECTION("conflicting primary key creations") {
+            auto realm = trigger_client_reset(
+                [&](auto& realm) {
+                    auto table = get_table(realm, "object");
+                    table->clear();
+                    table->create_object_with_primary_key(1).set("value", 4);
+                    table->create_object_with_primary_key(2).set("value", 5);
+                    table->create_object_with_primary_key(3).set("value", 6);
+                },
+                [&](auto& realm) {
+                    auto table = get_table(realm, "object");
+                    table->clear();
+                    table->create_object_with_primary_key(1).set("value", 4);
+                    table->create_object_with_primary_key(2).set("value", 7);
+                    table->create_object_with_primary_key(5).set("value", 8);
+                });
+            setup_listeners(realm);
+
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+            CHECK(results.size() == 3);
+            CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+            CHECK(results.size() == 3);
+            // here we rely on results being sorted by "value"
+            CHECK(results.get<Obj>(0).get<Int>("_id") == 1);
+            CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+            CHECK(results.get<Obj>(1).get<Int>("_id") == 2);
+            CHECK(results.get<Obj>(1).get<Int>("value") == 7);
+            CHECK(results.get<Obj>(2).get<Int>("_id") == 5);
+            CHECK(results.get<Obj>(2).get<Int>("value") == 8);
+
+            CHECK(object.is_valid());
+            REQUIRE_INDICES(results_changes.modifications, 1);
+            REQUIRE_INDICES(results_changes.insertions, 2);
+            REQUIRE_INDICES(results_changes.deletions, 2);
+            REQUIRE_INDICES(object_changes.modifications);
             REQUIRE_INDICES(object_changes.insertions);
             REQUIRE_INDICES(object_changes.deletions);
         }
