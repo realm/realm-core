@@ -36,7 +36,7 @@ private:
     ObjKey m_obj;
     TransactionChangeInfo* m_info;
 
-    void run() override;
+    void run() override REQUIRES(!m_callback_mutex);
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 

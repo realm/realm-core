@@ -56,6 +56,7 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
     // In this case we do not need a `DeepChangeChecker` and check the modifications using the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
+    util::CheckedLockGuard lock(m_callback_mutex);
     if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
         auto root_table_key = m_related_tables[0].table_key;
         auto& object_change_set = info.tables.find(root_table_key.value)->second;
