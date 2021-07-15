@@ -1580,6 +1580,7 @@ void DB::close(bool allow_open_read_transactions)
         m_commit_helper_terminated = true;
         m_commit_helper_changed.notify_one();
         m_commit_helper_thread->join();
+        m_commit_helper_thread = nullptr;
     }
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())
@@ -2145,7 +2146,7 @@ void DB::do_end_write() noexcept
 }
 
 
-Replication::version_type DB::do_commit(Transaction& transaction)
+Replication::version_type DB::do_commit(Transaction& transaction, bool without_sync)
 {
     version_type current_version;
     {
@@ -2162,7 +2163,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
         try {
-            low_level_commit(new_version, transaction); // Throws
+            low_level_commit(new_version, transaction, without_sync); // Throws
         }
         catch (...) {
             repl->abort_transact();
@@ -2186,9 +2187,7 @@ VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool wit
 
     flush_accessors_for_commit();
 
-    // FIXME: handle commit without sync to disk
-    static_cast<void>(without_sync);
-    DB::version_type version = db->do_commit(*this); // Throws
+    DB::version_type version = db->do_commit(*this, without_sync); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
@@ -2277,7 +2276,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 }
 
 
-void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
+void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool only_partial)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2334,7 +2333,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
-                out.commit(new_top_ref); // Throws
+                if (!only_partial)
+                    out.commit(new_top_ref); // Throws
                 break;
             case Durability::MemOnly:
             case Durability::Async:
@@ -2865,3 +2865,22 @@ Replication::~Replication()
         m_db->set_replication(nullptr);
     }
 }
+
+void Transaction::async_request_sync_to_storage(std::function<void()> when_synchronized)
+{
+    m_is_synchronizing = true;
+    // get a callback on the helper thread, in which to sync to disk
+    get_db()->async_sync_to_disk([&, when_synchronized]() {
+        // sync to disk:
+        DB::ReadLockInfo read_lock;
+        db->grab_read_lock(read_lock, VersionID());
+        GroupWriter out(*this);
+        out.commit(read_lock.m_top_ref);
+        // we must release the write mutex before the callback, because the callback
+        // is allowed to re-request it.
+        db->release_read_lock(read_lock);
+        db->do_end_write();
+        when_synchronized();
+        m_is_synchronizing = false;
+    });
+};

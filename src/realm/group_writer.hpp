@@ -139,8 +139,8 @@ private:
     // the least recently used and sync'ing it to disk
     MapWindow* get_window(ref_type start_ref, size_t size);
 
-    // Sync all cached memory mappings
-    void sync_all_mappings();
+    // Flush all cached memory mappings
+    void flush_all_mappings();
 
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if

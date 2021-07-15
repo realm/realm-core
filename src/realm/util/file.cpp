@@ -115,11 +115,11 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
 {
     DirScanner ds{path}; // Throws
     std::string name;
-    while (ds.next(name)) { // Throws
+    while (ds.next(name)) {                              // Throws
         std::string subpath = File::resolve(name, path); // Throws
         bool go_on;
-        if (File::is_dir(subpath)) { // Throws
-            std::string subdir = File::resolve(name, dir); // Throws
+        if (File::is_dir(subpath)) {                           // Throws
+            std::string subdir = File::resolve(name, dir);     // Throws
             go_on = for_each_helper(subpath, subdir, handler); // Throws
         }
         else {
@@ -276,10 +276,10 @@ bool try_remove_dir_recursive(const std::string& path)
         bool allow_missing = true;
         DirScanner ds{path, allow_missing}; // Throws
         std::string name;
-        while (ds.next(name)) { // Throws
+        while (ds.next(name)) {                              // Throws
             std::string subpath = File::resolve(name, path); // Throws
-            if (File::is_dir(subpath)) { // Throws
-                try_remove_dir_recursive(subpath); // Throws
+            if (File::is_dir(subpath)) {                     // Throws
+                try_remove_dir_recursive(subpath);           // Throws
             }
             else {
                 File::remove(subpath); // Throws
@@ -382,8 +382,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     }
     DWORD flags_and_attributes = 0;
     std::wstring ws = string_to_wstring(path);
-    HANDLE handle =
-        CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    HANDLE handle = CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_fd = handle;
         m_have_lock = false;
@@ -613,7 +612,7 @@ error:
         throw OutOfDiskSpace(msg);
     }
     throw std::system_error(err, std::system_category(), "write() failed");
-// LCOV_EXCL_STOP
+    // LCOV_EXCL_STOP
 
 #endif
 }
@@ -920,13 +919,13 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
     }
     throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
 
-// FIXME: OS X does not have any version of fallocate, but see
-// http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
+    // FIXME: OS X does not have any version of fallocate, but see
+    // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
-// FIXME: On Windows one could use a call to CreateFileMapping()
-// since it will grow the file if necessary, but never shrink it,
-// just like posix_fallocate(). The advantage would be that it
-// then becomes an atomic operation (probably).
+    // FIXME: On Windows one could use a call to CreateFileMapping()
+    // since it will grow the file if necessary, but never shrink it,
+    // just like posix_fallocate(). The advantage would be that it
+    // then becomes an atomic operation (probably).
 
 #else
 
@@ -1667,6 +1666,16 @@ void File::MapBase::sync()
     File::sync_map(m_fd, m_addr, m_size);
 }
 
+void File::MapBase::flush()
+{
+    REALM_ASSERT(m_addr);
+#if REALM_ENABLE_ENCRYPTION
+    if (m_encrypted_mapping) {
+        m_encrypted_mapping->flush();
+    }
+#endif
+}
+
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32
@@ -1826,9 +1835,7 @@ DirScanner::DirScanner(const std::string&, bool)
     throw util::runtime_error("Not yet supported");
 }
 
-DirScanner::~DirScanner() noexcept
-{
-}
+DirScanner::~DirScanner() noexcept {}
 
 bool DirScanner::next(std::string&)
 {

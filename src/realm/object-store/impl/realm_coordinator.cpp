@@ -705,7 +705,7 @@ void RealmCoordinator::wake_up_notifier_worker()
     }
 }
 
-void RealmCoordinator::commit_write(Realm& realm, bool with_lock_held)
+void RealmCoordinator::commit_write(Realm& realm, bool with_lock_held, bool without_sync)
 {
     REALM_ASSERT(!m_config.immutable());
     REALM_ASSERT(realm.is_in_transaction());
@@ -717,7 +717,7 @@ void RealmCoordinator::commit_write(Realm& realm, bool with_lock_held)
         // perform a write and notify us before we get the chance to set the
         // skip version
         util::CheckedLockGuard l(m_notifier_mutex);
-        new_version = tr.commit_and_continue_as_read(with_lock_held);
+        new_version = tr.commit_and_continue_as_read(with_lock_held, without_sync);
 
         // The skip version must always be the notifier transaction's current
         // version plus one, as we can only skip a prefix and not intermediate

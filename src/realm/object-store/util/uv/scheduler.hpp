@@ -98,24 +98,6 @@ public:
             // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
         }
         m_notification_handle = add_callback(std::move(fn));
-        /*
-        m_handle = new uv_async_t;
-        m_handle->data = new Data{std::move(fn), {false}};
-
-        // This assumes that only one thread matters: the main thread (default loop).
-        uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            auto& data = *static_cast<Data*>(handle->data);
-            if (data.close_requested) {
-                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
-                    delete reinterpret_cast<Data*>(handle->data);
-                    delete reinterpret_cast<uv_async_t*>(handle);
-                });
-            }
-            else {
-                data.callback();
-            }
-        });
-        */
     }
 
     void notify() override

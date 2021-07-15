@@ -524,7 +524,7 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit(Transaction&);
+    version_type do_commit(Transaction&, bool without_sync = false);
     void do_end_write() noexcept;
 
     // make sure the given index is within the currently mapped area.
@@ -532,7 +532,7 @@ private:
     bool grow_reader_mapping(uint_fast32_t index);
 
     // Must be called only by someone that has a lock on the write mutex.
-    void low_level_commit(uint_fast64_t new_version, Transaction& transaction);
+    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool only_partial = false);
 
     void do_async_commits();
 
@@ -594,7 +594,6 @@ private:
                     if (m_commit_helper_terminated)
                         break;
                     if (m_pending_sync) {
-                        // sync to disk here (currently no-op)
                         std::function<void()> cb = m_pending_sync.value();
                         m_pending_sync.reset();
                         lg.unlock();
@@ -745,20 +744,7 @@ public:
     };
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
-    void async_request_sync_to_storage(std::function<void()> when_synchronized)
-    {
-        // TODO make async flush to disk
-        m_is_synchronizing = true;
-        // start syncing dirty pages, callback when sync is complete and top-ptr
-        // has been updated and synced
-        get_db()->async_sync_to_disk([&, when_synchronized]() {
-            // we must release the write mutex before the callback, because the callback
-            // is allowed to re-request it.
-            db->do_end_write();
-            when_synchronized();
-            m_is_synchronizing = false;
-        });
-    };
+    void async_request_sync_to_storage(std::function<void()> when_synchronized);
     // release the write lock without any sync to disk
     void release_write_lock()
     {

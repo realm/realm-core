@@ -647,6 +647,7 @@ void Realm::run_writes()
     REALM_ASSERT(m_transaction->holds_write_mutex());
     REALM_ASSERT(!m_transaction->is_synchronizing());
     m_is_running_async_writes = true;
+    int run_limit = 20; // max number of commits without full sync to disk
     // this is tricky
     //  - each pending call may itself add other async writes
     //  - the 'run' will terminate as soon as a commit without grouping is requested
@@ -668,6 +669,11 @@ void Realm::run_writes()
 
         // FIXME: Handle any exceptions!
         write_desc.writer();
+        if (m_async_commit_performed) {
+            --run_limit;
+            if (!run_limit)
+                m_async_commit_barrier_requested = true;
+        }
         // a commit or rollback should have been done during write(), but if not we roll back:
         if (!m_async_commit_performed && !m_async_rollback_performed) {
             m_transaction->rollback_with_lock_held();
@@ -737,7 +743,7 @@ Realm::async_handle Realm::async_commit(const std::function<void()>& the_done_bl
 
     // auditing is not supported
     REALM_ASSERT(!audit_context());
-    m_coordinator->commit_write(*this, true);
+    m_coordinator->commit_write(*this, /* with_lock_held: */ true, /* without_sync: */ true);
 
     return 0;
 }
