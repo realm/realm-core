@@ -411,6 +411,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             }
         }
         else {
+            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
             auto list = object.get_linklist(column_key);
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
@@ -428,6 +429,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             }
         }
         else {
+            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < set.size(); i++) {
@@ -445,6 +447,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             }
         }
         else {
+            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
             auto dictionary = object.get_dictionary(column_key);
             auto linked_dictionary = std::make_unique<DictionaryLinkValues>(dictionary);
             auto target_table = table.get_link_target(column_key);
