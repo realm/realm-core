@@ -402,7 +402,6 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
 
     // Advance one level deeper into the key path.
     auto object = table.get_object(ObjKey(object_key_value));
-    auto target_table = table.get_link_target(column_key);
     if (column_key.is_list()) {
         if (column_type == col_type_Mixed) {
             auto list = object.get_list<Mixed>(column_key);
@@ -413,6 +412,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         }
         else {
             auto list = object.get_linklist(column_key);
+            auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
                 auto target_object = list.get(i);
                 find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
@@ -429,6 +429,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         }
         else {
             auto set = object.get_linkset(column_key);
+            auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < set.size(); i++) {
                 auto target_object = set.get(i);
                 find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
@@ -446,6 +447,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         else {
             auto dictionary = object.get_dictionary(column_key);
             auto linked_dictionary = std::make_unique<DictionaryLinkValues>(dictionary);
+            auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < linked_dictionary->size(); i++) {
                 auto target_object = linked_dictionary->get_key(i);
                 find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
@@ -455,6 +457,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     else if (column_type == col_type_Link) {
         // A forward link will only have one target object.
         auto target_object = object.get<ObjKey>(column_key);
+        auto target_table = table.get_link_target(column_key);
         find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
     }
     else if (column_type == col_type_BackLink) {
