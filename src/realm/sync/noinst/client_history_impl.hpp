@@ -68,8 +68,7 @@ public:
     };
 
     ClientHistoryImpl(const std::string& realm_path, Config config = {});
-    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-                      std::unique_ptr<ChangesetCooker> changeset_cooker);
+    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -141,10 +140,6 @@ public:
     // Overriding member functions in realm::sync::ClientHistory
     void get_upload_download_bytes(std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                    std::uint_fast64_t&) override final;
-    void get_cooked_status(version_type, std::int_fast64_t&, CookedProgress&,
-                           std::int_fast64_t&) const override final;
-    void get_cooked_changeset(std::int_fast64_t, util::AppendBuffer<char>&, version_type&) const override final;
-    version_type set_cooked_progress(CookedProgress) override final;
     UploadCursor get_upload_anchor_of_current_transact(const Transaction&) const override final;
     util::StringView get_sync_changeset_of_current_transact(const Transaction&) const noexcept override final;
 
@@ -188,7 +183,6 @@ private:
 
     struct Arrays {
         Array root;           // Root of history compartment
-        Array cooked_history; // Optional
         Arrays(Allocator&) noexcept;
     };
 
@@ -196,7 +190,6 @@ private:
 
     // Sizes of fixed-size arrays
     static constexpr int s_root_size            = 21;
-    static constexpr int s_cooked_history_size  =  5;
     static constexpr int s_schema_versions_size =  4;
 
     // Slots in root array of history compartment
@@ -219,15 +212,7 @@ private:
     static constexpr int s_origin_file_idents_iip = 16;                 // column ref
     static constexpr int s_origin_timestamps_iip = 17;                  // column ref
     static constexpr int s_object_id_history_state_iip = 18;            // ref
-    static constexpr int s_cooked_history_iip = 19;                     // ref (optional)
     static constexpr int s_schema_versions_iip = 20;                    // table ref
-
-    // Slots in root array of `cooked_history` substructure
-    static constexpr int s_ch_base_index_iip = 0;              // integer
-    static constexpr int s_ch_intrachangeset_progress_iip = 1; // integer
-    static constexpr int s_ch_base_server_version_iip = 2;     // integer
-    static constexpr int s_ch_changesets_iip = 3;              // column ref
-    static constexpr int s_ch_server_versions_iip = 4;         // column ref
 
     // Slots in root array of `schema_versions` table
     static constexpr int s_sv_schema_versions_iip = 0;   // integer
@@ -288,8 +273,6 @@ private:
 
     const bool m_owner_is_sync_client;
 
-    const std::shared_ptr<ChangesetCooker> m_changeset_cooker;
-
     /// A cache of the `s_ch_base_index_iip` slot in the history compartment
     /// root array. When the cooked history is not empty, this is the index into
     /// the total untrimmed sequence of cooked changesets of the first cooked
@@ -314,8 +297,6 @@ private:
 
     version_type find_sync_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry,
                                          version_type& last_integrated_server_version) const noexcept;
-    void do_get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>& buffer,
-                                 version_type& server_version) const noexcept;
 
     // sum_of_history_entry_sizes calculates the sum of the changeset sizes of the local history
     // entries that produced a version that succeeds `begin_version` and precedes `end_version`.
@@ -331,10 +312,6 @@ private:
     void do_trim_sync_history(std::size_t n);
     void clamp_sync_version_range(version_type& begin, version_type& end) const noexcept;
     Transformer& get_transformer();
-    void ensure_cooked_history();
-    void ensure_no_cooked_history();
-    void save_cooked_changeset(BinaryData changeset, version_type server_version);
-    void update_cooked_progress(CookedProgress progress);
     void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
@@ -356,23 +333,18 @@ private:
 inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, Config config)
     : ClientReplication{realm_path}
     , m_owner_is_sync_client{config.owner_is_sync_agent}
-    , m_changeset_cooker{std::move(config.changeset_cooker)}
 {
 }
 
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-                                            std::unique_ptr<ChangesetCooker> changeset_cooker)
+inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client)
     : ClientReplication{realm_path} // Throws
     , m_owner_is_sync_client{owner_is_sync_client}
-    , m_changeset_cooker{std::move(changeset_cooker)}
 {
 }
 
 inline ClientHistoryImpl::Arrays::Arrays(Allocator& alloc) noexcept
     : root{alloc}
-    , cooked_history{alloc}
 {
-    cooked_history.set_parent(&root, s_cooked_history_iip);
 }
 
 // Clamp the beginning of the specified upload skippable version range to the

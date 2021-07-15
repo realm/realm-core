@@ -245,125 +245,6 @@ public:
                                            std::uint_fast64_t& uploadable_bytes,
                                            std::uint_fast64_t& snapshot_version) = 0;
 
-    /// See set_cooked_progress().
-    struct CookedProgress {
-        std::int_fast64_t changeset_index = 0;
-        std::int_fast64_t intrachangeset_progress = 0;
-    };
-
-    /// Get information about the current state of the cooked history including
-    /// the point of progress of its consumption.
-    ///
-    /// \param server_version The server version associated with the last cooked
-    /// changeset that should be skipped. See `/doc/cooked_history.md` for an
-    /// explanation of the rationale behind this. Specifying zero means that no
-    /// changesets should be skipped. It is an error to specify a nonzero server
-    /// version that is not the server version associated with any of of the
-    /// cooked changesets, or to specify a nonzero server version that precedes
-    /// the one, that is associated with the last cooked changeset that was
-    /// marked as consumed. Doing so, will cause BadCookedServerVersion to be
-    /// thrown.
-    ///
-    /// \param num_changesets Set to the total number of produced cooked
-    /// changesets over the lifetime of the Realm file to which this history
-    /// accessor object is attached. This is the number of previously consumed
-    /// changesets plus the number of unconsumed changesets remaining in the
-    /// Realm file.
-    ///
-    /// \param progress The point of progress of the consumption of the cooked
-    /// history. Initially, and until explicitly modified by
-    /// set_cooked_progress(), both `CookedProgress::changeset_index` and
-    /// `CookedProgress::intrachangeset_progress` are zero. If a nonzero value
-    /// was passed for \a server_version, \a progress will be transparently
-    /// adjusted to account for the skipped changesets. See also \a
-    /// num_skipped_changesets. If one or more changesets are skipped,
-    /// `CookedProgress::intrachangeset_progress` will be set to zero.
-    ///
-    /// \param num_skipped_changesets The number of skipped changesets. See also
-    /// \a server_version.
-    ///
-    /// \throw BadCookedServerVersion See \a server_version.
-    virtual void get_cooked_status(version_type server_version, std::int_fast64_t& num_changesets,
-                                   CookedProgress& progress, std::int_fast64_t& num_skipped_changesets) const = 0;
-
-    /// Fetch the cooked changeset at the specified index.
-    ///
-    /// Cooked changesets are made available in the order they are produced by
-    /// the changeset cooker (ChangesetCooker).
-    ///
-    /// Behaviour is undefined if the specified index is less than the index
-    /// (CookedProgress::changeset_index) returned by get_cooked_progress(), or
-    /// if it is greater than, or equal to the total number of cooked changesets
-    /// (as returned by get_num_cooked_changesets()).
-    ///
-    /// The callee must append the bytes of the located cooked changeset to the
-    /// specified buffer, which does not have to be empty initially.
-    ///
-    /// \param server_version Will be set to the version produced on the server
-    /// by an earlier form of the retreived changeset. If the cooked changeset
-    /// was produced (as output of cooker) before migration of the client-side
-    /// history compartment to schema version 2, then \a server_version will be
-    /// set to zero instead, because the real value is unkown. Zero is not a
-    /// possible value in any other case.
-    virtual void get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>&,
-                                      version_type& server_version) const = 0;
-
-    /// Persistently stores the point of progress of the consumer of cooked
-    /// changesets.
-    ///
-    /// The changeset index (CookedProgress::changeset_index) is the index (as
-    /// passed to get_cooked_changeset()) of the first unconsumed cooked
-    /// changset. Changesets at lower indexes will no longer be available.
-    ///
-    /// The intrachangeset progress field
-    /// (CookedProgress::intrachangeset_progress) will be faithfully persisted,
-    /// but will otherwise be treated as an opaque object by the history
-    /// internals.
-    ///
-    /// As well as allowing for later retrieval, the specification of the point
-    /// of progress of the consumer of cooked changesets also has the effect of
-    /// trimming obsolete cooked changesets from the Realm file (i.e., removal
-    /// of all changesets at indexes lower than
-    /// CookedProgress::intrachangeset_progress).  Indeed, if this function is
-    /// never called, but cooked changesets are continually being produced, then
-    /// the Realm file will grow without bounds.
-    ///
-    /// It is an error if the specified index (CookedProgress::changeset_index)
-    /// is lower than the index returned by get_cooked_progress(), and if it is
-    /// higher that the value returned by get_num_cooked_changesets().
-    ///
-    /// \return The snapshot number produced by the transaction performed
-    /// internally in set_cooked_progress(). This is also the client-side sync
-    /// version, and it should be passed to
-    /// sync::Session::nonsync_transact_notify() if a synchronization session is
-    /// in progress for the same file while set_cooked_progress() is
-    /// called. Doing so, ensures that the server will be notified about the
-    /// released server versions as soon as possible.
-    ///
-    /// \throw InconsistentUseOfCookedHistory If this file does not have a
-    /// cooked history and one can no longer be added because changesets of
-    /// remote origin has already been integrated.
-    virtual version_type set_cooked_progress(CookedProgress) = 0;
-
-    /// \brief Get the number of cooked changesets so far produced for this
-    /// Realm.
-    ///
-    /// This is the same thing as is returned via \a num_changesets by
-    /// get_cooked_status().
-    std::int_fast64_t get_num_cooked_changesets() const noexcept;
-
-    /// \brief Returns the persisted progress that was last stored by
-    /// set_cooked_progress().
-    ///
-    /// This is the same thing as is returned via \a progress by
-    /// get_cooked_status() when invoked with a server version of zero.
-    CookedProgress get_cooked_progress() const noexcept;
-
-    /// Same as get_cooked_changeset(std::int_fast64_t,
-    /// util::AppendBuffer<char>&, version_type&) but does not retreived the
-    /// server version.
-    void get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>&) const;
-
     /// Return an upload cursor as it would be when the uploading process
     /// reaches the snapshot to which the current transaction is bound.
     ///
@@ -399,18 +280,6 @@ public:
     /// agent is created transparently by sync::Client (one history instance per
     /// sync::Session object).
     bool owner_is_sync_agent = false;
-
-    /// If a changeset cooker is specified, then the created history object will
-    /// allow for a cooked changeset to be produced for each changeset of remote
-    /// origin; that is, for each changeset that is integrated during the
-    /// execution of ClientHistory::integrate_remote_changesets(). If no
-    /// changeset cooker is specified, then no cooked changesets will be
-    /// produced on behalf of the created history object.
-    ///
-    /// ClientHistory::integrate_remote_changesets() will pass each incoming
-    /// changeset to the cooker after operational transformation; that is, when
-    /// the chageset is ready to be applied to the local Realm state.
-    std::shared_ptr<ChangesetCooker> changeset_cooker;
 };
 
 /// \brief Create a "sync history" implementation of the realm::Replication
@@ -497,36 +366,6 @@ private:
 inline ClientReplication::ClientReplication(const std::string& realm_path)
     : ClientReplicationBase{realm_path} // Throws
 {
-}
-
-inline std::int_fast64_t ClientReplication::get_num_cooked_changesets() const noexcept
-{
-    version_type server_version = 0; // Skip nothing
-    std::int_fast64_t num_changesets = 0;
-    ClientReplication::CookedProgress progress;
-    std::int_fast64_t num_skipped_changesets = 0;
-    get_cooked_status(server_version, num_changesets, progress, num_skipped_changesets);
-    REALM_ASSERT(progress.changeset_index <= num_changesets);
-    REALM_ASSERT(num_skipped_changesets == 0);
-    return num_changesets;
-}
-
-inline auto ClientReplication::get_cooked_progress() const noexcept -> CookedProgress
-{
-    version_type server_version = 0; // Skip nothing
-    std::int_fast64_t num_changesets = 0;
-    ClientReplication::CookedProgress progress;
-    std::int_fast64_t num_skipped_changesets = 0;
-    get_cooked_status(server_version, num_changesets, progress, num_skipped_changesets);
-    REALM_ASSERT(progress.changeset_index <= num_changesets);
-    REALM_ASSERT(num_skipped_changesets == 0);
-    return progress;
-}
-
-inline void ClientReplication::get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>& buffer) const
-{
-    version_type server_version;                         // Dummy
-    get_cooked_changeset(index, buffer, server_version); // Throws
 }
 
 } // namespace sync
