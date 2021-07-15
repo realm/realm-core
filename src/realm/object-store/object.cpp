@@ -139,7 +139,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
     verify_attached();
     m_realm->verify_notifications_available();
     if (!m_notifier) {
-        m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj);
+        m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
