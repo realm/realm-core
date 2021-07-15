@@ -50,23 +50,23 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         auto cur_table = group->get_table(key);
         REALM_ASSERT(cur_table);
         auto incoming_link_columns = cur_table->get_incoming_link_columns();
-        auto& backlinks = complete_mapping[cur_table->get_key()];
         for (auto& incoming_link : incoming_link_columns) {
             REALM_ASSERT(incoming_link.first);
             auto& links = complete_mapping[incoming_link.first];
             links.forward_links.push_back(incoming_link.second);
             links.forward_tables.push_back(cur_table->get_key());
-            cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
-                if (any_of(key_path_array.begin(), key_path_array.end(), [&](KeyPath key_path) {
-                        return any_of(key_path.begin(), key_path.end(), [&](std::pair<TableKey, ColKey> pair) {
-                            return pair.first == cur_table->get_key() && pair.second == backlink_col_key;
-                        });
-                    })) {
-                    backlinks.backlink_tables.push_back(incoming_link.first);
-                }
-                return false;
-            });
         }
+        auto& backlinks = complete_mapping[cur_table->get_key()];
+        cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
+            if (any_of(key_path_array.begin(), key_path_array.end(), [&](KeyPath key_path) {
+                    return any_of(key_path.begin(), key_path.end(), [&](std::pair<TableKey, ColKey> pair) {
+                        return pair.first == cur_table->get_key() && pair.second == backlink_col_key;
+                    });
+                })) {
+                backlinks.backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
+            }
+            return false;
+        });
     }
 
     // Remove duplicates:
