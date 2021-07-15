@@ -13,7 +13,11 @@
 -----------
 
 ### Internals
-* None.
+* Remove ClientResyncMode::Recover option. This doesn't work and shouldn't be used by anyone currently.
+* Remove sync support for CLIENT_VERSION request; it isn't used.
+* Remove the STATE message request and handling from the client and test sever. The current server was always responding with empty state anyhow. Clients will now consider receiving this message as an error because they never request it.
+* Handling for async open, involving state files is mostly removed.
+* When a client reset occured, we would create a metadata Realm to handle state download but this isn't needed anymore so it is removed.
 
 ----------------------------------------------
 
