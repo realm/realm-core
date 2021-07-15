@@ -32,7 +32,12 @@ ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key,
 
 void ObjectNotifier::do_attach_to(Transaction& sg)
 {
-    m_table = sg.get_table(m_table_key);
+    try {
+        m_table = sg.get_table(m_table_key);
+    }
+    catch (const NoSuchTable&) {
+        m_table = {};
+    }
 }
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
@@ -47,6 +52,7 @@ bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks) {
+        REALM_ASSERT(m_table);
         update_related_tables(*m_table);
     }
 
@@ -62,6 +68,7 @@ void ObjectNotifier::run()
     if (!m_change.modifications.contains(0) && any_callbacks_filtered()) {
         // If any callback has a key path filter we will check all related tables and if any of them was changed we
         // mark the this object as changed.
+        REALM_ASSERT(m_table);
         auto object_change_checker = get_object_modification_checker(*m_info, m_table);
         std::vector<int64_t> changed_columns = object_change_checker(m_obj_key.value);
 
