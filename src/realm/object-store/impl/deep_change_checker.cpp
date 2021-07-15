@@ -472,7 +472,9 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             auto origin_object = object.get_backlink(*origin_table, origin_column_key, i);
             find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object.value);
         }
-    }
+} else {
+    REALM_UNREACHABLE(); // unhandled column type
+}
 }
 
 ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo const& info, Table const& root_table,
