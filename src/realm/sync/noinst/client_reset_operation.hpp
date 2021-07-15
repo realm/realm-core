@@ -8,8 +8,7 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/util/aes_cryptor.hpp>
 
-namespace realm {
-namespace _impl {
+namespace realm::_impl {
 
 // A ClientResetOperation object is used per client session to keep track of
 // state Realm download.
@@ -25,11 +24,11 @@ public:
     // will be inserted in the Realm after download.
     bool finalize(sync::SaltedFileIdent salted_file_ident);
 
-    sync::version_type get_server_version();
-    sync::salt_type get_server_version_salt();
+    sync::version_type get_server_version() const noexcept;
+    sync::salt_type get_server_version_salt() const noexcept;
 
-    realm::VersionID get_client_reset_old_version();
-    realm::VersionID get_client_reset_new_version();
+    realm::VersionID get_client_reset_old_version() const noexcept;
+    realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
     const std::string m_realm_path;
@@ -47,27 +46,26 @@ private:
 
 // Implementation
 
-inline sync::version_type ClientResetOperation::get_server_version()
+inline sync::version_type ClientResetOperation::get_server_version() const noexcept
 {
     return m_server_version.version;
 }
 
-inline sync::salt_type ClientResetOperation::get_server_version_salt()
+inline sync::salt_type ClientResetOperation::get_server_version_salt() const noexcept
 {
     return m_server_version.salt;
 }
 
-inline realm::VersionID ClientResetOperation::get_client_reset_old_version()
+inline realm::VersionID ClientResetOperation::get_client_reset_old_version() const noexcept
 {
     return m_client_reset_old_version;
 }
 
-inline realm::VersionID ClientResetOperation::get_client_reset_new_version()
+inline realm::VersionID ClientResetOperation::get_client_reset_new_version() const noexcept
 {
     return m_client_reset_new_version;
 }
 
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_NOINST_CLIENT_RESET_OPERATION_HPP

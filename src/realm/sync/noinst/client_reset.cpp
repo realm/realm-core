@@ -651,28 +651,12 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
 
-    //    std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
-    //    DBRef sg_remote = DB::create(*history_remote, shared_group_options);
-    //    auto wt_remote = sg_remote->start_write();
-    //    sync::version_type current_version_remote = wt_remote->get_version();
-    //    history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-    //    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
-
     // make breaking changes in the local copy which cannot be advanced
     remove_all_tables(*group_local, logger);
 
     // Extract the changeset produced in the remote Realm during recovery.
-    //    sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
-    //    const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
-    //    BinaryData recovered_changeset{buffer.data(), buffer.size()};
+    // Since recovery mode has been unsupported this is always empty.
     BinaryData recovered_changeset;
-    //    {
-    //        // Debug.
-    //        ChunkedBinaryInputStream in{recovered_changeset};
-    //        sync::Changeset log;
-    //        sync::parse_changeset(in, log); // Throws
-    //        log.print();
-    //    }
     uint_fast64_t downloaded_bytes = 0;
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
                                                downloaded_bytes, recovered_changeset);
