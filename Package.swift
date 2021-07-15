@@ -59,9 +59,6 @@ let syncExcludes: [String] = [
     "realm/sync/server_index_command.cpp",
     "realm/sync/stat_command.cpp",
     "realm/sync/verify_server_file_command.cpp",
-
-    // Misc unused
-    "realm/sync/changeset_cooker.cpp"
 ]
 
 let notSyncServerSources: [String] = [
@@ -546,7 +543,6 @@ let headers: [String] = [
     "realm/sync/access_token.hpp",
     "realm/sync/auth.hpp",
     "realm/sync/changeset.hpp",
-    "realm/sync/changeset_cooker.hpp",
     "realm/sync/changeset_encoder.hpp",
     "realm/sync/changeset_parser.hpp",
     "realm/sync/client.hpp",
