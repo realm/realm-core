@@ -71,7 +71,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks && m_type == PropertyType::Object) {
         auto& list = static_cast<LnkLst&>(*m_list);
-        const Table& table = *(list.get_target_table());
+        const Table& table = *(list.get_table());
         update_related_tables(table);
     }
 
