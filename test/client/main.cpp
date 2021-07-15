@@ -1250,9 +1250,9 @@ int main(int argc, char* argv[])
     std::unique_ptr<std::unique_ptr<Peer>[]> peers = std::make_unique<std::unique_ptr<Peer>[]>(num_peers);
     if (num_peers == 1) {
         peer_loggers[0] = &logger;
-        peers[0] = std::make_unique<Peer>(context, sync_request_path, peer_params[0].realm_path, logger,
-                                          originator_ident, verify_ssl_cert, ssl_trust_certificate_path,
-                                          client_reset_config, on_sync_error);
+        peers[0] =
+            std::make_unique<Peer>(context, sync_request_path, peer_params[0].realm_path, logger, originator_ident,
+                                   verify_ssl_cert, ssl_trust_certificate_path, client_reset_config, on_sync_error);
     }
     else if (num_peers >= 2) {
         std::ostringstream out;

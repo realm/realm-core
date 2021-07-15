@@ -39,7 +39,7 @@ namespace _impl {
 //  10   Stable IDs supported by core.
 //
 //  11   Path-based instruction format for MongoDB Realm Sync (v10)
-//       
+//
 //       Cooked history was removed, except to verify that there is no cooked history.
 //
 

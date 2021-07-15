@@ -63,7 +63,8 @@ public:
 
     /// The mere creation of the slot is guaranteed to not involve any access to
     /// the file system.
-    Slot(ClientFileAccessCache&, std::string realm_path, util::Optional<std::array<char, 64>> encryption_key = none) noexcept;
+    Slot(ClientFileAccessCache&, std::string realm_path,
+         util::Optional<std::array<char, 64>> encryption_key = none) noexcept;
 
     /// Closes the file if it is open (as if by calling close()).
     ~Slot() noexcept;
