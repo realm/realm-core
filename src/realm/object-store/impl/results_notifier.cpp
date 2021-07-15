@@ -99,6 +99,14 @@ bool ResultsNotifier::get_tableview(TableView& out)
 bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
     m_info = &info;
+
+    // When adding or removing a callback the related tables can change due to the way we calculate related tables
+    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks) {
+        update_related_tables(*(m_query->get_table()));
+    }
+
     return m_query->get_table() && has_run() && have_callbacks();
 }
 

@@ -188,7 +188,8 @@ Results Collection::snapshot() const
 }
 
 
-NotificationToken Collection::add_notification_callback(CollectionChangeCallback cb) &
+NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
+                                                        KeyPathArray key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();
@@ -204,7 +205,7 @@ NotificationToken Collection::add_notification_callback(CollectionChangeCallback
         m_notifier = std::make_shared<_impl::ListNotifier>(m_realm, *m_coll_base, m_type);
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 namespace {

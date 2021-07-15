@@ -64,6 +64,17 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
+
+    // When adding or removing a callback, the related tables can change due to the way we calculate related tables
+    // when key path filters are set, hence we need to recalculate every time the callbacks are changed.
+    // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks && m_type == PropertyType::Object) {
+        auto& list = static_cast<LnkLst&>(*m_list);
+        const Table& table = *(list.get_table());
+        update_related_tables(table);
+    }
+
     return true;
 }
 

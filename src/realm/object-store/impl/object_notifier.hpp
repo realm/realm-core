@@ -22,22 +22,24 @@
 #include <realm/object-store/impl/collection_notifier.hpp>
 
 #include <realm/keys.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 
 namespace _impl {
 class ObjectNotifier : public CollectionNotifier {
 public:
-    ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, ObjKey obj);
+    ObjectNotifier(std::shared_ptr<Realm> realm, Obj obj);
 
 private:
-    TableKey m_table;
-    ObjKey m_obj;
+    Obj m_obj;
     TransactionChangeInfo* m_info;
 
-    void run() override;
+    void run() override REQUIRES(!m_callback_mutex);
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
+
+    bool object_was_deleted(const ObjectChangeSet& object_change_set);
 };
 } // namespace _impl
 } // namespace realm

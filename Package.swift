@@ -466,7 +466,6 @@ let headers: [String] = [
     "realm/object-store/impl/object_notifier.hpp",
     "realm/object-store/impl/realm_coordinator.hpp",
     "realm/object-store/impl/results_notifier.hpp",
-    "realm/object-store/impl/set_notifier.hpp",
     "realm/object-store/impl/transact_log_handler.hpp",
     "realm/object-store/impl/weak_realm_notifier.hpp",
     "realm/object-store/impl/windows/external_commit_helper.hpp",

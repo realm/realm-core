@@ -23,42 +23,91 @@
 using namespace realm;
 using namespace realm::_impl;
 
-ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table, ObjKey obj)
+ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, Obj obj)
     : CollectionNotifier(std::move(realm))
-    , m_table(table)
     , m_obj(obj)
 {
 }
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
+    auto table = m_obj.get_table();
+    if (!table)
+        return false;
+
     m_info = &info;
-    info.tables[m_table.value];
-    return false;
+    info.tables[table->get_key().value];
+
+    // When adding or removing a callback the related tables can change due to the way we calculate related tables
+    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks) {
+        update_related_tables(*table);
+    }
+
+    return true;
 }
 
 void ObjectNotifier::run()
 {
-    if (!m_table)
+    auto table = m_obj.get_table();
+    if (!table)
         return;
 
-    auto it = m_info->tables.find(m_table.value);
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (!m_change.modifications.contains(0) && any_callbacks_filtered()) {
+        // If any callback has a key path filter we will check all related tables and if any of them was changed we
+        // mark the this object as changed.
+        auto object_change_checker = get_object_modification_checker(*m_info, table);
+        std::vector<int64_t> changed_columns = object_change_checker(m_obj.get_key().value);
+
+        if (auto it = m_info->tables.find(table->get_key().value); it != m_info->tables.end()) {
+            const auto& change = it->second;
+            if (object_was_deleted(change)) {
+                return;
+            }
+        }
+
+        if (changed_columns.size() > 0) {
+            m_change.modifications.add(0);
+            for (auto changed_column : changed_columns) {
+                m_change.columns[changed_column].add(0);
+            }
+        }
+        if (all_callbacks_filtered()) {
+            return;
+        }
+    }
+
+    auto it = m_info->tables.find(table->get_key().value);
     if (it == m_info->tables.end())
+        // This object's table is not in the map of changed tables held by `m_info`
+        // hence no further details have to be checked.
         return;
-    auto& change = it->second;
 
-    if (change.deletions_contains(m_obj.value)) {
-        m_change.deletions.add(0);
-        m_table = {};
-        m_obj = {};
+    const auto& change = it->second;
+    if (object_was_deleted(change)) {
         return;
     }
 
-    auto column_modifications = change.get_columns_modified(m_obj.value);
+    auto column_modifications = change.get_columns_modified(m_obj.get_key().value);
     if (!column_modifications)
         return;
+
+    // Finally we add all changes to `m_change` which is later used to notify about the changed columns.
     m_change.modifications.add(0);
     for (auto col : *column_modifications) {
         m_change.columns[col].add(0);
     }
+}
+
+bool ObjectNotifier::object_was_deleted(const ObjectChangeSet& object_change_set)
+{
+    if (object_change_set.deletions_contains(m_obj.get_key().value)) {
+        // The object was deleted after adding the notifier.
+        m_change.deletions.add(0);
+        m_obj = {};
+        return true;
+    }
+    return false;
 }
