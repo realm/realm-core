@@ -494,7 +494,6 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     REALM_ASSERT(transact->get_sync_file_id() != 0);
 
     std::vector<char> assembled_transformed_changeset;
-    util::AppendBuffer<char> cooked_changeset_buffer;
     std::vector<sync::Changeset> changesets;
     changesets.resize(num_changesets); // Throws
 
@@ -795,11 +794,6 @@ void ClientHistoryImpl::prepare_for_write()
     REALM_ASSERT(!m_remote_versions);
     REALM_ASSERT(!m_origin_file_idents);
     REALM_ASSERT(!m_origin_timestamps);
-    REALM_ASSERT(m_ch_base_index == 0);
-    REALM_ASSERT(m_ch_base_server_version == 0);
-    REALM_ASSERT(m_cooked_history_size == 0);
-    REALM_ASSERT(!m_ch_changesets);
-    REALM_ASSERT(!m_ch_server_versions);
     Allocator& alloc = m_shared_group->get_alloc();
     std::unique_ptr<Arrays> arrays = std::make_unique<Arrays>(alloc); // Throws
     {
@@ -1323,11 +1317,6 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
         m_origin_file_idents.reset();
         m_origin_timestamps.reset();
         m_progress_download = {0, 0};
-        m_ch_base_index = 0;
-        m_ch_base_server_version = 0;
-        m_cooked_history_size = 0;
-        m_ch_changesets.reset();
-        m_ch_server_versions.reset();
         return;
     }
     if (REALM_LIKELY(m_arrays)) {
@@ -1355,6 +1344,10 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
         m_remote_versions->init_from_parent();    // Throws
         m_origin_file_idents->init_from_parent(); // Throws
         m_origin_timestamps->init_from_parent();  // Throws
+        Array cooked_history{m_shared_group->get_alloc()};
+        cooked_history.set_parent(&root, s_cooked_history_iip);
+        // We should have no cooked history in existing Realms.
+        REALM_ASSERT(cooked_history.get_ref_from_parent() == 0);
     }
     else {
         REALM_ASSERT(!m_ct_history);
@@ -1363,8 +1356,6 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
         REALM_ASSERT(!m_remote_versions);
         REALM_ASSERT(!m_origin_file_idents);
         REALM_ASSERT(!m_origin_timestamps);
-        REALM_ASSERT(!m_ch_changesets);
-        REALM_ASSERT(!m_ch_server_versions);
         Allocator& alloc = m_shared_group->get_alloc();
         std::unique_ptr<Arrays> arrays(new Arrays(alloc)); // Throws
         arrays->root.init_from_ref(ref);
@@ -1430,11 +1421,6 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
         version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int());
     m_progress_download.last_integrated_client_version =
         version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int());
-
-    m_ch_base_index = 0;
-    m_ch_base_server_version = 0;
-    m_ch_changesets.reset();
-    m_ch_server_versions.reset();
 }
 
 
@@ -1497,14 +1483,9 @@ void ClientHistoryImpl::verify() const
         REALM_ASSERT(m_sync_history_size == 0);
         REALM_ASSERT(m_progress_download.server_version == 0);
         REALM_ASSERT(m_progress_download.last_integrated_client_version == 0);
-        REALM_ASSERT(m_ch_base_index == 0);
-        REALM_ASSERT(m_ch_base_server_version == 0);
-        REALM_ASSERT(m_cooked_history_size == 0);
-        REALM_ASSERT(!m_ch_changesets);
-        REALM_ASSERT(!m_ch_server_versions);
         return;
     }
-    const Array& root = m_arrays->root;
+    Array& root = m_arrays->root;
     REALM_ASSERT(m_ct_history);
     REALM_ASSERT(m_changesets);
     REALM_ASSERT(m_reciprocal_transforms);
@@ -1538,18 +1519,9 @@ void ClientHistoryImpl::verify() const
         remote_version_of_last_entry = m_remote_versions->get(m_sync_history_size - 1);
     REALM_ASSERT(progress_download_server_version >= remote_version_of_last_entry);
 
-    REALM_ASSERT(m_ch_changesets);
-    REALM_ASSERT(m_ch_server_versions);
-    m_ch_changesets->verify();
-    version_type prev_server_version = m_ch_base_server_version;
-    for (std::size_t i = 0; i < m_cooked_history_size; ++i) {
-        version_type server_version = version_type(m_ch_server_versions->get(i));
-        // `server_version` can be zero, but only if the file was migrated
-        // from history schema version 1
-        if (server_version != 0) {
-            REALM_ASSERT(server_version > prev_server_version);
-            prev_server_version = server_version;
-        }
-    }
+    // Verify that there is no cooked history.
+    Array cooked_history{m_shared_group->get_alloc()};
+    cooked_history.set_parent(&root, s_cooked_history_iip);
+    REALM_ASSERT(cooked_history.get_ref_from_parent() == 0);
 #endif // REALM_DEBUG
 }

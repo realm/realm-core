@@ -47,16 +47,6 @@ timestamp_type generate_changeset_timestamp() noexcept;
 // arguments.
 void map_changeset_timestamp(timestamp_type, std::time_t& seconds_since_epoch, long& nanoseconds) noexcept;
 
-/// Thrown if changeset cooking is not either consistently on or consistently
-/// off during synchronization (ClientHistory::set_sync_progress() and
-/// ClientHistory::integrate_server_changesets()).
-class InconsistentUseOfCookedHistory;
-
-/// Thrown if a bad server version is passed to
-/// ClientHistory::get_cooked_status().
-class BadCookedServerVersion;
-
-
 class ClientReplicationBase : public SyncReplication {
 public:
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
@@ -115,12 +105,6 @@ public:
     /// \param downloadable_bytes If specified, and if the implementation cares
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
-    ///
-    /// \throw InconsistentUseOfCookedHistory If a changeset cooker has been
-    /// attached to this history object, and the Realm file does not have a
-    /// cooked history, and a cooked history can no longer be added because some
-    /// synchronization has already happened. Or if no changeset cooker has been
-    /// attached, and the Realm file does have a cooked history.
     virtual void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                    VersionInfo&) = 0;
 
@@ -218,12 +202,6 @@ public:
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
-    ///
-    /// \throw InconsistentUseOfCookedHistory If a changeset cooker has been
-    /// attached to this history object, and the Realm file does not have a
-    /// cooked history, and a cooked history can no longer be added because some
-    /// synchronization has already happened. Or if no changeset cooker has been
-    /// attached, and the Realm file does have a cooked history.
     virtual bool integrate_server_changesets(const SyncProgress& progress,
                                              const std::uint_fast64_t* downloadable_bytes,
                                              const RemoteChangeset* changesets, std::size_t num_changesets,
@@ -332,36 +310,6 @@ inline void map_changeset_timestamp(timestamp_type timestamp, std::time_t& secon
     seconds_since_epoch = std::time_t(millis_since_epoch / 1000);
     nanoseconds = long(millis_since_epoch % 1000 * 1000000L);
 }
-
-class InconsistentUseOfCookedHistory : public std::exception {
-public:
-    InconsistentUseOfCookedHistory(const char* message) noexcept
-        : m_message{message}
-    {
-    }
-    const char* what() const noexcept override final
-    {
-        return m_message;
-    }
-
-private:
-    const char* m_message;
-};
-
-class BadCookedServerVersion : public std::exception {
-public:
-    BadCookedServerVersion(const char* message) noexcept
-        : m_message{message}
-    {
-    }
-    const char* what() const noexcept override final
-    {
-        return m_message;
-    }
-
-private:
-    const char* m_message;
-};
 
 inline ClientReplication::ClientReplication(const std::string& realm_path)
     : ClientReplicationBase{realm_path} // Throws

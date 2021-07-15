@@ -39,6 +39,8 @@ namespace _impl {
 //  10   Stable IDs supported by core.
 //
 //  11   Path-based instruction format for MongoDB Realm Sync (v10)
+//       
+//       Cooked history was removed, except to verify that there is no cooked history.
 //
 
 constexpr int get_client_history_schema_version() noexcept
@@ -212,6 +214,7 @@ private:
     static constexpr int s_origin_file_idents_iip = 16;                 // column ref
     static constexpr int s_origin_timestamps_iip = 17;                  // column ref
     static constexpr int s_object_id_history_state_iip = 18;            // ref
+    static constexpr int s_cooked_history_iip = 19;                     // ref (removed)
     static constexpr int s_schema_versions_iip = 20;                    // table ref
 
     // Slots in root array of `schema_versions` table
@@ -272,26 +275,6 @@ private:
     version_type m_version_of_oldest_bound_snapshot = 0;
 
     const bool m_owner_is_sync_client;
-
-    /// A cache of the `s_ch_base_index_iip` slot in the history compartment
-    /// root array. When the cooked history is not empty, this is the index into
-    /// the total untrimmed sequence of cooked changesets of the first cooked
-    /// changeset that is currently in the Realm file.
-    mutable std::int_fast64_t m_ch_base_index;
-
-    /// A cache of the `s_ch_base_server_version_iip` slot in the history
-    /// compartment root array. This is a server version that is less than the
-    /// versions produced on the server by the original versions of all the
-    /// unconsumed cooked changesets. In general, it will be the latest server
-    /// version satisfying this chriterion.
-    mutable version_type m_ch_base_server_version;
-
-    /// Current number of entries in the cooked history. A cache of
-    /// `m_ch_changesets->size()`.
-    mutable std::size_t m_cooked_history_size;
-
-    mutable std::unique_ptr<BinaryColumn> m_ch_changesets; // Not nullable
-    mutable std::unique_ptr<IntegerBpTree> m_ch_server_versions;
 
     std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
 
