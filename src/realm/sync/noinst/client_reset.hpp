@@ -27,8 +27,6 @@ void recover_schema(const Transaction& group_src, Transaction& group_dst, util::
 
 void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
 
-void clear_all_tables(Transaction& tr_dst, util::Logger& logger);
-
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_remote' as the source of truth.
 // Local changes in 'path_local' with client version greater than

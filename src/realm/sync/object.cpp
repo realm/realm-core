@@ -103,24 +103,6 @@ PrimaryKey primary_key_for_row(const Obj& obj)
     return global_key;
 }
 
-ObjKey row_for_object_id(const Table& table, GlobalKey id)
-{
-    return table.get_objkey(id);
-}
-
-Obj obj_for_object_id(const Table& table, GlobalKey id)
-{
-    ObjKey key = table.get_objkey(id);
-
-    try {
-        auto obj = table.get_object(key);
-        return obj;
-    }
-    catch (const KeyNotFound&) {
-    }
-    return {};
-}
-
 ObjKey row_for_primary_key(const Table& table, PrimaryKey key)
 {
     ColKey pk_col = table.get_primary_key_column();

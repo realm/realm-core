@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "collection_fixtures.hpp"
 #include "sync/session/session_util.hpp"
 
 #include <realm/object-store/feature_checks.hpp>
@@ -709,15 +710,88 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
 }
 #endif
 
-TEST_CASE("sync: client reset") {
+namespace {
+
+TableRef get_table(Realm& realm, StringData object_type)
+{
+    return ObjectStore::table_for_object_type(realm.read_group(), object_type);
+}
+
+Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> primary_key = util::none)
+{
+    auto table = get_table(realm, object_type);
+    REQUIRE(table);
+    static int64_t pk = 0;
+    return table->create_object_with_primary_key(primary_key ? *primary_key : pk++);
+}
+
+SharedRealm trigger_client_reset(std::function<void(Realm&)> local, std::function<void(Realm&)> remote,
+                                 realm::Realm::Config local_config, realm::Realm::Config remote_config,
+                                 TestSyncManager& test_sync_manager)
+{
     using namespace std::literals::chrono_literals;
+    auto& server = test_sync_manager.sync_server();
+    auto sync_manager = test_sync_manager.app()->sync_manager();
+
+    auto realm = Realm::get_shared_realm(local_config);
+    auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
+    {
+        realm->begin_transaction();
+
+        auto obj = create_object(*realm, "object");
+        auto col = obj.get_table()->get_column_key("value");
+        obj.set(col, 1);
+        obj.set(col, 2);
+        obj.set(col, 3);
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        session->log_out();
+
+        // Make a change while offline so that log compaction will cause a
+        // client reset
+        realm->begin_transaction();
+        obj.set(col, 4);
+        local(*realm);
+        realm->commit_transaction();
+    }
+
+    // Make writes from another client while advancing the time so that
+    // the server performs log compaction
+    {
+        auto realm2 = Realm::get_shared_realm(remote_config);
+
+        for (int i = 0; i < 2; ++i) {
+            wait_for_download(*realm2);
+            realm2->begin_transaction();
+            auto table = get_table(*realm2, "object");
+            auto col = table->get_column_key("value");
+            table->begin()->set(col, i + 5);
+            realm2->commit_transaction();
+            wait_for_upload(*realm2);
+            server.advance_clock(10s);
+        }
+
+        realm2->begin_transaction();
+        remote(*realm2);
+        realm2->commit_transaction();
+        wait_for_upload(*realm2);
+        server.advance_clock(10s);
+        realm2->close();
+    }
+
+    // Resuming sync on the first realm should now result in a client reset
+    session->revive_if_needed();
+    return realm;
+}
+
+} // namespace
+
+TEST_CASE("sync: client reset", "[client reset]") {
     if (!EventLoop::has_implementation())
         return;
 
-
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
-    auto sync_manager = init_sync_manager.app()->sync_manager();
     SyncTestFile config(init_sync_manager.app(), "default");
     config.schema = Schema{
         {"object",
@@ -746,17 +820,6 @@ TEST_CASE("sync: client reset") {
     };
     SyncTestFile config2(init_sync_manager.app(), "default");
 
-    auto get_table = [](Realm& realm, StringData object_type) {
-        return ObjectStore::table_for_object_type(realm.read_group(), object_type);
-    };
-    auto create_object = [&](Realm& realm, StringData object_type,
-                             util::Optional<int64_t> primary_key = util::none) -> Obj {
-        auto table = get_table(realm, object_type);
-        REQUIRE(table);
-        static int64_t pk = 0;
-        return table->create_object_with_primary_key(primary_key ? *primary_key : pk++);
-    };
-
     auto setup = [&](auto fn) {
         auto realm = Realm::get_shared_realm(config);
         realm->begin_transaction();
@@ -766,56 +829,7 @@ TEST_CASE("sync: client reset") {
     };
 
     auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
-        auto realm = Realm::get_shared_realm(config);
-        auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
-        {
-            realm->begin_transaction();
-
-            auto obj = create_object(*realm, "object");
-            auto col = obj.get_table()->get_column_key("value");
-            obj.set(col, 1);
-            obj.set(col, 2);
-            obj.set(col, 3);
-            realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            session->log_out();
-
-            // Make a change while offline so that log compaction will cause a
-            // client reset
-            realm->begin_transaction();
-            obj.set(col, 4);
-            local(*realm);
-            realm->commit_transaction();
-        }
-
-        // Make writes from another client while advancing the time so that
-        // the server performs log compaction
-        {
-            auto realm2 = Realm::get_shared_realm(config2);
-
-            for (int i = 0; i < 2; ++i) {
-                wait_for_download(*realm2);
-                realm2->begin_transaction();
-                auto table = get_table(*realm2, "object");
-                auto col = table->get_column_key("value");
-                table->begin()->set(col, i + 5);
-                realm2->commit_transaction();
-                wait_for_upload(*realm2);
-                server.advance_clock(10s);
-            }
-
-            realm2->begin_transaction();
-            remote(*realm2);
-            realm2->commit_transaction();
-            wait_for_upload(*realm2);
-            server.advance_clock(10s);
-            realm2->close();
-        }
-
-        // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
-        return realm;
+        return ::trigger_client_reset(local, remote, config, config2, init_sync_manager);
     };
 
     SECTION("should trigger error callback when mode is manual") {
@@ -872,7 +886,7 @@ TEST_CASE("sync: client reset") {
         });
 
         auto realm = trigger_client_reset(
-            [&create_object](auto& realm) {
+            [&](auto& realm) {
                 realm.update_schema(
                     {
                         {"object2",
@@ -882,7 +896,7 @@ TEST_CASE("sync: client reset") {
                          }},
                     },
                     0, nullptr, nullptr, true);
-                create_object(realm, "object2");
+                ::create_object(realm, "object2");
             },
             [](auto&) {});
         wait_for_download(*realm);
@@ -1334,5 +1348,212 @@ TEST_CASE("sync: client reset") {
             REQUIRE_INDICES(object_changes.insertions);
             REQUIRE_INDICES(object_changes.deletions);
         }
+
+        auto get_key_for_object_with_value = [&](TableRef table, int64_t value) -> ObjKey {
+            REQUIRE(table);
+            auto target = std::find_if(table->begin(), table->end(), [&](auto it) -> bool {
+                return it.template get<Int>("value") == value;
+            });
+            if (target == table->end()) {
+                return {};
+            }
+            return target->get_key();
+        };
+
+        SECTION("link to remotely deleted object") {
+            setup([&](auto& realm) {
+                auto k0 = create_object(realm, "link target").set("value", 1).get_key();
+                create_object(realm, "link target").set("value", 2);
+                create_object(realm, "link target").set("value", 3);
+
+                Obj o = create_object(realm, "link origin");
+                o.set("link", k0);
+            });
+
+            auto realm = trigger_client_reset(
+                [&](auto& realm) {
+                    auto target_table = get_table(realm, "link target");
+                    auto key_of_second_target = get_key_for_object_with_value(target_table, 2);
+                    REQUIRE(key_of_second_target);
+                    auto table = get_table(realm, "link origin");
+                    table->begin()->set("link", key_of_second_target);
+                },
+                [&](auto& realm) {
+                    auto table = get_table(realm, "link target");
+                    auto key_of_second_target = get_key_for_object_with_value(table, 2);
+                    table->remove_object(key_of_second_target);
+                });
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(realm->refresh());
+
+            auto origin = get_table(*realm, "link origin");
+            auto target = get_table(*realm, "link target");
+            REQUIRE(origin->size() == 1);
+            REQUIRE(target->size() == 2);
+            REQUIRE(get_key_for_object_with_value(target, 1));
+            REQUIRE(get_key_for_object_with_value(target, 3));
+            auto key = origin->begin()->get<ObjKey>("link");
+            auto obj = target->get_object(key);
+            REQUIRE(obj.get<Int>("value") == 1);
+        }
+
+        SECTION("add remotely deleted object to list") {
+            ObjKey k0, k1, k2;
+            setup([&](auto& realm) {
+                k0 = create_object(realm, "link target").set("value", 1).get_key();
+                k1 = create_object(realm, "link target").set("value", 2).get_key();
+                k2 = create_object(realm, "link target").set("value", 3).get_key();
+
+                Obj o = create_object(realm, "link origin");
+                o.get_linklist("list").add(k0);
+            });
+
+            auto realm = trigger_client_reset(
+                [&](auto& realm) {
+                    auto key = get_key_for_object_with_value(get_table(realm, "link target"), 2);
+                    auto table = get_table(realm, "link origin");
+                    auto list = table->begin()->get_linklist("list");
+                    list.add(key);
+                },
+                [&](auto& realm) {
+                    auto table = get_table(realm, "link target");
+                    auto key = get_key_for_object_with_value(table, 2);
+                    REQUIRE(key);
+                    table->remove_object(key);
+                });
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(realm->refresh());
+
+            auto table = get_table(*realm, "link origin");
+            auto target_table = get_table(*realm, "link target");
+            REQUIRE(table->size() == 1);
+            REQUIRE(target_table->size() == 2);
+            REQUIRE(get_key_for_object_with_value(target_table, 1));
+            REQUIRE(get_key_for_object_with_value(target_table, 3));
+            auto list = table->begin()->get_linklist("list");
+            REQUIRE(list.size() == 1);
+            REQUIRE(list.get_object(0).get<Int>("value") == 1);
+        }
+    }
+}
+
+namespace cf = realm::collection_fixtures;
+TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
+                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
+                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+{
+    auto values = TestType::values();
+    using T = typename TestType::Type;
+    using W = typename TestType::Wrapped;
+    using Boxed = typename TestType::Boxed;
+
+    if (!EventLoop::has_implementation())
+        return;
+
+    TestSyncManager init_sync_manager;
+    SyncTestFile config(init_sync_manager.app(), "default");
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+        {"test type",
+         {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+          //{"value", TestType::property_type()},
+          {"primitive list", PropertyType::Array | TestType::property_type()}}},
+    };
+
+    SyncTestFile config2(init_sync_manager.app(), "default");
+
+    auto setup = [&](auto fn) {
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction();
+        fn(*realm);
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    };
+
+    auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
+        return ::trigger_client_reset(local, remote, config, config2, init_sync_manager);
+    };
+
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+
+    Results results;
+    Object object;
+    CollectionChangeSet object_changes, results_changes;
+    NotificationToken object_token, results_token;
+    auto setup_listeners = [&](SharedRealm realm) {
+        results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "test type"))
+                      .sort({{{"_id", true}}});
+        if (results.size() >= 1) {
+            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "test type")->begin();
+            object = Object(realm, obj);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                object_changes = std::move(changes);
+            });
+        }
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            results_changes = std::move(changes);
+        });
+    };
+
+    auto check_list = [&](Obj obj, std::vector<T> expected) {
+        ColKey col = obj.get_table()->get_column_key("primitive list");
+        auto actual = obj.get_list_values<T>(col);
+        REQUIRE(actual == expected);
+    };
+
+    SECTION("modify") {
+        REQUIRE(values.size() >= 2);
+        REQUIRE(values[0] != values[1]);
+        int64_t pk_val = 0;
+        setup([&](auto& realm) {
+            auto table = get_table(realm, "test type");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            ColKey col = table->get_column_key("primitive list");
+            obj.template set_list_values<T>(col, {values[0]});
+        });
+        auto realm = trigger_client_reset([](auto&) {},
+                                          [&](auto& remote_realm) {
+                                              auto table = get_table(remote_realm, "test type");
+                                              REQUIRE(table);
+                                              REQUIRE(table->size() == 1);
+                                              ColKey col = table->get_column_key("primitive list");
+                                              table->begin()->template set_list_values<T>(col, {values[1]});
+                                          });
+        setup_listeners(realm);
+
+        REQUIRE_NOTHROW(advance_and_notify(*realm));
+        CHECK(results.size() == 1);
+        CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
+        CHECK(object.is_valid());
+        check_list(results.get<Obj>(0), {values[0]});
+        check_list(object.obj(), {values[0]});
+
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+        REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+        CHECK(results.size() == 1);
+        CHECK(object.is_valid());
+        check_list(results.get<Obj>(0), {values[1]});
+        check_list(object.obj(), {values[1]});
+        REQUIRE_INDICES(results_changes.modifications, 0);
+        REQUIRE_INDICES(results_changes.insertions);
+        REQUIRE_INDICES(results_changes.deletions);
+        REQUIRE_INDICES(object_changes.modifications, 0);
+        REQUIRE_INDICES(object_changes.insertions);
+        REQUIRE_INDICES(object_changes.deletions);
     }
 }

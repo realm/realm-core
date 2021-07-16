@@ -137,12 +137,6 @@ bool table_has_primary_key(const Table&);
 PrimaryKey primary_key_for_row(const Table&, ObjKey);
 PrimaryKey primary_key_for_row(const Obj&);
 
-/// Get the index of the row with the object ID.
-///
-/// \returns realm::npos if the object does not exist in the table.
-ObjKey row_for_object_id(const Table&, GlobalKey);
-Obj obj_for_object_id(const Table&, GlobalKey);
-
 ObjKey row_for_primary_key(const Table&, PrimaryKey);
 Obj obj_for_primary_key(const Table&, PrimaryKey);
 

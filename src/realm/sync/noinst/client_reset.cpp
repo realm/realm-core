@@ -29,8 +29,7 @@ struct ClientResetFailed {
 };
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-template <class T>
-bool _copy_list(Lst<T>& src, Lst<T>& dst)
+bool _copy_list(LstBasePtr src, LstBasePtr dst)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -42,85 +41,55 @@ bool _copy_list(Lst<T>& src, Lst<T>& dst)
     // The common prefix is abc. The common suffix is hi. xy is replaced by defg.
 
     bool updated = false;
-    size_t len_src = src.size();
-    size_t len_dst = dst.size();
+    size_t len_src = src->size();
+    size_t len_dst = dst->size();
     size_t len_min = std::min(len_src, len_dst);
 
     size_t ndx = 0;
     size_t suffix_len = 0;
 
-    while (ndx < len_min && src.get(ndx) == dst.get(ndx)) {
+    while (ndx < len_min && src->get_any(ndx) == dst->get_any(ndx)) {
         ndx++;
     }
 
     size_t suffix_len_max = len_min - ndx;
-    while (suffix_len < suffix_len_max && src.get(len_src - 1 - suffix_len) == dst.get(len_dst - 1 - suffix_len)) {
+    while (suffix_len < suffix_len_max &&
+           src->get_any(len_src - 1 - suffix_len) == dst->get_any(len_dst - 1 - suffix_len)) {
         suffix_len++;
     }
 
     len_min -= (ndx + suffix_len);
 
     for (size_t i = 0; i < len_min; i++) {
-        auto val = src.get(ndx);
-        if (dst.get(ndx) != val) {
-            dst.set(ndx, val);
+        auto val = src->get_any(ndx);
+        if (dst->get_any(ndx) != val) {
+            dst->set_any(ndx, val);
         }
         ndx++;
     }
 
     // New elements must be inserted in dst.
     while (len_dst < len_src) {
-        dst.insert(ndx, src.get(ndx));
+        dst->insert_any(ndx, src->get_any(ndx));
         len_dst++;
         ndx++;
         updated = true;
     }
     // Excess elements must be removed from ll_dst.
-    while (len_dst > len_src) {
-        len_dst--;
-        dst.remove(len_dst - suffix_len);
+    if (len_dst > len_src) {
+        dst->remove(len_src, len_dst); // FIXME: check this
         updated = true;
     }
 
-    REALM_ASSERT(dst.size() == len_src);
+    REALM_ASSERT(dst->size() == len_src);
     return updated;
-}
-
-template <class T>
-bool _copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
-{
-    auto src = src_obj.get_list<T>(src_col);
-    auto dst = dst_obj.get_list<T>(dst_col);
-    return _copy_list(src, dst);
 }
 
 bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
-    switch (src_col.get_type()) {
-        case col_type_Int:
-            if (src_col.get_attrs().test(col_attr_Nullable)) {
-                return _copy_list<util::Optional<Int>>(src_obj, src_col, dst_obj, dst_col);
-            }
-            else {
-                return _copy_list<Int>(src_obj, src_col, dst_obj, dst_col);
-            }
-        case col_type_Bool:
-            return _copy_list<util::Optional<Bool>>(src_obj, src_col, dst_obj, dst_col);
-        case col_type_Float:
-            return _copy_list<util::Optional<float>>(src_obj, src_col, dst_obj, dst_col);
-        case col_type_Double:
-            return _copy_list<util::Optional<double>>(src_obj, src_col, dst_obj, dst_col);
-        case col_type_String:
-            return _copy_list<String>(src_obj, src_col, dst_obj, dst_col);
-        case col_type_Binary:
-            return _copy_list<Binary>(src_obj, src_col, dst_obj, dst_col);
-        case col_type_Timestamp:
-            return _copy_list<Timestamp>(src_obj, src_col, dst_obj, dst_col);
-        default: // FIXME: add new types
-            break;
-    }
-    REALM_ASSERT(false);
-    return false;
+    LstBasePtr src = src_obj.get_listbase_ptr(src_col);
+    LstBasePtr dst = dst_obj.get_listbase_ptr(dst_col);
+    return _copy_list(std::move(src), std::move(dst));
 }
 
 bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_object_keys)
@@ -187,18 +156,6 @@ void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
         TableRef table = tr_dst.get_table(table_key);
         if (table->get_name().begins_with("class_")) {
             sync::erase_table(tr_dst, table);
-        }
-    }
-}
-
-void client_reset::clear_all_tables(Transaction& tr_dst, util::Logger& logger)
-{
-    logger.debug("remove_all_tables, dst size = %1", tr_dst.size());
-    // Remove the tables to be removed.
-    for (auto table_key : tr_dst.get_table_keys()) {
-        TableRef table = tr_dst.get_table(table_key);
-        if (table->get_name().begins_with("class_")) {
-            table->clear();
         }
     }
 }
@@ -500,9 +457,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     }
                     else {
                         ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
-                        GlobalKey target_oid = table_target_src->get_object_id(target_obj_key_src);
-                        ObjKey target_obj_key_dst = sync::row_for_object_id(*table_target_dst, target_oid);
-                        if (dst.get<ObjKey>(col_key_dst) != target_obj_key_dst) {
+                        auto target_pk_src = table_target_src->get_primary_key(target_obj_key_src);
+                        auto dst_obj_key = dst.get<ObjKey>(col_key_dst);
+                        if (!dst_obj_key ||
+                            target_pk_src != table_target_dst->get_primary_key(dst.get<ObjKey>(col_key_dst))) {
+                            ObjKey target_obj_key_dst = table_target_dst->get_objkey_from_primary_key(target_pk_src);
                             dst.set(col_key_dst, target_obj_key_dst);
                             updated = true;
                         }
