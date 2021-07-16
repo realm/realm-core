@@ -73,6 +73,7 @@ ForEachMacros:
   - SECTION
   - TEST_CASE
   - DYNAMIC_SECTION
+  - BENCHMARK
 IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
