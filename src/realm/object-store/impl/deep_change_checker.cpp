@@ -270,8 +270,21 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
                                   const std::vector<ColKey>& filtered_columns, size_t depth)
 {
-    // Arbitrary upper limit on the maximum depth to search
-    if (depth >= m_current_path.size()) {
+    TableKey table_key = table.get_key();
+
+    // First check if the object was modified directly. We skip this if we're
+    // looking at the root object because that check is done more efficiently
+    // in operator() before calling this.
+    if (depth > 0) {
+        auto it = m_info.tables.find(table_key.value);
+        if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
+            return true;
+    }
+
+    // The object wasn't modified, so we move onto checking for if it links to
+    // a modified object. This has an arbitrary maximum depth on how far it'll
+    // search for performance.
+    if (depth + 1 == m_current_path.size()) {
         // Don't mark any of the intermediate rows checked along the path as
         // not modified, as a search starting from them might hit a modification
         for (size_t i = 0; i < m_current_path.size(); ++i)
@@ -279,25 +292,16 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
         return false;
     }
 
-    TableKey table_key = table.get_key();
-
-    // If the pair (table_key.value, key) can be found in `m_info.tables` we can
-    // end the search and return here.
-    if (depth > 0) {
-        auto it = m_info.tables.find(table_key.value);
-        if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
-            return true;
-    }
-
-    // Look up the unmodified objects for the `table_key.value` and check if the
-    // `key` can be found within them. If so, we can return without checking the
-    // outgoing links.
+    // We may have already performed deep checking on this object and discovered
+    // that it is not possible to reach a modified object from it.
     auto& not_modified = m_not_modified[table_key.value];
     auto it = not_modified.find(object_key);
     if (it != not_modified.end())
         return false;
 
     bool ret = check_outgoing_links(table, ObjKey(object_key), filtered_columns, depth);
+    // If this object isn't modified and we didn't exceed the maximum search depth,
+    // cache that result to avoid having to repeat it.
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
         not_modified.insert(object_key);
     return ret;
@@ -305,13 +309,15 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
 
 bool DeepChangeChecker::operator()(ObjKeyType key)
 {
-    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
-    // anyway.
+    // First check if the root object was modified. We could skip this and do
+    // it in check_row(), but this skips a few lookups.
     if (m_root_object_changes &&
         m_root_object_changes->modifications_contains(key, m_filtered_columns_in_root_table)) {
         return true;
     }
 
+    // The object itself wasn't modified, so move on to check if any of the
+    // objects it links to were modified.
     return check_row(m_root_table, key, m_filtered_columns, 0);
 }
 
