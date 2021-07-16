@@ -2294,7 +2294,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 std::lock_guard<std::mutex> lk(sync_error_mutex);
                 return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
             },
-            std::chrono::minutes(2)));
+            std::chrono::minutes(5)));
 
         auto captured_error = [&] {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
