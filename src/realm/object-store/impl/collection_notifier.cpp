@@ -94,7 +94,7 @@ CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const&
 
 void CollectionNotifier::recalculate_key_path_array()
 {
-    m_key_path_array = {};
+    m_key_path_array.clear();
     m_all_callbacks_filtered = true;
     for (const auto& callback : m_callbacks) {
         const auto& key_path_array = callback.key_path_array;

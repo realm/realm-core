@@ -25,6 +25,15 @@
 using namespace realm;
 using namespace realm::_impl;
 
+namespace {
+template <typename T>
+void sort_and_unique(T& container)
+{
+    std::sort(container.begin(), container.end());
+    container.erase(std::unique(container.begin(), container.end()), container.end());
+}
+} // namespace
+
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_tables, Table const& table,
                                             const KeyPathArray& key_path_array)
 {
@@ -33,7 +42,12 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         std::vector<TableKey> forward_tables;
 
         std::vector<TableKey> backlink_tables;
+        bool processed_table = false;
     };
+
+    auto has_key_paths = std::any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
+        return key_path.size() > 0;
+    });
 
     // Build up the complete forward mapping from the back links.
     // Following forward link columns does not account for TypedLink
@@ -49,21 +63,24 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     for (auto key : all_table_keys) {
         auto cur_table = group->get_table(key);
         REALM_ASSERT(cur_table);
-        auto incoming_link_columns = cur_table->get_incoming_link_columns();
-        for (auto& incoming_link : incoming_link_columns) {
-            REALM_ASSERT(incoming_link.first);
-            auto& links = complete_mapping[incoming_link.first];
-            links.forward_links.push_back(incoming_link.second);
-            links.forward_tables.push_back(cur_table->get_key());
+
+        LinkInfo* backlinks = nullptr;
+        if (has_key_paths) {
+            backlinks = &complete_mapping[cur_table->get_key()];
         }
-        auto& backlinks = complete_mapping[cur_table->get_key()];
         cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
-            if (any_of(key_path_array.begin(), key_path_array.end(), [&](KeyPath key_path) {
+            auto origin_table_key = cur_table->get_opposite_table_key(backlink_col_key);
+            auto origin_link_col = cur_table->get_opposite_column(backlink_col_key);
+            auto& links = complete_mapping[origin_table_key];
+            links.forward_links.push_back(origin_link_col);
+            links.forward_tables.push_back(cur_table->get_key());
+
+            if (any_of(key_path_array.begin(), key_path_array.end(), [&](const KeyPath& key_path) {
                     return any_of(key_path.begin(), key_path.end(), [&](std::pair<TableKey, ColKey> pair) {
                         return pair.first == cur_table->get_key() && pair.second == backlink_col_key;
                     });
                 })) {
-                backlinks.backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
+                backlinks->backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
             }
             return false;
         });
@@ -72,58 +89,32 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     // Remove duplicates:
     // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
     // duplicates in connected_tables can occur when there are different link paths to the same table
-    for (auto& kv_pair : complete_mapping) {
-        auto& cols = kv_pair.second.forward_links;
-        std::sort(cols.begin(), cols.end());
-        cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
-        auto& tables = kv_pair.second.forward_tables;
-        std::sort(tables.begin(), tables.end());
-        tables.erase(std::unique(tables.begin(), tables.end()), tables.end());
+    for (auto& [_, info] : complete_mapping) {
+        sort_and_unique(info.forward_links);
+        sort_and_unique(info.forward_tables);
     }
-
-    auto get_out_relationships_for = [&related_tables](TableKey table_key) -> std::vector<ColKey>& {
-        auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-            return related_table.table_key == table_key;
-        });
-        if (it == related_tables.end()) {
-            it = related_tables.insert(related_tables.end(), {table_key, {}});
-        }
-        return it->links;
-    };
-    auto has_key_paths = std::any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
-        return key_path.size() > 0;
-    });
 
     std::vector<TableKey> tables_to_check = {table.get_key()};
     while (tables_to_check.size()) {
-        auto table_key_to_check = *tables_to_check.begin();
-        tables_to_check.erase(tables_to_check.begin());
+        auto table_key_to_check = tables_to_check.back();
+        tables_to_check.pop_back();
+        auto& link_info = complete_mapping[table_key_to_check];
+        if (link_info.processed_table) {
+            continue;
+        }
+        link_info.processed_table = true;
 
-        auto link_info = complete_mapping[table_key_to_check];
-        auto& out_relations = get_out_relationships_for(table_key_to_check);
-        auto& forward_links = complete_mapping[table_key_to_check].forward_links;
-        out_relations.insert(out_relations.end(), forward_links.begin(), forward_links.end());
+        related_tables.push_back({table_key_to_check, std::move(link_info.forward_links)});
 
         // Add all tables reachable via a forward link to the vector of tables that need to be checked
-        // if they have not been identified as a related table already.
         for (auto linked_table_key : link_info.forward_tables) {
-            auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-                return related_table.table_key == linked_table_key;
-            });
-            if (it == related_tables.end()) {
-                tables_to_check.push_back(linked_table_key);
-            }
+            tables_to_check.push_back(linked_table_key);
         }
 
+        // Backlinks can only come into consideration when added via key paths.
         if (has_key_paths) {
-            // Backlinks can only come into consideration when added via key paths.
             for (auto linked_table_key : link_info.backlink_tables) {
-                auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-                    return related_table.table_key == linked_table_key;
-                });
-                if (it == related_tables.end()) {
-                    tables_to_check.push_back(linked_table_key);
-                }
+                tables_to_check.push_back(linked_table_key);
             }
         }
     }
@@ -335,7 +326,7 @@ CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChange
 
 bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
-    std::vector<int64_t> changed_columns = {};
+    std::vector<int64_t> changed_columns;
 
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
@@ -488,7 +479,7 @@ ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo con
 
 std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
-    std::vector<int64_t> changed_columns = {};
+    std::vector<int64_t> changed_columns;
 
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);

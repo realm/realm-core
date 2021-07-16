@@ -206,7 +206,7 @@ public:
         Query,      // Backed by a query that has not yet been turned into a TableView
         TableView,  // Backed by a TableView created from a Query
     };
-    // Get the currrent mode of the Results
+    // Get the current mode of the Results
     // Ideally this would not be public but it's needed for some KVO stuff
     Mode get_mode() const noexcept REQUIRES(!m_mutex);
 
