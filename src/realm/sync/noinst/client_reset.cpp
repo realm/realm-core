@@ -2,6 +2,8 @@
 #include <vector>
 
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
+#include <realm/set.hpp>
 
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_parser.hpp>
@@ -77,7 +79,7 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
     }
     // Excess elements must be removed from ll_dst.
     if (len_dst > len_src) {
-        dst->remove(len_src, len_dst); // FIXME: check this
+        dst->remove(len_src - suffix_len, len_dst - suffix_len);
         updated = true;
     }
 
@@ -90,6 +92,118 @@ bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
     LstBasePtr src = src_obj.get_listbase_ptr(src_col);
     LstBasePtr dst = dst_obj.get_listbase_ptr(dst_col);
     return _copy_list(std::move(src), std::move(dst));
+}
+
+bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+{
+    SetBasePtr src = src_obj.get_setbase_ptr(src_col);
+    SetBasePtr dst = dst_obj.get_setbase_ptr(dst_col);
+
+    std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
+    constexpr bool ascending = true;
+    // the implementation could be storing elements in sorted order, but
+    // we don't assume that here.
+    src->sort(sorted_src, ascending);
+    dst->sort(sorted_dst, ascending);
+
+    size_t dst_ndx = 0;
+    for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
+        size_t ndx_in_src = sorted_src[src_ndx];
+        Mixed src_val = src->get_any(ndx_in_src);
+        while (dst_ndx < sorted_dst.size()) {
+            size_t ndx_in_dst = sorted_dst[dst_ndx];
+            Mixed dst_val = dst->get_any(ndx_in_dst);
+            int cmp = src_val.compare(dst_val); // FIXME: need to compare pks of objects not ObjKeys
+            if (cmp == 0) {
+                // equal: advance both src and dst
+                ++dst_ndx;
+                break;
+            }
+            else if (cmp < 0) {
+                // src < dst: insert src, advance src only
+                to_insert.push_back(ndx_in_src);
+                break;
+            }
+            else {
+                // src > dst: delete dst, advance only dst
+                to_delete.push_back(ndx_in_dst);
+                ++dst_ndx;
+                continue;
+            }
+        }
+        if (dst_ndx >= sorted_dst.size()) {
+            to_insert.push_back(ndx_in_src);
+        }
+    }
+    while (dst_ndx < sorted_dst.size()) {
+        to_delete.push_back(sorted_dst[dst_ndx++]);
+    }
+
+    std::sort(to_delete.begin(), to_delete.end());
+    for (auto it = to_delete.rbegin(); it != to_delete.rend(); ++it) {
+        dst->erase_any(dst->get_any(*it));
+    }
+    for (auto ndx : to_insert) {
+        dst->insert_any(src->get_any(ndx));
+    }
+    return to_delete.size() || to_insert.size();
+}
+
+bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+{
+    Dictionary src = src_obj.get_dictionary(src_col);
+    Dictionary dst = dst_obj.get_dictionary(dst_col);
+
+    std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
+    constexpr bool ascending = true;
+    src.sort_keys(sorted_src, ascending);
+    dst.sort_keys(sorted_dst, ascending);
+
+    size_t dst_ndx = 0;
+    for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
+        auto src_val = src.get_pair(sorted_src[src_ndx]);
+
+        while (dst_ndx < sorted_dst.size()) {
+            auto dst_val = dst.get_pair(sorted_dst[dst_ndx]);
+            int cmp = src_val.first.compare(dst_val.first);
+            if (cmp == 0) {
+                // FIXME: need to compare pks of objects not ObjKeys
+                cmp = src_val.second.compare(dst_val.second);
+            }
+            if (cmp == 0) {
+                // equal: advance both src and dst
+                ++dst_ndx;
+                break;
+            }
+            else if (cmp < 0) {
+                // src < dst: insert src, advance src only
+                to_insert.push_back(sorted_src[src_ndx]);
+                break;
+            }
+            else {
+                // src > dst: delete dst, advance only dst
+                to_delete.push_back(sorted_dst[dst_ndx]);
+                ++dst_ndx;
+                continue;
+            }
+        }
+        if (dst_ndx >= sorted_dst.size()) {
+            to_insert.push_back(sorted_src[src_ndx]);
+        }
+    }
+    while (dst_ndx < sorted_dst.size()) {
+        to_delete.push_back(sorted_dst[dst_ndx++]);
+    }
+
+    std::sort(to_delete.begin(), to_delete.end());
+    for (auto it = to_delete.rbegin(); it != to_delete.rend(); ++it) {
+        dst.erase(dst.begin() + *it);
+    }
+    for (auto ndx : to_insert) {
+        auto pair = src.get_pair(ndx);
+        dst.insert(pair.first, pair.second);
+    }
+    return to_delete.size() || to_insert.size();
 }
 
 bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_object_keys)
@@ -486,13 +600,23 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                         updated = true;
                     }
                 }
-                else if (col_key_src.get_attrs().test(col_attr_List)) {
+                else if (col_key_src.is_list()) {
                     if (copy_list(src, col_key_src, dst, col_key_dst)) {
                         updated = true;
                     }
                 }
+                else if (col_key_src.is_dictionary()) {
+                    if (copy_dictionary(src, col_key_src, dst, col_key_dst)) {
+                        updated = true;
+                    }
+                }
+                else if (col_key_src.is_set()) {
+                    if (copy_set(src, col_key_src, dst, col_key_dst)) {
+                        updated = true;
+                    }
+                }
                 else {
-                    REALM_ASSERT(!col_key_src.is_collection()); // FIXME: support for set/dictionary
+                    REALM_ASSERT(!col_key_src.is_collection());
                     auto val_src = src.get_any(col_key_src);
                     auto val_dst = dst.get_any(col_key_dst);
                     if (val_src != val_dst) {

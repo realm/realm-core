@@ -1465,7 +1465,9 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int
         {"test type",
          {{"_id", PropertyType::Int, Property::IsPrimary{true}},
           //{"value", TestType::property_type()},
-          {"primitive list", PropertyType::Array | TestType::property_type()}}},
+          {"list", PropertyType::Array | TestType::property_type()},
+          {"dictionary", PropertyType::Dictionary | TestType::property_type()},
+          {"set", PropertyType::Set | TestType::property_type()}}},
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
@@ -1508,12 +1510,33 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int
     };
 
     auto check_list = [&](Obj obj, std::vector<T> expected) {
-        ColKey col = obj.get_table()->get_column_key("primitive list");
+        ColKey col = obj.get_table()->get_column_key("list");
         auto actual = obj.get_list_values<T>(col);
         REQUIRE(actual == expected);
     };
 
-    SECTION("modify") {
+    auto check_dictionary = [&](Obj obj, std::vector<std::pair<std::string, Mixed>> expected) {
+        ColKey col = obj.get_table()->get_column_key("dictionary");
+        Dictionary dict = obj.get_dictionary(col);
+        REQUIRE(dict.size() == expected.size());
+        for (auto pair : expected) {
+            auto it = dict.find(pair.first);
+            REQUIRE(it != dict.end());
+            REQUIRE((*it).second == pair.second);
+        }
+    };
+
+    auto check_set = [&](Obj obj, std::vector<Mixed> expected) {
+        ColKey col = obj.get_table()->get_column_key("set");
+        SetBasePtr set = obj.get_setbase_ptr(col);
+        REQUIRE(set->size() == expected.size());
+        for (auto value : expected) {
+            auto ndx = set->find_any(value);
+            REQUIRE(ndx != realm::not_found);
+        }
+    };
+
+    SECTION("lists") {
         REQUIRE(values.size() >= 2);
         REQUIRE(values[0] != values[1]);
         int64_t pk_val = 0;
@@ -1521,39 +1544,290 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int
             auto table = get_table(realm, "test type");
             REQUIRE(table);
             auto obj = table->create_object_with_primary_key(pk_val);
-            ColKey col = table->get_column_key("primitive list");
+            ColKey col = table->get_column_key("list");
             obj.template set_list_values<T>(col, {values[0]});
         });
-        auto realm = trigger_client_reset([](auto&) {},
-                                          [&](auto& remote_realm) {
-                                              auto table = get_table(remote_realm, "test type");
-                                              REQUIRE(table);
-                                              REQUIRE(table->size() == 1);
-                                              ColKey col = table->get_column_key("primitive list");
-                                              table->begin()->template set_list_values<T>(col, {values[1]});
-                                          });
-        setup_listeners(realm);
 
-        REQUIRE_NOTHROW(advance_and_notify(*realm));
-        CHECK(results.size() == 1);
-        CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
-        CHECK(object.is_valid());
-        check_list(results.get<Obj>(0), {values[0]});
-        check_list(object.obj(), {values[0]});
+        auto reset_list = [&](std::vector<T> local_state, std::vector<T> remote_state) {
+            auto realm = trigger_client_reset(
+                [&](auto& local_realm) {
+                    auto table = get_table(local_realm, "test type");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    ColKey col = table->get_column_key("list");
+                    table->begin()->template set_list_values<T>(col, local_state);
+                },
+                [&](auto& remote_realm) {
+                    auto table = get_table(remote_realm, "test type");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    ColKey col = table->get_column_key("list");
+                    table->begin()->template set_list_values<T>(col, remote_state);
+                });
+            setup_listeners(realm);
 
-        wait_for_upload(*realm);
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(advance_and_notify(*realm));
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+            CHECK(results.size() == 1);
+            CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
+            CHECK(object.is_valid());
+            check_list(results.get<Obj>(0), local_state);
+            check_list(object.obj(), local_state);
 
-        CHECK(results.size() == 1);
-        CHECK(object.is_valid());
-        check_list(results.get<Obj>(0), {values[1]});
-        check_list(object.obj(), {values[1]});
-        REQUIRE_INDICES(results_changes.modifications, 0);
-        REQUIRE_INDICES(results_changes.insertions);
-        REQUIRE_INDICES(results_changes.deletions);
-        REQUIRE_INDICES(object_changes.modifications, 0);
-        REQUIRE_INDICES(object_changes.insertions);
-        REQUIRE_INDICES(object_changes.deletions);
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+            CHECK(results.size() == 1);
+            CHECK(object.is_valid());
+            check_list(results.get<Obj>(0), remote_state);
+            check_list(object.obj(), remote_state);
+            if (local_state == remote_state) {
+                REQUIRE_INDICES(results_changes.modifications);
+                REQUIRE_INDICES(object_changes.modifications);
+            }
+            else {
+                REQUIRE_INDICES(results_changes.modifications, 0);
+                REQUIRE_INDICES(object_changes.modifications, 0);
+            }
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
+        };
+
+        SECTION("modify") {
+            reset_list({values[0]}, {values[1]});
+        }
+        SECTION("modify opposite") {
+            reset_list({values[1]}, {values[0]});
+        }
+        SECTION("empty remote") {
+            reset_list({values[1], values[0], values[1]}, {});
+        }
+        SECTION("empty local") {
+            reset_list({}, {values[0], values[1]});
+        }
+        SECTION("empty both") {
+            reset_list({}, {});
+        }
+        SECTION("equal suffix") {
+            reset_list({values[0], values[0], values[1]}, {values[0], values[1]});
+        }
+        SECTION("equal prefix") {
+            reset_list({values[0]}, {values[0], values[1], values[1]});
+        }
+        SECTION("equal lists") {
+            reset_list({values[0]}, {values[0]});
+        }
+        SECTION("equal middle") {
+            reset_list({values[0], values[1], values[0]}, {values[1], values[1], values[1]});
+        }
+    }
+
+    SECTION("dictionary") {
+        REQUIRE(values.size() >= 2);
+        REQUIRE(values[0] != values[1]);
+        int64_t pk_val = 0;
+        std::string dict_key = "hello";
+        setup([&](auto& realm) {
+            auto table = get_table(realm, "test type");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            ColKey col = table->get_column_key("dictionary");
+            Dictionary dict = obj.get_dictionary(col);
+            dict.insert(dict_key, Mixed{values[0]});
+        });
+
+        auto reset_dictionary = [&](std::vector<std::pair<std::string, Mixed>> local_state,
+                                    std::vector<std::pair<std::string, Mixed>> remote_state) {
+            auto realm = trigger_client_reset(
+                [&](auto& local_realm) {
+                    auto table = get_table(local_realm, "test type");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    ColKey col = table->get_column_key("dictionary");
+                    Dictionary dict = table->begin()->get_dictionary(col);
+                    for (auto pair : local_state) {
+                        dict.insert(pair.first, pair.second);
+                    }
+                    for (auto it = dict.begin(); it != dict.end(); ++it) {
+                        auto found = std::any_of(local_state.begin(), local_state.end(), [&](auto pair) {
+                            return Mixed{pair.first} == (*it).first && Mixed{pair.second} == (*it).second;
+                        });
+                        if (!found) {
+                            dict.erase(it);
+                        }
+                    }
+                },
+                [&](auto& remote_realm) {
+                    auto table = get_table(remote_realm, "test type");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    ColKey col = table->get_column_key("dictionary");
+                    Dictionary dict = table->begin()->get_dictionary(col);
+                    for (auto pair : remote_state) {
+                        dict.insert(pair.first, pair.second);
+                    }
+                    for (auto it = dict.begin(); it != dict.end(); ++it) {
+                        auto found = std::any_of(remote_state.begin(), remote_state.end(), [&](auto pair) {
+                            return Mixed{pair.first} == (*it).first && Mixed{pair.second} == (*it).second;
+                        });
+                        if (!found) {
+                            dict.erase(it);
+                        }
+                    }
+                });
+            setup_listeners(realm);
+
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+            CHECK(results.size() == 1);
+            CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
+            CHECK(object.is_valid());
+            check_dictionary(results.get<Obj>(0), local_state);
+            check_dictionary(object.obj(), local_state);
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+            CHECK(results.size() == 1);
+            CHECK(object.is_valid());
+            check_dictionary(results.get<Obj>(0), remote_state);
+            check_dictionary(object.obj(), remote_state);
+            if (local_state == remote_state) {
+                REQUIRE_INDICES(results_changes.modifications);
+                REQUIRE_INDICES(object_changes.modifications);
+            }
+            else {
+                REQUIRE_INDICES(results_changes.modifications, 0);
+                REQUIRE_INDICES(object_changes.modifications, 0);
+            }
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
+        };
+
+        SECTION("modify") {
+            reset_dictionary({{dict_key, Mixed{values[0]}}}, {{dict_key, Mixed{values[1]}}});
+        }
+        SECTION("modify opposite") {
+            reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
+        }
+        SECTION("empty remote") {
+            reset_dictionary({{dict_key, Mixed{values[1]}}}, {});
+        }
+        SECTION("empty local") {
+            reset_dictionary({}, {{dict_key, Mixed{values[1]}}});
+        }
+        SECTION("extra values on remote") {
+            reset_dictionary({{dict_key, Mixed{values[0]}}}, {{dict_key, Mixed{values[0]}},
+                                                              {"world", Mixed{values[1]}},
+                                                              {"foo", Mixed{values[1]}},
+                                                              {"aaa", Mixed{values[0]}}});
+        }
+    }
+
+    SECTION("set") {
+        int64_t pk_val = 0;
+
+        auto reset_set = [&](std::vector<Mixed> local_state, std::vector<Mixed> remote_state) {
+            auto realm = trigger_client_reset(
+                [&local_state](auto& local_realm) {
+                    auto table = get_table(local_realm, "test type");
+                    REQUIRE(table);
+                    ColKey col = table->get_column_key("set");
+                    SetBasePtr set = table->begin()->get_setbase_ptr(col);
+                    for (size_t i = set->size(); i > 0; --i) {
+                        Mixed si = set->get_any(i - 1);
+                        if (std::find(local_state.begin(), local_state.end(), si) == local_state.end()) {
+                            set->erase_any(si);
+                        }
+                    }
+                    for (auto e : local_state) {
+                        set->insert_any(e);
+                    }
+                },
+                [&remote_state](auto& remote_realm) {
+                    auto table = get_table(remote_realm, "test type");
+                    REQUIRE(table);
+                    ColKey col = table->get_column_key("set");
+                    SetBasePtr set = table->begin()->get_setbase_ptr(col);
+                    for (size_t i = set->size(); i > 0; --i) {
+                        Mixed si = set->get_any(i - 1);
+                        if (std::find(remote_state.begin(), remote_state.end(), si) == remote_state.end()) {
+                            set->erase_any(si);
+                        }
+                    }
+                    for (auto e : remote_state) {
+                        set->insert_any(e);
+                    }
+                });
+            setup_listeners(realm);
+
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+            CHECK(results.size() == 1);
+            CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
+            CHECK(object.is_valid());
+            check_set(results.get<Obj>(0), local_state);
+            check_set(object.obj(), local_state);
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+            REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+            CHECK(results.size() == 1);
+            CHECK(object.is_valid());
+            check_set(results.get<Obj>(0), remote_state);
+            check_set(object.obj(), remote_state);
+            if (local_state == remote_state) {
+                REQUIRE_INDICES(results_changes.modifications);
+                REQUIRE_INDICES(object_changes.modifications);
+            }
+            else {
+                REQUIRE_INDICES(results_changes.modifications, 0);
+                REQUIRE_INDICES(object_changes.modifications, 0);
+            }
+            REQUIRE_INDICES(results_changes.insertions);
+            REQUIRE_INDICES(results_changes.deletions);
+            REQUIRE_INDICES(object_changes.insertions);
+            REQUIRE_INDICES(object_changes.deletions);
+        };
+
+        REQUIRE(values.size() >= 2);
+        REQUIRE(values[0] != values[1]);
+        setup([&](auto& realm) {
+            auto table = get_table(realm, "test type");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            ColKey col = table->get_column_key("set");
+            SetBasePtr set = obj.get_setbase_ptr(col);
+            set->insert_any(Mixed{values[0]});
+        });
+
+        SECTION("modify") {
+            reset_set({{values[0]}}, {{values[1]}});
+        }
+        SECTION("modify opposite") {
+            reset_set({{values[1]}}, {{values[0]}});
+        }
+        SECTION("empty remote") {
+            reset_set({{values[1]}, {values[0]}}, {});
+        }
+        SECTION("empty local") {
+            reset_set({}, {{values[0]}, {values[1]}});
+        }
+        SECTION("empty both") {
+            reset_set({}, {});
+        }
+        SECTION("equal suffix") {
+            reset_set({{values[0]}, {values[1]}}, {{values[1]}});
+        }
+        SECTION("equal prefix") {
+            reset_set({{values[0]}}, {{values[1]}, {values[0]}});
+        }
+        SECTION("equal lists") {
+            reset_set({{values[0]}, {values[1]}}, {{values[0]}, {values[1]}});
+        }
     }
 }
