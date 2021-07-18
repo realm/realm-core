@@ -73,7 +73,7 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     if (!c.moves.empty() || !c.deletions.empty() || !c.insertions.empty()) {
         auto it = std::remove_if(begin(moves), end(moves), [&](auto& old) {
             // Check if the moved row was moved again, and if so just update the destination
-            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
+            auto it = std::find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
                 return old.to == m.from;
             });
             if (it != c.moves.end()) {

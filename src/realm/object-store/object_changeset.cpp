@@ -67,9 +67,29 @@ bool ObjectChangeSet::insertions_contains(ObjectKeyType obj) const
     return m_insertions.count(obj) > 0;
 }
 
-bool ObjectChangeSet::modifications_contains(ObjectKeyType obj) const
+bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vector<ColKey>& filtered_column_keys) const
 {
-    return m_modifications.count(obj) > 0;
+    // If there is no filter we just check if the object in question was changed which means its key (`obj`)
+    // can be found within the `m_modifications`.
+    if (filtered_column_keys.size() == 0) {
+        return m_modifications.count(obj) > 0;
+    }
+
+    // If a filter is set but the `obj` is not contained within the `m_modifcations` at all we do not need to check
+    // further.
+    if (m_modifications.count(obj) == 0) {
+        return false;
+    }
+
+    // If a filter was set we need to check if the changed column is part of this filter.
+    const std::unordered_set<ColKeyType>& changed_columns_for_object = m_modifications.at(obj);
+    for (const auto& column_key_in_filter : filtered_column_keys) {
+        if (changed_columns_for_object.count(column_key_in_filter.value)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 const ObjectChangeSet::ObjectSet* ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const

@@ -18,6 +18,7 @@
 
 #include <realm/object-store/impl/collection_notifier.hpp>
 
+#include <realm/object-store/impl/deep_change_checker.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
@@ -31,14 +32,13 @@ using namespace realm::_impl;
 
 bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo const& info) const noexcept
 {
-    // Check if any of the tables accessible from the root table were
-    // actually modified. This can be false if there were only insertions, or
-    // deletions which were not linked to by any row in the linking table
-    auto table_modified = [&](auto& outgoing_linkset) {
-        auto it = info.tables.find(outgoing_linkset.table_key.value);
-        return it != info.tables.end() && !it->second.modifications_empty();
+    // Check if any of the tables accessible from the root table were actually modified.
+    // This includes insertions which need to be checked to catch modifications via a backlink.
+    auto check_related_table = [&](auto& related_table) {
+        auto it = info.tables.find(related_table.table_key.value);
+        return it != info.tables.end() && (!it->second.modifications_empty() || !it->second.insertions_empty());
     };
-    return any_of(begin(m_related_tables), end(m_related_tables), table_modified);
+    return any_of(begin(m_related_tables), end(m_related_tables), check_related_table);
 }
 
 std::function<bool(ObjectChangeSet::ObjectKeyType)>
@@ -53,14 +53,73 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         };
     }
 
-    if (m_related_tables.size() == 1) {
-        auto& object_set = info.tables.find(m_related_tables.begin()->table_key.value)->second;
+    // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
+    // In this case we do not need a `DeepChangeChecker` and check the modifications using the
+    // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
+        auto root_table_key = m_related_tables[0].table_key;
+        auto& object_change_set = info.tables.find(root_table_key.value)->second;
         return [&](ObjectChangeSet::ObjectKeyType object_key) {
-            return object_set.modifications_contains(object_key);
+            return object_change_set.modifications_contains(object_key, {});
         };
     }
 
-    return DeepChangeChecker(info, *root_table, m_related_tables);
+    if (all_callbacks_filtered()) {
+        return CollectionKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array,
+                                              m_all_callbacks_filtered);
+    }
+    else if (any_callbacks_filtered()) {
+        // In case we have some callbacks, we need to combine the unfiltered `DeepChangeChecker` with
+        // the filtered `CollectionKeyPathChangeChecker` to make sure we send all expected notifications.
+        CollectionKeyPathChangeChecker key_path_checker(info, *root_table, m_related_tables, m_key_path_array,
+                                                        m_all_callbacks_filtered);
+        DeepChangeChecker deep_change_checker(info, *root_table, m_related_tables, m_key_path_array,
+                                              m_all_callbacks_filtered);
+        return [key_path_checker = std::move(key_path_checker), deep_change_checker = std::move(deep_change_checker)](
+                   ObjectChangeSet::ObjectKeyType object_key) mutable {
+            return key_path_checker(object_key) || deep_change_checker(object_key);
+        };
+    }
+
+    return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
+}
+
+std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
+CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
+{
+    return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array,
+                                      m_all_callbacks_filtered);
+}
+
+void CollectionNotifier::recalculate_key_path_array()
+{
+    m_key_path_array = {};
+    m_all_callbacks_filtered = true;
+    for (const auto& callback : m_callbacks) {
+        const auto& key_path_array = callback.key_path_array;
+        if (key_path_array.size() == 0) {
+            m_all_callbacks_filtered = false;
+        }
+        for (const auto& key_path : key_path_array) {
+            m_key_path_array.push_back(key_path);
+        }
+    }
+}
+
+bool CollectionNotifier::any_callbacks_filtered() const noexcept
+{
+    return any_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
+        return callback.key_path_array.size() > 0;
+    });
+}
+
+
+bool CollectionNotifier::all_callbacks_filtered() const noexcept
+{
+    return all_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
+        return callback.key_path_array.size() > 0;
+    });
 }
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
@@ -81,13 +140,14 @@ void CollectionNotifier::release_data() noexcept
     m_sg = nullptr;
 }
 
-uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
+uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array)
 {
     m_realm->verify_thread();
 
     util::CheckedLockGuard lock(m_callback_mutex);
     auto token = m_next_token++;
-    m_callbacks.push_back({std::move(callback), {}, {}, token, false, false});
+    m_callbacks.push_back({std::move(callback), {}, {}, std::move(key_path_array), token, false, false});
+    m_did_modify_callbacks = true;
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();
         m_have_callbacks = true;
@@ -99,7 +159,7 @@ void CollectionNotifier::remove_callback(uint64_t token)
 {
     // the callback needs to be destroyed after releasing the lock as destroying
     // it could cause user code to be called
-    Callback old;
+    NotificationCallback old;
     {
         util::CheckedLockGuard lock(m_callback_mutex);
         auto it = find_callback(token);
@@ -116,6 +176,7 @@ void CollectionNotifier::remove_callback(uint64_t token)
 
         old = std::move(*it);
         m_callbacks.erase(it);
+        m_did_modify_callbacks = true;
 
         m_have_callbacks = !m_callbacks.empty();
     }
@@ -142,11 +203,11 @@ void CollectionNotifier::suppress_next_notification(uint64_t token)
     }
 }
 
-std::vector<CollectionNotifier::Callback>::iterator CollectionNotifier::find_callback(uint64_t token)
+std::vector<NotificationCallback>::iterator CollectionNotifier::find_callback(uint64_t token)
 {
     REALM_ASSERT(m_error || m_callbacks.size() > 0);
 
-    auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
+    auto it = std::find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
         return c.token == token;
     });
     // We should only fail to find the callback if it was removed due to an error
@@ -174,7 +235,9 @@ std::unique_lock<std::mutex> CollectionNotifier::lock_target()
 void CollectionNotifier::set_table(ConstTableRef table)
 {
     m_related_tables.clear();
-    DeepChangeChecker::find_related_tables(m_related_tables, *table);
+    util::CheckedLockGuard lock(m_callback_mutex);
+    recalculate_key_path_array();
+    DeepChangeChecker::find_related_tables(m_related_tables, *table, m_key_path_array);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
@@ -183,9 +246,20 @@ void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
         return;
     }
 
+    // Create an entry in the `TransactionChangeInfo` for every table in `m_related_tables`.
     info.tables.reserve(m_related_tables.size());
     for (auto& tbl : m_related_tables)
         info.tables[tbl.table_key.value];
+}
+
+void CollectionNotifier::update_related_tables(Table const& table)
+{
+    m_related_tables.clear();
+    recalculate_key_path_array();
+    DeepChangeChecker::find_related_tables(m_related_tables, table, m_key_path_array);
+    // We deactivate the `m_did_modify_callbacks` toggle to make sure the recalculation is only done when
+    // necessary.
+    m_did_modify_callbacks = false;
 }
 
 void CollectionNotifier::prepare_handover()
@@ -202,6 +276,7 @@ void CollectionNotifier::prepare_handover()
     util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks)
         REALM_ASSERT(!callback.skip_next);
+    m_did_modify_callbacks = true;
 #endif
 }
 
