@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Removed the unused ChangesetCooker from the sync client. ([#4811](https://github.com/realm/realm-core/pull/4811))
 
 ----------------------------------------------
 
