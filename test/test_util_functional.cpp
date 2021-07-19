@@ -52,6 +52,7 @@ TEST(Util_UniqueFunction)
     CHECK(static_cast<bool>(func_moved));
     CHECK(!function_called);
     func_moved();
+    CHECK(function_called);
     CHECK(func_moved);
 }
 
