@@ -2309,6 +2309,62 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: custom user data integration tests", "[sync][app]") {
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+    auto app_session = create_app(default_app_config(base_url));
+
+    auto app_config = App::Config{app_session.client_app_id,
+                                  factory,
+                                  base_url,
+                                  util::none,
+                                  Optional<std::string>("A Local App Version"),
+                                  util::none,
+                                  "Object Store Platform Tests",
+                                  "Object Store Platform Version Blah",
+                                  "An sdk version"};
+
+    SECTION("custom user data happy path") {
+        TestSyncManager sync_manager(app_config);
+        auto app = sync_manager.app();
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> the_user;
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         CHECK(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                         the_user = user;
+                                     });
+
+        CHECK(processed);
+        processed = false;
+        CHECK(the_user->user_profile().data().empty());
+
+        app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
+                           [&](auto error, auto response) {
+                               CHECK(error == none);
+                               CHECK(response);
+                               CHECK(*response == true);
+                               processed = true;
+                           });
+        CHECK(processed);
+        processed = false;
+        app->refresh_custom_data(the_user, [&](auto) {
+            processed = true;
+        });
+        CHECK(processed);
+        auto data = *the_user->custom_data();
+        CHECK(data["favorite_color"] == "green");
+    }
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 class CustomErrorTransport : public GenericNetworkTransport {
@@ -2396,62 +2452,6 @@ static nlohmann::json user_profile_json(std::string user_id = random_string(15),
              {{{"id", identity_0_id}, {"provider_type", provider_type}, {"provider_id", "lol"}},
               {{"id", identity_1_id}, {"provider_type", "lol_wut"}, {"provider_id", "nah_dawg"}}}},
             {"data", profile_0}};
-}
-
-TEST_CASE("app: custom user data integration tests", "[sync][app]") {
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
-        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-    };
-    std::string base_url = get_base_url();
-    const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
-    auto app_session = create_app(default_app_config(base_url));
-
-    auto app_config = App::Config{app_session.client_app_id,
-                                  factory,
-                                  base_url,
-                                  util::none,
-                                  Optional<std::string>("A Local App Version"),
-                                  util::none,
-                                  "Object Store Platform Tests",
-                                  "Object Store Platform Version Blah",
-                                  "An sdk version"};
-
-    SECTION("custom user data happy path") {
-        TestSyncManager sync_manager(app_config);
-        auto app = sync_manager.app();
-
-        bool processed = false;
-
-        std::shared_ptr<SyncUser> the_user;
-        app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-                                         CHECK(user);
-                                         CHECK(!error);
-                                         processed = true;
-                                         the_user = user;
-                                     });
-
-        CHECK(processed);
-        processed = false;
-        CHECK(the_user->user_profile().data().empty());
-
-        app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
-                           [&](auto error, auto response) {
-                               CHECK(error == none);
-                               CHECK(response);
-                               CHECK(*response == true);
-                               processed = true;
-                           });
-        CHECK(processed);
-        processed = false;
-        app->refresh_custom_data(the_user, [&](auto) {
-            processed = true;
-        });
-        CHECK(processed);
-        auto data = *the_user->custom_data();
-        CHECK(data["favorite_color"] == "green");
-    }
 }
 
 // MARK: - Unit Tests
