@@ -627,6 +627,7 @@ let headers: [String] = [
     "realm/util/fixed_size_buffer.hpp",
     "realm/util/flat_map.hpp",
     "realm/util/from_chars.hpp",
+    "realm/util/functional.hpp",
     "realm/util/function_ref.hpp",
     "realm/util/get_file_size.hpp",
     "realm/util/hex_dump.hpp",

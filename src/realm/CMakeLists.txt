@@ -217,6 +217,7 @@ set(REALM_INSTALL_HEADERS
     util/file_mapper.hpp
     util/fixed_size_buffer.hpp
     util/function_ref.hpp
+    util/functional.hpp
     util/hex_dump.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp

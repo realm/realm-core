@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* Added UniqueFunction type ([#4815](https://github.com/realm/realm-core/pull/4815))
 
 ----------------------------------------------
 
