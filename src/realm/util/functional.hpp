@@ -82,10 +82,10 @@ public:
         // requirements are met.  They must be concrete parameters not template parameters to work
         // around bugs in some compilers that we presently use.  We may be able to revisit this
         // design after toolchain upgrades for C++17.
-        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> = makeTag(),
-        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = makeTag(),
-        std::enable_if_t<!std::is_same<std::decay_t<Functor>, UniqueFunction>::value, TagType> = makeTag())
-        : impl(makeImpl(std::forward<Functor>(functor)))
+        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> = make_tag(),
+        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = make_tag(),
+        std::enable_if_t<!std::is_same<std::decay_t<Functor>, UniqueFunction>::value, TagType> = make_tag())
+        : impl(make_impl(std::forward<Functor>(functor)))
     {
     }
 
@@ -117,7 +117,7 @@ public:
 private:
     // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
     // a static member function that initializes that default parameter.
-    static TagType makeTag()
+    static TagType make_tag()
     {
         return {};
     }
@@ -129,21 +129,23 @@ private:
 
     // These overload helpers are needed to squelch problems in the `T ()` -> `void ()` case.
     template <typename Functor>
-    static void callRegularVoid(const std::true_type isVoid, Functor& f, Args&&... args)
+    static void call_regular_void(const std::true_type is_void, Functor& f, Args&&... args)
     {
         // The result of this call is not cast to void, to help preserve detection of
         // `[[nodiscard]]` violations.
+        static_cast<void>(is_void);
         f(std::forward<Args>(args)...);
     }
 
     template <typename Functor>
-    static RetType callRegularVoid(const std::false_type isNotVoid, Functor& f, Args&&... args)
+    static RetType call_regular_void(const std::false_type is_not_void, Functor& f, Args&&... args)
     {
+        static_cast<void>(is_not_void);
         return f(std::forward<Args>(args)...);
     }
 
     template <typename Functor>
-    static auto makeImpl(Functor&& functor)
+    static auto make_impl(Functor&& functor)
     {
         struct SpecificImpl : Impl {
             explicit SpecificImpl(Functor&& func)
@@ -153,7 +155,7 @@ private:
 
             RetType call(Args&&... args) override
             {
-                return callRegularVoid(std::is_void<RetType>(), f, std::forward<Args>(args)...);
+                return call_regular_void(std::is_void<RetType>(), f, std::forward<Args>(args)...);
             }
 
             std::decay_t<Functor> f;
