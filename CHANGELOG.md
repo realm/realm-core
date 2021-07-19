@@ -6,11 +6,10 @@
   Multiple key path filters can be provided when adding a single notification callback.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* User profile now correctly persists between runs.
  
 ### Breaking changes
-* None.
+* User profile fields are now methods instead of fields.
 
 -----------
 
