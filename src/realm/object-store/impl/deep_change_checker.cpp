@@ -150,75 +150,95 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     }
 }
 
-template <typename T>
-bool DeepChangeChecker::do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value,
+bool DeepChangeChecker::do_check_mixed_for_link(Group& group, TableRef& cached_linked_table, Mixed value,
                                                 const std::vector<ColKey>& filtered_columns, size_t depth)
 {
-    if (value.is_type(type_TypedLink)) {
-        auto link = value.get_link();
-        if (!link.is_unresolved()) {
-            if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
-                REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+    if (!value.is_type(type_TypedLink)) {
+        return false;
+    }
+    auto link = value.get_link();
+    if (link.is_unresolved()) {
+        return false;
+    }
+
+    if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+        cached_linked_table = group.get_table(link.get_table_key());
+        REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+    }
+    return check_row(*cached_linked_table, link.get_obj_key().value, filtered_columns, depth + 1);
+}
+
+template <typename T>
+bool DeepChangeChecker::check_collection(ref_type ref, const Obj& obj, ColKey col,
+                                         const std::vector<ColKey>& filtered_columns, size_t depth)
+{
+    BPlusTree<T> bp(obj.get_alloc());
+    bp.init_from_ref(ref);
+    size_t size = bp.size();
+    if (size == 0) {
+        return false;
+    }
+
+    if constexpr (std::is_same_v<ObjKey, T>) {
+        auto target = obj.get_table()->get_link_target(col);
+        for (size_t i = 0; i < size; ++i) {
+            auto key = bp.get(i);
+            if (key && !key.is_unresolved() && check_row(*target, key.value, filtered_columns, depth + 1)) {
+                return true;
             }
-            return check_row(*cached_linked_table, link.get_obj_key().value, filtered_columns, depth + 1);
+        }
+    }
+    else {
+        static_cast<void>(col); // older gcc warns about things used in only one branch of if constexpr
+        TableRef cached_linked_table;
+        Group& group = *obj.get_table()->get_parent_group();
+        for (size_t i = 0; i < size; ++i) {
+            if (do_check_mixed_for_link(group, cached_linked_table, bp.get(i), filtered_columns, depth)) {
+                return true;
+            }
         }
     }
     return false;
 }
 
-template <typename T>
-bool DeepChangeChecker::do_check_for_collection_of_mixed(T* coll, const std::vector<ColKey>& filtered_columns,
-                                                         size_t depth)
-{
-    TableRef cached_linked_table;
-    return std::any_of(coll->begin(), coll->end(), [&](auto value) {
-        return do_check_mixed_for_link(coll, cached_linked_table, value, filtered_columns, depth);
-    });
-}
-
-bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll,
+bool DeepChangeChecker::do_check_for_collection_modifications(const Obj& obj, ColKey col,
                                                               const std::vector<ColKey>& filtered_columns,
                                                               size_t depth)
 {
-    REALM_ASSERT(coll);
-    if (auto lst = dynamic_cast<LnkLst*>(coll.get())) {
-        TableRef target = lst->get_target_table();
-        return std::any_of(lst->begin(), lst->end(), [&](auto key) {
-            return check_row(*target, key.value, filtered_columns, depth + 1);
-        });
+    auto ref = Obj::Internal::get_ref(obj, col);
+    if (!ref) {
+        return false;
     }
-    else if (auto list = dynamic_cast<Lst<Mixed>*>(coll.get())) {
-        return do_check_for_collection_of_mixed(list, filtered_columns, depth);
+
+    if (col.get_type() == col_type_LinkList || (col.is_set() && col.get_type() == col_type_Link)) {
+        return check_collection<ObjKey>(ref, obj, col, filtered_columns, depth);
     }
-    else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
+
+    if ((col.is_set() || col.is_list()) && col.get_type() == col_type_Mixed) {
+        return check_collection<Mixed>(ref, obj, col, filtered_columns, depth);
+    }
+
+    if (col.is_dictionary()) {
+        auto dict = obj.get_dictionary(col);
         TableRef cached_linked_table;
-        return std::any_of(dict->begin(), dict->end(), [&](auto key_value_pair) {
+        auto& group = *obj.get_table()->get_parent_group();
+        return std::any_of(dict.begin(), dict.end(), [&](auto key_value_pair) {
             Mixed value = key_value_pair.second;
             // Here we rely on Dictionaries storing all links as a TypedLink
             // even if the dictionary is set to a single object type.
             REALM_ASSERT(!value.is_type(type_Link));
-            return do_check_mixed_for_link(dict, cached_linked_table, value, filtered_columns, depth);
+            return do_check_mixed_for_link(group, cached_linked_table, value, filtered_columns, depth);
         });
     }
-    else if (auto set = dynamic_cast<LnkSet*>(coll.get())) {
-        auto target = set->get_target_table();
-        REALM_ASSERT(target);
-        return std::any_of(set->begin(), set->end(), [&](auto obj_key) {
-            return obj_key && check_row(*target, obj_key.value, filtered_columns, depth + 1);
-        });
-    }
-    else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
-        return do_check_for_collection_of_mixed(set, filtered_columns, depth);
-    }
+
     // at this point, we have not handled all datatypes
     REALM_UNREACHABLE();
-    return false;
 }
 
 bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
                                              const std::vector<ColKey>& filtered_columns, size_t depth)
 {
+    REALM_ASSERT(depth < m_current_path.size());
     auto table_key = table.get_key();
 
     // First we create an iterator pointing at the table identified by `table_key` within the `m_related_tables`.
@@ -252,15 +272,14 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
     auto linked_object_changed = [&](ColKey const& outgoing_link_column) {
         if (already_checking(outgoing_link_column))
             return false;
-        if (!outgoing_link_column.is_collection()) {
-            ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
-            if (!dst_key) // do not descend into a null or unresolved link
-                return false;
-            return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, filtered_columns,
-                             depth + 1);
+        if (outgoing_link_column.is_collection()) {
+            return do_check_for_collection_modifications(obj, outgoing_link_column, filtered_columns, depth);
         }
-        auto collection_ptr = obj.get_collection_ptr(outgoing_link_column);
-        return do_check_for_collection_modifications(std::move(collection_ptr), filtered_columns, depth);
+
+        ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
+        if (!dst_key) // do not descend into a null or unresolved link
+            return false;
+        return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, filtered_columns, depth + 1);
     };
 
     // Check the `links` of all `m_related_tables` and return true if any of them has a `linked_object_changed`.

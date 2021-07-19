@@ -2309,4 +2309,9 @@ ColKey Obj::get_primary_key_column() const
     return m_table->get_primary_key_column();
 }
 
+ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
+{
+    return to_ref(obj._get<int64_t>(col_key.get_index()));
+}
+
 } // namespace realm
