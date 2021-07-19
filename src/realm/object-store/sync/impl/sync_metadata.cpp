@@ -626,7 +626,10 @@ SyncUserProfile SyncUserMetadata::profile() const
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
-    StringData result = m_obj.get<String>(m_schema.idx_profile_dump);
+    StringData result = m_obj.get<String>("profile_data");
+    if (result.size() == 0) {
+        return SyncUserProfile();
+    }
     return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string(result))));
 }
 

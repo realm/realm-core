@@ -2345,7 +2345,6 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
 
         CHECK(processed);
         processed = false;
-        CHECK(the_user->user_profile().data().empty());
 
         app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
                            [&](auto error, auto response) {
@@ -2742,34 +2741,63 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                   "Object Store Platform Tests",
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
+        auto base_path = util::make_temp_dir() + app_name;
+        {
+            auto conf = TestSyncManager::Config(config);
+            conf.should_teardown_test_directory = false;
+            conf.base_path = base_path;
+            TestSyncManager tsm(conf, {});
+            auto app = tsm.app();
 
-        TestSyncManager tsm(TestSyncManager::Config(config), {});
-        auto app = tsm.app();
+            app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                         [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                CHECK(user);
+                CHECK(!error);
 
-        app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                         CHECK(user);
-                                         CHECK(!error);
+                CHECK(user->identities().size() == 2);
+                CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
+                CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
+                SyncUserProfile user_profile = user->user_profile();
 
-                                         CHECK(user->identities().size() == 2);
-                                         CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
-                                         CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
-                                         SyncUserProfile user_profile = user->user_profile();
+                CHECK(user_profile.name() == profile_0_name);
+                CHECK(user_profile.first_name() == profile_0_first_name);
+                CHECK(user_profile.last_name() == profile_0_last_name);
+                CHECK(user_profile.email() == profile_0_email);
+                CHECK(user_profile.picture_url() == profile_0_picture_url);
+                CHECK(user_profile.gender() == profile_0_gender);
+                CHECK(user_profile.birthday() == profile_0_birthday);
+                CHECK(user_profile.min_age() == profile_0_min_age);
+                CHECK(user_profile.max_age() == profile_0_max_age);
 
-                                         CHECK(user_profile.name() == profile_0_name);
-                                         CHECK(user_profile.first_name() == profile_0_first_name);
-                                         CHECK(user_profile.last_name() == profile_0_last_name);
-                                         CHECK(user_profile.email() == profile_0_email);
-                                         CHECK(user_profile.picture_url() == profile_0_picture_url);
-                                         CHECK(user_profile.gender() == profile_0_gender);
-                                         CHECK(user_profile.birthday() == profile_0_birthday);
-                                         CHECK(user_profile.min_age() == profile_0_min_age);
-                                         CHECK(user_profile.max_age() == profile_0_max_age);
+                processed = true;
+            });
 
-                                         processed = true;
-                                     });
+            CHECK(processed);
+        }
+        App::clear_cached_apps();
+        // assert everything is stored properly between runs
+        {
+            auto conf = TestSyncManager::Config(config);
+            conf.base_path = base_path;
+            TestSyncManager tsm(conf, {});
+            auto app = tsm.app();
+            REQUIRE(app->all_users().size() == 1);
+            auto user = app->all_users()[0];
+            CHECK(user->identities().size() == 2);
+            CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
+            CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
+            SyncUserProfile user_profile = user->user_profile();
 
-        CHECK(processed);
+            CHECK(user_profile.name() == profile_0_name);
+            CHECK(user_profile.first_name() == profile_0_first_name);
+            CHECK(user_profile.last_name() == profile_0_last_name);
+            CHECK(user_profile.email() == profile_0_email);
+            CHECK(user_profile.picture_url() == profile_0_picture_url);
+            CHECK(user_profile.gender() == profile_0_gender);
+            CHECK(user_profile.birthday() == profile_0_birthday);
+            CHECK(user_profile.min_age() == profile_0_min_age);
+            CHECK(user_profile.max_age() == profile_0_max_age);
+        }
     }
 
     SECTION("login_anonymous bad") {

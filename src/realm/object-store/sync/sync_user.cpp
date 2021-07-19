@@ -108,9 +108,11 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         metadata->set_access_token(m_access_token.token);
         metadata->set_device_id(m_device_id);
         m_local_identity = metadata->local_uuid();
+        this->m_user_profile = metadata->profile();
     });
     if (!updated)
         m_local_identity = m_identity;
+    
 }
 
 SyncUser::~SyncUser() {}
