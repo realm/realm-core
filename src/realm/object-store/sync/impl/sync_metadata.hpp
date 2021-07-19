@@ -70,11 +70,12 @@ public:
         // The identities for this user.
         ColKey idx_identities;
         // The profile for this user.
-        ColKey idx_profile;
+        ColKey idx_profile_deprecated;
         // The current state of this user.
         ColKey idx_state;
         // The device id of this user.
         ColKey idx_device_id;
+        ColKey idx_profile_dump;
     };
 
     // Cannot be set after creation.
@@ -95,6 +96,7 @@ public:
     std::string device_id() const;
     void set_device_id(const std::string&);
 
+    SyncUserProfile profile() const;
     void set_user_profile(const SyncUserProfile&);
 
     void set_state(SyncUser::State);

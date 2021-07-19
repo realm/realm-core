@@ -75,23 +75,6 @@ RealmJWT::RealmJWT(std::string&& token)
     }
 }
 
-SyncUserProfile::SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
-                                 util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
-                                 util::Optional<std::string> last_name, util::Optional<std::string> gender,
-                                 util::Optional<std::string> birthday, util::Optional<std::string> min_age,
-                                 util::Optional<std::string> max_age)
-    : name(std::move(name))
-    , email(std::move(email))
-    , picture_url(std::move(picture_url))
-    , first_name(std::move(first_name))
-    , last_name(std::move(last_name))
-    , gender(std::move(gender))
-    , birthday(std::move(birthday))
-    , min_age(std::move(min_age))
-    , max_age(std::move(max_age))
-{
-}
-
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
     : id(id)
     , provider_type(provider_type)
@@ -125,6 +108,7 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         metadata->set_access_token(m_access_token.token);
         metadata->set_device_id(m_device_id);
         m_local_identity = metadata->local_uuid();
+        this->m_user_profile = metadata->profile();
     });
     if (!updated)
         m_local_identity = m_identity;
