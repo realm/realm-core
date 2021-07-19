@@ -263,10 +263,6 @@ public:
     {
         return true;
     }
-    bool clear_table(size_t = 0) noexcept
-    {
-        return true;
-    }
     bool list_set(size_t)
     {
         return true;
@@ -291,11 +287,15 @@ public:
     {
         return true;
     }
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -308,6 +308,10 @@ public:
         return true;
     }
     bool set_clear(size_t)
+    {
+        return true;
+    }
+    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -453,6 +457,26 @@ public:
             m_active_collection->clear(old_size);
         return true;
     }
+    bool dictionary_insert(size_t index, Mixed)
+    {
+        if (m_active_collection) {
+            m_active_collection->insert(index);
+        }
+        return true;
+    }
+    bool dictionary_set(size_t index, Mixed)
+    {
+        if (m_active_collection) {
+            m_active_collection->modify(index);
+        }
+        return true;
+    }
+    bool dictionary_erase(size_t index, Mixed)
+    {
+        if (m_active_collection)
+            m_active_collection->erase(index);
+        return true;
+    }
 
     bool create_object(ObjKey key)
     {
@@ -491,18 +515,6 @@ public:
         return true;
     }
 
-    bool clear_table(size_t old_size)
-    {
-        auto cur_table = current_table();
-        if (m_active_table)
-            m_active_table->clear(old_size);
-        auto it = remove_if(begin(m_info.lists), end(m_info.lists), [&](auto const& lv) {
-            return lv.table_key == cur_table;
-        });
-        m_info.lists.erase(it, end(m_info.lists));
-        return true;
-    }
-
     bool insert_column(ColKey)
     {
         m_info.schema_changed = true;
@@ -510,6 +522,12 @@ public:
     }
 
     bool insert_group_level_table(TableKey)
+    {
+        m_info.schema_changed = true;
+        return true;
+    }
+
+    bool typed_link_change(ColKey, TableKey)
     {
         m_info.schema_changed = true;
         return true;

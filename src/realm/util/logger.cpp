@@ -18,7 +18,11 @@
 
 #include <realm/util/logger.hpp>
 
-const char* realm::util::Logger::get_level_prefix(Level level) noexcept
+#include <iostream>
+
+namespace realm::util {
+
+const char* Logger::get_level_prefix(Level level) noexcept
 {
     switch (level) {
         case Level::all:
@@ -38,3 +42,28 @@ const char* realm::util::Logger::get_level_prefix(Level level) noexcept
     }
     return "";
 }
+
+void StderrLogger::do_log(Level level, const std::string& message)
+{
+    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
+    std::cerr.flush();                                       // Throws
+}
+
+void StreamLogger::do_log(Level level, const std::string& message)
+{
+    m_out << get_level_prefix(level) << message << '\n'; // Throws
+    m_out.flush();                                       // Throws
+}
+
+void ThreadSafeLogger::do_log(Level level, const std::string& message)
+{
+    LockGuard l(m_mutex);
+    Logger::do_log(m_base_logger, level, message); // Throws
+}
+
+void PrefixLogger::do_log(Level level, const std::string& message)
+{
+    Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
+}
+
+} // namespace realm::util

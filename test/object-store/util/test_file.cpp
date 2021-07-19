@@ -123,7 +123,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config->error_handler = [](auto, auto) {
         abort();
     };
-    schema_mode = SchemaMode::Additive;
+    schema_mode = SchemaMode::AdditiveExplicit;
 }
 
 // MARK: - SyncServer
@@ -222,8 +222,8 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport_generator) {
-        app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
-            REALM_ASSERT_RELEASE(false);
+        app_config.transport_generator = [this] {
+            return transport_generator();
         };
     }
 
@@ -248,11 +248,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     util::try_make_dir(m_base_file_path);
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
-#if TEST_ENABLE_SYNC_LOGGING
-    sc_config.log_level = util::Logger::Level::all;
-#else
-    sc_config.log_level = util::Logger::Level::off;
-#endif
+    sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
 
     m_app = app::App::get_shared_app(app_config, sc_config);
     m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) +

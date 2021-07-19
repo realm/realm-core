@@ -108,6 +108,9 @@ public:
     // disabled afterwards, and currently is incompatible with automatic failover.
     void enable_session_multiplexing();
 
+    // Destroys the sync manager, terminates all sessions created by it, and stops its SyncClient.
+    ~SyncManager();
+
     // Sets the log level for the Sync Client.
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.
@@ -220,6 +223,13 @@ public:
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
+
+protected:
+    friend class SyncUser;
+    friend class SyncSesson;
+
+    using std::enable_shared_from_this<SyncManager>::shared_from_this;
+    using std::enable_shared_from_this<SyncManager>::weak_from_this;
 
 private:
     friend class app::App;

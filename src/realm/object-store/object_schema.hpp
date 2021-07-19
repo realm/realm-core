@@ -43,9 +43,9 @@ public:
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
-                 std::initializer_list<Property> computed_properties);
+                 std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
-                 std::initializer_list<Property> computed_properties);
+                 std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ~ObjectSchema();
 
     ObjectSchema(ObjectSchema const&) = default;
@@ -63,6 +63,7 @@ public:
     std::string primary_key;
     TableKey table_key;
     IsEmbedded is_embedded = false;
+    std::string alias;
 
     Property* property_for_public_name(StringData public_name) noexcept;
     const Property* property_for_public_name(StringData public_name) const noexcept;
@@ -83,6 +84,7 @@ public:
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
+    static PropertyType from_core_type(ColumnType type);
     static PropertyType from_core_type(ColKey col);
 
 private:

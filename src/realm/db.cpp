@@ -27,19 +27,20 @@
 #include <type_traits>
 #include <random>
 
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/group_writer.hpp>
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/replication.hpp>
+#include <realm/set.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/errno.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file_mapper.hpp>
-#include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/thread.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/replication.hpp>
-#include <realm/table_view.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/disable_sync_to_disk.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -79,7 +80,12 @@ const uint16_t relaxed_sync_threshold = 50;
 //  9      Fair write transactions requires an additional condition variable,
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
-const uint_fast16_t g_shared_info_version = 10;
+// 11      New impl of InterprocessCondVar on windows.
+#ifdef _WIN32
+const uint_fast16_t g_shared_info_version = 11;
+#else
+const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anything on non-windows platforms
+#endif
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -508,7 +514,6 @@ struct alignas(8) DB::SharedInfo {
     InterprocessMutex::SharedPart shared_balancemutex;
 #endif
     InterprocessMutex::SharedPart shared_controlmutex;
-    // FIXME: windows pthread support for condvar not ready
     InterprocessCondVar::SharedPart room_to_write;
     InterprocessCondVar::SharedPart work_to_do;
     InterprocessCondVar::SharedPart daemon_becomes_ready;
@@ -567,11 +572,6 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 // eternal constancy of this part of the layout is what ensures that a
 // joining session participant can reliably verify that the actual format is
 // as expected.
-//
-// offsetof() is undefined for non-pod types but often behaves correct.
-// Since we just use it in static_assert(), a bug is caught at compile time
-// which isn't critical. FIXME: See if there is a way to fix this, but it
-// might not be trivial since it contains RobustMutex members and others
 #ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -621,9 +621,9 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 namespace {
 
 #ifdef REALM_ASYNC_DAEMON
-// FIXME: Async commits unsupported
 void spawn_daemon(const std::string& file)
 {
+    REALM_ASSERT(false); // this code is currently not maintained.
     // determine maximum number of open descriptors
     errno = 0;
     int m = int(sysconf(_SC_OPEN_MAX));
@@ -643,8 +643,8 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        // FIXME: Do we want to always open the log file? Should it be configurable?
-        i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        auto core_files = DB::get_core_files(file);
+        i = ::open((core_files[DB::CoreFileType::Log].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -696,7 +696,6 @@ void spawn_daemon(const std::string& file)
         if (!WIFEXITED(status))
             throw std::runtime_error("failed starting async commit (exit)");
         if (WEXITSTATUS(status) == 1) {
-            // FIXME: Or `ld` could not find a required shared library
             throw std::runtime_error("async commit daemon not found");
         }
         if (WEXITSTATUS(status) == 2)
@@ -743,8 +742,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
 
-    // FIXME: Assess the exception safety of this function.
-
     REALM_ASSERT(!is_attached());
 
 #ifndef REALM_ASYNC_DAEMON
@@ -753,11 +750,23 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #endif
 
     m_db_path = path;
-    m_coordination_dir = path + ".management";
-    m_lockfile_path = path + ".lock";
-    try_make_dir(m_coordination_dir);
-    m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_alloc;
+    if (options.is_immutable) {
+        SlabAlloc::Config cfg;
+        cfg.read_only = true;
+        cfg.no_create = true;
+        cfg.encryption_key = options.encryption_key;
+        auto top_ref = alloc.attach_file(path, cfg);
+        SlabAlloc::DetachGuard dg(alloc);
+        Group::read_only_version_check(alloc, top_ref, path);
+        m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, m_alloc.get_baseline());
+        dg.release();
+        return;
+    }
+    auto core_files = DB::get_core_files(path);
+    m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
+    m_coordination_dir = core_files[DB::CoreFileType::Management].first;
+    m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
 #if REALM_METRICS
@@ -799,7 +808,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
-        m_file.set_fifo_path(m_coordination_dir + "/lock.fifo");
+        m_file.set_fifo_path(m_coordination_dir, "lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -839,6 +848,15 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #else
         m_file.lock_shared(); // Throws
 #endif
+        // The coordination/management dir is created as a side effect of the lock
+        // operation above if needed for lock emulation. But it may also be needed
+        // for other purposes, so make sure it exists.
+        // in worst case there'll be a race on creating this directory.
+        // This should be safe but a waste of resources.
+        // Unfortunately it cannot be created at an earlier point, because
+        // it may then be deleted during the above lock_shared() operation.
+        try_make_dir(m_coordination_dir);
+
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or
@@ -875,10 +893,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
 
-// offsetof() is undefined for non-pod types but often behaves correct.
-// Since we just use it in static_assert(), a bug is caught at compile time
-// which isn't critical. FIXME: See if there is a way to fix this, but it
-// might not be trivial since it contains RobustMutex members and others
 #ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -942,22 +956,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                << ".";
             throw IncompatibleLockFile(ss.str());
         }
-
-        // Even though fields match wrt alignment and size, there may still be
-        // incompatibilities between implementations, so lets ask one of the
-        // mutexes if it thinks it'll work.
-        //
-        // FIXME: Calling util::RobustMutex::is_valid() on a mutex object of
-        // unknown, and possibly invalid state has undefined behaviour, and is
-        // therfore dangerous. It should not be done.
-        //
-        // FIXME: This check tries to lock the mutex, and only unlocks it if the
-        // return value is zero. If pthread_mutex_trylock() fails with
-        // EOWNERDEAD, this leads to deadlock during the following propper
-        // attempt to lock. This cannot be fixed by also unlocking on failure
-        // with EOWNERDEAD, because that would mark the mutex as consistent
-        // again and prevent us from being notified below.
-
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
 #ifdef REALM_ASYNC_DAEMON
         if (info->durability == static_cast<uint16_t>(Durability::Async))
@@ -976,6 +974,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         // - attachment of the database file
         // - start of the async daemon
         // - stop of the async daemon
+        // - restore of a backup, if desired
+        // - backup of the realm file in preparation of file format upgrade
         // - DB beginning/ending a session
         // - Waiting for and signalling database changes
         {
@@ -1015,27 +1015,33 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
-                if (top_ref) {
-                    alloc.note_reader_start(this);
-                    auto handler = [this, &alloc]() noexcept {
-                        alloc.note_reader_end(this);
-                    };
-                    auto reader_end_guard = make_scope_exit(handler);
-                    Array top{alloc};
-                    top.init_from_ref(top_ref);
-                    Group::validate_top_array(top, alloc);
-                }
             }
             catch (const SlabAlloc::Retry&) {
+                // On a SlabAlloc::Retry file mappings are already unmapped, no
+                // need to do more
                 continue;
             }
-            catch (InvalidDatabase& e) {
-                if (e.get_path().empty()) {
-                    e.set_path(path);
-                }
-                throw;
+
+            // Determine target file format version for session (upgrade
+            // required if greater than file format version of attached file).
+            current_file_format_version = alloc.get_committed_file_format_version();
+            target_file_format_version =
+                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
+            BackupHandler backup(path, options.accepted_versions, options.to_be_deleted);
+            if (backup.must_restore_from_backup(current_file_format_version)) {
+                // we need to unmap before any file ops that'll change the realm
+                // file:
+                // (only strictly needed for Windows)
+                alloc.detach();
+                backup.restore_from_backup();
+                // finally, retry with the restored file instead of the original
+                // one:
+                continue;
             }
-            // If we fail in any way, we must detach the allocator.
+            backup.cleanup_backups();
+
+            // From here on, if we fail in any way, we must detach the
+            // allocator.
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
@@ -1044,37 +1050,44 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             };
             auto reader_end_guard = make_scope_exit(handler);
 
-            // Determine target file format version for session (upgrade
-            // required if greater than file format version of attached file).
+            // Check validity of top array (to give more meaningful errors
+            // early)
+            if (top_ref) {
+                try {
+                    alloc.note_reader_start(this);
+                    auto reader_end_guard = make_scope_exit([&]() noexcept {
+                        alloc.note_reader_end(this);
+                    });
+                    Array top{alloc};
+                    top.init_from_ref(top_ref);
+                    Group::validate_top_array(top, alloc);
+                }
+                catch (InvalidDatabase& e) {
+                    if (e.get_path().empty()) {
+                        e.set_path(path);
+                    }
+                    throw;
+                }
+            }
+            if (options.backup_at_file_format_change) {
+                backup.backup_realm_if_needed(current_file_format_version, target_file_format_version);
+            }
             using gf = _impl::GroupFriend;
-            current_file_format_version = alloc.get_committed_file_format_version();
-
-            bool file_format_ok = false;
+            bool file_format_ok;
             // In shared mode (Realm file opened via a DB instance) this
             // version of the core library is able to open Realms using file format
             // versions listed below. Please see Group::get_file_format_version() for
             // information about the individual file format versions.
-            switch (current_file_format_version) {
-                case 0:
-                    file_format_ok = (top_ref == 0);
-                    break;
-                case 6:
-                case 7:
-                case 8:
-                case 9:
-                case 10:
-                case 11:
-                case 20:
-                    file_format_ok = true;
-                    break;
+            if (current_file_format_version == 0) {
+                file_format_ok = (top_ref == 0);
+            }
+            else {
+                file_format_ok = backup.is_accepted_file_format(current_file_format_version);
             }
 
             if (REALM_UNLIKELY(!file_format_ok)) {
                 throw UnsupportedFileFormatVersion(current_file_format_version);
             }
-
-            target_file_format_version =
-                Group::get_target_file_format_version_for_session(current_file_format_version, openers_hist_type);
 
             if (begin_new_session) {
                 // Determine version (snapshot number) and check history
@@ -1218,7 +1231,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << info->file_format_version << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
@@ -1258,7 +1271,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                             spawn_daemon(path);
                             info->daemon_started = 1;
                         }
-                        // FIXME: It might be more robust to sleep a little, then restart the loop
                         // std::cerr << "Waiting for daemon" << std::endl;
                         m_daemon_becomes_ready.wait(m_controlmutex, 0);
                         // std::cerr << " - notified" << std::endl;
@@ -1324,8 +1336,17 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         close();
         throw;
     }
+
+    m_alloc.set_read_only(true);
 }
 
+void DB::open(BinaryData buffer, bool take_ownership)
+{
+    auto top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size());
+    m_fake_read_lock_if_immutable = ReadLockInfo::make_fake(top_ref, buffer.size());
+    if (take_ownership)
+        m_alloc.own_buffer();
+}
 
 void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
@@ -1360,7 +1381,8 @@ void DB::open(Replication& repl, const DBOptions options)
 
 
 // WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
-// corrupt your database if something fails
+// corrupt your database if something fails.
+// Tracked by https://github.com/realm/realm-core/issues/4111
 
 // A note about lock ordering.
 // The local mutex, m_mutex, guards transaction start/stop and map/unmap of the lock file.
@@ -1385,6 +1407,7 @@ void DB::open(Replication& repl, const DBOptions options)
 // transaction. The user must ensure that this race never happens if she uses DB::close().
 bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
 
     // To enter compact, the DB object must already have been attached to a file,
@@ -1430,7 +1453,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             File file;
             file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
             int incr = bump_version_number ? 1 : 0;
-            tr->write(file, write_key, info->latest_version_number + incr, true); // Throws
+            Group::DefaultTableWriter writer;
+            tr->write(file, write_key, info->latest_version_number + incr, writer); // Throws
             // Data needs to be flushed to the disk before renaming.
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
@@ -1485,8 +1509,43 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
+void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
+{
+    SharedInfo* info = m_file_map.get_addr();
+    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
+
+    auto tr = start_read();
+    if (auto hist = tr->get_history()) {
+        if (!hist->no_pending_local_changes(tr->get_version())) {
+            throw std::runtime_error("Could not write file as not all client changes are integrated in server");
+        }
+    }
+
+    class NoClientFileIdWriter : public Group::DefaultTableWriter {
+    public:
+        NoClientFileIdWriter()
+            : Group::DefaultTableWriter(true)
+        {
+        }
+        HistoryInfo write_history(_impl::OutputStream& out) override
+        {
+            auto hist = Group::DefaultTableWriter::write_history(out);
+            hist.sync_file_id = 0;
+            return hist;
+        }
+    } writer;
+
+    File file;
+    file.open(path, File::access_ReadWrite, allow_overwrite ? File::create_Auto : File::create_Must, 0);
+    file.resize(0);
+
+    tr->write(file, write_key, info->latest_version_number, writer);
+}
+
 uint_fast64_t DB::get_number_of_versions()
 {
+    if (m_fake_read_lock_if_immutable)
+        return 1;
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
@@ -1508,6 +1567,7 @@ DB::~DB() noexcept
 
 void DB::release_all_read_locks() noexcept
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
     SharedInfo* r_info = m_reader_map.get_addr();
     for (auto& read_lock : m_local_locks_held) {
@@ -1523,8 +1583,24 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
-    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
-                   allow_open_read_transactions);
+    if (m_fake_read_lock_if_immutable) {
+        if (!is_attached())
+            return;
+        {
+            std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+            if (!allow_open_read_transactions && m_transaction_count)
+                throw LogicError(LogicError::wrong_transact_state);
+        }
+        if (m_alloc.is_attached())
+            m_alloc.detach();
+        if (m_replication)
+            m_replication->terminate_session();
+        m_fake_read_lock_if_immutable.reset();
+    }
+    else {
+        close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
+                       allow_open_read_transactions);
+    }
 }
 
 void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
@@ -1597,12 +1673,15 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
 
 bool DB::has_changed(TransactionRef tr)
 {
+    if (m_fake_read_lock_if_immutable)
+        return false; // immutable doesn't change
     bool changed = tr->m_read_lock.m_version != get_version_of_latest_snapshot();
     return changed;
 }
 
 bool DB::wait_for_change(TransactionRef tr)
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     SharedInfo* info = m_file_map.get_addr();
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     while (tr->m_read_lock.m_version == info->latest_version_number && m_wait_for_change_enabled) {
@@ -1614,6 +1693,8 @@ bool DB::wait_for_change(TransactionRef tr)
 
 void DB::wait_for_change_release()
 {
+    if (m_fake_read_lock_if_immutable)
+        return;
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = false;
     m_new_commit_available.notify_all();
@@ -1622,6 +1703,7 @@ void DB::wait_for_change_release()
 
 void DB::enable_wait_for_change()
 {
+    REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<InterprocessMutex> lock(m_controlmutex);
     m_wait_for_change_enabled = true;
 }
@@ -1721,10 +1803,10 @@ void DB::do_async_commits()
             std::cerr << "Syncing from version " << m_read_lock.m_version << " to " << next_read_lock.m_version
                       << std::endl;
 #endif
-/* FIXME
+
             GroupWriter writer(m_group);
             writer.commit(next_read_lock.m_top_ref);
-            */
+
 #ifdef REALM_ENABLE_LOGFILE
             std::cerr << "..and Done" << std::endl;
 #endif
@@ -1854,6 +1936,9 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
 
 void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 {
+    // ignore if opened with immutable file (then we have no lockfile)
+    if (m_fake_read_lock_if_immutable)
+        return;
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     bool found_match = false;
     // simple linear search and move-last-over if a match is found.
@@ -2034,7 +2119,7 @@ void DB::finish_begin_write()
 
         // if we are running low on write slots, kick the sync daemon
         if (info->free_write_slots < relaxed_sync_threshold)
-            m_work_to_do.notify();
+            m_work_to_do.notify_all();
         // if we are out of write slots, wait for the sync daemon to catch up
         while (info->free_write_slots <= 0) {
             m_room_to_write.wait(m_balancemutex, 0);
@@ -2044,6 +2129,8 @@ void DB::finish_begin_write()
         m_balancemutex.unlock();
     }
 #endif // REALM_ASYNC_DAEMON
+
+    m_alloc.set_read_only(false);
 }
 
 
@@ -2054,6 +2141,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
 }
@@ -2091,7 +2179,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-DB::version_type Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read()
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2123,7 +2211,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 
-    return version;
+    return VersionID{version, new_read_lock.m_reader_idx};
 }
 
 // Caller must lock m_mutex.
@@ -2146,8 +2234,10 @@ bool DB::grow_reader_mapping(uint_fast32_t index)
 }
 
 
-DB::version_type DB::get_version_of_latest_snapshot()
+VersionID DB::get_version_id_of_latest_snapshot()
 {
+    if (m_fake_read_lock_if_immutable)
+        return {m_fake_read_lock_if_immutable->m_version, 0};
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
     // mutex, another thread may be performing changes to the ringbuffer
@@ -2170,14 +2260,19 @@ DB::version_type DB::get_version_of_latest_snapshot()
         // while we read it.
         const Ringbuffer::ReadCount& r = r_info->readers.get(index);
         if (!atomic_double_inc_if_even(r.count)) {
-
             continue;
         }
-        version_type version = r.version;
+        VersionID version{r.version, index};
         // release the entry again:
         atomic_double_dec(r.count);
         return version;
     }
+}
+
+
+DB::version_type DB::get_version_of_latest_snapshot()
+{
+    return get_version_id_of_latest_snapshot().version;
 }
 
 
@@ -2299,24 +2394,19 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 void DB::reserve(size_t size)
 {
     REALM_ASSERT(is_attached());
-    // FIXME: There is currently no synchronization between this and
-    // concurrent commits in progress. This is so because it is
-    // believed that the OS guarantees race free behavior when
-    // util::File::prealloc_if_supported() (posix_fallocate() on
-    // Linux) runs concurrently with modfications via a memory map of
-    // the file. This assumption must be verified though.
     m_alloc.reserve_disk_space(size); // Throws
 }
 #endif
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto lockfile_path(realm_path + ".lock");
+    auto core_files = DB::get_core_files(realm_path);
+    auto lockfile_path(core_files[DB::CoreFileType::Lock].first);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
-    lockfile.set_fifo_path(realm_path + ".management/lock.fifo");
+    lockfile.set_fifo_path(realm_path + ".management", "lock.fifo");
     if (lockfile.try_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
@@ -2324,15 +2414,21 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::vector<std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::unordered_map<DB::CoreFileType, std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
 {
-    std::vector<std::pair<std::string, bool>> files;
-    files.emplace_back(std::make_pair(realm_path, false));
-    files.emplace_back(std::make_pair(realm_path + ".management", true));
-    return files;
+    std::unordered_map<CoreFileType, std::pair<std::string, bool>> core_files;
+
+    core_files[DB::CoreFileType::Lock] = std::make_pair(realm_path + ".lock", false);
+    core_files[DB::CoreFileType::Storage] = std::make_pair(realm_path, false);
+    core_files[DB::CoreFileType::Management] = std::make_pair(realm_path + ".management", true);
+    core_files[DB::CoreFileType::Note] = std::make_pair(realm_path + ".note", false);
+    core_files[DB::CoreFileType::Log] = std::make_pair(realm_path + ".log", false);
+    core_files[DB::CoreFileType::LogA] = std::make_pair(realm_path + ".log_a", false);
+    core_files[DB::CoreFileType::LogB] = std::make_pair(realm_path + ".log_b", false);
+
+    return core_files;
 }
 
-// FIXME: Extend to provide recycling of transaction objects?
 void TransactionDeleter(Transaction* t)
 {
     t->close();
@@ -2343,12 +2439,18 @@ TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id);
-    ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+    Transaction* tr;
+    if (m_fake_read_lock_if_immutable) {
+        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
+    }
+    else {
+        ReadLockInfo read_lock;
+        grab_read_lock(read_lock, version_id);
+        ReadLockGuard g(*this, read_lock);
+        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+        g.release();
+    }
     tr->set_file_format_version(get_file_format_version());
-    g.release();
     return TransactionRef(tr, TransactionDeleter);
 }
 
@@ -2356,12 +2458,18 @@ TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    ReadLockInfo read_lock;
-    grab_read_lock(read_lock, version_id);
-    ReadLockGuard g(*this, read_lock);
-    Transaction* tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+    Transaction* tr;
+    if (m_fake_read_lock_if_immutable) {
+        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
+    }
+    else {
+        ReadLockInfo read_lock;
+        grab_read_lock(read_lock, version_id);
+        ReadLockGuard g(*this, read_lock);
+        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+        g.release();
+    }
     tr->set_file_format_version(get_file_format_version());
-    g.release();
     return TransactionRef(tr, TransactionDeleter);
 }
 
@@ -2563,9 +2671,12 @@ DB::VersionID Transaction::get_version_of_current_transaction()
 
 TransactionRef DB::start_write(bool nonblocking)
 {
+    if (m_fake_read_lock_if_immutable) {
+        REALM_ASSERT(false && "Can't write an immutable DB");
+    }
     if (nonblocking) {
-        bool succes = do_try_begin_write();
-        if (!succes) {
+        bool success = do_try_begin_write();
+        if (!success) {
             return TransactionRef();
         }
     }
@@ -2587,8 +2698,9 @@ TransactionRef DB::start_write(bool nonblocking)
         ReadLockGuard g(*this, read_lock);
         tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
+        version_type current_version = read_lock.m_version;
+        m_alloc.init_mapping_management(current_version);
         if (Replication* repl = get_replication()) {
-            version_type current_version = read_lock.m_version;
             bool history_updated = false;
             repl->initiate_transact(*tr, current_version, history_updated); // Throws
         }
@@ -2638,6 +2750,15 @@ LstBasePtr Transaction::import_copy_of(const LstBase& original)
     return {};
 }
 
+SetBasePtr Transaction::import_copy_of(const SetBase& original)
+{
+    if (Obj obj = import_copy_of(original.get_obj())) {
+        ColKey ck = original.get_col_key();
+        return obj.get_setbase_ptr(ck);
+    }
+    return {};
+}
+
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
     if (Obj obj = import_copy_of(original.get_obj())) {
@@ -2655,6 +2776,30 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
         ColKey ck = original->get_col_key();
         return obj.get_linklist_ptr(ck);
     }
+    return std::make_unique<LnkLst>();
+}
+
+LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_obj())) {
+        ColKey ck = original->get_col_key();
+        return obj.get_linkset_ptr(ck);
+    }
+    return std::make_unique<LnkSet>();
+}
+
+LinkCollectionPtr Transaction::import_copy_of(const LinkCollectionPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_owning_obj())) {
+        ColKey ck = original->get_owning_col_key();
+        return obj.get_linkcollection_ptr(ck);
+    }
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
     return std::make_unique<LnkLst>();
 }
 
@@ -2700,6 +2845,15 @@ DBRef DB::create(Replication& repl, const DBOptions options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(repl, options);
+    return retval;
+}
+
+DBRef DB::create(BinaryData buffer, bool take_ownership)
+{
+    DBOptions options;
+    options.is_immutable = true;
+    DBRef retval = std::make_shared<DBInit>(options);
+    retval->open(buffer, take_ownership);
     return retval;
 }
 

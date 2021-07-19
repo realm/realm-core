@@ -135,7 +135,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw InvalidEncryptionKeyException();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
-    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+    if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
+         config.schema_mode == SchemaMode::AdditiveExplicit) &&
+        config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");
@@ -270,7 +272,7 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
     if (!config.scheduler)
-        config.scheduler = version ? util::Scheduler::get_frozen(version.value()) : util::Scheduler::make_default();
+        config.scheduler = version ? util::Scheduler::make_frozen(version.value()) : util::Scheduler::make_default();
     // realm must be declared before lock so that the mutex is released before
     // we release the strong reference to realm, as Realm's destructor may want
     // to acquire the same lock
@@ -447,24 +449,19 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
 
 void RealmCoordinator::open_db()
 {
-    if (m_db || m_read_only_group)
+    if (m_db)
         return;
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
     try {
-        if (m_config.immutable()) {
-            if (m_config.realm_data.is_null()) {
-                m_read_only_group =
-                    std::make_shared<Group>(m_config.path, m_config.encryption_key.data(), Group::mode_ReadOnly);
-            }
-            else {
-                // Create in-memory read-only realm from existing buffer (without taking ownership of the buffer)
-                m_read_only_group = std::make_unique<Group>(m_config.realm_data, false);
-            }
+        if (m_config.immutable() && m_config.realm_data) {
+            m_db = DB::create(m_config.realm_data, false);
             return;
         }
-
-        if (server_synchronization_mode) {
+        if (m_config.immutable()) {
+            m_history.reset();
+        }
+        else if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
             m_history = sync::make_client_replication(m_config.path);
 #else
@@ -477,6 +474,7 @@ void RealmCoordinator::open_db()
 
         DBOptions options;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
+        options.is_immutable = m_config.immutable();
 
         if (!m_config.fifo_files_fallback_path.empty()) {
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
@@ -484,7 +482,13 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
-        m_db = DB::create(*m_history, options);
+        if (m_history) {
+            options.backup_at_file_format_change = m_config.backup_at_file_format_change;
+            m_db = DB::create(*m_history, options);
+        }
+        else {
+            m_db = DB::create(m_config.path, true, options);
+        }
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (m_config.schema_mode != SchemaMode::ResetFile) {
@@ -528,11 +532,9 @@ void RealmCoordinator::close()
     m_db = nullptr;
 }
 
-std::shared_ptr<Group> RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
+TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
 {
     open_db();
-    if (m_read_only_group)
-        return m_read_only_group;
     return (frozen_transaction) ? m_db->start_frozen(version) : m_db->start_read(version);
 }
 
@@ -709,28 +711,45 @@ void RealmCoordinator::commit_write(Realm& realm)
     REALM_ASSERT(realm.is_in_transaction());
 
     Transaction& tr = Realm::Internal::get_transaction(realm);
+    VersionID new_version;
     {
         // Need to acquire this lock before committing or another process could
         // perform a write and notify us before we get the chance to set the
         // skip version
         util::CheckedLockGuard l(m_notifier_mutex);
+        new_version = tr.commit_and_continue_as_read();
 
-        tr.commit_and_continue_as_read();
-
-        // Don't need to check m_new_notifiers because those don't skip versions
+        // The skip version must always be the notifier transaction's current
+        // version plus one, as we can only skip a prefix and not intermediate
+        // transactions. If we have a notifier for the current Realm, then we
+        // waited until it finished running in begin_transaction() and this
+        // invarient holds. If we don't have any notifiers then we don't need
+        // to set the skip version, but more importantly *can't* because we
+        // didn't block when starting the write and the notifier transaction
+        // may still be on an older version.
+        //
+        // Note that this relies on the fact that callbacks cannot be added from
+        // within write transactions. If they could be, we could hit this point
+        // with an implicit-created notifier which ran (and so is in m_notifiers
+        // and not m_new_notifiers) but didn't have a callback at the start of
+        // the write so we didn't block for it then, but does now have a callback.
+        // If we add support for that, we'll need to update this logic.
         bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(), [&](auto&& notifier) {
-            return notifier->is_for_realm(realm);
+            return notifier->is_for_realm(realm) && notifier->have_callbacks();
         });
         if (have_notifiers) {
-            m_notifier_skip_version = Realm::Internal::get_transaction(realm).get_version_of_current_transaction();
+            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(m_notifier_sg);
+            REALM_ASSERT_3(m_notifier_sg->get_transact_stage(), ==, DB::transact_Reading);
+            REALM_ASSERT_3(m_notifier_sg->get_version() + 1, ==, new_version.version);
+            m_notifier_skip_version = new_version;
         }
     }
 
 #if REALM_ENABLE_SYNC
     // Realm could be closed in did_change. So send sync notification first before did_change.
     if (m_sync_session) {
-        auto version = tr.get_version();
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
+        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, new_version.version);
     }
 #endif
     if (realm.m_binding_context) {
@@ -757,23 +776,15 @@ void RealmCoordinator::wait_for_change_release()
     m_db->wait_for_change_release();
 }
 
-void RealmCoordinator::pin_version(VersionID versionid)
-{
-    if (m_async_error)
-        return;
-    if (!m_advancer_sg || versionid < m_advancer_sg->get_version_of_current_transaction())
-        m_advancer_sg = m_db->start_read(versionid);
-}
-
 // Thread-safety analsys doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier) NO_THREAD_SAFETY_ANALYSIS
 {
-    auto version = notifier->version();
     auto& self = Realm::Internal::get_coordinator(*notifier->get_realm());
     {
         util::CheckedLockGuard lock(self.m_notifier_mutex);
-        self.pin_version(version);
+        if (!self.m_async_error)
+            notifier->attach_to(notifier->get_realm()->duplicate());
         self.m_new_notifiers.push_back(std::move(notifier));
     }
 }
@@ -803,9 +814,7 @@ void RealmCoordinator::clean_up_dead_notifiers()
         m_notifier_sg = nullptr;
         m_notifier_skip_version = {0, 0};
     }
-    if (swap_remove(m_new_notifiers) && m_new_notifiers.empty()) {
-        m_advancer_sg = nullptr;
-    }
+    swap_remove(m_new_notifiers);
 }
 
 void RealmCoordinator::on_change()
@@ -931,11 +940,13 @@ void RealmCoordinator::run_async_notifiers()
     clean_up_dead_notifiers();
 
     if (m_notifiers.empty() && m_new_notifiers.empty()) {
+        REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_cv.notify_all();
         return;
     }
 
     if (!m_notifier_sg) {
+        REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_sg = m_db->start_read();
     }
 
@@ -946,58 +957,10 @@ void RealmCoordinator::run_async_notifiers()
         return;
     }
 
-    VersionID version;
-
-    // Advance all of the new notifiers to the most recent version, if any
-    auto new_notifiers = std::move(m_new_notifiers);
-    IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, new_notifiers);
-    auto advancer_sg = std::move(m_advancer_sg);
-
-    if (!new_notifiers.empty()) {
-        REALM_ASSERT(advancer_sg);
-        REALM_ASSERT_3(advancer_sg->get_version_of_current_transaction().version, <=,
-                       new_notifiers.front()->version().version);
-
-        // The advancer SG can be at an older version than the oldest new notifier
-        // if a notifier was added and then removed before it ever got the chance
-        // to run, as we don't move the pin forward when removing dead notifiers
-        transaction::advance(*advancer_sg, nullptr, new_notifiers.front()->version());
-
-        // Advance each of the new notifiers to the latest version, attaching them
-        // to the SG at their handover version. This requires a unique
-        // TransactionChangeInfo for each source version, so that things don't
-        // see changes from before the version they were handed over from.
-        // Each Info has all of the changes between that source version and the
-        // next source version, and they'll be merged together later after
-        // releasing the lock
-        for (auto& notifier : new_notifiers) {
-            new_notifier_change_info.advance_incremental(notifier->version());
-            notifier->attach_to(advancer_sg);
-            notifier->add_required_change_info(new_notifier_change_info.current());
-        }
-        new_notifier_change_info.advance_to_final(VersionID{});
-
-        // We want to advance the non-new notifiers to the same version as the
-        // new notifiers to avoid having to merge changes from any new
-        // transaction that happen immediately after this into the new notifier
-        // changes
-        version = advancer_sg->get_version_of_current_transaction();
-    }
-    else {
-        // If we have no new notifiers we want to just advance to the latest
-        // version, but we have to pick a "latest" version while holding the
-        // notifier lock to avoid advancing over a transaction which should be
-        // skipped
-        // FIXME: this is comically slow
-        version = m_db->start_read()->get_version_of_current_transaction();
-        if (version == m_notifier_sg->get_version_of_current_transaction()) {
-            // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!m_notifier_skip_version.version);
-            m_notifier_cv.notify_all();
-            return;
-        }
-    }
-
+    // We need to pick the final version to advance to while the lock is held
+    // as otherwise if a commit is made while new notifiers are being advanced
+    // we could end up advancing over the skip version.
+    VersionID version = m_db->get_version_id_of_latest_snapshot();
     auto skip_version = m_notifier_skip_version;
     m_notifier_skip_version = {0, 0};
 
@@ -1010,15 +973,74 @@ void RealmCoordinator::run_async_notifiers()
         // skipping to work. The skip logic assumes that the notifier can't be
         // running when suppress_next() is called because it can only be called
         // from within a write transaction, and starting the write transaction
-        // would have blocked until the notifier is done running. However,
-        // on_change() can be triggered by things other than writes, so we may
-        // be here even if the notifiers don't need to rerun.
+        // would have blocked until the notifier is done running. However, if we
+        // run the notifiers at a point where the version isn't changing, that
+        // could happen concurrently with a call to suppress_next(), and we
+        // could unset skip_next on a callback from that zero-version run
+        // rather than the intended one.
+        //
+        // Spurious wakeups can happen in a few ways: adding a new notifier,
+        // adding a new notifier in a different process sharing this Realm file,
+        // closing the Realm in a different process, and possibly some other cases.
         notifiers = m_notifiers;
     }
-    m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
-    lock.unlock();
+    else {
+        REALM_ASSERT(!skip_version.version);
+    }
 
-    if (skip_version.version) {
+    auto new_notifiers = std::move(m_new_notifiers);
+    m_new_notifiers.clear();
+    m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
+
+    // Advance all of the new notifiers to the most recent version, if any
+    TransactionRef new_notifier_transaction;
+    util::Optional<IncrementalChangeInfo> new_notifier_change_info;
+    if (!new_notifiers.empty()) {
+        lock.unlock();
+
+        // Starting from the oldest notifier, incrementally advance the notifiers
+        // to the latest version, attaching each new notifier as we reach its
+        // source version. Suppose three new notifiers have been created:
+        //  - Notifier A has a source version of 2
+        //  - Notifier B has a source version of 7
+        //  - Notifier C has a source version of 5
+        // Notifier A wants the changes from versions 2-latest, B wants 7-latest,
+        // and C wants 5-latest. We achieve this by starting at version 2 and
+        // attaching A, then advancing to version 5 (letting A gather changes
+        // from 2-5). We then attach C and advance to 7, then attach B and advance
+        // to the latest.
+        std::sort(new_notifiers.begin(), new_notifiers.end(), [](auto& a, auto& b) {
+            return a->version() < b->version();
+        });
+        new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
+
+        new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
+        for (auto& notifier : new_notifiers) {
+            new_notifier_change_info->advance_incremental(notifier->version());
+            notifier->attach_to(new_notifier_transaction);
+            notifier->add_required_change_info(new_notifier_change_info->current());
+        }
+        new_notifier_change_info->advance_to_final(version);
+    }
+    else {
+        if (version == m_notifier_sg->get_version_of_current_transaction()) {
+            // We were spuriously woken up and there isn't actually anything to do
+            REALM_ASSERT(!skip_version.version);
+            m_notifier_cv.notify_all();
+            return;
+        }
+
+        lock.unlock();
+    }
+
+    // If the skip version is set and we have more than one version to process,
+    // we need to start with just the skip version so that any suppressed
+    // callbacks can ignore the changes from it without missing changes from
+    // later versions. If the skip version is set and there aren't any more
+    // versions after it, we just want to process with normal processing. See
+    // the above note about spurious wakeups for why this is required for
+    // correctness and not just a very minor optimization.
+    if (skip_version.version && skip_version != version) {
         REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version);
         IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
@@ -1213,4 +1235,9 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
 bool RealmCoordinator::compact()
 {
     return m_db->compact();
+}
+
+void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
+{
+    return m_db->write_copy(path, key.data(), allow_overwrite);
 }

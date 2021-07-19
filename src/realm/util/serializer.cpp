@@ -166,9 +166,36 @@ std::string print_value<>(realm::ObjKey k)
 }
 
 template <>
+std::string print_value<>(realm::ObjLink link)
+{
+    std::stringstream ss;
+    if (!link) {
+        ss << "NULL";
+    }
+    else {
+        ss << "L" << link.get_table_key().value << ":" << link.get_obj_key().value;
+    }
+    return ss.str();
+}
+
+template <>
 std::string print_value<>(realm::UUID uuid)
 {
     return "uuid(" + uuid.to_string() + ")";
+}
+
+StringData get_printable_table_name(StringData name, const std::string& prefix)
+{
+    if (prefix.size() && name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
+}
+
+template <>
+std::string print_value<>(realm::TypeOfValue type)
+{
+    return '"' + type.to_string() + '"';
 }
 
 // The variable name must be unique with respect to the already chosen variables at
@@ -216,13 +243,35 @@ std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_
     if (col_type == col_type_BackLink) {
         const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
         REALM_ASSERT(origin);
-        std::string source_table_name = origin->first->get_name();
-        std::string source_col_name = origin->first->get_column_name(origin->second);
+        std::string source_table_name = get_printable_table_name(origin->first->get_name(), class_prefix);
+        std::string source_col_name = get_column_name(origin->first, origin->second);
+
         return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
                source_col_name;
     }
     else if (col_key != ColKey()) {
-        return std::string(table->get_column_name(col_key));
+        std::string col_name = table->get_column_name(col_key);
+        size_t pos = col_name.find_first_of(" \t\r\n");
+        while (pos != std::string::npos) {
+            switch (col_name[pos]) {
+                case ' ':
+                    // space is unchanged
+                    break;
+                case '\t':
+                    col_name[pos] = 't';
+                    break;
+                case '\r':
+                    col_name[pos] = 'r';
+                    break;
+                case '\n':
+                    col_name[pos] = 'n';
+                    break;
+            }
+            col_name = col_name.substr(0, pos) + "\\" + col_name.substr(pos);
+            pos += 2;
+            pos = col_name.find_first_of(" \b\n\r", pos);
+        }
+        return col_name;
     }
     return "";
 }

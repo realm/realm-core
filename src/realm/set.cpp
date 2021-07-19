@@ -98,14 +98,9 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
             return std::make_unique<LnkSet>(*this, col_key);
         }
         case type_LinkList:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
-            REALM_ASSERT(false);
             break;
     }
-    return {};
+    REALM_TERMINATE("Unsupported column type.");
 }
 
 void SetBase::insert_repl(Replication* repl, size_t index, Mixed value) const
@@ -155,8 +150,19 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
         // FIXME: Exploit the fact that the values are sorted and unresolved
         // keys have a negative value.
-        _impl::check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(m_tree.get());
     }
+}
+
+template <>
+void Set<ObjKey>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_erase(ndx);
+    }
+
+    m_tree->set_context_flag(false);
 }
 
 template <>
@@ -185,7 +191,7 @@ void Set<ObjLink>::do_erase(size_t ndx)
 template <>
 void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 {
-    if (!value.is_null() && value.get_type() == type_TypedLink) {
+    if (value.is_type(type_TypedLink)) {
         m_obj.set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
@@ -194,7 +200,7 @@ void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Set<Mixed>::do_erase(size_t ndx)
 {
-    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+    if (Mixed old_value = get(ndx); old_value.is_type(type_TypedLink)) {
         auto old_link = old_value.get<ObjLink>();
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
@@ -210,6 +216,71 @@ void Set<Mixed>::do_erase(size_t ndx)
     }
     else {
         m_tree->erase(ndx);
+    }
+}
+
+template <>
+void Set<Mixed>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_erase(ndx);
+    }
+}
+
+void LnkSet::remove_target_row(size_t link_ndx)
+{
+    // Deleting the object will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    ObjKey k = get(link_ndx);
+    get_target_table()->remove_object(k);
+}
+
+void LnkSet::remove_all_target_rows()
+{
+    if (is_attached()) {
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
+    }
+}
+
+bool LnkSet::is_subset_of(const CollectionBase& rhs) const
+{
+    return this->m_set.is_subset_of(rhs);
+}
+
+bool LnkSet::is_strict_subset_of(const CollectionBase& rhs) const
+{
+    return this->m_set.is_strict_subset_of(rhs);
+}
+
+bool LnkSet::is_superset_of(const CollectionBase& rhs) const
+{
+    return this->m_set.is_superset_of(rhs);
+}
+
+bool LnkSet::is_strict_superset_of(const CollectionBase& rhs) const
+{
+    return this->m_set.is_strict_superset_of(rhs);
+}
+
+bool LnkSet::intersects(const CollectionBase& rhs) const
+{
+    return this->m_set.intersects(rhs);
+}
+
+bool LnkSet::set_equals(const CollectionBase& rhs) const
+{
+    return this->m_set.set_equals(rhs);
+}
+
+void set_sorted_indices(size_t sz, std::vector<size_t>& indices, bool ascending)
+{
+    indices.resize(sz);
+    if (ascending) {
+        std::iota(indices.begin(), indices.end(), 0);
+    }
+    else {
+        std::iota(indices.rbegin(), indices.rend(), 0);
     }
 }
 

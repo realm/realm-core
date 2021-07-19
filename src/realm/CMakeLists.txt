@@ -45,6 +45,7 @@ set(REALM_SOURCES
     global_key.cpp
     query_engine.cpp
     query_expression.cpp
+    query_value.cpp
     replication.cpp
     set.cpp
     spec.cpp
@@ -59,6 +60,7 @@ set(REALM_SOURCES
     utilities.cpp
     uuid.cpp
     version.cpp
+    backup_restore.cpp
 ) # REALM_SOURCES
 
 set(UTIL_SOURCES
@@ -66,6 +68,7 @@ set(UTIL_SOURCES
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
+    util/cli_args.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp
@@ -102,6 +105,7 @@ set(UTIL_SOURCES
 )
 
 set(REALM_INSTALL_HEADERS
+    aggregate_ops.hpp
     alloc.hpp
     alloc_slab.hpp
     array.hpp
@@ -165,6 +169,7 @@ set(REALM_INSTALL_HEADERS
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
+    query_value.hpp
     realm_nmmintrin.h
     replication.hpp
     set.hpp
@@ -181,6 +186,7 @@ set(REALM_INSTALL_HEADERS
     uuid.hpp
     version.hpp
     version_id.hpp
+    backup_restore.hpp
 
     impl/array_writer.hpp
     impl/cont_transact_hist.hpp
@@ -299,6 +305,9 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     endif()
 elseif(ANDROID)
     target_link_libraries(Storage INTERFACE android log atomic)
+    # Because on Android we compile with `-ffunction-sections` and `-fdata-sections` (see the root CMakeLists.txt)
+    # it makes sense to export this linker flag as well
+    target_link_options(Storage INTERFACE LINKER:-gc-sections)
 elseif(APPLE)
     target_link_options(Storage INTERFACE "SHELL:-framework Foundation")
 endif()
@@ -331,6 +340,6 @@ add_subdirectory(object-store)
 if (REALM_ENABLE_SYNC)
     add_subdirectory(sync)
 endif()
-if(NOT REALM_BUILD_LIB_ONLY)
+if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
     add_subdirectory(exec)
 endif()

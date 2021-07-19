@@ -58,9 +58,9 @@ struct RealmJWT {
     std::string token;
 
     // When the token expires.
-    long expires_at;
+    int64_t expires_at;
     // When the token was issued.
-    long issued_at;
+    int64_t issued_at;
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
@@ -172,8 +172,9 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state, const std::string device_id,
-             std::shared_ptr<SyncManager> sync_manager);
+             std::string access_token, SyncUser::State state, const std::string device_id, SyncManager* sync_manager);
+
+    ~SyncUser();
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -256,17 +257,22 @@ public:
     /// Refreshes the custom data for this user
     void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
 
+    /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
+    /// true.
+    bool access_token_refresh_required() const;
+
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<SyncManager> sync_manager() const
-    {
-        return m_sync_manager;
-    }
+    std::shared_ptr<SyncManager> sync_manager() const;
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name);
+
+protected:
+    friend class SyncManager;
+    void detach_from_sync_manager();
 
 private:
     static SyncUserContextFactory s_binding_context_factory;
@@ -310,7 +316,7 @@ private:
 
     const std::string m_device_id;
 
-    std::shared_ptr<SyncManager> m_sync_manager;
+    SyncManager* m_sync_manager;
 };
 
 } // namespace realm

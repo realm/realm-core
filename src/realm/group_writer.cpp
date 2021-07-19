@@ -114,7 +114,6 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
-    // FIXME: Add a remap which will work with a offset different from 0
     m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
@@ -241,8 +240,8 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
                                     m_free_versions.size(), m_free_lengths.size());
         }
         else {
-            int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
-            top.set(6, 1 + 2 * uint64_t(initial_version));      // Throws
+            int_fast64_t value = int_fast64_t(initial_version);
+            top.set(6, 1 + 2 * uint64_t(initial_version)); // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
             m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
@@ -473,10 +472,9 @@ ref_type GroupWriter::write_group()
     top.set(4, value_6); // Throws
     if (is_shared) {
         int_fast64_t value_7 = from_ref(free_versions_ref);
-        int_fast64_t value_8 =
-            1 + 2 * int_fast64_t(m_current_version); // FIXME: Problematic unsigned -> signed conversion
-        top.set(5, value_7);                         // Throws
-        top.set(6, value_8);                         // Throws
+        int_fast64_t value_8 = 1 + 2 * int_fast64_t(m_current_version);
+        top.set(5, value_7); // Throws
+        top.set(6, value_8); // Throws
     }
 
     // Get final sizes
@@ -942,7 +940,6 @@ void GroupWriter::commit(ref_type new_top_ref)
     file_header.m_flags = type_2(new_flags);
 
     // Write new selector to disk
-    // FIXME: we might optimize this to write of a single page?
     window->encryption_write_barrier(&file_header.m_flags, sizeof(file_header.m_flags));
     if (!disable_sync)
         window->sync();

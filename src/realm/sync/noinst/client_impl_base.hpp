@@ -299,6 +299,7 @@ public:
     void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
                                            const util::StringView*) override;
     void websocket_protocol_error_handler(std::error_code) override;
+    bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
     bool websocket_pong_message_received(const char*, std::size_t) override;
 

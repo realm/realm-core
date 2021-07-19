@@ -1,3 +1,5 @@
+add_subdirectory(c_api)
+
 set(SOURCES
     binding_callback_thread_observer.cpp
     collection_notifications.cpp
@@ -17,8 +19,8 @@ set(SOURCES
 
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
+    impl/deep_change_checker.cpp
     impl/list_notifier.cpp
-    impl/set_notifier.cpp
     impl/object_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
@@ -61,9 +63,9 @@ set(HEADERS
 
     impl/collection_change_builder.hpp
     impl/collection_notifier.hpp
+    impl/deep_change_checker.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
-    impl/set_notifier.hpp
     impl/notification_wrapper.hpp
     impl/object_accessor_impl.hpp
     impl/object_notifier.hpp
@@ -80,7 +82,10 @@ set(HEADERS
     util/scheduler.hpp
     util/tagged_bool.hpp
     util/tagged_string.hpp
-    util/uuid.hpp)
+    util/uuid.hpp
+
+    c_api/conversion.hpp
+)
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS

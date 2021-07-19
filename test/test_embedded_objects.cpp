@@ -40,6 +40,35 @@ TEST(EmbeddedObjects_Basic)
     CHECK(compare_groups(read_server, read_client_2));
 }
 
+TEST(Table_EmbeddedObjectsCircular)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    ColKey col_link1, col_link2, col_link3;
+
+    client_1->create_schema([&](WriteTransaction& tr) {
+        Group& g = tr.get_group();
+        auto table = g.add_table_with_primary_key("class_table", type_Int, "id");
+        auto e1 = g.add_embedded_table("class_e1");
+        auto e2 = g.add_embedded_table("class_e2");
+        table->add_column(*table, "unused");
+        col_link1 = table->add_column(*e1, "link");
+        col_link2 = e1->add_column(*e2, "link");
+        col_link3 = e2->add_column(*table, "link");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto table = tr.get_table("class_table");
+        Obj obj = table->create_object_with_primary_key(1);
+        obj.create_and_set_linked_object(col_link1).create_and_set_linked_object(col_link2).set(col_link3,
+                                                                                                obj.get_key());
+        obj.invalidate();
+        obj = table->create_object_with_primary_key(1);
+    });
+}
+
+
 TEST(EmbeddedObjects_ArrayOfObjects)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
@@ -62,6 +91,40 @@ TEST(EmbeddedObjects_ArrayOfObjects)
         auto obj_list = top_obj.get_linklist(sub_col);
         for (size_t i = 0; i < 10; ++i) {
             obj_list.create_and_insert_linked_object(i).set("i", int64_t(i));
+        }
+    });
+
+    synchronize(server.get(), {client_1.get(), client_2.get()});
+
+    ReadTransaction read_server(server->shared_group);
+    ReadTransaction read_client_1(client_1->shared_group);
+    ReadTransaction read_client_2(client_2->shared_group);
+    CHECK(compare_groups(read_server, read_client_1, test_context.logger));
+    CHECK(compare_groups(read_server, read_client_2));
+}
+
+TEST(EmbeddedObjects_DictionaryOfObjects)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+
+    client_1->create_schema([](WriteTransaction& tr) {
+        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef sub = tr.add_embedded_table("class_Sub");
+        top->add_column_dictionary(*sub, "sub");
+        sub->add_column(type_Int, "i");
+    });
+
+    client_1->transaction([&](auto& c) {
+        auto& tr = *c.group;
+        auto top = tr.get_table("class_Top");
+        auto top_obj = top->create_object_with_primary_key(123);
+        auto sub_col = top->get_column_key("sub");
+        auto dict = top_obj.get_dictionary(sub_col);
+        for (int64_t i = 0; i < 10; ++i) {
+            dict.create_and_insert_linked_object(util::to_string(i)).set("i", i);
         }
     });
 

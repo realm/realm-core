@@ -20,13 +20,7 @@
 
 #include "util/test_file.hpp"
 
-#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
-#include <realm/object-store/property.hpp>
-#include <realm/object-store/schema.hpp>
-
-#include <realm/string_data.hpp>
-#include <realm/table.hpp>
 
 using namespace realm;
 
@@ -35,43 +29,5 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
         auto input = StringData("good_no_bad", 4);
         auto result = ObjectStore::table_name_for_object_type(input);
         REQUIRE(result == "class_good");
-    }
-}
-
-TEST_CASE("ObjectStore:: property_for_column_key()") {
-    SECTION("Property should match the schema") {
-        Schema schema = {
-            {"object",
-             {
-                 {"int", PropertyType::Int},
-                 {"boolNullable", PropertyType::Bool | PropertyType::Nullable},
-                 {"stringPK", PropertyType::String, true},
-                 {"dateNullableIndexed", PropertyType::Date | PropertyType::Nullable, false, true},
-                 {"floatNullableArray", PropertyType::Float | PropertyType::Nullable | PropertyType::Array},
-                 {"doubleArray", PropertyType::Double | PropertyType::Array},
-                 {"object", PropertyType::Object | PropertyType::Nullable, "object"},
-                 {"objectArray", PropertyType::Object | PropertyType::Array, "object"},
-             }}};
-
-        TestFile config;
-        config.schema = schema;
-        config.schema_version = 1;
-
-        auto realm = Realm::get_shared_realm(config);
-        ConstTableRef table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        auto it = realm->schema().find("object");
-        REQUIRE_FALSE(it == realm->schema().end());
-        ObjectSchema object_schema = *it;
-
-        auto all_columns = table->get_column_keys();
-        for (auto col : all_columns) {
-            auto property = ObjectStore::property_for_column_key(table, col);
-            if (!property) {
-                FAIL();
-                continue;
-            }
-            auto actual_property = *object_schema.property_for_name(property->name);
-            REQUIRE(property.value() == actual_property);
-        }
     }
 }

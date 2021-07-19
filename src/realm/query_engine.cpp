@@ -23,11 +23,10 @@
 #include <realm/db.hpp>
 #include <realm/utilities.hpp>
 
-using namespace realm;
+namespace realm {
 
 ParentNode::ParentNode(const ParentNode& from)
     : m_child(from.m_child ? from.m_child->clone() : nullptr)
-    , m_condition_column_name(from.m_condition_column_name)
     , m_condition_column_key(from.m_condition_column_key)
     , m_dD(from.m_dD)
     , m_dT(from.m_dT)
@@ -70,6 +69,7 @@ size_t ParentNode::find_first(size_t start, size_t end)
 template <class T>
 inline bool Obj::evaluate(T func) const
 {
+    REALM_ASSERT(is_valid());
     Cluster cluster(0, get_alloc(), m_table->m_clusters);
     cluster.init(m_mem);
     cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
@@ -85,86 +85,6 @@ bool ParentNode::match(const Obj& obj)
     });
 }
 
-template <Action action>
-void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
-{
-    switch (col_id) {
-        case type_Int: {
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayInteger>;
-            break;
-        }
-        case type_Float:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayFloat>;
-            break;
-        case type_Double:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDouble>;
-            break;
-        case type_Decimal:
-            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
-            break;
-        default:
-            REALM_ASSERT(false);
-            break;
-    }
-}
-
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
-{
-    switch (TAction) {
-        case act_ReturnFirst: {
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
-            break;
-        }
-        case act_FindAll: {
-            // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
-            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
-            // false simply by convention. FIXME: Clean up all this.
-            REALM_ASSERT(!nullable);
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
-            break;
-        }
-        case act_Count: {
-            // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being
-            // read from any column upon each query match (just matchcount++ is performed), and we pass nullable =
-            // false simply by convention. FIXME: Clean up all this.
-            REALM_ASSERT(!nullable);
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
-            break;
-        }
-        case act_Sum: {
-            aggregate_local_prepare<act_Sum>(col_id, nullable);
-            break;
-        }
-        case act_Min: {
-            aggregate_local_prepare<act_Min>(col_id, nullable);
-            break;
-        }
-        case act_Max: {
-            aggregate_local_prepare<act_Max>(col_id, nullable);
-            break;
-        }
-        case act_CallbackIdx: {
-            // Future features where for each query match, you want to perform an action that only requires knowlege
-            // about the row index, and not the payload there. Examples could be find_all(), however, this code path
-            // below is for new features given in a callback method and not yet supported by core.
-            if (nullable)
-                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
-            else
-                m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
-            break;
-        }
-        default:
-            REALM_ASSERT(false);
-            break;
-    }
-}
-
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column)
 {
@@ -177,7 +97,12 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // data type array to make array call match() directly on each match, like for integers.
 
     m_state = st;
+    m_source_column = source_column;
     size_t local_matches = 0;
+
+    if (m_children.size() == 1) {
+        return find_all_local(start, end);
+    }
 
     size_t r = start - 1;
     for (;;) {
@@ -209,10 +134,116 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         // If index of first match in this node equals index of first match in all remaining nodes, we have a final
         // match
         if (m == r) {
-            bool cont = (this->*m_column_action_specializer)(st, source_column, r);
+            Mixed val;
+            if (source_column) {
+                val = source_column->get_any(r);
+            }
+            bool cont = st->match(r, val);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }
+        }
+    }
+}
+
+size_t ParentNode::find_all_local(size_t start, size_t end)
+{
+    while (start < end) {
+        start = find_first_local(start, end);
+        if (start != not_found) {
+            Mixed val;
+            if (m_source_column) {
+                val = m_source_column->get_any(start);
+            }
+            bool cont = m_state->match(start, val);
+            if (!cont) {
+                return static_cast<size_t>(-1);
+            }
+            start++;
+        }
+    }
+    return end;
+}
+
+void MixedNode<Equal>::init(bool will_query_ranges)
+{
+    MixedNodeBase::init(will_query_ranges);
+
+    if (m_has_search_index) {
+        m_dT = 0.0;
+    }
+    else {
+        m_dT = 10.0;
+    }
+
+    if (m_has_search_index) {
+        // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
+        auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+        m_index_matches.clear();
+        index->find_all(m_index_matches, static_cast<Mixed>(m_value), true);
+        m_results_start = 0;
+        m_results_ndx = 0;
+        m_results_end = m_index_matches.size();
+        if (m_results_start != m_results_end) {
+            m_actual_key = m_index_matches[0];
+        }
+    }
+}
+
+size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
+{
+    REALM_ASSERT(m_table);
+
+    if (m_has_search_index) {
+        if (start < end) {
+            ObjKey first_key = m_cluster->get_real_key(start);
+            if (first_key < m_last_start_key) {
+                // We are not advancing through the clusters. We basically don't know where we are,
+                // so just start over from the beginning.
+                m_results_ndx = m_results_start;
+                m_actual_key = (m_results_start != m_results_end) ? m_index_matches[m_results_start] : ObjKey();
+            }
+            m_last_start_key = first_key;
+
+            // Check if we can expect to find more keys
+            if (m_results_ndx < m_results_end) {
+                // Check if we should advance to next key to search for
+                while (first_key > m_actual_key) {
+                    m_results_ndx++;
+                    if (m_results_ndx == m_results_end) {
+                        return not_found;
+                    }
+                    m_actual_key = m_index_matches[m_results_ndx];
+                }
+
+                // If actual_key is bigger than last key, it is not in this leaf
+                ObjKey last_key = m_cluster->get_real_key(end - 1);
+                if (m_actual_key > last_key)
+                    return not_found;
+
+                // Now actual_key must be found in leaf keys
+                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
+            }
+        }
+    }
+    else {
+        Equal cond;
+        for (size_t i = start; i < end; i++) {
+            QueryValue val(m_leaf_ptr->get(i));
+            if (cond(val, m_value))
+                return i;
+        }
+    }
+
+    return not_found;
+}
+
+void MixedNode<Equal>::index_based_aggregate(size_t limit, Evaluator evaluator)
+{
+    for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
+        auto obj = m_table->get_object(m_index_matches[t]);
+        if (evaluator(obj)) {
+            --limit;
         }
     }
 }
@@ -278,8 +309,6 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
     return _find_first_local(start, end);
 }
 
-
-namespace realm {
 
 size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
                        const Cluster* cluster, size_t start, size_t end)
@@ -469,8 +498,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
         case col_type_TypedLink:
         case col_type_BackLink:
         case col_type_LinkList:
-        case col_type_OldDateTime:
-        case col_type_OldTable:
             break;
     };
     REALM_UNREACHABLE();
@@ -552,16 +579,12 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_OldTable:
         case col_type_Link:
         case col_type_BackLink:
-        case col_type_OldDateTime:
-            REALM_ASSERT(false);
+            break;
     }
-    return 0;
+    REALM_TERMINATE("Unsupported column type.");
 }
-
-} // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)
 {
@@ -697,7 +720,7 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 }
 
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
-: m_expression(std::move(expression))
+    : m_expression(std::move(expression))
 {
     m_dT = 50.0;
 }
@@ -748,3 +771,72 @@ ExpressionNode::ExpressionNode(const ExpressionNode& from)
     , m_expression(from.m_expression->clone())
 {
 }
+
+template <>
+size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
+{
+    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
+
+        // LinkLists never contain null
+        if (!m_target_keys[0] && m_target_keys.size() == 1 && start != end)
+            return not_found;
+
+        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
+        for (size_t i = start; i < end; i++) {
+            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+                links.init_from_ref(ref);
+                for (auto& key : m_target_keys) {
+                    if (key) {
+                        if (links.find_first(key) != not_found)
+                            return i;
+                    }
+                }
+            }
+        }
+    }
+    else if (m_column_type == col_type_Link) {
+        for (auto& key : m_target_keys) {
+            auto pos = static_cast<const ArrayKey*>(m_leaf_ptr)->find_first(key, start, end);
+            if (pos != realm::npos) {
+                return pos;
+            }
+        }
+    }
+
+    return not_found;
+}
+
+template <>
+size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
+{
+    // NotEqual only makes sense for a single value
+    REALM_ASSERT(m_target_keys.size() == 1);
+    ObjKey key = m_target_keys[0];
+
+    if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
+        BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
+        for (size_t i = start; i < end; i++) {
+            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+                links.init_from_ref(ref);
+                auto sz = links.size();
+                for (size_t j = 0; j < sz; j++) {
+                    if (links.get(j) != key) {
+                        return i;
+                    }
+                }
+            }
+        }
+    }
+    else if (m_column_type == col_type_Link) {
+        auto leaf = static_cast<const ArrayKey*>(m_leaf_ptr);
+        for (size_t i = start; i < end; i++) {
+            if (leaf->get(i) != key) {
+                return i;
+            }
+        }
+    }
+
+    return not_found;
+}
+
+} // namespace realm

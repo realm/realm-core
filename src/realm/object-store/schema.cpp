@@ -82,34 +82,54 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
     return const_cast<Schema*>(this)->find(object);
 }
 
+Schema::iterator Schema::find(TableKey table_key) noexcept
+{
+    if (!table_key) {
+        return end();
+    }
+    // FIXME: Faster lookup than linear search.
+    return std::find_if(begin(), end(), [table_key](const ObjectSchema& os) {
+        return os.table_key == table_key;
+    });
+}
+
+Schema::const_iterator Schema::find(TableKey table_key) const noexcept
+{
+    return const_cast<Schema*>(this)->find(table_key);
+}
+
 namespace {
 
 struct CheckObjectPath {
-    const ObjectSchema& object;
-    std::string path;
+    const ObjectSchema& object;              // the schema to check
+    std::string path;                        // a printable path for error messaging
+    std::unordered_set<std::string> visited; // the list of object types encountered along this path so far
 };
 
-// a non-recursive search that returns a path to any embedded object that has multiple paths from the start
+// a non-recursive search that returns a property path to the first embedded object cycle detected
 std::string do_check(Schema const& schema, const ObjectSchema& start)
 {
     std::queue<CheckObjectPath> to_visit;
-    std::unordered_set<std::string> visited;
-    to_visit.push(CheckObjectPath{start, start.name});
+    to_visit.push(CheckObjectPath{start, start.name, {start.name}});
 
     while (to_visit.size() > 0) {
         auto current = to_visit.front();
-        visited.insert(current.object.name);
         for (auto& prop : current.object.persisted_properties) {
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
                 REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
-                auto next_path = current.path + "." + prop.name;
-                if (visited.find(prop.object_type) == visited.end()) {
-                    to_visit.push(CheckObjectPath{*it, next_path});
+                if (!it->is_embedded) {
+                    // the server does support links to top level objects (serialized as a PK)
+                    // so if we encounter this type of link, no need to check further along this path
+                    continue;
                 }
-                else if (it->is_embedded) {
+                auto next_path = current.path + "." + prop.name;
+                if (current.visited.find(prop.object_type) != current.visited.end()) {
                     return next_path;
                 }
+                auto visited_copy = current.visited;
+                visited_copy.insert(current.object.name);
+                to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
             }
         }
         to_visit.pop();
@@ -119,6 +139,9 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
 
 void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
 {
+    // A prerequisite for an embedded object loop is that there are links orginating from an embedded object
+    // so we only need to run this check from embedded objects. This is an optimization to exclude entire
+    // object graphs which do not contain embedded objects.
     for (auto const& object : schema) {
         if (object.is_embedded) {
             std::string loop = do_check(schema, object);
@@ -129,9 +152,46 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
         }
     }
 }
-} // namespace
 
-void Schema::validate(bool for_sync) const
+} // end anonymous namespace
+
+std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
+{
+    std::queue<const ObjectSchema*> to_check;
+    for (auto& object : *this) {
+        if (!object.is_embedded) {
+            to_check.push(&object);
+        }
+    }
+    // Perform a breadth-first search of the schema graph to discover all object
+    // types which are reachable from any of the root types
+    std::unordered_set<const ObjectSchema*> reachable;
+    while (!to_check.empty()) {
+        auto object = to_check.front();
+        reachable.insert(object);
+        for (auto& prop : object->persisted_properties) {
+            if (prop.type == PropertyType::Object) {
+                auto it = find(prop.object_type);
+                REALM_ASSERT(it != this->end());
+                if (it->is_embedded && reachable.insert(&*it).second) {
+                    to_check.push(&*it);
+                }
+            }
+        }
+        to_check.pop();
+    }
+    // Any object types which weren't found above are orphans
+    std::unordered_set<std::string> orphans;
+    for (auto& object : *this) {
+        if (object.is_embedded && !reachable.count(&object)) {
+            orphans.insert(object.name);
+        }
+    }
+    return orphans;
+}
+
+
+void Schema::validate(uint64_t validation_mode) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -147,6 +207,7 @@ void Schema::validate(bool for_sync) const
             ObjectSchemaValidationException("Type '%1' appears more than once in the schema.", it->name));
     }
 
+    const bool for_sync = validation_mode & SchemaValidationMode::Sync;
     for (auto const& object : *this) {
         object.validate(*this, exceptions, for_sync);
     }
@@ -157,6 +218,14 @@ void Schema::validate(bool for_sync) const
         // only attempt to check for loops if the rest of the schema is valid
         // because we rely on all link types being defined
         check_for_embedded_objects_loop(*this, exceptions);
+
+        if (validation_mode & SchemaValidationMode::RejectEmbeddedOrphans) {
+            auto orphans = this->get_embedded_object_orphans();
+            for (auto& name : orphans) {
+                exceptions.push_back(util::format(
+                    "Embedded object '%1' is unreachable by any link path from top level objects.", name));
+            }
+        }
     }
 
     if (exceptions.size()) {
@@ -253,8 +322,6 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
             if (include_table_removals)
                 changes.emplace_back(schema_change::RemoveTable{existing});
         }
-        else if (existing->is_embedded != target->is_embedded)
-            changes.emplace_back(schema_change::ChangeTableType{target});
     });
 
     // Modify columns
@@ -267,6 +334,14 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
         }
         // nothing for tables in existing but not target
     });
+
+    // Detect embedded table changes last, in case column property changes affect link counts
+    zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
+        if (existing && target && existing->is_embedded != target->is_embedded) {
+            changes.emplace_back(schema_change::ChangeTableType{target});
+        }
+    });
+
     return changes;
 }
 

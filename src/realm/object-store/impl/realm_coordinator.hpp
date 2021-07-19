@@ -161,7 +161,7 @@ public:
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
-    std::shared_ptr<Group> begin_read(VersionID version = {}, bool frozen_transaction = false);
+    TransactionRef begin_read(VersionID version = {}, bool frozen_transaction = false);
 
     // Check if advance_to_ready() would actually advance the Realm's read version
     bool can_advance(Realm& realm);
@@ -195,6 +195,7 @@ public:
 
     void close();
     bool compact();
+    void write_copy(StringData path, BinaryData key, bool allow_overwrite);
 
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
@@ -209,7 +210,6 @@ private:
     Realm::Config m_config;
     std::unique_ptr<Replication> m_history;
     std::shared_ptr<DB> m_db;
-    std::shared_ptr<Group> m_read_only_group;
 
     mutable util::CheckedMutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema GUARDED_BY(m_schema_cache_mutex);
@@ -221,7 +221,7 @@ private:
     std::vector<WeakRealmNotifier> m_weak_realm_notifiers GUARDED_BY(m_realm_mutex);
 
     util::CheckedMutex m_notifier_mutex;
-    std::condition_variable m_notifier_cv;
+    std::condition_variable m_notifier_cv GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_new_notifiers GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers GUARDED_BY(m_notifier_mutex);
     VersionID m_notifier_skip_version GUARDED_BY(m_notifier_mutex) = {0, 0};
@@ -230,10 +230,6 @@ private:
     // Will have a read transaction iff m_notifiers is non-empty
     std::shared_ptr<Transaction> m_notifier_sg;
 
-    // Transaction used to advance notifiers in m_new_notifiers to the main shared
-    // group's transaction version
-    // Will have a read transaction iff m_new_notifiers is non-empty
-    std::shared_ptr<Transaction> m_advancer_sg;
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
@@ -247,8 +243,6 @@ private:
     std::shared_ptr<AuditInterface> m_audit_context;
 
     void open_db();
-
-    void pin_version(VersionID version) REQUIRES(m_notifier_mutex);
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);

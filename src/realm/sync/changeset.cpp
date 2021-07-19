@@ -58,18 +58,26 @@ InternString Changeset::find_string(StringData string) const noexcept
     return InternString{};
 }
 
+// TODO: https://github.com/realm/realm-core/issues/4624 remove the check disabling code once
+// we understand why MSVC reports stack corruption in this method.
+#if _MSC_VER
+#pragma runtime_checks("", off)
+#endif
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overload{
-        [&](InternString str) -> PrimaryKey {
+    const auto& get = overload{
+        [this](InternString str) -> PrimaryKey {
             return get_string(str);
         },
-        [&](auto&& otherwise) -> PrimaryKey {
+        [](auto otherwise) -> PrimaryKey {
             return otherwise;
         },
     };
     return mpark::visit(get, key);
 }
+#if _MSC_VER
+#pragma runtime_checks("", restore)
+#endif
 
 bool Changeset::operator==(const Changeset& that) const noexcept
 {
@@ -420,7 +428,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("type", p.type);
     }
     else {
-        m_tracer.field("type", "Mixed");
+        m_tracer.field("type", Instruction::Payload::Type::Null);
     }
     m_tracer.field("nullable", p.nullable);
     m_tracer.field("collection_type", p.collection_type);

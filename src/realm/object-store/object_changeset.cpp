@@ -42,15 +42,6 @@ void ObjectChangeSet::deletions_add(ObjectKeyType obj)
     }
 }
 
-void ObjectChangeSet::clear(size_t old_size)
-{
-    static_cast<void>(old_size); // unused
-    m_clear_did_occur = true;
-    m_insertions.clear();
-    m_modifications.clear();
-    m_deletions.clear();
-}
-
 bool ObjectChangeSet::insertions_remove(ObjectKeyType obj)
 {
     return m_insertions.erase(obj) > 0;
@@ -68,11 +59,6 @@ bool ObjectChangeSet::deletions_remove(ObjectKeyType obj)
 
 bool ObjectChangeSet::deletions_contains(ObjectKeyType obj) const
 {
-    if (m_clear_did_occur) {
-        // FIXME: what are the expected notifications when an object is deleted
-        // and then another object is inserted with the same key?
-        return m_insertions.count(obj) == 0;
-    }
     return m_deletions.count(obj) > 0;
 }
 
@@ -81,9 +67,29 @@ bool ObjectChangeSet::insertions_contains(ObjectKeyType obj) const
     return m_insertions.count(obj) > 0;
 }
 
-bool ObjectChangeSet::modifications_contains(ObjectKeyType obj) const
+bool ObjectChangeSet::modifications_contains(ObjectKeyType obj, const std::vector<ColKey>& filtered_column_keys) const
 {
-    return m_modifications.count(obj) > 0;
+    // If there is no filter we just check if the object in question was changed which means its key (`obj`)
+    // can be found within the `m_modifications`.
+    if (filtered_column_keys.size() == 0) {
+        return m_modifications.count(obj) > 0;
+    }
+
+    // If a filter is set but the `obj` is not contained within the `m_modifcations` at all we do not need to check
+    // further.
+    if (m_modifications.count(obj) == 0) {
+        return false;
+    }
+
+    // If a filter was set we need to check if the changed column is part of this filter.
+    const std::unordered_set<ColKeyType>& changed_columns_for_object = m_modifications.at(obj);
+    for (const auto& column_key_in_filter : filtered_column_keys) {
+        if (changed_columns_for_object.count(column_key_in_filter.value)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 const ObjectChangeSet::ObjectSet* ObjectChangeSet::get_columns_modified(ObjectKeyType obj) const
@@ -103,34 +109,24 @@ void ObjectChangeSet::merge(ObjectChangeSet&& other)
         *this = std::move(other);
         return;
     }
-    m_clear_did_occur = m_clear_did_occur || other.m_clear_did_occur;
 
     verify();
     other.verify();
 
     // Drop any inserted-then-deleted rows, then merge in new insertions
     for (auto it = other.m_deletions.begin(); it != other.m_deletions.end();) {
-        auto previously_inserted = m_insertions.find(*it);
-        auto previously_modified = m_modifications.find(*it);
-        if (previously_modified != m_modifications.end()) {
-            m_modifications.erase(previously_modified);
-        }
-        if (previously_inserted != m_insertions.end()) {
-            m_insertions.erase(previously_inserted);
+        m_modifications.erase(*it);
+        if (m_insertions.erase(*it)) {
             it = m_deletions.erase(it);
         }
         else {
             ++it;
         }
     }
-    if (!other.m_insertions.empty()) {
-        m_insertions.insert(other.m_insertions.begin(), other.m_insertions.end());
-    }
-    if (!other.m_deletions.empty()) {
-        m_deletions.insert(other.m_deletions.begin(), other.m_deletions.end());
-    }
-    for (auto it = other.m_modifications.begin(); it != other.m_modifications.end(); ++it) {
-        m_modifications[it->first].insert(it->second.begin(), it->second.end());
+    m_insertions.merge(std::move(other.m_insertions));
+    m_deletions.merge(std::move(other.m_deletions));
+    for (auto& obj : other.m_modifications) {
+        m_modifications[obj.first].merge(std::move(obj.second));
     }
 
     verify();
@@ -142,6 +138,7 @@ void ObjectChangeSet::verify()
 {
 #ifdef REALM_DEBUG
     for (auto it = m_deletions.begin(); it != m_deletions.end(); ++it) {
+        REALM_ASSERT_EX(m_modifications.find(*it) == m_modifications.end(), *it);
         REALM_ASSERT_EX(m_insertions.find(*it) == m_insertions.end(), *it);
     }
 #endif

@@ -23,6 +23,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>
@@ -35,176 +36,6 @@ using SyncAction = SyncFileActionMetadata::Action;
 
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
 static const std::string metadata_path = base_path + "/metadata.realm";
-
-TEST_CASE("sync_metadata: migration", "[sync]") {
-    util::try_make_dir(base_path);
-    auto close = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-
-    const std::string identity_1 = "id_1";
-    const std::string identity_2 = "id_2";
-    const std::string identity_3 = "id_3";
-    const std::string provider_type = "https://realm.example.org";
-    const std::string token = "dummy_token";
-
-    const Schema v0_schema{
-        {"UserMetadata",
-         {
-             {"identity", PropertyType::String, Property::IsPrimary{true}},
-             {"marked_for_removal", PropertyType::Bool},
-             {"provider_type", PropertyType::String | PropertyType::Nullable},
-             {"refresh_token", PropertyType::String | PropertyType::Nullable},
-             {"access_token", PropertyType::String | PropertyType::Nullable},
-         }},
-        {"FileActionMetadata",
-         {
-             {"original_name", PropertyType::String, Property::IsPrimary{true}},
-             {"action", PropertyType::Int},
-             {"new_name", PropertyType::String | PropertyType::Nullable},
-             {"url", PropertyType::String},
-             {"identity", PropertyType::String},
-         }},
-    };
-
-    const Schema v1_schema{
-        {"UserMetadata",
-         {
-             {"identity", PropertyType::String, Property::IsPrimary{true}},
-             {"marked_for_removal", PropertyType::Bool},
-             {"provider_type", PropertyType::String | PropertyType::Nullable},
-             {"refresh_token", PropertyType::String | PropertyType::Nullable},
-             {"access_token", PropertyType::String | PropertyType::Nullable},
-             {"user_is_admin", PropertyType::Bool},
-         }},
-        {"FileActionMetadata",
-         {
-             {"original_name", PropertyType::String, Property::IsPrimary{true}},
-             {"action", PropertyType::Int},
-             {"new_name", PropertyType::String | PropertyType::Nullable},
-             {"url", PropertyType::String},
-             {"identity", PropertyType::String},
-         }},
-    };
-
-    SECTION("properly upgrades from v0 to v2") {
-        // Open v0 metadata (create a Realm directly)
-        {
-            Realm::Config config;
-            config.path = metadata_path;
-            config.schema = v0_schema;
-            config.schema_version = 0;
-            config.schema_mode = SchemaMode::Additive;
-            auto realm = Realm::get_shared_realm(std::move(config));
-            REQUIRE(realm);
-
-            // Add some v0 entries
-            CppContext context;
-            realm->begin_transaction();
-            auto user_metadata_schema = *realm->schema().find("UserMetadata");
-            Object::create<util::Any>(context, realm, user_metadata_schema,
-                                      AnyDict{
-                                          {"identity", identity_1},
-                                          {"marked_for_removal", false},
-                                          {"refresh_token", token},
-                                          {"access_token", token},
-                                      });
-            Object::create<util::Any>(
-                context, realm, user_metadata_schema,
-                AnyDict{{"identity", identity_2}, {"marked_for_removal", false}, {"provider_type", provider_type}});
-            realm->commit_transaction();
-        }
-        // Open v2 metadata
-        {
-            SyncMetadataManager manager(metadata_path, false, none);
-            SECTION("for existing entries") {
-                auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
-                REQUIRE(bool(md_1));
-                CHECK(md_1->identity() == identity_1);
-                CHECK(md_1->local_uuid() == identity_1);
-                CHECK(md_1->provider_type() == "");
-                CHECK(md_1->access_token() == token);
-                CHECK(md_1->is_valid());
-                auto md_2 = manager.get_or_make_user_metadata(identity_2, provider_type, false);
-                REQUIRE(bool(md_2));
-                CHECK(md_2->identity() == identity_2);
-                CHECK(md_2->local_uuid() == identity_2);
-                CHECK(md_2->provider_type() == provider_type);
-                CHECK(md_2->access_token().empty());
-                CHECK(md_2->is_valid());
-            }
-
-            SECTION("and creates new entries properly") {
-                auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
-                REQUIRE(user_metadata->is_valid());
-                CHECK(user_metadata->identity() == identity_3);
-                CHECK(user_metadata->local_uuid() != "");
-                CHECK(user_metadata->local_uuid() != identity_3);
-                CHECK(user_metadata->provider_type() == provider_type);
-            }
-        }
-    }
-
-    SECTION("properly upgrades from v1 to v2") {
-        // Open v1 metadata (create a Realm directly)
-        {
-            Realm::Config config;
-            config.path = metadata_path;
-            config.schema = v1_schema;
-            config.schema_version = 1;
-            auto realm = Realm::get_shared_realm(std::move(config));
-            REQUIRE(realm);
-
-            // Add some v1 entries
-            CppContext context;
-            realm->begin_transaction();
-            auto user_metadata_schema = *realm->schema().find("UserMetadata");
-            Object::create<util::Any>(context, realm, user_metadata_schema,
-                                      AnyDict{{"identity", identity_1},
-                                              {"marked_for_removal", false},
-                                              {"refresh_token", token},
-                                              {"access_token", token},
-                                              {"user_is_admin", false}});
-            Object::create<util::Any>(context, realm, user_metadata_schema,
-                                      AnyDict{{"identity", identity_2},
-                                              {"marked_for_removal", false},
-                                              {"provider_type", provider_type},
-                                              {"user_is_admin", true}});
-            realm->commit_transaction();
-        }
-        // Open v2 metadata
-        {
-            SyncMetadataManager manager(metadata_path, false, none);
-            SECTION("for existing entries") {
-                auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
-                REQUIRE(bool(md_1));
-                CHECK(md_1->identity() == identity_1);
-                CHECK(md_1->local_uuid() == identity_1);
-                CHECK(md_1->provider_type() == "");
-                CHECK(md_1->access_token() == token);
-                CHECK(md_1->is_valid());
-                auto md_2 = manager.get_or_make_user_metadata(identity_2, provider_type, false);
-                REQUIRE(bool(md_2));
-                CHECK(md_2->identity() == identity_2);
-                CHECK(md_2->local_uuid() == identity_2);
-                CHECK(md_2->provider_type() == provider_type);
-                CHECK(md_2->access_token().empty());
-                CHECK(md_2->is_valid());
-            }
-
-            SECTION("and creates new entries properly") {
-                auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
-                REQUIRE(user_metadata->is_valid());
-                CHECK(user_metadata->identity() == identity_3);
-                CHECK(user_metadata->local_uuid() != "");
-                CHECK(user_metadata->local_uuid() != identity_3);
-                CHECK(user_metadata->provider_type() == provider_type);
-
-                CHECK(manager.client_uuid().size());
-            }
-        }
-    }
-}
 
 TEST_CASE("sync_metadata: user metadata", "[sync]") {
     util::try_make_dir(base_path);
@@ -511,14 +342,65 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         util::try_remove_dir_recursive(base_path);
     });
 
+    const auto identity0 = "identity0";
+    const auto auth_url = "https://realm.example.org";
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
-            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, make_test_encryption_key(11)));
+            {
+                // Open metadata realm, make metadata
+                std::vector<char> key0 = make_test_encryption_key(10);
+                SyncMetadataManager manager0(metadata_path, true, key0);
+
+                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0, auth_url);
+                REQUIRE(bool(user_metadata0));
+                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->provider_type() == auth_url);
+                CHECK(user_metadata0->access_token().empty());
+                CHECK(user_metadata0->is_valid());
+            }
+            // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
+            // Open new metadata realm at path with different key
+            std::vector<char> key1 = make_test_encryption_key(11);
+            SyncMetadataManager manager1(metadata_path, true, key1);
+
+            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
+            // Expect previous metadata to have been deleted
+            CHECK_FALSE(bool(user_metadata1));
+
+            // But new metadata can still be created
+            const auto identity1 = "identity1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1, auth_url);
+            CHECK(user_metadata2->identity() == identity1);
+            CHECK(user_metadata2->provider_type() == auth_url);
+            CHECK(user_metadata2->access_token().empty());
+            CHECK(user_metadata2->is_valid());
         }
         SECTION("different encryption settings") {
-            SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
+            {
+                // Encrypt metadata realm at path, make metadata
+                SyncMetadataManager manager0(metadata_path, true, make_test_encryption_key(10));
+
+                auto user_metadata0 = manager0.get_or_make_user_metadata(identity0, auth_url);
+                REQUIRE(bool(user_metadata0));
+                CHECK(user_metadata0->identity() == identity0);
+                CHECK(user_metadata0->provider_type() == auth_url);
+                CHECK(user_metadata0->access_token().empty());
+                CHECK(user_metadata0->is_valid());
+            }
+            // Metadata realm is closed because only reference to the realm (user_metadata) is now out of scope
+            // Open new metadata realm at path with different encryption configuration
+            SyncMetadataManager manager1(metadata_path, false);
+            auto user_metadata1 = manager1.get_or_make_user_metadata(identity0, auth_url, false);
+            // Expect previous metadata to have been deleted
+            CHECK_FALSE(bool(user_metadata1));
+
+            // But new metadata can still be created
+            const auto identity1 = "identity1";
+            auto user_metadata2 = manager1.get_or_make_user_metadata(identity1, auth_url);
+            CHECK(user_metadata2->identity() == identity1);
+            CHECK(user_metadata2->provider_type() == auth_url);
+            CHECK(user_metadata2->access_token().empty());
+            CHECK(user_metadata2->is_valid());
         }
     }
 

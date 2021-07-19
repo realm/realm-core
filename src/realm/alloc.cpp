@@ -28,24 +28,6 @@
 using namespace realm;
 
 
-// FIXME: Casting a pointers to size_t is inherently
-// nonportable. For example, systems exist where pointers are 64 bits
-// and size_t is 32. One idea would be to use a different type
-// for refs such as uintptr_t, the problem with this one is that
-// while it is described by the C++11 standard it is not required to
-// be present. C++03 does not even mention it. A real working solution
-// will be to introduce a new name for the type of refs. The typedef
-// can then be made as complex as required to pick out an appropriate
-// type on any supported platform.
-//
-// A better solution may be to use an instance of SlabAlloc. The main
-// problem is that SlabAlloc is not thread-safe. Another problem is
-// that its free-list management is currently exceedingly slow do to
-// linear searches. Another problem is that it is prone to general
-// memory corruption due to lack of exception safety when upding
-// free-lists. But these problems must be fixed anyway.
-
-
 namespace {
 
 /// For use with free-standing objects (objects that are not part of a
@@ -59,7 +41,7 @@ class DefaultAllocator : public realm::Allocator {
 public:
     DefaultAllocator()
     {
-        m_baseline = 0; // Zero is not available .. WHY? FIXME!
+        m_baseline = 0;
     }
 
     MemRef do_alloc(const size_t size) override
@@ -176,4 +158,4 @@ char* Allocator::translate_less_critical(RefTranslation* ref_translation_ptr, re
         return addr;
     }
 }
-}
+} // namespace realm

@@ -81,6 +81,75 @@ struct TestContext : CppContext {
     {
         return false;
     }
+
+    template <class T>
+    T get(Object& obj, const std::string& name)
+    {
+        return any_cast<T>(obj.get_property_value<util::Any>(*this, name));
+    }
+};
+
+class CreatePolicyRecordingContext {
+public:
+    CreatePolicyRecordingContext(CreatePolicyRecordingContext&, Obj, Property const&) {}
+    CreatePolicyRecordingContext() = default;
+    CreatePolicyRecordingContext(std::shared_ptr<Realm>, const ObjectSchema*) {}
+
+    util::Optional<util::Any> value_for_property(util::Any&, const Property&, size_t) const
+    {
+        return util::none;
+    }
+
+    template <typename Func>
+    void enumerate_collection(util::Any&, Func&&)
+    {
+    }
+
+    template <typename Func>
+    void enumerate_dictionary(util::Any&, Func&&)
+    {
+    }
+
+    bool is_same_set(object_store::Set const&, util::Any const&)
+    {
+        return false;
+    }
+
+    bool is_same_list(List const&, util::Any const&)
+    {
+        return false;
+    }
+
+    bool is_same_dictionary(const object_store::Dictionary&, const util::Any&)
+    {
+        return false;
+    }
+
+    util::Any box(Mixed v) const
+    {
+        return v;
+    }
+
+    template <typename T>
+    T unbox(util::Any& v, CreatePolicy p, ObjKey = ObjKey()) const
+    {
+        last_create_policy = p;
+        return util::any_cast<T>(v);
+    }
+
+    bool is_null(util::Any const& v) const noexcept
+    {
+        return !v.has_value();
+    }
+    util::Any null_value() const noexcept
+    {
+        return {};
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+
+    mutable CreatePolicy last_create_policy;
 };
 
 TEST_CASE("object") {
@@ -97,6 +166,13 @@ TEST_CASE("object") {
              {"value 1", PropertyType::Int},
              {"value 2", PropertyType::Int},
          }},
+        {"table2",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             {"link", PropertyType::Object | PropertyType::Nullable, "table"},
+             {"link2", PropertyType::Object | PropertyType::Array, "table2"},
+         }},
         {"all types",
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
@@ -110,7 +186,8 @@ TEST_CASE("object") {
              {"object id", PropertyType::ObjectId},
              {"decimal", PropertyType::Decimal},
              {"uuid", PropertyType::UUID},
-             {"mixed", PropertyType::Mixed | PropertyType::Nullable},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable, Property::IsPrimary{false},
+              Property::IsIndexed{true}},
              {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
              {"bool array", PropertyType::Array | PropertyType::Bool},
@@ -141,6 +218,8 @@ TEST_CASE("object") {
              {"object id", PropertyType::ObjectId | PropertyType::Nullable},
              {"decimal", PropertyType::Decimal | PropertyType::Nullable},
              {"uuid", PropertyType::UUID | PropertyType::Nullable},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable, Property::IsPrimary{false},
+              Property::IsIndexed{true}},
 
              {"bool array", PropertyType::Array | PropertyType::Bool | PropertyType::Nullable},
              {"int array", PropertyType::Array | PropertyType::Int | PropertyType::Nullable},
@@ -203,6 +282,26 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
+    TestContext d(r);
+    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("all types"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+    auto create_sub = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("link target"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+    auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        r->begin_transaction();
+        Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
+        r->commit_transaction();
+        return obj;
+    };
+
     SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
@@ -226,26 +325,30 @@ TEST_CASE("object") {
             advance_and_notify(*r);
         };
 
-        auto require_change = [&] {
-            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                change = c;
-            });
+        auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                },
+                key_path_array);
             advance_and_notify(*r);
             return token;
         };
 
-        auto require_no_change = [&] {
+        auto require_no_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             bool first = true;
-            auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                REQUIRE(first);
-                first = false;
-            });
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet, std::exception_ptr) {
+                    REQUIRE(first);
+                    first = false;
+                },
+                key_path_array);
             advance_and_notify(*r);
             return token;
         };
 
         SECTION("deleting the object sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 obj.remove();
             });
@@ -253,7 +356,7 @@ TEST_CASE("object") {
         }
 
         SECTION("clearing the table sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 table->clear();
             });
@@ -264,7 +367,7 @@ TEST_CASE("object") {
             obj = table->get_object(table->size() - 1);
             object = Object(r, obj);
 
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 table->clear();
             });
@@ -272,7 +375,7 @@ TEST_CASE("object") {
         }
 
         SECTION("modifying the object sends a change notification") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             write([&] {
                 obj.set(col_keys[0], 10);
@@ -290,14 +393,14 @@ TEST_CASE("object") {
         }
 
         SECTION("modifying a different object") {
-            auto token = require_no_change();
+            auto token = require_no_change(object);
             write([&] {
                 table->get_object(1).set(col_keys[0], 10);
             });
         }
 
         SECTION("multiple write transactions") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             auto r2row = r2->read_group().get_table("class_table")->get_object(0);
             r2->begin_transaction();
@@ -314,7 +417,7 @@ TEST_CASE("object") {
         }
 
         SECTION("skipping a notification") {
-            auto token = require_no_change();
+            auto token = require_no_change(object);
             write([&] {
                 obj.set(col_keys[0], 1);
                 token.suppress_next();
@@ -322,7 +425,7 @@ TEST_CASE("object") {
         }
 
         SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
-            auto token = require_change();
+            auto token = require_change(object);
 
             // would not produce a notification even if it wasn't skipped because no changes were made
             write([&] {
@@ -343,7 +446,7 @@ TEST_CASE("object") {
                     FAIL("This should never happen");
                 });
             }
-            auto token = require_change();
+            auto token = require_change(object);
             write([&] {
                 obj.remove();
             });
@@ -354,29 +457,448 @@ TEST_CASE("object") {
             write([&] {
                 obj.remove();
             });
-            REQUIRE_THROWS(require_change());
+            REQUIRE_THROWS(require_change(object));
+        }
+
+        SECTION("keypath filtered notifications") {
+            auto table_origin = r->read_group().get_table("class_table2");
+            auto col_origin_value = table_origin->get_column_key("value");
+            auto col_origin_link = table_origin->get_column_key("link");
+            auto col_origin_link2 = table_origin->get_column_key("link2");
+
+            auto table_target = r->read_group().get_table("class_table");
+            auto col_target_value1 = table_target->get_column_key("value 1");
+            auto col_target_value2 = table_target->get_column_key("value 2");
+            auto col_target_backlink = table_origin->get_opposite_column(col_origin_link);
+
+            r->begin_transaction();
+
+            Obj obj_target = table_target->create_object_with_primary_key(200);
+            Object object_target(r, obj_target);
+            object_target.set_column_value("value 1", 201);
+            object_target.set_column_value("value 2", 202);
+
+            Obj obj_origin = table_origin->create_object_with_primary_key(100);
+            Object object_origin(r, obj_origin);
+            object_origin.set_column_value("value", 101);
+            object_origin.set_property_value(d, "link", util::Any(object_target));
+
+            r->commit_transaction();
+
+            std::pair<TableKey, ColKey> pair_origin_value(table_origin->get_key(), col_origin_value);
+            std::pair<TableKey, ColKey> pair_origin_link(table_origin->get_key(), col_origin_link);
+            std::pair<TableKey, ColKey> pair_origin_link2(table_origin->get_key(), col_origin_link2);
+            std::pair<TableKey, ColKey> pair_target_backlink1(table_target->get_key(), col_target_backlink);
+            std::pair<TableKey, ColKey> pair_target_value1(table_target->get_key(), col_target_value1);
+            std::pair<TableKey, ColKey> pair_target_value2(table_target->get_key(), col_target_value2);
+
+            auto key_path_origin_value = {pair_origin_value};
+            auto key_path_origin_link = {pair_origin_link};
+            auto key_path_target_value1 = {pair_target_value1};
+            auto key_path_target_value2 = {pair_target_value2};
+
+            auto key_path_origin_to_target_value1 = {pair_origin_link, pair_target_value1};
+            auto key_path_origin_to_target_value2 = {pair_origin_link, pair_target_value2};
+            auto key_path_target_backlink = {pair_target_backlink1};
+            auto key_path_target_to_origin_value = {pair_target_backlink1, pair_origin_value};
+            auto key_path_target_to_origin_link = {pair_target_backlink1, pair_origin_link};
+
+            KeyPathArray key_path_array_origin_value = {key_path_origin_value};
+            KeyPathArray key_path_array_origin_link = {key_path_origin_link};
+            KeyPathArray key_path_array_target_value1 = {key_path_target_value1};
+            KeyPathArray key_path_array_target_value2 = {key_path_target_value2};
+
+            KeyPathArray key_path_array_origin_to_target_value1 = {key_path_origin_to_target_value1};
+            KeyPathArray key_path_array_origin_to_target_value2 = {key_path_origin_to_target_value2};
+            KeyPathArray key_path_array_target_backlink = {key_path_target_backlink};
+            KeyPathArray key_path_array_target_to_origin_value = {key_path_target_to_origin_value};
+            KeyPathArray key_path_array_target_to_origin_link = {key_path_target_to_origin_link};
+
+            SECTION("callbacks on a single object") {
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing origin table 'table2', property 'value' "
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_origin, key_path_array_origin_value);
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_origin_value.value], 0);
+                }
+
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_value);
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 2' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_origin, key_path_array_origin_value);
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
+
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value1);
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_target, key_path_array_target_value1);
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_value1.value], 0);
+                }
+
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 1' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value1);
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                }
+
+                SECTION("modifying origin table 'table2', property 'value' "
+                        "while observing related table 'table', property 'value 2' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_origin.set_column_value("value", 105);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 1' "
+                        "while observing related table 'table', property 'value 2' "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_target.set_column_value("value 1", 205);
+                    });
+                }
+
+                SECTION("modifying related table 'table', property 'value 2' "
+                        "while observing related table 'table', property 'value 2' "
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_target, key_path_array_target_value2);
+
+                    write([&] {
+                        object_target.set_column_value("value 2", 205);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_value2.value], 0);
+                }
+            }
+
+            SECTION("callbacks on linked objects") {
+                SECTION("all callbacks filtered") {
+                    SECTION("modifying origin table 'table2', property 'value' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> does NOT send a notification") {
+                        auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
+
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                    }
+
+                    SECTION("modifying related table 'table', property 'value 1' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> DOES send a notification") {
+                        auto token = require_change(object_origin, key_path_array_origin_to_target_value1);
+
+                        write([&] {
+                            object_target.set_column_value("value 1", 205);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
+                    }
+
+                    SECTION("modifying related table 'table', property 'value 2' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> does NOT send a notification") {
+                        auto token = require_no_change(object_origin, key_path_array_origin_to_target_value1);
+
+                        write([&] {
+                            object_target.set_column_value("value 2", 205);
+                        });
+                    }
+                }
+
+                SECTION("some callbacks filtered") {
+                    SECTION("modifying origin table 'table2', property 'value' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> DOES send a notification") {
+                        auto token_with_filter =
+                            require_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_without_filter = require_change(object_origin);
+
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_origin_value.value], 0);
+                    }
+
+                    SECTION("modifying related table 'table', property 'value 1' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> DOES send a notification") {
+                        auto token_with_filter =
+                            require_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_without_filter = require_change(object_origin);
+
+                        write([&] {
+                            object_target.set_column_value("value 1", 205);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_origin_link.value], 0);
+                    }
+
+                    SECTION("modifying related table 'table', property 'value 2' "
+                            "while observing related table 'table', property 'value 1' "
+                            "-> does NOT send a notification") {
+                        auto token_with_filter =
+                            require_no_change(object_origin, key_path_array_origin_to_target_value1);
+                        auto token_without_filter = require_no_change(object_origin);
+
+                        write([&] {
+                            object_target.set_column_value("value 2", 205);
+                        });
+                    }
+                }
+            }
+
+            SECTION("callbacks on objects with link depth > 4") {
+                r->begin_transaction();
+
+                Obj obj_depth6 = table_origin->create_object_with_primary_key(600);
+                Object object_depth6(r, obj_depth6);
+                object_depth6.set_column_value("value", 601);
+
+                Obj obj_depth5 = table_origin->create_object_with_primary_key(500);
+                Object object_depth5(r, obj_depth5);
+                object_depth5.set_column_value("value", 501);
+                object_depth5.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth6)}));
+
+                Obj obj_depth4 = table_origin->create_object_with_primary_key(400);
+                Object object_depth4(r, obj_depth4);
+                object_depth4.set_column_value("value", 401);
+                object_depth4.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth5)}));
+
+                Obj obj_depth3 = table_origin->create_object_with_primary_key(300);
+                Object object_depth3(r, obj_depth3);
+                object_depth3.set_column_value("value", 301);
+                object_depth3.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth4)}));
+
+                Obj obj_depth2 = table_origin->create_object_with_primary_key(200);
+                Object object_depth2(r, obj_depth2);
+                object_depth2.set_column_value("value", 201);
+                object_depth2.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth3)}));
+
+                Obj obj_depth1 = table_origin->create_object_with_primary_key(100);
+                Object object_depth1(r, obj_depth1);
+                object_depth1.set_column_value("value", 101);
+                object_depth1.set_property_value(d, "link2", util::Any(AnyVec{util::Any(object_depth2)}));
+
+                r->commit_transaction();
+
+                auto key_path_to_depth_5 = {pair_origin_link2, pair_origin_link2, pair_origin_link2,
+                                            pair_origin_link2, pair_origin_value};
+                auto key_path_to_depth_6 = {pair_origin_link2, pair_origin_link2, pair_origin_link2,
+                                            pair_origin_link2, pair_origin_link2, pair_origin_value};
+
+                KeyPathArray key_path_array_to_depth_5 = {key_path_to_depth_5};
+                KeyPathArray key_path_array_to_depth_6 = {key_path_to_depth_6};
+
+                SECTION("modifying table 'table2', property 'link2' 5 levels deep "
+                        "while observing table 'table2', property 'link2' 5 levels deep "
+                        "-> DOES send a notification") {
+                    auto token = require_change(object_depth1, key_path_array_to_depth_5);
+
+                    write([&] {
+                        object_depth5.set_column_value("value", 555);
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_origin_link2.value], 0);
+                }
+
+                SECTION("modifying table 'table2', property 'link2' 6 depths deep "
+                        "while observing table 'table2', property 'link2' 5 depths deep "
+                        "-> does NOT send a notification") {
+                    auto token = require_no_change(object_depth1, key_path_array_to_depth_5);
+
+                    write([&] {
+                        object_depth6.set_column_value("value", 555);
+                    });
+                }
+            }
+
+            SECTION("keypath filter with a backlink") {
+                SECTION("all callbacks filtered") {
+                    SECTION("modifying backlinked table 'table2', property 'value' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
+                            "-> DOES send a notification") {
+                        auto token_with_backlink =
+                            require_change(object_target, key_path_array_target_to_origin_value);
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                    SECTION("modifying backlinked table 'table2', property 'link' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
+                            "-> does NOT send a notification") {
+                        auto token_with_backlink =
+                            require_no_change(object_target, key_path_array_target_to_origin_value);
+                        write([&] {
+                            Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                            Object object_target2(r, obj_target2);
+                            object_origin.set_property_value(d, "link", util::Any(object_target2));
+                        });
+                    }
+                }
+
+                SECTION("adding a new origin pointing to the target "
+                        "while observing target table 'table2's backlink "
+                        "-> DOES send a notification") {
+                    auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", util::Any(object_target));
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                }
+
+                SECTION("adding a new origin pointing to the target "
+                        "while observing target table 'table2', property 'link' on origin "
+                        "-> DOES send a notification") {
+                    auto token_with_backlink = require_change(object_target, key_path_array_target_to_origin_link);
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", util::Any(object_target));
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                }
+
+                SECTION("adding a new origin pointing to the target "
+                        "while observing target table 'table2', property 'value' on origin "
+                        "-> DOES send a notification") {
+                    auto token_with_backlink = require_change(object_target, key_path_array_target_to_origin_value);
+                    write([&] {
+                        Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                        Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", util::Any(object_target));
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                }
+
+                SECTION("some callbacks filtered") {
+                    SECTION("modifying backlinked table 'table2', property 'value' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
+                            "-> DOES send a notification") {
+                        auto token_with_backlink =
+                            require_change(object_target, key_path_array_target_to_origin_value);
+                        auto token_without_filter = require_change(object_target);
+                        write([&] {
+                            object_origin.set_column_value("value", 105);
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                    SECTION("modifying backlinked table 'table2', property 'link2' "
+                            "while observing backlinked table 'table2', property 'value' on origin "
+                            "-> does NOT a notification") {
+                        auto token_with_backlink =
+                            require_no_change(object_target, key_path_array_target_to_origin_value);
+                        auto token_without_filter = require_no_change(object_target);
+                        write([&] {
+                            Obj obj_target2 = table_target->create_object_with_primary_key(300);
+                            Object object_target2(r, obj_target2);
+                            object_origin.set_property_value(d, "link", util::Any(object_target2));
+                        });
+                    }
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2's backlink "
+                            "-> DOES send a notification") {
+                        auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
+                        auto token_without_filter = require_change(object_target);
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            Object object_origin2(r, obj_origin2);
+                            object_origin2.set_property_value(d, "link", util::Any(object_target));
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                    SECTION("adding a new origin pointing to the target "
+                            "while observing target table 'table2', property 'value' on origin "
+                            "-> DOES send a notification") {
+                        auto token_with_backlink =
+                            require_change(object_target, key_path_array_target_to_origin_value);
+                        auto token_without_filter = require_change(object_target);
+                        write([&] {
+                            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+                            Object object_origin2(r, obj_origin2);
+                            object_origin2.set_property_value(d, "link", util::Any(object_target));
+                        });
+                        REQUIRE_INDICES(change.modifications, 0);
+                        REQUIRE(change.columns.size() == 1);
+                        REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                    }
+                }
+            }
+
+            SECTION("deleting the object sends a change notification") {
+                auto token = require_change(object_origin, key_path_array_origin_value);
+
+                write([&] {
+                    obj_origin.remove();
+                });
+                REQUIRE_INDICES(change.deletions, 0);
+            }
         }
     }
-
-    TestContext d(r);
-    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("all types"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
-    auto create_sub = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("link target"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
-    auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
-        r->begin_transaction();
-        Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
-        r->commit_transaction();
-        return obj;
-    };
 
     SECTION("create object") {
         auto obj = create(AnyDict{
@@ -915,38 +1437,27 @@ TEST_CASE("object") {
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"_id", INT64_C(1)}}),
                            policy);
 
-            REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
-            REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
-            REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 2.2f);
-            REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
-            REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
-            REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
-                    ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
-            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
-                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<bool>(obj, "bool") == true);
+            REQUIRE(d.get<int64_t>(obj, "int") == 5);
+            REQUIRE(d.get<float>(obj, "float") == 2.2f);
+            REQUIRE(d.get<double>(obj, "double") == 3.3);
+            REQUIRE(d.get<std::string>(obj, "string") == "hello");
+            REQUIRE(d.get<Timestamp>(obj, "date") == Timestamp(10, 20));
+            REQUIRE(d.get<util::Optional<ObjectId>>(obj, "object id") == ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<Decimal128>(obj, "decimal") == Decimal128("1.23e45"));
+            REQUIRE(d.get<util::Optional<UUID>>(obj, "uuid") == UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                true);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                5);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == 3.3);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
-                    Decimal128("1.23e45"));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == true);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == 5);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == 1.1f);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == "a");
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) ==
+                    ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) ==
+                    UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
 
             // Set all properties to null
             AnyDict null_values{
@@ -986,65 +1497,66 @@ TEST_CASE("object") {
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "decimal").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "uuid").has_value());
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                util::none);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                util::none);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) ==
-                    StringData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).get<BinaryData>(0) ==
-                    BinaryData());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) ==
-                    Timestamp());
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == util::none);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) ==
-                    Decimal128(realm::null()));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                util::none);
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == StringData());
+            REQUIRE(d.get<List>(obj, "data array").get<BinaryData>(0) == BinaryData());
+            REQUIRE(d.get<List>(obj, "date array").get<Timestamp>(0) == Timestamp());
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) == util::none);
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal>(0) == Decimal128(realm::null()));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) == util::none);
+
+            // Set all lists to null
+            AnyDict null_arrays{{"_id", INT64_C(1)},
+                                {"bool array", util::Any()},
+                                {"int array", util::Any()},
+                                {"float array", util::Any()},
+                                {"double array", util::Any()},
+                                {"string array", util::Any()},
+                                {"data array", util::Any()},
+                                {"date array", util::Any()},
+                                {"object id array", util::Any()},
+                                {"decimal array", util::Any()},
+                                {"uuid array", util::Any()}};
+            Object::create(d, r, *r->schema().find("all optional types"), util::Any(null_arrays), policy);
+
+            REQUIRE(d.get<List>(obj, "bool array").size() == 0);
+            REQUIRE(d.get<List>(obj, "int array").size() == 0);
+            REQUIRE(d.get<List>(obj, "float array").size() == 0);
+            REQUIRE(d.get<List>(obj, "double array").size() == 0);
+            REQUIRE(d.get<List>(obj, "string array").size() == 0);
+            REQUIRE(d.get<List>(obj, "data array").size() == 0);
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").size() == 0);
+            REQUIRE(d.get<List>(obj, "decimal array").size() == 0);
+            REQUIRE(d.get<List>(obj, "uuid array").size() == 0);
 
             // Set all properties back to non-null
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values), policy);
-            REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
-            REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
-            REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 2.2f);
-            REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
-            REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
-            REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+            REQUIRE(d.get<bool>(obj, "bool") == true);
+            REQUIRE(d.get<int64_t>(obj, "int") == 5);
+            REQUIRE(d.get<float>(obj, "float") == 2.2f);
+            REQUIRE(d.get<double>(obj, "double") == 3.3);
+            REQUIRE(d.get<std::string>(obj, "string") == "hello");
+            REQUIRE(d.get<Timestamp>(obj, "date") == Timestamp(10, 20));
+            REQUIRE(d.get<util::Optional<ObjectId>>(obj, "object id").value() ==
                     ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
-            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
-                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<Decimal128>(obj, "decimal") == Decimal128("1.23e45"));
+            REQUIRE(d.get<util::Optional<UUID>>(obj, "uuid") == UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
-                true);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).get<util::Optional<int64_t>>(0) ==
-                5);
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).get<util::Optional<float>>(0) ==
-                1.1f);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array"))
-                        .get<util::Optional<double>>(0) == 3.3);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
-            REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
-                    Decimal128("1.23e45"));
-            REQUIRE(
-                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
-                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
+            REQUIRE(d.get<List>(obj, "bool array").get<util::Optional<bool>>(0) == true);
+            REQUIRE(d.get<List>(obj, "int array").get<util::Optional<int64_t>>(0) == 5);
+            REQUIRE(d.get<List>(obj, "float array").get<util::Optional<float>>(0) == 1.1f);
+            REQUIRE(d.get<List>(obj, "double array").get<util::Optional<double>>(0) == 3.3);
+            REQUIRE(d.get<List>(obj, "string array").get<StringData>(0) == "a");
+            REQUIRE(d.get<List>(obj, "date array").size() == 0);
+            REQUIRE(d.get<List>(obj, "object id array").get<util::Optional<ObjectId>>(0) ==
+                    ObjectId("000000000000000000000001"));
+            REQUIRE(d.get<List>(obj, "decimal array").get<Decimal128>(0) == Decimal128("1.23e45"));
+            REQUIRE(d.get<List>(obj, "uuid array").get<util::Optional<UUID>>(0) ==
+                    UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
         }
     }
 
@@ -1178,28 +1690,28 @@ TEST_CASE("object") {
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "mixed", util::Any(25));
-        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
         obj.set_property_value(d, "mixed", util::Any("Hello"s));
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
         obj.set_property_value(d, "mixed", util::Any(1.23));
-        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
         obj.set_property_value(d, "mixed", util::Any(123.45f));
-        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
         obj.set_property_value(d, "mixed", util::Any(Timestamp(30, 40)));
-        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
         obj.set_property_value(d, "mixed", util::Any(ObjectId("111111111111111111111111")));
-        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 ObjectId("111111111111111111111111"));
         obj.set_property_value(d, "mixed", util::Any(Decimal128("42.4242e42")));
-        REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
         obj.set_property_value(d, "mixed", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
-        REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "dictionary", util::Any(AnyDict({{"k1", "v1"s}, {"k2", "v2"s}})));
         auto dict = any_cast<AnyDict&&>(obj.get_property_value<util::Any>(d, "dictionary"));
-        REQUIRE(util::any_cast<std::string>(dict["k1"]) == "v1");
-        REQUIRE(util::any_cast<std::string>(dict["k2"]) == "v2");
+        REQUIRE(util::any_cast<Mixed>(dict["k1"]) == "v1");
+        REQUIRE(util::any_cast<Mixed>(dict["k2"]) == "v2");
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
@@ -1216,6 +1728,29 @@ TEST_CASE("object") {
 
         REQUIRE_THROWS(obj.get_property_value<util::Any>(d, "not a property"));
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5))));
+    }
+
+    SECTION("setter has correct create policy") {
+        r->begin_transaction();
+        auto table = r->read_group().get_table("class_all types");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+        CreatePolicyRecordingContext ctx;
+
+        auto validate = [&obj, &ctx](CreatePolicy policy) {
+            obj.set_property_value(ctx, "mixed", util::Any(Mixed("Hello")), policy);
+            REQUIRE(policy.copy == ctx.last_create_policy.copy);
+            REQUIRE(policy.diff == ctx.last_create_policy.diff);
+            REQUIRE(policy.create == ctx.last_create_policy.create);
+            REQUIRE(policy.update == ctx.last_create_policy.update);
+        };
+
+        validate(CreatePolicy::Skip);
+        validate(CreatePolicy::ForceCreate);
+        validate(CreatePolicy::UpdateAll);
+        validate(CreatePolicy::UpdateModified);
+        validate(CreatePolicy::SetLink);
+        r->commit_transaction();
     }
 
     SECTION("list property self-assign is a no-op") {
@@ -1247,6 +1782,66 @@ TEST_CASE("object") {
 
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+    }
+
+    SECTION("Mixed emit notification on type change") {
+        auto validate_change = [&](util::Any&& obj_dict, util::Any&& value) {
+            r->begin_transaction();
+            auto obj =
+                Object::create(d, r, *r->schema().find("all optional types"), obj_dict, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+
+            CollectionChangeSet change;
+            auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            obj.set_property_value(d, "mixed", value, CreatePolicy::UpdateModified);
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+
+            REQUIRE_INDICES(change.modifications, 0);
+        };
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", true}}, util::Any(1));
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", false}}, util::Any(0));
+
+        auto object_id = ObjectId::gen();
+
+        validate_change(AnyDict{{"_id", util::Any()}, {"mixed", object_id}}, util::Any(object_id.get_timestamp()));
+    }
+
+    SECTION("get and set an unresolved object") {
+        r->begin_transaction();
+
+        auto table = r->read_group().get_table("class_all types");
+        ColKey link_col = table->get_column_key("object");
+        table->create_object_with_primary_key(1);
+        Object obj(r, *r->schema().find("all types"), *table->begin());
+
+        auto link_table = r->read_group().get_table("class_link target");
+        link_table->create_object_with_primary_key(0);
+        Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
+
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+        obj.set_property_value(d, "object", util::Any(linkobj));
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+                linkobj.obj().get_key());
+
+        REQUIRE(!obj.obj().is_unresolved(link_col));
+        linkobj.obj().invalidate();
+        REQUIRE(obj.obj().is_unresolved(link_col));
+
+        CHECK_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+
+        obj.set_property_value(d, "object", util::Any());
+        // Cancelling a transaction in which the first tombstone was created, caused the program to crash
+        // because we tried to update m_tombstones on a null ref. Now fixed
+        r->cancel_transaction();
     }
 
 #if REALM_ENABLE_SYNC

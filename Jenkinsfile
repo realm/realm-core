@@ -140,7 +140,8 @@ jobWrapper {
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+            // FIXME: disabled due to issues with CI
+	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -258,13 +259,10 @@ def doCheckInDocker(Map options = [:]) {
         REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
     if (options.enableSync) {
-        echo 'FIXME: Skipping stitch tests because of a breaking change in the sync client'
-        /*
         cmakeOptions << [
             REALM_ENABLE_AUTH_TESTS: 'ON',
             REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
         ]
-        */
     }
     if (longRunningTests) {
         cmakeOptions << [
@@ -281,8 +279,6 @@ def doCheckInDocker(Map options = [:]) {
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
-
-            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
@@ -309,7 +305,7 @@ def doCheckInDocker(Map options = [:]) {
                 // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
                 // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
                 // if there's really a new feature you need from the latest stitch, upgrade this manually
-                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/test/object-store/mongodb"]) { networkName ->
+                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG) { networkName ->
                     buildSteps("--network=${networkName}")
                 }
 
@@ -486,7 +482,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
+            def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
@@ -494,7 +490,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
             } else if (test.hasValue(TestAction.Build)) {
                 // TODO: should we build sync tests, too?
-                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON'
+                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON'
             }
 
             def doBuild = {
@@ -506,13 +502,15 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                         filters: warningFilters,
                     )
                 }
-                dir(buildDir) {
-                    archiveArtifacts('realm-*.tar.gz')
-                    stash includes: 'realm-*.tar.gz', name: stashName
-                }
-                androidStashes << stashName
-                if (gitTag) {
-                    publishingStashes << stashName
+                if (test == TestAction.None) {
+                    dir(buildDir) {
+                        archiveArtifacts('realm-*.tar.gz')
+                        stash includes: 'realm-*.tar.gz', name: stashName
+                    }
+                    androidStashes << stashName
+                    if (gitTag) {
+                        publishingStashes << stashName
+                    }
                 }
             }
 
@@ -527,7 +525,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                             sh """
                                 cd ${buildDir}
                                 adb connect emulator
-                                timeout 10m adb wait-for-device
+                                timeout 30m adb wait-for-device
                                 adb push test/realm-tests /data/local/tmp
                                 find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                 find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
@@ -704,7 +702,6 @@ def doBuildMacOs(Map options = [:]) {
         CMAKE_BUILD_TYPE: options.buildType,
         CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
         REALM_ENABLE_SYNC: options.enableSync,
-        OSX_ARM64: 'ON',
     ]
     if (!options.runTests) {
         cmakeOptions << [
@@ -745,7 +742,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -799,7 +796,6 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_VERSION=${gitDescribeVersion} \\
                                   -D REALM_SKIP_SHARED_LIB=ON \\
                                   -D REALM_BUILD_LIB_ONLY=ON \\
-                                  -D OSX_ARM64=1 \\
                                   -G Ninja ..
                         """
                     runAndCollectWarnings(
@@ -826,13 +822,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            // Builds for Apple devices have to be done with the oldest Xcode
-            // version we support because bitcode is not backwards-compatible.
-            // This doesn't apply to simulators, and Xcode 12 supports more
-            // architectures than 11, so we want to use 12 for simulator builds.
-            def xcodeVersion = sdk.contains('simulator') ? '12' : '11'
-
-            withEnv(["DEVELOPER_DIR=/Applications/Xcode-${xcodeVersion}.app/Contents/Developer/"]) {
+            withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """

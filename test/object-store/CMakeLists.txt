@@ -24,12 +24,18 @@ set(SOURCES
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
+    backup.cpp
+    c_api/c_api.cpp
+    c_api/c_api.c
 
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
 )
 
+if(REALM_ENABLE_AUTH_TESTS)
+    list(APPEND SOURCES util/baas_admin_api.cpp)
+endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
@@ -58,7 +64,7 @@ set_target_properties(ObjectStoreTests PROPERTIES
     OUTPUT_NAME realm-object-store-tests
 )
 
-target_link_libraries(ObjectStoreTests ObjectStore)
+target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
 create_coverage_target(generate-coverage ObjectStoreTests)
 
@@ -75,19 +81,20 @@ if(REALM_ENABLE_SYNC)
             message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
         endif()
 
-        if(NOT REALM_STITCH_CONFIG)
-            message(FATAL_ERROR "REALM_STITCH_CONFIG must be set when specifying REALM_ENABLE_AUTH_TESTS.")
-        endif()
-
         target_compile_definitions(ObjectStoreTests PRIVATE
             REALM_ENABLE_AUTH_TESTS=1
             REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
-            REALM_STITCH_CONFIG="${REALM_STITCH_CONFIG}"
         )
 
         find_package(CURL REQUIRED)
         target_link_libraries(ObjectStoreTests CURL::libcurl)
     endif()
+endif()
+
+if(REALM_TEST_SYNC_LOGGING)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        TEST_ENABLE_SYNC_LOGGING=1
+    )
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -98,8 +105,13 @@ if(VSCODE_TEST_RUNNER)
     target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 endif()
 
+# Resources required for running the tests
+file(GLOB REQUIRED_TEST_FILES
+     "*.realm")
+
+
 add_custom_command(TARGET ObjectStoreTests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:ObjectStoreTests>)
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${REQUIRED_TEST_FILES} $<TARGET_FILE_DIR:ObjectStoreTests>)
 
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build

@@ -141,11 +141,29 @@ Group::Group(SlabAlloc* alloc) noexcept
     init_array_parents();
 }
 
+class TableRecycler : public std::vector<Table*> {
+public:
+    ~TableRecycler()
+    {
+        REALM_UNREACHABLE();
+        // if ever enabled, remember to release Tables:
+        // for (auto t : *this) {
+        //    delete t;
+        //}
+    }
+};
 
-Group::TableRecycler Group::g_table_recycler_1;
-Group::TableRecycler Group::g_table_recycler_2;
-std::mutex Group::g_table_recycler_mutex;
-
+// We use the classic approach to construct a FIFO from two LIFO's,
+// insertion is done into recycler_1, removal is done from recycler_2,
+// and when recycler_2 is empty, recycler_1 is reversed into recycler_2.
+// this i O(1) for each entry.
+auto& g_table_recycler_1 = *new TableRecycler;
+auto& g_table_recycler_2 = *new TableRecycler;
+// number of tables held back before being recycled. We hold back recycling
+// the latest to increase the probability of detecting race conditions
+// without crashing.
+const static int g_table_recycling_delay = 100;
+auto& g_table_recycler_mutex = *new std::mutex;
 
 TableKeyIterator& TableKeyIterator::operator++()
 {
@@ -266,11 +284,10 @@ size_t Group::key2ndx_checked(TableKey key) const
         if (tbl && tbl->get_key() == key)
             return idx;
     }
-    // FIXME: This is a temporary hack we should revisit.
     // The notion of a const group as it is now, is not really
     // useful. It is linked to a distinction between a read
-    // and a write transaction. This distinction is likely to
-    // be moved from compile time to run time.
+    // and a write transaction. This distinction is no longer
+    // a compile time aspect (it's not const anymore)
     Allocator* alloc = const_cast<SlabAlloc*>(&m_alloc);
     if (m_tables.is_attached() && idx < m_tables.size()) {
         RefOrTagged rot = m_tables.get_as_ref_or_tagged(idx);
@@ -300,10 +317,19 @@ int Group::get_committed_file_format_version() const noexcept
     return m_alloc.get_committed_file_format_version();
 }
 
+std::optional<int> Group::fake_target_file_format;
+
+void _impl::GroupFriend::fake_target_file_format(const std::optional<int> format) noexcept
+{
+    Group::fake_target_file_format = format;
+}
 
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
+    if (Group::fake_target_file_format) {
+        return *Group::fake_target_file_format;
+    }
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
     // `current_file_format_version`, it will trigger a file format upgrade
@@ -316,12 +342,14 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 11) {
-        // We are able to open file format 11 in RO mode
-        return 11;
+    if (requested_history_type == Replication::hist_None) {
+        if (current_file_format_version == 22) {
+            // We are able to open these file formats in RO mode
+            return current_file_format_version;
+        }
     }
 
-    return 20;
+    return g_current_file_format_version;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -375,11 +403,15 @@ uint64_t Group::get_sync_file_id() const noexcept
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
+    if (fake_target_file_format && *fake_target_file_format == target_file_format_version) {
+        // Testing, mockup scenario, not a real upgrade. Just pretend we're done!
+        return;
+    }
 
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 20, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -387,7 +419,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 11,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 21,
                     current_file_format_version);
 
 
@@ -447,7 +479,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
                 pk_table->migrate_column_info();
                 pk_table->migrate_indexes(ColKey());
                 pk_table->create_columns();
-                pk_table->migrate_objects(ColKey());
+                pk_table->migrate_objects();
                 pk_cols = get_primary_key_columns_from_pk_table(pk_table);
             }
 
@@ -484,7 +516,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         for (auto k : table_accessors) {
             auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
             if (!progress_status.get<bool>(col_objects)) {
-                bool no_links = k->migrate_objects(pk_cols[k]);
+                bool no_links = k->migrate_objects();
                 progress_status.set(col_objects, true);
                 progress_status.set(col_links, no_links);
                 commit_and_continue_writing();
@@ -510,30 +542,24 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // If we come from a file format version lower than 10, all objects with primary keys
-    // will be upgraded correctly by the above process. In file format 20 we don't have
-    // search index on primary key columns. We need to rebuild the tables to ensure that
-    // the ObjKeys matches the primary key value.
-    if (current_file_format_version > 9 && current_file_format_version < 20 && target_file_format_version >= 20) {
-        auto table_keys = get_table_keys();
-        for (auto k : table_keys) {
-            auto t = get_table(k);
-            if (auto col = t->get_primary_key_column()) {
-                t->remove_search_index(col);
-                t->rebuild_table_with_pk_column();
-            }
+    // Ensure we have search index on all primary key columns. This is idempotent so no
+    // need to check on current_file_format_version
+    auto table_keys = get_table_keys();
+    for (auto k : table_keys) {
+        auto t = get_table(k);
+        if (auto col = t->get_primary_key_column()) {
+            t->do_add_search_index(col);
         }
     }
 
     // NOTE: Additional future upgrade steps go here.
 }
 
-void Group::open(ref_type top_ref, const std::string& file_path)
-{
-    SlabAlloc::DetachGuard dg(m_alloc);
 
+int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std::string& path)
+{
     // Select file format if it is still undecided.
-    m_file_format_version = m_alloc.get_committed_file_format_version();
+    auto file_format_version = alloc.get_committed_file_format_version();
 
     bool file_format_ok = false;
     // It is not possible to open prior file format versions without an upgrade.
@@ -541,17 +567,26 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
-    switch (m_file_format_version) {
+    switch (file_format_version) {
         case 0:
             file_format_ok = (top_ref == 0);
             break;
         case 11:
         case 20:
+        case 21:
+        case g_current_file_format_version:
             file_format_ok = true;
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", file_path);
+        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+    return file_format_version;
+}
+
+void Group::open(ref_type top_ref, const std::string& file_path)
+{
+    SlabAlloc::DetachGuard dg(m_alloc);
+    m_file_format_version = read_only_version_check(m_alloc, top_ref, file_path);
 
     Replication::HistoryType history_type = Replication::hist_None;
     int target_file_format_version = get_target_file_format_version_for_session(m_file_format_version, history_type);
@@ -585,6 +620,9 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    // Non-Transaction Groups always allow writing and simply don't allow
+    // committing when opened in read-only mode
+    m_alloc.set_read_only(false);
 
     open(top_ref, file_path);
 }
@@ -747,7 +785,7 @@ void Group::update_num_objects()
 {
 #if REALM_METRICS
     if (m_metrics) {
-        // FIXME: this is quite invasive and completely defeats the lazy loading mechanism
+        // This is quite invasive and completely defeats the lazy loading mechanism
         // where table accessors are only instantiated on demand, because they are all created here.
 
         m_total_rows = 0;
@@ -873,7 +911,6 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 
     // get new key and index
     // find first empty spot:
-    // FIXME: Optimize with rowing ptr or free list of some sort
     uint32_t j;
     RefOrTagged rot = RefOrTagged::make_tagged(0);
     for (j = 0; j < m_tables.size(); ++j) {
@@ -1094,83 +1131,61 @@ void Group::validate(ObjLink link) const
     }
 }
 
-class Group::DefaultTableWriter : public Group::TableWriter {
-public:
-    DefaultTableWriter(const Group& group, bool should_write_history)
-        : m_group(group)
-        , m_should_write_history(should_write_history)
-    {
-    }
-    ref_type write_names(_impl::OutputStream& out) override
-    {
-        bool deep = true;                                                // Deep
-        bool only_if_modified = false;                                   // Always
-        return m_group.m_table_names.write(out, deep, only_if_modified); // Throws
-    }
-    ref_type write_tables(_impl::OutputStream& out) override
-    {
-        bool deep = true;                                           // Deep
-        bool only_if_modified = false;                              // Always
-        return m_group.m_tables.write(out, deep, only_if_modified); // Throws
-    }
+ref_type Group::DefaultTableWriter::write_names(_impl::OutputStream& out)
+{
+    bool deep = true;                                                 // Deep
+    bool only_if_modified = false;                                    // Always
+    return m_group->m_table_names.write(out, deep, only_if_modified); // Throws
+}
+ref_type Group::DefaultTableWriter::write_tables(_impl::OutputStream& out)
+{
+    bool deep = true;                                            // Deep
+    bool only_if_modified = false;                               // Always
+    return m_group->m_tables.write(out, deep, only_if_modified); // Throws
+}
 
-    HistoryInfo write_history(_impl::OutputStream& out) override
-    {
-        bool deep = true;              // Deep
-        bool only_if_modified = false; // Always
-        ref_type history_ref = _impl::GroupFriend::get_history_ref(m_group);
-        HistoryInfo info;
-        if (history_ref) {
-            _impl::History::version_type version;
-            int history_type, history_schema_version;
-            _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(m_group),
-                                                             m_group.m_top.get_ref(), version, history_type,
-                                                             history_schema_version);
-            REALM_ASSERT(history_type != Replication::hist_None);
-            if (!m_should_write_history ||
-                (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
-                return info; // Only sync history should be preserved when writing to a new file
-            }
-            info.type = history_type;
-            info.version = history_schema_version;
-            // FIXME: It's ugly that we have to instantiate a new array here,
-            // but it isn't obvious that Group should have history as a member.
-            Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(m_group))};
-            history.init_from_ref(history_ref);
-            info.ref = history.write(out, deep, only_if_modified); // Throws
+auto Group::DefaultTableWriter::write_history(_impl::OutputStream& out) -> HistoryInfo
+{
+    bool deep = true;              // Deep
+    bool only_if_modified = false; // Always
+    ref_type history_ref = _impl::GroupFriend::get_history_ref(*m_group);
+    HistoryInfo info;
+    if (history_ref) {
+        _impl::History::version_type version;
+        int history_type, history_schema_version;
+        _impl::GroupFriend::get_version_and_history_info(_impl::GroupFriend::get_alloc(*m_group),
+                                                         m_group->m_top.get_ref(), version, history_type,
+                                                         history_schema_version);
+        REALM_ASSERT(history_type != Replication::hist_None);
+        if (!m_should_write_history ||
+            (history_type != Replication::hist_SyncClient && history_type != Replication::hist_SyncServer)) {
+            return info; // Only sync history should be preserved when writing to a new file
         }
-        info.sync_file_id = m_group.get_sync_file_id();
-        return info;
+        info.type = history_type;
+        info.version = history_schema_version;
+        Array history{const_cast<Allocator&>(_impl::GroupFriend::get_alloc(*m_group))};
+        history.init_from_ref(history_ref);
+        info.ref = history.write(out, deep, only_if_modified); // Throws
     }
-
-private:
-    const Group& m_group;
-    bool m_should_write_history;
-};
+    info.sync_file_id = m_group->get_sync_file_id();
+    return info;
+}
 
 void Group::write(std::ostream& out, bool pad) const
 {
-    write(out, pad, 0, true);
+    DefaultTableWriter table_writer;
+    write(out, pad, 0, table_writer);
 }
 
-void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, bool write_history) const
+void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(is_attached());
-    DefaultTableWriter table_writer(*this, write_history);
+    writer.set_group(this);
     bool no_top_array = !m_top.is_attached();
-    write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
+    write(out, m_file_format_version, writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
-void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
-                  bool write_history) const
-{
-    File file;
-    int flags = 0;
-    file.open(path, File::access_ReadWrite, File::create_Must, flags);
-    write(file, encryption_key, version_number, write_history);
-}
-
-void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, bool write_history) const
+void Group::write(File& file, const char* encryption_key, uint_fast64_t version_number, TableWriter& writer) const
 {
     REALM_ASSERT(file.get_size() == 0);
 
@@ -1187,19 +1202,27 @@ void Group::write(File& file, const char* encryption_key, uint_fast64_t version_
 
     std::ostream out(&streambuf);
     out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    write(out, encryption_key != 0, version_number, write_history);
+    write(out, encryption_key != 0, version_number, writer);
     int sync_status = streambuf.pubsync();
     REALM_ASSERT(sync_status == 0);
 }
+
+void Group::write(const std::string& path, const char* encryption_key, uint64_t version_number,
+                  bool write_history) const
+{
+    File file;
+    int flags = 0;
+    file.open(path, File::access_ReadWrite, File::create_Must, flags);
+    DefaultTableWriter table_writer(write_history);
+    write(file, encryption_key, version_number, table_writer);
+}
+
 
 BinaryData Group::write_to_mem() const
 {
     REALM_ASSERT(is_attached());
 
     // Get max possible size of buffer
-    //
-    // FIXME: This size could potentially be vastly bigger that what
-    // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
@@ -1253,7 +1276,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         Array top(new_alloc);
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
-        // FIXME: We really need an alternative to Array::truncate() that is able to expand.
         int_fast64_t value_1 = from_ref(names_ref);
         int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
@@ -1648,11 +1670,15 @@ public:
         return true; // No-op
     }
 
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return true; // No-op
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true; // No-op
     }
@@ -1673,6 +1699,10 @@ public:
     {
         return true; // No-op
     }
+    bool typed_link_change(ColKey, TableKey)
+    {
+        return true; // No-op
+    }
 
 private:
     bool& m_schema_changed;
@@ -1682,7 +1712,6 @@ private:
 void Group::update_allocator_wrappers(bool writable)
 {
     m_is_writable = writable;
-    // FIXME: We can't write protect at group level as the allocator is shared: m_alloc.set_read_only(!writable);
     for (size_t i = 0; i < m_table_accessors.size(); ++i) {
         auto table_accessor = m_table_accessors[i];
         if (table_accessor) {

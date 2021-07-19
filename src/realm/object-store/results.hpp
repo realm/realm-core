@@ -20,11 +20,13 @@
 #define REALM_RESULTS_HPP
 
 #include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
@@ -34,7 +36,6 @@
 
 namespace realm {
 class Mixed;
-class ObjectSchema;
 
 namespace _impl {
 class ResultsNotifierBase;
@@ -47,11 +48,10 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> collection, util::Optional<Query> q = {},
             SortDescriptor s = {});
     ~Results();
 
@@ -69,6 +69,9 @@ public:
 
     // Object schema describing the vendored object type
     const ObjectSchema& get_object_schema() const REQUIRES(!m_mutex);
+
+    // Get the table of the vendored object type
+    ConstTableRef get_table() const REQUIRES(!m_mutex);
 
     // Get a query which will match the same rows as is contained in this Results
     // Returned query will not be valid if the current mode is Empty
@@ -102,6 +105,14 @@ public:
     // Throws OutOfBoundsIndexException if index >= size()
     template <typename T = Obj>
     T get(size_t index) REQUIRES(!m_mutex);
+
+    // Get an element in a list
+    Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
+    // Get the key/value pair at an index of the results.
+    // This method is only valid when applied to a results based on a
+    // object_store::Dictionary::get_values(), and will assert this.
+    std::pair<StringData, Mixed> get_dictionary_element(size_t index) REQUIRES(!m_mutex);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -145,14 +156,21 @@ public:
     Results apply_ordering(DescriptorOrdering&& ordering) REQUIRES(!m_mutex);
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
+    // A snapshot can still change if modified explicitly. The problem that a snapshot solves is that
+    // a collection of links may change in unexpected ways if the destination objects are removed.
+    // It’s unintuitive that users can accidentally modify the collection, e.g. when deleting
+    // the object from the Realm. This would work just fine with an in-memory collection but fail
+    // with Realm collections that are not snapshotted.
+    // Since snapshots only account for links to objects, using snapshot on a collection of
+    // primitive values has no effect.
     Results snapshot() const& REQUIRES(!m_mutex);
     Results snapshot() && REQUIRES(!m_mutex);
 
-    // Returns a frozen copy of this result
+    // Returns a frozen copy of this result.
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
-    bool is_frozen() REQUIRES(!m_mutex);
+    bool is_frozen() const REQUIRES(!m_mutex);
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
@@ -182,12 +200,11 @@ public:
     }
 
     enum class Mode {
-        Empty,     // Backed by nothing (for missing tables)
-        Table,     // Backed directly by a Table
-        List,      // Backed by a list-of-primitives that is not a link list.
-        Query,     // Backed by a query that has not yet been turned into a TableView
-        LinkList,  // Backed directly by a LinkList
-        TableView, // Backed by a TableView created from a Query
+        Empty,      // Backed by nothing (for missing tables)
+        Table,      // Backed directly by a Table
+        Collection, // Backed by a collection of links or primitives
+        Query,      // Backed by a query that has not yet been turned into a TableView
+        TableView,  // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
     // Ideally this would not be public but it's needed for some KVO stuff
@@ -249,10 +266,21 @@ public:
         UnimplementedOperationException(const char* message);
     };
 
-    // Create an async query from this Results
-    // The query will be run on a background thread and delivered to the callback,
-    // and then rerun after each commit (if needed) and redelivered if it changed
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    /**
+     * Create an async query from this Results
+     * The query will be run on a background thread and delivered to the callback,
+     * and then rerun after each commit (if needed) and redelivered if it changed
+     *
+     * @param callback The function to execute when a insertions, modification or deletion in this `Collection` was
+     * detected.
+     * @param key_path_array A filter that can be applied to make sure the `CollectionChangeCallback` is only executed
+     * when the property in the filter is changed but not otherwise.
+     *
+     * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
+     * callback via `remove_callback`.
+     */
+    NotificationToken add_notification_callback(CollectionChangeCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
 
     // Returns whether the rows are guaranteed to be in table order.
     bool is_in_table_order() const;
@@ -294,7 +322,6 @@ private:
     TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
-    std::shared_ptr<LnkLst> m_link_list;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
@@ -302,8 +329,6 @@ private:
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
-
-    bool update_linklist() REQUIRES(m_mutex);
 
     void validate_read() const;
     void validate_write() const;
@@ -327,10 +352,7 @@ private:
     template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
-    template <typename T>
-    auto& list_as() const;
-
-    void evaluate_sort_and_distinct_on_list() REQUIRES(m_mutex);
+    void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
     void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);
 
     class IteratorWrapper {

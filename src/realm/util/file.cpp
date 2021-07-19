@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <fcntl.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -34,10 +35,10 @@
 #include <direct.h>
 #else
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
+#include <sys/statvfs.h>
 #endif
 
 #include <realm/exceptions.hpp>
@@ -114,11 +115,11 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
 {
     DirScanner ds{path}; // Throws
     std::string name;
-    while (ds.next(name)) { // Throws
+    while (ds.next(name)) {                              // Throws
         std::string subpath = File::resolve(name, path); // Throws
         bool go_on;
-        if (File::is_dir(subpath)) { // Throws
-            std::string subdir = File::resolve(name, dir); // Throws
+        if (File::is_dir(subpath)) {                           // Throws
+            std::string subdir = File::resolve(name, dir);     // Throws
             go_on = for_each_helper(subpath, subdir, handler); // Throws
         }
         else {
@@ -129,6 +130,56 @@ bool for_each_helper(const std::string& path, const std::string& dir, File::ForE
     }
     return true;
 }
+
+#ifdef _WIN32
+
+std::chrono::system_clock::time_point file_time_to_system_clock(FILETIME ft)
+{
+    // Microseconds between 1601-01-01 00:00:00 UTC and 1970-01-01 00:00:00 UTC
+    constexpr uint64_t kEpochDifferenceMicros = 11644473600000000ull;
+
+    // Construct a 64 bit value that is the number of nanoseconds from the
+    // Windows epoch which is 1601-01-01 00:00:00 UTC
+    auto totalMicros = static_cast<uint64_t>(ft.dwHighDateTime) << 32;
+    totalMicros |= static_cast<uint64_t>(ft.dwLowDateTime);
+
+    // FILETIME is 100's of nanoseconds since Windows epoch
+    totalMicros /= 10;
+    // Move it from micros since the Windows epoch to micros since the Unix epoch
+    totalMicros -= kEpochDifferenceMicros;
+
+    std::chrono::duration<uint64_t, std::micro> totalMicrosDur(totalMicros);
+    return std::chrono::system_clock::time_point(totalMicrosDur);
+}
+
+struct WindowsFileHandleHolder {
+    WindowsFileHandleHolder() = default;
+    explicit WindowsFileHandleHolder(HANDLE h)
+        : handle(h)
+    {
+    }
+
+    WindowsFileHandleHolder(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder(const WindowsFileHandleHolder&) = delete;
+    WindowsFileHandleHolder& operator=(WindowsFileHandleHolder&&) = delete;
+    WindowsFileHandleHolder& operator=(const WindowsFileHandleHolder&) = delete;
+
+    operator HANDLE() const noexcept
+    {
+        return handle;
+    }
+
+    ~WindowsFileHandleHolder()
+    {
+        if (handle != INVALID_HANDLE_VALUE) {
+            ::CloseHandle(handle);
+        }
+    }
+
+    HANDLE handle = INVALID_HANDLE_VALUE;
+};
+
+#endif
 
 } // anonymous namespace
 
@@ -225,10 +276,10 @@ bool try_remove_dir_recursive(const std::string& path)
         bool allow_missing = true;
         DirScanner ds{path, allow_missing}; // Throws
         std::string name;
-        while (ds.next(name)) { // Throws
+        while (ds.next(name)) {                              // Throws
             std::string subpath = File::resolve(name, path); // Throws
-            if (File::is_dir(subpath)) { // Throws
-                try_remove_dir_recursive(subpath); // Throws
+            if (File::is_dir(subpath)) {                     // Throws
+                try_remove_dir_recursive(subpath);           // Throws
             }
             else {
                 File::remove(subpath); // Throws
@@ -331,8 +382,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     }
     DWORD flags_and_attributes = 0;
     std::wstring ws = string_to_wstring(path);
-    HANDLE handle =
-        CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
+    HANDLE handle = CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_fd = handle;
         m_have_lock = false;
@@ -562,7 +612,7 @@ error:
         throw OutOfDiskSpace(msg);
     }
     throw std::system_error(err, std::system_category(), "write() failed");
-// LCOV_EXCL_STOP
+    // LCOV_EXCL_STOP
 
 #endif
 }
@@ -606,6 +656,12 @@ uint64_t File::get_file_pos(FileDesc fd)
     }
     return uint64_t(pos);
 #endif
+}
+
+File::SizeType File::get_size_static(const std::string& path)
+{
+    File f(path);
+    return f.get_size();
 }
 
 File::SizeType File::get_size_static(FileDesc fd)
@@ -863,13 +919,13 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
     }
     throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
 
-// FIXME: OS X does not have any version of fallocate, but see
-// http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
+    // FIXME: OS X does not have any version of fallocate, but see
+    // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
-// FIXME: On Windows one could use a call to CreateFileMapping()
-// since it will grow the file if necessary, but never shrink it,
-// just like posix_fallocate(). The advantage would be that it
-// then becomes an atomic operation (probably).
+    // FIXME: On Windows one could use a call to CreateFileMapping()
+    // since it will grow the file if necessary, but never shrink it,
+    // just like posix_fallocate(). The advantage would be that it
+    // then becomes an atomic operation (probably).
 
 #else
 
@@ -1032,12 +1088,31 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (status) {
         int err = errno;
         REALM_ASSERT_EX(status == -1, status);
-        if (exclusive && err == ENOENT) {
+        if (err == ENOENT) {
             // The management directory doesn't exist, so there's clearly no
-            // readers. This can happen when calling DB::call_with_lock().
-            return true;
+            // readers. This can happen when calling DB::call_with_lock() or
+            // if the management directory has been removed by DB::call_with_lock()
+            if (exclusive) {
+                return true;
+            }
+            // open shared:
+            // We need the fifo in order to make a shared lock. If we have it
+            // in a management directory, we may need to create that first:
+            if (!m_fifo_dir_path.empty())
+                try_make_dir(m_fifo_dir_path);
+            // now we can try creating the FIFO again
+            status = mkfifo(m_fifo_path.c_str(), 0666);
+            if (status) {
+                // If we fail it must be because it already exists
+                err = errno;
+                REALM_ASSERT_EX(err == EEXIST, err);
+            }
         }
-        REALM_ASSERT_EX(err == EEXIST, err);
+        else {
+            // if we failed to create the fifo and not because dir is missing,
+            // it must be because the fifo already exists!
+            REALM_ASSERT_EX(err == EEXIST, err);
+        }
     }
     if (exclusive) {
         // check if any shared locks are already taken by trying to open the pipe for writing
@@ -1227,7 +1302,7 @@ void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileM
 #endif
 }
 
-#endif
+#endif // REALM_ENABLE_ENCRYPTION
 
 void File::unmap(void* addr, size_t size) noexcept
 {
@@ -1610,7 +1685,58 @@ void File::MapBase::sync()
     File::sync_map(m_fd, m_addr, m_size);
 }
 
+std::time_t File::last_write_time(const std::string& path)
+{
+#ifdef _WIN32
+    auto wpath = string_to_wstring(path);
+    WindowsFileHandleHolder fileHandle(::CreateFile2(wpath.c_str(), FILE_READ_ATTRIBUTES,
+                                                     FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                     OPEN_EXISTING, nullptr));
 
+    if (fileHandle == INVALID_HANDLE_VALUE) {
+        throw std::system_error(GetLastError(), std::system_category(), "CreateFileW failed");
+    }
+
+    FILETIME mtime = {0};
+    if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
+        throw std::system_error(GetLastError(), std::system_category(), "GetFileTime failed");
+    }
+
+    auto tp = file_time_to_system_clock(mtime);
+    return std::chrono::system_clock::to_time_t(tp);
+#else
+    struct stat statbuf;
+    if (::stat(path.c_str(), &statbuf) != 0) {
+        throw std::system_error(errno, std::system_category(), "stat() failed");
+    }
+    return statbuf.st_mtime;
+#endif
+}
+
+File::SizeType File::get_free_space(const std::string& path)
+{
+#ifdef _WIN32
+    auto pos = path.find_last_of("/\\");
+    std::string dir_path;
+    if (pos != std::string::npos) {
+        dir_path = path.substr(0, pos);
+    }
+    else {
+        dir_path = path;
+    }
+    ULARGE_INTEGER available;
+    if (!GetDiskFreeSpaceExA(dir_path.c_str(), &available, NULL, NULL)) {
+        throw std::system_error(errno, std::system_category(), "GetDiskFreeSpaceExA failed");
+    }
+    return available.QuadPart;
+#else
+    struct statvfs stat;
+    if (statvfs(path.c_str(), &stat) != 0) {
+        throw std::system_error(errno, std::system_category(), "statvfs() failed");
+    }
+    return SizeType(stat.f_bavail) * stat.f_bsize;
+#endif
+}
 
 #ifndef _WIN32
 
@@ -1718,9 +1844,7 @@ DirScanner::DirScanner(const std::string&, bool)
     throw util::runtime_error("Not yet supported");
 }
 
-DirScanner::~DirScanner() noexcept
-{
-}
+DirScanner::~DirScanner() noexcept {}
 
 bool DirScanner::next(std::string&)
 {

@@ -21,12 +21,12 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
+#include <ctime>
 #include <functional>
+#include <memory>
 #include <stdexcept>
-#include <string>
 #include <streambuf>
-#include <iostream>
+#include <string>
 
 #ifndef _WIN32
 #include <dirent.h> // POSIX.1-2001
@@ -263,6 +263,7 @@ public:
     /// an open file has undefined behavior.
     SizeType get_size() const;
     static SizeType get_size_static(FileDesc fd);
+    static SizeType get_size_static(const std::string& path);
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this function
@@ -371,7 +372,7 @@ public:
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
-    void set_fifo_path(const std::string& fifo_path);
+    void set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name);
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -441,6 +442,12 @@ public:
     /// calling process has no access to, will necessarily be reported
     /// as not existing.
     static bool exists(const std::string& path);
+
+    /// Get the time of last modification made to the file
+    static time_t last_write_time(const std::string& path);
+
+    /// Get freespace (in bytes) of filesystem containing path
+    static SizeType get_free_space(const std::string& path);
 
     /// Check whether the specified path exists and refers to a directory. If
     /// the referenced file system object resides in an inaccessible directory,
@@ -610,6 +617,7 @@ private:
 #ifdef REALM_FILELOCK_EMULATION
     int m_pipe_fd = -1; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
+    std::string m_fifo_dir_path;
     std::string m_fifo_path;
 #endif
 #endif
@@ -738,6 +746,7 @@ public:
     /// Move the mapping from another Map object to this Map object
     File::Map<T>& operator=(File::Map<T>&& other) noexcept
     {
+        REALM_ASSERT(this != &other);
         if (m_addr)
             unmap();
         m_addr = other.get_addr();
@@ -1002,12 +1011,14 @@ inline File::~File() noexcept
     close();
 }
 
-inline void File::set_fifo_path(const std::string& fifo_path)
+inline void File::set_fifo_path(const std::string& fifo_dir_path, const std::string& fifo_file_name)
 {
 #ifdef REALM_FILELOCK_EMULATION
-    m_fifo_path = fifo_path;
+    m_fifo_dir_path = fifo_dir_path;
+    m_fifo_path = fifo_dir_path + "/" + fifo_file_name;
 #else
-    static_cast<void>(fifo_path);
+    static_cast<void>(fifo_dir_path);
+    static_cast<void>(fifo_file_name);
 #endif
 }
 
@@ -1176,7 +1187,7 @@ inline void File::Map<T>::unmap() noexcept
 template <class T>
 inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
 {
-    //MapBase::remap(f, a, size, map_flags);
+    // MapBase::remap(f, a, size, map_flags);
     // missing sync() here?
     unmap();
     map(f, a, size, map_flags);

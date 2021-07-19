@@ -22,7 +22,7 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/deep_change_checker.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/transact_log_handler.hpp>
 #include <realm/object-store/binding_context.hpp>
@@ -32,6 +32,8 @@
 
 #include <realm.hpp>
 #include <realm/history.hpp>
+
+#include <iostream>
 
 using namespace realm;
 
@@ -57,7 +59,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key, m_list.get_key().value, m_list.get_col_key().value, &c});
+        info.lists.push_back({m_table_key, m_list.get_owner_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {
@@ -227,7 +229,7 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::AdditiveExplicit;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"table",
@@ -318,7 +320,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(info.tables.size() == 1);
             REQUIRE(info.tables[table_key].modifications_size() == 1);
-            REQUIRE(info.tables[table_key].modifications_contains(1));
+            REQUIRE(info.tables[table_key].modifications_contains(1, {}));
         }
 
         SECTION("modifications to untracked tables are ignored") {
@@ -358,7 +360,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables[table_key].insertions_size() == 1);
             REQUIRE(info.tables[table_key].insertions_contains(10));
             REQUIRE(info.tables[table_key].modifications_size() == 0);
-            REQUIRE(!info.tables[table_key].modifications_contains(10));
+            REQUIRE(!info.tables[table_key].modifications_contains(10, {}));
             REQUIRE(info.tables[table_key].deletions_empty());
         }
 
@@ -1575,7 +1577,177 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
     }
 }
 
-TEST_CASE("DeepChangeChecker") {
+struct ListOfObjects {
+    const Property property = {"array", PropertyType::Array | PropertyType::Object, "table"};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_linklist(col).add(to.get_obj_key());
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_linklist(col).size();
+    }
+    void set_relation_updater(std::function<void()>) {}
+    size_t count_unresolved_links(Obj, ColKey)
+    {
+        return 0;
+    }
+    constexpr static bool allows_storing_nulls = false;
+};
+
+struct ListOfMixedLinks {
+    const Property property = {"array", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_list<Mixed>(col).add(to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_list<Mixed>(col).size();
+    }
+    void set_relation_updater(std::function<void()> updater)
+    {
+        m_relation_updater = updater;
+    }
+    size_t count_unresolved_links(Obj obj, ColKey col)
+    {
+        Lst<Mixed> list = obj.get_list<Mixed>(col);
+        size_t num_unresolved = 0;
+        for (auto value : list) {
+            if (value.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    std::function<void()> m_relation_updater;
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct SetOfObjects {
+    const Property property = {"array", PropertyType::Set | PropertyType::Object, "table"};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_linkset(col).insert(to.get_obj_key());
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_linkset(col).size();
+    }
+    void set_relation_updater(std::function<void()>) {}
+    size_t count_unresolved_links(Obj, ColKey)
+    {
+        return 0;
+    }
+    constexpr static bool allows_storing_nulls = false;
+};
+
+struct SetOfMixedLinks {
+    const Property property = {"array", PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_set<Mixed>(col).insert(to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_set<Mixed>(col).size();
+    }
+    void set_relation_updater(std::function<void()> updater)
+    {
+        m_relation_updater = updater;
+    }
+    size_t count_unresolved_links(Obj obj, ColKey col)
+    {
+        Set<Mixed> set = obj.get_set<Mixed>(col);
+        size_t num_unresolved = 0;
+        for (auto value : set) {
+            if (value.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    std::function<void()> m_relation_updater;
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct DictionaryOfObjects {
+    const Property property = {"array", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+                               "table"};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to.get_obj_key());
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_dictionary(col).size();
+    }
+    void set_relation_updater(std::function<void()>) {}
+    size_t count_unresolved_links(Obj obj, ColKey col)
+    {
+        Dictionary dict = obj.get_dictionary(col);
+        size_t num_unresolved = 0;
+        for (auto value : dict) {
+            if (value.second.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    size_t key_counter = 0;
+    std::function<void()> m_relation_updater;
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct DictionaryOfMixedLinks {
+    const Property property = {"array", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable};
+    void add_link(Obj from, ColKey col, ObjLink to)
+    {
+        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    size_t size_of_collection(Obj obj, ColKey col)
+    {
+        return obj.get_dictionary(col).size();
+    }
+    void set_relation_updater(std::function<void()> updater)
+    {
+        m_relation_updater = updater;
+    }
+    size_t count_unresolved_links(Obj obj, ColKey col)
+    {
+        Dictionary dict = obj.get_dictionary(col);
+        size_t num_unresolved = 0;
+        for (auto value : dict) {
+            if (value.second.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    size_t key_counter = 0;
+    std::function<void()> m_relation_updater;
+    constexpr static bool allows_storing_nulls = true;
+};
+
+TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOfMixedLinks, SetOfObjects,
+                   SetOfMixedLinks, DictionaryOfObjects, DictionaryOfMixedLinks)
+{
+    TestType test_type;
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1584,9 +1756,10 @@ TEST_CASE("DeepChangeChecker") {
          {{"int", PropertyType::Int},
           {"link1", PropertyType::Object | PropertyType::Nullable, "table"},
           {"link2", PropertyType::Object | PropertyType::Nullable, "table"},
-          {"array", PropertyType::Array | PropertyType::Object, "table"}}},
+          test_type.property}},
     });
     auto table = r->read_group().get_table("class_table");
+    TableKey dst_table_key = table->get_key();
 
     std::vector<Obj> objects;
     r->begin_transaction();
@@ -1610,8 +1783,22 @@ TEST_CASE("DeepChangeChecker") {
         return info;
     };
 
-    std::vector<_impl::DeepChangeChecker::RelatedTable> tables;
-    _impl::DeepChangeChecker::find_related_tables(tables, *table);
+    std::vector<_impl::DeepChangeChecker::RelatedTable> related_tables;
+    std::pair<TableKey, ColKey> pair_int(table->get_key(), table->get_column_key("int"));
+    std::pair<TableKey, ColKey> pair_link(table->get_key(), table->get_column_key("link1"));
+    std::pair<TableKey, ColKey> pair_test_type(table->get_key(), table->get_column_key(test_type.property.name));
+    KeyPath key_path_int = {pair_int};
+    KeyPath key_path_link = {pair_link};
+    KeyPath key_path_test_type = {pair_test_type};
+    KeyPathArray key_path_array_int = {key_path_int};
+    KeyPathArray key_path_array_link = {key_path_link};
+    KeyPathArray key_path_array_test_type = {key_path_test_type};
+    KeyPathArray key_path_array_empty = {};
+    auto relation_updater = [&]() {
+        _impl::DeepChangeChecker::find_related_tables(related_tables, *table, key_path_array_empty);
+    };
+    relation_updater();
+    test_type.set_relation_updater(relation_updater);
 
     auto cols = table->get_column_keys();
     SECTION("direct changes are tracked") {
@@ -1619,9 +1806,29 @@ TEST_CASE("DeepChangeChecker") {
             table->get_object(9).set(cols[0], 10);
         });
 
-        _impl::DeepChangeChecker checker(info, *table, tables);
-        REQUIRE_FALSE(checker(8));
-        REQUIRE(checker(9));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(8));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(8));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(9));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(8));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(9));
     }
 
     SECTION("changes over links are tracked") {
@@ -1675,19 +1882,54 @@ TEST_CASE("DeepChangeChecker") {
             });
 
             // link chain should cascade to all but #3 being marked as modified
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
-            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
-            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(3));
+
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
         });
     }
 
-    SECTION("changes over linklists are tracked") {
+    SECTION("changes over collections are tracked") {
         r->begin_transaction();
         for (int i = 0; i < 3; ++i) {
-            objects[i].get_linklist(cols[3]).add(objects[i].get_key());
-            objects[i].get_linklist(cols[3]).add(objects[i].get_key());
-            objects[i].get_linklist(cols[3]).add(objects[i + 1 + (i == 2)].get_key());
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
         }
         r->commit_transaction();
 
@@ -1695,34 +1937,149 @@ TEST_CASE("DeepChangeChecker") {
             objects[4].set(cols[0], 10);
         });
 
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
     }
 
     SECTION("changes from an invalidated object") {
         r->begin_transaction();
         size_t obj_ndx_to_invalidate = 6;
         for (int i = 0; i < 3; ++i) {
-            objects[i].get_linklist(cols[3]).add(objects[i].get_key());
-            objects[i].get_linklist(cols[3]).add(objects[obj_ndx_to_invalidate].get_key());
-            objects[i].get_linklist(cols[3]).add(objects[i + 1 + (i == 2)].get_key());
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[obj_ndx_to_invalidate].get_key()});
+            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
         }
         // Object invalidation can only happen if another sync client has deleted the object
         // we simulate this by calling it directly here. The consequence is that links to this
         // object are changed to the invalidated key, but not removed. This tests that the abstraction
         // that core has built to hide invalidated links inside LnkLst is not leaking at this level.
-        objects[6].invalidate();
-        REQUIRE(objects[0].get_linklist(cols[3]).size() == 2); // LnkLst actually has 3 entries but hides one
+        objects[obj_ndx_to_invalidate].invalidate();
+        if (TestType::allows_storing_nulls) {
+            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) == 3);
+            REQUIRE(test_type.count_unresolved_links(objects[0], cols[3]) == 1);
+            REQUIRE(test_type.count_unresolved_links(objects[1], cols[3]) == 1);
+            REQUIRE(test_type.count_unresolved_links(objects[2], cols[3]) == 1);
+        }
+        else {
+            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) ==
+                    2); // LnkLst actually has 3 entries but hides one
+        }
         r->commit_transaction();
 
         auto info = track_changes([&] {
             objects[4].set(cols[0], 10);
         });
         // if the change checker iterates over an invalid link, it'll hit an assertion
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
+    }
+
+    SECTION("changes from an object with an unresolved link") {
+        r->begin_transaction();
+        size_t obj_ndx_to_invalidate = 6;
+        ColKey col_link1 = cols[1];
+        objects[0].set(col_link1, objects[obj_ndx_to_invalidate].get_key());
+        ObjKey link = objects[0].get<ObjKey>(col_link1);
+        REQUIRE(!link.is_unresolved());
+        REQUIRE(link);
+
+        // Object invalidation can only happen if another sync client has deleted the object
+        // we simulate this by calling it directly here. The consequence is that links to this
+        // object are changed to the invalidated key, but not removed. This tests that the
+        // change checker doesn't try to descend down invalidated link paths.
+        objects[obj_ndx_to_invalidate].invalidate();
+
+        // the link is actually unresolved, but that is hidden by a null at this level of abstraction
+        link = objects[0].get<ObjKey>(col_link1);
+        REQUIRE(!link.is_unresolved());
+        REQUIRE(!link);
+        r->commit_transaction();
+
+        auto info = track_changes([&] {
+            objects[1].set(cols[0], 10);
+        });
+        // if the change checker iterates over an invalid link, it'll throw an exception
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
     }
 
     SECTION("cycles over links do not loop forever") {
@@ -1733,21 +2090,35 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[9].set(cols[0], 10);
         });
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 
-    SECTION("cycles over linklists do not loop forever") {
+    SECTION("cycles over collections do not loop forever") {
         r->begin_transaction();
-        objects[0].get_linklist(cols[3]).add(objects[0].get_key());
+        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[0].get_key()});
         r->commit_transaction();
 
         auto info = track_changes([&] {
             objects[9].set(cols[0], 10);
         });
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 
-    SECTION("link chains are tracked up to 4 levels deep") {
+    SECTION("link chains are tracked") {
         r->begin_transaction();
         for (int i = 0; i < 10; ++i)
             objects.push_back(table->create_object());
@@ -1759,32 +2130,62 @@ TEST_CASE("DeepChangeChecker") {
             objects[19].set(cols[0], -1);
         });
 
-        _impl::DeepChangeChecker checker(info, *table, tables);
-        CHECK(checker(19));
-        CHECK(checker(18));
-        CHECK(checker(16));
-        CHECK_FALSE(checker(15));
+        SECTION("without filter - up to 4 levels deep") {
+            _impl::DeepChangeChecker checker(info, *table, related_tables, key_path_array_empty, false);
+            CHECK(checker(19));
+            CHECK(checker(18));
+            CHECK(checker(16));
+            CHECK_FALSE(checker(15));
 
-        // Check in other orders to make sure that the caching doesn't effect
-        // the results
-        _impl::DeepChangeChecker checker2(info, *table, tables);
-        CHECK_FALSE(checker2(15));
-        CHECK(checker2(16));
-        CHECK(checker2(18));
-        CHECK(checker2(19));
+            // Check in other orders to make sure that the caching doesn't effect
+            // the results
+            _impl::DeepChangeChecker checker2(info, *table, related_tables, key_path_array_empty, false);
+            CHECK_FALSE(checker2(15));
+            CHECK(checker2(16));
+            CHECK(checker2(18));
+            CHECK(checker2(19));
 
-        _impl::DeepChangeChecker checker3(info, *table, tables);
-        CHECK(checker3(16));
-        CHECK_FALSE(checker3(15));
-        CHECK(checker3(18));
-        CHECK(checker3(19));
+            _impl::DeepChangeChecker checker3(info, *table, related_tables, key_path_array_empty, false);
+            CHECK(checker3(16));
+            CHECK_FALSE(checker3(15));
+            CHECK(checker3(18));
+            CHECK(checker3(19));
+        }
+
+        SECTION("with filter - more than 4 levels deep") {
+            KeyPath key_path_five_levels = {pair_link, pair_link, pair_link, pair_link, pair_int};
+            KeyPathArray key_path_array_five_levels = {key_path_five_levels};
+
+            _impl::CollectionKeyPathChangeChecker checker(info, *table, related_tables, key_path_array_five_levels,
+                                                          false);
+            CHECK_THROWS(checker(19));
+            CHECK_THROWS(checker(18));
+            CHECK_FALSE(checker(16));
+            CHECK(checker(15));
+
+            // Check in other orders to make sure that the caching doesn't effect
+            // the results
+            _impl::CollectionKeyPathChangeChecker checker2(info, *table, related_tables, key_path_array_five_levels,
+                                                           false);
+            CHECK(checker2(15));
+            CHECK_FALSE(checker2(16));
+            CHECK_THROWS(checker2(18));
+            CHECK_THROWS(checker2(19));
+
+            _impl::CollectionKeyPathChangeChecker checker3(info, *table, related_tables, key_path_array_five_levels,
+                                                           false);
+            CHECK_FALSE(checker3(16));
+            CHECK(checker3(15));
+            CHECK_THROWS(checker3(18));
+            CHECK_THROWS(checker3(19));
+        }
     }
 
     SECTION("changes made in the 3rd elements in the link list") {
         r->begin_transaction();
-        objects[0].get_linklist(cols[3]).add(objects[1].get_key());
-        objects[0].get_linklist(cols[3]).add(objects[2].get_key());
-        objects[0].get_linklist(cols[3]).add(objects[3].get_key());
+        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[1].get_key()});
+        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[2].get_key()});
+        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[3].get_key()});
         objects[1].set(cols[1], objects[0].get_key());
         objects[2].set(cols[1], objects[0].get_key());
         objects[3].set(cols[1], objects[0].get_key());
@@ -1793,17 +2194,50 @@ TEST_CASE("DeepChangeChecker") {
         auto info = track_changes([&] {
             objects[3].set(cols[0], 42);
         });
-        _impl::DeepChangeChecker checker(info, *table, tables);
-        REQUIRE(checker(1));
-        REQUIRE(checker(2));
-        REQUIRE(checker(3));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(3));
+
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(1));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(2));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(3));
+
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(1));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(2));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(3));
     }
 
     SECTION("changes made to lists mark the containing row as modified") {
         auto info = track_changes([&] {
-            objects[0].get_linklist(cols[3]).add(objects[1].get_key());
+            test_type.add_link(objects[0], cols[3], {dst_table_key, objects[1].get_key()});
         });
-        _impl::DeepChangeChecker checker(info, *table, tables);
-        REQUIRE(checker(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_int, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, false)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_link, true)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, false)(0));
+        REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_test_type, true)(0));
     }
 }

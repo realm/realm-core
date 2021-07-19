@@ -27,7 +27,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(ANDROID)
+if(NOT APPLE)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 elseif(APPLE)
@@ -44,7 +44,7 @@ function(add_cxx_flag_if_supported flag)
 
     check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
     if(HAVE${check_flag})
-        add_compile_options(${flag})
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
     endif()
 endfunction()
 
@@ -59,6 +59,7 @@ function(use_faster_linker)
         set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
         check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
         if(HAVE_LINKER_${LINKER})
+            message(STATUS "Using linker ${LINKER}")
             add_link_options("-fuse-ld=${LINKER}")
             return()
         endif()
@@ -75,8 +76,10 @@ else()
         add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation)
+        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
     endif()
+
+    add_cxx_flag_if_supported(-Wpartial-availability)
 
     # This warning is too agressive. It warns about moves that are not redundant on older
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
@@ -92,15 +95,14 @@ endif()
 
 if(ANDROID)
     # Optimize for size vs. performance for Android. The has the following implications:
-    # - Replace `-O3` with `-Oz`.
     # - Add `-ffunction-sections` and `-fdata-sections`. This requires that `-Wl,-gc-sections` are used when creating
     #   the final .so file.
     # - `-fstrict-aliasing` is inherited from NDK r10e.
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
-    #
-    # On some architectures char is unsigned by default. Make it signed
-    add_compile_options($<$<CONFIG:Release>:-Oz>)
-    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
+    # - On some architectures char is unsigned by default. Make it signed
+    # - Compile with -Oz in Release because on Android we favor code size over performance
+    # 
+    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes $<$<CONFIG:Release>:-Oz>)
 endif()
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
@@ -160,7 +162,7 @@ if(UNIX)
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
-if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+if (NOT APPLE)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
 else()
     set(REALM_INCLUDE_CERTS_DEFAULT OFF)
@@ -177,7 +179,7 @@ option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
-option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" REALM_INCLUDE_CERTS_DEFAULT)
+option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
@@ -187,6 +189,8 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(BISON 3.7.4)
+find_package(FLEX 2.6.4)
 
 set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
 if(UNIX AND NOT APPLE)
@@ -239,7 +243,18 @@ endif()
 # so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
 # Just use -lz and let Xcode figure it out
 if(REALM_ENABLE_SYNC AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
+    if(ANDROID)
+        # On Android FindZLIB chooses the static libz over the dynamic one, but this leads to issues
+        # (see https://github.com/android/ndk/issues/1179)
+        # We want to link against the stub library instead of statically linking anyway,
+        # so we hack find_library to only consider shared object libraries when looking for libz
+        set(_CMAKE_FIND_LIBRARY_SUFFIXES_orig ${CMAKE_FIND_LIBRARY_SUFFIXES})
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
+    endif()
     find_package(ZLIB REQUIRED)
+    if(ANDROID)
+        set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CMAKE_FIND_LIBRARY_SUFFIXES_orig})
+    endif()
 endif()
 
 # Store configuration in header file
@@ -253,7 +268,6 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
-set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/external/pegtl/include/tao/)
 set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/single_include)
 set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 
@@ -291,6 +305,8 @@ set(REALM_EXPORTED_TARGETS
     Storage
     QueryParser
     ObjectStore
+    RealmFFI
+    RealmFFIStatic
 )
 if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)

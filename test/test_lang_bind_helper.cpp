@@ -1912,11 +1912,15 @@ public:
     {
         return false;
     }
-    bool dictionary_insert(Mixed)
+    bool dictionary_insert(size_t, Mixed)
     {
         return false;
     }
-    bool dictionary_erase(Mixed)
+    bool dictionary_set(size_t, Mixed)
+    {
+        return false;
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return false;
     }
@@ -1995,6 +1999,10 @@ public:
     bool optimize_table()
     {
         return false;
+    }
+    bool typed_link_change(ColKey, TableKey)
+    {
+        return true;
     }
 };
 
@@ -3557,14 +3565,14 @@ TEST(LangBindHelper_HandoverNestedTableViews)
             writer->commit_and_continue_as_read();
             // Create a TableView tv2 that is backed by a Query that is restricted to rows from TableView tv1.
             TableView tv1 = table->where().less_equal(col, 50).find_all();
-            TableView tv2 = tv1.get_parent()->where(&tv1).find_all();
+            TableView tv2 = tv1.get_parent()->where(&tv1).greater(col, 25).find_all();
             CHECK(tv2.is_in_sync());
             reader = writer->duplicate();
             tv = reader->import_copy_of(tv2, PayloadPolicy::Move);
         }
         CHECK(tv->is_in_sync());
         CHECK(tv->is_attached());
-        CHECK_EQUAL(51, tv->size());
+        CHECK_EQUAL(25, tv->size());
     }
 }
 
@@ -5865,20 +5873,20 @@ TEST(LangBindHelper_getCoreFiles)
     CHECK(core_files.size() > 0);
 
     std::string file;
-    DirScanner scaner(dir);
-    while (scaner.next(file)) {
+    DirScanner scanner(dir);
+    while (scanner.next(file)) {
         const std::string lock_suffix = ".lock";
         if (file.size() >= lock_suffix.size() &&
             file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
             continue;
         }
         std::string path(std::string(dir) + "/" + file);
-        auto file_pair = std::make_pair(path, File::is_dir(path));
         CHECK(core_files.size() != 0);
-        core_files.erase(std::remove(core_files.begin(), core_files.end(), file_pair), core_files.end());
+        auto is_included_in_core_files = std::any_of(core_files.begin(), core_files.end(), [&](auto core_file) {
+            return core_file.second.first == path;
+        });
+        CHECK(is_included_in_core_files);
     }
-
-    CHECK(core_files.size() == 0);
 }
 
 TEST(LangBindHelper_AdvanceReadCluster)

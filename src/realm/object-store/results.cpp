@@ -25,6 +25,8 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
 
+#include <realm/set.hpp>
+
 #include <stdexcept>
 
 namespace realm {
@@ -50,19 +52,27 @@ Results::Results(SharedRealm r, ConstTableRef table)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, util::Optional<Query> q,
+                 SortDescriptor s)
     : m_realm(std::move(r))
-    , m_collection(std::move(list))
-    , m_mode(Mode::List)
+    , m_table(coll->get_target_table())
+    , m_collection(std::move(coll))
+    , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
+    if (q) {
+        m_query = std::move(*q);
+        m_mode = Mode::Query;
+    }
+    m_descriptor_ordering.append_sort(std::move(s));
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> coll, DescriptorOrdering o)
     : m_realm(std::move(r))
+    , m_table(coll->get_target_table())
     , m_descriptor_ordering(std::move(o))
-    , m_collection(std::move(list))
-    , m_mode(Mode::List)
+    , m_collection(std::move(coll))
+    , m_mode(Mode::Collection)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
 }
@@ -75,20 +85,6 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
     m_table = m_table_view.get_parent();
-}
-
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
-    : m_realm(std::move(r))
-    , m_link_list(std::move(lv))
-    , m_mode(Mode::LinkList)
-    , m_mutex(m_realm && m_realm->is_frozen())
-{
-    m_table = m_link_list->get_target_table();
-    if (q) {
-        m_query = std::move(*q);
-        m_mode = Mode::Query;
-    }
-    m_descriptor_ordering.append_sort(std::move(s));
 }
 
 Results::Results(const Results&) = default;
@@ -147,11 +143,9 @@ size_t Results::do_size()
         case Mode::Empty:
             return 0;
         case Mode::Table:
-            return m_table->size();
-        case Mode::LinkList:
-            return m_link_list->size();
-        case Mode::List:
-            evaluate_sort_and_distinct_on_list();
+            return m_table ? m_table->size() : 0;
+        case Mode::Collection:
+            evaluate_sort_and_distinct_on_collection();
             return m_list_indices ? m_list_indices->size() : m_collection->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
@@ -189,16 +183,17 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-template <typename T>
-auto& Results::list_as() const
-{
-    return static_cast<Lst<T>&>(*m_collection);
-}
-
-void Results::evaluate_sort_and_distinct_on_list()
+void Results::evaluate_sort_and_distinct_on_collection()
 {
     if (m_descriptor_ordering.is_empty())
         return;
+
+    if (do_get_type() == PropertyType::Object) {
+        m_query = do_get_query();
+        m_mode = Mode::Query;
+        do_evaluate_query_if_needed();
+        return;
+    }
 
     // We can't use the sorted list from the notifier if we're in a write
     // transaction as we only check the transaction version to see if the data matches
@@ -235,18 +230,26 @@ void Results::evaluate_sort_and_distinct_on_list()
 }
 
 template <typename T>
+static T get_unwraped(CollectionBase& collection, size_t ndx)
+{
+    using U = typename util::RemoveOptional<T>::type;
+    Mixed mixed = collection.get_any(ndx);
+    if (!mixed.is_null())
+        return mixed.get<U>();
+    return BPlusTree<T>::default_value(collection.get_col_key().is_nullable());
+}
+
+template <typename T>
 util::Optional<T> Results::try_get(size_t ndx)
 {
     validate_read();
-    if (m_mode == Mode::List) {
-        evaluate_sort_and_distinct_on_list();
+    if (m_mode == Mode::Collection) {
+        evaluate_sort_and_distinct_on_collection();
         if (m_list_indices) {
-            if (ndx < m_list_indices->size())
-                return list_as<T>().get((*m_list_indices)[ndx]);
+            ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
         }
-        else {
-            if (ndx < m_collection->size())
-                return list_as<T>().get(ndx);
+        if (ndx < m_collection->size()) {
+            return get_unwraped<T>(*m_collection, ndx);
         }
     }
     return util::none;
@@ -268,21 +271,14 @@ Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
 {
     // Using a Table iterator is much faster for repeated access into a table
     // than indexing into it as the iterator caches the cluster the last accessed
-    // object is stored in.
-    if (!m_it && table.size() > 5) {
-        m_it = std::make_unique<Table::Iterator>(table.begin());
-    }
+    // object is stored in, but creating the iterator is somewhat expensive.
     if (!m_it) {
-        return const_cast<Table&>(table).get_object(ndx);
-    }
-    try {
-        return (*m_it)[ndx];
-    }
-    catch (...) {
-        // Iterator might be outdated
+        if (table.size() <= 5)
+            return const_cast<Table&>(table).get_object(ndx);
         m_it = std::make_unique<Table::Iterator>(table.begin());
-        return (*m_it)[ndx];
     }
+    m_it->go(ndx);
+    return **m_it;
 }
 
 template <>
@@ -291,19 +287,26 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::List:
             break;
         case Mode::Table:
-            if (row_ndx < m_table->size())
+            if (m_table && row_ndx < m_table->size())
                 return m_table_iterator.get(*m_table, row_ndx);
             break;
-        case Mode::LinkList:
-            if (update_linklist()) {
-                if (row_ndx < m_link_list->size())
-                    return m_link_list->get_object(row_ndx);
+        case Mode::Collection:
+            evaluate_sort_and_distinct_on_collection();
+            if (m_mode == Mode::Collection) {
+                if (row_ndx < m_collection->size()) {
+                    auto m = m_collection->get_any(row_ndx);
+                    if (m.is_null())
+                        return Obj();
+                    if (m.get_type() == type_Link)
+                        return m_table->get_object(m.get<ObjKey>());
+                    if (m.get_type() == type_TypedLink)
+                        return m_table->get_parent_group()->get_object(m.get_link());
+                }
                 break;
             }
-            REALM_FALLTHROUGH;
+            [[fallthrough]];
         case Mode::Query:
         case Mode::TableView:
             do_evaluate_query_if_needed();
@@ -314,6 +317,63 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
             return m_table_view.get(row_ndx);
     }
     return util::none;
+}
+
+Mixed Results::get_any(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+            break;
+        case Mode::Table:
+            if (ndx < m_table->size())
+                return m_table_iterator.get(*m_table, ndx);
+            break;
+        case Mode::Collection:
+            evaluate_sort_and_distinct_on_collection();
+            if (m_list_indices) {
+                if (ndx < m_list_indices->size())
+                    return m_collection->get_any((*m_list_indices)[ndx]);
+                break;
+            }
+            if (m_mode == Mode::Collection) {
+                if (ndx < m_collection->size())
+                    return m_collection->get_any(ndx);
+                break;
+            }
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView: {
+            do_evaluate_query_if_needed();
+            if (ndx >= m_table_view.size())
+                break;
+            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(ndx))
+                return {};
+            auto obj_key = m_table_view.get_key(ndx);
+            return Mixed(ObjLink(m_table->get_key(), obj_key));
+        }
+    }
+    throw OutOfBoundsIndexException{ndx, do_size()};
+}
+
+std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(m_mode == Mode::Collection);
+    auto& dict = static_cast<Dictionary&>(*m_collection);
+    REALM_ASSERT(typeid(dict) == typeid(Dictionary));
+
+    evaluate_sort_and_distinct_on_collection();
+    size_t actual = ndx;
+    if (m_list_indices)
+        actual = ndx < m_list_indices->size() ? (*m_list_indices)[ndx] : npos;
+
+    if (actual < dict.size()) {
+        auto val = dict.get_pair(ndx);
+        return {val.first.get_string(), val.second};
+    }
+    throw OutOfBoundsIndexException{ndx, dict.size()};
 }
 
 template <typename T>
@@ -343,19 +403,6 @@ util::Optional<T> Results::last()
     return try_get<T>(do_size() - 1);
 }
 
-bool Results::update_linklist()
-{
-    REALM_ASSERT(m_update_policy == UpdatePolicy::Auto);
-
-    if (!m_descriptor_ordering.is_empty()) {
-        m_query = do_get_query();
-        m_mode = Mode::Query;
-        do_evaluate_query_if_needed();
-        return false;
-    }
-    return true;
-}
-
 void Results::evaluate_query_if_needed(bool wants_notifications)
 {
     util::CheckedUniqueLock lock(m_mutex);
@@ -373,8 +420,7 @@ void Results::do_evaluate_query_if_needed(bool wants_notifications)
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
-        case Mode::List:
-        case Mode::LinkList:
+        case Mode::Collection:
             return;
         case Mode::Query:
             if (m_notifier && m_notifier->get_tableview(m_table_view)) {
@@ -414,14 +460,13 @@ size_t Results::index_of(Obj const& row)
 
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::List:
-            return not_found;
         case Mode::Table:
             return m_table->get_object_ndx(row.get_key());
-        case Mode::LinkList:
-            if (update_linklist())
-                return m_link_list->find_first(row.get_key());
-            REALM_FALLTHROUGH;
+        case Mode::Collection:
+            evaluate_sort_and_distinct_on_collection();
+            if (m_mode == Mode::Collection)
+                return m_collection->find_any(row.get_key());
+            [[fallthrough]];
         case Mode::Query:
         case Mode::TableView:
             do_evaluate_query_if_needed();
@@ -435,17 +480,17 @@ size_t Results::index_of(T const& value)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
-    if (m_mode != Mode::List)
-        return not_found; // Non-List results can only ever contain Objects
-    evaluate_sort_and_distinct_on_list();
+    if (m_mode != Mode::Collection)
+        return not_found; // Non-Collection results can only ever contain Objects
+    evaluate_sort_and_distinct_on_collection();
     if (m_list_indices) {
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
-            if (list_as<T>().get((*m_list_indices)[i]) == value)
+            if (value == get_unwraped<T>(*m_collection, (*m_list_indices)[i]))
                 return i;
         }
         return not_found;
     }
-    return list_as<T>().find_first(value);
+    return m_collection->find_any(value);
 }
 
 size_t Results::index_of(Query&& q)
@@ -470,10 +515,10 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
         case Mode::Table:
             type = m_table->get_column_type(column);
             break;
-        case Mode::List:
+        case Mode::Collection:
             type = m_collection->get_table()->get_column_type(m_collection->get_col_key());
-            break;
-        case Mode::LinkList:
+            if (type != type_LinkList && type != type_Link)
+                break;
             m_query = do_get_query();
             m_mode = Mode::Query;
             REALM_FALLTHROUGH;
@@ -491,9 +536,15 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
         case type_Float:
         case type_Int:
         case type_Decimal:
+        case type_Mixed:
             break;
         default:
-            throw UnsupportedColumnTypeException{column, *m_table, name};
+            if (m_mode == Mode::Collection) {
+                throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
+            }
+            else {
+                throw UnsupportedColumnTypeException{column, *m_table, name};
+            }
     }
     return type;
 }
@@ -607,21 +658,43 @@ struct AggregateHelper<Decimal128, Table> {
     }
 };
 
+template <typename Table>
+struct AggregateHelper<Mixed, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)
+    {
+        return table.minimum_mixed(col, obj);
+    }
+    Mixed max(ColKey col, ObjKey* obj)
+    {
+        return table.maximum_mixed(col, obj);
+    }
+    Mixed sum(ColKey col)
+    {
+        return table.sum_mixed(col);
+    }
+    Mixed avg(ColKey col, size_t* count)
+    {
+        return table.average_mixed(col, count);
+    }
+};
+
+
 struct ListAggregateHelper {
     CollectionBase& list;
-    Mixed min(ColKey, size_t* ndx)
+    util::Optional<Mixed> min(ColKey, size_t* ndx)
     {
         return list.min(ndx);
     }
-    Mixed max(ColKey, size_t* ndx)
+    util::Optional<Mixed> max(ColKey, size_t* ndx)
     {
         return list.max(ndx);
     }
-    Mixed sum(ColKey)
+    util::Optional<Mixed> sum(ColKey)
     {
         return list.sum();
     }
-    Mixed avg(ColKey, size_t* count)
+    util::Optional<Mixed> avg(ColKey, size_t* count)
     {
         return list.avg(count);
     }
@@ -672,8 +745,16 @@ struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
     }
 };
 
+template <>
+struct AggregateHelper<Mixed, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
+        : ListAggregateHelper{l}
+    {
+    }
+};
+
 template <typename Table, typename Func>
-Mixed call_with_helper(Func&& func, Table&& table, DataType type)
+util::Optional<Mixed> call_with_helper(Func&& func, Table&& table, DataType type)
 {
     switch (type) {
         case type_Timestamp:
@@ -686,6 +767,8 @@ Mixed call_with_helper(Func&& func, Table&& table, DataType type)
             return func(AggregateHelper<Int, Table>{table});
         case type_Decimal:
             return func(AggregateHelper<Decimal128, Table>{table});
+        case type_Mixed:
+            return func(AggregateHelper<Mixed, Table>{table});
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -721,7 +804,7 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
     switch (m_mode) {
         case Mode::Table:
             return call_with_helper(func, *m_table, type);
-        case Mode::List:
+        case Mode::Collection:
             return call_with_helper(func, *m_collection, type);
         default:
             return call_with_helper(func, m_table_view, type);
@@ -792,13 +875,14 @@ void Results::clear()
                 }
             }
             break;
-        case Mode::List:
+        case Mode::Collection:
             validate_write();
-            m_collection->clear();
-            break;
-        case Mode::LinkList:
-            validate_write();
-            m_link_list->remove_all_target_rows();
+            if (auto list = dynamic_cast<LnkLst*>(m_collection.get()))
+                list->remove_all_target_rows();
+            else if (auto set = dynamic_cast<LnkSet*>(m_collection.get()))
+                set->remove_all_target_rows();
+            else
+                m_collection->clear();
             break;
     }
 }
@@ -806,21 +890,19 @@ void Results::clear()
 PropertyType Results::get_type() const
 {
     util::CheckedUniqueLock lock(m_mutex);
+    validate_read();
     return do_get_type();
 }
 
 PropertyType Results::do_get_type() const
 {
-    validate_read();
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::LinkList:
-            return PropertyType::Object;
         case Mode::Query:
         case Mode::TableView:
         case Mode::Table:
             return PropertyType::Object;
-        case Mode::List:
+        case Mode::Collection:
             return ObjectSchema::from_core_type(m_collection->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
@@ -832,14 +914,30 @@ Query Results::get_query() const
     return do_get_query();
 }
 
+ConstTableRef Results::get_table() const
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+        case Mode::Query:
+            return const_cast<Query&>(m_query).get_table();
+        case Mode::TableView:
+            return m_table_view.get_target_table();
+        case Mode::Collection:
+            return m_collection->get_target_table();
+        case Mode::Table:
+            return m_table;
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
+}
+
 Query Results::do_get_query() const
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Query:
-        case Mode::List:
-            return m_query;
         case Mode::TableView: {
             if (const_cast<Query&>(m_query).get_table())
                 return m_query;
@@ -858,8 +956,16 @@ Query Results::do_get_query() const
             }
             return Query(m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
         }
-        case Mode::LinkList:
-            return m_table->where(*m_link_list);
+        case Mode::Collection:
+            if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
+                return m_table->where(*list);
+            }
+            if (auto dict = dynamic_cast<Dictionary*>(m_collection.get())) {
+                if (dict->get_value_data_type() == type_Link) {
+                    return m_table->where(*dict);
+                }
+            }
+            return m_query;
         case Mode::Table:
             return m_table->where();
     }
@@ -872,12 +978,11 @@ TableView Results::get_tableview()
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::List:
-            return {};
-        case Mode::LinkList:
-            if (update_linklist())
-                return m_table->where(*m_link_list).find_all();
-            REALM_FALLTHROUGH;
+        case Mode::Collection:
+            evaluate_sort_and_distinct_on_collection();
+            if (m_mode == Mode::Collection)
+                return do_get_query().find_all();
+            return m_table_view;
         case Mode::Query:
         case Mode::TableView:
             do_evaluate_query_if_needed();
@@ -962,9 +1067,7 @@ Results Results::sort(SortDescriptor&& sort) const
     util::CheckedUniqueLock lock(m_mutex);
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
-    if (m_mode == Mode::LinkList)
-        return Results(m_realm, m_link_list, util::none, std::move(sort));
-    else if (m_mode == Mode::List)
+    if (m_mode == Mode::Collection)
         return Results(m_realm, m_collection, std::move(new_order));
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
@@ -978,39 +1081,22 @@ Results Results::filter(Query&& q) const
 
 Results Results::limit(size_t max_count) const
 {
+    util::CheckedUniqueLock lock(m_mutex);
     auto new_order = m_descriptor_ordering;
     new_order.append_limit(max_count);
-    return Results(m_realm, get_query(), std::move(new_order));
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
 Results Results::apply_ordering(DescriptorOrdering&& ordering)
 {
+    util::CheckedUniqueLock lock(m_mutex);
     DescriptorOrdering new_order = m_descriptor_ordering;
-    for (size_t i = 0; i < ordering.size(); ++i) {
-        switch (ordering.get_type(i)) {
-            case DescriptorType::Sort: {
-                auto sort = dynamic_cast<const SortDescriptor*>(ordering[i]);
-                new_order.append_sort(std::move(*sort));
-                break;
-            }
-            case DescriptorType::Distinct: {
-                auto distinct = dynamic_cast<const DistinctDescriptor*>(ordering[i]);
-                new_order.append_distinct(std::move(*distinct));
-                break;
-            }
-            case DescriptorType::Limit: {
-                auto limit = dynamic_cast<const LimitDescriptor*>(ordering[i]);
-                new_order.append_limit(std::move(*limit));
-                break;
-            }
-            case DescriptorType::Include: {
-                auto include = dynamic_cast<const IncludeDescriptor*>(ordering[i]);
-                new_order.append_include(std::move(*include));
-                break;
-            }
-        }
-    }
-    return Results(m_realm, get_query(), std::move(new_order));
+    new_order.append(std::move(ordering));
+    if (m_mode == Mode::Collection)
+        return Results(m_realm, m_collection, std::move(new_order));
+    return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
 Results Results::distinct(DistinctDescriptor&& uniqueness) const
@@ -1018,7 +1104,7 @@ Results Results::distinct(DistinctDescriptor&& uniqueness) const
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_distinct(std::move(uniqueness));
     util::CheckedUniqueLock lock(m_mutex);
-    if (m_mode == Mode::List)
+    if (m_mode == Mode::Collection)
         return Results(m_realm, m_collection, std::move(new_order));
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
@@ -1063,14 +1149,14 @@ Results Results::snapshot() &&
             return Results();
 
         case Mode::Table:
-        case Mode::LinkList:
+        case Mode::Collection:
             m_query = do_get_query();
-            m_mode = Mode::Query;
-
+            if (m_query.get_table()) {
+                m_mode = Mode::Query;
+            }
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
-        case Mode::List: // FIXME Correct?
             do_evaluate_query_if_needed(false);
             m_notifier.reset();
             m_update_policy = UpdatePolicy::Never;
@@ -1104,17 +1190,17 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
             return;
     }
 
-    if (m_collection)
+    if (do_get_type() != PropertyType::Object)
         m_notifier = std::make_shared<_impl::ListResultsNotifier>(*this);
     else
         m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
+NotificationToken Results::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
 {
     prepare_async(ForCallback{true});
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 // This function cannot be called on frozen results and so does not require locking
@@ -1124,9 +1210,8 @@ bool Results::is_in_table_order() const NO_THREAD_SAFETY_ANALYSIS
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
-        case Mode::List:
             return true;
-        case Mode::LinkList:
+        case Mode::Collection:
             return false;
         case Mode::Query:
             return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
@@ -1178,16 +1263,8 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
     switch (m_mode) {
         case Mode::Table:
             return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
-        case Mode::List:
+        case Mode::Collection:
             return Results(frozen_realm, frozen_realm->import_copy_of(*m_collection), m_descriptor_ordering);
-        case Mode::LinkList: {
-            std::shared_ptr<LnkLst> frozen_ll(
-                frozen_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
-
-            // If query/sort was provided for the original Results, mode would have changed to Query, so no need
-            // include them here.
-            return Results(frozen_realm, std::move(frozen_ll));
-        }
         case Mode::Query:
             return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy),
                            m_descriptor_ordering);
@@ -1203,7 +1280,7 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
     }
 }
 
-bool Results::is_frozen()
+bool Results::is_frozen() const
 {
     return !m_realm || m_realm->is_frozen();
 }

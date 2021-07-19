@@ -944,7 +944,9 @@ TEST(Shared_try_begin_write)
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
-    cv.wait(lock, [&] { return init_complete; });
+    cv.wait(lock, [&] {
+        return init_complete;
+    });
 
     // Try to also obtain a write lock. This should fail but not block.
     auto tr = sg->start_write(true);
@@ -1535,7 +1537,9 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &sg, i] { writer_threads_thread(test_context, sg, ObjKey(i)); });
+            threads[i].start([this, &sg, i] {
+                writer_threads_thread(test_context, sg, ObjKey(i));
+            });
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -2099,8 +2103,9 @@ void multiprocess_threaded(TestContext& test_context, std::string path, int64_t 
 
     // Start threads
     for (int64_t i = 0; i != num_threads; ++i) {
-        threads[i].start(
-            [&test_context, &path, base, i] { multiprocess_thread(test_context, path, ObjKey(base + i)); });
+        threads[i].start([&test_context, &path, base, i] {
+            multiprocess_thread(test_context, path, ObjKey(base + i));
+        });
     }
 
     // Wait for threads to finish
@@ -3504,7 +3509,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3569,7 +3574,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
 
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
 
         f.lock_shared();
         File::UnlockGuard ug(f);
@@ -3622,7 +3627,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3676,7 +3681,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
-        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
+        f.set_fifo_path(std::string(path) + ".management", "lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3767,14 +3772,12 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::runtime_error);
-    CHECK_THROW(i5[0], std::runtime_error);
+    CHECK_THROW(*i5, std::logic_error);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::runtime_error);
-    CHECK_THROW(i5[0], std::runtime_error);
+    CHECK_THROW(*i5, std::logic_error);
     CHECK(i5 == t4->end());
 }
 
@@ -4281,6 +4284,71 @@ TEST(Shared_ManyColumns)
     tr->promote_to_write();
     foo->clear();
     foo->create_object().set("Prop0", 500);
+}
+
+TEST(Shared_MultipleDBInstances)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        auto hist = make_in_realm_history(path);
+        DBRef db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto t = tr->add_table("foo");
+        t->create_object();
+        t->add_column(type_Int, "value");
+        tr->commit();
+    }
+
+    auto hist1 = make_in_realm_history(path);
+    DBRef db1 = DB::create(*hist1);
+    auto hist2 = make_in_realm_history(path);
+    DBRef db2 = DB::create(*hist2);
+
+    auto tr = db1->start_write();
+    tr->commit();
+    // db1 now has m_youngest_live_version=3, db2 has m_youngest_live_version=2
+
+    auto frozen = db2->start_frozen(); // version=3
+    auto table = frozen->get_table("foo");
+
+    tr = db2->start_write();
+    // creates a new mapping and incorrectly marks the old one as being for
+    // version 2 rather than 3
+    tr->get_table("foo")->create_object();
+    // deletes the old mapping even though version 3 still needs it
+    tr->commit();
+
+    // tries to use deleted mapping
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("value"), 0);
+}
+
+TEST(Shared_WriteCopy)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+    SHARED_GROUP_TEST_PATH(path3);
+
+    {
+        auto hist = make_in_realm_history(path1);
+        DBRef db = DB::create(*hist);
+        auto tr = db->start_write();
+        auto t = tr->add_table("foo");
+        t->create_object();
+        t->add_column(type_Int, "value");
+        tr->commit();
+
+        db->write_copy(path2.c_str());
+        CHECK_THROW_ANY(db->write_copy(path2.c_str())); // Not allowed to overwrite
+        db->write_copy(path2.c_str(), {}, true);        // Overwrite allowed
+    }
+    {
+        auto hist = make_in_realm_history(path2);
+        DBRef db = DB::create(*hist);
+        db->write_copy(path3.c_str());
+    }
+    auto hist = make_in_realm_history(path3);
+    DBRef db = DB::create(*hist);
+    CHECK_EQUAL(db->start_read()->get_table("foo")->size(), 1);
 }
 
 #endif // TEST_SHARED

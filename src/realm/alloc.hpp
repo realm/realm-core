@@ -1,4 +1,4 @@
-﻿/*************************************************************************
+/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -153,6 +153,11 @@ public:
 
     struct MappedFile;
 
+    static constexpr size_t section_size() noexcept
+    {
+        return 1 << section_shift;
+    }
+
 protected:
     constexpr static int section_shift = 26;
 
@@ -166,7 +171,8 @@ protected:
     // The ref translation splits the full ref-space (both below and above baseline)
     // into equal chunks.
     struct RefTranslation {
-        char* mapping_addr = nullptr;
+        char* mapping_addr;
+        uint64_t cookie;
         std::atomic<size_t> lowest_possible_xover_offset = 0;
 
         // member 'xover_mapping_addr' is used for memory synchronization of the fields
@@ -181,9 +187,17 @@ protected:
 #endif
         explicit RefTranslation(char* addr)
             : mapping_addr(addr)
+            , cookie(0x1234567890)
         {
         }
-        RefTranslation() = default;
+        RefTranslation()
+            : RefTranslation(nullptr)
+        {
+        }
+        ~RefTranslation()
+        {
+            cookie = 0xdeadbeefdeadbeef;
+        }
         RefTranslation& operator=(const RefTranslation& from)
         {
             if (&from != this) {
@@ -337,13 +351,18 @@ public:
         m_alloc = &underlying_allocator;
         m_baseline.store(m_alloc->m_baseline, std::memory_order_relaxed);
         m_debug_watch = 0;
-        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
+        refresh_ref_translation();
     }
 
     void update_from_underlying_allocator(bool writable)
     {
         switch_underlying_allocator(*m_alloc);
         set_read_only(!writable);
+    }
+
+    void refresh_ref_translation()
+    {
+        m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
 protected:
@@ -419,8 +438,8 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-    //    FIXME: Enable once we get clang warning flags correct
-    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    int64_t res = static_cast<int64_t>(value);
+    REALM_ASSERT_DEBUG(res >= 0);
     return static_cast<int64_t>(value);
 }
 
@@ -551,21 +570,25 @@ inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, 
 {
     size_t idx = get_section_index(ref);
     RefTranslation& txl = ref_translation_ptr[idx];
-    size_t offset = ref - get_section_base(idx);
-    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
-    if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
-        // the lowest possible xover offset may grow concurrently, but that will not affect this code path
-        char* addr = txl.mapping_addr + offset;
+    if (REALM_LIKELY(txl.cookie == 0x1234567890)) {
+        size_t offset = ref - get_section_base(idx);
+        size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
+        if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
+            // the lowest possible xover offset may grow concurrently, but that will not affect this code path
+            char* addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
-                                             NodeHeader::get_byte_size_from_header);
+            realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
+                                                 NodeHeader::get_byte_size_from_header);
 #endif
-        return addr;
+            return addr;
+        }
+        else {
+            // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
+            return translate_less_critical(ref_translation_ptr, ref);
+        }
     }
-    else {
-        // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
-        return translate_less_critical(ref_translation_ptr, ref);
-    }
+    realm::util::terminate("Invalid ref translation entry", __FILE__, __LINE__, txl.cookie, 0x1234567890);
+    return nullptr;
 }
 
 inline char* Allocator::translate(ref_type ref) const noexcept

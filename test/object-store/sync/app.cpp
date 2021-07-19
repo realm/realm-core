@@ -27,14 +27,24 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
-#include "util/event_loop.hpp"
 
 #include <external/json/json.hpp>
+#include <realm/sync/access_token.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
+#include <realm/util/websocket.hpp>
+
+#include <chrono>
+#include <condition_variable>
+#include <future>
+#include <thread>
+#include <iostream>
+#include <list>
+#include <mutex>
 #include <thread>
 
 using namespace realm;
@@ -51,138 +61,29 @@ using namespace std::string_view_literals;
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
-#include <curl/curl.h>
-
-// When a stitch instance starts up and imports the app at this config location,
-// it will generate a new app_id and write it back to the config. This is why we
-// need to parse it at runtime after spinning up the instance.
-static std::string get_runtime_app_id(std::string config_path)
+namespace {
+// This will create a new test app in the baas server at base_url to be used in tests throughout
+// tis file.
+AppSession get_runtime_app_session(std::string base_url)
 {
-    static std::string cached_app_id;
-    if (cached_app_id.empty()) {
-        util::File config(config_path);
-        std::string contents;
-        contents.resize(config.get_size());
-        config.read(contents.data(), config.get_size());
-        nlohmann::json json;
-        json = nlohmann::json::parse(contents);
-        cached_app_id = json["app_id"].get<std::string>();
-        std::cout << "found app_id: " << cached_app_id << " in stitch config" << std::endl;
-    }
-    return cached_app_id;
+    static const AppSession cached_app_session = [&] {
+        auto cached_app_session = create_app(default_app_config(base_url));
+        std::cout << "found app_id: " << cached_app_session.client_app_id << " in stitch config" << std::endl;
+        return cached_app_session;
+    }();
+    return cached_app_session;
 }
 
 class IntTestTransport : public GenericNetworkTransport {
 public:
-    IntTestTransport()
-    {
-        curl_global_init(CURL_GLOBAL_ALL);
-    }
-
-    ~IntTestTransport()
-    {
-        curl_global_cleanup();
-    }
-
-    static size_t write(char* ptr, size_t size, size_t nmemb, std::string* data)
-    {
-        REALM_ASSERT(data);
-        size_t realsize = size * nmemb;
-        data->append(ptr, realsize);
-        return realsize;
-    }
-    static size_t header_callback(char* buffer, size_t size, size_t nitems,
-                                  std::map<std::string, std::string>* headers_storage)
-    {
-        REALM_ASSERT(headers_storage);
-        std::string combined(buffer, size * nitems);
-        if (auto pos = combined.find(':'); pos != std::string::npos) {
-            std::string key = combined.substr(0, pos);
-            std::string value = combined.substr(pos + 1);
-            while (value.size() > 0 && value[0] == ' ') {
-                value = value.substr(1);
-            }
-            while (value.size() > 0 && (value[value.size() - 1] == '\r' || value[value.size() - 1] == '\n')) {
-                value = value.substr(0, value.size() - 1);
-            }
-            headers_storage->insert({key, value});
-        }
-        else {
-            if (combined.size() > 5 && combined.substr(0, 5) != "HTTP/") { // ignore for now HTTP/1.1 ...
-                std::cerr << "test transport skipping header: " << combined << std::endl;
-            }
-        }
-        return nitems * size;
-    }
-
     void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
     {
-        CURL* curl;
-        CURLcode response_code;
-        std::string response;
-        std::map<std::string, std::string> response_headers;
-
-        /* get a curl handle */
-        curl = curl_easy_init();
-
-        struct curl_slist* list = NULL;
-
-        if (curl) {
-            /* First set the URL that is about to receive our POST. This URL can
-             just as well be a https:// URL if that is what should receive the
-             data. */
-            curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-
-            /* Now specify the POST data */
-            if (request.method == HttpMethod::post) {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::put) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-            else if (request.method == HttpMethod::del) {
-                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
-
-            for (auto header : request.headers) {
-                std::stringstream h;
-                h << header.first << ": " << header.second;
-                list = curl_slist_append(list, h.str().data());
-            }
-
-            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
-            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
-
-            /* Perform the request, res will get the return code */
-            response_code = curl_easy_perform(curl);
-            int http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-            /* Check for errors */
-            if (response_code != CURLE_OK)
-                fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
-                        request.url.c_str(), request.body.c_str(), curl_easy_strerror(response_code));
-
-            /* always cleanup */
-            curl_easy_cleanup(curl);
-            curl_slist_free_all(list); /* free the list again */
-            int binding_response_code = 0;
-            completion_block(Response{http_code, binding_response_code, response_headers, response});
-        }
-
-        curl_global_cleanup();
+        completion_block(do_http_request(request));
     }
 };
 
 #ifdef REALM_MONGODB_ENDPOINT
-static std::string get_base_url()
+std::string get_base_url()
 {
     // allows configuration with or without quotes
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
@@ -195,20 +96,47 @@ static std::string get_base_url()
     return base_url;
 }
 #endif
-#ifdef REALM_STITCH_CONFIG
-static std::string get_config_path()
-{
-    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
-    if (config_path.size() > 0 && config_path[0] == '"') {
-        config_path.erase(0, 1);
-    }
-    if (config_path.size() > 0 && config_path[config_path.size() - 1] == '"') {
-        config_path.erase(config_path.size() - 1);
-    }
-    return config_path;
-}
-#endif
 
+struct AutoVerifiedEmailCredentials {
+    AutoVerifiedEmailCredentials()
+    {
+        // emails with this prefix will pass through the baas app due to the register function
+        email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        password = random_string(10);
+    }
+    std::string email;
+    std::string password;
+};
+
+void timed_wait_for(std::function<bool()> condition,
+                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(2000))
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    util::EventLoop::main().run_until([&] {
+        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
+            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
+        }
+        return condition();
+    });
+}
+
+AutoVerifiedEmailCredentials create_user_and_login(SharedApp app)
+{
+    REQUIRE(app);
+    AutoVerifiedEmailCredentials creds;
+    app->provider_client<App::UsernamePasswordProviderClient>().register_email(creds.email, creds.password,
+                                                                               [&](Optional<app::AppError> error) {
+                                                                                   CHECK(!error);
+                                                                               });
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                     REQUIRE(user);
+                                     CHECK(!error);
+                                 });
+    return creds;
+}
+
+} // namespace
 // MARK: - Login with Credentials Tests
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
@@ -219,14 +147,12 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         };
 
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
-        std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
+        auto app_session = get_runtime_app_session(base_url);
 
-        // this app id is configured in tests/mongodb/stitch.json
-        auto config = App::Config{get_runtime_app_id(config_path),
+        // this app id is configured in tests/mongodb/config.json
+        auto config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -280,18 +206,18 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 // MARK: - UsernamePasswordProviderClient Tests
 
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-
-    auto password = random_string(10);
+    AutoVerifiedEmailCredentials creds;
+    auto email = creds.email;
+    auto password = creds.password;
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -446,6 +372,56 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
             });
         CHECK(processed);
     }
+
+    SECTION("log in, remove, log in") {
+
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                     });
+        CHECK(processed);
+        processed = false;
+        auto user = app->current_user();
+        REQUIRE(user);
+        CHECK(user->user_profile().email == email);
+
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+
+        app->remove_user(user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+
+        CHECK(user->state() == SyncUser::State::Removed);
+
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                     });
+        CHECK(processed);
+        processed = false;
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(app->current_user() != user);
+        user = app->current_user();
+        CHECK(user->user_profile().email == email);
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+
+        app->remove_user(user, [&](Optional<app::AppError> error) {
+            REQUIRE(!error);
+            CHECK(app->sync_manager()->all_users().size() == 0);
+            processed = true;
+        });
+
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(processed);
+        CHECK(app->all_users().size() == 0);
+    }
 }
 
 // MARK: - UserAPIKeyProviderClient Tests
@@ -456,10 +432,9 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -473,35 +448,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     auto app = sync_manager.app();
 
     bool processed = false;
-
-    auto register_and_log_in_user = [&]() -> std::shared_ptr<SyncUser> {
-        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        auto password = util::format("%1", random_string(15));
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, [&](Optional<app::AppError> error) {
-                CHECK(!error); // first registration should succeed
-                if (error) {
-                    std::cout << "register failed for email: " << email << " pw: " << password
-                              << " message: " << error->error_code.message() << "+" << error->message << std::endl;
-                }
-            });
-        std::shared_ptr<SyncUser> logged_in_user;
-        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                         REQUIRE(user);
-                                         CHECK(!error);
-                                         logged_in_user = user;
-                                         processed = true;
-                                     });
-        CHECK(processed);
-        processed = false;
-        return logged_in_user;
-    };
-
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
-        std::shared_ptr<SyncUser> logged_in_user = register_and_log_in_user();
+        create_user_and_login(app);
+        std::shared_ptr<SyncUser> logged_in_user = app->current_user();
         auto api_key_name = util::format("%1", random_string(15));
         app->provider_client<App::UserAPIKeyProviderClient>().create_api_key(
             api_key_name, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
@@ -644,8 +595,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     }
 
     SECTION("api-key against the wrong user") {
-        std::shared_ptr<SyncUser> first_user = register_and_log_in_user();
-        std::shared_ptr<SyncUser> second_user = register_and_log_in_user();
+        create_user_and_login(app);
+        std::shared_ptr<SyncUser> first_user = app->current_user();
+        create_user_and_login(app);
+        std::shared_ptr<SyncUser> second_user = app->current_user();
+        REQUIRE(first_user != second_user);
         auto api_key_name = util::format("%1", random_string(15));
         App::UserAPIKey api_key;
         App::UserAPIKeyProviderClient provider = app->provider_client<App::UserAPIKeyProviderClient>();
@@ -783,10 +737,9 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -821,19 +774,14 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
 
 TEST_CASE("app: link_user integration", "[sync][app]") {
     SECTION("link_user intergration") {
-
-        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-
-        auto password = random_string(10);
-
+        AutoVerifiedEmailCredentials creds;
         std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
         std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
         REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
-        auto config = App::Config{get_runtime_app_id(config_path),
+        auto app_session = get_runtime_app_session(base_url);
+        auto config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -850,13 +798,13 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
 
         std::shared_ptr<SyncUser> sync_user;
 
-        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(creds.email, creds.password);
 
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, [&](Optional<app::AppError> error) {
+            creds.email, creds.password, [&](Optional<app::AppError> error) {
                 CHECK(!error); // first registration success
                 if (error) {
-                    std::cout << "register failed for email: " << email << " pw: " << password
+                    std::cout << "register failed for email: " << creds.email << " pw: " << creds.password
                               << " message: " << error->error_code.message() << "+" << error->message << std::endl;
                 }
             });
@@ -890,10 +838,9 @@ TEST_CASE("app: call function", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -906,31 +853,16 @@ TEST_CASE("app: call function", "[sync][app]") {
     TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
+    create_user_and_login(app);
 
-    app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                               [&](Optional<app::AppError> error) {
-                                                                                   CHECK(!error);
-                                                                               });
-
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     CHECK(!error);
-                                 });
-
-    app->call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
-
-    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", {1, 2, 3, 4, 5},
-                                [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-                                    REQUIRE(!error);
-                                    CHECK(*sum == 15);
-                                });
+    bson::BsonArray toSum(5);
+    std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
+    const auto checkFn = [](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    };
+    app->call_function<int64_t>("sumFunc", toSum, checkFn);
+    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", toSum, checkFn);
 }
 
 // MARK: - Remote Mongo Client Tests
@@ -941,10 +873,9 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -957,21 +888,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
-    app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                               [&](Optional<app::AppError> error) {
-                                                                                   CHECK(!error);
-                                                                               });
-
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     CHECK(!error);
-                                 });
+    create_user_and_login(app);
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     auto person_collection = db["Person"];
 
@@ -1001,23 +921,23 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument bad_document{{"bad", "value"}};
 
     dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     dog_collection.delete_many(person_document2, [&](uint64_t, Optional<app::AppError> error) {
-        CHECK(!error);
+        REQUIRE(!error);
     });
 
     SECTION("insert") {
@@ -1614,10 +1534,9 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -1630,22 +1549,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
-
-    app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                               [&](Optional<app::AppError> error) {
-                                                                                   CHECK(!error);
-                                                                               });
-
-    std::shared_ptr<SyncUser> sync_user;
-
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     CHECK(!error);
-                                     sync_user = user;
-                                 });
+    create_user_and_login(app);
+    std::shared_ptr<SyncUser> sync_user = app->current_user();
 
     SECTION("register") {
         bool processed;
@@ -1725,16 +1630,15 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 
 // MARK: - Token refresh
 
-TEST_CASE("app: token refresh", "[sync][app]") {
+TEST_CASE("app: token refresh", "[sync][app][token]") {
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path),
+    auto app_session = get_runtime_app_session(base_url);
+    auto config = App::Config{app_session.client_app_id,
                               factory,
                               base_url,
                               util::none,
@@ -1747,26 +1651,12 @@ TEST_CASE("app: token refresh", "[sync][app]") {
     TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
-
-    app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                               [&](Optional<app::AppError> error) {
-                                                                                   CHECK(!error);
-                                                                               });
-
-    std::shared_ptr<SyncUser> sync_user;
-
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     CHECK(!error);
-                                     sync_user = user;
-                                     sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
-                                 });
+    create_user_and_login(app);
+    std::shared_ptr<SyncUser> sync_user = app->current_user();
+    sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
+    auto db = remote_client.db(app_session.config.mongo_dbname);
     auto dog_collection = db["Dog"];
     bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
 
@@ -1791,16 +1681,30 @@ TEST_CASE("app: token refresh", "[sync][app]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: sync integration", "[sync][app]") {
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
-        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+TEST_CASE("app: set new embedded object", "[sync][app]") {
+    auto factory = []() -> std::unique_ptr<GenericNetworkTransport> {
+        return std::make_unique<IntTestTransport>();
     };
     std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto app_config = App::Config{get_runtime_app_id(config_path),
+
+    Schema schema{
+        ObjectSchema("TopLevel",
+                     {
+                         {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+                         {"embedded", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded"},
+                     }),
+        ObjectSchema("TopLevel_embedded", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
+    auto app_session = create_app(server_app_config);
+
+    auto app_config = App::Config{app_session.client_app_id,
                                   factory,
                                   base_url,
                                   util::none,
@@ -1813,15 +1717,27 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     auto base_path = util::make_temp_dir() + app_config.app_id;
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
-    // Heap allocate to control lifecycle.
-    // This is required so that we can reset the sync manager
-    // through deallocation without worrying about it being popped
-    // off the stack at the end of test case.
 
+    auto make_realm_config = [&](const std::shared_ptr<SyncUser> user) {
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson("foo"));
+        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+            std::cout << error.message << std::endl;
+        };
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/default.realm";
+        realm_config.schema = server_app_config.schema;
+        return realm_config;
+    };
 
-    auto get_app_and_login = [&](SharedApp app) -> std::shared_ptr<App> {
-        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        auto password = random_string(10);
+    auto top_level_id = ObjectId::gen();
+    auto email = util::format("realm_tests_do_autoverify-test@example.com");
+    auto password = std::string{"password"};
+
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
             email, password, [&](Optional<app::AppError> error) {
                 CHECK(!error);
@@ -1831,8 +1747,99 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                          REQUIRE(user);
                                          CHECK(!error);
                                      });
-        return app;
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto obj = Object::create(c, realm, "TopLevel",
+                                  util::Any(AnyDict{
+                                      {valid_pk_name, top_level_id},
+                                      {"embedded", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
+                                  }),
+                                  CreatePolicy::ForceCreate);
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        obj.set_property_value(c, "embedded",
+                               util::Any(AnyDict{{
+                                   "array",
+                                   AnyVector{INT64_C(3), INT64_C(4)},
+                               }}),
+                               realm::CreatePolicy::UpdateAll);
+        realm->commit_transaction();
+
+        std::promise<void> promise;
+        auto future = promise.get_future();
+        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
+        session->wait_for_download_completion(
+            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
+                REALM_ASSERT(!ec);
+                shared_promise->set_value();
+            });
+
+        future.wait();
+    }
+
+    {
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        std::promise<void> promise;
+        auto future = promise.get_future();
+        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
+        session->wait_for_download_completion(
+            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
+                REALM_ASSERT(!ec);
+                shared_promise->set_value();
+            });
+
+        future.wait();
+        CppContext c(realm);
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{top_level_id});
+        auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded"));
+        auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+        CHECK(array_list.size() == 2);
+        CHECK(array_list.get<int64_t>(0) == int64_t(3));
+        CHECK(array_list.get<int64_t>(1) == int64_t(4));
+    }
+}
+
+TEST_CASE("app: sync integration", "[sync][app]") {
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+    auto app_session = create_app(default_app_config(base_url));
+
+    auto app_config = App::Config{app_session.client_app_id,
+                                  factory,
+                                  base_url,
+                                  util::none,
+                                  Optional<std::string>("A Local App Version"),
+                                  util::none,
+                                  "Object Store Platform Tests",
+                                  "Object Store Platform Version Blah",
+                                  "An sdk version"};
+
+    auto base_path = util::make_temp_dir() + app_config.app_id;
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
+
     auto setup_and_get_config = [&base_path, &valid_pk_name](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
         config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
@@ -1863,26 +1870,39 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        util::EventLoop::main().run_until([&] {
+        REQUIRE_NOTHROW(timed_wait_for([&] {
             return called.load();
-        });
+        }));
         REQUIRE(called);
         called.store(false);
         session->wait_for_download_completion([&](std::error_code err) {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        util::EventLoop::main().run_until([&] {
+        REQUIRE_NOTHROW(timed_wait_for([&] {
             return called.load();
-        });
+        }));
         return realm::Results(r, r->read_group().get_table("class_Dog"));
+    };
+
+    auto create_one_dog = [&](realm::SharedRealm r) {
+        r->begin_transaction();
+        CppContext c;
+        Object::create(c, r, "Dog",
+                       util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                {"breed", std::string("bulldog")},
+                                                {"name", std::string("fido")},
+                                                {"realm_id", std::string("foo")}}),
+                       CreatePolicy::ForceCreate);
+        r->commit_transaction();
     };
 
     // MARK: Add Objects -
     SECTION("Add Objects") {
-        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
-            auto app = get_app_and_login(sync_manager.app());
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1896,29 +1916,20 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             }
 
             REQUIRE(get_dogs(r, session).size() == 0);
-            r->begin_transaction();
-            CppContext c;
-            Object::create(c, r, "Dog",
-                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-                                                    {"breed", std::string("bulldog")},
-                                                    {"name", std::string("fido")},
-                                                    {"realm_id", std::string("foo")}}),
-                           CreatePolicy::ForceCreate);
-            r->commit_transaction();
-
+            create_one_dog(r);
             REQUIRE(get_dogs(r, session).size() == 1);
         }
 
         // reset sync manager, deleting local data
-        delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
-            auto app = get_app_and_login(reinit.app());
-            auto config = setup_and_get_config(app);
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
+            create_user_and_login(reinit.app());
+
+            auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            auto session = reinit.app()->current_user()->session_for_on_disk_path(r->config().path);
             Results dogs = get_dogs(r, session);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -1928,10 +1939,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     // MARK: Expired Session Refresh -
-    SECTION("Expired Session Refresh") {
-        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
+    SECTION("Invalid Access Token is Refreshed") {
         {
-            auto app = get_app_and_login(sync_manager.app());
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1945,31 +1957,21 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             }
 
             REQUIRE(get_dogs(r, session).size() == 0);
-            r->begin_transaction();
-            CppContext c;
-            Object::create(c, r, "Dog",
-                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-                                                    {"breed", std::string("bulldog")},
-                                                    {"name", std::string("fido")},
-                                                    {"realm_id", std::string("foo")}}),
-                           CreatePolicy::ForceCreate);
-            r->commit_transaction();
-
+            create_one_dog(r);
             REQUIRE(get_dogs(r, session).size() == 1);
         }
-
-        delete &sync_manager;
-        util::try_remove_dir_recursive(base_path);
-        util::try_make_dir(base_path);
-        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
+        REQUIRE(util::try_remove_dir_recursive(base_path));
+        REQUIRE(util::try_make_dir(base_path));
         {
-            auto app = get_app_and_login(reinit.app());
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
+            create_user_and_login(reinit.app());
+            auto user = reinit.app()->current_user();
             // set a bad access token. this will trigger a refresh when the sync session opens
-            app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
+            user->update_access_token(encode_fake_jwt("fake_access_token"));
 
-            auto config = setup_and_get_config(app);
+            auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            auto session = user->session_for_on_disk_path(r->config().path);
             Results dogs = get_dogs(r, session);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -1978,29 +1980,246 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
+    SECTION("Expired Access Token is Refreshed") {
+        realm::sync::AccessToken token;
+        {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+            // clear state from previous runs
+            {
+                Results dogs = get_dogs(r, session);
+                r->begin_transaction();
+                dogs.clear();
+                r->commit_transaction();
+            }
+
+            REQUIRE(get_dogs(r, session).size() == 0);
+            create_one_dog(r);
+
+            REQUIRE(get_dogs(r, session).size() == 1);
+            realm::sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
+            realm::sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
+            REQUIRE(error_state == realm::sync::AccessToken::ParseError::none);
+            REQUIRE(token.timestamp);
+            REQUIRE(token.expires);
+            REQUIRE(token.timestamp < token.expires);
+            std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+            using namespace std::chrono_literals;
+            token.expires = std::chrono::system_clock::to_time_t(now - 30s);
+            REQUIRE(token.expired(now));
+        }
+
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        {
+            std::function<void()> hook;
+            std::function<std::unique_ptr<GenericNetworkTransport>()> hooked_factory = [&hook] {
+                if (hook) {
+                    hook();
+                }
+                return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+            };
+            app_config.transport_generator = hooked_factory;
+
+            TestSyncManager reinit(TestSyncManager::Config(app_config), {});
+            auto app = reinit.app();
+            create_user_and_login(app);
+            REQUIRE(!app->current_user()->access_token_refresh_required());
+            // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+            app->current_user()->update_access_token(
+                encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+            REQUIRE(app->current_user()->access_token_refresh_required());
+
+            // This assumes that we make an http request for the new token while
+            // already in the WaitingForAccessToken state.
+            std::vector<SyncSession::PublicState> seen_states;
+            auto config = setup_and_get_config(app);
+            hook = [&]() {
+                auto user = app->current_user();
+                REQUIRE(user);
+                for (auto session : user->all_sessions()) {
+                    seen_states.push_back(session->state());
+                }
+            };
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+            REQUIRE(std::find(begin(seen_states), end(seen_states),
+                              SyncSession::PublicState::WaitingForAccessToken) != end(seen_states));
+            Results dogs = get_dogs(r, session);
+            REQUIRE(dogs.size() == 1);
+            REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+            REQUIRE(dogs.get(0).get<String>("name") == "fido");
+            REQUIRE(dogs.get(0).get<String>("realm_id") == "foo");
+        }
+    }
+
+    SECTION("Invalid refresh token") {
+        auto verify_error_on_sync_with_invalid_refresh_token = [&](std::shared_ptr<SyncUser> user,
+                                                                   realm::Realm::Config config) {
+            REQUIRE(user);
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+
+            // requesting a new access token fails because the refresh token used for this request is revoked
+            user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(error);
+                REQUIRE(error->http_status_code == 401);
+                REQUIRE(error->error_code ==
+                        realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+            });
+
+            // Set a bad access token. This will force a request for a new access token when the sync session opens
+            // this is only necessary because the server doesn't actually revoke previously issued access tokens
+            // instead allowing their session to time out as normal. So this simulates the access token expiring.
+            // see:
+            // https://github.com/10gen/baas/blob/05837cc3753218dfaf89229c6930277ef1616402/api/common/auth.go#L1380-L1386
+            user->update_access_token(encode_fake_jwt("fake_access_token"));
+            REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+
+            std::atomic<bool> sync_error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                sync_error_handler_called.store(true);
+                REQUIRE(error.error_code ==
+                        realm::sync::make_error_code(realm::sync::ProtocolError::permission_denied));
+                REQUIRE(error.message == "Unable to refresh the user access token.");
+            };
+
+            auto r = realm::Realm::get_shared_realm(config);
+            auto session = user->session_for_on_disk_path(r->config().path);
+            REQUIRE(user->is_logged_in());
+            REQUIRE(!sync_error_handler_called.load());
+            {
+                std::atomic<bool> called{false};
+                session->wait_for_upload_completion([&](std::error_code err) {
+                    called.store(true);
+                    REQUIRE(err == realm::app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+                });
+                REQUIRE_NOTHROW(timed_wait_for([&] {
+                    return called.load();
+                }));
+                REQUIRE(called);
+            }
+            REQUIRE_NOTHROW(timed_wait_for([&] {
+                return sync_error_handler_called.load();
+            }));
+
+            // the failed refresh logs out the user
+            REQUIRE(!user->is_logged_in());
+        };
+
+        SECTION("Disabled user results in a sync error") {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto user = app->current_user();
+            REQUIRE(user);
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+            app_session.admin_api.disable_user_sessions(app->current_user()->identity(), app_session.server_app_id);
+
+            verify_error_on_sync_with_invalid_refresh_token(user, config);
+
+            // logging in again doesn't fix things while the account is disabled
+            app->log_in_with_credentials(
+                realm::app::AppCredentials::username_password(creds.email, creds.password),
+                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                    REQUIRE(!user);
+                    REQUIRE(error);
+                    REQUIRE(error->error_code ==
+                            realm::app::make_error_code(realm::app::ServiceErrorCode::user_disabled));
+                });
+
+            // admin enables user sessions again which should allow the session to continue
+            app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
+
+            // logging in now works properly
+            app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                         [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                             REQUIRE(user);
+                                             REQUIRE(!error);
+                                         });
+            // still referencing the same user
+            REQUIRE(user == app->current_user());
+            REQUIRE(user->is_logged_in());
+
+            {
+                // check that there are no errors initiating a session now by making sure upload/download succeeds
+                auto r = realm::Realm::get_shared_realm(config);
+                auto session = user->session_for_on_disk_path(r->config().path);
+                Results dogs = get_dogs(r, session);
+            }
+        }
+
+        SECTION("Revoked refresh token results in a sync error") {
+            TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_login(sync_manager.app());
+            auto config = setup_and_get_config(app);
+            auto user = app->current_user();
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+            app_session.admin_api.revoke_user_sessions(user->identity(), app_session.server_app_id);
+            // revoking a user session only affects the refresh token, so the access token should still continue to
+            // work.
+            REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
+
+            verify_error_on_sync_with_invalid_refresh_token(user, config);
+
+            // logging in again succeeds and generates a new and valid refresh token
+            app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
+                                         [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                             REQUIRE(!error);
+                                             REQUIRE(user);
+                                         });
+
+            // still referencing the same user and now the user is logged in
+            REQUIRE(user == app->current_user());
+            REQUIRE(user->is_logged_in());
+
+            // new requests for an access token succeed again
+            user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(!error);
+            });
+
+            {
+                // check that there are no errors initiating a new sync session by making sure upload/download
+                // succeeds
+                auto r = realm::Realm::get_shared_realm(config);
+                auto session = user->session_for_on_disk_path(r->config().path);
+                Results dogs = get_dogs(r, session);
+            }
+        }
+    }
+
     SECTION("invalid partition error handling") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
         config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-            CHECK(error.message ==
-                  "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            CHECK(error.message.find(
+                      "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid") !=
+                  std::string::npos);
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);
         auto session = app->current_user()->session_for_on_disk_path(r->config().path);
-        util::EventLoop::main().run_until([&] {
+        REQUIRE_NOTHROW(timed_wait_for([&] {
             return error_did_occur.load();
-        });
+        }));
         REQUIRE(error_did_occur.load());
     }
 
     SECTION("invalid pk schema error handling") {
         const std::string invalid_pk_name = "my_primary_key";
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");
         REQUIRE(it != config.schema->end());
@@ -2017,7 +2236,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("missing pk schema error handling") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = get_app_and_login(sync_manager.app());
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");
         REQUIRE(it != config.schema->end());
@@ -2029,6 +2249,63 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                                   util::format("There must be a primary key property named '%1' on a synchronized "
                                                "Realm but none was found for type 'Dog'",
                                                valid_pk_name));
+    }
+
+    SECTION("too large sync message error handling") {
+        TestSyncManager::Config test_config(app_config);
+        // Too much log output seems to create problems on Evergreen CI
+        test_config.verbose_sync_client_logging = false;
+
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+
+        std::mutex sync_error_mutex;
+        std::vector<SyncError> sync_errors;
+        config.sync_config->error_handler = [&](auto, SyncError error) {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            sync_errors.push_back(std::move(error));
+        };
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+
+        // Create 26 MB worth of dogs in a single transaction - this should all get put into one changeset
+        // and get uploaded at once, which for now is an error on the server.
+        r->begin_transaction();
+        CppContext c;
+        for (auto i = 'a'; i < 'z'; ++i) {
+            Object::create(c, r, "Dog",
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                    {"breed", std::string("bulldog")},
+                                                    {"name", random_string(1024 * 1024)},
+                                                    {"realm_id", std::string("foo")}}),
+                           CreatePolicy::ForceCreate);
+        }
+        r->commit_transaction();
+
+        auto pred = [](const SyncError& error) {
+            return error.error_code.category() == util::websocket::websocket_close_status_category();
+        };
+        // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+        // and we should fail the test.
+        REQUIRE_NOTHROW(timed_wait_for(
+            [&] {
+                std::lock_guard<std::mutex> lk(sync_error_mutex);
+                return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
+            },
+            std::chrono::minutes(2)));
+
+        auto captured_error = [&] {
+            std::lock_guard<std::mutex> lk(sync_error_mutex);
+            const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
+            REQUIRE(it != sync_errors.end());
+            return *it;
+        }();
+
+        REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
+        REQUIRE(captured_error.error_code.value() == 1009);
+        REQUIRE(captured_error.message == "read limited at 16777217 bytes");
     }
 }
 
@@ -3565,7 +3842,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     }
                     else if (request.url.find("/session") != std::string::npos &&
                              request.method == HttpMethod::post) {
-
                         CHECK(login_hit);
                         CHECK(get_profile_1_hit);
                         CHECK(!get_profile_2_hit);
@@ -3608,6 +3884,275 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     }
 }
 
+namespace {
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+class AsyncMockNetworkTransport {
+public:
+    AsyncMockNetworkTransport()
+        : transport_thread(&AsyncMockNetworkTransport::worker_routine, this)
+    {
+    }
+
+    void add_work_item(Response response, std::function<void(const Response)> completion_block)
+    {
+        std::lock_guard<std::mutex> lk(transport_work_mutex);
+        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion_block)});
+        transport_work_cond.notify_one();
+    }
+
+    void add_work_item(std::function<void()> cb)
+    {
+        std::lock_guard<std::mutex> lk(transport_work_mutex);
+        transport_work.push_front(std::move(cb));
+        transport_work_cond.notify_one();
+    }
+
+    void mark_complete()
+    {
+        std::unique_lock<std::mutex> lk(transport_work_mutex);
+        test_complete = true;
+        transport_work_cond.notify_one();
+        lk.unlock();
+        transport_thread.join();
+    }
+
+private:
+    struct ResponseWorkItem {
+        Response response;
+        std::function<void(const Response)> completion_block;
+    };
+
+    void worker_routine()
+    {
+        std::unique_lock<std::mutex> lk(transport_work_mutex);
+        for (;;) {
+            transport_work_cond.wait(lk, [&] {
+                return test_complete || !transport_work.empty();
+            });
+
+            if (!transport_work.empty()) {
+                auto work_item = std::move(transport_work.back());
+                transport_work.pop_back();
+                lk.unlock();
+
+                mpark::visit(overloaded{[](ResponseWorkItem& work_item) {
+                                            work_item.completion_block(std::move(work_item.response));
+                                        },
+                                        [](std::function<void()>& cb) {
+                                            cb();
+                                        }},
+                             work_item);
+
+                lk.lock();
+                continue;
+            }
+
+            if (test_complete) {
+                return;
+            }
+        }
+    }
+
+    std::mutex transport_work_mutex;
+    std::condition_variable transport_work_cond;
+    bool test_complete = false;
+    std::list<mpark::variant<ResponseWorkItem, std::function<void()>>> transport_work;
+    JoiningThread transport_thread;
+};
+
+} // namespace
+
+TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    std::function<std::unique_ptr<GenericNetworkTransport>()> generic_factory = [&] {
+        struct transport : public GenericNetworkTransport {
+            transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+                : mock_transport_worker(worker)
+                , state(state)
+            {
+            }
+
+            void send_request_to_server(const Request request,
+                                        std::function<void(const Response)> completion_block) override
+
+            {
+                std::cerr << request.url << std::endl;
+                if (request.url.find("/login") != std::string::npos) {
+                    CHECK(state.get() == TestState::location);
+                    state.advance_to(TestState::login);
+                    mock_transport_worker.add_work_item(
+                        Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
+                        std::move(completion_block));
+                }
+                else if (request.url.find("/profile") != std::string::npos) {
+                    // simulated bad token request
+                    auto cur_state = state.get();
+                    CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
+                    if (cur_state == TestState::refresh_1) {
+                        state.advance_to(TestState::profile_2);
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                            std::move(completion_block));
+                    }
+                    else if (cur_state == TestState::login) {
+                        state.advance_to(TestState::profile_1);
+                        mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
+                    }
+                }
+                else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                    if (state.get() == TestState::profile_1) {
+                        state.advance_to(TestState::refresh_1);
+                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                            std::move(completion_block));
+                    }
+                    else if (state.get() == TestState::profile_2) {
+                        state.advance_to(TestState::refresh_2);
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
+                                                            std::move(completion_block));
+                    }
+                    else {
+                        CHECK(state.get() == TestState::refresh_2);
+                        state.advance_to(TestState::refresh_3);
+                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                            std::move(completion_block));
+                    }
+                }
+                else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    CHECK(state.get() == TestState::unknown);
+                    state.advance_to(TestState::location);
+                    mock_transport_worker.add_work_item(
+                        Response{200,
+                                 0,
+                                 {},
+                                 "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                 "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                        std::move(completion_block));
+                }
+            }
+
+            AsyncMockNetworkTransport& mock_transport_worker;
+            TestStateBundle& state;
+        };
+        return std::make_unique<transport>(mock_transport_worker, state);
+    };
+
+    {
+        auto config = get_config(generic_factory);
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = util::make_temp_dir() + config.app_id;
+        cfg.should_teardown_test_directory = false;
+
+        util::try_remove_dir_recursive(cfg.base_path);
+        util::make_dir(cfg.base_path);
+
+        TestSyncManager sync_manager(cfg);
+        auto app = sync_manager.app();
+
+        {
+            std::shared_ptr<SyncUser> cur_user;
+            app->log_in_with_credentials(AppCredentials::anonymous(),
+                                         [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                             CHECK(user);
+                                             CHECK(!error);
+                                             cur_user = std::move(user);
+                                         });
+
+
+            state.wait_for(TestState::profile_2);
+            util::EventLoop::main().run_until([&] {
+                return cur_user != nullptr;
+            });
+            CHECK(cur_user);
+
+            realm::Realm::Config realm_config;
+            realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+            realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+            realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+                std::cout << error.message << std::endl;
+            };
+            realm_config.schema_version = 1;
+
+            realm_config.path = cfg.base_path + "/default.realm";
+            const auto dog_schema = realm::ObjectSchema(
+                "Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                        realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                        realm::Property("name", PropertyType::String),
+                        realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+            const auto person_schema = realm::ObjectSchema(
+                "Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                           realm::Property("age", PropertyType::Int),
+                           realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+                           realm::Property("firstName", PropertyType::String),
+                           realm::Property("lastName", PropertyType::String),
+                           realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+            realm_config.schema = realm::Schema({dog_schema, person_schema});
+
+            auto r = realm::Realm::get_shared_realm(std::move(realm_config));
+            auto session = cur_user->session_for_on_disk_path(r->config().path);
+            mock_transport_worker.add_work_item([session] {
+                session->initiate_access_token_refresh();
+            });
+        }
+        for (const auto& user : app->all_users()) {
+            user->log_out();
+        }
+
+        while (app->sync_manager()->has_existing_sessions()) {
+            millisleep(5);
+        }
+
+        bool did_reset = false;
+        while (!did_reset) {
+            try {
+                sync_manager.app()->sync_manager()->reset_for_testing();
+                did_reset = true;
+            }
+            catch (const std::exception& e) {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+
+        App::clear_cached_apps();
+    }
+
+    mock_transport_worker.mark_complete();
+}
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";

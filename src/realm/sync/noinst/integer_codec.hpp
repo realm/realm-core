@@ -13,6 +13,10 @@
 namespace realm {
 namespace _impl {
 
+struct Bid128 {
+    uint64_t w[2];
+};
+
 /// The maximum number of bytes that can be consumed by encode_int() for an
 /// integer of the same type, \a T.
 template <class T>
@@ -101,6 +105,32 @@ std::size_t encode_int(char* buffer, T value)
     REALM_DIAG_POP();
 }
 
+template <>
+inline std::size_t encode_int(char* buffer, Bid128 value)
+{
+    auto value_0 = value.w[0];
+    auto value_1 = value.w[1];
+    constexpr int bits_per_byte = 7;
+    using uchar = unsigned char;
+    char* ptr = buffer;
+    while (value_0 >> (bits_per_byte - 1) || value_1 != 0) {
+        unsigned c = unsigned(value_0 & ((1U << bits_per_byte) - 1));
+        *reinterpret_cast<uchar*>(ptr) = uchar((1U << bits_per_byte) | c);
+        ++ptr;
+
+        value_0 >>= bits_per_byte;
+        if (value_1) {
+            uint64_t tmp = value_1 & ((1U << bits_per_byte) - 1);
+            value_1 >>= bits_per_byte;
+            value_0 |= (tmp << (64 - bits_per_byte));
+        }
+    }
+    *reinterpret_cast<uchar*>(ptr) = uchar(value_0);
+    ++ptr;
+    return std::size_t(ptr - buffer);
+}
+
+
 template <class I, class T>
 bool decode_int(I& input, T& value) noexcept(noexcept(std::declval<I>().read_char(std::declval<char&>())))
 {
@@ -139,6 +169,44 @@ bool decode_int(I& input, T& value) noexcept(noexcept(std::declval<I>().read_cha
     value = value_2;
     return true; // Success
     REALM_DIAG_POP();
+}
+
+template <class I>
+bool decode_int(I& input, _impl::Bid128& value) noexcept
+{
+    uint64_t value_0 = 0;
+    uint64_t value_1 = 0;
+    constexpr int max_bytes = 16; // 112 bits / 7
+
+    int i = 0;
+    for (;;) {
+        char c;
+        if (!input.read_char(c))
+            return false; // Failure: Premature end of input
+        uint64_t part = c & 0x7F;
+        if (i < 9) {
+            value_0 |= part << (7 * i);
+        }
+        else if (i == 9) {
+            value_0 |= part << 63;
+            value_1 |= part >> 1;
+        }
+        else if (i < max_bytes) {
+            value_1 |= part << ((7 * i) - 64);
+        }
+        else {
+            return false; // Failure: Too many bytes
+        }
+        if ((c & 0x80) == 0) {
+            break;
+        }
+        i++;
+    }
+
+    value.w[0] = value_0;
+    value.w[1] = value_1;
+
+    return true; // Success
 }
 
 template <class T>

@@ -35,8 +35,9 @@
 #include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
-#include <realm/util/scope_exit.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
@@ -44,11 +45,28 @@
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/version.hpp>
 #endif
 
 using namespace realm;
 using namespace realm::_impl;
+
+namespace {
+class CountGuard {
+public:
+    CountGuard(size_t& count)
+        : m_count(count)
+    {
+        ++m_count;
+    }
+    ~CountGuard()
+    {
+        --m_count;
+    }
+
+private:
+    size_t& m_count;
+};
+} // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
              MakeSharedTag)
@@ -57,10 +75,10 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
     , m_scheduler(m_config.scheduler)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
-        m_group = coordinator->begin_read();
+        m_transaction = coordinator->begin_read();
         read_schema_from_group_if_needed();
         coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
-        m_group = nullptr;
+        m_transaction = nullptr;
     }
 
     m_coordinator = std::move(coordinator);
@@ -75,34 +93,33 @@ Realm::~Realm()
 
 Group& Realm::read_group()
 {
-    verify_open();
-
-    if (!m_group)
-        begin_read(m_frozen_version.value_or(VersionID{}));
-    return *m_group;
+    return transaction();
 }
 
 Transaction& Realm::transaction()
 {
-    REALM_ASSERT(!m_config.immutable());
-    return static_cast<Transaction&>(read_group());
+    verify_open();
+
+    if (!m_transaction)
+        begin_read(m_frozen_version.value_or(VersionID{}));
+    return *m_transaction;
 }
 
 Transaction& Realm::transaction() const
 {
-    REALM_ASSERT(!m_config.immutable());
-    // FIXME: read_group() is not even remotly const
-    return static_cast<Transaction&>(const_cast<Realm*>(this)->read_group());
+    // one day we should change the way we use constness
+    Realm* nc_realm = const_cast<Realm*>(this);
+    return nc_realm->transaction();
 }
 
 std::shared_ptr<Transaction> Realm::transaction_ref()
 {
-    return std::static_pointer_cast<Transaction>(m_group);
+    return m_transaction;
 }
 
 std::shared_ptr<Transaction> Realm::duplicate() const
 {
-    return std::static_pointer_cast<Transaction>(m_coordinator->begin_read(read_transaction_version(), is_frozen()));
+    return m_coordinator->begin_read(read_transaction_version(), is_frozen());
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm)
@@ -117,8 +134,8 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 
 void Realm::begin_read(VersionID version_id)
 {
-    REALM_ASSERT(!m_group);
-    m_group = m_coordinator->begin_read(version_id, bool(m_frozen_version));
+    REALM_ASSERT(!m_transaction);
+    m_transaction = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
@@ -171,10 +188,10 @@ void Realm::set_schema(Schema const& reference, Schema schema)
 void Realm::read_schema_from_group_if_needed()
 {
     if (m_config.immutable()) {
-        REALM_ASSERT(m_group);
+        REALM_ASSERT(m_transaction);
         if (m_schema.empty()) {
-            m_schema_version = ObjectStore::get_schema_version(*m_group);
-            m_schema = ObjectStore::schema_from_group(*m_group);
+            m_schema_version = ObjectStore::get_schema_version(*m_transaction);
+            m_schema = ObjectStore::schema_from_group(*m_transaction);
         }
         return;
     }
@@ -213,7 +230,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
     // the same time, or even multiple threads if there is not any external
     // synchronization. The latter is probably fixable, but making it
     // multi-process-safe requires some sort of multi-process exclusive lock
-    m_group = nullptr;
+    m_transaction = nullptr;
     m_coordinator->close();
     util::File::remove(m_config.path);
 
@@ -252,7 +269,8 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             reset_file(schema, changes);
             return true;
 
-        case SchemaMode::Additive: {
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit: {
             bool will_apply_index_changes = version > m_schema_version;
             if (ObjectStore::verify_valid_additive_changes(changes, will_apply_index_changes))
                 return true;
@@ -312,7 +330,8 @@ void Realm::set_schema_subset(Schema schema)
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
-        case SchemaMode::Additive:
+        case SchemaMode::AdditiveDiscovered:
+        case SchemaMode::AdditiveExplicit:
             ObjectStore::verify_valid_additive_changes(changes);
             break;
 
@@ -327,7 +346,15 @@ void Realm::set_schema_subset(Schema schema)
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
-    schema.validate(bool(m_config.sync_config));
+    uint64_t validation_mode = SchemaValidationMode::Basic;
+    if (m_config.sync_config) {
+        validation_mode |= SchemaValidationMode::Sync;
+    }
+    if (m_config.schema_mode == SchemaMode::AdditiveExplicit) {
+        validation_mode |= SchemaValidationMode::RejectEmbeddedOrphans;
+    }
+
+    schema.validate(validation_mode);
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -335,7 +362,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
         if (!was_in_read_transaction)
-            m_group = nullptr;
+            m_transaction = nullptr;
         set_schema(actual_schema, std::move(schema));
         return;
     }
@@ -347,7 +374,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         if (!in_transaction && is_in_transaction())
             cancel_transaction();
         if (!was_in_read_transaction)
-            m_group = nullptr;
+            m_transaction = nullptr;
     });
 
     if (!in_transaction) {
@@ -369,7 +396,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
 
     uint64_t old_schema_version = m_schema_version;
-    bool additive = m_config.schema_mode == SchemaMode::Additive;
+    bool additive = m_config.schema_mode == SchemaMode::AdditiveDiscovered ||
+                    m_config.schema_mode == SchemaMode::AdditiveExplicit;
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
@@ -431,7 +459,7 @@ void Realm::add_schema_change_handler()
 {
     if (m_config.immutable())
         return;
-    m_group->set_schema_change_notification_handler([&] {
+    m_transaction->set_schema_change_notification_handler([&] {
         m_new_schema = ObjectStore::schema_from_group(read_group());
         m_schema_version = ObjectStore::get_schema_version(read_group());
         if (m_dynamic_schema) {
@@ -473,13 +501,6 @@ void Realm::notify_schema_changed()
 {
     if (m_binding_context) {
         m_binding_context->schema_did_change(m_schema);
-    }
-}
-
-static void check_can_create_any_transaction(const Realm* realm)
-{
-    if (realm->config().immutable()) {
-        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
 
@@ -544,28 +565,26 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
-    check_can_create_any_transaction(this);
-    return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+    return m_transaction->get_version_of_current_transaction();
 }
 
 uint_fast64_t Realm::get_number_of_versions() const
 {
     verify_open();
-    check_can_create_any_transaction(this);
     return m_coordinator->get_number_of_versions();
 }
 
 bool Realm::is_in_transaction() const noexcept
 {
-    return !m_config.immutable() && !is_closed() && m_group &&
+    return !m_config.immutable() && !is_closed() && m_transaction &&
            transaction().get_transact_stage() == DB::transact_Writing;
 }
 
 util::Optional<VersionID> Realm::current_transaction_version() const
 {
     util::Optional<VersionID> ret;
-    if (m_group) {
-        ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+    if (m_transaction) {
+        ret = m_transaction->get_version_of_current_transaction();
     }
     else if (m_frozen_version) {
         ret = m_frozen_version;
@@ -583,7 +602,7 @@ bool Realm::wait_for_change()
     if (m_frozen_version) {
         return false;
     }
-    return m_group ? m_coordinator->wait_for_change(transaction_ref()) : false;
+    return m_transaction ? m_coordinator->wait_for_change(transaction_ref()) : false;
 }
 
 void Realm::wait_for_change_release()
@@ -604,24 +623,10 @@ void Realm::begin_transaction()
     // strong reference to `this`
     auto retain_self = shared_from_this();
 
-    // If we're already in the middle of sending notifications, just begin the
-    // write transaction without sending more notifications. If this actually
-    // advances the read version this could leave the user in an inconsistent
-    // state, but that's unavoidable.
-    if (m_is_sending_notifications) {
-        _impl::NotifierPackage notifiers;
-        transaction::begin(transaction_ref(), m_binding_context.get(), notifiers);
-        return;
-    }
-
     // make sure we have a read transaction
     read_group();
 
-    m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
-
+    CountGuard sending_notifications(m_is_sending_notifications);
     try {
         m_coordinator->promote_to_write(*this);
     }
@@ -668,9 +673,11 @@ void Realm::invalidate()
 {
     verify_open();
     verify_thread();
-    check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
+        // This was originally because closing the Realm during notification
+        // sending would break things, but we now support that. However, it's a
+        // breaking change so we keep the old behavior for now.
         return;
     }
 
@@ -678,7 +685,7 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
-    m_group = nullptr;
+    m_transaction = nullptr;
 }
 
 bool Realm::compact()
@@ -694,7 +701,7 @@ bool Realm::compact()
     }
 
     verify_open();
-    m_group = nullptr;
+    m_transaction = nullptr;
     return m_coordinator->compact();
 }
 
@@ -706,6 +713,20 @@ void Realm::write_copy(StringData path, BinaryData key)
     verify_thread();
     try {
         read_group().write(path, key.data());
+    }
+    catch (...) {
+        _impl::translate_file_exception(path);
+    }
+}
+
+void Realm::write_copy_without_client_file_id(StringData path, BinaryData key, bool allow_overwrite)
+{
+    if (key.data() && key.size() != 64) {
+        throw InvalidEncryptionKeyException();
+    }
+    verify_thread();
+    try {
+        m_coordinator->write_copy(path, key, allow_overwrite);
     }
     catch (...) {
         _impl::translate_file_exception(path);
@@ -741,11 +762,8 @@ void Realm::notify()
         }
     }
 
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
     if (!m_coordinator->can_advance(*this)) {
-        m_is_sending_notifications = true;
+        CountGuard sending_notifications(m_is_sending_notifications);
         m_coordinator->process_available_async(*this);
         return;
     }
@@ -759,9 +777,9 @@ void Realm::notify()
             return;
     }
 
-    m_is_sending_notifications = true;
+    CountGuard sending_notifications(m_is_sending_notifications);
     if (m_auto_refresh) {
-        if (m_group) {
+        if (m_transaction) {
             try {
                 m_coordinator->advance_to_ready(*this);
             }
@@ -785,7 +803,6 @@ void Realm::notify()
 bool Realm::refresh()
 {
     verify_thread();
-    check_can_create_any_transaction(this);
     return do_refresh();
 }
 
@@ -810,15 +827,11 @@ bool Realm::do_refresh()
     // strong reference to `this`
     auto retain_self = shared_from_this();
 
-    m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept {
-        m_is_sending_notifications = false;
-    });
-
+    CountGuard sending_notifications(m_is_sending_notifications);
     if (m_binding_context) {
         m_binding_context->before_notify();
     }
-    if (m_group) {
+    if (m_transaction) {
         try {
             bool version_changed = m_coordinator->advance_to_latest(*this);
             if (is_closed())
@@ -872,7 +885,7 @@ uint64_t Realm::get_schema_version(const Realm::Config& config)
 bool Realm::is_frozen() const
 {
     bool result = bool(m_frozen_version);
-    REALM_ASSERT_DEBUG((result && m_group) ? m_group->is_frozen() : true);
+    REALM_ASSERT_DEBUG((result && m_transaction) ? m_transaction->is_frozen() : true);
     return result;
 }
 
@@ -880,7 +893,7 @@ SharedRealm Realm::freeze()
 {
     auto config = m_config;
     auto version = read_transaction_version();
-    config.scheduler = util::Scheduler::get_frozen(version);
+    config.scheduler = util::Scheduler::make_frozen(version);
     return Realm::get_frozen_realm(std::move(config), version);
 }
 
@@ -889,13 +902,47 @@ void Realm::close()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
-    if (!m_config.immutable() && m_group) {
+    if (!m_config.immutable() && m_transaction) {
         transaction().close();
     }
 
-    m_group = nullptr;
+    m_transaction = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
+}
+
+void Realm::delete_files(const std::string& realm_file_path)
+{
+    if (!realm::util::File::exists(realm_file_path)) {
+        return;
+    }
+
+    auto core_files = DB::get_core_files(realm_file_path);
+    auto lock_successful = DB::call_with_lock(realm_file_path, [&](auto) {
+        for (const auto& core_file : core_files) {
+            auto file_type = core_file.first;
+            if (file_type == DB::CoreFileType::Lock) {
+                // The lock cannot be safely deleted here since it is used by `call_with_lock` itself.
+                continue;
+            }
+            auto file_information = core_file.second;
+            auto file_path = file_information.first;
+            auto is_folder = file_information.second;
+            // For both files and folders we use the `try_remove` version to delete them because we want
+            // to avoid throwing in case the file does not exist.
+            // The return value can be ignored for the same reason (false if file or folder does not exist).
+            if (is_folder) {
+                util::try_remove_dir_recursive(file_path); // Throws
+            }
+            else {
+                util::File::try_remove(file_path); // Throws
+            }
+        }
+    });
+    if (!lock_successful) {
+        auto lock_file_path = core_files[DB::CoreFileType::Lock].first;
+        throw DeleteOnOpenRealmException(lock_file_path);
+    }
 }
 
 AuditInterface* Realm::audit_context() const noexcept

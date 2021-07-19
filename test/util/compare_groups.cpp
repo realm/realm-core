@@ -2,6 +2,7 @@
 #include <vector>
 #include <set>
 #include <sstream>
+#include <iostream>
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -19,7 +20,7 @@ namespace {
 
 class MuteLogger : public util::RootLogger {
 public:
-    void do_log(Level, std::string) override final {}
+    void do_log(Level, const std::string&) override final {}
 };
 
 
@@ -31,7 +32,7 @@ public:
         , m_base_logger{base_logger}
     {
     }
-    void do_log(Level level, std::string message) override final
+    void do_log(Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
         Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
@@ -60,7 +61,7 @@ public:
         , m_base_logger{base_logger}
     {
     }
-    void do_log(Level level, std::string message) override final
+    void do_log(Level level, const std::string& message) override final
     {
         ensure_prefix();                                          // Throws
         Logger::do_log(m_base_logger, level, m_prefix + message); // Throws
@@ -449,10 +450,6 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
             break;
         }
         case type_Link:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
             REALM_TERMINATE("Unsupported column type.");
     }
 
@@ -571,16 +568,49 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
             }
             break;
         }
+        case type_Link: {
+            auto a = obj_1.get_linkset(col.key_1);
+            auto b = obj_2.get_linkset(col.key_2);
+            if (a.size() != b.size()) {
+                logger.error("Link set size mismatch in column '%1'", col.name);
+                return false;
+                break;
+            }
+
+            auto target_table_1 = a.get_target_table();
+            auto target_table_2 = b.get_target_table();
+
+            std::size_t n = a.size();
+            for (std::size_t i = 0; i < n; ++i) {
+                ObjKey link_1 = a.get(i);
+                ObjKey link_2 = b.get(i);
+
+                if (link_1.is_unresolved() || link_2.is_unresolved()) {
+                    // if one link is unresolved, the other should also be unresolved
+                    if (!link_1.is_unresolved() || !link_2.is_unresolved()) {
+                        logger.error("Value mismatch in column '%1' at index %2 of the link "
+                                     "set (%3 vs %4)",
+                                     col.name, i, link_1, link_2);
+                        return false;
+                    }
+                }
+                else {
+                    sync::PrimaryKey target_oid_1 = sync::primary_key_for_row(*target_table_1, link_1);
+                    sync::PrimaryKey target_oid_2 = sync::primary_key_for_row(*target_table_2, link_2);
+                    if (target_oid_1 != target_oid_2) {
+                        logger.error("Value mismatch in column '%1' at index %2 of the link "
+                                     "set (%3 vs %4)",
+                                     col.name, i, link_1, link_2);
+                        return false;
+                    }
+                }
+            }
+            break;
+        }
         case type_TypedLink:
             // FIXME: Implement
             break;
         case type_LinkList:
-            [[fallthrough]];
-        case type_Link:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
             REALM_TERMINATE("Unsupported column type.");
     }
 
@@ -813,8 +843,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 
                 continue;
             }
-            case type_OldDateTime:
-            case type_OldTable:
             case type_LinkList:
                 break;
         }

@@ -64,7 +64,8 @@ fi
 if [ "${OS}" == "android" ]; then
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D ANDROID_ABI="${ARCH}" \
@@ -93,6 +94,7 @@ else
           -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
+          -D REALM_BUILD_LIB_ONLY=1 \
           -D REALM_VERSION="${VERSION}" \
           ${CMAKE_FLAGS} \
           -G Xcode ..

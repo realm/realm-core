@@ -99,28 +99,15 @@ bool ResultsNotifier::get_tableview(TableView& out)
 bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
     m_info = &info;
+
+    // When adding or removing a callback the related tables can change due to the way we calculate related tables
+    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks) {
+        update_related_tables(*(m_query->get_table()));
+    }
+
     return m_query->get_table() && has_run() && have_callbacks();
-}
-
-bool ResultsNotifier::need_to_run()
-{
-    REALM_ASSERT(m_info);
-
-    {
-        auto lock = lock_target();
-        // Don't run the query if the results aren't actually going to be used
-        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
-            return false;
-    }
-
-    // If we've run previously, check if we need to rerun
-    if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
-        // Does m_last_seen_version match m_related_tables
-        if (all_related_tables_covered(m_last_seen_version)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 void ResultsNotifier::calculate_changes()
@@ -130,6 +117,16 @@ void ResultsNotifier::calculate_changes()
         next_rows.reserve(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
             next_rows.push_back(m_run_tv.get_key(i).value);
+
+        auto table_key = m_query->get_table()->get_key();
+        if (auto it = m_info->tables.find(table_key.value); it != m_info->tables.end()) {
+            auto& changes = it->second;
+            for (auto& key_val : m_previous_rows) {
+                if (changes.deletions_contains(key_val)) {
+                    key_val = -1;
+                }
+            }
+        }
 
         m_change = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                       get_modification_checker(*m_info, m_query->get_table()),
@@ -146,6 +143,8 @@ void ResultsNotifier::calculate_changes()
 
 void ResultsNotifier::run()
 {
+    REALM_ASSERT(m_info);
+
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()) {
         m_change = {};
@@ -154,14 +153,37 @@ void ResultsNotifier::run()
         return;
     }
 
-    if (!need_to_run())
+    {
+        auto lock = lock_target();
+        // Don't run the query if the results aren't actually going to be used
+        if (!get_realm() || (!have_callbacks() && !m_results_were_used))
+            return;
+    }
+
+    auto new_versions = m_query->sync_view_if_needed();
+    m_descriptor_ordering.collect_dependencies(m_query->get_table().unchecked_ptr());
+    m_descriptor_ordering.get_versions(m_query->get_table()->get_parent_group(), new_versions);
+    if (has_run() && new_versions == m_last_seen_version) {
+        // We've run previously and none of the tables involved in the query
+        // changed so we don't need to rerun the query, but we still need to
+        // check each object in the results to see if it was modified
+        if (!any_related_table_was_modified(*m_info))
+            return;
+        REALM_ASSERT(m_change.empty());
+        auto checker = get_modification_checker(*m_info, m_query->get_table());
+        for (size_t i = 0; i < m_previous_rows.size(); ++i) {
+            if (checker(m_previous_rows[i])) {
+                m_change.modifications.add(i);
+            }
+        }
         return;
+    }
 
     m_query->sync_view_if_needed();
     m_run_tv = m_query->find_all();
     m_run_tv.apply_descriptor_ordering(m_descriptor_ordering);
     m_run_tv.sync_if_needed();
-    m_last_seen_version = m_run_tv.ObjList::get_dependency_versions();
+    m_last_seen_version = std::move(new_versions);
 
     calculate_changes();
 }
@@ -224,6 +246,7 @@ ListResultsNotifier::ListResultsNotifier(Results& target)
     : ResultsNotifierBase(target.get_realm())
     , m_list(target.get_collection())
 {
+    REALM_ASSERT(target.get_type() != PropertyType::Object);
     auto& ordering = target.get_descriptor_ordering();
     for (size_t i = 0, sz = ordering.size(); i < sz; i++) {
         auto descr = ordering[i];
@@ -259,7 +282,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
         return false; // origin row was deleted after the notification was added
 
     info.lists.push_back(
-        {m_list->get_table()->get_key(), m_list->get_key().value, m_list->get_col_key().value, &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key().value, m_list->get_col_key().value, &m_change});
 
     m_info = &info;
     return true;
@@ -296,7 +319,7 @@ void ListResultsNotifier::calculate_changes()
         }
 
         m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](int64_t key) {
-            return m_change.modifications_new.contains(static_cast<size_t>(key));
+            return m_change.modifications.contains(static_cast<size_t>(key));
         });
     }
 
@@ -310,6 +333,7 @@ void ListResultsNotifier::run()
         m_change = {};
         m_change.deletions.set(m_previous_indices.size());
         m_previous_indices.clear();
+        report_collection_root_is_deleted();
         return;
     }
 

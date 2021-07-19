@@ -44,18 +44,19 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
 }
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
-    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
+    : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties, name_alias)
 {
 }
 
 ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
                            std::initializer_list<Property> persisted_properties,
-                           std::initializer_list<Property> computed_properties)
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
     : name(std::move(name))
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , is_embedded(is_embedded)
+    , alias(name_alias)
 {
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
@@ -65,56 +66,57 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
     }
 }
 
-PropertyType ObjectSchema::from_core_type(ColKey col)
+PropertyType ObjectSchema::from_core_type(ColumnType type)
 {
-    auto flags = PropertyType::Required;
-    auto attr = col.get_attrs();
-
-    if (attr.test(col_attr_Nullable))
-        flags |= PropertyType::Nullable;
-    if (attr.test(col_attr_List))
-        flags |= PropertyType::Array;
-    else if (attr.test(col_attr_Set))
-        flags |= PropertyType::Set;
-    else if (attr.test(col_attr_Dictionary))
-        flags |= PropertyType::Dictionary;
-
-    switch (col.get_type()) {
+    switch (type) {
         case col_type_Int:
-            return PropertyType::Int | flags;
+            return PropertyType::Int;
         case col_type_Float:
-            return PropertyType::Float | flags;
+            return PropertyType::Float;
         case col_type_Double:
-            return PropertyType::Double | flags;
+            return PropertyType::Double;
         case col_type_Bool:
-            return PropertyType::Bool | flags;
+            return PropertyType::Bool;
         case col_type_String:
-            return PropertyType::String | flags;
+            return PropertyType::String;
         case col_type_Binary:
-            return PropertyType::Data | flags;
+            return PropertyType::Data;
         case col_type_Timestamp:
-            return PropertyType::Date | flags;
+            return PropertyType::Date;
         case col_type_Mixed:
-            return PropertyType::Mixed | flags;
+            return PropertyType::Mixed;
         case col_type_ObjectId:
-            return PropertyType::ObjectId | flags;
+            return PropertyType::ObjectId;
         case col_type_Decimal:
-            return PropertyType::Decimal | flags;
+            return PropertyType::Decimal;
         case col_type_UUID:
-            return PropertyType::UUID | flags;
-        case col_type_Link: {
-            if (attr.test(col_attr_Set) || attr.test(col_attr_Dictionary)) {
-                return PropertyType::Object | flags;
-            }
-            else {
-                return PropertyType::Object | PropertyType::Nullable;
-            }
-        }
+            return PropertyType::UUID;
+        case col_type_Link:
+        case col_type_TypedLink:
+            return PropertyType::Object;
         case col_type_LinkList:
             return PropertyType::Object | PropertyType::Array;
         default:
             REALM_UNREACHABLE();
     }
+    return PropertyType::Int;
+}
+
+PropertyType ObjectSchema::from_core_type(ColKey col)
+{
+    PropertyType prop_type = from_core_type(col.get_type());
+
+    auto attr = col.get_attrs();
+    if (attr.test(col_attr_Nullable))
+        prop_type |= PropertyType::Nullable;
+    if (attr.test(col_attr_List))
+        prop_type |= PropertyType::Array;
+    else if (attr.test(col_attr_Set))
+        prop_type |= PropertyType::Set;
+    else if (attr.test(col_attr_Dictionary))
+        prop_type |= PropertyType::Dictionary;
+
+    return prop_type;
 }
 
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
@@ -136,13 +138,6 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
 
     for (auto col_key : table->get_column_keys()) {
         StringData column_name = table->get_column_name(col_key);
-
-#if REALM_ENABLE_SYNC
-        // The object ID column is an implementation detail, and is omitted from the schema.
-        // FIXME: this can go away once sync adopts stable ids?
-        if (column_name.begins_with("!"))
-            continue;
-#endif
 
         Property property;
         property.name = column_name;
@@ -235,8 +230,12 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
         exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
                                 string_for_property_type(prop.type));
     }
-    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
+    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) &&
+             !(is_array(prop.type) || is_set(prop.type))) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
+    }
+    else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type) && !is_collection(prop.type)) {
+        exceptions.emplace_back("Property '%1.%2' of type 'Mixed' must be nullable.", object_name, prop.name);
     }
 
     // check primary keys

@@ -191,11 +191,11 @@ TEST_CASE("ObjectSchema") {
         add_set(table, type_Decimal, "decimal? set", true);
         add_set(table, type_UUID, "uuid? set", true);
 
-        auto add_dictionary = [](TableRef table, DataType type, StringData name) {
-            table->add_column_dictionary(type, name);
+        auto add_dictionary = [](TableRef table, DataType type, StringData name, bool nullable = false) {
+            table->add_column_dictionary(type, name, nullable);
         };
 
-        add_dictionary(table, type_Int, "int dictionary");
+        add_dictionary(table, type_Int, "int dictionary?", true);
         add_dictionary(table, type_Bool, "bool dictionary");
         add_dictionary(table, type_Float, "float dictionary");
         add_dictionary(table, type_Double, "double dictionary");
@@ -259,7 +259,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
         REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
-        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object | PropertyType::Nullable, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -314,7 +314,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
 
-        REQUIRE_PROPERTY("int dictionary", Int | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("int dictionary?", Int | PropertyType::Dictionary | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool dictionary", Bool | PropertyType::Dictionary);
         REQUIRE_PROPERTY("float dictionary", Float | PropertyType::Dictionary);
         REQUIRE_PROPERTY("double dictionary", Double | PropertyType::Dictionary);
@@ -378,8 +378,31 @@ TEST_CASE("Schema") {
                 "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
         }
 
-        SECTION("allows link properties from embedded to top-level") {
+        SECTION("rejects explicitly included embedded object orphans") {
             Schema schema = {{"target", {{"value", PropertyType::Int}}},
+                             {"origin",
+                              ObjectSchema::IsEmbedded{true},
+                              {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
+            REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(SchemaValidationMode::RejectEmbeddedOrphans),
+                "Embedded object 'origin' is unreachable by any link path from top level objects.");
+        }
+
+        SECTION("allows embedded object chains starting from a top level object") {
+            Schema schema = {
+                {"top", {{"linkA", PropertyType::Object | PropertyType::Nullable, "A"}}},
+                {"A", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "B"}}},
+                {"B", ObjectSchema::IsEmbedded{true}, {{"link", PropertyType::Object | PropertyType::Nullable, "C"}}},
+                {"C", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
+            REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
+        }
+
+        SECTION("allows link properties from embedded to top-level") {
+            Schema schema = {{"target",
+                              {{"value", PropertyType::Int},
+                               {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "origin"}}},
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
                               {{"link", PropertyType::Object | PropertyType::Nullable, "target"}}}};
@@ -387,7 +410,9 @@ TEST_CASE("Schema") {
         }
 
         SECTION("allows array properties from embedded to top-level") {
-            Schema schema = {{"target", {{"value", PropertyType::Int}}},
+            Schema schema = {{"target",
+                              {{"value", PropertyType::Int},
+                               {"link_to_embedded_object", PropertyType::Object | PropertyType::Array, "origin"}}},
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
                               {{"array", PropertyType::Array | PropertyType::Object, "target"}}}};
@@ -403,16 +428,26 @@ TEST_CASE("Schema") {
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects embedded objects self loop via top level object") {
+        SECTION("does not reject an embedded object loop via top level object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
                 {"EmbeddedObject",
                  ObjectSchema::IsEmbedded{true},
                  {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
-            REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Cycles containing embedded objects are not currently supported: "
-                                      "'EmbeddedObject.link_to_top_level_object.link_to_embedded_object'");
+            REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
+        }
+
+        SECTION("does not reject a top level loop via embedded object link") {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"},
+                  {"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
+            REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("rejects embedded objects loop to itself") {
@@ -427,7 +462,19 @@ TEST_CASE("Schema") {
                 "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
         }
 
-        SECTION("rejects embedded objects self loop via different embedded object") {
+        SECTION("rejects embedded objects loop to itself from a list") {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_self", PropertyType::Object | PropertyType::Array, "EmbeddedObject"}}}};
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(),
+                "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+        }
+
+        SECTION("rejects embedded objects loop via different embedded object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
@@ -462,29 +509,64 @@ TEST_CASE("Schema") {
             catch (const std::exception& e) {
                 message = e.what();
             }
-            bool found_loop_on_a = message.find("Cycles containing embedded objects are not currently supported: "
-                                                "'EmbeddedObjectA.link_to_c.link_to_a'") != std::string::npos ||
-                                   message.find("Cycles containing embedded objects are not currently supported: "
-                                                "'EmbeddedObjectA.link_to_b.link_to_a'") != std::string::npos;
+            bool found_loop_on_a = message.find("EmbeddedObjectA.link_to_c.link_to_a") != std::string::npos ||
+                                   message.find("EmbeddedObjectA.link_to_b.link_to_a") != std::string::npos;
+            bool found_loop_on_b = message.find("EmbeddedObjectB.link_to_a.link_to_b") != std::string::npos ||
+                                   message.find("EmbeddedObjectB.link_to_a.link_to_c.link_to_a") != std::string::npos;
+            bool found_loop_on_c = message.find("EmbeddedObjectC.link_to_a.link_to_c") != std::string::npos ||
+                                   message.find("EmbeddedObjectC.link_to_a.link_to_b.link_to_a") != std::string::npos;
             REQUIRE(found_loop_on_a);
-            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
-                                 "'EmbeddedObjectB.link_to_a.link_to_b'") != std::string::npos);
-            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
-                                 "'EmbeddedObjectC.link_to_a.link_to_c'") != std::string::npos);
+            REQUIRE(found_loop_on_b);
+            REQUIRE(found_loop_on_c);
         }
 
         SECTION("allows top level loops") {
-            Schema schema = {{"TopLevelObjectA",
-                              {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"}}},
-                             {"TopLevelObjectB",
-                              {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
-                             {"EmbeddedObjectA",
-                              ObjectSchema::IsEmbedded{true},
-                              {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
-                             {"EmbeddedObjectB",
-                              ObjectSchema::IsEmbedded{true},
-                              {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"},
+                  {"link_to_embedded_b", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"TopLevelObjectB",
+                 {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
+        }
+
+        SECTION("distinct paths to an embedded object is not a loop") {
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link1_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
+                  {"link2_to_embedded", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
+                {"EmbeddedObjectA", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}},
+            };
+            REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
+        }
+
+        SECTION("linked distinct paths to an embedded object is not a loop") {
+            Schema schema = {
+                {"TopLevelObjectA",
+                 {{"link_to_embedded_A", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"},
+                  {"link_to_embedded_B", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
+                  {"link_to_b", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {
+                     {"link_to_c", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectC"},
+                 }},
+                {"EmbeddedObjectC", ObjectSchema::IsEmbedded{true}, {{"prop", PropertyType::Int}}}
+
+            };
+            REQUIRE_NOTHROW(schema.validate());
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::RejectEmbeddedOrphans));
         }
 
         SECTION("rejects linking objects without a source object") {
@@ -607,6 +689,13 @@ TEST_CASE("Schema") {
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.link' of type 'object' must be nullable.");
         }
 
+        SECTION("rejects non-nullable dictionary properties") {
+            Schema schema = {{"object", {{"dictionary", PropertyType::Dictionary | PropertyType::Object, "target"}}},
+                             {"target", {{"value", PropertyType::Int}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                                      "Property 'object.dictionary' of type 'object' must be nullable.");
+        }
+
         SECTION("rejects nullable array properties") {
             Schema schema = {
                 {"object",
@@ -614,6 +703,13 @@ TEST_CASE("Schema") {
                 {"target", {{"value", PropertyType::Int}}}};
             REQUIRE_THROWS_CONTAINING(schema.validate(),
                                       "Property 'object.array' of type 'array' cannot be nullable.");
+        }
+
+        SECTION("rejects nullable set properties") {
+            Schema schema = {
+                {"object", {{"set", PropertyType::Set | PropertyType::Object | PropertyType::Nullable, "target"}}},
+                {"target", {{"value", PropertyType::Int}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.set' of type 'set' cannot be nullable.");
         }
 
         SECTION("rejects nullable linking objects") {
@@ -1047,6 +1143,91 @@ TEST_CASE("Schema") {
                 schema1.compare(schema2) ==
                 vec{(ChangePropertyType{&*schema1.find("object"), &schema1.find("object")->persisted_properties[0],
                                         &schema2.find("object")->persisted_properties[0]})});
+        }
+    }
+
+    SECTION("find in attached schema") {
+        Group g;
+        TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
+        TableRef embedded = g.add_embedded_table("class_embedded");
+        ObjectSchema os(g, "table", {});
+        REQUIRE(os.table_key == table->get_key());
+        ObjectSchema os1(g, "embedded", {});
+        REQUIRE(os1.table_key == embedded->get_key());
+        REQUIRE(os1.is_embedded);
+
+        Schema schema = {os, os1};
+        REQUIRE_NOTHROW(schema.validate());
+
+        SECTION("find by name") {
+            auto it = schema.find("table");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "table");
+            REQUIRE(it->table_key == table->get_key());
+        }
+        SECTION("find by name embedded") {
+            auto it = schema.find("embedded");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "embedded");
+            REQUIRE(it->table_key == embedded->get_key());
+        }
+        SECTION("find non existant name") {
+            auto it = schema.find("not_found");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find empty string") {
+            auto it = schema.find("");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find by key") {
+            auto it = schema.find(table->get_key());
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "table");
+            REQUIRE(it->table_key == table->get_key());
+        }
+        SECTION("find embedded by key") {
+            auto it = schema.find(embedded->get_key());
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "embedded");
+            REQUIRE(it->table_key == embedded->get_key());
+        }
+        SECTION("find null key") {
+            auto null_key = TableKey();
+            REQUIRE(!null_key);
+            auto it = schema.find(null_key);
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find missing key") {
+            auto missing_key = TableKey(42);
+            REQUIRE(missing_key);
+            auto it = schema.find(missing_key);
+            REQUIRE(it == schema.end());
+        }
+    }
+    SECTION("find in unattached schema") {
+        Schema schema = {{"object", {{"value", PropertyType::Int}}}};
+        REQUIRE_NOTHROW(schema.validate());
+
+        SECTION("find by name works") {
+            auto it = schema.find("object");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "object");
+            REQUIRE(!it->table_key);
+        }
+        SECTION("find missing name") {
+            auto it = schema.find("not_a_valid_name");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find empty name") {
+            auto it = schema.find("");
+            REQUIRE(it == schema.end());
+        }
+        SECTION("find by key") {
+            std::vector<TableKey> test_keys = {TableKey{0}, TableKey{1}, TableKey{42}, TableKey{}};
+            for (auto& key : test_keys) {
+                auto it = schema.find(key);
+                REQUIRE(it == schema.end());
+            }
         }
     }
 }

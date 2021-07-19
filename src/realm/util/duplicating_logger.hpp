@@ -19,7 +19,7 @@ public:
     explicit DuplicatingLogger(Logger& base_logger, Logger& aux_logger) noexcept;
 
 protected:
-    void do_log(Logger::Level, std::string message) override;
+    void do_log(Logger::Level, const std::string& message) override;
 
 private:
     Logger& m_base_logger;

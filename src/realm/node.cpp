@@ -18,6 +18,7 @@
 
 #include <realm/node.hpp>
 #include <realm/utilities.hpp>
+#include <realm/mixed.hpp>
 
 #if REALM_ENABLE_MEMDEBUG
 #include <cstring>
@@ -165,3 +166,5 @@ void Node::do_copy_on_write(size_t minimum_size)
     // future commits, when no versions are using it anymore
     m_alloc.free_(old_ref, old_begin);
 }
+
+ArrayPayload::~ArrayPayload() {}

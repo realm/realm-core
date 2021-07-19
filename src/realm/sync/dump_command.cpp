@@ -15,7 +15,7 @@
 #include <realm/util/load_file.hpp>
 #include <realm/list.hpp>
 #include <realm/group.hpp>
-#include <realm/sync/version.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 
@@ -65,16 +65,17 @@ public:
     std::string format_binary(BinaryData);
     std::string format_timestamp(Timestamp);
     std::string format_object_id(ObjectId);
+    std::string format_uuid(UUID);
     std::string format_decimal(Decimal128);
     std::string format_list(CollectionBase&);
     std::string format_link(ObjKey);
     std::string format_link_list(const LnkLst&);
 
-    template <DataType>
+    template <DataType::Type>
     std::string format_cell(const Obj& obj, ColKey col_key);
     std::string format_cell_list(const Obj& obj, ColKey col_key);
 
-    template <DataType>
+    template <DataType::Type>
     void format_column(const Table&, ColKey col_ndx, TextColumn&);
     void format_column_list(const Table&, ColKey col_ndx, TextColumn&);
 
@@ -151,6 +152,11 @@ std::string Formatter::format_object_id(ObjectId id)
     return id.to_string();
 }
 
+std::string Formatter::format_uuid(UUID id)
+{
+    return id.to_string();
+}
+
 std::string Formatter::format_decimal(Decimal128 id)
 {
     return id.to_string();
@@ -177,7 +183,7 @@ std::string Formatter::format_link_list(const LnkLst& list)
     return std::string{m_out.data(), m_out.size()};
 }
 
-template <DataType>
+template <DataType::Type>
 inline std::string Formatter::format_cell(const Obj&, ColKey)
 {
     return "unknown";
@@ -232,6 +238,12 @@ inline std::string Formatter::format_cell<type_ObjectId>(const Obj& obj, ColKey 
 }
 
 template <>
+inline std::string Formatter::format_cell<type_UUID>(const Obj& obj, ColKey col_key)
+{
+    return format_uuid(obj.get<UUID>(col_key));
+}
+
+template <>
 inline std::string Formatter::format_cell<type_Decimal>(const Obj& obj, ColKey col_key)
 {
     return format_decimal(obj.get<Decimal128>(col_key));
@@ -256,7 +268,7 @@ inline std::string Formatter::format_cell_list(const Obj& obj, ColKey col_key)
     return format_list(*ll);
 }
 
-template <DataType type>
+template <DataType::Type type>
 void Formatter::format_column(const Table& table, ColKey col_ndx, TextColumn& col)
 {
     std::size_t end;
@@ -443,7 +455,7 @@ int main(int argc, char* argv[])
 #else
             build_mode = "Release";
 #endif
-            std::cerr << "RealmSync/" REALM_SYNC_VER_STRING " (build_mode=" << build_mode << ")\n";
+            std::cerr << "RealmSync/" REALM_VERSION_STRING " (build_mode=" << build_mode << ")\n";
             return EXIT_SUCCESS;
         }
 
@@ -520,6 +532,9 @@ int main(int argc, char* argv[])
                             case type_Mixed:
                                 formatter.format_column<type_Mixed>(*table, col_ndx, col);
                                 break;
+                            case type_UUID:
+                                formatter.format_column<type_UUID>(*table, col_ndx, col);
+                                break;
                             case type_TypedLink:
                                 formatter.format_column<type_TypedLink>(*table, col_ndx, col);
                                 break;
@@ -528,9 +543,6 @@ int main(int argc, char* argv[])
                                 break;
                             case type_LinkList:
                                 formatter.format_column<type_LinkList>(*table, col_ndx, col);
-                                break;
-                            case type_OldDateTime:
-                            case type_OldTable:
                                 break;
                         }
                     }

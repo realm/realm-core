@@ -24,6 +24,7 @@
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/results_notifier.hpp>
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/keypath_helpers.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -136,7 +137,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm();
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -599,7 +600,7 @@ TEST_CASE("notifications: async delivery") {
         }
     }
 
-    SECTION("refresh() from within changes_available() do not interfere with notification delivery") {
+    SECTION("refresh() from within changes_available() works and does not interfere with notification delivery") {
         struct Context : BindingContext {
             Realm& realm;
             Context(Realm& realm)
@@ -642,17 +643,18 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE_FALSE(r->refresh()); // does not advance since it's now up-to-date
     }
 
-    SECTION("begin_transaction() from within a notification does not send notifications immediately") {
-        bool first = true;
+    SECTION("begin_transaction() from within a notification sends notifications recursively") {
+        size_t calls = 0;
         auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
-            if (first)
-                first = false;
-            else {
-                // would deadlock if it tried to send notifications as they aren't ready yet
-                r->begin_transaction();
-                r->cancel_transaction();
-            }
+            if (++calls != 2)
+                return;
+
+            REQUIRE(calls == 2);
+            coordinator->on_change();
+            r->begin_transaction();
+            REQUIRE(calls == 3);
+            r->cancel_transaction();
         });
         advance_and_notify(*r);
 
@@ -660,19 +662,67 @@ TEST_CASE("notifications: async delivery") {
         coordinator->on_change();
         make_remote_change(); // 2
         r->notify();          // advances to version from 1
-        REQUIRE(notification_calls == 2);
-        coordinator->on_change();
+        REQUIRE(notification_calls == 3);
         REQUIRE_FALSE(r->refresh()); // we made the commit locally, so no advancing here
         REQUIRE(notification_calls == 3);
+    }
+
+    SECTION("begin_transaction() from within a notification adds new changes to the pending callbacks"
+            " and restarts invoking callbacks recursively") {
+        size_t calls1 = 0, calls2 = 0, calls3 = 0;
+        token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls1;
+            // This callback is before the callback performing writes and so
+            // sees each notification normally
+            if (calls1 > 1)
+                REQUIRE_INDICES(c.insertions, calls1 + 2);
+        });
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls2;
+            if (calls2 > 1)
+                REQUIRE_INDICES(c.insertions, calls2 + 2);
+            if (calls2 == 10)
+                return;
+
+            // We get here due to a call to begin_transaction() (either at the
+            // top level of the test or later in this function), so we're already
+            // in a write transaction.
+            table->create_object().set_all(5);
+            r->commit_transaction();
+
+            // Calculate the changeset from the wriet we just made and then
+            // start another write, which restarts notification sending and
+            // recursively calls this function again.
+            coordinator->on_change();
+            r->begin_transaction();
+
+            // By the time the outermost begin_transaction() returns we've
+            // recurred all the way to 10
+            REQUIRE(calls2 == 10);
+        });
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            ++calls3;
+            // This callback comes after the one performing writes, and so doesn't
+            // even get the initial notification until after all the writes.
+            REQUIRE_INDICES(c.insertions, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+        });
+        coordinator->on_change();
+        r->begin_transaction();
+        r->cancel_transaction();
+
+        REQUIRE(calls1 == 10);
+        REQUIRE(calls2 == 10);
+        REQUIRE(calls3 == 1);
     }
 
     SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
         size_t calls = 0;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
-            if (++calls == 1)
+            if (++calls != 2)
                 return;
 
+            coordinator->on_change();
             // force the read version to advance by beginning a transaction
             r->begin_transaction();
             r->cancel_transaction();
@@ -695,15 +745,17 @@ TEST_CASE("notifications: async delivery") {
         make_remote_change(); // 2
         r->notify();          // advances to version from 1
 
-        REQUIRE(calls == 2);
+        REQUIRE(calls == 3);
         REQUIRE(calls2 == 2);
     }
 
     SECTION("begin_transaction() from within did_change() does not break delivering collection notification") {
         struct Context : BindingContext {
+            _impl::RealmCoordinator& coordinator;
             Realm& realm;
-            Context(Realm& realm)
-                : realm(realm)
+            Context(_impl::RealmCoordinator& coordinator, Realm& realm)
+                : coordinator(coordinator)
+                , realm(realm)
             {
             }
 
@@ -711,12 +763,13 @@ TEST_CASE("notifications: async delivery") {
             {
                 if (!realm.is_in_transaction()) {
                     // advances to version from 2 (and recursively calls this, hence the check above)
+                    coordinator.on_change();
                     realm.begin_transaction();
                     realm.cancel_transaction();
                 }
             }
         };
-        r->m_binding_context.reset(new Context(*r));
+        r->m_binding_context.reset(new Context(*coordinator, *r));
 
         make_remote_change(); // 1
         coordinator->on_change();
@@ -775,6 +828,49 @@ TEST_CASE("notifications: async delivery") {
         r->begin_transaction();
         REQUIRE_FALSE(r->is_in_transaction());
     }
+
+    SECTION("committing a transaction after beginning it refreshed from within a notification works") {
+        int calls = 0;
+        auto r2 = coordinator->get_realm();
+        auto table2 = r2->read_group().get_table("class_object");
+
+        SECTION("other write set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                Results results2(r2, table2);
+                auto token2 = results2.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {});
+                advance_and_notify(*r2);
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
+
+        SECTION("other write did not set skip version") {
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                if (++calls != 1)
+                    return;
+
+                r2->begin_transaction();
+                table2->begin()->set(col, 5);
+                r2->commit_transaction();
+
+                coordinator->on_change();
+                r->begin_transaction();
+                r->commit_transaction();
+            });
+            advance_and_notify(*r);
+            REQUIRE(calls > 0);
+        }
+    }
 }
 
 TEST_CASE("notifications: skip") {
@@ -816,7 +912,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1026,6 +1122,121 @@ TEST_CASE("notifications: skip") {
         exit = true;
         REQUIRE(calls1 == 1);
     }
+
+    SECTION("run_async_notifiers() processes new notifier between suppress_next() and commit_transaction()") {
+        advance_and_notify(*r);
+
+        // Create a new notifier and then immediately remove the callback so
+        // that begin_transaction() doesn't block
+        Results results2(r, r->read_group().get_table("class_object")->where());
+        results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+
+        r->begin_transaction();
+        table->create_object();
+        token1.suppress_next();
+
+        // If this spuriously reruns existing notifiers it'll clear skip_next
+        on_change_but_no_notify(*r);
+        r->commit_transaction();
+
+        // And then this'll fail to skip the write
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+    }
+
+    SECTION("skipping from a write inside the skipped callback works") {
+        NotificationToken token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            if (c.empty())
+                return;
+            r->begin_transaction();
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+
+        // no more notifications because the writing callback was skipped and
+        // so didn't make a second write
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+    }
+
+    SECTION("skipping from a write inside a callback before the skipped callback works") {
+        int calls3 = 0;
+        CollectionChangeSet changes3;
+        NotificationToken token3;
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls3 == 1);
+            r->begin_transaction();
+            REQUIRE(calls3 == 2);
+            table->create_object();
+            token3.suppress_next();
+            r->commit_transaction();
+        });
+        token3 = add_callback(results, calls3, changes3);
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls3 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls3 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls3 == 2);
+    }
+
+    SECTION("skipping from a write inside a callback after the skipped callback works") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        NotificationToken token2 = add_callback(results, calls2, changes2);
+        auto token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            if (calls1 != 2)
+                return;
+            REQUIRE(calls2 == 2);
+            r->begin_transaction();
+            REQUIRE(calls2 == 2);
+            table->create_object();
+            token2.suppress_next();
+            r->commit_transaction();
+        });
+
+        // initial notification
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        // notification for this write
+        make_remote_change();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+
+        // notification for the write made in the callback
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 3);
+        REQUIRE(calls2 == 2);
+    }
 }
 
 TEST_CASE("notifications: TableView delivery") {
@@ -1071,7 +1282,7 @@ TEST_CASE("notifications: TableView delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1454,32 +1665,87 @@ TEST_CASE("notifications: results") {
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
-    r->update_schema({{"object",
-                       {{"value", PropertyType::Int},
-                        {"link", PropertyType::Object | PropertyType::Nullable, "linked to object"}}},
-                      {"other object", {{"value", PropertyType::Int}}},
-                      {"linking object", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
-                      {"linked to object", {{"value", PropertyType::Int}}}});
+    r->update_schema(
+        {{"object",
+          {{"value", PropertyType::Int},
+           {"link", PropertyType::Object | PropertyType::Nullable, "linked to object"},
+           {"second link", PropertyType::Object | PropertyType::Nullable, "second linked to object"},
+           {"object links dictionary", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
+            "linked to object"},
+           {"object links set", PropertyType::Set | PropertyType::Object, "linked to object"},
+           {"object links array", PropertyType::Array | PropertyType::Object, "linked to object"},
+           {"mixed links dictionary", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable},
+           {"mixed links set", PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable},
+           {"mixed links array", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable}}},
+         {"other object", {{"value", PropertyType::Int}}},
+         {"linking object", {{"link", PropertyType::Object | PropertyType::Nullable, "object"}}},
+         {"linked to object",
+          {{"value", PropertyType::Int},
+           {"value2", PropertyType::Int},
+           {"link", PropertyType::Object | PropertyType::Nullable, "other linked to object"}}},
+         {"other linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}},
+         {"second linked to object", {{"value", PropertyType::Int}, {"value2", PropertyType::Int}}}});
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
+    auto other_table = r->read_group().get_table("class_other object");
+    auto linked_to_table = r->read_group().get_table("class_linked to object");
+    auto second_linked_to_table = r->read_group().get_table("class_second linked to object");
+
     auto col_value = table->get_column_key("value");
     auto col_link = table->get_column_key("link");
+    auto col_object_links_dictionary = table->get_column_key("object links dictionary");
+    auto col_object_links_set = table->get_column_key("object links set");
+    auto col_object_links_array = table->get_column_key("object links array");
+    auto col_mixed_links_dictionary = table->get_column_key("mixed links dictionary");
+    auto col_mixed_links_set = table->get_column_key("mixed links set");
+    auto col_mixed_links_array = table->get_column_key("mixed links array");
 
     r->begin_transaction();
     std::vector<ObjKey> target_keys;
-    r->read_group().get_table("class_linked to object")->create_objects(10, target_keys);
+    linked_to_table->create_objects(10, target_keys);
+    std::vector<ObjKey> second_target_keys;
+    second_linked_to_table->create_objects(10, second_target_keys);
 
     ObjKeys object_keys({3, 4, 7, 9, 10, 21, 24, 34, 42, 50});
     for (int i = 0; i < 10; ++i) {
-        table->create_object(object_keys[i]).set_all(i * 2, target_keys[i]);
+        table->create_object(object_keys[i]).set_all(i * 2, target_keys[i], second_target_keys[i]);
     }
+
+    auto object = table->get_object(object_keys[0]);
+    object_store::Dictionary object_dictionary(r, object, col_object_links_dictionary);
+    object_dictionary.insert(util::format("object_item"), target_keys[0]);
+
+    object_store::Set object_set(r, object, col_object_links_set);
+    object_set.insert(target_keys[0]);
+
+    List object_list(r, object, col_object_links_array);
+    object_list.add(target_keys[0]);
+
+    object_store::Dictionary mixed_dictionary(r, object, col_mixed_links_dictionary);
+    mixed_dictionary.insert("mixed_item_1", Mixed{ObjLink(linked_to_table->get_key(), target_keys[0])});
+    mixed_dictionary.insert("mixed_item_2", Mixed{ObjLink(second_linked_to_table->get_key(), second_target_keys[0])});
+
+    object_store::Set mixed_set(r, object, col_mixed_links_set);
+    mixed_set.insert(Mixed{ObjLink(linked_to_table->get_key(), target_keys[0])});
+    mixed_set.insert(Mixed{ObjLink(second_linked_to_table->get_key(), second_target_keys[0])});
+
+    List mixed_list(r, object, col_mixed_links_array);
+    mixed_list.add(Mixed{ObjLink(linked_to_table->get_key(), target_keys[0])});
+    mixed_list.add(Mixed{ObjLink(second_linked_to_table->get_key(), second_target_keys[0])});
     r->commit_transaction();
 
     auto r2 = coordinator->get_realm();
     auto r2_table = r2->read_group().get_table("class_object");
 
     Results results(r, table->where().greater(col_value, 0).less(col_value, 10));
+
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+        advance_and_notify(*r);
+    };
 
     SECTION("unsorted notifications") {
         int notification_calls = 0;
@@ -1492,23 +1758,16 @@ TEST_CASE("notifications: results") {
 
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
         SECTION("modifications to unrelated tables do not send notifications") {
             write([&] {
-                r->read_group().get_table("class_other object")->create_object();
+                other_table->create_object();
             });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("irrelevant modifications to linked tables do not send notifications") {
             write([&] {
-                r->read_group().get_table("class_linked to object")->create_object();
+                linked_to_table->create_object();
             });
             REQUIRE(notification_calls == 1);
         }
@@ -1653,9 +1912,8 @@ TEST_CASE("notifications: results") {
 
         SECTION("modification to related table not included in query") {
             write([&] {
-                auto table = r->read_group().get_table("class_linked to object");
-                auto col = table->get_column_key("value");
-                auto obj = table->get_object(target_keys[1]);
+                auto col = linked_to_table->get_column_key("value");
+                auto obj = linked_to_table->get_object(target_keys[1]);
                 obj.set(col, 42); // Will affect first entry in results
             });
             REQUIRE(notification_calls == 2);
@@ -1698,7 +1956,7 @@ TEST_CASE("notifications: results") {
             REQUIRE(callback.after_change.empty());
         }
 
-        auto write = [&](auto&& func) {
+        auto write_r2 = [&](auto&& func) {
             r2->begin_transaction();
             func(*r2_table);
             r2->commit_transaction();
@@ -1706,7 +1964,7 @@ TEST_CASE("notifications: results") {
         };
 
         SECTION("both are called after a write") {
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
@@ -1722,7 +1980,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE(results.get(0).is_valid());
                 REQUIRE(results.get(0).get<int64_t>(col_value) == 2);
             };
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.remove_object(results.get(0).get_key());
             });
             REQUIRE(callback.before_calls == 1);
@@ -1735,7 +1993,7 @@ TEST_CASE("notifications: results") {
                 REQUIRE_INDICES(callback.after_change.insertions, 4);
                 REQUIRE(results.last()->get<int64_t>(col_value) == 5);
             };
-            write([&](auto&& t) {
+            write_r2([&](auto&& t) {
                 t.create_object(ObjKey(53)).set(col_value, 5);
             });
             REQUIRE(callback.before_calls == 1);
@@ -1756,13 +2014,6 @@ TEST_CASE("notifications: results") {
         });
 
         advance_and_notify(*r);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
             write([&] {
@@ -1911,6 +2162,1015 @@ TEST_CASE("notifications: results") {
         }
     }
 
+    SECTION("keypath filtered notifications") {
+        // Additional table/column keys and object for keypath filtered notifications:
+        auto other_linked_to_table = r->read_group().get_table("class_other linked to object");
+
+        auto table_key_origin = table->get_key();
+        auto table_key_linked_to = linked_to_table->get_key();
+        auto other_linked_to_table_key = other_linked_to_table->get_key();
+
+        auto column_key_linked_to_table_value = linked_to_table->get_column_key("value");
+        auto column_key_linked_to_table_value2 = linked_to_table->get_column_key("value2");
+        auto column_key_linked_to_table_link = linked_to_table->get_column_key("link");
+        auto column_key_second_linked_to_table_value = second_linked_to_table->get_column_key("value");
+        auto column_key_second_linked_to_table_value2 = second_linked_to_table->get_column_key("value2");
+        auto column_key_other_linked_to_table_value = other_linked_to_table->get_column_key("value");
+        auto column_key_other_table_value = other_table->get_column_key("value");
+
+        r->begin_transaction();
+        auto other_table_obj_key = ObjKey(1);
+        other_table->create_object(other_table_obj_key).set_all(1);
+        r->commit_transaction();
+
+        Results results_for_notification_filter(r, table);
+
+        // Creating KeyPathArrays:
+        // 1. Property pairs
+        std::pair<TableKey, ColKey> pair_table_value(table_key_origin, col_value);
+        std::pair<TableKey, ColKey> pair_table_link(table_key_origin, col_link);
+        std::pair<TableKey, ColKey> pair_table_object_dictionary(table_key_origin, col_object_links_dictionary);
+        std::pair<TableKey, ColKey> pair_table_object_set(table_key_origin, col_object_links_set);
+        std::pair<TableKey, ColKey> pair_table_object_array(table_key_origin, col_object_links_array);
+        std::pair<TableKey, ColKey> pair_table_mixed_dictionary(table_key_origin, col_mixed_links_dictionary);
+        std::pair<TableKey, ColKey> pair_table_mixed_set(table_key_origin, col_mixed_links_set);
+        std::pair<TableKey, ColKey> pair_table_mixed_array(table_key_origin, col_mixed_links_array);
+        std::pair<TableKey, ColKey> pair_linked_to_value(table_key_linked_to, column_key_linked_to_table_value);
+        std::pair<TableKey, ColKey> pair_linked_to_value2(table_key_linked_to, column_key_linked_to_table_value2);
+        std::pair<TableKey, ColKey> pair_linked_to_link(table_key_linked_to, column_key_linked_to_table_link);
+        std::pair<TableKey, ColKey> pair_second_linked_to_value(table_key_linked_to,
+                                                                column_key_second_linked_to_table_value);
+        std::pair<TableKey, ColKey> pair_second_linked_to_value2(table_key_linked_to,
+                                                                 column_key_second_linked_to_table_value2);
+        std::pair<TableKey, ColKey> pair_other_linked_to_value(other_linked_to_table_key,
+                                                               column_key_other_linked_to_table_value);
+        // 2. Keypaths
+        auto key_path_table_value = {pair_table_value};
+        auto key_path_linked_to_value = {pair_table_link, pair_linked_to_value};
+        auto key_path_linked_to_value_object_dictionary = {pair_table_object_dictionary, pair_linked_to_value};
+        auto key_path_linked_to_value_object_set = {pair_table_object_set, pair_linked_to_value};
+        auto key_path_linked_to_value_object_array = {pair_table_object_array, pair_linked_to_value};
+        auto key_path_linked_to_value_mixed_dictionary = {pair_table_mixed_dictionary, pair_linked_to_value};
+        auto key_path_linked_to_value_mixed_set = {pair_table_mixed_set, pair_linked_to_value};
+        auto key_path_linked_to_value_mixed_array = {pair_table_mixed_array, pair_linked_to_value};
+        auto key_path_second_linked_to_value = {pair_table_link, pair_second_linked_to_value};
+        auto key_path_other_linked_to_value = {pair_table_link, pair_linked_to_link, pair_other_linked_to_value};
+        // 3. Aggregated `KeyPathArray`
+        KeyPathArray key_path_array_table_value = {key_path_table_value};
+        KeyPathArray key_path_array_linked_to_value = {key_path_linked_to_value};
+        KeyPathArray key_path_array_linked_to_value_object_dictionary = {key_path_linked_to_value_object_dictionary};
+        KeyPathArray key_path_array_linked_to_value_object_set = {key_path_linked_to_value_object_set};
+        KeyPathArray key_path_array_linked_to_value_object_array = {key_path_linked_to_value_object_array};
+        KeyPathArray key_path_array_linked_to_value_mixed_dictionary = {key_path_linked_to_value_mixed_dictionary};
+        KeyPathArray key_path_array_linked_to_value_mixed_set = {key_path_linked_to_value_mixed_set};
+        KeyPathArray key_path_array_linked_to_value_mixed_array = {key_path_linked_to_value_mixed_array};
+        KeyPathArray key_path_array_second_linked_to_value = {key_path_second_linked_to_value};
+        KeyPathArray key_path_array_other_linked_to_value = {key_path_other_linked_to_value};
+
+        // For the keypath filtered notifications we need to check three scenarios:
+        // - no callbacks have filters (this part is covered by other sections)
+        // - some callbacks have filters
+        // - all callbacks have filters
+        int notification_calls_without_filter = 0;
+        int notification_calls_table_value = 0;
+        int notification_calls_linked_to_value = 0;
+        int notification_calls_other_linked_to_value = 0;
+        CollectionChangeSet collection_change_set_without_filter;
+        CollectionChangeSet collection_change_set_table_value;
+        CollectionChangeSet collection_change_set_linked_to_value;
+        CollectionChangeSet collection_change_set_other_linked_to_value;
+
+        // Note that in case not all callbacks have filters we do accept false positive notifications by design.
+        // Distinguishing between these two cases would be a big change for little value.
+        SECTION("some callbacks have filters") {
+            auto token_without_filter = results_for_notification_filter.add_notification_callback(
+                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                    REQUIRE_FALSE(error);
+                    collection_change_set_without_filter = collection_change_set;
+                    ++notification_calls_without_filter;
+                });
+            auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
+                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                    REQUIRE_FALSE(error);
+                    collection_change_set_table_value = collection_change_set;
+                    ++notification_calls_table_value;
+                },
+                key_path_array_table_value);
+            auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
+                [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                    REQUIRE_FALSE(error);
+                    collection_change_set_linked_to_value = collection_change_set;
+                    ++notification_calls_linked_to_value;
+                },
+                key_path_array_linked_to_value);
+            auto token_for_filter_on_other_linked_to_value =
+                results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_other_linked_to_value = collection_change_set;
+                        ++notification_calls_other_linked_to_value;
+                    },
+                    key_path_array_other_linked_to_value);
+            // We advance and notify once to have a clean start.
+            advance_and_notify(*r);
+            // Check the initial state after notifying once since this it what we're comparing against later.
+            REQUIRE(notification_calls_without_filter == 1);
+            REQUIRE(collection_change_set_without_filter.empty());
+            REQUIRE(notification_calls_table_value == 1);
+            REQUIRE(collection_change_set_table_value.empty());
+            REQUIRE(notification_calls_linked_to_value == 1);
+            REQUIRE(collection_change_set_linked_to_value.empty());
+
+            SECTION("modifying root table 'object', property 'value' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->get_object(object_keys[1]).set(col_value, 3);
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_table_value == 2);
+                REQUIRE_FALSE(collection_change_set_table_value.empty());
+                REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+            }
+
+            SECTION("modifying root table 'object', property 'link' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_table_value == 2);
+                REQUIRE_FALSE(collection_change_set_table_value.empty());
+                REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+            }
+
+            SECTION("modifying related table 'linked to object', property 'value' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->get_object(object_keys[1])
+                        .get_linked_object(col_link)
+                        .set(column_key_linked_to_table_value, 42);
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_table_value == 2);
+                REQUIRE_FALSE(collection_change_set_table_value.empty());
+                REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+            }
+
+            SECTION("modifying related table 'linked to object', property 'value2' "
+                    "-> DOES send a notification") {
+                write([&] {
+                    table->get_object(object_keys[1])
+                        .get_linked_object(col_link)
+                        .set(column_key_linked_to_table_value2, 42);
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_table_value == 2);
+                REQUIRE_FALSE(collection_change_set_table_value.empty());
+                REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+            }
+
+            SECTION("modifying unrelated table 'other object', property 'value' "
+                    "-> does NOT send a notification") {
+                write([&] {
+                    other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
+                });
+
+                REQUIRE(notification_calls_without_filter == 1);
+                REQUIRE(collection_change_set_without_filter.empty());
+
+                REQUIRE(notification_calls_table_value == 1);
+                REQUIRE(collection_change_set_table_value.empty());
+
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+            }
+
+            SECTION("Key path arrays with more than two elements") {
+                write([&] {
+                    table->get_object(object_keys[1])
+                        .get_linked_object(col_link)
+                        .set(column_key_linked_to_table_link, other_linked_to_table->create_object().get_key());
+                });
+
+                REQUIRE(notification_calls_without_filter == 2);
+                REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+
+                REQUIRE(notification_calls_table_value == 2);
+                REQUIRE_FALSE(collection_change_set_table_value.empty());
+                REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+
+                REQUIRE(notification_calls_other_linked_to_value == 2);
+                REQUIRE_FALSE(collection_change_set_other_linked_to_value.empty());
+                REQUIRE_INDICES(collection_change_set_other_linked_to_value.modifications, 1);
+                REQUIRE_INDICES(collection_change_set_other_linked_to_value.modifications_new, 1);
+            }
+        }
+
+        // In case all callbacks do have filters we expect every callback to only get called when the corresponding
+        // filter is hit. Compared to the above 'some callbacks have filters' case we do not expect false positives
+        // here.
+        SECTION("all callbacks have filters") {
+            SECTION("keypath filter on root table 'object', property 'value'") {
+                auto token_for_filter_on_root_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_table_value = collection_change_set;
+                        ++notification_calls_table_value;
+                    },
+                    key_path_array_table_value);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_table_value == 1);
+                REQUIRE(collection_change_set_table_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_table_value == 2);
+                    REQUIRE_FALSE(collection_change_set_table_value.empty());
+                    REQUIRE_INDICES(collection_change_set_table_value.modifications, 1);
+                    REQUIRE_INDICES(collection_change_set_table_value.modifications_new, 1);
+                }
+
+                SECTION("modifying root table 'object', property 'link' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
+                    });
+
+                    REQUIRE(notification_calls_table_value == 1);
+                    REQUIRE(collection_change_set_table_value.empty());
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .get_linked_object(col_link)
+                            .set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_table_value == 1);
+                    REQUIRE(collection_change_set_table_value.empty());
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .get_linked_object(col_link)
+                            .set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_table_value == 1);
+                    REQUIRE(collection_change_set_table_value.empty());
+                }
+
+                SECTION("modifying unrelated table 'other object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
+                    });
+
+                    REQUIRE(notification_calls_table_value == 1);
+                    REQUIRE(collection_change_set_table_value.empty());
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object', property 'value'") {
+                auto token_for_filter_on_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'link' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1]).set(col_link, linked_to_table->create_object().get_key());
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .get_linked_object(col_link)
+                            .set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 1);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 1);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[1])
+                            .get_linked_object(col_link)
+                            .set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying unrelated table 'other object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        other_table->get_object(other_table_obj_key).set(column_key_other_table_value, 43);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION(
+                "keypath filter on related table 'linked to object', property 'value' - using object link dictionary"
+                "dictionary") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_object_dictionary);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'object links dictionary' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        object_store::Dictionary dict(r, root_object, col_object_links_dictionary);
+                        dict.insert("object_item_1", target_object.get_key());
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object', property 'value' - using object link set") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_object_set);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'object links set' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        object_store::Set set(r, root_object, col_object_links_set);
+                        set.insert(target_object.get_key());
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value1' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION(
+                "keypath filter on related table 'linked to object', property 'value' - using object link array") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_object_array);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'object links array' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        List list(r, root_object, col_object_links_array);
+                        list.add(target_object.get_key());
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed dictionary") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_mixed_dictionary);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'mixed links dictionary' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        object_store::Dictionary dict(r, root_object, col_mixed_links_dictionary);
+                        dict.insert(util::format("mixed_item_1"),
+                                    Mixed{ObjLink(linked_to_table->get_key(), target_object.get_key())});
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed set") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_mixed_set);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'mixed links set' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        object_store::Set set(r, root_object, col_mixed_links_set);
+                        set.insert(Mixed{ObjLink(linked_to_table->get_key(), target_object.get_key())});
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value1' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object', property 'value' - using mixed array") {
+                auto token_linked_to_value = results_for_notification_filter.add_notification_callback(
+                    [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                        REQUIRE_FALSE(error);
+                        collection_change_set_linked_to_value = collection_change_set;
+                        ++notification_calls_linked_to_value;
+                    },
+                    key_path_array_linked_to_value_mixed_array);
+                // We advance and notify once to have a clean start.
+                advance_and_notify(*r);
+                // Check the initial state after notifying once since this it what we're comparing against later.
+                REQUIRE(notification_calls_linked_to_value == 1);
+                REQUIRE(collection_change_set_linked_to_value.empty());
+
+                SECTION("modifying root table 'object', property 'value' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        table->get_object(object_keys[0]).set(col_value, 3);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+
+                SECTION("modifying root table 'object', property 'mixed links array' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        auto root_object = table->get_object(object_keys[0]);
+                        auto target_object = linked_to_table->create_object();
+
+                        List list(r, root_object, col_mixed_links_array);
+                        list.add(Mixed{ObjLink(linked_to_table->get_key(), target_object.get_key())});
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value' "
+                        "-> DOES send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 2);
+                    REQUIRE_FALSE(collection_change_set_linked_to_value.empty());
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_linked_to_value.modifications_new, 0);
+                }
+
+                SECTION("modifying related table 'linked to object', property 'value2' "
+                        "-> does NOT send a notification") {
+                    write([&] {
+                        linked_to_table->get_object(target_keys[0]).set(column_key_linked_to_table_value2, 42);
+                    });
+
+                    REQUIRE(notification_calls_linked_to_value == 1);
+                    REQUIRE(collection_change_set_linked_to_value.empty());
+                }
+            }
+        }
+
+        SECTION("keypath filter with a backlink") {
+            auto col_second_link = table->get_column_key("second link");
+            auto col_linked_to_backlink_to_object = table->get_opposite_column(col_link);
+            auto col_second_linked_to_backlink_to_object = table->get_opposite_column(col_second_link);
+
+            std::pair<TableKey, ColKey> pair_linked_to_backlink(linked_to_table->get_key(),
+                                                                col_linked_to_backlink_to_object);
+            std::pair<TableKey, ColKey> pair_table_second_link(table_key_origin, col_second_link);
+            std::pair<TableKey, ColKey> pair_second_linked_to_backlink(second_linked_to_table->get_key(),
+                                                                       col_second_linked_to_backlink_to_object);
+
+            KeyPath key_path_backlink = {pair_linked_to_backlink};
+            KeyPath key_path_backlink_to_value = {pair_linked_to_backlink, pair_table_value};
+            KeyPath key_path_backlink_to_second_link = {pair_linked_to_backlink, pair_table_second_link};
+            KeyPath key_path_backlink_from_second_link_to_value = {pair_second_linked_to_backlink, pair_table_value};
+
+            KeyPathArray key_path_array_backlink = {key_path_backlink};
+            KeyPathArray key_path_array_backlink_to_value = {key_path_backlink_to_value};
+            KeyPathArray key_path_array_backlink_to_second_link = {key_path_backlink_to_second_link};
+            KeyPathArray key_path_array_backlink_from_second_link_to_value = {
+                key_path_backlink_from_second_link_to_value};
+
+            Results results_linked_to(r, linked_to_table);
+            TestContext test_context(r);
+
+            int notification_calls_backlink_to_value = 0;
+            CollectionChangeSet collection_change_set_backlink_to_value;
+            CollectionChangeSet collection_change_set_backlink_to_second_link;
+
+            SECTION("keypath filter on related table 'linked to object' to table 'object', property 'value'") {
+                SECTION("all callbacks have filters") {
+                    auto token_backlink_value = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_backlink_to_value = collection_change_set;
+                            notification_calls_backlink_to_value++;
+                        },
+                        key_path_array_backlink_to_value);
+                    // We advance and notify once to have a clean start.
+                    advance_and_notify(*r);
+                    // Check the initial state after notifying once since this it what we're comparing against
+                    // later.
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+
+                    SECTION("modifying backlinked table 'object', property 'value' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            table->get_object(object_keys[1]).set(col_value, 3);
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 1);
+                    }
+
+                    SECTION("modifying backlinked table 'object', property 'link' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            table->get_object(object_keys[1])
+                                .set(col_second_link, second_linked_to_table->create_object().get_key());
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 1);
+                        REQUIRE(collection_change_set_backlink_to_value.empty());
+                    }
+                    SECTION("adding new backlinked object 'object' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            Obj obj = table->create_object();
+                            Object object(r, obj);
+                            object.set_property_value(test_context, "link",
+                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 0);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 0);
+                    }
+                }
+
+                SECTION("some callbacks have filters") {
+                    auto token_backlink_value = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_backlink_to_value = collection_change_set;
+                            notification_calls_backlink_to_value++;
+                        },
+                        key_path_array_backlink_to_value);
+                    int notification_calls_without_filter = 0;
+                    CollectionChangeSet collection_change_set_without_filter;
+                    auto token_without_filter = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_without_filter = collection_change_set;
+                            notification_calls_without_filter++;
+                        });
+                    // We advance and notify once to have a clean start.
+                    advance_and_notify(*r);
+                    // Check the initial state after notifying once since this it what we're comparing against
+                    // later.
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+                    REQUIRE(notification_calls_without_filter == 1);
+                    REQUIRE(collection_change_set_without_filter.empty());
+
+                    SECTION("modifying backlinked table 'object', property 'value' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            table->get_object(object_keys[1]).set(col_value, 3);
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 1);
+                        REQUIRE(notification_calls_without_filter == 2);
+                        REQUIRE_FALSE(collection_change_set_without_filter.empty());
+                        REQUIRE_INDICES(collection_change_set_without_filter.modifications, 1);
+                        REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 1);
+                    }
+
+                    SECTION("modifying backlinked table 'object', property 'link' "
+                            "-> does NOT send a notification") {
+                        write([&] {
+                            table->get_object(object_keys[1])
+                                .set(col_second_link, second_linked_to_table->create_object().get_key());
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 1);
+                        REQUIRE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE(notification_calls_without_filter == 1);
+                        REQUIRE(collection_change_set_without_filter.empty());
+                    }
+
+                    SECTION("adding new backlinked object 'object' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            Obj obj = table->create_object();
+                            Object object(r, obj);
+                            object.set_property_value(test_context, "link",
+                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications, 0);
+                        REQUIRE_INDICES(collection_change_set_backlink_to_value.modifications_new, 0);
+                    }
+                }
+            }
+
+            SECTION("keypath filter on related table 'linked to object's backlink to 'object'") {
+                SECTION("all callbacks have filters") {
+                    auto token_backlink_value = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_backlink_to_value = collection_change_set;
+                            notification_calls_backlink_to_value++;
+                        },
+                        key_path_array_backlink);
+                    // We advance and notify once to have a clean start.
+                    advance_and_notify(*r);
+                    // Check the initial state after notifying once since this it what we're comparing against
+                    // later.
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+
+                    SECTION("adding new backlinked object 'object' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            Obj obj = table->create_object();
+                            Object object(r, obj);
+                            object.set_property_value(test_context, "link",
+                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE(collection_change_set_backlink_to_value.modifications.contains(0));
+                        REQUIRE(collection_change_set_backlink_to_value.modifications_new.contains(0));
+                    }
+                }
+
+                SECTION("some callbacks have filters") {
+                    auto token_backlink_value = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_backlink_to_value = collection_change_set;
+                            notification_calls_backlink_to_value++;
+                        },
+                        key_path_array_backlink);
+                    int notification_calls_without_filter = 0;
+                    CollectionChangeSet collection_change_set_without_filter;
+                    auto token_backlink_second_value = results_linked_to.add_notification_callback(
+                        [&](CollectionChangeSet collection_change_set, std::exception_ptr error) {
+                            REQUIRE_FALSE(error);
+                            collection_change_set_without_filter = collection_change_set;
+                            notification_calls_without_filter++;
+                        });
+                    // We advance and notify once to have a clean start.
+                    advance_and_notify(*r);
+                    // Check the initial state after notifying once since this it what we're comparing against
+                    // later.
+                    REQUIRE(notification_calls_backlink_to_value == 1);
+                    REQUIRE(collection_change_set_backlink_to_value.empty());
+                    REQUIRE(notification_calls_without_filter == 1);
+                    REQUIRE(collection_change_set_without_filter.empty());
+
+                    SECTION("adding new backlinked object 'object' "
+                            "-> DOES send a notification") {
+                        write([&] {
+                            Obj obj = table->create_object();
+                            Object object(r, obj);
+                            object.set_property_value(test_context, "link",
+                                                      util::Any(linked_to_table->get_object(target_keys[0])));
+                        });
+                        REQUIRE(notification_calls_backlink_to_value == 2);
+                        REQUIRE_FALSE(collection_change_set_backlink_to_value.empty());
+                        REQUIRE(collection_change_set_backlink_to_value.modifications.contains(0));
+                        REQUIRE(collection_change_set_backlink_to_value.modifications_new.contains(0));
+                    }
+                }
+            }
+        }
+    }
+
     SECTION("distinct notifications") {
         results = results.distinct(DistinctDescriptor({{col_value}}));
 
@@ -1923,13 +3183,6 @@ TEST_CASE("notifications: results") {
         });
 
         advance_and_notify(*r);
-
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
             write([&] {
@@ -1998,13 +3251,6 @@ TEST_CASE("notifications: results") {
         });
         advance_and_notify(*r);
 
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
-
         SECTION("insert table before observed table") {
             write([&] {
                 table->create_object(ObjKey(53)).set(col_value, 5);
@@ -2034,6 +3280,73 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 #endif
+    }
+
+    SECTION("notifier query rerunning") {
+        results = Results(r, 0 <= table->column<Link>(col_link));
+        _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+            std::make_shared<_impl::ResultsNotifier>(results);
+        _impl::RealmCoordinator::register_notifier(notifier);
+        advance_and_notify(*r);
+        TableView tv;
+        REQUIRE(notifier->get_tableview(tv));
+        REQUIRE_FALSE(notifier->get_tableview(tv));
+
+        SECTION("modifying the query's table reruns the query") {
+            write([&] {
+                table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table used in the query reruns the query") {
+            write([&] {
+                linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table used for sorting reruns the query") {
+            results = Results(r, table).sort({{"link.value", false}});
+            _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+                std::make_shared<_impl::ResultsNotifier>(results);
+            _impl::RealmCoordinator::register_notifier(notifier);
+            advance_and_notify(*r);
+            REQUIRE(notifier->get_tableview(tv));
+
+            write([&] {
+                linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table not used by the query does not rerun the query") {
+            write([&] {
+                second_linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying an unrelated table does not rerun the query") {
+            write([&] {
+                other_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
+
+        SECTION("modifying a linked table not used for sorting does not rerun the query") {
+            results = Results(r, table).sort({{"link.value", false}});
+            _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
+                std::make_shared<_impl::ResultsNotifier>(results);
+            _impl::RealmCoordinator::register_notifier(notifier);
+            advance_and_notify(*r);
+            REQUIRE(notifier->get_tableview(tv));
+
+            write([&] {
+                second_linked_to_table->create_object(ObjKey(53));
+            });
+            REQUIRE_FALSE(notifier->get_tableview(tv));
+        }
     }
 }
 
@@ -2115,7 +3428,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
+        auto r2 = coordinator->get_realm(util::Scheduler::make_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2883,8 +4196,37 @@ struct ResultsFromLinkView {
     }
 };
 
+struct ResultsFromLinkSet {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table)
+    {
+        r->begin_transaction();
+        auto link_table = r->read_group().get_table("class_linking_object");
+        std::shared_ptr<LnkSet> link_set =
+            link_table->create_object().get_linkset_ptr(link_table->get_column_key("linkset"));
+        for (auto& o : *table) {
+            link_set->insert(o.get_key());
+        }
+        r->commit_transaction();
+        return Results(r, link_set);
+    }
+};
+
+struct ResultsFromNothing {
+    static Results call(std::shared_ptr<Realm>, ConstTableRef)
+    {
+        return Results();
+    }
+};
+
+struct ResultsFromInvalidTable {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef)
+    {
+        return Results(std::move(r), ConstTableRef{});
+    }
+};
+
 TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2895,7 +4237,11 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -2932,8 +4278,63 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
     }
 }
 
+TEMPLATE_TEST_CASE("results: get<Obj>() intermixed with writes", "", ResultsFromTable, ResultsFromQuery,
+                   ResultsFromTableView)
+{
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object",
+         {
+             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+         }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    ColKey col_value = table->get_column_key("pk");
+    Results results = TestType::call(r, table);
+
+    r->begin_transaction();
+
+    SECTION("append at end") {
+        for (int i = 0; i < 1000; ++i) {
+            table->create_object_with_primary_key(i);
+            REQUIRE(results.get<Obj>(i).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("random order") {
+        int indexes[1000];
+        std::iota(std::begin(indexes), std::end(indexes), 0);
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
+
+        for (auto i : indexes) {
+            auto index = table->get_object_ndx(table->create_object_with_primary_key(i).get_key());
+            REQUIRE(results.get<Obj>(index).get<int64_t>(col_value) == i);
+        }
+    }
+
+    SECTION("delete from front") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(0).remove();
+    }
+
+    SECTION("delete from back") {
+        for (int i = 0; i < 1000; ++i)
+            table->create_object_with_primary_key(i);
+        while (table->size())
+            results.get<Obj>(table->size() - 1).remove();
+    }
+}
+
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2948,7 +4349,11 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -3013,8 +4418,79 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     }
 }
 
+TEST_CASE("results: list of primitives indexes") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {{"list", PropertyType::Int | PropertyType::Array | PropertyType::Nullable}}},
+    });
+
+    constexpr size_t num_items = 10;
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    auto obj = table->create_object();
+    auto list = obj.get_list<util::Optional<Int>>(table->get_column_key("list"));
+    for (size_t i = 0; i < num_items; ++i)
+        list.add(i);
+    r->commit_transaction();
+
+    Results results(r, obj.get_collection_ptr(table->get_column_key("list")));
+
+    SECTION("index_of() Mixed of correct type") {
+        for (size_t i = 0; i < num_items; ++i)
+            REQUIRE(results.index_of(Mixed(int64_t(i))) == i);
+    }
+    SECTION("index_of(null)") {
+        REQUIRE(results.index_of(Mixed{}) == realm::not_found);
+    }
+    SECTION("index_of() with type checking") {
+        SECTION("double does not match") {
+            for (size_t i = 0; i < num_items; ++i)
+                REQUIRE(results.index_of(Mixed(double(i))) == realm::not_found);
+        }
+    }
+}
+
+TEST_CASE("results: dictionary keys") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {{"dictionary", PropertyType::Int | PropertyType::Dictionary | PropertyType::Nullable}}},
+    });
+
+    constexpr size_t num_items = 10;
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    auto obj = table->create_object();
+    auto dict_col_key = table->get_column_key("dictionary");
+    object_store::Dictionary dict(r, obj, dict_col_key);
+    for (size_t i = 0; i < num_items; ++i)
+        dict.insert(util::format("item_%1", i), int64_t(i));
+    r->commit_transaction();
+
+    Results results = dict.get_keys();
+
+    SECTION("index_of() Mixed of correct type") {
+        for (size_t i = 0; i < num_items; ++i) {
+            // nb: these are not in insertion order!
+            Mixed key_i = results.get<StringData>(i);
+            REQUIRE(results.index_of(key_i) == i);
+        }
+    }
+    SECTION("index_of() non existant key") {
+        REQUIRE(results.index_of(Mixed("foo")) == realm::npos);
+    }
+    SECTION("index_of() wrong key type") {
+        REQUIRE(results.index_of(Mixed(int64_t(0))) == realm::npos);
+    }
+}
+
 TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable, ResultsFromQuery,
-                   ResultsFromTableView, ResultsFromLinkView)
+                   ResultsFromTableView, ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -3028,7 +4504,11 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -3151,6 +4631,36 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
             REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
         }
+    }
+}
+
+TEMPLATE_TEST_CASE("results: backed by nothing", "[results]", ResultsFromInvalidTable, ResultsFromNothing)
+{
+    InMemoryTestFile config;
+    auto realm = Realm::get_shared_realm(config);
+    Results results = TestType::call(realm, TableRef());
+    TestContext ctx(realm);
+
+    ColKey invalid_col;
+    SECTION("max") {
+        REQUIRE(!results.max(invalid_col));
+    }
+    SECTION("min") {
+        REQUIRE(!results.min(invalid_col));
+    }
+    SECTION("average") {
+        REQUIRE(!results.average(invalid_col));
+    }
+    SECTION("sum") {
+        REQUIRE(!results.sum(invalid_col));
+    }
+    SECTION("first") {
+        REQUIRE(!results.first());
+        REQUIRE(!results.first(ctx));
+    }
+    SECTION("last") {
+        REQUIRE(!results.last());
+        REQUIRE(!results.last(ctx));
     }
 }
 
@@ -3358,6 +4868,57 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     }
 }
 
+TEST_CASE("results: nullable list of primitives") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema =
+        Schema{{"ListTypes",
+                {
+                    {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                    {"nullable decimal list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+                    {"non nullable decimal list", PropertyType::Array | PropertyType::Decimal},
+                    {"nullable objectid list", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
+                    {"non nullable objectid list", PropertyType::Array | PropertyType::ObjectId},
+                }}};
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_ListTypes");
+    auto nullable_decimal_col = table->get_column_key("nullable decimal list");
+    auto non_nullable_decimal_col = table->get_column_key("non nullable decimal list");
+    auto nullable_oid_col = table->get_column_key("nullable objectid list");
+    auto non_nullable_oid_col = table->get_column_key("non nullable objectid list");
+    realm->begin_transaction();
+    auto obj = table->create_object_with_primary_key(1);
+    List nullable_decimal_list(realm, obj, nullable_decimal_col);
+    List non_nullable_decimal_list(realm, obj, non_nullable_decimal_col);
+    nullable_decimal_list.add(Decimal128{realm::null()});
+    non_nullable_decimal_list.add(Decimal128{});
+    List nullable_oid_list(realm, obj, nullable_oid_col);
+    List non_nullable_oid_list(realm, obj, non_nullable_oid_col);
+    nullable_oid_list.add(util::Optional<ObjectId>{});
+    non_nullable_oid_list.add(ObjectId()); // all zeros
+    realm->commit_transaction();
+    TestContext ctx(realm);
+
+    SECTION("check property values on internal null type") {
+        Results r_nullable = nullable_decimal_list.as_results();
+        Results r_non_nullable = non_nullable_decimal_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<Decimal128>(0) == Decimal128(realm::null()));
+        CHECK(r_non_nullable.get<Decimal128>(0) == Decimal128(0));
+    }
+
+    SECTION("check property values on optional type") {
+        Results r_nullable = nullable_oid_list.as_results();
+        Results r_non_nullable = non_nullable_oid_list.as_results();
+        CHECK(r_nullable.size() == 1);
+        CHECK(r_non_nullable.size() == 1);
+        CHECK(r_nullable.get<util::Optional<ObjectId>>(0) == util::Optional<ObjectId>());
+        CHECK(r_non_nullable.get<ObjectId>(0) == ObjectId());
+    }
+}
+
 TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     // config.cache = false;
@@ -3485,43 +5046,117 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
-TEST_CASE("results: query helpers", "[include]") {
+TEST_CASE("notifications: objects with PK recreated") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
-    config.schema = Schema{
-        {"object",
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"no_pk",
          {
+             {"id", PropertyType::Int},
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"int_pk",
+         {
+             {"id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+        {"string_pk",
+         {
+             {"id", PropertyType::String, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+    });
+
+    auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
+        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++calls;
+            changes = std::move(c);
+        });
     };
 
-    auto realm = Realm::get_shared_realm(config);
-    auto table = realm->read_group().get_table("class_object");
-    auto col = table->get_column_key("value");
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table1 = r->read_group().get_table("class_no_pk");
+    auto table2 = r->read_group().get_table("class_int_pk");
+    auto table3 = r->read_group().get_table("class_string_pk");
 
-    realm->begin_transaction();
-    for (int i = 0; i < 8; ++i) {
-        table->create_object().set(col, (i + 2) % 4);
+    TestContext d(r);
+    auto create = [&](StringData type, util::Any&& value) {
+        return Object::create(d, r, *r->schema().find(type), value);
+    };
+
+    r->begin_transaction();
+    auto k1 = create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k2 = create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(100)}}).obj().get_key();
+    auto k3 = create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(100)}}).obj().get_key();
+    r->commit_transaction();
+
+    Results results1(r, table1->where());
+    int calls1 = 0;
+    CollectionChangeSet changes1;
+    auto token1 = add_callback(results1, calls1, changes1);
+
+    Results results2(r, table2->where());
+    int calls2 = 0;
+    CollectionChangeSet changes2;
+    auto token2 = add_callback(results2, calls2, changes2);
+
+    Results results3(r, table3->where());
+    int calls3 = 0;
+    CollectionChangeSet changes3;
+    auto token3 = add_callback(results3, calls3, changes3);
+
+    advance_and_notify(*r);
+    REQUIRE(calls1 == 1);
+    REQUIRE(calls2 == 1);
+    REQUIRE(calls3 == 1);
+
+    SECTION("objects removed") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->remove_object(k1);
+        r->read_group().get_table("class_int_pk")->remove_object(k2);
+        r->read_group().get_table("class_string_pk")->remove_object(k3);
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
+
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
     }
-    realm->commit_transaction();
 
-    Results r(realm, table);
+    SECTION("table cleared") {
+        r->begin_transaction();
+        r->read_group().get_table("class_no_pk")->clear();
+        r->read_group().get_table("class_int_pk")->clear();
+        r->read_group().get_table("class_string_pk")->clear();
+        create("no_pk", AnyDict{{"id", INT64_C(123)}, {"value", INT64_C(200)}});
+        create("int_pk", AnyDict{{"id", INT64_C(456)}, {"value", INT64_C(200)}});
+        create("string_pk", AnyDict{{"id", std::string("hello")}, {"value", INT64_C(200)}});
+        r->commit_transaction();
 
-    SECTION("not valid") {
-        std::vector<StringData> paths;
-        parser::KeyPathMapping mapping;
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(!includes.is_valid());
-    }
-    SECTION("valid") {
-        std::vector<StringData> paths = {"@links.linking_object.link"};
-        parser::KeyPathMapping mapping;
-        realm::populate_keypath_mapping(mapping, *realm);
-        ObjectSchema schema = *realm->schema().find("object");
-        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
-        CHECK(includes.is_valid());
-        CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.count() == 1);
+        REQUIRE(changes1.deletions.count() == 1);
+        REQUIRE(changes2.insertions.count() == 1);
+        REQUIRE(changes2.deletions.count() == 1);
+        REQUIRE(changes3.insertions.count() == 1);
+        REQUIRE(changes3.deletions.count() == 1);
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 2);
+        REQUIRE(calls3 == 2);
     }
 }

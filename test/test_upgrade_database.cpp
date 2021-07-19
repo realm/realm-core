@@ -30,15 +30,13 @@
 #endif
 
 #include <realm.hpp>
-#include <realm/query_expression.hpp>
-#include <realm/util/to_string.hpp>
-#include <realm/util/file.hpp>
-#include <realm/version.hpp>
 #include <realm/history.hpp>
-
+#include <realm/query_expression.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/to_string.hpp>
+#include <realm/version.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
-
 
 using namespace realm;
 using namespace realm::util;
@@ -81,9 +79,9 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-// Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
-// it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
-// even read using Get()) without upgrading the database first.
+    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+    // even read using Get()) without upgrading the database first.
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -381,7 +379,8 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
-TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction,
+        REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -671,7 +670,9 @@ TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE =
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() { DB sg(temp_copy); });
+        tt.start([&]() {
+            DB sg(temp_copy);
+        });
     }
 
     for (auto& tt : t)
@@ -778,7 +779,9 @@ TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 ||
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int) { throw std::exception(); };
+    auto exception_callback = [&](int, int) {
+        throw std::exception();
+    };
     auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
@@ -914,11 +917,12 @@ TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
+#endif
 
 
 // Open an existing database-file-format-version 5 file and
 // check that it automatically upgrades to version 6.
-TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";
@@ -941,27 +945,26 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 4 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
         // for all tables because the file is in version 4
-        DB sg(temp_copy);
+        auto sg = DB::create(temp_copy);
 
         WriteTransaction wt(sg);
         TableRef t = wt.get_table("t1");
         TableRef t2 = wt.get_table("t2");
 
-        size_t int_ndx = 0;
-        size_t bool_ndx = 1;
-        size_t str_ndx = 4;
-        size_t ts_ndx = 6;
+        auto int_ndx = t->get_column_key("int");
+        auto bool_ndx = t->get_column_key("bool");
+        auto str_ndx = t->get_column_key("string");
+        auto ts_ndx = t->get_column_key("timestamp");
 
-        size_t null_int_ndx = 0;
-        size_t null_bool_ndx = 1;
-        size_t null_str_ndx = 4;
-        size_t null_ts_ndx = 6;
+        auto null_int_ndx = t->get_column_key("nullable int");
+        auto null_bool_ndx = t->get_column_key("nullable bool");
+        auto null_str_ndx = t->get_column_key("nullable string");
+        auto null_ts_ndx = t->get_column_key("nullable timestamp");
 
         size_t num_rows = 6;
 
@@ -976,26 +979,25 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
         CHECK(t->has_search_index(null_str_ndx));
         CHECK(t->has_search_index(null_ts_ndx));
 
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), 0);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), 1);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2), 4);
-        CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), ObjKey(0));
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), ObjKey(1));
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2), ObjKey(4));
+        // CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
         CHECK_EQUAL(t->size(), 6);
 
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_b), 0);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_c), 1);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2), 4);
-        CHECK_EQUAL(t->get_distinct_view(null_str_ndx).size(), 4);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_b), ObjKey(0));
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_c), ObjKey(1));
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2), ObjKey(4));
+        // CHECK_EQUAL(t->get_distinct_view(null_str_ndx).size(), 4);
 
         // If the StringIndexes were not updated we couldn't do this
         // on a format 5 file and find it again.
         std::string std_base2_d = std_base2 + "d";
         StringData base2_d(std_base2_d);
-        t->add_empty_row();
-        t->set_string(str_ndx, 6, base2_d);
-        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), 6);
-        t->set_string(null_str_ndx, 6, base2_d);
-        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_d), 6);
+        auto obj = t->create_object().set(str_ndx, base2_d);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), ObjKey(6));
+        obj.set(null_str_ndx, base2_d);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_d), ObjKey(6));
 
         // And if the indexes were using the old format, adding a long
         // prefix string would cause a stack overflow.
@@ -1004,17 +1006,15 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
         std::string big_base_c = big_base + "c";
         StringData b(big_base_b);
         StringData c(big_base_c);
-        t->add_empty_row(2);
-        t->set_string(str_ndx, 7, b);
-        t->set_string(str_ndx, 8, c);
-        t->set_string(null_str_ndx, 7, b);
-        t->set_string(null_str_ndx, 8, c);
+        t->create_object().set(str_ndx, b).set(null_str_ndx, b);
+        t->create_object().set(str_ndx, c).set(null_str_ndx, c);
 
         t->verify();
         t2->verify();
     }
 
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 5
     // core in order to create a file-format-version 5 test file!
     char leafsize[20];
@@ -1067,9 +1067,9 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
     t->set_string(null_str_ndx, 5, base2);
 
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
 }
-#endif
 
 
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1077,7 +1077,6 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_6_to_7.realm";
 
-#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1085,8 +1084,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 6 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1103,6 +1101,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 6
     // core in order to create a file-format-version 6 test file!
 
@@ -1112,8 +1111,8 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
-#endif
 }
 
 TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1121,7 +1120,6 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_7_to_8.realm";
 
-#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1129,8 +1127,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 7 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1147,6 +1144,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<Int>(col), 123);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 7
     // core in order to create a file-format-version 7 test file!
 
@@ -1156,8 +1154,8 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     size_t row = t->add_empty_row();
     t->set_int(col, row, 123);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
-#endif
 }
 
 
@@ -1166,7 +1164,6 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
     std::string validation_str = "test string";
-#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1174,8 +1171,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_OR_RETURN(File::exists(path));
         SHARED_GROUP_TEST_PATH(temp_copy);
 
-        // Make a copy of the version 9 database so that we keep the
-        // original file intact and unmodified
+        // Make a copy of the database so that we keep the original file intact and unmodified
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
@@ -1194,6 +1190,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         CHECK_EQUAL(t->begin()->get<String>(col_str), validation_str);
     }
 #else  // test write mode
+#ifndef REALM_CLUSTER_IF
     // NOTE: This code must be executed from an old file-format-version 8
     // core in order to create a file-format-version 8 test file!
 
@@ -1206,8 +1203,8 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     t->set_string(str_col, row, validation_str);
     g.write(path);
+#endif // REALM_CLUSTER_IF
 #endif // TEST_READ_UPGRADE_MODE
-#endif
 }
 
 TEST(Upgrade_Database_6_10)
@@ -1217,8 +1214,7 @@ TEST(Upgrade_Database_6_10)
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     DBRef sg = DB::create(*hist);
@@ -1260,8 +1256,7 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_pk_table.realm";
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
@@ -1310,8 +1305,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
 
@@ -1646,8 +1640,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
+    // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history(temp_copy);
     auto sg = DB::create(*hist);
@@ -1672,7 +1665,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
     Group g;
     TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
     TableRef o = g.add_table("origin");
-    auto col = o->add_column_link(type_Link, "link", *t);
+    auto col = o->add_column(*t, "link");
 
     for (auto id : ids) {
         auto obj = t->create_object_with_primary_key(id);
@@ -1681,6 +1674,156 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+}
+
+TEST_TYPES(Upgrade_Database_11, std::true_type, std::false_type)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_11.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+    std::vector<std::string> names = {"adam", "bart", "carlo", "david", "eric", "frank", "gary"};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    DBOptions options;
+    options.is_immutable = TEST_TYPE::value;
+    auto sg = DB::create(*hist, options);
+    auto rt = sg->start_read();
+
+    auto foo = rt->get_table("foo");
+    auto bar = rt->get_table("bar");
+    auto o = rt->get_table("origin");
+    auto col1 = o->get_column_key("link1");
+    auto col2 = o->get_column_key("link2");
+#else
+    // NOTE: This code must be executed from an old file-format-version 20
+    // core in order to create a file-format-version 20 test file!
+
+    Group g;
+    TableRef foo = g.add_table_with_primary_key("foo", type_Int, "id", false);
+    TableRef bar = g.add_table_with_primary_key("bar", type_String, "name", false);
+    TableRef o = g.add_table("origin");
+    auto col1 = o->add_column_link(type_Link, "link1", *foo);
+    auto col2 = o->add_column_link(type_Link, "link2", *bar);
+
+    for (auto id : ids) {
+        auto obj = foo->create_object_with_primary_key(id);
+        o->create_object().set(col1, obj.get_key());
+    }
+
+    for (auto name : names) {
+        auto obj = bar->create_object_with_primary_key(name);
+        o->create_object().set(col2, obj.get_key());
+    }
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
+    auto get_object = [](TableRef table, auto pk) {
+        auto col = table->get_primary_key_column();
+        auto key = table->find_first(col, pk);
+        return table->get_object(key);
+    };
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = get_object(foo, id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col1), obj.get_key());
+        ++it;
+    }
+    for (auto name : names) {
+        auto obj = get_object(bar, StringData(name));
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col2), obj.get_key());
+        ++it;
+    }
+}
+
+TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_20.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+    std::vector<std::string> names = {"adam", "bart", "carlo", "david", "eric", "frank", "gary"};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto wt = sg->start_write();
+
+    auto foo = wt->get_table("foo");
+    auto bar = wt->get_table("bar");
+    auto o = wt->get_table("origin");
+    auto col1 = o->get_column_key("link1");
+    auto col2 = o->get_column_key("link2");
+    ObjKey bl1(4);
+    ObjKey bl2(11);
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 20
+    // core in order to create a file-format-version 20 test file!
+
+    Group g;
+    TableRef foo = g.add_table_with_primary_key("foo", type_Int, "id", false);
+    TableRef bar = g.add_table_with_primary_key("bar", type_String, "name", false);
+    TableRef o = g.add_table("origin");
+    auto col1 = o->add_column(*foo, "link1");
+    auto col2 = o->add_column(*bar, "link2");
+
+    for (auto id : ids) {
+        auto obj = foo->create_object_with_primary_key(id);
+        o->create_object().set(col1, obj.get_key());
+    }
+
+    for (auto name : names) {
+        auto obj = bar->create_object_with_primary_key(name);
+        o->create_object().set(col2, obj.get_key());
+    }
+
+    auto o1 = foo->get_object_with_primary_key(ids[4]);
+    auto bl1 = o1.get_backlink(*o, col1, 0);
+    o1.invalidate();
+    auto o2 = bar->get_object_with_primary_key(names[4]);
+    auto bl2 = o2.get_backlink(*o, col2, 0);
+    o2.invalidate();
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+
+    CHECK_EQUAL(foo->nb_unresolved(), 1);
+    CHECK_EQUAL(bar->nb_unresolved(), 1);
+    CHECK_NOT(o->get_object(bl1).get<ObjKey>(col1));
+    CHECK_NOT(o->get_object(bl2).get<ObjKey>(col2));
+    // We test that we are able to identify the tombstones for these primary keys
+    foo->create_object_with_primary_key(ids[4]);
+    bar->create_object_with_primary_key(names[4]);
+    CHECK_EQUAL(foo->nb_unresolved(), 0);
+    CHECK_EQUAL(bar->nb_unresolved(), 0);
+    CHECK(o->get_object(bl1).get<ObjKey>(col1));
+    CHECK(o->get_object(bl2).get<ObjKey>(col2));
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = foo->get_object_with_primary_key(id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col1), obj.get_key());
+        ++it;
+    }
+    for (auto name : names) {
+        auto obj = bar->get_object_with_primary_key(name);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col2), obj.get_key());
+        ++it;
+    }
 }
 
 TEST(Upgrade_progress)
@@ -1705,6 +1848,169 @@ TEST(Upgrade_FixColumnKeys)
 
     auto hist = make_in_realm_history(temp_copy);
     DB::create(*hist)->start_read()->verify();
+}
+
+NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
+
+    // Build a realm file with format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->add_table("MyTable");
+        table->add_column(type_String, "names");
+        tr->commit();
+    }
+
+    // upgrade to format 201
+    _impl::GroupFriend::fake_target_file_format(201);
+    {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        table->create_object().set(col, "hr hansen");
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // downgrade/restore backup of format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        CHECK(table->size() == 0); // no sign of "hr hansen"
+        table->create_object().set(col, "mr Kirby");
+        tr->commit();
+    }
+    CHECK(!File::exists(prefix + "v200.backup.realm"));
+
+    // move forward to version 202, bypassing the outlawed 201
+    _impl::GroupFriend::fake_target_file_format(202);
+    {
+        DBOptions options;
+        options.accepted_versions = {202, 200};
+        options.to_be_deleted = {{201, 0}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        CHECK(table->size() == 1);
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // Cleanup file and disable mockup versioning
+    File::try_remove(prefix + "v200.backup.realm");
+    _impl::GroupFriend::fake_target_file_format({});
+}
+
+NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::string prefix = realm::BackupHandler::get_prefix_from_path(path);
+    // clear out any leftovers from potential earlier crash of unittest
+    File::try_remove(prefix + "v200.backup.realm");
+    File::try_remove(prefix + "v201.backup.realm");
+
+    // Build a realm file with format 200
+    _impl::GroupFriend::fake_target_file_format(200);
+    {
+        DBOptions options;
+        options.accepted_versions = {200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->add_table("MyTable");
+        table->add_column(type_String, "names");
+        tr->commit();
+    }
+
+    // upgrade to format 201
+    _impl::GroupFriend::fake_target_file_format(201);
+    {
+        DBOptions options;
+        options.accepted_versions = {201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        auto col = table->get_column_key("names");
+        table->create_object().set(col, "hr hansen");
+        tr->commit();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+
+    // upgrade further to 202, based on 201, to create a v201 backup
+    _impl::GroupFriend::fake_target_file_format(202);
+    {
+        DBOptions options;
+        options.accepted_versions = {202, 201, 200};
+        options.to_be_deleted = {};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+
+    // downgrade/restore backup of format 200, but simulate that no downgrade
+    // is actually shipped. Instead directly move forward to version 203,
+    // bypassing the outlawed 201 and 202. Set an age limit of 2 seconds for any backuo
+    // of version 201 to prevent it from being deleted
+    _impl::GroupFriend::fake_target_file_format(203);
+    {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 2}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+        auto tr = db->start_write();
+        auto table = tr->get_table("MyTable");
+        CHECK(table->size() == 0);
+        tr->commit();
+    }
+
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(File::exists(prefix + "v201.backup.realm"));
+    // Ask for v201 to have a max age of one sec.
+    // When opened more than a sec later,
+    // the v201 backup will be too old and automagically removed
+    millisleep(2000);
+    {
+        DBOptions options;
+        options.accepted_versions = {203, 200};
+        options.to_be_deleted = {{201, 1}};
+        auto hist = make_in_realm_history(path);
+        auto db = DB::create(*hist, options);
+    }
+    CHECK(File::exists(prefix + "v200.backup.realm"));
+    CHECK(!File::exists(prefix + "v201.backup.realm"));
+
+    // Cleanup file and disable mockup versioning
+    File::try_remove(prefix + "v200.backup.realm");
+    _impl::GroupFriend::fake_target_file_format({});
 }
 
 /*

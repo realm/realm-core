@@ -26,6 +26,7 @@
 #include <cwchar>
 
 #include <realm.hpp>
+#include <realm/history.hpp>
 
 #include "util/misc.hpp"
 
@@ -1345,6 +1346,35 @@ TEST(TableView_SortOverMultiLink)
     CHECK_EQUAL(tv[1].get<Int>(col_int), 28);
     CHECK_EQUAL(tv[2].get<Int>(col_int), 30);
     CHECK_EQUAL(tv[3].get<Int>(col_int), 29);
+}
+
+TEST(TableView_IsInSync)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto repl = make_in_realm_history(path);
+    DBRef db_ref = DB::create(*repl, DBOptions(DBOptions::Durability::MemOnly));
+
+    auto tr = db_ref->start_write();
+    Table& table = *tr->add_table("source");
+    table.add_column(type_Int, "int");
+    tr->commit_and_continue_as_read();
+    auto initial_tr = tr->duplicate(); // Hold onto version
+
+    // Add another column to advance transaction version
+    tr->promote_to_write();
+    table.add_column(type_Double, "double");
+    tr->commit_and_continue_as_read();
+
+    VersionID src_v = tr->get_version_of_current_transaction();
+    VersionID initial_v = initial_tr->get_version_of_current_transaction();
+    CHECK_NOT_EQUAL(src_v.version, initial_v.version);
+
+    TableView tv = table.where().find_all();
+    ConstTableView ctv0 = ConstTableView(tv, initial_tr.get(), PayloadPolicy::Copy);
+    ConstTableView ctv1 = ConstTableView(tv, tr.get(), PayloadPolicy::Copy);
+
+    CHECK_NOT(ctv0.is_in_sync());
+    CHECK(ctv1.is_in_sync());
 }
 
 namespace {
@@ -2949,6 +2979,43 @@ TEST(TableView_UpdateQuery)
     CHECK_EQUAL(2, v.size());
     CHECK_EQUAL(3, v[0].get<Int>(col));
     CHECK_EQUAL(3, v[1].get<Int>(col));
+}
+
+class TestTableView : public ConstTableView {
+public:
+    using ConstTableView::ConstTableView;
+
+    KeyColumn& get_keys()
+    {
+        return this->m_key_values;
+    }
+    void add_values()
+    {
+        m_key_values.create();
+        for (int i = 0; i < 10; i++) {
+            m_key_values.add(ObjKey(i));
+        }
+    }
+};
+
+TestTableView get_table_view(TestTableView val)
+{
+    return val;
+}
+
+TEST(TableView_CopyKeyValues)
+{
+    TestTableView view;
+
+    view.add_values();
+
+    TestTableView another_view(view);
+    CHECK_EQUAL(another_view.size(), 10);
+    CHECK_EQUAL(another_view.get_key(0), ObjKey(0));
+
+    TestTableView yet_another_view(get_table_view(view)); // Using move constructor
+    CHECK_EQUAL(yet_another_view.size(), 10);
+    CHECK_EQUAL(yet_another_view.get_key(0), ObjKey(0));
 }
 
 #endif // TEST_TABLE_VIEW

@@ -491,6 +491,7 @@ TEST(Links_LinkList_Construction)
     list0.add(target_keys[0]); // Ensure usability
     list0.clear();             // Make it empty again
 
+    links1.size();        // call update_if_needed()
     LnkLst list1(links1); // Constructed from not empty list
     CHECK_EQUAL(3, list1.size());
     list1.clear();
@@ -778,7 +779,7 @@ TEST(Links_LinkList_Inserts)
     auto obj = origin->create_object();
     auto links = obj.get_linklist_ptr(col_link);
     auto links2 = obj.get_linklist_ptr(col_link);
-    auto k0 = links->get_key();
+    auto k0 = links->get_owner_key();
 
     CHECK_EQUAL(0, links->size());
     CHECK_EQUAL(0, links2->size());
@@ -829,7 +830,7 @@ TEST(Links_LinkList_Backlinks)
 
     Obj origin_obj = origin->create_object();
     auto links = origin_obj.get_linklist_ptr(col_link);
-    auto k0 = links->get_key();
+    auto k0 = links->get_owner_key();
 
     // add several links to a single linklist
     links->add(key2);
@@ -863,8 +864,8 @@ TEST(Links_LinkList_Backlinks)
     auto links2 = origin->create_object().get_linklist_ptr(col_link);
     links1->add(obj1.get_key());
     links2->add(obj0.get_key());
-    auto k1 = links1->get_key();
-    auto k2 = links2->get_key();
+    auto k1 = links1->get_owner_key();
+    auto k2 = links2->get_owner_key();
 
     // Verify backlinks
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));

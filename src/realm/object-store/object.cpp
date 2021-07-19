@@ -104,7 +104,7 @@ Object::Object(SharedRealm r, Obj const& o)
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(key))
 {
     REALM_ASSERT(!m_obj.get_table() ||
                  (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
@@ -113,10 +113,18 @@ Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 Object::Object(SharedRealm r, StringData object_type, size_t index)
     : m_realm(std::move(r))
     , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
+    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(index))
 {
     REALM_ASSERT(!m_obj.get_table() ||
                  (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
+}
+
+Object::Object(std::shared_ptr<Realm> r, ObjLink link)
+    : m_realm(std::move(r))
+    , m_obj(m_realm->read_group().get_object(link))
+{
+    m_object_schema =
+        &*m_realm->schema().find(ObjectStore::object_type_for_table_name(m_obj.get_table()->get_name()));
 }
 
 Object::Object() = default;
@@ -126,7 +134,7 @@ Object::Object(Object&&) = default;
 Object& Object::operator=(Object const&) = default;
 Object& Object::operator=(Object&&) = default;
 
-NotificationToken Object::add_notification_callback(CollectionChangeCallback callback) &
+NotificationToken Object::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();
@@ -134,7 +142,7 @@ NotificationToken Object::add_notification_callback(CollectionChangeCallback cal
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(callback))};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 void Object::verify_attached() const

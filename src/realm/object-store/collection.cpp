@@ -21,6 +21,8 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
+#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 namespace realm::object_store {
 
@@ -33,10 +35,19 @@ Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_
 
 Collection::Collection() noexcept {}
 
+Collection::Collection(const Object& parent_obj, const Property* prop)
+    : m_realm(parent_obj.get_realm())
+    , m_type(prop->type)
+    , m_coll_base(parent_obj.obj().get_collection_ptr(prop->column_key))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+{
+}
+
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
     , m_coll_base(parent_obj.get_collection_ptr(col))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
 {
 }
 
@@ -44,6 +55,15 @@ Collection::Collection(std::shared_ptr<Realm> r, const CollectionBase& coll)
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(coll.get_col_key()) & ~PropertyType::Collection)
     , m_coll_base(coll.clone_collection())
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+{
+}
+
+Collection::Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll)
+    : m_realm(std::move(r))
+    , m_type(ObjectSchema::from_core_type(coll->get_col_key()) & ~PropertyType::Collection)
+    , m_coll_base(std::move(coll))
+    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
 {
 }
 
@@ -67,7 +87,7 @@ bool Collection::is_valid() const
 ObjKey Collection::get_parent_object_key() const
 {
     verify_attached();
-    return m_coll_base->get_key();
+    return m_coll_base->get_owner_key();
 }
 
 ColKey Collection::get_parent_column_key() const
@@ -86,7 +106,6 @@ static StringData object_name(Table const& table)
 {
     return ObjectStore::object_type_for_table_name(table.get_name());
 }
-
 
 void Collection::validate(const Obj& obj) const
 {
@@ -149,10 +168,64 @@ bool Collection::is_frozen() const noexcept
 Results Collection::as_results() const
 {
     verify_attached();
-    if (auto link_list = std::dynamic_pointer_cast<LnkLst>(m_coll_base)) {
-        return Results(m_realm, link_list);
-    }
     return Results(m_realm, m_coll_base);
+}
+
+Results Collection::sort(SortDescriptor order) const
+{
+    verify_attached();
+    return Results(m_realm, m_coll_base, util::none, std::move(order));
+}
+
+Results Collection::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
+{
+    return as_results().sort(keypaths);
+}
+
+Results Collection::snapshot() const
+{
+    return as_results().snapshot();
+}
+
+
+NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
+                                                        KeyPathArray key_path_array) &
+{
+    verify_attached();
+    m_realm->verify_notifications_available();
+    // Adding a new callback to a notifier which had all of its callbacks
+    // removed does not properly reinitialize the notifier. Work around this by
+    // recreating it instead.
+    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
+    // from a notifier a zombie is left sitting around uselessly) and should be
+    // cleaned up.
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
+    if (!m_notifier) {
+        m_notifier = std::make_shared<_impl::ListNotifier>(m_realm, *m_coll_base, m_type);
+        _impl::RealmCoordinator::register_notifier(m_notifier);
+    }
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
+}
+
+namespace {
+size_t hash_combine()
+{
+    return 0;
+}
+template <typename T, typename... Rest>
+size_t hash_combine(const T& v, Rest... rest)
+{
+    size_t h = hash_combine(rest...);
+    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    return h;
+}
+} // namespace
+
+size_t Collection::hash() const noexcept
+{
+    auto& impl = *m_coll_base;
+    return hash_combine(impl.get_owner_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
 }
 
 } // namespace realm::object_store

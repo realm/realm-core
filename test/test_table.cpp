@@ -46,7 +46,7 @@ using namespace std::chrono;
 #include "test_table_helper.hpp"
 #include "test_types_helper.hpp"
 
-// #include <valgrind/callgrind.h>
+//#include <valgrind/callgrind.h>
 //#define PERFORMACE_TESTING
 
 using namespace realm;
@@ -1515,7 +1515,10 @@ TEST(Table_AddInt)
     Table t;
     auto col_int = t.add_column(type_Int, "i");
     auto col_int_null = t.add_column(type_Int, "ni", /*nullable*/ true);
+    auto col_mixed = t.add_column(type_Mixed, "m");
     Obj obj = t.create_object();
+
+    obj.set(col_mixed, Mixed(5));
 
     obj.add_int(col_int, 1);
     CHECK_EQUAL(obj.get<Int>(col_int), 1);
@@ -1530,6 +1533,11 @@ TEST(Table_AddInt)
     // add_int() has no effect on a NULL
     CHECK(obj.is_null(col_int_null));
     CHECK_LOGIC_ERROR(obj.add_int(col_int_null, 123), LogicError::illegal_combination);
+
+    obj.add_int(col_mixed, 1);
+    CHECK_EQUAL(obj.get_any(col_mixed).get_int(), 6);
+    obj.set(col_mixed, Mixed("Foo"));
+    CHECK_LOGIC_ERROR(obj.add_int(col_mixed, 123), LogicError::illegal_combination);
 }
 
 TEST(Table_AddIntIndexed)
@@ -3125,7 +3133,7 @@ TEST(Table_ListOfPrimitives)
 
     auto string_list = obj.get_list<StringData>(string_col);
     auto str_min = string_list.min();
-    CHECK(str_min.is_null());
+    CHECK(!str_min);
     CHECK_EQUAL(string_list.begin()->size(), string_vector.begin()->size());
     CHECK_EQUAL(string_vector.size(), string_list.size());
     for (unsigned i = 0; i < string_list.size(); i++) {
@@ -3251,6 +3259,31 @@ TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<doub
     list.distinct(indices, false);
     std::sort(distinct_values.begin(), distinct_values.end(), std::greater<type>());
     cmp();
+}
+
+TEST(Table_ListOfMixedSwap)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col = t->add_column_list(type_Mixed, "values");
+    BinaryData bin("foo", 3);
+
+    auto obj = t->create_object();
+    auto list = obj.get_list<Mixed>(col);
+    list.add("a");
+    list.add("b");
+    list.add("c");
+    list.add(bin);
+    list.move(2, 0);
+    CHECK_EQUAL(list.get(0).get_string(), "c");
+    CHECK_EQUAL(list.get(1).get_string(), "a");
+    CHECK_EQUAL(list.get(2).get_string(), "b");
+    CHECK_EQUAL(list.get(3).get_binary(), bin);
+    list.swap(3, 2);
+    CHECK_EQUAL(list.get(0).get_string(), "c");
+    CHECK_EQUAL(list.get(1).get_string(), "a");
+    CHECK_EQUAL(list.get(2).get_binary(), bin);
+    CHECK_EQUAL(list.get(3).get_string(), "b");
 }
 
 TEST(Table_object_merge_nodes)
@@ -4853,62 +4886,75 @@ void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::Da
     }
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
-        CHECK(!min.is_null());
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
+        CHECK(!min->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
-        Mixed max = lst.max(&ret_ndx);
-        CHECK(!max.is_null());
+        CHECK_EQUAL(min->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
+        CHECK(!max->is_null());
         CHECK_EQUAL(ret_ndx, 1999);
-        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
+        CHECK_EQUAL(max->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
         size_t ret_count = 0;
-        Mixed sum = lst.sum(&ret_count);
-        CHECK(!sum.is_null());
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
+        CHECK(!sum->is_null());
         CHECK_EQUAL(ret_count, 2000);
-        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
-        Mixed avg = lst.avg(&ret_count);
-        CHECK(!avg.is_null());
+        CHECK_EQUAL(sum->template get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
+        CHECK(!avg->is_null());
         CHECK_EQUAL(ret_count, 2000);
-        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
+        CHECK_EQUAL(avg->template get<ColumnAverageType<T>>(),
+                    (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
     }
 
     lst.clear();
     CHECK_EQUAL(lst.size(), 0);
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
         CHECK_EQUAL(ret_ndx, realm::npos);
         ret_ndx = realm::npos;
-        Mixed max = lst.max(&ret_ndx);
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
         CHECK_EQUAL(ret_ndx, realm::npos);
         size_t ret_count = realm::npos;
-        Mixed sum = lst.sum(&ret_count);
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
         CHECK_EQUAL(ret_count, 0);
         ret_count = realm::npos;
-        Mixed avg = lst.avg(&ret_count);
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
         CHECK_EQUAL(ret_count, 0);
     }
 
     lst.add(T(1));
     {
         size_t ret_ndx = realm::npos;
-        Mixed min = lst.min(&ret_ndx);
-        CHECK(!min.is_null());
+        auto min = lst.min(&ret_ndx);
+        CHECK(min);
+        CHECK(!min->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
-        Mixed max = lst.max(&ret_ndx);
-        CHECK(!max.is_null());
+        CHECK_EQUAL(min->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        auto max = lst.max(&ret_ndx);
+        CHECK(max);
+        CHECK(!max->is_null());
         CHECK_EQUAL(ret_ndx, 0);
-        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        CHECK_EQUAL(max->template get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
         size_t ret_count = 0;
-        Mixed sum = lst.sum(&ret_count);
-        CHECK(!sum.is_null());
+        auto sum = lst.sum(&ret_count);
+        CHECK(sum);
+        CHECK(!sum->is_null());
         CHECK_EQUAL(ret_count, 1);
-        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(1));
-        Mixed avg = lst.avg(&ret_count);
-        CHECK(!avg.is_null());
+        CHECK_EQUAL(sum->template get<ColumnSumType<T>>(), ColumnSumType<T>(1));
+        auto avg = lst.avg(&ret_count);
+        CHECK(avg);
+        CHECK(!avg->is_null());
         CHECK_EQUAL(ret_count, 1);
-        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
+        CHECK_EQUAL(avg->template get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
     }
 
     t->rollback();
@@ -4947,9 +4993,10 @@ TEST(List_DecimalMinMax)
     CHECK_EQUAL(lst.size(), 1);
     CHECK_EQUAL(lst.get(0), Decimal128(larger_than_max_int64_t));
     size_t min_ndx = realm::npos;
-    Mixed min = lst.min(&min_ndx);
+    auto min = lst.min(&min_ndx);
+    CHECK(min);
     CHECK_EQUAL(min_ndx, 0);
-    CHECK_EQUAL(min.get<Decimal128>(), Decimal128(larger_than_max_int64_t));
+    CHECK_EQUAL(min->get<Decimal128>(), Decimal128(larger_than_max_int64_t));
     lst.clear();
     CHECK_EQUAL(lst.size(), 0);
     std::string smaller_than_min_int64_t = "-123.45e99";
@@ -4957,9 +5004,10 @@ TEST(List_DecimalMinMax)
     CHECK_EQUAL(lst.size(), 1);
     CHECK_EQUAL(lst.get(0), Decimal128(smaller_than_min_int64_t));
     size_t max_ndx = realm::npos;
-    Mixed max = lst.max(&max_ndx);
+    auto max = lst.max(&max_ndx);
+    CHECK(max);
     CHECK_EQUAL(max_ndx, 0);
-    CHECK_EQUAL(max.get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
+    CHECK_EQUAL(max->get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
 }
 
 template <typename T>
@@ -5207,6 +5255,35 @@ TEST(Table_Column_Conversions)
 
 }
 */
+
+TEST(Table_ChangePKNullability)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto wt = sg->start_write();
+    auto table = wt->add_table_with_primary_key("foo", type_String, "id", false);
+
+    table->create_object_with_primary_key("Paul");
+    table->create_object_with_primary_key("John");
+    table->create_object_with_primary_key("George");
+    table->create_object_with_primary_key("Ringo");
+
+    auto pk_col = table->get_primary_key_column();
+    pk_col = table->set_nullability(pk_col, true, true);
+    CHECK(pk_col.is_nullable());
+
+    table->create_object_with_primary_key("");
+    table->create_object_with_primary_key({});
+
+    CHECK_LOGIC_ERROR(table->set_nullability(pk_col, false, true), LogicError::column_not_nullable);
+
+    table->get_object_with_primary_key({}).remove();
+    table->set_nullability(pk_col, false, true);
+}
+
 TEST(Table_MultipleObjs) {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -5246,7 +5323,6 @@ TEST(Table_IteratorRandomAccess)
 
     auto key = keys.begin();
     auto iter = t.begin();
-    auto end = t.end();
     for (size_t pos = 0; (pos + 3) < 1000; pos += 3) {
         CHECK_EQUAL(iter->get_key(), *key);
         iter += 3;
@@ -5273,19 +5349,17 @@ TEST(Table_IteratorRandomAccess)
                     i = 0;
                 }
                 else {
-                    CHECK_EQUAL(k, iter[index].get_key());
+                    iter.go(index);
+                    CHECK_EQUAL(k, iter->get_key());
                 }
                 i++;
             }
         }
     }
 
+    iter.go(0);
     auto iter200 = iter + 200;
     CHECK_EQUAL(keys[200], iter200->get_key());
-    ++iter; // Now points to element 1
-    CHECK_EQUAL(keys[201], iter[200].get_key());
-    CHECK_EQUAL(keys[201], iter200[1].get_key());
-    CHECK_EQUAL(keys[1], iter->get_key());
 }
 
 TEST(Table_EmbeddedObjects)
@@ -5384,6 +5458,11 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     o2_ll.create_and_insert_linked_object(0);
     o2_ll.create_and_insert_linked_object(0);
     o3_ll.create_and_insert_linked_object(0);
+
+    tr->commit_and_continue_as_read();
+    tr->verify();
+
+    tr->promote_to_write();
     CHECK(table->size() == 6);
     parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
@@ -5392,6 +5471,64 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     CHECK(table->size() == 0);
     parent_ll.create_and_insert_linked_object(0);
     parent_ll.create_and_insert_linked_object(1);
+    CHECK(table->size() == 2);
+    o.remove();
+    CHECK(table->size() == 0);
+    tr->commit();
+}
+
+TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    auto tr = sg->start_write();
+    auto table = tr->add_embedded_table("myEmbeddedStuff");
+    auto col_recurse = table->add_column_dictionary(*table, "theRecursiveBit");
+    CHECK_THROW(table->create_object(), LogicError);
+    auto parent = tr->add_table("myParentStuff");
+    auto ck = parent->add_column_dictionary(*table, "theGreatColumn");
+    Obj o = parent->create_object();
+    auto parent_dict = o.get_dictionary(ck);
+    Obj o2 = parent_dict.create_and_insert_linked_object("one");
+
+    auto obj_path = o2.get_path();
+    CHECK_EQUAL(obj_path.path_from_top.size(), 1);
+    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
+    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
+
+    Obj o3 = parent_dict.create_and_insert_linked_object("two");
+    Obj o4 = parent_dict.create_and_insert_linked_object("three");
+
+    CHECK_EQUAL(parent_dict.get_object("one").get_key(), o2.get_key());
+
+    auto o2_dict = o2.get_dictionary(col_recurse);
+    auto o3_dict = o3.get_dictionary(col_recurse);
+    o2_dict.create_and_insert_linked_object("foo1");
+    o2_dict.create_and_insert_linked_object("foo2");
+    o3_dict.create_and_insert_linked_object("foo3");
+
+    obj_path = o2_dict.get_object("foo1").get_path();
+    CHECK_EQUAL(obj_path.path_from_top.size(), 2);
+    CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
+    CHECK_EQUAL(obj_path.path_from_top[0].col_key, ck);
+    CHECK_EQUAL(obj_path.path_from_top[1].index.get_string(), "foo1");
+    CHECK_EQUAL(obj_path.path_from_top[1].col_key, col_recurse);
+
+    tr->commit_and_continue_as_read();
+    tr->verify();
+
+    tr->promote_to_write();
+    CHECK(table->size() == 6);
+    parent_dict.create_and_insert_linked_object("one"); // implicitly remove entry for 02
+    CHECK(!o2.is_valid());
+    CHECK(table->size() == 4);
+    parent_dict.clear();
+    CHECK(table->size() == 0);
+    parent_dict.create_and_insert_linked_object("four");
+    parent_dict.create_and_insert_linked_object("five");
     CHECK(table->size() == 2);
     o.remove();
     CHECK(table->size() == 0);
@@ -5612,6 +5749,63 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
     CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
+}
+
+TEST(Table_MixedNull)
+{
+    Group g;
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column_list(type_Mixed, "any", true);
+    auto obj = foos->create_object();
+    auto list = obj.get_list<Mixed>(col);
+    list.add(Mixed());
+    list.set(0, Mixed(1));
+    list.set(0, Mixed());
+    list.remove(0);
+}
+
+TEST(Table_SortEncrypted)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    Random random(random_int<unsigned long>());
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
+
+    auto wt = sg->start_write();
+    auto foos = wt->add_table("foo");
+    auto col_id = foos->add_column(type_String, "id");
+    auto col_b = foos->add_column(type_Bool, "b");
+
+    for (int i = 0; i < 10000; i++) {
+        auto n = random.draw_int_max(10000);
+        foos->create_object().set(col_id, util::to_string(n));
+    }
+    wt->commit_and_continue_as_read();
+    auto q = foos->where();
+    DescriptorOrdering ordering;
+    ordering.append_sort(SortDescriptor({{col_b}, {col_id}}));
+
+    // auto t1 = steady_clock::now();
+
+    CALLGRIND_START_INSTRUMENTATION;
+    auto tv = q.find_all(ordering);
+    CALLGRIND_STOP_INSTRUMENTATION;
+
+    // auto t2 = steady_clock::now();
+
+    // std::cout << "time: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+}
+
+TEST(Table_RebuildTable)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    auto id = t->add_column(type_Int, "id");
+    for (int64_t i = 1; i < 8; i++) {
+        t->create_object().set(id, i);
+    }
+    t->set_primary_key_column(id);
 }
 
 #endif // TEST_TABLE
