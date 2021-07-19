@@ -562,7 +562,8 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
             auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
 
-            sync_user->update_user_profile(SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(profile_data.dump()))));
+            sync_user->update_user_profile(
+                SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(profile_data.dump()))));
 
             sync_user->set_state(SyncUser::State::LoggedIn);
             m_sync_manager->set_current_user(sync_user->identity());

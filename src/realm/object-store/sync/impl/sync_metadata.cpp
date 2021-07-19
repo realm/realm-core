@@ -182,8 +182,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key, object_schema->persisted_properties[7].column_key,
         object_schema->persisted_properties[8].column_key, object_schema->persisted_properties[9].column_key,
-        object_schema->persisted_properties[10].column_key
-    };
+        object_schema->persisted_properties[10].column_key};
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {

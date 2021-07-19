@@ -2426,25 +2426,26 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
         std::shared_ptr<SyncUser> the_user;
         app->log_in_with_credentials(AppCredentials::anonymous(),
                                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-            CHECK(user);
-            CHECK(!error);
-            processed = true;
-            the_user = user;
-        });
+                                         CHECK(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                         the_user = user;
+                                     });
 
         CHECK(processed);
         processed = false;
         CHECK(the_user->user_profile().data().empty());
 
-        app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})}, [&](auto error, auto response){
-            CHECK(error == none);
-            CHECK(response);
-            CHECK(*response == true);
-            processed = true;
-        });
+        app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
+                           [&](auto error, auto response) {
+                               CHECK(error == none);
+                               CHECK(response);
+                               CHECK(*response == true);
+                               processed = true;
+                           });
         CHECK(processed);
         processed = false;
-        app->refresh_custom_data(the_user, [&](auto){
+        app->refresh_custom_data(the_user, [&](auto) {
             processed = true;
         });
         CHECK(processed);

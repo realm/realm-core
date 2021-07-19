@@ -130,7 +130,7 @@ struct SyncUserProfile {
     }
 
     SyncUserProfile(bson::BsonDocument&& data)
-    : m_data(std::move(data))
+        : m_data(std::move(data))
     {
     }
     SyncUserProfile() = default;
