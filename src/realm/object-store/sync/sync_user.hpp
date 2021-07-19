@@ -134,6 +134,7 @@ struct SyncUserProfile {
     {
     }
     SyncUserProfile() = default;
+
 private:
     bson::BsonDocument m_data;
 };
