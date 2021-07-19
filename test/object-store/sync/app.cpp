@@ -2287,7 +2287,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto pred = [](const SyncError& error) {
             return error.error_code.category() == util::websocket::websocket_close_status_category();
         };
-        // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+        // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
         REQUIRE_NOTHROW(timed_wait_for(
             [&] {
