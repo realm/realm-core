@@ -112,7 +112,6 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
     });
     if (!updated)
         m_local_identity = m_identity;
-    
 }
 
 SyncUser::~SyncUser() {}
