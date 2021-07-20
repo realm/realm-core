@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.0.4"
+let versionStr = "11.1.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -59,9 +59,6 @@ let syncExcludes: [String] = [
     "realm/sync/server_index_command.cpp",
     "realm/sync/stat_command.cpp",
     "realm/sync/verify_server_file_command.cpp",
-
-    // Misc unused
-    "realm/sync/changeset_cooker.cpp"
 ]
 
 let notSyncServerSources: [String] = [
@@ -466,7 +463,6 @@ let headers: [String] = [
     "realm/object-store/impl/object_notifier.hpp",
     "realm/object-store/impl/realm_coordinator.hpp",
     "realm/object-store/impl/results_notifier.hpp",
-    "realm/object-store/impl/set_notifier.hpp",
     "realm/object-store/impl/transact_log_handler.hpp",
     "realm/object-store/impl/weak_realm_notifier.hpp",
     "realm/object-store/impl/windows/external_commit_helper.hpp",
@@ -546,7 +542,6 @@ let headers: [String] = [
     "realm/sync/access_token.hpp",
     "realm/sync/auth.hpp",
     "realm/sync/changeset.hpp",
-    "realm/sync/changeset_cooker.hpp",
     "realm/sync/changeset_encoder.hpp",
     "realm/sync/changeset_parser.hpp",
     "realm/sync/client.hpp",
@@ -628,6 +623,7 @@ let headers: [String] = [
     "realm/util/fixed_size_buffer.hpp",
     "realm/util/flat_map.hpp",
     "realm/util/from_chars.hpp",
+    "realm/util/functional.hpp",
     "realm/util/function_ref.hpp",
     "realm/util/get_file_size.hpp",
     "realm/util/hex_dump.hpp",

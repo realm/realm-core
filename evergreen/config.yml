@@ -391,8 +391,6 @@ tasks:
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
-    vars:
-      enable_logging: true
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec

@@ -267,7 +267,10 @@ TEST_CASE("set", "[set]") {
           {"decimal_set", PropertyType::Set | PropertyType::Decimal | PropertyType::Nullable},
           {"decimal_list", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
           {"link_set", PropertyType::Set | PropertyType::Object, "table2"}}},
-        {"table2", {{"id", PropertyType::Int, Property::IsPrimary{true}}}},
+        {"table2",
+         {{"id", PropertyType::Int, Property::IsPrimary{true}},
+          {"value", PropertyType::Int},
+          {"value2", PropertyType::Int}}},
         {"other_table",
          {{"int_set", PropertyType::Set | PropertyType::Int},
           {"link_set", PropertyType::Set | PropertyType::Object, "other_table2"}}},
@@ -527,6 +530,140 @@ TEST_CASE("set", "[set]") {
                 table->create_object();
             });
             REQUIRE(change.empty());
+        }
+
+        SECTION("key path filtered change notifications") {
+            ColKey col_table2_value = table2->get_column_key("value");
+            ColKey col_table2_value2 = table2->get_column_key("value2");
+
+            // Creating KeyPathArrays:
+            // 1. Property pairs
+            std::pair<TableKey, ColKey> pair_table2_value(table2->get_key(), col_table2_value);
+            std::pair<TableKey, ColKey> pair_table2_value2(table2->get_key(), col_table2_value2);
+            // 2. KeyPaths
+            auto key_path_table2_value = {pair_table2_value};
+            auto key_path_table2_value2 = {pair_table2_value2};
+            // 3. Aggregated `KeyPathArray`
+            KeyPathArray key_path_array_table2_value = {key_path_table2_value};
+            KeyPathArray key_path_array_table2_value2 = {key_path_table2_value2};
+
+            // For the keypath filtered notifications we need to check three scenarios:
+            // - no callbacks have filters (this part is covered by other sections)
+            // - some callbacks have filters
+            // - all callbacks have filters
+            CollectionChangeSet collection_change_set_without_filter;
+            CollectionChangeSet collection_change_set_with_filter_on_table2_value;
+            CollectionChangeSet collection_change_set_with_filter_on_table2_value2;
+
+            auto require_change_filter_table2_value = [&] {
+                auto token = link_set.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr) {
+                        collection_change_set_with_filter_on_table2_value = c;
+                    },
+                    key_path_array_table2_value);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            auto require_change_filter_table2_value2 = [&] {
+                auto token = link_set.add_notification_callback(
+                    [&](CollectionChangeSet c, std::exception_ptr) {
+                        collection_change_set_with_filter_on_table2_value2 = c;
+                    },
+                    key_path_array_table2_value2);
+                advance_and_notify(*r);
+                return token;
+            };
+
+            Obj target;
+            write([&]() {
+                target = table2->create_object_with_primary_key(42);
+                target.set(col_table2_value, 42);
+                link_set.insert(target);
+            });
+
+            // Note that in case not all callbacks have filters we do accept false positive notifications by design.
+            // Distinguishing between these two cases would be a big change for little value.
+            SECTION("some callbacks have filters") {
+                auto require_change_no_filter = [&] {
+                    auto token = link_set.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                        collection_change_set_without_filter = c;
+                    });
+                    advance_and_notify(*r);
+                    return token;
+                };
+
+                SECTION("modifying table 'target', property 'value' "
+                        "-> DOES send a notification") {
+                    auto token1 = require_change_no_filter();
+                    auto token2 = require_change_filter_table2_value();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications_new, 0);
+                }
+
+                SECTION("modifying table 'target', property 'value2' "
+                        "-> DOES send a notification") {
+                    auto token1 = require_change_no_filter();
+                    auto token2 = require_change_filter_table2_value2();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_without_filter.modifications_new, 0);
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value2.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value2.modifications_new, 0);
+                }
+            }
+
+            // In case all callbacks do have filters we expect every callback to only get called when the
+            // corresponding filter is hit. Compared to the above 'some callbacks have filters' case we do not expect
+            // false positives here.
+            SECTION("all callbacks have filters") {
+                auto require_change = [&] {
+                    auto token = link_set.add_notification_callback(
+                        [&](CollectionChangeSet c, std::exception_ptr) {
+                            collection_change_set_with_filter_on_table2_value = c;
+                        },
+                        key_path_array_table2_value);
+                    advance_and_notify(*r);
+                    return token;
+                };
+
+                auto require_no_change = [&] {
+                    bool first = true;
+                    auto token = link_set.add_notification_callback(
+                        [&, first](CollectionChangeSet, std::exception_ptr) mutable {
+                            REQUIRE(first);
+                            first = false;
+                        },
+                        key_path_array_table2_value2);
+                    advance_and_notify(*r);
+                    return token;
+                };
+
+                SECTION("modifying table 'target', property 'value' "
+                        "-> DOES send a notification for 'value'") {
+                    auto token2 = require_change();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications, 0);
+                    REQUIRE_INDICES(collection_change_set_with_filter_on_table2_value.modifications_new, 0);
+                }
+
+                SECTION("modifying table 'target', property 'value' "
+                        "-> does NOT send a notification for 'value2'") {
+                    auto token2 = require_no_change();
+                    write([&] {
+                        target.set(col_table2_value, 23);
+                    });
+                }
+            }
         }
     }
 

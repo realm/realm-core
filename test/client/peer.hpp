@@ -62,7 +62,7 @@ public:
     Peer(Context&, std::string http_request_path, std::string realm_path, util::Logger&,
          std::int_fast64_t originator_ident, bool verify_ssl_cert,
          util::Optional<std::string> ssl_trust_certificate_path,
-         util::Optional<sync::Session::Config::ClientReset> client_reset_config, bool use_trivial_cooker,
+         util::Optional<sync::Session::Config::ClientReset> client_reset_config,
          std::function<void(bool is_fatal)> on_sync_error);
 
     sync::Session& get_session() noexcept;

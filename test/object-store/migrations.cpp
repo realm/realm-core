@@ -125,7 +125,7 @@ Schema add_property(Schema schema, StringData object_name, Property property)
 Schema remove_property(Schema schema, StringData object_name, StringData property_name)
 {
     auto& properties = schema.find(object_name)->persisted_properties;
-    properties.erase(find_if(begin(properties), end(properties), [&](auto&& prop) {
+    properties.erase(std::find_if(begin(properties), end(properties), [&](auto&& prop) {
         return prop.name == property_name;
     }));
     return schema;

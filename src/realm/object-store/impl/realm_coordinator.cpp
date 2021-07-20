@@ -203,10 +203,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
                                                 config.path);
             }
-            if (m_config.sync_config->transformer != config.sync_config->transformer) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.",
-                                                config.path);
-            }
             if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with sync session encryption key.",
                                                 config.path);

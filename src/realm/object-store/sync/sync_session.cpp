@@ -706,7 +706,6 @@ void SyncSession::do_create_sync_session()
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
     session_config.realm_identifier = m_config.partition_value;
-    session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
@@ -1160,7 +1159,7 @@ void SyncSession::ConnectionChangeNotifier::remove_callback(uint64_t token)
     Callback old;
     {
         std::lock_guard<std::mutex> lock(m_callback_mutex);
-        auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
+        auto it = std::find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
             return c.token == token;
         });
         if (it == end(m_callbacks)) {

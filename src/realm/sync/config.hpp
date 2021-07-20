@@ -110,38 +110,6 @@ enum class SyncSessionStopPolicy {
     AfterChangesUploaded, // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
 };
 
-/// \brief Abstract interface for changeset cookers.
-///
-/// Note, it is completely up to the application to decide what a cooked
-/// changeset is. History objects (instances of ClientHistory) are required to
-/// treat cooked changesets as opaque entities. For an example of a concrete
-/// changeset cooker, see TrivialChangesetCooker which defines the cooked
-/// changesets to be identical copies of the raw changesets.
-class ChangesetCooker {
-public:
-    virtual ~ChangesetCooker() {}
-
-    /// \brief An opportunity to produce a cooked changeset.
-    ///
-    /// When the implementation chooses to produce a cooked changeset, it must
-    /// write the cooked changeset to the specified buffer, and return
-    /// true. When the implementation chooses not to produce a cooked changeset,
-    /// it must return false. The implementation is allowed to write to the
-    /// buffer, and return false, and in that case, the written data will be
-    /// ignored.
-    ///
-    /// \param prior_state The state of the local Realm on which the specified
-    /// raw changeset is based.
-    ///
-    /// \param changeset changeset_size The raw changeset.
-    ///
-    /// \param buffer The buffer to which the cooked changeset must be written.
-    ///
-    /// \return True if a cooked changeset was produced. Otherwise false.
-    virtual bool cook_changeset(const Group& prior_state, const char* changeset, std::size_t changeset_size,
-                                util::AppendBuffer<char>& buffer) = 0;
-};
-
 struct SyncConfig {
     struct ProxyConfig {
         using port_type = util::network::Endpoint::port_type;
@@ -156,7 +124,6 @@ struct SyncConfig {
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    std::shared_ptr<ChangesetCooker> transformer;
     util::Optional<std::array<char, 64>> realm_encryption_key;
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;

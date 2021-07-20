@@ -101,7 +101,19 @@ public:
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
 
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    /**
+     * Adds a `CollectionChangeCallback` to this `Collection`. The `CollectionChangeCallback` is exectuted when
+     * insertions, modifications or deletions happen on this `Collection`.
+     *
+     * @param callback The function to execute when a insertions, modification or deletion in this `Collection` was
+     * detected.
+     * @param key_path_array A filter that can be applied to make sure the `CollectionChangeCallback` is only executed
+     * when the property in the filter is changed but not otherwise.
+     *
+     * @return A `NotificationToken` that is used to identify this callback.
+     */
+    NotificationToken add_notification_callback(CollectionChangeCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
 
     // The object being added to the collection is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {
