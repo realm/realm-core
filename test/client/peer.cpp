@@ -10,7 +10,6 @@
 #include <realm/list.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/changeset_cooker.hpp>
 
 #include "statistics.hpp"
 #include "object_observer.hpp"
@@ -234,16 +233,13 @@ const char* get_error_metric(Peer::Error error)
     return nullptr;
 }
 
-std::shared_ptr<sync::ClientReplication::ChangesetCooker> g_trivial_cooker =
-    std::make_shared<sync::TrivialChangesetCooker>();
-
 } // unnamed namespace
 
 
 Peer::Peer(Context& context, std::string http_request_path, std::string realm_path, util::Logger& logger,
            std::int_fast64_t originator_ident, bool verify_ssl_cert,
            util::Optional<std::string> ssl_trust_certificate_path,
-           util::Optional<sync::Session::Config::ClientReset> client_reset_config, bool use_trivial_cooker,
+           util::Optional<sync::Session::Config::ClientReset> client_reset_config,
            std::function<void(bool is_fatal)> on_sync_error)
     : m_context{context}
     , m_realm_path{std::move(realm_path)}
@@ -295,8 +291,6 @@ Peer::Peer(Context& context, std::string http_request_path, std::string realm_pa
     session_config.verify_servers_ssl_certificate = verify_ssl_cert;
     session_config.ssl_trust_certificate_path = ssl_trust_certificate_path;
     session_config.client_reset_config = client_reset_config;
-    if (use_trivial_cooker)
-        session_config.changeset_cooker = g_trivial_cooker;
     session_config.service_identifier = http_request_path;
     m_session = sync::Session{m_context.client, m_realm_path, session_config};
     m_session.set_connection_state_change_listener(listener);

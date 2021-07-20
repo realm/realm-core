@@ -710,7 +710,6 @@ void SyncSession::do_create_sync_session()
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
     session_config.realm_identifier = m_config.partition_value;
-    session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;

@@ -319,7 +319,6 @@ int main(int argc, char* argv[])
     bool halt_on_crash = false;
     bool allow_core_dump = false;
     bool disable_upload_compaction = false;
-    bool use_trivial_cooker = false;
 
     // Process command line
     {
@@ -686,10 +685,6 @@ int main(int argc, char* argv[])
                 disable_upload_compaction = true;
                 continue;
             }
-            else if (std::strcmp(arg, "--use-trivial-cooker") == 0) {
-                use_trivial_cooker = true;
-                continue;
-            }
             else {
                 std::cerr << "ERROR: Unknown option: " << arg << "\n";
                 error = true;
@@ -997,10 +992,7 @@ int main(int argc, char* argv[])
                          "                       core files to 'unlimited', thereby allowing for core\n"
                          "                       files to be created when the process is killed.\n"
                          "  --disable-upload-compaction\n"
-                         "                       Disable compaction during upload.\n"
-                         "  --use-trivial-cooker  Associate a trivial changeset cooker with each\n"
-                         "                       synchronization session. This causes a cooked history to\n"
-                         "                       be produced in the corresponding Realm files.\n";
+                         "                       Disable compaction during upload.\n";
             return EXIT_SUCCESS;
         }
 
@@ -1258,9 +1250,9 @@ int main(int argc, char* argv[])
     std::unique_ptr<std::unique_ptr<Peer>[]> peers = std::make_unique<std::unique_ptr<Peer>[]>(num_peers);
     if (num_peers == 1) {
         peer_loggers[0] = &logger;
-        peers[0] = std::make_unique<Peer>(context, sync_request_path, peer_params[0].realm_path, logger,
-                                          originator_ident, verify_ssl_cert, ssl_trust_certificate_path,
-                                          client_reset_config, use_trivial_cooker, on_sync_error);
+        peers[0] =
+            std::make_unique<Peer>(context, sync_request_path, peer_params[0].realm_path, logger, originator_ident,
+                                   verify_ssl_cert, ssl_trust_certificate_path, client_reset_config, on_sync_error);
     }
     else if (num_peers >= 2) {
         std::ostringstream out;
@@ -1274,7 +1266,7 @@ int main(int argc, char* argv[])
             peer_loggers[i] = peer_logger_owners[i].get();
             peers[i] = std::make_unique<Peer>(context, sync_request_path, peer_params[i].realm_path, *peer_loggers[i],
                                               originator_ident, verify_ssl_cert, ssl_trust_certificate_path,
-                                              client_reset_config, use_trivial_cooker, on_sync_error);
+                                              client_reset_config, on_sync_error);
         }
     }
     if (receive_ptime_requests) {
