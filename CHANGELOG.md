@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 11.1.0 Release notes
 
 ### Enhancements
 * Change notifications can now be filtered via a key path. This keypath is passed via the `add_notification_callback` on `Object`, `Set`, `List` and `Result`.
