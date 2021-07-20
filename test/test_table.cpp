@@ -5808,4 +5808,69 @@ TEST(Table_RebuildTable)
     t->set_primary_key_column(id);
 }
 
+TEST(Obj_GetIntPerformance)
+{
+    Group g;
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column(type_Int, "int");
+
+    const size_t nb_rows = 100000;
+    const size_t nb_ops = 100000;
+
+    Obj o;
+    for (size_t i = 0; i < nb_rows; ++i) {
+        auto obj = foos->create_object();
+        obj.set(col, 123123);
+        if (i == nb_rows / 2) {
+            o = obj;
+        }
+    }
+
+    CALLGRIND_START_INSTRUMENTATION;
+
+    std::cout << nb_ops << " Obj::get_any()" << std::endl;
+
+    {
+        auto t1 = steady_clock::now();
+        int64_t x = 0;
+        for (size_t i = 0; i < nb_ops; ++i) {
+            auto v = o.get_any(col);
+            if (!v.is_null() && v.get_type() == type_Int) {
+                x += v.get<int64_t>();
+            }
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   result: " << x << std::endl;
+        std::cout << "   get time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_ops << " ns/op" << std::endl;
+    }
+
+    std::cout << nb_ops << " Obj::get<int64_t>()" << std::endl;
+
+    {
+        auto t1 = steady_clock::now();
+        int64_t x = 0;
+        for (size_t i = 0; i < nb_ops; ++i) {
+            x += o.get<int64_t>(col);
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   result: " << x << std::endl;
+        std::cout << "   get time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_ops << " ns/op" << std::endl;
+    }
+
+    std::cout << nb_ops << " Obj::_get<int64_t>()" << std::endl;
+
+    {
+        auto t1 = steady_clock::now();
+        int64_t x = 0;
+        for (size_t i = 0; i < nb_ops; ++i) {
+            x += o._get<int64_t>(col.get_index());
+        }
+        auto t2 = steady_clock::now();
+        std::cout << "   result: " << x << std::endl;
+        std::cout << "   get time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_ops << " ns/op" << std::endl;
+    }
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+}
+
 #endif // TEST_TABLE
