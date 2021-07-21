@@ -667,8 +667,19 @@ void Realm::run_writes()
         }
         cache_new_schema();
 
+        // prevent any calls to commit/cancel during a simple notification
+        m_notify_only = write_desc.notify_only;
         // FIXME: Handle any exceptions!
         write_desc.writer();
+        m_notify_only = false;
+        // if we've merely delivered a notification, the full transaction will follow later
+        // and terminate with a call to async commit or async cancel
+        if (write_desc.notify_only) {
+            m_is_running_async_writes = false;
+            return;
+        }
+
+        // if we've run the full transaction, there is follow up work to do:
         if (m_async_commit_performed) {
             --run_limit;
             if (!run_limit)
@@ -691,17 +702,16 @@ void Realm::run_writes()
     }
 }
 
-Realm::async_handle Realm::async_transaction(const std::function<void()>& the_write_block)
+Realm::async_handle Realm::async_transaction(bool notify_only, const std::function<void()>& the_write_block)
 {
     verify_thread();
     check_can_create_write_transaction(this);
-
     REALM_ASSERT(!m_is_running_async_commit_completions);
 
     // make sure we have a (at least a) read transaction
     auto& trans = transaction();
     auto retain_self = shared_from_this();
-    m_async_write_q.push_back({retain_self, std::move(the_write_block)});
+    m_async_write_q.push_back({retain_self, std::move(the_write_block), notify_only});
     if (m_is_running_async_writes)
         return 0;
 
@@ -730,22 +740,41 @@ Realm::async_handle Realm::async_transaction(const std::function<void()>& the_wr
 Realm::async_handle Realm::async_commit(const std::function<void()>& the_done_block, bool allow_grouping)
 {
     REALM_ASSERT(!m_is_running_async_commit_completions);
-    REALM_ASSERT(m_is_running_async_writes);
-    m_async_commit_performed = true;
-    if (!allow_grouping) {
-        m_async_commit_barrier_requested = true;
-    }
+    REALM_ASSERT(!m_notify_only);
+    // auditing is not supported
+    REALM_ASSERT(!audit_context());
     // grab a version lock on current version, push it along with the done block
     DB::ReadLockInfo read_lock = m_transaction->grab_read_lock();
     // do in-buffer-cache commit_transaction();
     // m_transaction->commit_and_continue_with_lock_held();
     m_async_commit_q.push_back({read_lock, std::move(the_done_block)});
 
-    // auditing is not supported
-    REALM_ASSERT(!audit_context());
-    m_coordinator->commit_write(*this, /* with_lock_held: */ true, /* without_sync: */ true);
+    if (m_is_running_async_writes) {
+        // we're called from with the callback loop and it will take care of releasing lock
+        // if applicable, and of triggering followup runs of callbacks
+        m_async_commit_performed = true;
+        if (!allow_grouping) {
+            m_async_commit_barrier_requested = true;
+        }
 
-    return 0;
+        m_coordinator->commit_write(*this, /* with_lock_held: */ true, /* without_sync: */ true);
+
+        return 0;
+    }
+    else {
+        // we're called from outside the callback loop so we have to take care of
+        // releasing any lock and of keeping callbacks coming.
+        m_coordinator->commit_write(*this, true, true);
+        if (allow_grouping) {
+            run_writes();
+        }
+        else {
+            m_transaction->async_request_sync_to_storage([&]() {
+                run_async_completions_on_proper_thread();
+            });
+        }
+        return 0;
+    }
 }
 
 void Realm::begin_transaction()

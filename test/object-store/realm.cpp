@@ -773,7 +773,7 @@ TEST_CASE("SharedRealm: async_writes") {
     auto realm = Realm::get_shared_realm(config);
     int write_nr = 0;
     int commit_nr = 0;
-    realm->async_transaction([&]() {
+    realm->async_transaction(false, [&]() {
         REQUIRE(write_nr == 0);
         ++write_nr;
         auto table = realm->read_group().get_table("class_object");
@@ -784,8 +784,8 @@ TEST_CASE("SharedRealm: async_writes") {
             ++commit_nr;
         });
     });
-    for (int expected = 1; expected < 100000; ++expected) {
-        realm->async_transaction([&, expected]() {
+    for (int expected = 1; expected < 1000; ++expected) {
+        realm->async_transaction(false, [&, expected]() {
             REQUIRE(write_nr == expected);
             ++write_nr;
             auto table = realm->read_group().get_table("class_object");
@@ -795,12 +795,95 @@ TEST_CASE("SharedRealm: async_writes") {
             realm->async_commit(
                 [&]() {
                     ++commit_nr;
-                    done = commit_nr == 100000;
+                    done = commit_nr == 1000;
                 },
                 true);
         });
     }
     util::EventLoop::main().run_until([&] {
+        return done;
+    });
+    REQUIRE(done);
+}
+
+class LooperDelegate {
+public:
+    LooperDelegate(){};
+    void run_once()
+    {
+        for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
+            if (it->may_run && *it->may_run) {
+                it->the_job();
+                m_tasks.erase(it);
+                return;
+            }
+        }
+    }
+    std::shared_ptr<bool> add_task(const std::function<void()>& the_job)
+    {
+        Task t{std::make_shared<bool>(false), the_job};
+
+        m_tasks.push_back(t);
+        return t.may_run;
+    }
+    bool has_tasks()
+    {
+        return !m_tasks.empty();
+    }
+
+private:
+    struct Task {
+        std::shared_ptr<bool> may_run;
+        std::function<void()> the_job;
+    };
+    std::vector<Task> m_tasks;
+};
+
+TEST_CASE("SharedRealm: async_writes_2") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Int}}},
+    };
+    bool done = false;
+    auto realm = Realm::get_shared_realm(config);
+    int write_nr = 0;
+    int commit_nr = 0;
+    LooperDelegate ld;
+    std::shared_ptr<bool> t1_rdy = ld.add_task([&]() {
+        REQUIRE(write_nr == 0);
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 45);
+        realm->async_commit([&]() {
+            REQUIRE(commit_nr == 0);
+            ++commit_nr;
+        });
+    });
+    std::shared_ptr<bool> t2_rdy = ld.add_task([&]() {
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        auto o = table->get_object(0);
+        o.set(col, o.get<int64_t>(col) + 37);
+        realm->async_commit([&]() {
+            ++commit_nr;
+            done = true;
+        });
+    });
+    realm->async_transaction(true, [&]() {
+        *t1_rdy = true;
+    });
+    realm->async_transaction(true, [&]() {
+        *t2_rdy = true;
+    });
+    util::EventLoop::main().run_until([&] {
+        ld.run_once();
         return done;
     });
     REQUIRE(done);

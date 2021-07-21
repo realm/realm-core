@@ -311,17 +311,19 @@ public:
     // * 'the_write_block' is queued for execution on the scheduler
     //   associated with the current realm. It will run after the write
     //   mutex has been acquired.
-    // * 'the_write_block' should end by calling commit_transaction(),
+    // * If 'notify_only' is false, 'the_block' should end by calling commit_transaction(),
     //   cancel_transaction() or async_commit().
-    // * Returning without one of these calls will be equivalent to calling
+    // * If 'notify_only' is false, returning without one of these calls will be equivalent to calling
     //   cancel_transaction().
+    // * If 'notify_only' is true, 'the_block' should only be used for signalling that
+    //   a write transaction can proceed, but must not itself call async_commit() or cancel_transaction()
     // * The call returns immediately allowing the caller to proceed
     //   while the write mutex is held by someone else.
     // * Write blocks from multiple calls to async_transaction() will be
     //   executed in order.
     // * A later call to begin_transaction() will wait for any earlier write blocks.
     using async_handle = int;
-    async_handle async_transaction(const std::function<void()>& the_write_block);
+    async_handle async_transaction(bool notify_only, const std::function<void()>& the_block);
 
     // Asynchronous commit.
     // * 'the_done_block' is queued for execution on the scheduler associated with
@@ -538,6 +540,7 @@ private:
     struct async_write_desc {
         SharedRealm retained_ref; // needed to keep the Realm object alive
         std::function<void()> writer;
+        bool notify_only;
     };
     std::deque<async_write_desc> m_async_write_q;
     struct async_commit_desc {
@@ -546,6 +549,7 @@ private:
     };
     std::vector<async_commit_desc> m_async_commit_q;
     bool m_is_running_async_writes = false;
+    bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;
     bool m_has_requested_write_mutex = false;
     bool m_async_commit_performed = false;
