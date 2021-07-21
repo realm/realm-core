@@ -369,6 +369,7 @@ let bidExcludes: [String] = [
 let headers: [String] = [
     "dogless.hpp",
     "realm.hpp",
+    "realm/aggregate_ops.hpp",
     "realm/alloc.hpp",
     "realm/alloc_slab.hpp",
     "realm/array.hpp",
@@ -832,6 +833,8 @@ let package = Package(
                 "notifications-fuzzer",
                 "query.json",
                 "sync-1.x.realm",
+                "sync-metadata-v4.realm",
+                "sync-metadata-v5.realm",
                 "sync/session/session_util.hpp",
                 "sync/sync_test_utils.hpp",
                 "test_backup-olden-and-golden.realm",

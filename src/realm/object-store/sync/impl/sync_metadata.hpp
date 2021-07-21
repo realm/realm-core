@@ -69,8 +69,6 @@ public:
         ColKey idx_access_token;
         // The identities for this user.
         ColKey idx_identities;
-        // The profile for this user.
-        ColKey idx_profile_deprecated;
         // The current state of this user.
         ColKey idx_state;
         // The device id of this user.
@@ -272,7 +270,6 @@ private:
     SyncFileActionMetadata::Schema m_file_action_schema;
     SyncClientMetadata::Schema m_client_schema;
     SyncClientMetadata::Schema m_current_user_identity_schema;
-    SyncUserMetadata::Schema m_profile_schema;
     SyncAppMetadata::Schema m_app_metadata_schema;
 
     std::string m_client_uuid;
