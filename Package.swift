@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.8.1"
+let versionStr = "11.1.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -59,9 +59,6 @@ let syncExcludes: [String] = [
     "realm/sync/server_index_command.cpp",
     "realm/sync/stat_command.cpp",
     "realm/sync/verify_server_file_command.cpp",
-
-    // Misc unused
-    "realm/sync/changeset_cooker.cpp"
 ]
 
 let notSyncServerSources: [String] = [
@@ -208,7 +205,6 @@ let bidExcludes: [String] = [
     "bid128_tgamma.c",
     "bid128_to_int16.c",
     "bid128_to_int32.c",
-    "bid128_to_int64.c",
     "bid128_to_int8.c",
     "bid128_to_uint16.c",
     "bid128_to_uint32.c",
@@ -467,7 +463,6 @@ let headers: [String] = [
     "realm/object-store/impl/object_notifier.hpp",
     "realm/object-store/impl/realm_coordinator.hpp",
     "realm/object-store/impl/results_notifier.hpp",
-    "realm/object-store/impl/set_notifier.hpp",
     "realm/object-store/impl/transact_log_handler.hpp",
     "realm/object-store/impl/weak_realm_notifier.hpp",
     "realm/object-store/impl/windows/external_commit_helper.hpp",
@@ -547,7 +542,6 @@ let headers: [String] = [
     "realm/sync/access_token.hpp",
     "realm/sync/auth.hpp",
     "realm/sync/changeset.hpp",
-    "realm/sync/changeset_cooker.hpp",
     "realm/sync/changeset_encoder.hpp",
     "realm/sync/changeset_parser.hpp",
     "realm/sync/client.hpp",
@@ -629,6 +623,7 @@ let headers: [String] = [
     "realm/util/fixed_size_buffer.hpp",
     "realm/util/flat_map.hpp",
     "realm/util/from_chars.hpp",
+    "realm/util/functional.hpp",
     "realm/util/function_ref.hpp",
     "realm/util/get_file_size.hpp",
     "realm/util/hex_dump.hpp",
@@ -700,10 +695,10 @@ let package = Package(
     products: [
         .library(
             name: "RealmCore",
-            targets: ["Core"]),
+            targets: ["RealmCore"]),
         .library(
             name: "RealmQueryParser",
-            targets: ["QueryParser"]),
+            targets: ["RealmQueryParser"]),
         .library(
             name: "RealmCapi",
             targets: ["Capi"]),
@@ -719,7 +714,7 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
-            name: "Core",
+            name: "RealmCore",
             dependencies: ["Bid"],
             path: "src",
             exclude: ([
@@ -748,8 +743,8 @@ let package = Package(
                 .linkedLibrary("z"),
             ]),
         .target(
-            name: "QueryParser",
-            dependencies: ["Core"],
+            name: "RealmQueryParser",
+            dependencies: ["RealmCore"],
             path: "src/realm/parser",
             exclude: [
                 "CMakeLists.txt",
@@ -767,7 +762,7 @@ let package = Package(
             ] + cxxSettings),
         .target(
             name: "SyncServer",
-            dependencies: ["Core"],
+            dependencies: ["RealmCore"],
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
@@ -790,7 +785,7 @@ let package = Package(
             cxxSettings: cxxSettings),
         .target(
             name: "Capi",
-            dependencies: ["Core", "QueryParser"],
+            dependencies: ["RealmCore", "RealmQueryParser"],
             path: "src/realm/object-store/c_api",
             exclude: [
                 "CMakeLists.txt",
@@ -809,7 +804,7 @@ let package = Package(
             path: "src/swift"),
         .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["Core", "SyncServer"],
+            dependencies: ["RealmCore", "SyncServer"],
             path: "test/object-store/util",
             exclude: [
                 "baas_admin_api.hpp",
@@ -825,7 +820,7 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
-            dependencies: ["Core", "QueryParser", "ObjectStoreTestUtils"],
+            dependencies: ["RealmCore", "RealmQueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "CMakeLists.txt",

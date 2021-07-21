@@ -28,6 +28,8 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+extern unsigned int unit_test_random_seed;
+
 TEST(Set_Basics)
 {
     Group g;
@@ -65,6 +67,7 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         s.insert("Hello");
         CHECK_EQUAL(s.size(), 2);
+        CHECK_THROW_ANY(s.insert(StringData{}));
         auto ndx = s.find("Hello");
         CHECK_NOT_EQUAL(ndx, realm::npos);
         auto [erased_ndx, erased] = s.erase("Hello");
@@ -94,41 +97,60 @@ TEST(Set_Mixed)
 {
     Group g;
 
+    Obj bar = g.add_table("bar")->create_object();
     auto t = g.add_table("foo");
     t->add_column_set(type_Mixed, "mixeds");
     auto obj = t->create_object();
 
+    // Check that different typed with same numeric value are treated as the same
     auto set = obj.get_set<Mixed>("mixeds");
     set.insert(123);
-    set.insert(123);
-    set.insert(123);
+    set.insert(123.f);
+    set.insert(123.);
+    set.insert(Decimal128("123"));
     CHECK_EQUAL(set.size(), 1);
     CHECK_EQUAL(set.get(0), Mixed(123));
+    set.clear();
 
-    // Sets of Mixed should be ordered by their type index (as specified by the `DataType` enum).
-    set.insert(56.f);
-    set.insert("Hello, World!");
-    set.insert(util::none);
-    set.insert(util::none);
-    set.insert("Hello, World!");
-    CHECK_EQUAL(set.size(), 4);
+    std::vector<Mixed> ref_values{{},
+                                  false,
+                                  true,
+                                  Decimal128("-123"),
+                                  25,
+                                  56.f,
+                                  88.,
+                                  "Hello, World!",
+                                  "æbler", // Apples
+                                  "ørken", // Dessert
+                                  "ådsel", // Carrion
+                                  Timestamp(1, 2),
+                                  ObjectId::gen(),
+                                  UUID("01234567-9abc-4def-9012-3456789abcde"),
+                                  bar.get_link()};
+    // Sets of Mixed should be ordered by the rules defined for Set<Mixed>. Refer to "realm/set.hpp".
+    std::vector<size_t> indices(ref_values.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::shuffle(indices.begin(), indices.end(), std::mt19937(unit_test_random_seed));
+    for (auto i : indices) {
+        set.insert(ref_values[i]);
+    }
+    std::vector<Mixed> actuals;
+    std::for_each(set.begin(), set.end(), [&actuals](auto v) {
+        actuals.push_back(v);
+    });
+    CHECK(ref_values == actuals);
+    actuals.clear();
 
-    CHECK_EQUAL(set.get(0), Mixed{});
-    CHECK_EQUAL(set.get(1), Mixed{123});
-    CHECK_EQUAL(set.get(2), Mixed{"Hello, World!"});
-    CHECK_EQUAL(set.get(3), Mixed{56.f});
-
-    // Sets of Mixed can be sorted.
-    std::vector<Mixed> sorted;
-    std::vector<size_t> sorted_indices;
-    set.sort(sorted_indices);
-    std::transform(begin(sorted_indices), end(sorted_indices), std::back_inserter(sorted), [&](size_t index) {
+    // Sets of Mixed can be sorted. Should sort according to the comparison rules defined for Mixed, which
+    // currently
+    set.sort(indices);
+    std::transform(begin(indices), end(indices), std::back_inserter(actuals), [&](size_t index) {
         return set.get(index);
     });
-    CHECK(std::equal(begin(sorted), end(sorted), set.begin()));
-    auto sorted2 = sorted;
-    std::sort(begin(sorted2), end(sorted2), SetElementLessThan<Mixed>{});
-    CHECK(sorted2 == sorted);
+    std::sort(begin(ref_values), end(ref_values), [](auto v1, auto v2) {
+        return v1 < v2;
+    });
+    CHECK(ref_values == actuals);
 }
 
 TEST(Set_Links)
@@ -171,6 +193,10 @@ TEST(Set_Links)
     CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
     CHECK_EQUAL(set_links.find(bar4.get_key()), realm::npos);
+    CHECK_THROW_ANY(set_links.insert({}));
+    set_links.erase(bar1.get_key());
+    CHECK_EQUAL(bar1.get_backlink_count(), 0);
+    set_links.insert(bar1.get_key());
 
     set_typed_links.insert(bar1.get_link());
     set_typed_links.insert(bar2.get_link());
@@ -242,8 +268,9 @@ TEST(Set_Links)
 }
 
 TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>, Prop<ObjectId>,
-           Prop<Decimal128>, Prop<BinaryData>, Nullable<Int>, Nullable<String>, Nullable<Float>, Nullable<Double>,
-           Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>, Nullable<Decimal128>, Nullable<BinaryData>)
+           Prop<Decimal128>, Prop<BinaryData>, Prop<Mixed>, Nullable<Int>, Nullable<String>, Nullable<Float>,
+           Nullable<Double>, Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>, Nullable<Decimal128>,
+           Nullable<BinaryData>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
@@ -251,16 +278,20 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
 
     auto t = g.add_table("foo");
     auto col = t->add_column_set(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    auto col_list = t->add_column_list(TEST_TYPE::data_type, "list", TEST_TYPE::is_nullable);
     CHECK(col.is_set());
 
     auto obj = t->create_object();
     {
         auto s = obj.get_set<type>(col);
+        auto l = obj.get_list<type>(col_list);
         auto values = gen.values_from_int<type>({0, 1, 2, 3});
         for (auto v : values) {
             s.insert(v);
+            l.add(v);
         }
         CHECK_EQUAL(s.size(), values.size());
+        CHECK(s.set_equals(l));
         for (auto v : values) {
             auto ndx = s.find(v);
             CHECK_NOT_EQUAL(ndx, realm::npos);
@@ -269,6 +300,7 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
         CHECK(erased);
         CHECK_EQUAL(erased_ndx, 0);
         CHECK_EQUAL(s.size(), values.size() - 1);
+        CHECK(s.is_subset_of(l));
 
         s.clear();
         CHECK_EQUAL(s.size(), 0);
@@ -286,6 +318,96 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
             CHECK_EQUAL(ndx, realm::npos);
         }
     }
+}
+
+TEST(Set_BinarySets)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.add_table("class_foo");
+        auto set1 = foo->add_column_set(type_Binary, "bin1");
+        auto set2 = foo->add_column_set(type_Binary, "bin2");
+
+        auto obj = foo->create_object();
+        auto s1 = obj.get_set<Binary>(set1);
+        auto s2 = obj.get_set<Binary>(set2);
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        auto set1 = foo->get_column_key("bin1");
+        auto set2 = foo->get_column_key("bin2");
+
+        auto s1 = foo->begin()->get_set<Binary>(set1);
+        auto s2 = foo->begin()->get_set<Binary>(set2);
+
+        std::string str1(1024, 'a');
+        std::string str2(256, 'b');
+        std::string str3(64, 'c');
+        std::string str4(256, 'd');
+        std::string str5(1024, 'e');
+
+        s1.insert(BinaryData(str1.data(), str1.size()));
+        s1.insert(BinaryData(str2.data(), str2.size()));
+        s1.insert(BinaryData(str3.data(), str3.size()));
+
+        s2.insert(BinaryData(str3.data(), str3.size()));
+        s2.insert(BinaryData(str4.data(), str4.size()));
+        s2.insert(BinaryData(str5.data(), str5.size()));
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        auto set1 = foo->get_column_key("bin1");
+        auto set2 = foo->get_column_key("bin2");
+
+        auto s1 = foo->begin()->get_set<Binary>(set1);
+        auto s2 = foo->begin()->get_set<Binary>(set2);
+
+        s1.assign_intersection(s2);
+        wt.commit();
+    }
+
+    sg->start_read()->verify();
+}
+
+TEST(Set_TableClear)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.add_table("class_foo");
+        TableRef origin = wt.add_table("class_origin");
+        auto set = origin->add_column_set(*foo, "set");
+
+        auto obj = foo->create_object();
+        auto s1 = origin->create_object().get_linkset(set);
+        s1.insert(obj.get_key());
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef origin = wt.get_or_add_table("class_origin");
+        auto set = origin->get_column_key("set");
+        auto s1 = origin->begin()->get_linkset(set);
+        s1.clear();
+        wt.commit();
+    }
+    {
+        WriteTransaction wt{sg};
+        TableRef foo = wt.get_or_add_table("class_foo");
+        foo->clear();
+        wt.commit();
+    }
+
+    sg->start_read()->verify();
 }
 
 TEST(Set_LnkSetUnresolved)
@@ -352,13 +474,14 @@ TEST(Set_Union)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_set = foos->add_column_set(type_Int, "int_set");
+    ColKey col_list = foos->add_column_list(type_Int, "int_list");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
 
-    auto set1 = obj1.get_set<int64_t>(col_ints);
-    auto set2 = obj2.get_set<int64_t>(col_ints);
+    auto set1 = obj1.get_set<int64_t>(col_set);
+    auto set2 = obj2.get_set<int64_t>(col_set);
 
     for (int64_t x : {1, 2, 4, 5}) {
         set1.insert(x);
@@ -366,6 +489,12 @@ TEST(Set_Union)
 
     for (int64_t x : {3, 4, 5}) {
         set2.insert(x);
+    }
+
+    auto list = obj1.get_list<int64_t>(col_list);
+
+    for (int64_t x : {11, 3, 7, 5, 14, 7}) {
+        list.add(x);
     }
 
     set1.assign_union(set2);
@@ -375,19 +504,24 @@ TEST(Set_Union)
     CHECK_EQUAL(set1.get(2), 3);
     CHECK_EQUAL(set1.get(3), 4);
     CHECK_EQUAL(set1.get(4), 5);
+    set2.assign_union(list);
+    CHECK_EQUAL(set2.size(), 6);
+    CHECK_EQUAL(set2.get(0), 3);
+    CHECK_EQUAL(set2.get(5), 14);
 }
 
 TEST(Set_UnionString)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_strings = foos->add_column_set(type_String, "strings");
+    ColKey col_set = foos->add_column_set(type_String, "string set", true);
+    ColKey col_list = foos->add_column_list(type_String, "string list", true);
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
 
-    auto set1 = obj1.get_set<String>(col_strings);
-    auto set2 = obj2.get_set<String>(col_strings);
+    auto set1 = obj1.get_set<String>(col_set);
+    auto set2 = obj2.get_set<String>(col_set);
 
     set1.insert("FooBar");
     set1.insert("A");
@@ -397,6 +531,12 @@ TEST(Set_UnionString)
     set2.insert("World");
     set2.insert("Atomic");
 
+    auto list1 = obj1.get_list<String>(col_list);
+    list1.add("FooBar");
+    list1.add("World");
+    list1.add({});
+    list1.add("Atomic");
+
     set1.assign_union(set2);
     CHECK_EQUAL(set1.size(), 5);
     CHECK_EQUAL(set1.get(0), "A");
@@ -404,19 +544,30 @@ TEST(Set_UnionString)
     CHECK_EQUAL(set1.get(2), "FooBar");
     CHECK_EQUAL(set1.get(3), "The fox jumps over the lazy dog");
     CHECK_EQUAL(set1.get(4), "World");
+
+    set1.assign_union(list1);
+    CHECK_EQUAL(set1.size(), 6);
+    CHECK_EQUAL(set1.get(0), StringData());
+    CHECK_EQUAL(set1.get(1), "A");
+    CHECK_EQUAL(set1.get(2), "Atomic");
+    CHECK_EQUAL(set1.get(3), "FooBar");
+    CHECK_EQUAL(set1.get(4), "The fox jumps over the lazy dog");
+    CHECK_EQUAL(set1.get(5), "World");
 }
 
 TEST(Set_Intersection)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_set = foos->add_column_set(type_Int, "int set", true);
+    ColKey col_list = foos->add_column_list(type_Int, "int list", true);
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
+    auto obj3 = foos->create_object();
 
-    auto set1 = obj1.get_set<int64_t>(col_ints);
-    auto set2 = obj2.get_set<int64_t>(col_ints);
+    auto set1 = obj1.get_set<util::Optional<int64_t>>(col_set);
+    auto set2 = obj2.get_set<util::Optional<int64_t>>(col_set);
 
     for (int64_t x : {1, 2, 4, 5}) {
         set1.insert(x);
@@ -424,6 +575,22 @@ TEST(Set_Intersection)
 
     for (int64_t x : {3, 4, 5}) {
         set2.insert(x);
+    }
+
+    auto superset = obj1.get_list<util::Optional<int64_t>>(col_list);
+    auto subset = obj2.get_list<util::Optional<int64_t>>(col_list);
+    auto same_set = obj3.get_list<util::Optional<int64_t>>(col_list);
+
+    for (int64_t x : {3, 4, 5, 1, 2}) {
+        superset.add(x);
+    }
+
+    for (int64_t x : {1, 2}) {
+        subset.add(x);
+    }
+
+    for (int64_t x : {1, 4, 2, 5}) {
+        same_set.add(x);
     }
 
     CHECK(set1.intersects(set2));
@@ -434,9 +601,6 @@ TEST(Set_Intersection)
     CHECK(!set2.is_superset_of(set1));
     CHECK(!set1.is_strict_superset_of(set1));
     CHECK(!set1.is_strict_subset_of(set1));
-    std::vector<int64_t> superset{{1, 2, 3, 4, 5}};
-    std::vector<int64_t> subset{{1, 2}};
-    std::vector<int64_t> same_set{{1, 2, 4, 5}};
     CHECK(set1.is_subset_of(superset));
     CHECK(set1.is_superset_of(subset));
     CHECK(set1.is_strict_superset_of(subset));
@@ -448,9 +612,9 @@ TEST(Set_Intersection)
     CHECK(set1.set_equals(set1));
     CHECK(set1.set_equals(same_set));
     CHECK(!set1.set_equals(superset));
-    CHECK(!set1.set_equals(superset.begin(), superset.end()));
+    CHECK(!set1.set_equals(superset));
     CHECK(!set1.set_equals(subset));
-    CHECK(!set1.set_equals(subset.begin(), subset.end()));
+    CHECK(!set1.set_equals(subset));
 
     set1.assign_intersection(set2);
     CHECK_EQUAL(set1.size(), 2);
@@ -496,13 +660,14 @@ TEST(Set_Difference)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_set = foos->add_column_set(type_Int, "int set");
+    ColKey col_list = foos->add_column_list(type_Int, "int list");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
 
-    auto set1 = obj1.get_set<int64_t>(col_ints);
-    auto set2 = obj2.get_set<int64_t>(col_ints);
+    auto set1 = obj1.get_set<int64_t>(col_set);
+    auto set2 = obj2.get_set<int64_t>(col_set);
 
     for (int64_t x : {1, 2, 4, 5}) {
         set1.insert(x);
@@ -516,19 +681,30 @@ TEST(Set_Difference)
     CHECK_EQUAL(set1.size(), 2);
     CHECK_EQUAL(set1.get(0), 1);
     CHECK_EQUAL(set1.get(1), 2);
+
+    set1.assign_union(set2);
+    auto list = obj2.get_list<int64_t>(col_list);
+    for (int64_t x : {4, 5, 1, 27}) {
+        list.add(x);
+    }
+    set1.assign_difference(list);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), 2);
+    CHECK_EQUAL(set1.get(1), 3);
 }
 
 TEST(Set_SymmetricDifference)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_set = foos->add_column_set(type_Int, "int set");
+    ColKey col_list = foos->add_column_list(type_Int, "int list");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
 
-    auto set1 = obj1.get_set<int64_t>(col_ints);
-    auto set2 = obj2.get_set<int64_t>(col_ints);
+    auto set1 = obj1.get_set<int64_t>(col_set);
+    auto set2 = obj2.get_set<int64_t>(col_set);
 
     for (int64_t x : {1, 2, 4, 5}) {
         set1.insert(x);
@@ -543,6 +719,17 @@ TEST(Set_SymmetricDifference)
     CHECK_EQUAL(set1.get(0), 1);
     CHECK_EQUAL(set1.get(1), 2);
     CHECK_EQUAL(set1.get(2), 3);
+
+    set1.assign_union(set2);
+    auto list = obj2.get_list<int64_t>(col_list);
+    for (int64_t x : {4, 5, 1, 27}) {
+        list.add(x);
+    }
+    set1.assign_symmetric_difference(list);
+    CHECK_EQUAL(set1.size(), 3);
+    CHECK_EQUAL(set1.get(0), 2);
+    CHECK_EQUAL(set1.get(1), 3);
+    CHECK_EQUAL(set1.get(2), 27);
 }
 
 TEST(Set_SymmetricDifferenceString)

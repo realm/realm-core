@@ -1076,16 +1076,31 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         logger.debug("Removing objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
-        std::vector<std::pair<GlobalKey, ObjKey>> objects_to_remove;
-        for (auto obj : *table_dst) {
-            auto oid = table_dst->get_object_id(obj.get_key());
-            auto key_src = table_src->get_objkey(oid);
-            if (oid.hi() == new_file_id || !key_src || !table_src->is_valid(key_src))
-                objects_to_remove.emplace_back(oid, obj.get_key());
+        if (auto pk_col = table_dst->get_primary_key_column()) {
+            std::vector<std::pair<Mixed, ObjKey>> objects_to_remove;
+            for (auto obj : *table_dst) {
+                auto pk = obj.get_any(pk_col);
+                if (!table_src->find_primary_key(pk)) {
+                    objects_to_remove.emplace_back(pk, obj.get_key());
+                }
+            }
+            for (auto& pair : objects_to_remove) {
+                logger.debug("  removing '%1'", pair.first);
+                table_dst->remove_object(pair.second);
+            }
         }
-        for (auto& pair : objects_to_remove) {
-            logger.debug("  removing '%1'", pair.first);
-            table_dst->remove_object(pair.second);
+        else {
+            std::vector<std::pair<GlobalKey, ObjKey>> objects_to_remove;
+            for (auto obj : *table_dst) {
+                auto oid = table_dst->get_object_id(obj.get_key());
+                auto key_src = table_src->get_objkey(oid);
+                if (oid.hi() == new_file_id || !key_src || !table_src->is_valid(key_src))
+                    objects_to_remove.emplace_back(oid, obj.get_key());
+            }
+            for (auto& pair : objects_to_remove) {
+                logger.debug("  removing '%1'", pair.first);
+                table_dst->remove_object(pair.second);
+            }
         }
     }
 

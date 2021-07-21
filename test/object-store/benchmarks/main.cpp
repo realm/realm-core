@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 #ifdef _MSC_VER
     char path[MAX_PATH];
     if (GetModuleFileNameA(NULL, path, sizeof(path)) == 0) {
-        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        fprintf(stderr, "Failed to retrieve path to executable.\n");
         return 1;
     }
     PathRemoveFileSpecA(path);

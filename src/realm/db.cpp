@@ -766,7 +766,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     auto core_files = DB::get_core_files(path);
     m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
     m_coordination_dir = core_files[DB::CoreFileType::Management].first;
-    try_make_dir(m_coordination_dir);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
@@ -809,7 +808,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
-        m_file.set_fifo_path(m_coordination_dir + "/lock.fifo");
+        m_file.set_fifo_path(m_coordination_dir, "lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -849,6 +848,15 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #else
         m_file.lock_shared(); // Throws
 #endif
+        // The coordination/management dir is created as a side effect of the lock
+        // operation above if needed for lock emulation. But it may also be needed
+        // for other purposes, so make sure it exists.
+        // in worst case there'll be a race on creating this directory.
+        // This should be safe but a waste of resources.
+        // Unfortunately it cannot be created at an earlier point, because
+        // it may then be deleted during the above lock_shared() operation.
+        try_make_dir(m_coordination_dir);
+
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or
@@ -1223,7 +1231,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << info->file_format_version << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
@@ -2398,7 +2406,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
-    lockfile.set_fifo_path(realm_path + ".management/lock.fifo");
+    lockfile.set_fifo_path(realm_path + ".management", "lock.fifo");
     if (lockfile.try_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
@@ -2780,6 +2788,19 @@ LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
         return obj.get_linkset_ptr(ck);
     }
     return std::make_unique<LnkSet>();
+}
+
+LinkCollectionPtr Transaction::import_copy_of(const LinkCollectionPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_owning_obj())) {
+        ColKey ck = original->get_owning_col_key();
+        return obj.get_linkcollection_ptr(ck);
+    }
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
+    return std::make_unique<LnkLst>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)

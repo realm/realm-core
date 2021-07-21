@@ -39,9 +39,13 @@
 #include <realm/util/websocket.hpp>
 
 #include <chrono>
+#include <condition_variable>
 #include <future>
 #include <thread>
 #include <iostream>
+#include <list>
+#include <mutex>
+#include <thread>
 
 using namespace realm;
 using namespace realm::app;
@@ -275,7 +279,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         processed = false;
         auto user = app->current_user();
         REQUIRE(user);
-        CHECK(user->user_profile().email == email);
+        CHECK(user->user_profile().email() == email);
     }
 
     SECTION("confirm user") {
@@ -384,7 +388,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         processed = false;
         auto user = app->current_user();
         REQUIRE(user);
-        CHECK(user->user_profile().email == email);
+        CHECK(user->user_profile().email() == email);
 
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
@@ -405,7 +409,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         CHECK(user->state() == SyncUser::State::Removed);
         CHECK(app->current_user() != user);
         user = app->current_user();
-        CHECK(user->user_profile().email == email);
+        CHECK(user->user_profile().email() == email);
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
         app->remove_user(user, [&](Optional<app::AppError> error) {
@@ -2283,14 +2287,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto pred = [](const SyncError& error) {
             return error.error_code.category() == util::websocket::websocket_close_status_category();
         };
-        // If we haven't gotten an error in more than 2 minutes, then something has gone wrong
+        // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
         REQUIRE_NOTHROW(timed_wait_for(
             [&] {
                 std::lock_guard<std::mutex> lk(sync_error_mutex);
                 return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
             },
-            std::chrono::minutes(2)));
+            std::chrono::minutes(5)));
 
         auto captured_error = [&] {
             std::lock_guard<std::mutex> lk(sync_error_mutex);
@@ -2302,6 +2306,61 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
         REQUIRE(captured_error.error_code.value() == 1009);
         REQUIRE(captured_error.message == "read limited at 16777217 bytes");
+    }
+}
+
+TEST_CASE("app: custom user data integration tests", "[sync][app]") {
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+    auto app_session = create_app(default_app_config(base_url));
+
+    auto app_config = App::Config{app_session.client_app_id,
+                                  factory,
+                                  base_url,
+                                  util::none,
+                                  Optional<std::string>("A Local App Version"),
+                                  util::none,
+                                  "Object Store Platform Tests",
+                                  "Object Store Platform Version Blah",
+                                  "An sdk version"};
+
+    SECTION("custom user data happy path") {
+        TestSyncManager sync_manager(app_config);
+        auto app = sync_manager.app();
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> the_user;
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         CHECK(user);
+                                         CHECK(!error);
+                                         processed = true;
+                                         the_user = user;
+                                     });
+
+        CHECK(processed);
+        processed = false;
+
+        app->call_function(the_user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
+                           [&](auto error, auto response) {
+                               CHECK(error == none);
+                               CHECK(response);
+                               CHECK(*response == true);
+                               processed = true;
+                           });
+        CHECK(processed);
+        processed = false;
+        app->refresh_custom_data(the_user, [&](auto) {
+            processed = true;
+        });
+        CHECK(processed);
+        auto data = *the_user->custom_data();
+        CHECK(data["favorite_color"] == "green");
     }
 }
 
@@ -2682,34 +2741,64 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                                   "Object Store Platform Tests",
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
+        auto base_path = util::make_temp_dir() + app_name;
+        {
+            auto conf = TestSyncManager::Config(config);
+            conf.should_teardown_test_directory = false;
+            conf.base_path = base_path;
+            TestSyncManager tsm(conf, {});
+            auto app = tsm.app();
 
-        TestSyncManager tsm(TestSyncManager::Config(config), {});
-        auto app = tsm.app();
+            app->log_in_with_credentials(
+                realm::app::AppCredentials::anonymous(),
+                [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                    CHECK(user);
+                    CHECK(!error);
 
-        app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
-                                         CHECK(user);
-                                         CHECK(!error);
+                    CHECK(user->identities().size() == 2);
+                    CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
+                    CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
+                    SyncUserProfile user_profile = user->user_profile();
 
-                                         CHECK(user->identities().size() == 2);
-                                         CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
-                                         CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
-                                         SyncUserProfile user_profile = user->user_profile();
+                    CHECK(user_profile.name() == profile_0_name);
+                    CHECK(user_profile.first_name() == profile_0_first_name);
+                    CHECK(user_profile.last_name() == profile_0_last_name);
+                    CHECK(user_profile.email() == profile_0_email);
+                    CHECK(user_profile.picture_url() == profile_0_picture_url);
+                    CHECK(user_profile.gender() == profile_0_gender);
+                    CHECK(user_profile.birthday() == profile_0_birthday);
+                    CHECK(user_profile.min_age() == profile_0_min_age);
+                    CHECK(user_profile.max_age() == profile_0_max_age);
 
-                                         CHECK(user_profile.name == profile_0_name);
-                                         CHECK(user_profile.first_name == profile_0_first_name);
-                                         CHECK(user_profile.last_name == profile_0_last_name);
-                                         CHECK(user_profile.email == profile_0_email);
-                                         CHECK(user_profile.picture_url == profile_0_picture_url);
-                                         CHECK(user_profile.gender == profile_0_gender);
-                                         CHECK(user_profile.birthday == profile_0_birthday);
-                                         CHECK(user_profile.min_age == profile_0_min_age);
-                                         CHECK(user_profile.max_age == profile_0_max_age);
+                    processed = true;
+                });
 
-                                         processed = true;
-                                     });
+            CHECK(processed);
+        }
+        App::clear_cached_apps();
+        // assert everything is stored properly between runs
+        {
+            auto conf = TestSyncManager::Config(config);
+            conf.base_path = base_path;
+            TestSyncManager tsm(conf, {});
+            auto app = tsm.app();
+            REQUIRE(app->all_users().size() == 1);
+            auto user = app->all_users()[0];
+            CHECK(user->identities().size() == 2);
+            CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
+            CHECK(user->identities()[1].id == UnitTestTransport::identity_1_id);
+            SyncUserProfile user_profile = user->user_profile();
 
-        CHECK(processed);
+            CHECK(user_profile.name() == profile_0_name);
+            CHECK(user_profile.first_name() == profile_0_first_name);
+            CHECK(user_profile.last_name() == profile_0_last_name);
+            CHECK(user_profile.email() == profile_0_email);
+            CHECK(user_profile.picture_url() == profile_0_picture_url);
+            CHECK(user_profile.gender() == profile_0_gender);
+            CHECK(user_profile.birthday() == profile_0_birthday);
+            CHECK(user_profile.min_age() == profile_0_min_age);
+            CHECK(user_profile.max_age() == profile_0_max_age);
+        }
     }
 
     SECTION("login_anonymous bad") {
@@ -3880,6 +3969,275 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     }
 }
 
+namespace {
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+class AsyncMockNetworkTransport {
+public:
+    AsyncMockNetworkTransport()
+        : transport_thread(&AsyncMockNetworkTransport::worker_routine, this)
+    {
+    }
+
+    void add_work_item(Response response, std::function<void(const Response)> completion_block)
+    {
+        std::lock_guard<std::mutex> lk(transport_work_mutex);
+        transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion_block)});
+        transport_work_cond.notify_one();
+    }
+
+    void add_work_item(std::function<void()> cb)
+    {
+        std::lock_guard<std::mutex> lk(transport_work_mutex);
+        transport_work.push_front(std::move(cb));
+        transport_work_cond.notify_one();
+    }
+
+    void mark_complete()
+    {
+        std::unique_lock<std::mutex> lk(transport_work_mutex);
+        test_complete = true;
+        transport_work_cond.notify_one();
+        lk.unlock();
+        transport_thread.join();
+    }
+
+private:
+    struct ResponseWorkItem {
+        Response response;
+        std::function<void(const Response)> completion_block;
+    };
+
+    void worker_routine()
+    {
+        std::unique_lock<std::mutex> lk(transport_work_mutex);
+        for (;;) {
+            transport_work_cond.wait(lk, [&] {
+                return test_complete || !transport_work.empty();
+            });
+
+            if (!transport_work.empty()) {
+                auto work_item = std::move(transport_work.back());
+                transport_work.pop_back();
+                lk.unlock();
+
+                mpark::visit(overloaded{[](ResponseWorkItem& work_item) {
+                                            work_item.completion_block(std::move(work_item.response));
+                                        },
+                                        [](std::function<void()>& cb) {
+                                            cb();
+                                        }},
+                             work_item);
+
+                lk.lock();
+                continue;
+            }
+
+            if (test_complete) {
+                return;
+            }
+        }
+    }
+
+    std::mutex transport_work_mutex;
+    std::condition_variable transport_work_cond;
+    bool test_complete = false;
+    std::list<mpark::variant<ResponseWorkItem, std::function<void()>>> transport_work;
+    JoiningThread transport_thread;
+};
+
+} // namespace
+
+TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, profile_1, profile_2, refresh_1, refresh_2, refresh_3 };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    std::function<std::unique_ptr<GenericNetworkTransport>()> generic_factory = [&] {
+        struct transport : public GenericNetworkTransport {
+            transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+                : mock_transport_worker(worker)
+                , state(state)
+            {
+            }
+
+            void send_request_to_server(const Request request,
+                                        std::function<void(const Response)> completion_block) override
+
+            {
+                std::cerr << request.url << std::endl;
+                if (request.url.find("/login") != std::string::npos) {
+                    CHECK(state.get() == TestState::location);
+                    state.advance_to(TestState::login);
+                    mock_transport_worker.add_work_item(
+                        Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
+                        std::move(completion_block));
+                }
+                else if (request.url.find("/profile") != std::string::npos) {
+                    // simulated bad token request
+                    auto cur_state = state.get();
+                    CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
+                    if (cur_state == TestState::refresh_1) {
+                        state.advance_to(TestState::profile_2);
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                            std::move(completion_block));
+                    }
+                    else if (cur_state == TestState::login) {
+                        state.advance_to(TestState::profile_1);
+                        mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
+                    }
+                }
+                else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                    if (state.get() == TestState::profile_1) {
+                        state.advance_to(TestState::refresh_1);
+                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                            std::move(completion_block));
+                    }
+                    else if (state.get() == TestState::profile_2) {
+                        state.advance_to(TestState::refresh_2);
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
+                                                            std::move(completion_block));
+                    }
+                    else {
+                        CHECK(state.get() == TestState::refresh_2);
+                        state.advance_to(TestState::refresh_3);
+                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
+                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                            std::move(completion_block));
+                    }
+                }
+                else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    CHECK(state.get() == TestState::unknown);
+                    state.advance_to(TestState::location);
+                    mock_transport_worker.add_work_item(
+                        Response{200,
+                                 0,
+                                 {},
+                                 "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                 "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                        std::move(completion_block));
+                }
+            }
+
+            AsyncMockNetworkTransport& mock_transport_worker;
+            TestStateBundle& state;
+        };
+        return std::make_unique<transport>(mock_transport_worker, state);
+    };
+
+    {
+        auto config = get_config(generic_factory);
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = util::make_temp_dir() + config.app_id;
+        cfg.should_teardown_test_directory = false;
+
+        util::try_remove_dir_recursive(cfg.base_path);
+        util::make_dir(cfg.base_path);
+
+        TestSyncManager sync_manager(cfg);
+        auto app = sync_manager.app();
+
+        {
+            std::shared_ptr<SyncUser> cur_user;
+            app->log_in_with_credentials(AppCredentials::anonymous(),
+                                         [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                             CHECK(user);
+                                             CHECK(!error);
+                                             cur_user = std::move(user);
+                                         });
+
+
+            state.wait_for(TestState::profile_2);
+            util::EventLoop::main().run_until([&] {
+                return cur_user != nullptr;
+            });
+            CHECK(cur_user);
+
+            realm::Realm::Config realm_config;
+            realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+            realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+            realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+                std::cout << error.message << std::endl;
+            };
+            realm_config.schema_version = 1;
+
+            realm_config.path = cfg.base_path + "/default.realm";
+            const auto dog_schema = realm::ObjectSchema(
+                "Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                        realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                        realm::Property("name", PropertyType::String),
+                        realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+            const auto person_schema = realm::ObjectSchema(
+                "Person", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+                           realm::Property("age", PropertyType::Int),
+                           realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+                           realm::Property("firstName", PropertyType::String),
+                           realm::Property("lastName", PropertyType::String),
+                           realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+            realm_config.schema = realm::Schema({dog_schema, person_schema});
+
+            auto r = realm::Realm::get_shared_realm(std::move(realm_config));
+            auto session = cur_user->session_for_on_disk_path(r->config().path);
+            mock_transport_worker.add_work_item([session] {
+                session->initiate_access_token_refresh();
+            });
+        }
+        for (const auto& user : app->all_users()) {
+            user->log_out();
+        }
+
+        while (app->sync_manager()->has_existing_sessions()) {
+            millisleep(5);
+        }
+
+        bool did_reset = false;
+        while (!did_reset) {
+            try {
+                sync_manager.app()->sync_manager()->reset_for_testing();
+                did_reset = true;
+            }
+            catch (const std::exception& e) {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+
+        App::clear_cached_apps();
+    }
+
+    mock_transport_worker.mark_complete();
+}
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";
     static const auto test_ws_hostname = "wsproto://host:1234";

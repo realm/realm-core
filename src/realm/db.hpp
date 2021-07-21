@@ -634,6 +634,7 @@ public:
     CollectionBasePtr import_copy_of(const CollectionBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
     LnkSetPtr import_copy_of(const LnkSetPtr& original);
+    LinkCollectionPtr import_copy_of(const LinkCollectionPtr& original);
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);

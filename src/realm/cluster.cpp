@@ -33,6 +33,7 @@
 #include "realm/array_backlink.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
+#include "realm/dictionary.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -707,26 +708,22 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     values.set_parent(this, col_ndx.val + s_first_col_index);
     set_spec<T>(values, col_ndx);
     values.init_from_parent();
+    ObjLink link;
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
-        ObjLink link = values.get(ndx);
-        if (link) {
-            const Table* origin_table = m_tree_top.get_owning_table();
-            auto target_obj = origin_table->get_parent_group()->get_object(link);
-
-            ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-
-            target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
-        }
+        link = values.get(ndx);
     }
     if constexpr (std::is_same_v<T, ArrayMixed>) {
         Mixed value = values.get(ndx);
-        if (!value.is_null() && value.get_type() == type_TypedLink) {
-            ObjLink link = value.get<ObjLink>();
-            const Table* origin_table = m_tree_top.get_owning_table();
+        if (value.is_type(type_TypedLink)) {
+            link = value.get<ObjLink>();
+        }
+    }
+    if (link) {
+        if (const Table* origin_table = m_tree_top.get_owning_table()) {
             auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
-
+            REALM_ASSERT(backlink_col_key);
             target_obj.remove_one_backlink(backlink_col_key, get_real_key(ndx)); // Throws
         }
     }
@@ -747,19 +744,19 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.erase(ndx);
 }
 
-size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
+size_t Cluster::get_ndx(ObjKey k, size_t ndx) const noexcept
 {
     size_t index;
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw KeyNotFound("Key not found in get_ndx");
+            return realm::npos;
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw KeyNotFound("Key not found in get_ndx (compact)");
+            return realm::npos;
         }
     }
     return index + ndx;
@@ -768,6 +765,8 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::erase");
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -781,7 +780,15 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             ref_type ref = values.get(ndx);
 
             if (ref) {
-                if (col_type == col_type_LinkList) {
+                const Table* origin_table = m_tree_top.get_owning_table();
+                if (attr.test(col_attr_Dictionary)) {
+                    if (col_type == col_type_Mixed || col_type == col_type_Link) {
+                        Obj obj(origin_table->m_own_ref, get_mem(), key, ndx);
+                        const Dictionary dict = obj.get_dictionary(col_key);
+                        dict.remove_backlinks(state);
+                    }
+                }
+                else if (col_type == col_type_LinkList) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {
@@ -791,7 +798,6 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_TypedLink) {
                     BPlusTree<ObjLink> links(m_alloc);
                     links.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < links.size(); i++) {
                         ObjLink link = links.get(i);
                         auto target_obj = origin_table->get_parent_group()->get_object(link);
@@ -803,10 +809,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_Mixed) {
                     BPlusTree<Mixed> list(m_alloc);
                     list.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < list.size(); i++) {
                         Mixed val = list.get(i);
-                        if (val.get_type() == type_TypedLink) {
+                        if (val.is_type(type_TypedLink)) {
                             ObjLink link = val.get<ObjLink>();
                             auto target_obj = origin_table->get_parent_group()->get_object(link);
                             ColKey backlink_col_key =
@@ -913,6 +918,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::nullify_incoming_links");
 
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before
@@ -1246,7 +1253,6 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
     if (!m_keys.is_attached()) {
         std::cout << lead << "compact form" << std::endl;
     }
-    auto col_keys = get_owning_table()->get_column_keys();
 
     for (unsigned i = 0; i < node_size(); i++) {
         int64_t key_value;
@@ -1257,11 +1263,29 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
             key_value = int64_t(i);
         }
         std::cout << lead << "key: " << std::hex << key_value + key_offset << std::dec;
-        for (auto col : col_keys) {
+        m_tree_top.for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
-                std::cout << ", list";
-                continue;
+                ref_type ref = Array::get_as_ref(j);
+                ArrayRef refs(m_alloc);
+                refs.init_from_ref(ref);
+                std::cout << ", {";
+                ref = refs.get(i);
+                if (ref) {
+                    if (col.get_type() == col_type_Int) {
+                        // This is easy to handle
+                        Array ints(m_alloc);
+                        ints.init_from_ref(ref);
+                        for (size_t n = 0; n < ints.size(); n++) {
+                            std::cout << ints.get(n) << ", ";
+                        }
+                    }
+                    else {
+                        std::cout << col.get_type();
+                    }
+                }
+                std::cout << "}";
+                return false;
             }
 
             switch (col.get_type()) {
@@ -1399,7 +1423,8 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     std::cout << ", Error";
                     break;
             }
-        }
+            return false;
+        });
         std::cout << std::endl;
     }
 }

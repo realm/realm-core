@@ -256,7 +256,6 @@ tasks:
         #!/bin/bash
         set -o errexit
         set -o pipefail
-        set -o verbose
 
         mkdir bloaty-binaries && cd bloaty-binaries
         curl --silent -L ${bloaty_url} | tar -xz --strip-components=1
@@ -272,9 +271,14 @@ tasks:
             $BLOATY -d sections $input_path -n 0 --csv > "bloaty-results/$input_file-sections.csv"
             $BLOATY -d shortsymbols $input_path -n 0 > "bloaty-results/$input_file-shortsymbols.txt"
             $BLOATY -d sections $input_path -n 0 > "bloaty-results/$input_file-sections.txt"
+            $BLOATY -d compileunits $input_path -n 0 > "bloaty-results/$input_file-compileunits.txt"
+            $BLOATY -d compileunits $input_path -n 0 --csv > "bloaty-results/$input_file-compileunits.csv"
 
             echo "Bloaty sections output for $input_file"
             head -n 100 "bloaty-results/$input_file-sections.txt"
+            echo
+            echo "Bloaty compile units output for $input_file"
+            head -n 100 "bloaty-results/$input_file-compileunits.txt"
             echo
             echo "Bloaty short symbols output for $input_file"
             head -n 100 "bloaty-results/$input_file-shortsymbols.txt"
@@ -282,6 +286,7 @@ tasks:
             ${python3|} ./evergreen/bloaty_to_json.py \
                 --short-symbols-input="bloaty-results/$input_file-shortsymbols.csv" \
                 --sections-input="bloaty-results/$input_file-sections.csv" \
+                --compileunits-input="bloaty-results/$input_file-compileunits.csv" \
                 --analyzed-file=$input_file \
                 --output "bloaty-results/$input_file-results.json" \
                 --project=${project} \
@@ -349,6 +354,7 @@ tasks:
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -356,6 +362,7 @@ tasks:
       test_filter: StorageTests
 
 - name: benchmark-common-tasks
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -363,6 +370,7 @@ tasks:
       path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
 
 - name: benchmark-crud
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -371,6 +379,7 @@ tasks:
 
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -379,10 +388,9 @@ tasks:
 
 - name: object-store-tests
   tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
-    vars:
-      enable_logging: true
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec
@@ -579,7 +587,7 @@ buildvariants:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     bloaty_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/bloaty-v1.1-39-gefc1c61-ubuntu2004-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    cmake_build_type: Release
+    cmake_build_type: RelWithDebInfo
     fetch_missing_dependencies: On
     run_tests_against_baas: On
     c_compiler: "./clang_binaries/bin/clang"

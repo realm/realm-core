@@ -125,7 +125,7 @@ Schema add_property(Schema schema, StringData object_name, Property property)
 Schema remove_property(Schema schema, StringData object_name, StringData property_name)
 {
     auto& properties = schema.find(object_name)->persisted_properties;
-    properties.erase(find_if(begin(properties), end(properties), [&](auto&& prop) {
+    properties.erase(std::find_if(begin(properties), end(properties), [&](auto&& prop) {
         return prop.name == property_name;
     }));
     return schema;
@@ -1528,9 +1528,8 @@ TEST_CASE("migration: Automatic") {
             REQUIRE(table->size() == 11);
             REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
             for (int i = 0; i < 11; ++i) {
-                auto obj = table->get_object(i);
-                REQUIRE(obj.get<int64_t>("pk") == i + 1);
-                REQUIRE(obj.get<int64_t>("int") == i + 4);
+                auto obj = table->get_object_with_primary_key(i + 1);
+                REQUIRE(obj.get<int64_t>("pk") + 3 == obj.get<int64_t>("int"));
             }
         }
 

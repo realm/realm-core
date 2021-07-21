@@ -73,7 +73,7 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     if (!c.moves.empty() || !c.deletions.empty() || !c.insertions.empty()) {
         auto it = std::remove_if(begin(moves), end(moves), [&](auto& old) {
             // Check if the moved row was moved again, and if so just update the destination
-            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
+            auto it = std::find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
                 return old.to == m.from;
             });
             if (it != c.moves.end()) {
@@ -621,6 +621,19 @@ void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std:
         calculate_moves_sorted(new_rows, ret);
 }
 
+template <typename T>
+std::vector<RowInfo> build_row_info(const std::vector<T>& rows)
+{
+    std::vector<RowInfo> info;
+    info.reserve(rows.size());
+    for (size_t i = 0; i < rows.size(); ++i)
+        info.push_back({static_cast<int64_t>(rows[i]), IndexSet::npos, i});
+    std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
+        return lft.key < rgt.key;
+    });
+    return info;
+}
+
 } // Anonymous namespace
 
 CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> const& prev_rows,
@@ -628,18 +641,6 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
                                                            std::function<bool(int64_t)> key_did_change,
                                                            bool in_table_order)
 {
-
-    auto build_row_info = [](auto& rows) {
-        std::vector<RowInfo> info;
-        info.reserve(rows.size());
-        for (size_t i = 0; i < rows.size(); ++i)
-            info.push_back({rows[i], IndexSet::npos, i});
-        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
-            return lft.key < rgt.key;
-        });
-        return info;
-    };
-
     CollectionChangeBuilder ret;
     ::calculate(ret, build_row_info(prev_rows), build_row_info(next_rows), std::move(key_did_change), in_table_order);
     ret.verify();
@@ -651,18 +652,6 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
                                                            std::vector<size_t> const& next_rows,
                                                            std::function<bool(int64_t)> key_did_change)
 {
-
-    auto build_row_info = [](auto& rows) {
-        std::vector<RowInfo> info;
-        info.reserve(rows.size());
-        for (size_t i = 0; i < rows.size(); ++i)
-            info.push_back({static_cast<int64_t>(rows[i]), IndexSet::npos, i});
-        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
-            return lft.key < rgt.key;
-        });
-        return info;
-    };
-
     CollectionChangeBuilder ret;
     ::calculate(ret, build_row_info(prev_rows), build_row_info(next_rows), std::move(key_did_change), false);
     ret.verify();

@@ -20,6 +20,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '--compileunits-input',
+    type=Path,
+    help='Path to CSV output of compileunits input file',
+)
+
+parser.add_argument(
     '--analyzed-file',
     type=str,
     help='Name of file being analyzed by bloaty',
@@ -131,6 +137,20 @@ if args.sections_input:
                 items.append({
                     'name': section_name,
                     'type': type_str,
+                    'file_size': int(row['filesize']),
+                    'vm_size': int(row['vmsize'])
+                })
+
+if args.sections_input:
+    with open(args.compileunits_input, 'r') as csv_file:
+        input_csv_reader = DictReader(csv_file)
+
+        for row in input_csv_reader:
+            compileunit_name = row['compileunits']
+            if not elf_section_re.search(compileunit_name):
+                items.append({
+                    'name': compileunit_name,
+                    'type': 'compileunit',
                     'file_size': int(row['filesize']),
                     'vm_size': int(row['vmsize'])
                 })

@@ -91,6 +91,7 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
         nlohmann::json(
             {{"user_data", {{"token", in}}}, {"exp", *exp}, {"iat", *iat}, {"access", {"download", "upload"}}})
             .dump();
+
     std::string encoded_prefix, encoded_body;
     encoded_prefix.resize(util::base64_encoded_size(unencoded_prefix.size()));
     encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));

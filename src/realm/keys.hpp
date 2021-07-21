@@ -321,6 +321,9 @@ private:
     TableKey m_table_key;
 };
 
+using TableKeyType = decltype(TableKey::value);
+using ObjKeyType = decltype(ObjKey::value);
+
 inline std::ostream& operator<<(std::ostream& os, ObjLink link)
 {
     os << '{' << link.get_table_key() << ',' << link.get_obj_key() << '}';
@@ -347,6 +350,14 @@ struct hash<realm::ObjKey> {
     size_t operator()(realm::ObjKey key) const
     {
         return std::hash<uint64_t>{}(key.value);
+    }
+};
+
+template <>
+struct hash<realm::TableKey> {
+    size_t operator()(realm::TableKey key) const
+    {
+        return std::hash<uint32_t>{}(key.value);
     }
 };
 
