@@ -38,7 +38,6 @@ class SyncUser;
 namespace _impl {
 class RealmCoordinator;
 struct SyncClient;
-class WriteTransactionNotifyingSync;
 
 namespace sync_session_states {
 struct Active;
@@ -251,7 +250,6 @@ public:
     // without making it public to everyone
     class Internal {
         friend class _impl::RealmCoordinator;
-        friend class _impl::WriteTransactionNotifyingSync;
 
         static void set_sync_transact_callback(SyncSession& session,
                                                std::function<SyncSessionTransactCallback> callback)
