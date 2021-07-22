@@ -473,7 +473,6 @@ public:
     void upgrade_history_schema(int) override;
     _impl::History* _get_history_write() override;
     std::unique_ptr<_impl::History> _create_history_read() override;
-    bool is_sync_agent() const noexcept override;
 
     // Overriding member functions in TrivialReplication
     version_type prepare_changeset(const char*, std::size_t, version_type) override;
@@ -784,7 +783,6 @@ public:
 
 class ServerHistory::Context {
 public:
-    virtual bool owner_is_sync_server() const noexcept = 0;
     virtual std::mt19937_64& server_history_get_random() noexcept = 0;
 
     // @{

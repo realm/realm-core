@@ -20,21 +20,12 @@ namespace {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext(bool owner_is_sync_server = true)
-        : m_owner_is_sync_server{owner_is_sync_server}
-    {
-    }
-    bool owner_is_sync_server() const noexcept override
-    {
-        return m_owner_is_sync_server;
-    }
     std::mt19937_64& server_history_get_random() noexcept override
     {
         return m_random;
     }
 
 private:
-    const bool m_owner_is_sync_server;
     std::mt19937_64 m_random;
 };
 
@@ -424,8 +415,7 @@ TEST(Sync_ServerHistoryCompaction_ReadOnlyClients)
 
     std::string vpath = "/test";
     std::string server_path = fixture.map_virtual_to_real_path(vpath);
-    bool owner_is_sync_agent = false;
-    ServerHistoryContext context{owner_is_sync_agent};
+    ServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     _impl::ServerHistory server_history{server_path, context, compaction_control};
     DBRef server_realm = DB::create(server_history);

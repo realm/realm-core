@@ -228,16 +228,10 @@ _impl::History* ClientHistoryImpl::_get_history_write()
 // Overriding member function in realm::Replication
 std::unique_ptr<_impl::History> ClientHistoryImpl::_create_history_read()
 {
-    auto hist_impl = std::make_unique<ClientHistoryImpl>(get_database_path(), m_owner_is_sync_client);
+    auto hist_impl = std::make_unique<ClientHistoryImpl>(get_database_path());
     hist_impl->initialize(*m_shared_group); // Throws
     // Transfer ownership with pointer to private base class
     return std::unique_ptr<_impl::History>{hist_impl.release()};
-}
-
-// Overriding member function in realm::Replication
-bool ClientHistoryImpl::is_sync_agent() const noexcept
-{
-    return m_owner_is_sync_client;
 }
 
 // Overriding member function in realm::Replication

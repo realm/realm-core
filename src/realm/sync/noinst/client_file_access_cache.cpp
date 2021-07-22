@@ -43,19 +43,17 @@ void ClientFileAccessCache::Slot::open()
 
     m_cache.m_logger.debug("Opening Realm file: %1", realm_path); // Throws
 
-    sync::ClientReplication::Config config;
-    config.owner_is_sync_agent = true;
-    std::unique_ptr<sync::ClientReplication> history =
-        sync::make_client_replication(realm_path, std::move(config)); // Throws
+    std::unique_ptr<sync::ClientReplication> history = sync::make_client_replication(realm_path); // Throws
     DBOptions shared_group_options;
     if (m_encryption_key)
         shared_group_options.encryption_key = m_encryption_key->data();
     if (m_cache.m_disable_sync_to_disk)
         shared_group_options.durability = DBOptions::Durability::Unsafe;
-    DBRef shared_group = DB::create(*history, shared_group_options); // Throws
+    DBRef db = DB::create(*history, shared_group_options); // Throws
+    db->claim_sync_agent();
 
     m_history = std::move(history);
-    m_shared_group = std::move(shared_group);
+    m_db = std::move(db);
 
     m_cache.insert(*this);
     m_cache.m_first_open_file = this;

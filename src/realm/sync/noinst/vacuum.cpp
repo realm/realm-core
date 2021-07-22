@@ -90,9 +90,7 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
     SyncClientVacuumFile(util::Logger& logger, const Vacuum::Options& options, const std::string& path)
         : VacuumFile(logger, options, path)
     {
-        ClientReplication::Config history_config;
-        history_config.owner_is_sync_agent = false; // Prevent "multiple sync agents" error
-        auto client_history = sync::make_client_replication(path, history_config);
+        auto client_history = sync::make_client_replication(path);
         m_client_history = client_history.get();
         m_repl = std::move(client_history);
         DBOptions sg_options;
@@ -139,11 +137,6 @@ public:
     {
     }
 
-    bool owner_is_sync_server() const noexcept override final
-    {
-        return true;
-    }
-
     std::mt19937_64& server_history_get_random() noexcept override final
     {
         return m_random;
@@ -181,6 +174,7 @@ struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCom
         if (options.encryption_key)
             sg_options.encryption_key = options.encryption_key->data();
         m_sg = DB::create(*m_repl, sg_options);
+        m_sg->claim_sync_agent();
     }
 
     std::string get_type_description() const override

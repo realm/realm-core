@@ -69,8 +69,7 @@ public:
         ChunkedBinaryData changeset;
     };
 
-    ClientHistoryImpl(const std::string& realm_path, Config config = {});
-    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client);
+    ClientHistoryImpl(const std::string& realm_path);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -122,7 +121,6 @@ public:
     void upgrade_history_schema(int) override final;
     History* _get_history_write() override;
     std::unique_ptr<History> _create_history_read() override;
-    bool is_sync_agent() const noexcept override final;
     void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
 
     // Overriding member functions in realm::TrivialReplication
@@ -274,8 +272,6 @@ private:
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
-    const bool m_owner_is_sync_client;
-
     std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
 
     version_type find_sync_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry,
@@ -313,15 +309,8 @@ private:
 
 // Implementation
 
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, Config config)
+inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
     : ClientReplication{realm_path}
-    , m_owner_is_sync_client{config.owner_is_sync_agent}
-{
-}
-
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client)
-    : ClientReplication{realm_path} // Throws
-    , m_owner_is_sync_client{owner_is_sync_client}
 {
 }
 

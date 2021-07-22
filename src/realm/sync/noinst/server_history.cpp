@@ -1806,14 +1806,6 @@ std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 }
 
 
-// Overriding member in Replication
-bool ServerHistory::is_sync_agent() const noexcept
-{
-    bool owner_is_sync_server = m_context.owner_is_sync_server();
-    return owner_is_sync_server;
-}
-
-
 // Overriding member in TrivialReplication
 auto ServerHistory::prepare_changeset(const char* data, std::size_t size, version_type realm_version) -> version_type
 {

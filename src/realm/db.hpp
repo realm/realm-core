@@ -388,6 +388,8 @@ public:
     static void delete_files(const std::string& base_path, bool* did_delete_realm = nullptr,
                              bool delete_lockfile = false);
 
+    void claim_sync_agent();
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
@@ -446,8 +448,9 @@ private:
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
-
     std::shared_ptr<metrics::Metrics> m_metrics;
+    bool m_is_sync_agent = false;
+
     /// Attach this DB instance to the specified database file.
     ///
     /// While at least one instance of DB exists for a specific

@@ -99,7 +99,7 @@ private:
     Slot* m_next_open_file = nullptr;
 
     std::unique_ptr<sync::ClientReplication> m_history;
-    DBRef m_shared_group;
+    DBRef m_db;
     util::Optional<std::array<char, 64>> m_encryption_key;
 
     bool is_open() const noexcept;
@@ -177,7 +177,7 @@ inline ClientFileAccessCache::Slot::~Slot() noexcept
 inline ClientFileAccessCache::Slot::RefPair ClientFileAccessCache::Slot::access()
 {
     m_cache.access(*this); // Throws
-    return RefPair(*m_history, *m_shared_group);
+    return RefPair(*m_history, *m_db);
 }
 
 inline void ClientFileAccessCache::Slot::close() noexcept
@@ -188,7 +188,7 @@ inline void ClientFileAccessCache::Slot::close() noexcept
 
 inline bool ClientFileAccessCache::Slot::is_open() const noexcept
 {
-    if (m_shared_group) {
+    if (m_db) {
         REALM_ASSERT(m_prev_open_file);
         REALM_ASSERT(m_next_open_file);
         REALM_ASSERT(m_history);
@@ -209,8 +209,8 @@ inline void ClientFileAccessCache::Slot::do_close() noexcept
     // We are about to delete the Replication implementation passed to
     // DB::create(), so we must make sure that we are the only users of the
     // DBRef.
-    REALM_ASSERT(m_shared_group.use_count() == 1);
-    m_shared_group.reset();
+    REALM_ASSERT(m_db.use_count() == 1);
+    m_db.reset();
     m_history.reset();
 }
 

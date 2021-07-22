@@ -12,21 +12,13 @@ namespace {
 
 class HistoryContext : public _impl::ServerHistory::Context {
 public:
-    HistoryContext(bool owner_is_sync_server = false)
-        : m_owner_is_sync_server{owner_is_sync_server}
-    {
-    }
-    bool owner_is_sync_server() const noexcept override final
-    {
-        return m_owner_is_sync_server;
-    }
+    HistoryContext() {}
     std::mt19937_64& server_history_get_random() noexcept override final
     {
         return m_random;
     }
 
 private:
-    const bool m_owner_is_sync_server;
     std::mt19937_64 m_random;
 };
 
