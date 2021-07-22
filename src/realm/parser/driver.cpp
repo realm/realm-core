@@ -303,15 +303,11 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-void AtomPredNode::accept(NodeVisitor& visitor) {
-
-}
-
 void AndNode::accept(NodeVisitor& visitor) {
     visitor.visitAnd(*this);
 }
 
-void NodeVisitor::visitAnd(const AndNode& node) {
+void NodeVisitor::visitAnd(AndNode& node) {
     for (auto pred : node.atom_preds) {
         pred->accept(*this);
     }
@@ -321,7 +317,7 @@ void OrNode::accept(NodeVisitor& visitor) {
     visitor.visitOr(*this);
 }
 
-void NodeVisitor::visitOr(const OrNode& node) {
+void NodeVisitor::visitOr(OrNode& node) {
     for (auto pred : node.and_preds) {
         this->visitAnd(*pred);
     }
@@ -331,7 +327,7 @@ void NotNode::accept(NodeVisitor& visitor) {
     visitor.visitNot(*this);
 }
 
-void NodeVisitor::visitNot(const NotNode& node) {
+void NodeVisitor::visitNot(NotNode& node) {
     node.atom_pred->accept(*this);
 }
 
@@ -339,7 +335,7 @@ void TrueOrFalseNode::accept(NodeVisitor& visitor) {
     visitor.visitTrueOrFalse(*this);
 }
 
-void NodeVisitor::visitTrueOrFalse(const TrueOrFalseNode& node) {
+void NodeVisitor::visitTrueOrFalse(TrueOrFalseNode&) {
     //leaf node, no further traversal
 }
 
@@ -347,35 +343,23 @@ void ParensNode::accept(NodeVisitor& visitor) {
     visitor.visitParens(*this);
 }
 
-void NodeVisitor::visitParens(const ParensNode& node) {
+void NodeVisitor::visitParens(ParensNode& node) {
     this->visitOr(*node.pred);
-}
-
-void CompareNode::accept(NodeVisitor& visitor) {
-    visitor.visitCompare(*this);
-}
-
-void NodeVisitor::visitCompare(const CompareNode& node) {
-    //leaf node, no further traversal
 }
 
 void ConstantNode::accept(NodeVisitor& visitor) {
     visitor.visitConstant(*this);
 }
 
-void NodeVisitor::visitConstant(const ConstantNode& node) {
+void NodeVisitor::visitConstant(ConstantNode&) {
     //leaf node, no further traversal
-}
-
-void PropertyNode::accept(NodeVisitor& visitor) {
-
 }
 
 void ValueNode::accept(NodeVisitor& visitor) {
     visitor.visitValue(*this);
 }
 
-void NodeVisitor::visitValue(const ValueNode& node) {
+void NodeVisitor::visitValue(ValueNode& node) {
     if (node.constant != nullptr) {
         this->visitConstant(*node.constant);
     } else {
@@ -388,9 +372,10 @@ void EqualityNode::accept(NodeVisitor& visitor) {
     visitor.visitEquality(*this);
 }
 
-void NodeVisitor::visitEquality(const EqualityNode& node) {
+void NodeVisitor::visitEquality(EqualityNode& node) {
     for (auto value : node.values) {
-        this->visitValue(*value);
+        value->accept(*this);
+        // this->visitValue(*value);
     }
 }
 
@@ -398,9 +383,10 @@ void RelationalNode::accept(NodeVisitor& visitor) {
     visitor.visitRelational(*this);
 }
 
-void NodeVisitor::visitRelational(const RelationalNode& node) {
+void NodeVisitor::visitRelational(RelationalNode& node) {
     for (auto value : node.values) {
-        this->visitValue(*value);
+        value->accept(*this);
+        //this->visitValue(*value);
     }
 }
 
@@ -408,9 +394,10 @@ void StringOpsNode::accept(NodeVisitor& visitor) {
     visitor.visitStringOps(*this);
 }
 
-void NodeVisitor::visitStringOps(const StringOpsNode& node) {
+void NodeVisitor::visitStringOps(StringOpsNode& node) {
     for (auto value : node.values) {
-        this->visitValue(*value);
+        value->accept(*this);
+        // this->visitValue(*value);
     }
 }
 
@@ -418,7 +405,7 @@ void PostOpNode::accept(NodeVisitor& visitor) {
     visitor.visitPostOp(*this);
 }
 
-void NodeVisitor::visitPostOp(const PostOpNode& node) {
+void NodeVisitor::visitPostOp(PostOpNode&) {
     //leaf node, no further traversal
 }
 
@@ -426,7 +413,7 @@ void AggrNode::accept(NodeVisitor& visitor) {
     visitor.visitAggr(*this);
 }
 
-void NodeVisitor::visitAggr(const AggrNode& node) {
+void NodeVisitor::visitAggr(AggrNode&) {
     //leaf node, no further traversal
 }
 
@@ -434,7 +421,7 @@ void PathNode::accept(NodeVisitor& visitor) {
     visitor.visitPath(*this);
 }
 
-void NodeVisitor::visitPath(const PathNode& node) {
+void NodeVisitor::visitPath(PathNode&) {
     //leaf node, no further traversal
 }
 
@@ -442,7 +429,7 @@ void ListAggrNode::accept(NodeVisitor& visitor) {
     visitor.visitListAggr(*this);
 }
 
-void NodeVisitor::visitListAggr(const ListAggrNode& node) {
+void NodeVisitor::visitListAggr(ListAggrNode& node) {
     this->visitPath(*node.path);
     this->visitAggr(*node.aggr_op);
 }
@@ -451,7 +438,7 @@ void LinkAggrNode::accept(NodeVisitor& visitor) {
     visitor.visitLinkAggr(*this);
 }
 
-void NodeVisitor::visitLinkAggr(const LinkAggrNode& node) {
+void NodeVisitor::visitLinkAggr(LinkAggrNode& node) {
     this->visitPath(*node.path);
     this->visitAggr(*node.aggr_op);
 }
@@ -460,7 +447,7 @@ void PropNode::accept(NodeVisitor& visitor) {
     visitor.visitProp(*this);
 }
 
-void NodeVisitor::visitProp(const PropNode& node) {
+void NodeVisitor::visitProp(PropNode& node) {
     this->visitPath(*node.path);
     if (node.post_op != nullptr) {
         this->visitPostOp(*node.post_op);
@@ -474,7 +461,7 @@ void SubqueryNode::accept(NodeVisitor& visitor) {
     visitor.visitSubquery(*this);
 }
 
-void NodeVisitor::visitSubquery(const SubqueryNode& node) {
+void NodeVisitor::visitSubquery(SubqueryNode& node) {
     this->visitProp(*node.prop);
     this->visitOr(*node.subquery);
 }
@@ -483,7 +470,7 @@ void DescriptorNode::accept(NodeVisitor& visitor) {
     visitor.visitDescriptor(*this);
 }
 
-void NodeVisitor::visitDescriptor(const DescriptorNode& node) {
+void NodeVisitor::visitDescriptor(DescriptorNode&) {
     //leaf node, no further traversal
 }
 
@@ -491,7 +478,7 @@ void DescriptorOrderingNode::accept(NodeVisitor& visitor) {
     visitor.visitDescriptorOrdering(*this);
 }
 
-void NodeVisitor::visitDescriptorOrdering(const DescriptorOrderingNode& node) {
+void NodeVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node) {
     for (auto ordering : node.orderings) {
         this->visitDescriptor(*ordering);
     }
@@ -1598,7 +1585,11 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
-    return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+    Query query = QueryVisitor(&driver).visit(*driver.result);
+    return query.set_ordering(driver.ordering->visit(&driver));
+    // return visitor.query.set_ordering(DescriptorOrderingVisitor(&driver).visit(driver.ordering));
+    // return visitor.query.set_ordering(driver.ordering->visit(&driver));
+    // return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
 Subexpr* LinkChain::column(const std::string& col)
@@ -1732,5 +1723,1145 @@ SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery)
     static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
     return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
 }
+
+void PrintingVisitor::visitAnd(AndNode& node){
+    out << "AndNode(";
+    base::visitAnd(node);
+    out << ")";
+} 
+void PrintingVisitor::visitOr(OrNode& node){
+    out << "OrNode(";
+    base::visitOr(node);
+    out << ")";
+}
+void PrintingVisitor::visitNot(NotNode& node){
+    out << "NotNode(";
+    base::visitNot(node);
+    out << ")";
+}
+void PrintingVisitor::visitParens(ParensNode& node){
+    out << "ParensNode(";
+    base::visitParens(node);
+    out << ")";
+} 
+void PrintingVisitor::visitConstant(ConstantNode& node){
+    out << "ConstantNode: type = " << node.type << " value = " << node.text;
+} 
+void PrintingVisitor::visitEquality(EqualityNode& node){
+    out << "EqualityNode(";
+    base::visitEquality(node);
+    out << ")";
+}
+void PrintingVisitor::visitRelational(RelationalNode& node){
+    out << "RelationalNode(";
+    base::visitRelational(node);
+    out << ")";
+}
+void PrintingVisitor::visitStringOps(StringOpsNode& node){
+    out << "StringOpsNode(";
+    base::visitStringOps(node);
+    out << ")";
+} 
+void PrintingVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
+    out << "TrueOrFalseNode : value = " << node.true_or_false << " ";
+} 
+void PrintingVisitor::visitPostOp(PostOpNode& node){
+    out << "PostOpNode: opType = " << node.op_type << " opName = " << node.op_name << " ";
+} 
+void PrintingVisitor::visitAggr(AggrNode& node){
+    out << "AggrNode: type = " << node.type;
+} 
+void PrintingVisitor::visitPath(PathNode& node){
+    out << "PathNode: path_elems = {";
+    for (auto i: node.path_elems)
+    out << i << ", ";
+    out << "} ";
+} 
+void PrintingVisitor::visitListAggr(ListAggrNode& node){
+    out << "ListAggrNode(";
+    base::visitListAggr(node);
+    out << ")";
+} 
+void PrintingVisitor::visitLinkAggr(LinkAggrNode& node){
+    out << "LinkAggrNode(";
+    base::visitLinkAggr(node);
+    out << ")";
+} 
+void PrintingVisitor::visitProp(PropNode& node){
+    out << "PropNode(identifier = " << node.identifier << " comp_type: = " << static_cast<unsigned>(node.comp_type) << " ";
+    base::visitProp(node);
+    out << ")";
+} 
+void PrintingVisitor::visitSubquery(SubqueryNode& node){
+    out << "SubQueryNode(";
+    base::visitSubquery(node);
+    out << ")";
+} 
+void PrintingVisitor::visitDescriptor(DescriptorNode& node){
+    out << "DescriptorNode, type = " << node.type;
+} 
+void PrintingVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node){
+    out << "DescriptorOrderingNode(";
+    base::visitDescriptorOrdering(node);
+    out << ")";
+} 
+
+Query QueryVisitor::visit(ParserNode& node) {
+    node.accept(*this);
+    return std::move(query);
+}
+
+void QueryVisitor::visitAnd(AndNode& node){
+    auto atom_preds = node.atom_preds;
+    if (atom_preds.size() == 1) {
+        atom_preds[0]->accept(*this);
+        return;
+    }
+    realm::Query q(drv->m_base_table);
+    for (auto it : atom_preds) {
+        it->accept(*this);
+        q.and_query(query);
+    }
+    query = q;
+} 
+
+void QueryVisitor::visitOr(OrNode& node){
+    auto and_preds = node.and_preds;
+    if (and_preds.size() == 1) {
+        visitAnd(*and_preds[0]);
+        return;
+    }
+    realm::Query q(drv->m_base_table);
+    q.group();
+    for (auto it : and_preds) {
+        q.Or();
+        visitAnd(*it);
+        q.and_query(query);
+    }
+    q.end_group();
+    query = q;
+}
+
+void QueryVisitor::visitNot(NotNode& node){
+    node.atom_pred->accept(*this);
+    realm::Query q = drv->m_base_table->where();
+    q.Not();
+    q.and_query(query);
+    query = q;
+}
+
+void QueryVisitor::visitEquality(EqualityNode& node){
+    auto values = node.values;
+    auto op = node.op;
+    auto case_sensitive = node.case_sensitive;
+    auto [left, right] = cmp(values);
+    auto left_type = left->get_type();
+    auto right_type = right->get_type();
+
+    if (left_type == type_Link && right_type == type_TypedLink && right->has_constant_evaluation()) {
+        if (auto link_column = dynamic_cast<const Columns<Link>*>(left.get())) {
+            if (right->get_mixed().is_null()) {
+                right_type = ColumnTypeTraits<realm::null>::id;
+                right = std::make_unique<Value<realm::null>>();
+            }
+            else {
+                auto left_dest_table_key = link_column->link_map().get_target_table()->get_key();
+                auto right_table_key = right->get_mixed().get_link().get_table_key();
+                auto right_obj_key = right->get_mixed().get_link().get_obj_key();
+                if (left_dest_table_key == right_table_key) {
+                    right = std::make_unique<Value<ObjKey>>(right_obj_key);
+                    right_type = type_Link;
+                }
+                else {
+                    const Group* g = drv->m_base_table->get_parent_group();
+                    throw std::invalid_argument(util::format(
+                        "The relationship '%1' which links to type '%2' cannot be compared to an argument of type %3",
+                        link_column->link_map().description(drv->m_serializer_state),
+                        drv->get_printable_name(link_column->link_map().get_target_table()->get_name()),
+                        print_pretty_objlink(right->get_mixed().get_link(), g, drv)));
+                }
+            }
+        }
+    }
+
+    if (left_type.is_valid() && right_type.is_valid() && !Mixed::data_types_are_comparable(left_type, right_type)) {
+        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                             get_data_type_name(left_type), get_data_type_name(right_type)));
+    }
+    if (left_type == type_TypeOfValue || right_type == type_TypeOfValue) {
+        if (left_type != right_type) {
+            throw InvalidQueryArgError(
+                util::format("Unsupported comparison between @type and raw value: '%1' and '%2'",
+                             get_data_type_name(left_type), get_data_type_name(right_type)));
+        }
+    }
+
+    if (op == CompareNode::IN) {
+        Subexpr* r = right.get();
+        if (!r->has_multiple_values()) {
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list");
+        }
+    }
+
+    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
+    if (right->has_constant_evaluation() && (left_type == right_type || left_type == type_Mixed)) {
+        Mixed val = right->get_mixed();
+        if (prop && !prop->links_exist()) {
+            auto col_key = prop->column_key();
+            if (val.is_null()) {
+                switch (op) {
+                    case CompareNode::EQUAL:
+                    case CompareNode::IN:
+                        query = drv->m_base_table->where().equal(col_key, realm::null());
+                        return;
+                    case CompareNode::NOT_EQUAL:
+                        query = drv->m_base_table->where().not_equal(col_key, realm::null());
+                        return;
+                }
+            }
+            switch (left->get_type()) {
+                case type_Int:
+                    query = drv->simple_query(op, col_key, val.get_int());
+                    return;
+                case type_Bool:
+                    query = drv->simple_query(op, col_key, val.get_bool());
+                    return;
+                case type_String:
+                    query = drv->simple_query(op, col_key, val.get_string(), case_sensitive);
+                    return;
+                case type_Binary:
+                    query = drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
+                    return;
+                case type_Timestamp:
+                    query = drv->simple_query(op, col_key, val.get<Timestamp>());
+                    return;
+                case type_Float:
+                    query = drv->simple_query(op, col_key, val.get_float());
+                    return;
+                case type_Double:
+                    query = drv->simple_query(op, col_key, val.get_double());
+                    return;
+                case type_Decimal:
+                    query = drv->simple_query(op, col_key, val.get<Decimal128>());
+                    return;
+                case type_ObjectId:
+                    query = drv->simple_query(op, col_key, val.get<ObjectId>());
+                    return;
+                case type_UUID:
+                    query = drv->simple_query(op, col_key, val.get<UUID>());
+                    return;
+                case type_Mixed:
+                    query = drv->simple_query(op, col_key, val, case_sensitive);
+                    return;
+                default:
+                    break;
+            }
+        }
+        else if (left_type == type_Link) {
+            auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
+            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
+                link_column->get_comparison_type() == ExpressionComparisonType::Any) {
+                // We can use equal/not_equal and get a LinksToNode based query
+                if (op == CompareNode::EQUAL) {
+                    query = drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
+                    return;
+                }
+                else if (op == CompareNode::NOT_EQUAL) {
+                    query = drv->m_base_table->where().not_equal(link_column->link_map().get_first_column_key(), val);
+                    return;
+                }
+            }
+        }
+    }
+    if (case_sensitive) {
+        switch (op) {
+            case CompareNode::EQUAL:
+            case CompareNode::IN:
+                query = realm::Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::NOT_EQUAL:
+                query = realm::Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(right), std::move(left))));
+                return;
+        }
+    }
+    else {
+        verify_only_string_types(right_type, opstr[op] + "[c]");
+        switch (op) {
+            case CompareNode::EQUAL:
+            case CompareNode::IN:
+                query = Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::NOT_EQUAL:
+                query = Query(
+                    std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(right), std::move(left))));
+                return;
+        }
+    }
+    query = {};
+}
+
+void QueryVisitor::visitRelational(RelationalNode& node){
+    auto values = node.values;
+    auto op = node.op;
+    auto [left, right] = cmp(values);
+
+    auto left_type = left->get_type();
+    auto right_type = right->get_type();
+    const bool right_type_is_null = right->has_constant_evaluation() && right->get_mixed().is_null();
+    const bool left_type_is_null = left->has_constant_evaluation() && left->get_mixed().is_null();
+    REALM_ASSERT(!(left_type_is_null && right_type_is_null));
+
+    if (left_type == type_Link || left_type == type_TypeOfValue) {
+        throw InvalidQueryError(util::format(
+            "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
+            opstr[op]));
+    }
+
+    if (!(left_type_is_null || right_type_is_null) && (!left_type.is_valid() || !right_type.is_valid() ||
+                                                       !Mixed::data_types_are_comparable(left_type, right_type))) {
+        throw InvalidQueryError(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                             get_data_type_name(left_type), get_data_type_name(right_type)));
+    }
+
+    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+        (left_type == right_type || left_type == type_Mixed)) {
+        auto col_key = prop->column_key();
+        switch (left->get_type()) {
+            case type_Int:
+                query = drv->simple_query(op, col_key, right->get_mixed().get_int());
+                return;
+            case type_Bool:
+                break;
+            case type_String:
+                break;
+            case type_Binary:
+                break;
+            case type_Timestamp:
+                query = drv->simple_query(op, col_key, right->get_mixed().get<Timestamp>());
+                return;
+            case type_Float:
+                query = drv->simple_query(op, col_key, right->get_mixed().get_float());
+                return;
+            case type_Double:
+                query = drv->simple_query(op, col_key, right->get_mixed().get_double());
+                return;
+            case type_Decimal:
+                query = drv->simple_query(op, col_key, right->get_mixed().get<Decimal128>());
+                return;
+            case type_ObjectId:
+                query = drv->simple_query(op, col_key, right->get_mixed().get<ObjectId>());
+                return;
+            case type_UUID:
+                query = drv->simple_query(op, col_key, right->get_mixed().get<UUID>());
+                return;
+            case type_Mixed:
+                query = drv->simple_query(op, col_key, right->get_mixed());
+                return;
+            default:
+                break;
+        }
+    }
+    switch (op) {
+        case CompareNode::GREATER:
+            query = realm::Query(std::unique_ptr<Expression>(new Compare<Less>(std::move(right), std::move(left))));
+            return;
+        case CompareNode::LESS:
+            query = realm::Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(right), std::move(left))));
+            return;
+        case CompareNode::GREATER_EQUAL:
+            query = realm::Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(right), std::move(left))));
+            return;
+        case CompareNode::LESS_EQUAL:
+            query = realm::Query(std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(right), std::move(left))));
+            return;
+    }
+    query = {};
+}
+
+void QueryVisitor::visitStringOps(StringOpsNode& node){
+    auto values = node.values;
+    auto op = node.op;
+    auto case_sensitive = node.case_sensitive;
+    auto [left, right] = drv->cmp(values);
+
+    auto left_type = left->get_type();
+    auto right_type = right->get_type();
+    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
+
+    verify_only_string_types(right_type, opstr[op]);
+
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() &&
+        (left_type == right_type || left_type == type_Mixed)) {
+        auto col_key = prop->column_key();
+        if (right_type == type_String) {
+            StringData val = right->get_mixed().get_string();
+
+            switch (op) {
+                case CompareNode::BEGINSWITH:
+                    query = drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::ENDSWITH:
+                    query = drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::CONTAINS:
+                    query = drv->m_base_table->where().contains(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::LIKE:
+                    query = drv->m_base_table->where().like(col_key, val, case_sensitive);
+                    return;
+            }
+        }
+        else if (right_type == type_Binary) {
+            BinaryData val = right->get_mixed().get_binary();
+
+            switch (op) {
+                case CompareNode::BEGINSWITH:
+                    query = drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::ENDSWITH:
+                    query = drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::CONTAINS:
+                    query = drv->m_base_table->where().contains(col_key, val, case_sensitive);
+                    return;
+                case CompareNode::LIKE:
+                    query = drv->m_base_table->where().like(col_key, val, case_sensitive);
+                    return;
+            }
+        }
+    }
+
+    if (case_sensitive) {
+        switch (op) {
+            case CompareNode::BEGINSWITH:
+                query = Query(std::unique_ptr<Expression>(new Compare<BeginsWith>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::ENDSWITH:
+                query = Query(std::unique_ptr<Expression>(new Compare<EndsWith>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::CONTAINS:
+                query = Query(std::unique_ptr<Expression>(new Compare<Contains>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::LIKE:
+                query = Query(std::unique_ptr<Expression>(new Compare<Like>(std::move(right), std::move(left))));
+                return;
+        }
+    }
+    else {
+        switch (op) {
+            case CompareNode::BEGINSWITH:
+                query = Query(
+                    std::unique_ptr<Expression>(new Compare<BeginsWithIns>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::ENDSWITH:
+                query = Query(
+                    std::unique_ptr<Expression>(new Compare<EndsWithIns>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::CONTAINS:
+                query = Query(
+                    std::unique_ptr<Expression>(new Compare<ContainsIns>(std::move(right), std::move(left))));
+                return;
+            case CompareNode::LIKE:
+                query = Query(std::unique_ptr<Expression>(new Compare<LikeIns>(std::move(right), std::move(left))));
+                return;
+        }
+    }
+    query = {};
+} 
+void QueryVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
+    auto true_or_false = node.true_or_false;
+    Query q = drv->m_base_table->where();
+    if (true_or_false) {
+        q.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
+    }
+    else {
+        q.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
+    }
+    query = q;
+} 
+
+std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(const std::vector<ValueNode*>& values)
+{
+    std::unique_ptr<Subexpr> left;
+    std::unique_ptr<Subexpr> right;
+
+    auto left_constant = values[0]->constant;
+    auto right_constant = values[1]->constant;
+    auto left_prop = values[0]->prop;
+    auto right_prop = values[1]->prop;
+
+    if (left_constant && right_constant) {
+        throw InvalidQueryError("Cannot compare two constants");
+    }
+    if (right_constant) {
+        // Take left first - it cannot be a constant
+        left = SubexprVisitor(drv).visit(*left_prop);
+        right = SubexprVisitor(drv, left->get_type()).visit(*right_constant); 
+        verify_conditions(left.get(), right.get(), drv->m_serializer_state);
+    }
+    else {
+        right = SubexprVisitor(drv).visit(*right_prop);
+        if (left_constant) {
+            left = SubexprVisitor(drv, right->get_type()).visit(*left_constant);
+        }
+        else {
+            left = SubexprVisitor(drv).visit(*left_prop);
+        }
+        verify_conditions(right.get(), left.get(), drv->m_serializer_state);
+    }
+    return {std::move(left), std::move(right)};
+}
+
+std::unique_ptr<realm::Subexpr> SubexprVisitor::visit(ParserNode& node) {
+    // base::visit(*node);
+    node.accept(*this);
+    return std::move(subexpr);
+}
+
+void SubexprVisitor::visitConstant(ConstantNode& node){
+    auto text = node.text;
+    auto type = node.type;
+    auto hint = this->t;
+    Subexpr* ret = nullptr;
+    std::string explain_value_message = text;
+    switch (type) {
+        case ConstantNode::Type::NUMBER: {
+            if (hint == type_Decimal) {
+                ret = new Value<Decimal128>(Decimal128(text));
+            }
+            else {
+                ret = new Value<int64_t>(strtoll(text.c_str(), nullptr, 0));
+            }
+            break;
+        }
+        case ConstantNode::Type::FLOAT: {
+            switch (hint) {
+                case type_Float: {
+                    ret = new Value<float>(strtof(text.c_str(), nullptr));
+                    break;
+                }
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128(text));
+                    break;
+                default:
+                    ret = new Value<double>(strtod(text.c_str(), nullptr));
+                    break;
+            }
+            break;
+        }
+        case ConstantNode::Type::INFINITY_VAL: {
+            bool negative = text[0] == '-';
+            switch (hint) {
+                case type_Float: {
+                    auto inf = std::numeric_limits<float>::infinity();
+                    ret = new Value<float>(negative ? -inf : inf);
+                    break;
+                }
+                case type_Double: {
+                    auto inf = std::numeric_limits<double>::infinity();
+                    ret = new Value<double>(negative ? -inf : inf);
+                    break;
+                }
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128(text));
+                    break;
+                default:
+                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+                    break;
+            }
+            break;
+        }
+        case ConstantNode::Type::NAN_VAL: {
+            switch (hint) {
+                case type_Float:
+                    ret = new Value<float>(type_punning<float>(0x7fc00000));
+                    break;
+                case type_Double:
+                    ret = new Value<double>(type_punning<double>(0x7ff8000000000000));
+                    break;
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128::nan("0"));
+                    break;
+                default:
+                    REALM_UNREACHABLE();
+                    break;
+            }
+            break;
+        }
+        case ConstantNode::Type::STRING: {
+            std::string str = text.substr(1, text.size() - 2);
+            switch (hint) {
+                case type_Int:
+                    ret = new Value<int64_t>(string_to<int64_t>(str));
+                    break;
+                case type_Float:
+                    ret = new Value<float>(string_to<float>(str));
+                    break;
+                case type_Double:
+                    ret = new Value<double>(string_to<double>(str));
+                    break;
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128(str.c_str()));
+                    break;
+                default:
+                    if (hint == type_TypeOfValue) {
+                        try {
+                            ret = new Value<TypeOfValue>(TypeOfValue(str));
+                        }
+                        catch (const std::runtime_error& e) {
+                            throw InvalidQueryArgError(e.what());
+                        }
+                    }
+                    else {
+                        ret = new ConstantStringValue(str);
+                    }
+                    break;
+            }
+            break;
+        }
+        case ConstantNode::Type::BASE64: {
+            const size_t encoded_size = text.size() - 5;
+            size_t buffer_size = util::base64_decoded_size(encoded_size);
+            drv->m_args.buffer_space.push_back({});
+            auto& decode_buffer = drv->m_args.buffer_space.back();
+            decode_buffer.resize(buffer_size);
+            StringData window(text.c_str() + 4, encoded_size);
+            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+            if (!decoded_size) {
+                throw SyntaxError("Invalid base64 value");
+            }
+            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+            decode_buffer.resize(*decoded_size); // truncate
+
+            if (hint == type_String) {
+                ret = new ConstantStringValue(StringData(decode_buffer.data(), decode_buffer.size()));
+            }
+            if (hint == type_Binary) {
+                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+            }
+            if (hint == type_Mixed) {
+                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+            }
+            break;
+        }
+        case ConstantNode::Type::TIMESTAMP: {
+            auto s = text;
+            int64_t seconds;
+            int32_t nanoseconds;
+            if (s[0] == 'T') {
+                size_t colon_pos = s.find(":");
+                std::string s1 = s.substr(1, colon_pos - 1);
+                std::string s2 = s.substr(colon_pos + 1);
+                seconds = strtol(s1.c_str(), nullptr, 0);
+                nanoseconds = int32_t(strtol(s2.c_str(), nullptr, 0));
+            }
+            else {
+                // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
+                struct tm tmp = tm();
+                char sep = s.find("@") < s.size() ? '@' : 'T';
+                std::string fmt = "%d-%d-%d"s + sep + "%d:%d:%d:%d"s;
+                int cnt = sscanf(s.c_str(), fmt.c_str(), &tmp.tm_year, &tmp.tm_mon, &tmp.tm_mday, &tmp.tm_hour,
+                                 &tmp.tm_min, &tmp.tm_sec, &nanoseconds);
+                REALM_ASSERT(cnt >= 6);
+                tmp.tm_year -= 1900; // epoch offset (see man mktime)
+                tmp.tm_mon -= 1;     // converts from 1-12 to 0-11
+
+                if (tmp.tm_year < 0) {
+                    // platform timegm functions do not throw errors, they return -1 which is also a valid time
+                    throw InvalidQueryError("Conversion of dates before 1900 is not supported.");
+                }
+
+                seconds = platform_timegm(tmp); // UTC time
+                if (cnt == 6) {
+                    nanoseconds = 0;
+                }
+                if (nanoseconds < 0) {
+                    throw SyntaxError("The nanoseconds of a Timestamp cannot be negative.");
+                }
+                if (seconds < 0) { // seconds determines the sign of the nanoseconds part
+                    nanoseconds *= -1;
+                }
+            }
+            ret = new Value<Timestamp>(get_timestamp_if_valid(seconds, nanoseconds));
+            break;
+        }
+        case ConstantNode::Type::UUID_T:
+            ret = new Value<UUID>(UUID(text.substr(5, text.size() - 6)));
+            break;
+        case ConstantNode::Type::OID:
+            ret = new Value<ObjectId>(ObjectId(text.substr(4, text.size() - 5).c_str()));
+            break;
+        case ConstantNode::Type::LINK: {
+            ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
+            break;
+        }
+        case ConstantNode::Type::TYPED_LINK: {
+            size_t colon_pos = text.find(":");
+            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
+            auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
+            ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
+            break;
+        }
+        case ConstantNode::Type::NULL_VAL:
+            if (hint == type_String) {
+                ret = new ConstantStringValue(StringData()); // Null string
+            }
+            else if (hint == type_Binary) {
+                ret = new Value<Binary>(BinaryData()); // Null string
+            }
+            else {
+                ret = new Value<null>(realm::null());
+            }
+            break;
+        case ConstantNode::Type::TRUE:
+            ret = new Value<Bool>(true);
+            break;
+        case ConstantNode::Type::FALSE:
+            ret = new Value<Bool>(false);
+            break;
+        case ConstantNode::Type::ARG: {
+            size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
+            if (drv->m_args.is_argument_null(arg_no)) {
+                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
+                ret = new Value<null>(realm::null());
+            }
+            else {
+                auto type = drv->m_args.type_for_argument(arg_no);
+                explain_value_message =
+                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
+                switch (type) {
+                    case type_Int:
+                        ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
+                        break;
+                    case type_String:
+                        ret = new ConstantStringValue(drv->m_args.string_for_argument(arg_no));
+                        break;
+                    case type_Binary:
+                        ret = new ConstantBinaryValue(drv->m_args.binary_for_argument(arg_no));
+                        break;
+                    case type_Bool:
+                        ret = new Value<Bool>(drv->m_args.bool_for_argument(arg_no));
+                        break;
+                    case type_Float:
+                        ret = new Value<float>(drv->m_args.float_for_argument(arg_no));
+                        break;
+                    case type_Double: {
+                        // In realm-js all number type arguments are returned as double. If we don't cast to the
+                        // expected type, we would in many cases miss the option to use the optimized query node
+                        // instead of the general Compare class.
+                        double val = drv->m_args.double_for_argument(arg_no);
+                        switch (hint) {
+                            case type_Int:
+                            case type_Bool: {
+                                int64_t int_val = int64_t(val);
+                                // Only return an integer if it precisely represents val
+                                if (double(int_val) == val)
+                                    ret = new Value<int64_t>(int_val);
+                                else
+                                    ret = new Value<double>(val);
+                                break;
+                            }
+                            case type_Float:
+                                ret = new Value<float>(float(val));
+                                break;
+                            default:
+                                ret = new Value<double>(val);
+                                break;
+                        }
+                        break;
+                    }
+                    case type_Timestamp: {
+                        try {
+                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
+                        }
+                        catch (const std::exception&) {
+                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
+                        }
+                        break;
+                    }
+                    case type_ObjectId: {
+                        try {
+                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
+                        }
+                        catch (const std::exception&) {
+                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
+                        }
+                        break;
+                    }
+                    case type_Decimal:
+                        ret = new Value<Decimal128>(drv->m_args.decimal128_for_argument(arg_no));
+                        break;
+                    case type_UUID:
+                        ret = new Value<UUID>(drv->m_args.uuid_for_argument(arg_no));
+                        break;
+                    case type_Link:
+                        ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
+                        break;
+                    case type_TypedLink:
+                        if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
+                            ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
+                            break;
+                        }
+                        explain_value_message =
+                            util::format("%1 which links to %2", explain_value_message,
+                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
+                                                              drv->m_base_table->get_parent_group(), drv));
+                        break;
+                    default:
+                        break;
+                }
+            }
+            break;
+        }
+    }
+    if (!ret) {
+        throw InvalidQueryError(
+            util::format("Unsupported comparison between property of type '%1' and constant value: %2",
+                         get_data_type_name(hint), explain_value_message));
+    }
+    subexpr = std::unique_ptr<Subexpr>{ret};
+} 
+
+void SubexprVisitor::visitPostOp(PostOpNode& node){
+    auto op_type = node.op_type;
+    auto op_name = node.op_name;
+    if (op_type == PostOpNode::SIZE) {
+        if (auto s = dynamic_cast<Columns<Link>*>(subexpr.get())) {
+            subexpr = s->count().clone();
+            return;
+        }
+        if (auto s = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+            subexpr = s->size().clone();
+            return;
+        }
+        if (auto s = dynamic_cast<Columns<StringData>*>(subexpr.get())) {
+            subexpr = s->size().clone();
+            return;
+        }
+        if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr.get())) {
+            subexpr = s->size().clone();
+            return;
+        }
+    }
+    else if (op_type == PostOpNode::TYPE) {
+        if (auto s = dynamic_cast<Columns<Mixed>*>(subexpr.get())) {
+            subexpr = s->type_of_value().clone();
+            return;
+        }
+        if (auto s = dynamic_cast<ColumnsCollection<Mixed>*>(subexpr.get())) {
+            subexpr = s->type_of_value().clone();
+            return;
+        }
+        if (auto s = dynamic_cast<ObjPropertyBase*>(subexpr.get())) {
+            subexpr = Value<TypeOfValue>(TypeOfValue(s->column_key())).clone();
+            return;
+        }
+        if (dynamic_cast<Columns<Link>*>(subexpr.get())) {
+            subexpr = Value<TypeOfValue>(TypeOfValue(TypeOfValue::Attribute::ObjectLink)).clone();
+            return;
+        }
+    }
+
+    if (subexpr) {
+        throw InvalidQueryError(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
+                                             get_data_type_name(DataType(subexpr->get_type()))));
+    }
+    REALM_UNREACHABLE();
+} 
+
+void SubexprVisitor::visitAggr(AggrNode& node){
+    auto type = node.type;
+    std::unique_ptr<Subexpr> agg;
+    if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+        switch (type) {
+            case AggrNode::MAX:
+                agg = list_prop->max_of();
+                break;
+            case AggrNode::MIN:
+                agg = list_prop->min_of();
+                break;
+            case AggrNode::SUM:
+                agg = list_prop->sum_of();
+                break;
+            case AggrNode::AVG:
+                agg = list_prop->avg_of();
+                break;
+        }
+    }
+    else if (auto prop = dynamic_cast<SubColumnBase*>(subexpr.get())) {
+        switch (type) {
+            case AggrNode::MAX:
+                agg = prop->max_of();
+                break;
+            case AggrNode::MIN:
+                agg = prop->min_of();
+                break;
+            case AggrNode::SUM:
+                agg = prop->sum_of();
+                break;
+            case AggrNode::AVG:
+                agg = prop->avg_of();
+                break;
+        }
+    }
+    if (!agg) {
+        throw InvalidQueryError(
+            util::format("Cannot use aggregate '%1' for this type of property", agg_op_type_to_str(type)));
+    }
+    subexpr = std::move(agg);
+} 
+
+void SubexprVisitor::visitListAggr(ListAggrNode& node){
+    LinkChain link_chain = LinkChainVisitor(drv).visit(*node.path);
+    subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, node.identifier));
+    visitAggr(*node.aggr_op);
+} 
+
+void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
+    auto path = node.path;
+    auto prop = node.prop;
+    auto link = node.link;
+    auto aggr_op = node.aggr_op;
+    LinkChain link_chain = LinkChainVisitor(drv).visit(*path);
+    auto subexprtmp = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
+    auto link_prop = dynamic_cast<Columns<Link>*>(subexprtmp.get());
+    if (!link_prop) {
+        throw InvalidQueryError(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
+                                             agg_op_type_to_str(aggr_op->type), link));
+    }
+    prop = drv->translate(link_chain, prop);
+    auto col_key = link_chain.get_current_table()->get_column_key(prop);
+
+    std::unique_ptr<Subexpr> sub_column;
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            sub_column = link_prop->column<Int>(col_key).clone();
+            break;
+        case col_type_Float:
+            sub_column = link_prop->column<float>(col_key).clone();
+            break;
+        case col_type_Double:
+            sub_column = link_prop->column<double>(col_key).clone();
+            break;
+        case col_type_Decimal:
+            sub_column = link_prop->column<Decimal>(col_key).clone();
+            break;
+        case col_type_Timestamp:
+            sub_column = link_prop->column<Timestamp>(col_key).clone();
+            break;
+        default:
+            throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
+                                                 get_data_type_name(DataType(col_key.get_type()))));
+    }
+    subexpr = std::move(sub_column);
+    visitAggr(*aggr_op);
+} 
+
+void SubexprVisitor::visitProp(PropNode& node){
+    auto identifier = node.identifier;
+    auto path = node.path;
+    auto comp_type = node.comp_type;
+    auto index = node.index;
+    auto post_op = node.post_op;
+    bool is_keys = false;
+    if (identifier[0] == '@') {
+        if (identifier == "@values") {
+            identifier = path->path_elems.back();
+            path->path_elems.pop_back();
+        }
+        else if (identifier == "@keys") {
+            identifier = path->path_elems.back();
+            path->path_elems.pop_back();
+            is_keys = true;
+        }
+        else if (identifier == "@links") {
+            // This is a backlink aggregate query
+            LinkChain link_chain = LinkChainVisitor(drv, comp_type).visit(*path);
+            auto sub = link_chain.get_backlink_count<Int>();
+            subexpr = sub.clone();
+            return;
+        }
+    }
+    try {
+        LinkChain link_chain = LinkChainVisitor(drv, comp_type).visit(*path);
+        std::unique_ptr<Subexpr> test{drv->column(link_chain, identifier)};
+        // std::unique_ptr<Subexpr> test = std::unique_ptr<Subexpr>(drv->column(link_chain, identifier));
+        if (index) {
+            if (auto s = dynamic_cast<Columns<Dictionary>*>(test.get())) {
+                auto t = s->get_type();
+                // SubexprVisitor(drv, t).visit(index);
+                auto idx = SubexprVisitor(drv, t).visit(*index);
+                Mixed key = idx->get_mixed();
+                test = s->key(key).clone();
+            }
+        }
+        if (is_keys) {
+            if (auto s = dynamic_cast<Columns<Dictionary>*>(test.get())) {
+                test = std::make_unique<ColumnDictionaryKeys>(*s);
+            }
+        }
+        subexpr = std::move(test);
+        if (post_op) {
+            visitPostOp(*post_op);
+        }
+        return;
+    }
+    catch (const std::runtime_error& e) {
+        // Is 'identifier' perhaps length operator?
+        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+            // If 'length' is the operator, the last id in the path must be the name
+            // of a list property
+            auto prop = path->path_elems.back();
+            path->path_elems.pop_back();
+            std::unique_ptr<Subexpr> column{LinkChainVisitor(drv, comp_type).visit(*path).column(prop)};
+            if (auto list = dynamic_cast<ColumnListBase*>(column.get())) {
+                if (auto length_expr = list->get_element_length())
+                    subexpr = std::move(length_expr);
+                    return;
+            }
+        }
+        throw InvalidQueryError(e.what());
+    }
+    REALM_UNREACHABLE();
+} 
+
+void SubexprVisitor::visitSubquery(SubqueryNode& node){
+    auto variable_name = node.variable_name;
+    auto prop = node.prop;
+    auto subquery = node.subquery;
+    if (variable_name.size() < 2 || variable_name[0] != '$') {
+        throw SyntaxError(util::format("The subquery variable '%1' is invalid. The variable must start with "
+                                       "'$' and cannot be empty; for example '$x'.",
+                                       variable_name));
+    }
+    LinkChain lc = LinkChainVisitor(drv, prop->comp_type).visit(*prop->path);
+    prop->identifier = drv->translate(lc, prop->identifier);
+
+    if (prop->identifier.find("@links") == 0) {
+        drv->backlink(lc, prop->identifier);
+    }
+    else {
+        ColKey col_key = lc.get_current_table()->get_column_key(prop->identifier);
+        if (col_key.is_list() && col_key.get_type() != col_type_LinkList) {
+            throw InvalidQueryError(util::format(
+                "A subquery can not operate on a list of primitive values (property '%1')", prop->identifier));
+        }
+        if (col_key.get_type() != col_type_LinkList) {
+            throw InvalidQueryError(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
+                                                 prop->identifier,
+                                                 realm::get_data_type_name(DataType(col_key.get_type()))));
+        }
+        lc.link(prop->identifier);
+    }
+    TableRef previous_table = drv->m_base_table;
+    drv->m_base_table = lc.get_current_table().cast_away_const();
+    bool did_add = drv->m_mapping.add_mapping(drv->m_base_table, variable_name, "");
+    if (!did_add) {
+        throw InvalidQueryError(util::format("Unable to create a subquery expression with variable '%1' since an "
+                                             "identical variable already exists in this context",
+                                             variable_name));
+    }
+    Query query = QueryVisitor(drv).visit(*subquery);
+    drv->m_mapping.remove_mapping(drv->m_base_table, variable_name);
+    drv->m_base_table = previous_table;
+
+    subexpr = std::unique_ptr<Subexpr>(lc.subquery(query));
+} 
+
+LinkChain LinkChainVisitor::visit(PathNode& node) {
+    node.accept(*this);
+    return std::move(link_chain);
+}
+
+void LinkChainVisitor::visitPath(PathNode& node){
+    auto path_elems = node.path_elems;
+    LinkChain tmp = LinkChain(drv->m_base_table, comp_type);
+    for (std::string path_elem : path_elems) {
+        path_elem = drv->translate(tmp, path_elem);
+        if (path_elem.find("@links.") == 0) {
+            drv->backlink(tmp, path_elem);
+        }
+        else if (path_elem == "@values") {
+            if (!tmp.get_current_col().is_dictionary()) {
+                throw InvalidQueryError("@values only allowed on dictionaries");
+            }
+            continue;
+        }
+        else if (path_elem.empty()) {
+            continue; // this element has been removed, this happens in subqueries
+        }
+        else {
+            try {
+                tmp.link(path_elem);
+            }
+            // I case of exception, we have to throw InvalidQueryError
+            catch (const std::runtime_error& e) {
+                auto str = e.what();
+                StringData table_name = drv->get_printable_name(tmp.get_current_table()->get_name());
+                if (strstr(str, "no property")) {
+                    throw InvalidQueryError(util::format("'%1' has no property: '%2'", table_name, path_elem));
+                }
+                else {
+                    throw InvalidQueryError(
+                        util::format("Property '%1' in '%2' is not an Object", path_elem, table_name));
+                }
+            }
+        }
+    }
+    link_chain = std::move(tmp);
+    return;
+} 
+
+std::unique_ptr<DescriptorOrdering> DescriptorOrderingVisitor::visit(DescriptorOrderingNode& node){
+    node.accept(*this);
+    return std::move(descriptor_ordering);
+}
+
+void DescriptorOrderingVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node){
+    auto orderings = node.orderings;
+    auto target = drv->m_base_table;
+    std::unique_ptr<DescriptorOrdering> ordering;
+    for (auto cur_ordering : orderings) {
+        if (!ordering)
+            ordering = std::make_unique<DescriptorOrdering>();
+        if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
+            ordering->append_limit(LimitDescriptor(cur_ordering->limit));
+        }
+        else {
+            bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
+            std::vector<std::vector<ColKey>> property_columns;
+            for (auto& col_names : cur_ordering->columns) {
+                std::vector<ColKey> columns;
+                LinkChain link_chain(target);
+                for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
+                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
+                    if (!col_key) {
+                        throw InvalidQueryError(
+                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
+                                         col_names[ndx_in_path],
+                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
+                                         is_distinct ? "distinct" : "sort"));
+                    }
+                    columns.push_back(col_key);
+                    if (ndx_in_path < col_names.size() - 1) {
+                        link_chain.link(col_key);
+                    }
+                }
+                property_columns.push_back(columns);
+            }
+
+            if (is_distinct) {
+                ordering->append_distinct(DistinctDescriptor(property_columns));
+            }
+            else {
+                ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
+                                      SortDescriptor::MergeMode::prepend);
+            }
+        }
+    }
+    descriptor_ordering = std::move(ordering);
+} 
 
 } // namespace realm
