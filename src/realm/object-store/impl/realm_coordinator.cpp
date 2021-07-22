@@ -111,18 +111,12 @@ void RealmCoordinator::create_sync_session()
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-    SyncSession::Internal::set_sync_transact_callback(
-        *m_sync_session, [weak_self](VersionID old_version, VersionID new_version) {
-            if (auto self = weak_self.lock()) {
-                util::CheckedUniqueLock lock(self->m_transaction_callback_mutex);
-                if (auto transaction_callback = self->m_transaction_callback) {
-                    lock.unlock();
-                    transaction_callback(old_version, new_version);
-                }
-                if (self->m_notifier)
-                    self->m_notifier->notify_others();
-            }
-        });
+    SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
+        if (auto self = weak_self.lock()) {
+            if (self->m_notifier)
+                self->m_notifier->notify_others();
+        }
+    });
 #endif
 }
 
@@ -712,7 +706,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // version plus one, as we can only skip a prefix and not intermediate
         // transactions. If we have a notifier for the current Realm, then we
         // waited until it finished running in begin_transaction() and this
-        // invarient holds. If we don't have any notifiers then we don't need
+        // invariant holds. If we don't have any notifiers then we don't need
         // to set the skip version, but more importantly *can't* because we
         // didn't block when starting the write and the notifier transaction
         // may still be on an older version.
@@ -1216,13 +1210,6 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     if (realm.m_binding_context)
         realm.m_binding_context->did_send_notifications();
-}
-
-void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
-{
-    create_sync_session();
-    util::CheckedLockGuard lock(m_transaction_callback_mutex);
-    m_transaction_callback = std::move(fn);
 }
 
 bool RealmCoordinator::compact()
