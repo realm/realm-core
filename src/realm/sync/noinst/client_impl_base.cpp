@@ -1779,12 +1779,6 @@ void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_byte
 }
 
 
-util::Optional<std::array<char, 64>> Session::get_encryption_key() const noexcept
-{
-    return none;
-}
-
-
 const util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() const noexcept
 {
     return m_client_reset_config;
@@ -1849,15 +1843,14 @@ void Session::activate()
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config) {
-            if (!util::File::exists(client_reset_config->metadata_dir)) {
+            if (!util::File::is_dir(client_reset_config->metadata_dir)) {
                 logger.error("Client reset config requires an existing metadata directory"); // Throws
                 REALM_TERMINATE("No metadata directory");
             }
             logger.info("Client reset config, metadata_dir = '%1', ",
                         client_reset_config->metadata_dir); // Throws
-            m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
-                                                                           client_reset_config->metadata_dir,
-                                                                           get_encryption_key())); // Throws
+            m_client_reset_operation.reset(
+                new _impl::ClientResetOperation(logger, get_db(), client_reset_config->metadata_dir)); // Throws
         }
 
         if (!m_client_reset_operation) {
@@ -2301,7 +2294,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
 
     auto client_reset_if_needed = [&]() -> bool {
-        // ClientResetOperation::finilize() will return true only if the operation actually did
+        // ClientResetOperation::finalize() will return true only if the operation actually did
         // a client reset. It may choose not to do a reset if the local Realm does not exist
         // at this point (in that case there is nothing to reset). But in any case, we must
         // clean up m_client_reset_operation at this point as sync should be able to continue from

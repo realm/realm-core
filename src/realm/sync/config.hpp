@@ -124,7 +124,6 @@ struct SyncConfig {
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    util::Optional<std::array<char, 64>> realm_encryption_key;
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SSLVerifyCallback> ssl_verify_callback;

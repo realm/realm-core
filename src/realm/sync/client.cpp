@@ -7,7 +7,7 @@
 #include <realm/util/uri.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/platform_info.hpp>
-#include <realm/sync/noinst/client_file_access_cache.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/version.hpp>
 #include <realm/version.hpp>
@@ -21,7 +21,6 @@ using namespace realm::util;
 
 // clang-format off
 using ClientImplBase                  = _impl::ClientImplBase;
-using ClientFileAccessCache           = _impl::ClientFileAccessCache;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -49,17 +48,16 @@ class SessionWrapper;
 using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
 
 
-class SessionWrapperQueue {
+class SessionWrapperStack {
 public:
     bool empty() const noexcept;
-    void push_back(util::bind_ptr<SessionWrapper>) noexcept;
-    void push_back(SessionWrapperQueue&) noexcept;
-    util::bind_ptr<SessionWrapper> pop_front() noexcept;
+    void push(util::bind_ptr<SessionWrapper>) noexcept;
+    util::bind_ptr<SessionWrapper> pop() noexcept;
     void clear() noexcept;
-    SessionWrapperQueue() noexcept = default;
-    SessionWrapperQueue(SessionWrapperQueue&&) noexcept;
-    ~SessionWrapperQueue();
-    friend void swap(SessionWrapperQueue& q_1, SessionWrapperQueue& q_2) noexcept
+    SessionWrapperStack() noexcept = default;
+    SessionWrapperStack(SessionWrapperStack&&) noexcept;
+    ~SessionWrapperStack();
+    friend void swap(SessionWrapperStack& q_1, SessionWrapperStack& q_2) noexcept
     {
         std::swap(q_1.m_back, q_2.m_back);
     }
@@ -81,7 +79,6 @@ public:
     void run();
 
 private:
-    _impl::ClientFileAccessCache m_file_access_cache;
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
     util::network::DeadlineTimer m_keep_running_timer;
@@ -131,7 +128,7 @@ private:
     // been finalized. Order in queue is immaterial.
     //
     // Protected by `m_mutex`.
-    SessionWrapperQueue m_abandoned_session_wrappers;
+    SessionWrapperStack m_abandoned_session_wrappers;
 
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
@@ -231,12 +228,12 @@ public:
 
     void on_connection_state_changed(ConnectionState, const ErrorInfo*);
 
-    // Overrinding member function in ClientImplBase::Session
+    // Overriding member function in ClientImplBase::Session
     const std::string& get_virt_path() const noexcept override final;
     const std::string& get_signed_access_token() const noexcept override final;
     const std::string& get_realm_path() const noexcept override final;
+    DB& get_db() const noexcept override final;
     ClientHistoryBase& access_realm() override final;
-    util::Optional<std::array<char, 64>> get_encryption_key() const noexcept override final;
     const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
     void initiate_integrate_changesets(std::uint_fast64_t, const ReceivedChangesets&) override final;
     void on_upload_completion() override final;
@@ -293,8 +290,10 @@ private:
 // in _impl::ClientImplBase::Connection.
 class SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, std::string realm_path, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, Session::Config);
+    ~SessionWrapper() noexcept;
 
+    ClientReplication& get_history() noexcept;
     ClientImpl& get_client() noexcept;
 
     void set_sync_transact_handler(std::function<SyncTransactCallback>);
@@ -320,7 +319,6 @@ public:
     // These are called from ClientImpl
     void actualize(ServerEndpoint);
     void finalize();
-    void close_file_slot() noexcept;
     void finalize_before_actualization() noexcept;
 
     // Overriding member function in SyncTransactReporter
@@ -328,7 +326,8 @@ public:
 
 private:
     ClientImpl& m_client;
-    ClientFileAccessCache::Slot m_file_slot;
+    DBRef m_db;
+    Replication* m_history;
 
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -350,8 +349,6 @@ private:
     std::string m_http_request_path_prefix;
     std::string m_virt_path;
     std::string m_signed_access_token;
-
-    const util::Optional<std::array<char, 64>> m_encryption_key;
 
     util::Optional<Session::Config::ClientReset> m_client_reset_config;
 
@@ -388,7 +385,7 @@ private:
     // the download progress is likely completely out of date.
     bool m_reliable_download_progress = false;
 
-    // Set to point to an actiavted session object during actualization of the
+    // Set to point to an activated session object during actualization of the
     // session wrapper. Set to null during finalization of the session
     // wrapper. Both modifications are guaranteed to be performed by the event
     // loop thread.
@@ -436,80 +433,55 @@ private:
     void report_progress();
     void change_server_endpoint(ServerEndpoint);
 
-    friend class SessionWrapperQueue;
+    friend class SessionWrapperStack;
     friend class SessionImpl;
 };
 
 
-// ################ SessionwrapperQueue ################
+// ################ SessionWrapperStack ################
 
-inline bool SessionWrapperQueue::empty() const noexcept
+inline bool SessionWrapperStack::empty() const noexcept
 {
     return !m_back;
 }
 
 
-inline void SessionWrapperQueue::push_back(util::bind_ptr<SessionWrapper> w) noexcept
+inline void SessionWrapperStack::push(util::bind_ptr<SessionWrapper> w) noexcept
 {
     REALM_ASSERT(!w->m_next);
-    if (m_back) {
-        w->m_next = m_back->m_next;
-        m_back->m_next = w.get();
-    }
-    else {
-        w->m_next = w.get();
-    }
+    w->m_next = m_back;
     m_back = w.release();
 }
 
 
-inline void SessionWrapperQueue::push_back(SessionWrapperQueue& q) noexcept
+inline util::bind_ptr<SessionWrapper> SessionWrapperStack::pop() noexcept
 {
-    if (!q.m_back)
-        return;
-    if (m_back)
-        std::swap(m_back->m_next, q.m_back->m_next);
-    m_back = q.m_back;
-    q.m_back = nullptr;
-}
-
-
-inline util::bind_ptr<SessionWrapper> SessionWrapperQueue::pop_front() noexcept
-{
-    SessionWrapper* w = nullptr;
+    util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
     if (m_back) {
-        w = m_back->m_next;
-        if (w != m_back) {
-            m_back->m_next = w->m_next;
-        }
-        else {
-            m_back = nullptr;
-        }
+        m_back = m_back->m_next;
         w->m_next = nullptr;
     }
-    return util::bind_ptr<SessionWrapper>{w, util::bind_ptr_base::adopt_tag{}};
+    return w;
 }
 
 
-inline void SessionWrapperQueue::clear() noexcept
+inline void SessionWrapperStack::clear() noexcept
 {
-    if (m_back) {
+    while (m_back) {
         util::bind_ptr<SessionWrapper> w{m_back, util::bind_ptr_base::adopt_tag{}};
-        while (w->m_next != m_back)
-            w.reset(w->m_next);
-        m_back = nullptr;
+        m_back = w->m_next;
     }
 }
 
 
-inline SessionWrapperQueue::SessionWrapperQueue(SessionWrapperQueue&& q) noexcept
+inline SessionWrapperStack::SessionWrapperStack(SessionWrapperStack&& q) noexcept
     : m_back{q.m_back}
 {
     q.m_back = nullptr;
 }
 
 
-inline SessionWrapperQueue::~SessionWrapperQueue()
+inline SessionWrapperStack::~SessionWrapperStack()
 {
     clear();
 }
@@ -519,7 +491,6 @@ inline SessionWrapperQueue::~SessionWrapperQueue()
 
 inline ClientImpl::ClientImpl(Client::Config config)
     : ClientImplBase{make_client_impl_base_config(config)}                            // Throws
-    , m_file_access_cache{config.max_open_files, config.disable_sync_to_disk, logger} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -534,8 +505,6 @@ inline ClientImpl::ClientImpl(Client::Config config)
     build_mode = "Release";
 #endif
     logger.debug("Build mode: %1", build_mode);
-    logger.debug("Config param: max_open_files = %1",
-                 config.max_open_files); // Throws
     logger.debug("Config param: one_connection_per_session = %1",
                  config.one_connection_per_session); // Throws
     logger.debug("Config param: connect_timeout = %1 ms",
@@ -603,11 +572,6 @@ ClientImpl::~ClientImpl()
     // Session wrappers are removed from m_unactualized_session_wrappers as they
     // are abandoned.
     REALM_ASSERT(m_unactualized_session_wrappers.empty());
-
-    // All file slots need to have been closed before the file access cache is
-    // destroyed.
-    while (util::bind_ptr<SessionWrapper> wrapper = m_abandoned_session_wrappers.pop_front())
-        wrapper->close_file_slot();
 }
 
 
@@ -779,7 +743,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
         wrapper->finalize_before_actualization();
         return;
     }
-    m_abandoned_session_wrappers.push_back(std::move(wrapper));
+    m_abandoned_session_wrappers.push(std::move(wrapper));
     bool retrigger = !m_actualize_and_finalize_needed;
     m_actualize_and_finalize_needed = true;
     // The conditional triggering needs to happen before releasing the
@@ -794,7 +758,7 @@ void ClientImpl::register_abandoned_session_wrapper(util::bind_ptr<SessionWrappe
 void ClientImpl::actualize_and_finalize_session_wrappers()
 {
     std::map<SessionWrapper*, ServerEndpoint> unactualized_session_wrappers;
-    SessionWrapperQueue abandoned_session_wrappers;
+    SessionWrapperStack abandoned_session_wrappers;
     {
         util::LockGuard lock{m_mutex};
         m_actualize_and_finalize_needed = false;
@@ -805,7 +769,7 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
     // ones. This ensures that deactivation of old sessions is initiated before
     // new session are activated. This, in turn, ensures that the server does
     // not see two overlapping sessions for the same local Realm file.
-    while (util::bind_ptr<SessionWrapper> wrapper = abandoned_session_wrappers.pop_front())
+    while (util::bind_ptr<SessionWrapper> wrapper = abandoned_session_wrappers.pop())
         wrapper->finalize(); // Throws
     for (auto& p : unactualized_session_wrappers) {
         SessionWrapper& wrapper = *p.first;
@@ -1051,17 +1015,17 @@ const std::string& SessionImpl::get_signed_access_token() const noexcept
 
 const std::string& SessionImpl::get_realm_path() const noexcept
 {
-    return m_wrapper.m_file_slot.realm_path;
+    return m_wrapper.m_db->get_path();
+}
+
+DB& SessionImpl::get_db() const noexcept
+{
+    return *m_wrapper.m_db;
 }
 
 ClientReplicationBase& SessionImpl::access_realm()
 {
-    return m_wrapper.m_file_slot.access().history;
-}
-
-util::Optional<std::array<char, 64>> SessionImpl::get_encryption_key() const noexcept
-{
-    return m_wrapper.m_encryption_key;
+    return m_wrapper.get_history();
 }
 
 const util::Optional<sync::Session::Config::ClientReset>& SessionImpl::get_client_reset_config() const noexcept
@@ -1114,9 +1078,10 @@ void SessionImpl::on_resumed()
 
 // ################ SessionWrapper ################
 
-SessionWrapper::SessionWrapper(ClientImpl& client, std::string realm_path, Session::Config config)
+SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
     : m_client{client}
-    , m_file_slot{client.m_file_access_cache, std::move(realm_path), config.encryption_key}
+    , m_db(std::move(db))
+    , m_history(m_db->get_replication())
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -1131,10 +1096,24 @@ SessionWrapper::SessionWrapper(ClientImpl& client, std::string realm_path, Sessi
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
-    , m_encryption_key{config.encryption_key}
     , m_client_reset_config{config.client_reset_config}
     , m_proxy_config{config.proxy_config} // Throws
 {
+    REALM_ASSERT(m_db);
+    REALM_ASSERT(m_db->get_replication());
+    REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
+}
+
+SessionWrapper::~SessionWrapper() noexcept
+{
+    if (m_db && m_actualized)
+        m_db->release_sync_agent();
+}
+
+
+inline ClientReplication& SessionWrapper::get_history() noexcept
+{
+    return static_cast<ClientReplication&>(*m_history);
 }
 
 
@@ -1398,6 +1377,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
 {
     REALM_ASSERT(!m_actualized);
     REALM_ASSERT(!m_sess);
+    m_db->claim_sync_agent();
 
     bool was_created = false;
     ConnectionImpl& conn = m_client.get_connection(
@@ -1411,7 +1391,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         std::unique_ptr<SessionImpl> sess_2 =
             std::make_unique<SessionImpl>(*this, conn, m_session_impl_config); // Throws
         SessionImpl& sess = *sess_2;
-        sess.logger.detail("Binding '%1' to '%2'", m_file_slot.realm_path, m_virt_path); // Throws
+        sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path);       // Throws
         conn.activate_session(std::move(sess_2));                                        // Throws
 
         m_actualized = true;
@@ -1452,9 +1432,10 @@ void SessionWrapper::finalize()
     m_sess = nullptr;
 
     // The Realm file can be closed now, as no access to the Realm file is
-    // suppoed to happen on behalf of a session after initiation of
+    // supposed to happen on behalf of a session after initiation of
     // deactivation.
-    m_file_slot.proper_close(); // Throws
+    m_db->release_sync_agent();
+    m_db = nullptr;
 
     // All outstanding wait operations must be canceled
     while (!m_upload_completion_handlers.empty()) {
@@ -1475,13 +1456,6 @@ void SessionWrapper::finalize()
         std::error_code ec = error::operation_aborted;
         handler(ec); // Throws
     }
-}
-
-
-// Should only be called during destruction of the client object.
-void SessionWrapper::close_file_slot() noexcept
-{
-    m_file_slot.close();
 }
 
 
@@ -1619,9 +1593,8 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    ClientReplication& history = m_file_slot.access().history; // Throws
-    history.get_upload_download_bytes(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
-                                      snapshot_version);
+    _impl::ClientHistoryImpl::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes,
+                                                        uploaded_bytes, uploadable_bytes, snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total
     // size of the history. From protocol version 26, downloadable_bytes
@@ -1685,7 +1658,7 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
         std::unique_ptr<SessionImpl> new_sess_2 =
             std::make_unique<SessionImpl>(*this, new_conn, m_session_impl_config); // Throws
         SessionImpl& new_sess = *new_sess_2;
-        new_sess.logger.detail("Rebinding '%1' to '%2'", m_file_slot.realm_path,
+        new_sess.logger.detail("Rebinding '%1' to '%2'", m_db->get_path(),
                                m_virt_path);              // Throws
         new_conn.activate_session(std::move(new_sess_2)); // Throws
 
@@ -1816,15 +1789,15 @@ public:
 
 class Session::Impl : public SessionWrapper {
 public:
-    Impl(ClientImpl& client, std::string realm_path, Config config)
-        : SessionWrapper{client, std::move(realm_path), std::move(config)} // Throws
+    Impl(ClientImpl& client, DBRef db, Config config)
+        : SessionWrapper{client, std::move(db), std::move(config)} // Throws
     {
     }
 
-    static Impl* make_session(ClientImpl& client, std::string realm_path, Config config)
+    static Impl* make_session(ClientImpl& client, DBRef db, Config config)
     {
         util::bind_ptr<Impl> sess;
-        sess.reset(new Impl{client, std::move(realm_path), std::move(config)}); // Throws
+        sess.reset(new Impl{client, std::move(db), std::move(config)}); // Throws
         // The reference count passed back to the application is implicitly
         // owned by a naked pointer. This is done to avoid exposing
         // implementation details through the header file (that is, through the
@@ -1880,8 +1853,8 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, std::string realm_path, Config config)
-    : m_impl{Impl::make_session(*client.m_impl, std::move(realm_path), std::move(config))} // Throws
+Session::Session(Client& client, DBRef db, Config config)
+    : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
 {
 }
 

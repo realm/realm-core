@@ -70,11 +70,6 @@ public:
         /// that it remains easily interpretable by human beings.
         std::string user_agent_application_info;
 
-        /// The maximum number of Realm files that will be kept open
-        /// concurrently by this client. The client keeps a cache of open Realm
-        /// files for efficiency reasons.
-        long max_open_files = 256;
-
         /// An optional logger to be used by the client. If no logger is
         /// specified, the client will use an instance of util::StderrLogger
         /// with the log level threshold set to util::Logger::Level::info. The
@@ -331,11 +326,11 @@ class BadServerUrl; // Exception
 /// longer be executing when session termination completes, and they are
 /// guaranteed to not be called after session termination completes. Termination
 /// is an event that completes asynchronously with respect to the application,
-/// but is initiated by calling detach(), or implicitely by destroying a session
+/// but is initiated by calling detach(), or implicitly by destroying a session
 /// object. After having initiated one or more session terminations, the
 /// application can wait for those terminations to complete by calling
 /// Client::wait_for_session_terminations_or_client_stopped(). Since callback
-/// functinos are always executed by the event loop thread, they are also
+/// functions are always executed by the event loop thread, they are also
 /// guaranteed to not be executing after Client::run() has returned.
 class Session {
 public:
@@ -489,9 +484,6 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// The encryption key the DB will be opened with.
-        util::Optional<std::array<char, 64>> encryption_key;
-
         /// ClientReset is used for both async open and client reset. If
         /// client_reset is not util::none, the sync client will perform
         /// async open for this session if the local Realm does not exist, and
@@ -594,10 +586,7 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    ///
-    /// \param realm_path The file-system path of a local client-side Realm
-    /// file.
-    Session(Client&, std::string realm_path, Config = {});
+    Session(Client&, std::shared_ptr<DB>, Config = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
@@ -615,12 +604,12 @@ public:
     /// under detach().
     Session& operator=(Session&&) noexcept;
 
-    /// Detach this sesion object from the client object (Client). If the
+    /// Detach this session object from the client object (Client). If the
     /// session object is already detached, this function has no effect
     /// (idempotency).
     ///
     /// Detachment initiates session termination, which is an event that takes
-    /// place shortly therafter in the context of the client's event loop
+    /// place shortly thereafter in the context of the client's event loop
     /// thread.
     ///
     /// A detached session object may be destroyed, move-assigned to, and moved
@@ -632,7 +621,7 @@ public:
     /// not execute concurrently with object destruction. Additionally,
     /// detachment must not execute concurrently with a moving operation
     /// involving the session object on the left or right-hand side. See move
-    /// constructor and assigment operator.
+    /// constructor and assignment operator.
     void detach() noexcept;
 
     /// \brief Set a function to be called when the local Realm has changed due

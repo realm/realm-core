@@ -12,18 +12,6 @@ using namespace realm::sync;
 using namespace realm::_impl;
 using realm::util::File;
 
-// FIXME: This constexpr check belongs in Core's version.hpp
-static constexpr bool core_version_at_least(int major, int minor, int patch)
-{
-    // FIXME: Also compare the 'extra' component of the version. To do this, we
-    // need the C++20 constexpr version of std::equal().
-    return (REALM_VERSION_MAJOR > major) ||
-           (REALM_VERSION_MAJOR == major &&
-            ((REALM_VERSION_MINOR > minor) || (REALM_VERSION_MINOR == minor && REALM_VERSION_PATCH >= patch)));
-}
-
-static_assert(core_version_at_least(5, 6, 0), "Vacuum is only supported on Core version >= 5.6.0");
-
 struct Vacuum::VacuumFile {
     util::Logger& logger;
 
@@ -37,7 +25,6 @@ struct Vacuum::VacuumFile {
 
     const Options& m_options;
     std::string m_path;
-    std::unique_ptr<Replication> m_repl;
     DBRef m_sg;
 
     virtual void dry_run(Results& results) = 0;
@@ -92,12 +79,11 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
     {
         auto client_history = sync::make_client_replication(path);
         m_client_history = client_history.get();
-        m_repl = std::move(client_history);
         DBOptions sg_options;
         sg_options.allow_file_format_upgrade = !options.no_file_upgrade;
         if (options.encryption_key)
             sg_options.encryption_key = options.encryption_key->data();
-        m_sg = DB::create(*m_repl, sg_options);
+        m_sg = DB::create(std::move(client_history), sg_options);
     }
 
     std::string get_type_description() const override
@@ -168,12 +154,11 @@ struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCom
     {
         auto server_history = std::make_unique<ServerHistory>(path, m_context, *this);
         m_server_history = server_history.get();
-        m_repl = std::move(server_history);
         DBOptions sg_options;
         sg_options.allow_file_format_upgrade = !options.no_file_upgrade;
         if (options.encryption_key)
             sg_options.encryption_key = options.encryption_key->data();
-        m_sg = DB::create(*m_repl, sg_options);
+        m_sg = DB::create(std::move(server_history), sg_options);
         m_sg->claim_sync_agent();
     }
 

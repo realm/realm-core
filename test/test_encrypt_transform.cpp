@@ -137,18 +137,15 @@ TEST_IF(EncryptTransform_ServerHistory, false)
     std::string partial_server_path;
 
     {
-        std::unique_ptr<Replication> reference_history = make_client_replication(reference_path);
-        auto reference_sg = DB::create(*reference_history);
-
-        std::unique_ptr<Replication> partial_history = make_client_replication(partial_path);
-        auto partial_sg = DB::create(*partial_history);
+        auto reference_sg = DB::create(make_client_replication(reference_path));
+        auto partial_sg = DB::create(make_client_replication(partial_path));
 
         ClientServerFixture::Config server_config;
         server_config.server_encryption_key = encryption_key1;
         ClientServerFixture fixture{dir, test_context, server_config};
         fixture.start();
 
-        Session reference_session = fixture.make_session(reference_path);
+        Session reference_session = fixture.make_session(reference_sg);
         fixture.bind_session(reference_session, "/reference");
         ColKey col_ndx_person_name;
         ColKey col_ndx_person_age;
@@ -167,7 +164,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         }
         reference_session.wait_for_upload_complete_or_client_stopped();
 
-        Session partial_session = fixture.make_session(partial_path);
+        Session partial_session = fixture.make_session(partial_sg);
         fixture.bind_session(partial_session, "/reference/__partial/test/0");
         partial_session.wait_for_download_complete_or_client_stopped();
 
@@ -227,10 +224,6 @@ TEST_IF(EncryptTransform_ServerHistory, false)
             // StringData name = persons->get_object(0).get<String>(col_ndx_person_name);
             // CHECK_EQUAL(name, "Frank");
         }
-
-        partial_session.detach();
-        reference_session.detach();
-        fixture.stop();
     }
 
     // perform a key rotation

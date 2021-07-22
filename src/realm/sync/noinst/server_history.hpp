@@ -635,7 +635,7 @@ private:
     // a high probability).
     salt_type m_salt_for_new_server_versions;
 
-    DB* m_shared_group = nullptr;
+    DB* m_db = nullptr;
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
@@ -907,7 +907,7 @@ inline ServerHistory::ServerHistory(const std::string& realm_path, Context& cont
 template <class H>
 bool ServerHistory::transact(H handler, sync::VersionInfo& version_info)
 {
-    auto wt = m_shared_group->start_write();       // Throws
+    auto wt = m_db->start_write();                 // Throws
     if (handler(*wt)) {                            // Throws
         version_info.realm_version = wt->commit(); // Throws
         version_info.sync_version = get_salted_server_version();

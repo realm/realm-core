@@ -94,21 +94,8 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
-    if (!m_config.encryption_key.empty() && !m_config.sync_config->realm_encryption_key) {
-        throw std::logic_error("A realm encryption key was specified in Realm::Config but not in SyncConfig");
-    }
-    else if (m_config.sync_config->realm_encryption_key && m_config.encryption_key.empty()) {
-        throw std::logic_error("A realm encryption key was specified in SyncConfig but not in Realm::Config");
-    }
-    else if (m_config.sync_config->realm_encryption_key &&
-             !std::equal(m_config.sync_config->realm_encryption_key->begin(),
-                         m_config.sync_config->realm_encryption_key->end(), m_config.encryption_key.begin(),
-                         m_config.encryption_key.end())) {
-        throw std::logic_error(
-            "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
-    }
-
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config);
+    open_db();
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
@@ -195,10 +182,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
-                                                config.path);
-            }
-            if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with sync session encryption key.",
                                                 config.path);
             }
         }
@@ -441,18 +424,16 @@ void RealmCoordinator::open_db()
             m_db = DB::create(m_config.realm_data, false);
             return;
         }
-        if (m_config.immutable()) {
-            m_history.reset();
-        }
-        else if (server_synchronization_mode) {
+        std::unique_ptr<Replication> history;
+        if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            m_history = sync::make_client_replication(m_config.path);
+            history = sync::make_client_replication(m_config.path);
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
         }
-        else {
-            m_history = make_in_realm_history(m_config.path);
+        else if (!m_config.immutable()) {
+            history = make_in_realm_history(m_config.path);
         }
 
         DBOptions options;
@@ -465,9 +446,9 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
-        if (m_history) {
+        if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-            m_db = DB::create(*m_history, options);
+            m_db = DB::create(std::move(history), options);
         }
         else {
             m_db = DB::create(m_config.path, true, options);

@@ -47,10 +47,8 @@ TEST(Sync_ServerHistoryCompaction_Basic)
 
     SHARED_GROUP_TEST_PATH(client_1_path);
     SHARED_GROUP_TEST_PATH(client_2_path);
-    auto client_1_history = make_client_replication(client_1_path);
-    auto client_2_history = make_client_replication(client_2_path);
-    auto sg_1 = DB::create(*client_1_history);
-    auto sg_2 = DB::create(*client_2_history);
+    auto sg_1 = DB::create(make_client_replication(client_1_path));
+    auto sg_2 = DB::create(make_client_replication(client_2_path));
 
     std::atomic<bool> did_fail{false};
     std::atomic<bool> did_expire{false};
@@ -69,7 +67,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
         WriteTransaction wt{sg_1};
         sync::create_table(wt, "class_Foo");
         wt.commit();
-        Session session = fixture.make_bound_session(client_1_path, "/test");
+        Session session = fixture.make_bound_session(sg_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -81,7 +79,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
         WriteTransaction wt{sg_2};
         sync::create_table(wt, "class_Bar");
         wt.commit();
-        Session session = fixture.make_bound_session(client_2_path, "/test");
+        Session session = fixture.make_bound_session(sg_2, "/test");
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -93,7 +91,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
         TableRef foo = wt.get_table("class_Foo");
         foo->create_object();
         wt.commit();
-        Session session = fixture.make_bound_session(client_1_path, "/test");
+        Session session = fixture.make_bound_session(sg_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -107,7 +105,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
         TableRef foo = wt.get_table("class_Foo");
         foo->create_object();
         wt.commit();
-        Session session = fixture.make_bound_session(client_1_path, "/test");
+        Session session = fixture.make_bound_session(sg_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -119,7 +117,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
         TableRef foo = wt.get_table("class_Foo");
         foo->create_object();
         wt.commit();
-        Session session = fixture.make_bound_session(client_1_path, "/test");
+        Session session = fixture.make_bound_session(sg_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -129,7 +127,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     // Attempt to reconnect with client 2, and thereby trigger a failure due to
     // expired client file entry in server-side file.
     {
-        Session session = fixture.make_bound_session(client_2_path, "/test");
+        Session session = fixture.make_bound_session(sg_2, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -216,14 +214,15 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
     {
         ClientServerFixture fixture{dir, test_context, fixture_config};
         fixture.start();
-        Session session = fixture.make_bound_session(client_1_path, "/test");
-        session.wait_for_download_complete_or_client_stopped();
         auto history = make_client_replication(client_1_path);
-        auto sg = DB::create(*history);
+        auto& history_local = *history;
+        auto sg = DB::create(std::move(history));
+        Session session = fixture.make_bound_session(sg, "/test");
+        session.wait_for_download_complete_or_client_stopped();
         version_type current_client_version;
         SaltedFileIdent client_file_ident;
         SyncProgress progress;
-        history->get_status(current_client_version, client_file_ident, progress);
+        history_local.get_status(current_client_version, client_file_ident, progress);
         client_1_file_ident = client_file_ident.ident;
     }
 
@@ -265,8 +264,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
 
     // Use client 2 to push a changeset that expires client 1
     {
-        auto history = make_client_replication(client_2_path);
-        auto sg = DB::create(*history);
+        auto sg = DB::create(make_client_replication(client_2_path));
         WriteTransaction wt{sg};
         sync::create_table(wt, "class_Foo");
         wt.commit();
@@ -283,8 +281,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
 
     // Now use client 1 to trigger an error due to expiration at upload time
     {
-        auto history = make_client_replication(client_1_path);
-        auto sg = DB::create(*history);
+        auto sg = DB::create(make_client_replication(client_1_path));
         WriteTransaction wt{sg};
         sync::create_table(wt, "class_Bar");
         version_type version = wt.commit();
@@ -317,8 +314,6 @@ TEST(Sync_ServerHistoryCompaction_Old)
 
     SHARED_GROUP_TEST_PATH(client_1_path);
     SHARED_GROUP_TEST_PATH(client_2_path);
-    auto client_1_history = make_client_replication(client_1_path);
-    auto client_2_history = make_client_replication(client_2_path);
 
     bool client_reset_did_happen = false;
     fixture.set_client_side_error_handler([&](std::error_code ec, bool fatal, const std::string& message) {
@@ -330,8 +325,8 @@ TEST(Sync_ServerHistoryCompaction_Old)
         fixture.stop();
     });
 
-    DBRef sg_1 = DB::create(*client_1_history);
-    Session client_1 = fixture.make_bound_session(client_1_path, "/test");
+    DBRef sg_1 = DB::create(make_client_replication(client_1_path));
+    Session client_1 = fixture.make_bound_session(sg_1, "/test");
     {
         WriteTransaction wt{sg_1};
         sync::create_table(wt, "class_Foo");
@@ -351,15 +346,15 @@ TEST(Sync_ServerHistoryCompaction_Old)
     client_1.wait_for_upload_complete_or_client_stopped();
 
     // Download changes to client2, then stop.
+    DBRef sg_2 = DB::create(make_client_replication(client_2_path));
     {
-        Session expired_client = fixture.make_bound_session(client_2_path, "/test");
+        Session expired_client = fixture.make_bound_session(sg_2, "/test");
         expired_client.wait_for_download_complete_or_client_stopped();
     }
 
     // Make a change in client2 while offline.
     {
-        DBRef sg_3 = DB::create(*client_2_history);
-        WriteTransaction wt{sg_3};
+        WriteTransaction wt{sg_2};
         TableRef foos = wt.get_table("class_Foo");
         foos->create_object();
         wt.commit();
@@ -391,7 +386,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     // Attempt to reconnect with client2, which has changes based on the
     // now-compacted history.
     {
-        Session expired_client = fixture.make_bound_session(client_2_path, "/test");
+        Session expired_client = fixture.make_bound_session(sg_2, "/test");
         expired_client.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -470,9 +465,8 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
             for (size_t i = 0; i < 10; ++i) {
                 std::cout << "Producing data on client " << i << "\n";
                 SHARED_GROUP_TEST_PATH(path);
-                auto history = make_client_replication(path);
-                DBRef sg = DB::create(*history);
-                Session session = fixture.make_bound_session(path, "/test");
+                DBRef sg = DB::create(make_client_replication(path));
+                Session session = fixture.make_bound_session(sg, "/test");
                 {
                     WriteTransaction wt{sg};
                     TableRef foo = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
@@ -500,9 +494,8 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
 
             // Make a client that uploads 1 changeset to trigger compaction.
             SHARED_GROUP_TEST_PATH(path);
-            auto history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            Session session = fixture.make_bound_session(path, "/test");
+            DBRef sg = DB::create(make_client_replication(path));
+            Session session = fixture.make_bound_session(sg, "/test");
             session.wait_for_download_complete_or_client_stopped();
             WriteTransaction wt{sg};
             TableRef foo = wt.get_table("class_Foo");

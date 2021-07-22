@@ -16,11 +16,12 @@
  *
  **************************************************************************/
 
+#include <realm/db.hpp>
+
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
-#include <realm/db.hpp>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -729,9 +730,9 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // is associated with any resources that are local to the initializing
 // process, because that would imply a leak.
 //
-// While it is not explicitely guaranteed in the man page, we shall
+// While it is not explicitly guaranteed in the man page, we shall
 // assume that is is valid to initialize a process-shared mutex twice
-// without an intervending call to pthread_mutex_destroy(). We need to
+// without an intervening call to pthread_mutex_destroy(). We need to
 // be able to reinitialize a process-shared mutex if the first
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
@@ -2853,6 +2854,15 @@ DBRef DB::create(Replication& repl, const DBOptions options)
     return retval;
 }
 
+DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions options)
+{
+    REALM_ASSERT(repl);
+    DBRef retval = std::make_shared<DBInit>(options);
+    retval->m_history = std::move(repl);
+    retval->open(*retval->m_history, options);
+    return retval;
+}
+
 DBRef DB::create(BinaryData buffer, bool take_ownership)
 {
     DBOptions options;
@@ -2871,6 +2881,18 @@ void DB::claim_sync_agent()
         throw MultipleSyncAgents{};
     info->sync_agent_present = 1; // Set to true
     m_is_sync_agent = true;
+}
+
+void DB::release_sync_agent()
+{
+    REALM_ASSERT(is_attached());
+    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    if (!m_is_sync_agent)
+        return;
+    SharedInfo* info = m_file_map.get_addr();
+    REALM_ASSERT(info->sync_agent_present);
+    info->sync_agent_present = 0;
+    m_is_sync_agent = false;
 }
 
 // HACK: Somewhat misplaced, but we have no replication.cpp
