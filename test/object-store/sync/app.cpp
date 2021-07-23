@@ -4390,3 +4390,40 @@ TEST_CASE("app: make_streaming_request", "[sync][app]") {
         REQUIRE(tail == ("&baas_at=" + user->access_token()));
     }
 }
+
+TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
+    SECTION("with empty map") {
+        auto profile = SyncUserProfile(bson::BsonDocument());
+        CHECK(profile.name() == util::none);
+        CHECK(profile.email() == util::none);
+        CHECK(profile.picture_url() == util::none);
+        CHECK(profile.first_name() == util::none);
+        CHECK(profile.last_name() == util::none);
+        CHECK(profile.gender() == util::none);
+        CHECK(profile.birthday() == util::none);
+        CHECK(profile.min_age() == util::none);
+        CHECK(profile.max_age() == util::none);
+    }
+    SECTION("with full map") {
+        auto profile = SyncUserProfile(bson::BsonDocument({
+            {"first_name", "Jan"},
+            {"last_name", "Jaanson"},
+            {"name", "Jan Jaanson"},
+            {"email", "jan.jaanson@jaanson.com"},
+            {"gender", "none"},
+            {"birthday", "January 1, 1970"},
+            {"min_age", "0"},
+            {"max_age", "100"},
+            {"picture_url", "some"},
+        }));
+        CHECK(profile.name() == "Jan Jaanson");
+        CHECK(profile.email() == "jan.jaanson@jaanson.com");
+        CHECK(profile.picture_url() == "some");
+        CHECK(profile.first_name() == "Jan");
+        CHECK(profile.last_name() == "Jaanson");
+        CHECK(profile.gender() == "none");
+        CHECK(profile.birthday() == "January 1, 1970");
+        CHECK(profile.min_age() == "0");
+        CHECK(profile.max_age() == "100");
+    }
+}

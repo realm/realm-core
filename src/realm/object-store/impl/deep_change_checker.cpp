@@ -25,6 +25,15 @@
 using namespace realm;
 using namespace realm::_impl;
 
+namespace {
+template <typename T>
+void sort_and_unique(T& container)
+{
+    std::sort(container.begin(), container.end());
+    container.erase(std::unique(container.begin(), container.end()), container.end());
+}
+} // namespace
+
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_tables, Table const& table,
                                             const KeyPathArray& key_path_array)
 {
@@ -33,7 +42,12 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
         std::vector<TableKey> forward_tables;
 
         std::vector<TableKey> backlink_tables;
+        bool processed_table = false;
     };
+
+    auto has_key_paths = std::any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
+        return key_path.size() > 0;
+    });
 
     // Build up the complete forward mapping from the back links.
     // Following forward link columns does not account for TypedLink
@@ -49,21 +63,24 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     for (auto key : all_table_keys) {
         auto cur_table = group->get_table(key);
         REALM_ASSERT(cur_table);
-        auto incoming_link_columns = cur_table->get_incoming_link_columns();
-        for (auto& incoming_link : incoming_link_columns) {
-            REALM_ASSERT(incoming_link.first);
-            auto& links = complete_mapping[incoming_link.first];
-            links.forward_links.push_back(incoming_link.second);
-            links.forward_tables.push_back(cur_table->get_key());
+
+        LinkInfo* backlinks = nullptr;
+        if (has_key_paths) {
+            backlinks = &complete_mapping[cur_table->get_key()];
         }
-        auto& backlinks = complete_mapping[cur_table->get_key()];
         cur_table->for_each_backlink_column([&](ColKey backlink_col_key) {
-            if (any_of(key_path_array.begin(), key_path_array.end(), [&](KeyPath key_path) {
+            auto origin_table_key = cur_table->get_opposite_table_key(backlink_col_key);
+            auto origin_link_col = cur_table->get_opposite_column(backlink_col_key);
+            auto& links = complete_mapping[origin_table_key];
+            links.forward_links.push_back(origin_link_col);
+            links.forward_tables.push_back(cur_table->get_key());
+
+            if (any_of(key_path_array.begin(), key_path_array.end(), [&](const KeyPath& key_path) {
                     return any_of(key_path.begin(), key_path.end(), [&](std::pair<TableKey, ColKey> pair) {
                         return pair.first == cur_table->get_key() && pair.second == backlink_col_key;
                     });
                 })) {
-                backlinks.backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
+                backlinks->backlink_tables.push_back(cur_table->get_link_target(backlink_col_key)->get_key());
             }
             return false;
         });
@@ -72,58 +89,32 @@ void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& related_t
     // Remove duplicates:
     // duplicates in link_columns can occur when a Mixed(TypedLink) contain links to different tables
     // duplicates in connected_tables can occur when there are different link paths to the same table
-    for (auto& kv_pair : complete_mapping) {
-        auto& cols = kv_pair.second.forward_links;
-        std::sort(cols.begin(), cols.end());
-        cols.erase(std::unique(cols.begin(), cols.end()), cols.end());
-        auto& tables = kv_pair.second.forward_tables;
-        std::sort(tables.begin(), tables.end());
-        tables.erase(std::unique(tables.begin(), tables.end()), tables.end());
+    for (auto& [_, info] : complete_mapping) {
+        sort_and_unique(info.forward_links);
+        sort_and_unique(info.forward_tables);
     }
-
-    auto get_out_relationships_for = [&related_tables](TableKey table_key) -> std::vector<ColKey>& {
-        auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-            return related_table.table_key == table_key;
-        });
-        if (it == related_tables.end()) {
-            it = related_tables.insert(related_tables.end(), {table_key, {}});
-        }
-        return it->links;
-    };
-    auto has_key_paths = std::any_of(begin(key_path_array), end(key_path_array), [&](auto key_path) {
-        return key_path.size() > 0;
-    });
 
     std::vector<TableKey> tables_to_check = {table.get_key()};
     while (tables_to_check.size()) {
-        auto table_key_to_check = *tables_to_check.begin();
-        tables_to_check.erase(tables_to_check.begin());
+        auto table_key_to_check = tables_to_check.back();
+        tables_to_check.pop_back();
+        auto& link_info = complete_mapping[table_key_to_check];
+        if (link_info.processed_table) {
+            continue;
+        }
+        link_info.processed_table = true;
 
-        auto link_info = complete_mapping[table_key_to_check];
-        auto& out_relations = get_out_relationships_for(table_key_to_check);
-        auto& forward_links = complete_mapping[table_key_to_check].forward_links;
-        out_relations.insert(out_relations.end(), forward_links.begin(), forward_links.end());
+        related_tables.push_back({table_key_to_check, std::move(link_info.forward_links)});
 
         // Add all tables reachable via a forward link to the vector of tables that need to be checked
-        // if they have not been identified as a related table already.
         for (auto linked_table_key : link_info.forward_tables) {
-            auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-                return related_table.table_key == linked_table_key;
-            });
-            if (it == related_tables.end()) {
-                tables_to_check.push_back(linked_table_key);
-            }
+            tables_to_check.push_back(linked_table_key);
         }
 
+        // Backlinks can only come into consideration when added via key paths.
         if (has_key_paths) {
-            // Backlinks can only come into consideration when added via key paths.
             for (auto linked_table_key : link_info.backlink_tables) {
-                auto it = std::find_if(begin(related_tables), end(related_tables), [&](auto&& related_table) {
-                    return related_table.table_key == linked_table_key;
-                });
-                if (it == related_tables.end()) {
-                    tables_to_check.push_back(linked_table_key);
-                }
+                tables_to_check.push_back(linked_table_key);
             }
         }
     }
@@ -159,75 +150,95 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     }
 }
 
-template <typename T>
-bool DeepChangeChecker::do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value,
+bool DeepChangeChecker::do_check_mixed_for_link(Group& group, TableRef& cached_linked_table, Mixed value,
                                                 const std::vector<ColKey>& filtered_columns, size_t depth)
 {
-    if (value.is_type(type_TypedLink)) {
-        auto link = value.get_link();
-        if (!link.is_unresolved()) {
-            if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
-                cached_linked_table = coll->get_table()->get_parent_group()->get_table(link.get_table_key());
-                REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+    if (!value.is_type(type_TypedLink)) {
+        return false;
+    }
+    auto link = value.get_link();
+    if (link.is_unresolved()) {
+        return false;
+    }
+
+    if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
+        cached_linked_table = group.get_table(link.get_table_key());
+        REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+    }
+    return check_row(*cached_linked_table, link.get_obj_key().value, filtered_columns, depth + 1);
+}
+
+template <typename T>
+bool DeepChangeChecker::check_collection(ref_type ref, const Obj& obj, ColKey col,
+                                         const std::vector<ColKey>& filtered_columns, size_t depth)
+{
+    BPlusTree<T> bp(obj.get_alloc());
+    bp.init_from_ref(ref);
+    size_t size = bp.size();
+    if (size == 0) {
+        return false;
+    }
+
+    if constexpr (std::is_same_v<ObjKey, T>) {
+        auto target = obj.get_table()->get_link_target(col);
+        for (size_t i = 0; i < size; ++i) {
+            auto key = bp.get(i);
+            if (key && !key.is_unresolved() && check_row(*target, key.value, filtered_columns, depth + 1)) {
+                return true;
             }
-            return check_row(*cached_linked_table, link.get_obj_key().value, filtered_columns, depth + 1);
+        }
+    }
+    else {
+        static_cast<void>(col); // older gcc warns about things used in only one branch of if constexpr
+        TableRef cached_linked_table;
+        Group& group = *obj.get_table()->get_parent_group();
+        for (size_t i = 0; i < size; ++i) {
+            if (do_check_mixed_for_link(group, cached_linked_table, bp.get(i), filtered_columns, depth)) {
+                return true;
+            }
         }
     }
     return false;
 }
 
-template <typename T>
-bool DeepChangeChecker::do_check_for_collection_of_mixed(T* coll, const std::vector<ColKey>& filtered_columns,
-                                                         size_t depth)
-{
-    TableRef cached_linked_table;
-    return std::any_of(coll->begin(), coll->end(), [&](auto value) {
-        return do_check_mixed_for_link(coll, cached_linked_table, value, filtered_columns, depth);
-    });
-}
-
-bool DeepChangeChecker::do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll,
+bool DeepChangeChecker::do_check_for_collection_modifications(const Obj& obj, ColKey col,
                                                               const std::vector<ColKey>& filtered_columns,
                                                               size_t depth)
 {
-    REALM_ASSERT(coll);
-    if (auto lst = dynamic_cast<LnkLst*>(coll.get())) {
-        TableRef target = lst->get_target_table();
-        return std::any_of(lst->begin(), lst->end(), [&](auto key) {
-            return check_row(*target, key.value, filtered_columns, depth + 1);
-        });
+    auto ref = Obj::Internal::get_ref(obj, col);
+    if (!ref) {
+        return false;
     }
-    else if (auto list = dynamic_cast<Lst<Mixed>*>(coll.get())) {
-        return do_check_for_collection_of_mixed(list, filtered_columns, depth);
+
+    if (col.get_type() == col_type_LinkList || (col.is_set() && col.get_type() == col_type_Link)) {
+        return check_collection<ObjKey>(ref, obj, col, filtered_columns, depth);
     }
-    else if (auto dict = dynamic_cast<Dictionary*>(coll.get())) {
+
+    if ((col.is_set() || col.is_list()) && col.get_type() == col_type_Mixed) {
+        return check_collection<Mixed>(ref, obj, col, filtered_columns, depth);
+    }
+
+    if (col.is_dictionary()) {
+        auto dict = obj.get_dictionary(col);
         TableRef cached_linked_table;
-        return std::any_of(dict->begin(), dict->end(), [&](auto key_value_pair) {
+        auto& group = *obj.get_table()->get_parent_group();
+        return std::any_of(dict.begin(), dict.end(), [&](auto key_value_pair) {
             Mixed value = key_value_pair.second;
             // Here we rely on Dictionaries storing all links as a TypedLink
             // even if the dictionary is set to a single object type.
             REALM_ASSERT(!value.is_type(type_Link));
-            return do_check_mixed_for_link(dict, cached_linked_table, value, filtered_columns, depth);
+            return do_check_mixed_for_link(group, cached_linked_table, value, filtered_columns, depth);
         });
     }
-    else if (auto set = dynamic_cast<LnkSet*>(coll.get())) {
-        auto target = set->get_target_table();
-        REALM_ASSERT(target);
-        return std::any_of(set->begin(), set->end(), [&](auto obj_key) {
-            return obj_key && check_row(*target, obj_key.value, filtered_columns, depth + 1);
-        });
-    }
-    else if (auto set = dynamic_cast<Set<Mixed>*>(coll.get())) {
-        return do_check_for_collection_of_mixed(set, filtered_columns, depth);
-    }
+
     // at this point, we have not handled all datatypes
     REALM_UNREACHABLE();
-    return false;
 }
 
 bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
                                              const std::vector<ColKey>& filtered_columns, size_t depth)
 {
+    REALM_ASSERT(depth < m_current_path.size());
     auto table_key = table.get_key();
 
     // First we create an iterator pointing at the table identified by `table_key` within the `m_related_tables`.
@@ -261,15 +272,14 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
     auto linked_object_changed = [&](ColKey const& outgoing_link_column) {
         if (already_checking(outgoing_link_column))
             return false;
-        if (!outgoing_link_column.is_collection()) {
-            ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
-            if (!dst_key) // do not descend into a null or unresolved link
-                return false;
-            return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, filtered_columns,
-                             depth + 1);
+        if (outgoing_link_column.is_collection()) {
+            return do_check_for_collection_modifications(obj, outgoing_link_column, filtered_columns, depth);
         }
-        auto collection_ptr = obj.get_collection_ptr(outgoing_link_column);
-        return do_check_for_collection_modifications(std::move(collection_ptr), filtered_columns, depth);
+
+        ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
+        if (!dst_key) // do not descend into a null or unresolved link
+            return false;
+        return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, filtered_columns, depth + 1);
     };
 
     // Check the `links` of all `m_related_tables` and return true if any of them has a `linked_object_changed`.
@@ -279,8 +289,21 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
                                   const std::vector<ColKey>& filtered_columns, size_t depth)
 {
-    // Arbitrary upper limit on the maximum depth to search
-    if (depth >= m_current_path.size()) {
+    TableKey table_key = table.get_key();
+
+    // First check if the object was modified directly. We skip this if we're
+    // looking at the root object because that check is done more efficiently
+    // in operator() before calling this.
+    if (depth > 0) {
+        auto it = m_info.tables.find(table_key.value);
+        if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
+            return true;
+    }
+
+    // The object wasn't modified, so we move onto checking for if it links to
+    // a modified object. This has an arbitrary maximum depth on how far it'll
+    // search for performance.
+    if (depth + 1 == m_current_path.size()) {
         // Don't mark any of the intermediate rows checked along the path as
         // not modified, as a search starting from them might hit a modification
         for (size_t i = 0; i < m_current_path.size(); ++i)
@@ -288,25 +311,16 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
         return false;
     }
 
-    TableKey table_key = table.get_key();
-
-    // If the pair (table_key.value, key) can be found in `m_info.tables` we can
-    // end the search and return here.
-    if (depth > 0) {
-        auto it = m_info.tables.find(table_key.value);
-        if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
-            return true;
-    }
-
-    // Look up the unmodified objects for the `table_key.value` and check if the
-    // `key` can be found within them. If so, we can return without checking the
-    // outgoing links.
+    // We may have already performed deep checking on this object and discovered
+    // that it is not possible to reach a modified object from it.
     auto& not_modified = m_not_modified[table_key.value];
     auto it = not_modified.find(object_key);
     if (it != not_modified.end())
         return false;
 
     bool ret = check_outgoing_links(table, ObjKey(object_key), filtered_columns, depth);
+    // If this object isn't modified and we didn't exceed the maximum search depth,
+    // cache that result to avoid having to repeat it.
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
         not_modified.insert(object_key);
     return ret;
@@ -314,13 +328,15 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
 
 bool DeepChangeChecker::operator()(ObjKeyType key)
 {
-    // If the root object changed we do not need to iterate over every row since a notification needs to be sent
-    // anyway.
+    // First check if the root object was modified. We could skip this and do
+    // it in check_row(), but this skips a few lookups.
     if (m_root_object_changes &&
         m_root_object_changes->modifications_contains(key, m_filtered_columns_in_root_table)) {
         return true;
     }
 
+    // The object itself wasn't modified, so move on to check if any of the
+    // objects it links to were modified.
     return check_row(m_root_table, key, m_filtered_columns, 0);
 }
 
@@ -335,7 +351,7 @@ CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChange
 
 bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
-    std::vector<int64_t> changed_columns = {};
+    std::vector<int64_t> changed_columns;
 
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
@@ -488,7 +504,7 @@ ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo con
 
 std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
-    std::vector<int64_t> changed_columns = {};
+    std::vector<int64_t> changed_columns;
 
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);

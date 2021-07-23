@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a segfault in sync compiled by MSVC 2019. ([#4624](https://github.com/realm/realm-core/issues/4624), since v10.4.0)
  
 ### Breaking changes
 * None.
@@ -18,6 +18,24 @@
 * Remove the STATE message request and handling from the client and test sever. The current server was always responding with empty state anyhow. Clients will now consider receiving this message as an error because they never request it.
 * Handling for async open, involving state files is mostly removed.
 * When a client reset occured, we would create a metadata Realm to handle state download but this isn't needed anymore so it is removed.
+
+----------------------------------------------
+
+# 11.1.1 Release notes
+
+### Enhancements
+* Improve performance of creating collection notifiers for Realms with a complex schema. In the SDKs this means that the first run of a synchronous query, first call to observe() on a collection, or any call to find_async() will do significantly less work on the calling thread.
+* Improve performance of calculating changesets for notifications, particularly for deeply nested object graphs and objects which have List or Set properties with small numbers of objects in the collection.
+
+### Fixed
+* Opening a synchronized Realm created with a version older than v11.1.0 would fail due to a schema change in the metadata Realm which did not bump the schema version (since v11.1.0).
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
 * Removed the unused ChangesetCooker from the sync client. ([#4811](https://github.com/realm/realm-core/pull/4811))
 
 ----------------------------------------------

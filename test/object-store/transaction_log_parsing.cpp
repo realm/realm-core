@@ -1795,6 +1795,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
     KeyPathArray key_path_array_test_type = {key_path_test_type};
     KeyPathArray key_path_array_empty = {};
     auto relation_updater = [&]() {
+        related_tables.clear();
         _impl::DeepChangeChecker::find_related_tables(related_tables, *table, key_path_array_empty);
     };
     relation_updater();
@@ -1982,8 +1983,8 @@ TEMPLATE_TEST_CASE("DeepChangeChecker", "[notifications]", ListOfObjects, ListOf
             REQUIRE(test_type.count_unresolved_links(objects[2], cols[3]) == 1);
         }
         else {
-            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) ==
-                    2); // LnkLst actually has 3 entries but hides one
+            // LnkLst actually has 3 entries but hides one
+            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) == 2);
         }
         r->commit_transaction();
 

@@ -17,17 +17,18 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync_test_utils.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
-
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
-#include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <iostream>
 
 using namespace realm;
 using namespace realm::util;
@@ -424,3 +425,64 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         CHECK(user_metadata_2->is_valid());
     }
 }
+
+#ifndef SWIFT_PACKAGE // The SPM build currently doesn't copy resource files
+TEST_CASE("sync metadata: can open old metadata realms", "[sync]") {
+    util::try_make_dir(base_path);
+    auto close = util::make_scope_exit([=]() noexcept {
+        util::try_remove_dir_recursive(base_path);
+    });
+
+    const std::string provider_type = "https://realm.example.org";
+    const auto identity = "metadata migration test";
+    const std::string sample_token = "metadata migration token";
+
+    // change to true to create a test file for the current schema version
+    // this will only work on unix-like systems
+    if ((false)) {
+        { // Create a metadata Realm with a test user
+            SyncMetadataManager manager(metadata_path, false);
+            auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
+            user_metadata->set_access_token(sample_token);
+        }
+
+        // Open the metadata Realm directly and grab the schema version from it
+        Realm::Config config;
+        config.path = metadata_path;
+        auto realm = Realm::get_shared_realm(config);
+        realm->read_group();
+        auto schema_version = realm->schema_version();
+
+        // Take the path of this file, remove everything after the "test" directory,
+        // then append the output filename
+        std::string out_path = __FILE__;
+        auto suffix = out_path.find("sync/metadata.cpp");
+        REQUIRE(suffix != out_path.npos);
+        out_path.resize(suffix);
+        out_path.append(util::format("sync-metadata-v%1.realm", schema_version));
+
+        // Write a compacted copy of the metadata realm to the test directory
+        realm->write_copy(out_path, BinaryData());
+        std::cout << "Wrote metadata realm to: " << out_path << "\n";
+        return;
+    }
+
+    SECTION("open schema version 4") {
+        File::copy("sync-metadata-v4.realm", metadata_path);
+        SyncMetadataManager manager(metadata_path, false);
+        auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
+        REQUIRE(user_metadata->identity() == identity);
+        REQUIRE(user_metadata->provider_type() == provider_type);
+        REQUIRE(user_metadata->access_token() == sample_token);
+    }
+
+    SECTION("open schema version 5") {
+        File::copy("sync-metadata-v5.realm", metadata_path);
+        SyncMetadataManager manager(metadata_path, false);
+        auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
+        REQUIRE(user_metadata->identity() == identity);
+        REQUIRE(user_metadata->provider_type() == provider_type);
+        REQUIRE(user_metadata->access_token() == sample_token);
+    }
+}
+#endif // SWIFT_PACKAGE

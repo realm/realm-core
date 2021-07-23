@@ -26,6 +26,7 @@
 
 namespace realm {
 class CollectionBase;
+class Group;
 class Mixed;
 class Realm;
 class Table;
@@ -34,6 +35,7 @@ class Transaction;
 
 using KeyPath = std::vector<std::pair<TableKey, ColKey>>;
 using KeyPathArray = std::vector<KeyPath>;
+using ref_type = size_t;
 
 namespace _impl {
 class RealmCoordinator;
@@ -182,12 +184,12 @@ private:
     bool check_outgoing_links(Table const& table, ObjKey object_key, const std::vector<ColKey>& filtered_columns,
                               size_t depth = 0);
 
-    bool do_check_for_collection_modifications(std::unique_ptr<CollectionBase> coll,
+    bool do_check_for_collection_modifications(const Obj& obj, ColKey col,
                                                const std::vector<ColKey>& filtered_columns, size_t depth);
     template <typename T>
-    bool do_check_for_collection_of_mixed(T* coll, const std::vector<ColKey>& filtered_columns, size_t depth);
-    template <typename T>
-    bool do_check_mixed_for_link(T* coll, TableRef& cached_linked_table, Mixed value,
+    bool check_collection(ref_type ref, const Obj& obj, ColKey col, const std::vector<ColKey>& filtered_columns,
+                          size_t depth);
+    bool do_check_mixed_for_link(Group&, TableRef& cached_linked_table, Mixed value,
                                  const std::vector<ColKey>& filtered_columns, size_t depth);
 };
 

@@ -209,7 +209,7 @@ T Obj::_get(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
-    typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
+    typename ColumnTypeTraits<T>::cluster_leaf_type values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
 
@@ -221,7 +221,7 @@ ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
-    ArrayKey values(get_alloc());
+    ArrayKey values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
 
@@ -2307,6 +2307,11 @@ size_t Obj::colkey2spec_ndx(ColKey key)
 ColKey Obj::get_primary_key_column() const
 {
     return m_table->get_primary_key_column();
+}
+
+ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
+{
+    return to_ref(obj._get<int64_t>(col_key.get_index()));
 }
 
 } // namespace realm
