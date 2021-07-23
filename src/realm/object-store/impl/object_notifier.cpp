@@ -32,12 +32,8 @@ ObjectNotifier::ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key,
 
 void ObjectNotifier::do_attach_to(Transaction& sg)
 {
-    try {
-        m_table = sg.get_table(m_table_key);
-    }
-    catch (const NoSuchTable&) {
-        m_table = {};
-    }
+    REALM_ASSERT(m_table_key);
+    m_table = sg.get_table(m_table_key);
 }
 
 bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
@@ -64,7 +60,6 @@ void ObjectNotifier::run()
     if (!m_table_key)
         return;
 
-    util::CheckedLockGuard lock(m_callback_mutex);
     if (!m_change.modifications.contains(0) && any_callbacks_filtered()) {
         // If any callback has a key path filter we will check all related tables and if any of them was changed we
         // mark the this object as changed.

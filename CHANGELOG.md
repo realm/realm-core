@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Removing a change callback from a Results would sometimes block the calling thread while the query for that Results was running on the background worker thread (since v11.1.0).
  
 ### Breaking changes
 * None.
