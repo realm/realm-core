@@ -58,18 +58,16 @@ InternString Changeset::find_string(StringData string) const noexcept
     return InternString{};
 }
 
+// TODO: https://github.com/realm/realm-core/issues/4624 remove the check disabling code once
+// we understand why MSVC reports stack corruption in this method.
+#if _MSC_VER
+#pragma runtime_checks("", off)
+#endif
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overload{
+    const auto& get = overload{
         [this](InternString str) -> PrimaryKey {
             return get_string(str);
-        },
-        // Normally, GlobalKey could be handled by the auto case below, but MSVC 2019
-        // warns of stack corruption in Debug mode, and segfaults in Release mode without
-        // this handled explicitly here.
-        // Also see https://github.com/realm/realm-core/issues/4624
-        [](const GlobalKey& key) -> PrimaryKey {
-            return key;
         },
         [](auto otherwise) -> PrimaryKey {
             return otherwise;
@@ -77,6 +75,9 @@ PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
     };
     return mpark::visit(get, key);
 }
+#if _MSC_VER
+#pragma runtime_checks("", restore)
+#endif
 
 bool Changeset::operator==(const Changeset& that) const noexcept
 {
