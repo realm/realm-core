@@ -1584,7 +1584,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     driver.parse(query_string);
     Query query = QueryVisitor(&driver).visit(*driver.result);
     // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
-    return query.set_ordering(QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering));
+    return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
     // return visitor.query.set_ordering(driver.ordering->visit(&driver));
     // return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
@@ -2210,7 +2210,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
     return {std::move(left), std::move(right)};
 }
 
-std::unique_ptr<DescriptorOrdering> QueryVisitor::get_descriptor_ordering(DescriptorOrderingNode& node){
+std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(DescriptorOrderingNode& node){
     auto orderings = node.orderings;
     auto target = drv->m_base_table;
     std::unique_ptr<DescriptorOrdering> ordering;
@@ -2656,7 +2656,7 @@ void SubexprVisitor::visitAggr(AggrNode& node){
 } 
 
 void SubexprVisitor::visitListAggr(ListAggrNode& node){
-    LinkChain link_chain = LinkChainVisitor(drv).visit(*node.path);
+    LinkChain link_chain = getLinkChain(*node.path);
     subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, node.identifier));
     visitAggr(*node.aggr_op);
 } 
@@ -2666,7 +2666,7 @@ void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
     auto prop = node.prop;
     auto link = node.link;
     auto aggr_op = node.aggr_op;
-    LinkChain link_chain = LinkChainVisitor(drv).visit(*path);
+    LinkChain link_chain = getLinkChain(*path);
     auto subexprtmp = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexprtmp.get());
     if (!link_prop) {
@@ -2720,14 +2720,14 @@ void SubexprVisitor::visitProp(PropNode& node){
         }
         else if (identifier == "@links") {
             // This is a backlink aggregate query
-            LinkChain link_chain = LinkChainVisitor(drv, comp_type).visit(*path);
+            LinkChain link_chain = getLinkChain(*path, comp_type);
             auto sub = link_chain.get_backlink_count<Int>();
             subexpr = sub.clone();
             return;
         }
     }
     try {
-        LinkChain link_chain = LinkChainVisitor(drv, comp_type).visit(*path);
+        LinkChain link_chain = getLinkChain(*path, comp_type);
         std::unique_ptr<Subexpr> test{drv->column(link_chain, identifier)};
         // std::unique_ptr<Subexpr> test = std::unique_ptr<Subexpr>(drv->column(link_chain, identifier));
         if (index) {
@@ -2757,7 +2757,7 @@ void SubexprVisitor::visitProp(PropNode& node){
             // of a list property
             auto prop = path->path_elems.back();
             path->path_elems.pop_back();
-            std::unique_ptr<Subexpr> column{LinkChainVisitor(drv, comp_type).visit(*path).column(prop)};
+            std::unique_ptr<Subexpr> column{getLinkChain(*path, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(column.get())) {
                 if (auto length_expr = list->get_element_length())
                     subexpr = std::move(length_expr);
@@ -2778,7 +2778,7 @@ void SubexprVisitor::visitSubquery(SubqueryNode& node){
                                        "'$' and cannot be empty; for example '$x'.",
                                        variable_name));
     }
-    LinkChain lc = LinkChainVisitor(drv, prop->comp_type).visit(*prop->path);
+    LinkChain lc = getLinkChain(*prop->path, prop->comp_type);
     prop->identifier = drv->translate(lc, prop->identifier);
 
     if (prop->identifier.find("@links") == 0) {
@@ -2812,21 +2812,17 @@ void SubexprVisitor::visitSubquery(SubqueryNode& node){
     subexpr = std::unique_ptr<Subexpr>(lc.subquery(query));
 } 
 
-LinkChain LinkChainVisitor::visit(PathNode& node) {
-    node.accept(*this);
-    return std::move(link_chain);
-}
 
-void LinkChainVisitor::visitPath(PathNode& node){
+LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType comp_type){
+    LinkChain link_chain = LinkChain(drv->m_base_table, comp_type);
     auto path_elems = node.path_elems;
-    LinkChain tmp = LinkChain(drv->m_base_table, comp_type);
     for (std::string path_elem : path_elems) {
-        path_elem = drv->translate(tmp, path_elem);
+        path_elem = drv->translate(link_chain, path_elem);
         if (path_elem.find("@links.") == 0) {
-            drv->backlink(tmp, path_elem);
+            drv->backlink(link_chain, path_elem);
         }
         else if (path_elem == "@values") {
-            if (!tmp.get_current_col().is_dictionary()) {
+            if (!link_chain.get_current_col().is_dictionary()) {
                 throw InvalidQueryError("@values only allowed on dictionaries");
             }
             continue;
@@ -2836,12 +2832,12 @@ void LinkChainVisitor::visitPath(PathNode& node){
         }
         else {
             try {
-                tmp.link(path_elem);
+                link_chain.link(path_elem);
             }
             // I case of exception, we have to throw InvalidQueryError
             catch (const std::runtime_error& e) {
                 auto str = e.what();
-                StringData table_name = drv->get_printable_name(tmp.get_current_table()->get_name());
+                StringData table_name = drv->get_printable_name(link_chain.get_current_table()->get_name());
                 if (strstr(str, "no property")) {
                     throw InvalidQueryError(util::format("'%1' has no property: '%2'", table_name, path_elem));
                 }
@@ -2852,8 +2848,7 @@ void LinkChainVisitor::visitPath(PathNode& node){
             }
         }
     }
-    link_chain = std::move(tmp);
-    return;
+    return link_chain;
 } 
 
 

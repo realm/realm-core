@@ -546,7 +546,7 @@ using base = NodeVisitor;
 public:
     QueryVisitor(ParserDriver *drv): drv(drv){}
     Query visit(ParserNode& node);
-    std::unique_ptr<DescriptorOrdering> get_descriptor_ordering(DescriptorOrderingNode& node);
+    std::unique_ptr<DescriptorOrdering> getDescriptorOrdering(DescriptorOrderingNode& node);
     realm::Query query;
     std::unique_ptr<DescriptorOrdering> descriptor_ordering;
 private:
@@ -560,7 +560,6 @@ private:
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
     ParserDriver* drv;
     realm::LinkChain link;
-    //add descriptorOrdering helper method
 };
 
 
@@ -578,23 +577,10 @@ private:
     void visitLinkAggr(LinkAggrNode& link_aggr_node) override;
     void visitProp(PropNode& prop_node) override;
     void visitSubquery(SubqueryNode& sub_query_node) override;
-    //add linkchain helper method
+    LinkChain getLinkChain(PathNode& node, ExpressionComparisonType comp_type = ExpressionComparisonType::Any);
     std::unique_ptr<realm::Subexpr> subexpr;
     ParserDriver* drv;
     DataType t;
-};
-
-class LinkChainVisitor : private NodeVisitor {
-using base = NodeVisitor;
-public:
-    LinkChain visit(PathNode& node);
-    LinkChainVisitor(ParserDriver *drv, ExpressionComparisonType comp_type): drv(drv), comp_type(comp_type){}
-    LinkChainVisitor(ParserDriver *drv): drv(drv), comp_type(ExpressionComparisonType::Any){}
-private:
-    void visitPath(PathNode& path_node) override;
-    LinkChain link_chain;
-    ParserDriver* drv;
-    ExpressionComparisonType comp_type;
 };
 
 } // namespace query_parser
