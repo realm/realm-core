@@ -44,8 +44,14 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
 std::function<bool(ObjectChangeSet::ObjectKeyType)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
-    if (info.schema_changed)
-        set_table(root_table);
+    // If new links were added to existing tables we need to recalculate our
+    // related tables info. This'll also happen for schema changes that don't
+    // matter, but making this check more precise than "any schema change at all
+    // happened" would mostly just be a source of potential bugs.
+    if (info.schema_changed) {
+        util::CheckedLockGuard lock(m_callback_mutex);
+        update_related_tables(*root_table);
+    }
 
     if (!any_related_table_was_modified(info)) {
         return [](ObjectChangeSet::ObjectKeyType) {
@@ -247,14 +253,6 @@ bool CollectionNotifier::is_alive() const noexcept
 std::unique_lock<std::mutex> CollectionNotifier::lock_target()
 {
     return std::unique_lock<std::mutex>{m_realm_mutex};
-}
-
-void CollectionNotifier::set_table(ConstTableRef table)
-{
-    m_related_tables.clear();
-    util::CheckedLockGuard lock(m_callback_mutex);
-    recalculate_key_path_array();
-    DeepChangeChecker::find_related_tables(m_related_tables, *table, m_key_path_array);
 }
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)

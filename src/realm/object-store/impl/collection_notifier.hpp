@@ -178,7 +178,6 @@ public:
 
 protected:
     void add_changes(CollectionChangeBuilder change) REQUIRES(!m_callback_mutex);
-    void set_table(ConstTableRef table) REQUIRES(!m_callback_mutex);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
     // signal that the underlying source object of the collection has been deleted
