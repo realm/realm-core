@@ -35,33 +35,28 @@ struct TableKey {
         : value(null_value)
     {
     }
-    explicit TableKey(uint32_t val) noexcept
+    constexpr explicit TableKey(uint32_t val) noexcept
         : value(val)
     {
     }
-    TableKey& operator=(uint32_t val) noexcept
-    {
-        value = val;
-        return *this;
-    }
-    bool operator==(const TableKey& rhs) const noexcept
+    constexpr bool operator==(const TableKey& rhs) const noexcept
     {
         return value == rhs.value;
     }
-    bool operator!=(const TableKey& rhs) const noexcept
+    constexpr bool operator!=(const TableKey& rhs) const noexcept
     {
         return value != rhs.value;
     }
-    bool operator<(const TableKey& rhs) const noexcept
+    constexpr bool operator<(const TableKey& rhs) const noexcept
     {
         return value < rhs.value;
     }
-    bool operator>(const TableKey& rhs) const noexcept
+    constexpr bool operator>(const TableKey& rhs) const noexcept
     {
         return value > rhs.value;
     }
 
-    explicit operator bool() const noexcept
+    constexpr explicit operator bool() const noexcept
     {
         return value != null_value;
     }
