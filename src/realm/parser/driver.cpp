@@ -375,7 +375,6 @@ void EqualityNode::accept(NodeVisitor& visitor) {
 void NodeVisitor::visitEquality(EqualityNode& node) {
     for (auto value : node.values) {
         value->accept(*this);
-        // this->visitValue(*value);
     }
 }
 
@@ -386,7 +385,6 @@ void RelationalNode::accept(NodeVisitor& visitor) {
 void NodeVisitor::visitRelational(RelationalNode& node) {
     for (auto value : node.values) {
         value->accept(*this);
-        //this->visitValue(*value);
     }
 }
 
@@ -397,7 +395,6 @@ void StringOpsNode::accept(NodeVisitor& visitor) {
 void NodeVisitor::visitStringOps(StringOpsNode& node) {
     for (auto value : node.values) {
         value->accept(*this);
-        // this->visitValue(*value);
     }
 }
 
@@ -1586,8 +1583,8 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
     Query query = QueryVisitor(&driver).visit(*driver.result);
-    return query.set_ordering(driver.ordering->visit(&driver));
-    // return visitor.query.set_ordering(DescriptorOrderingVisitor(&driver).visit(driver.ordering));
+    // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
+    return query.set_ordering(QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering));
     // return visitor.query.set_ordering(driver.ordering->visit(&driver));
     // return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
@@ -2213,6 +2210,52 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
     return {std::move(left), std::move(right)};
 }
 
+std::unique_ptr<DescriptorOrdering> QueryVisitor::get_descriptor_ordering(DescriptorOrderingNode& node){
+    auto orderings = node.orderings;
+    auto target = drv->m_base_table;
+    std::unique_ptr<DescriptorOrdering> ordering;
+    for (auto cur_ordering : orderings) {
+        if (!ordering)
+            ordering = std::make_unique<DescriptorOrdering>();
+        if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
+            ordering->append_limit(LimitDescriptor(cur_ordering->limit));
+        }
+        else {
+            bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
+            std::vector<std::vector<ColKey>> property_columns;
+            for (auto& col_names : cur_ordering->columns) {
+                std::vector<ColKey> columns;
+                LinkChain link_chain(target);
+                for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
+                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
+                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
+                    if (!col_key) {
+                        throw InvalidQueryError(
+                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
+                                         col_names[ndx_in_path],
+                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
+                                         is_distinct ? "distinct" : "sort"));
+                    }
+                    columns.push_back(col_key);
+                    if (ndx_in_path < col_names.size() - 1) {
+                        link_chain.link(col_key);
+                    }
+                }
+                property_columns.push_back(columns);
+            }
+
+            if (is_distinct) {
+                ordering->append_distinct(DistinctDescriptor(property_columns));
+            }
+            else {
+                ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
+                                      SortDescriptor::MergeMode::prepend);
+            }
+        }
+    }
+    return ordering;
+} 
+
 std::unique_ptr<realm::Subexpr> SubexprVisitor::visit(ParserNode& node) {
     // base::visit(*node);
     node.accept(*this);
@@ -2813,55 +2856,5 @@ void LinkChainVisitor::visitPath(PathNode& node){
     return;
 } 
 
-std::unique_ptr<DescriptorOrdering> DescriptorOrderingVisitor::visit(DescriptorOrderingNode& node){
-    node.accept(*this);
-    return std::move(descriptor_ordering);
-}
-
-void DescriptorOrderingVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node){
-    auto orderings = node.orderings;
-    auto target = drv->m_base_table;
-    std::unique_ptr<DescriptorOrdering> ordering;
-    for (auto cur_ordering : orderings) {
-        if (!ordering)
-            ordering = std::make_unique<DescriptorOrdering>();
-        if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
-            ordering->append_limit(LimitDescriptor(cur_ordering->limit));
-        }
-        else {
-            bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
-            std::vector<std::vector<ColKey>> property_columns;
-            for (auto& col_names : cur_ordering->columns) {
-                std::vector<ColKey> columns;
-                LinkChain link_chain(target);
-                for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
-                    std::string path_elem = drv->translate(link_chain, col_names[ndx_in_path]);
-                    ColKey col_key = link_chain.get_current_table()->get_column_key(path_elem);
-                    if (!col_key) {
-                        throw InvalidQueryError(
-                            util::format("No property '%1' found on object type '%2' specified in '%3' clause",
-                                         col_names[ndx_in_path],
-                                         drv->get_printable_name(link_chain.get_current_table()->get_name()),
-                                         is_distinct ? "distinct" : "sort"));
-                    }
-                    columns.push_back(col_key);
-                    if (ndx_in_path < col_names.size() - 1) {
-                        link_chain.link(col_key);
-                    }
-                }
-                property_columns.push_back(columns);
-            }
-
-            if (is_distinct) {
-                ordering->append_distinct(DistinctDescriptor(property_columns));
-            }
-            else {
-                ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
-                                      SortDescriptor::MergeMode::prepend);
-            }
-        }
-    }
-    descriptor_ordering = std::move(ordering);
-} 
 
 } // namespace realm

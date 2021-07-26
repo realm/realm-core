@@ -546,7 +546,9 @@ using base = NodeVisitor;
 public:
     QueryVisitor(ParserDriver *drv): drv(drv){}
     Query visit(ParserNode& node);
+    std::unique_ptr<DescriptorOrdering> get_descriptor_ordering(DescriptorOrderingNode& node);
     realm::Query query;
+    std::unique_ptr<DescriptorOrdering> descriptor_ordering;
 private:
     void visitAnd(AndNode& and_node) override;
     void visitOr(OrNode& or_node) override;
@@ -556,7 +558,6 @@ private:
     void visitStringOps(StringOpsNode& string_ops_node) override;
     void visitTrueOrFalse(TrueOrFalseNode& true_or_false_node) override;
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
-    std::unique_ptr<realm::Subexpr>subexpr;
     ParserDriver* drv;
     realm::LinkChain link;
     //add descriptorOrdering helper method
@@ -596,16 +597,6 @@ private:
     ExpressionComparisonType comp_type;
 };
 
-class DescriptorOrderingVisitor : public NodeVisitor {
-using base = NodeVisitor;
-public:
-    std::unique_ptr<DescriptorOrdering> visit(DescriptorOrderingNode& node);
-    DescriptorOrderingVisitor(ParserDriver *drv): drv(drv){}
-private:
-    void visitDescriptorOrdering(DescriptorOrderingNode& descriptor_ordering_node) override;
-    std::unique_ptr<DescriptorOrdering> descriptor_ordering;
-    ParserDriver* drv;
-};
 } // namespace query_parser
 } // namespace realm
 #endif // ! DRIVER_HH
