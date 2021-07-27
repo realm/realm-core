@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Realm::write_copy_without_client_file_id and Realm::write_copy are merged.
 
 ----------------------------------------------
 
