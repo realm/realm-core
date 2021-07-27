@@ -58,11 +58,6 @@ TableRef InstructionApplier::table_for_class_name(StringData class_name) const
     return m_transaction.get_table(class_name_to_table_name(class_name, buffer));
 }
 
-// TODO: https://github.com/realm/realm-core/issues/4624 remove the check disabling code once
-// we understand why MSVC reports stack corruption in this and the following methods.
-#if _MSC_VER
-#pragma runtime_checks("", off)
-#endif
 void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
@@ -272,28 +267,29 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto field_name = table->get_column_name(col);
             auto data_type = DataType(col.get_type());
 
-            auto visitor = util::overload{
-                [&](const ObjLink& link) {
+            auto visitor = [&](const mpark::variant<ObjLink, Mixed, Instruction::Payload::ObjectValue,
+                                                    Instruction::Payload::Erased>& arg) {
+                if (const auto link_ptr = mpark::get_if<ObjLink>(&arg)) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
-                        obj.set_any(col, link, instr.is_default);
+                        obj.set_any(col, *link_ptr, instr.is_default);
                     }
                     else if (data_type == type_Link) {
                         // Validate target table.
                         auto target_table = table->get_link_target(col);
-                        if (target_table->get_key() != link.get_table_key()) {
+                        if (target_table->get_key() != link_ptr->get_table_key()) {
                             bad_transaction_log("Update: Target table mismatch (expected %1, got %2)",
                                                 target_table->get_name(),
-                                                m_transaction.get_table(link.get_table_key())->get_name());
+                                                m_transaction.get_table(link_ptr->get_table_key())->get_name());
                         }
-                        obj.set<ObjKey>(col, link.get_obj_key(), instr.is_default);
+                        obj.set<ObjKey>(col, link_ptr->get_obj_key(), instr.is_default);
                     }
                     else {
                         bad_transaction_log("Update: Type mismatch in '%2.%1' (expected %3, got %4)", field_name,
                                             table_name, col.get_type(), type_Link);
                     }
-                },
-                [&](Mixed value) {
-                    if (value.is_null()) {
+                }
+                else if (const auto mixed_ptr = mpark::get_if<Mixed>(&arg)) {
+                    if (mixed_ptr->is_null()) {
                         if (col.is_nullable()) {
                             obj.set_null(col, instr.is_default);
                         }
@@ -301,22 +297,22 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                             bad_transaction_log("Update: NULL in non-nullable field '%2.%1'", field_name, table_name);
                         }
                     }
-                    else if (data_type == type_Mixed || value.get_type() == data_type) {
-                        obj.set_any(col, value, instr.is_default);
+                    else if (data_type == type_Mixed || mixed_ptr->get_type() == data_type) {
+                        obj.set_any(col, *mixed_ptr, instr.is_default);
                     }
                     else {
                         bad_transaction_log("Update: Type mismatch in '%2.%1' (expected %3, got %4)", field_name,
-                                            table_name, col.get_type(), value.get_type());
+                                            table_name, col.get_type(), mixed_ptr->get_type());
                     }
-                },
-                [&](const Instruction::Payload::ObjectValue&) {
+                }
+                else if (const auto obj_val_ptr = mpark::get_if<Instruction::Payload::ObjectValue>(&arg)) {
                     if (obj.is_null(col)) {
                         obj.create_and_set_linked_object(col);
                     }
-                },
-                [&](const Instruction::Payload::Erased&) {
+                }
+                else if (const auto erase_ptr = mpark::get_if<Instruction::Payload::Erased>(&arg)) {
                     bad_transaction_log("Update: Dictionary erase at object field");
-                },
+                }
             };
 
             visit_payload(instr.value, visitor);
@@ -416,10 +412,15 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             visit_payload(instr.value, visitor);
         },
-        [&](auto&&...) {
-            bad_transaction_log("Update: Invalid path");
+        [&](LstBase&) {
+            bad_transaction_log("Update: Invalid path (list)");
         },
-    };
+        [&](Dictionary&) {
+            bad_transaction_log("Update: Invalid path (dictionary)");
+        },
+        [&](SetBase&) {
+            bad_transaction_log("Update: Invalid path (set)");
+        }};
 
     resolve_path(instr, "Update", std::move(setter));
 }
@@ -441,8 +442,20 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
             }
         },
         // FIXME: Implement increments of array elements, dictionary values.
-        [&](auto&&...) {
-            bad_transaction_log("AddInteger: Invalid path");
+        [&](LstBase&) {
+            bad_transaction_log("AddInteger: Invalid path (list)");
+        },
+        [&](LstBase&, size_t) {
+            bad_transaction_log("AddInteger: Invalid path (list, index)");
+        },
+        [&](SetBase&) {
+            bad_transaction_log("AddInteger: Invalid path (set)");
+        },
+        [&](Dictionary&) {
+            bad_transaction_log("AddInteger: Invalid path (dictionary)");
+        },
+        [&](Dictionary&, Mixed) {
+            bad_transaction_log("AddInteger: Invalid path (dictionary, key)");
         },
     };
     resolve_path(instr, "AddInteger", std::move(setter));
@@ -673,10 +686,21 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for ArrayInsert");
+        [&](LstBase&) {
+            bad_transaction_log("Invalid path for ArrayInsert (list)");
         },
-    };
+        [&](SetBase&) {
+            bad_transaction_log("Invalid path for ArrayInsert (set)");
+        },
+        [&](Dictionary&) {
+            bad_transaction_log("Invalid path for ArrayInsert (dictionary)");
+        },
+        [&](Dictionary&, Mixed) {
+            bad_transaction_log("Invalid path for ArrayInsert (dictionary, key)");
+        },
+        [&](Obj&, ColKey) {
+            bad_transaction_log("Invalid path for ArrayInsert (obj, col)");
+        }};
 
     resolve_path(instr, "ArrayInsert", callback);
 }
@@ -702,56 +726,81 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
             }
             list.move(index, instr.ndx_2);
         },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for ArrayMode");
+        [&](LstBase&) {
+            bad_transaction_log("Invalid path for ArrayMove (list)");
         },
-    };
+        [&](SetBase&) {
+            bad_transaction_log("Invalid path for ArrayMove (set)");
+        },
+        [&](Dictionary&) {
+            bad_transaction_log("Invalid path for ArrayMove (dictionary)");
+        },
+        [&](Dictionary&, Mixed) {
+            bad_transaction_log("Invalid path for ArrayMove (dictionary, key)");
+        },
+        [&](Obj&, ColKey) {
+            bad_transaction_log("Invalid path for ArrayMove (obj, col)");
+        }};
     resolve_path(instr, "ArrayMove", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    auto callback = util::overload{
-        [&](LstBase& list, size_t index) {
-            if (index >= instr.prior_size) {
-                bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
-                                    instr.prior_size);
-            }
-            if (index >= list.size()) {
-                bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
-            }
-            if (instr.prior_size != list.size()) {
-                bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
-                                    instr.prior_size);
-            }
+    resolve_path(
+        instr, "ArrayErase",
+        util::overload{[&](LstBase& list, size_t index) {
+                           if (index >= instr.prior_size) {
+                               bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
+                                                   instr.prior_size);
+                           }
+                           if (index >= list.size()) {
+                               bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
+                           }
+                           if (instr.prior_size != list.size()) {
+                               bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)",
+                                                   list.size(), instr.prior_size);
+                           }
 
-            list.remove(index, index + 1);
-        },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for ArrayErase");
-        },
-    };
-    resolve_path(instr, "ArrayErase", callback);
+                           list.remove(index, index + 1);
+                       },
+                       [&](LstBase&) {
+                           bad_transaction_log("Invalid path for ArrayErase (list)");
+                       },
+                       [&](SetBase&) {
+                           bad_transaction_log("Invalid path for ArrayErase (set)");
+                       },
+                       [&](Dictionary&) {
+                           bad_transaction_log("Invalid path for ArrayErase (dictionary)");
+                       },
+                       [&](Dictionary&, Mixed) {
+                           bad_transaction_log("Invalid path for ArrayErase (dictionary, key)");
+                       },
+                       [&](Obj&, ColKey) {
+                           bad_transaction_log("Invalid path for ArrayErase (obj, col)");
+                       }});
 }
 
 void InstructionApplier::operator()(const Instruction::Clear& instr)
 {
-    auto callback = util::overload{
-        [&](LstBase& list) {
-            list.clear();
-        },
-        [](Dictionary& dict) {
-            dict.clear();
-        },
-        [](SetBase& set) {
-            set.clear();
-        },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for Clear");
-        },
-    };
-
-    resolve_path(instr, "Clear", callback);
+    resolve_path(instr, "Clear",
+                 util::overload{[&](LstBase& list) {
+                                    list.clear();
+                                },
+                                [&](Dictionary& dict) {
+                                    dict.clear();
+                                },
+                                [&](SetBase& set) {
+                                    set.clear();
+                                },
+                                [&](LstBase&, size_t) {
+                                    bad_transaction_log("Invalid path for Clear (list, index)");
+                                },
+                                [&](Dictionary&, Mixed) {
+                                    bad_transaction_log("Invalid path for Clear (dictionary, key)");
+                                },
+                                [&](Obj&, ColKey&) {
+                                    bad_transaction_log("Invalid path for Clear (object, column)");
+                                }});
 }
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
@@ -818,10 +867,21 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for SetInsert");
+        [&](LstBase&, size_t) {
+            bad_transaction_log("Invalid path for SetInsert (list, index)");
         },
-    };
+        [&](LstBase&) {
+            bad_transaction_log("Invalid path for SetInsert (list)");
+        },
+        [&](Dictionary&, Mixed) {
+            bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
+        },
+        [&](Dictionary&) {
+            bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
+        },
+        [&](Obj&, ColKey) {
+            bad_transaction_log("Invalid path for SetInsert (object, column)");
+        }};
 
     resolve_path(instr, "SetInsert", callback);
 }
@@ -890,16 +950,24 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [&](auto&&...) {
-            bad_transaction_log("Invalid path for SetErase");
+        [&](LstBase&, size_t) {
+            bad_transaction_log("Invalid path for SetErase (list, index)");
         },
-    };
+        [&](LstBase&) {
+            bad_transaction_log("Invalid path for SetErase (list)");
+        },
+        [&](Dictionary&, Mixed) {
+            bad_transaction_log("Invalid path for SetErase (dictionary, key)");
+        },
+        [&](Dictionary&) {
+            bad_transaction_log("Invalid path for SetErase (dictionary, key)");
+        },
+        [&](Obj&, ColKey) {
+            bad_transaction_log("Invalid path for SetErase (object, column)");
+        }};
 
     resolve_path(instr, "SetErase", callback);
 }
-#if _MSC_VER
-#pragma runtime_checks("", restore)
-#endif
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
 {
