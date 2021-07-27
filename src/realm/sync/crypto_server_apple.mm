@@ -94,8 +94,6 @@ bool PKey::verify(BinaryData message, BinaryData signature) const {
     throw CryptoError{"Cannot verify (no public key)."};
   }
 
-#if TARGET_OS_MAC
-
   CFPtr<CFDataRef> signatureCF = adoptCF(CFDataCreateWithBytesNoCopy(
       kCFAllocatorDefault, reinterpret_cast<const UInt8 *>(signature.data()),
       signature.size(), kCFAllocatorNull));
@@ -106,42 +104,27 @@ bool PKey::verify(BinaryData message, BinaryData signature) const {
     throw util::bad_alloc();
   }
 
-  auto translateError = [](CFErrorRef error) -> CryptoError {
-    auto errorCF = adoptCF(error);
-    return CryptoError(std::string("Error verifying message: ") +
-                       [(__bridge NSError *)error description].UTF8String);
-  };
-
   CFErrorRef error = nullptr;
-  CFPtr<SecTransformRef> verifier = adoptCF(SecVerifyTransformCreate(
-      m_impl->public_key.get(), signatureCF.get(), &error));
-  if (!verifier) {
-    throw translateError(error);
+  bool result =
+      SecKeyVerifySignature(m_impl->public_key.get(),
+                            kSecKeyAlgorithmRSASignatureMessagePKCS1v15SHA256,
+                            messageCF.get(), signatureCF.get(), &error);
+  if (result) {
+    return true;
   }
 
-  if (!SecTransformSetAttribute(verifier.get(), kSecTransformInputAttributeName,
-                                messageCF.get(), &error) ||
-      !SecTransformSetAttribute(verifier.get(), kSecDigestTypeAttribute,
-                                kSecDigestSHA2, &error) ||
-      !SecTransformSetAttribute(verifier.get(), kSecDigestLengthAttribute,
-                                (__bridge CFTypeRef) @256, &error)) {
-    throw translateError(error);
+  auto errorCF = adoptCF(error);
+  auto errorNS = (__bridge NSError *)error;
+  if ([errorNS.domain isEqualToString:NSOSStatusErrorDomain] &&
+      errorNS.code == errSecVerifyFailed) {
+    // Valid input, but the signature doesn't match
+    return false;
   }
 
-  CFPtr<CFTypeRef> result =
-      adoptCF(SecTransformExecute(verifier.get(), &error));
-  if (!result) {
-    throw translateError(error);
+  std::string description;
+  @autoreleasepool {
+    description = util::format("Error verifying message: %1",
+                               errorNS.description.UTF8String);
   }
-  return result.get() == kCFBooleanTrue ? true : false;
-
-#else
-
-  OSStatus status = SecKeyRawVerify(
-      m_impl->public_key.get(), (SecPadding)kSecPaddingPKCS1SHA256,
-      reinterpret_cast<const uint8_t *>(message.data()), message.size(),
-      reinterpret_cast<const uint8_t *>(signature.data()), signature.size());
-  return status == errSecSuccess;
-
-#endif
+  throw CryptoError(description);
 }

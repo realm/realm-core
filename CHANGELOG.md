@@ -23,6 +23,7 @@
 
 ### Internals
 * Realm::write_copy_without_client_file_id and Realm::write_copy are merged. For synchronized realms, the file written will have the client file ident removed. Furthermore it is required that all local changes are synchronized with the server before the copy can. The function will throw if there are pending uploads.
+* Switch from SecTransform to SecKeyVerifySignature() in the sync server on macOS due to the former being deprecated.
 
 ----------------------------------------------
 
