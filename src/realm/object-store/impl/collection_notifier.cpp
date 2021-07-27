@@ -44,8 +44,14 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
 std::function<bool(ObjectChangeSet::ObjectKeyType)>
 CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
-    if (info.schema_changed)
-        set_table(root_table);
+    // If new links were added to existing tables we need to recalculate our
+    // related tables info. This'll also happen for schema changes that don't
+    // matter, but making this check more precise than "any schema change at all
+    // happened" would mostly just be a source of potential bugs.
+    if (info.schema_changed) {
+        util::CheckedLockGuard lock(m_callback_mutex);
+        update_related_tables(*root_table);
+    }
 
     if (!any_related_table_was_modified(info)) {
         return [](ObjectChangeSet::ObjectKeyType) {
@@ -56,7 +62,6 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
     // If the table in question has no outgoing links it will be the only entry in `m_related_tables`.
     // In this case we do not need a `DeepChangeChecker` and check the modifications using the
     // `ObjectChangeSet` within the `TransactionChangeInfo` for this table directly.
-    util::CheckedLockGuard lock(m_callback_mutex);
     if (m_related_tables.size() == 1 && !all_callbacks_filtered()) {
         auto root_table_key = m_related_tables[0].table_key;
         auto& object_change_set = info.tables.find(root_table_key.value)->second;
@@ -94,14 +99,17 @@ CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const&
 
 void CollectionNotifier::recalculate_key_path_array()
 {
-    m_key_path_array.clear();
     m_all_callbacks_filtered = true;
+    m_any_callbacks_filtered = false;
+    m_key_path_array.clear();
     for (const auto& callback : m_callbacks) {
-        const auto& key_path_array = callback.key_path_array;
-        if (key_path_array.size() == 0) {
+        if (callback.key_path_array.empty()) {
             m_all_callbacks_filtered = false;
         }
-        for (const auto& key_path : key_path_array) {
+        else {
+            m_any_callbacks_filtered = true;
+        }
+        for (const auto& key_path : callback.key_path_array) {
             m_key_path_array.push_back(key_path);
         }
     }
@@ -109,17 +117,12 @@ void CollectionNotifier::recalculate_key_path_array()
 
 bool CollectionNotifier::any_callbacks_filtered() const noexcept
 {
-    return any_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
-        return callback.key_path_array.size() > 0;
-    });
+    return m_any_callbacks_filtered;
 }
-
 
 bool CollectionNotifier::all_callbacks_filtered() const noexcept
 {
-    return all_of(begin(m_callbacks), end(m_callbacks), [](const auto& callback) {
-        return callback.key_path_array.size() > 0;
-    });
+    return m_all_callbacks_filtered;
 }
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
@@ -140,14 +143,28 @@ void CollectionNotifier::release_data() noexcept
     m_sg = nullptr;
 }
 
+static bool all_have_filters(std::vector<NotificationCallback> const& callbacks) noexcept
+{
+    return std::all_of(callbacks.begin(), callbacks.end(), [](auto& cb) {
+        return !cb.key_path_array.empty();
+    });
+}
+
 uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array)
 {
     m_realm->verify_thread();
 
     util::CheckedLockGuard lock(m_callback_mutex);
+    // If we're adding a callback with a keypath filter or if previously all
+    // callbacks had filters but this one doesn't we will need to recalculate
+    // the related tables on the background thread.
+    if (!key_path_array.empty() || all_have_filters(m_callbacks)) {
+        m_did_modify_callbacks = true;
+    }
+
     auto token = m_next_token++;
     m_callbacks.push_back({std::move(callback), {}, {}, std::move(key_path_array), token, false, false});
-    m_did_modify_callbacks = true;
+
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();
         m_have_callbacks = true;
@@ -176,7 +193,13 @@ void CollectionNotifier::remove_callback(uint64_t token)
 
         old = std::move(*it);
         m_callbacks.erase(it);
-        m_did_modify_callbacks = true;
+
+        // If we're removing a callback with a keypath filter or the last callback
+        // without a keypath filter we will need to recalcuate the related tables
+        // on next run.
+        if (!old.key_path_array.empty() || all_have_filters(m_callbacks)) {
+            m_did_modify_callbacks = true;
+        }
 
         m_have_callbacks = !m_callbacks.empty();
     }
@@ -232,14 +255,6 @@ std::unique_lock<std::mutex> CollectionNotifier::lock_target()
     return std::unique_lock<std::mutex>{m_realm_mutex};
 }
 
-void CollectionNotifier::set_table(ConstTableRef table)
-{
-    m_related_tables.clear();
-    util::CheckedLockGuard lock(m_callback_mutex);
-    recalculate_key_path_array();
-    DeepChangeChecker::find_related_tables(m_related_tables, *table, m_key_path_array);
-}
-
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
 {
     if (!do_add_required_change_info(info) || m_related_tables.empty()) {
@@ -276,7 +291,6 @@ void CollectionNotifier::prepare_handover()
     util::CheckedLockGuard lock(m_callback_mutex);
     for (auto& callback : m_callbacks)
         REALM_ASSERT(!callback.skip_next);
-    m_did_modify_callbacks = true;
 #endif
 }
 
@@ -320,7 +334,12 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
     // because we're going to remove all the callbacks immediately.
     m_error = true;
 
-    m_callback_count = m_callbacks.size();
+    {
+        // In the non-error codepath this is done as part of package_for_delivery()
+        // but that's skipped for errors
+        util::CheckedLockGuard lock(m_callback_mutex);
+        m_callback_count = m_callbacks.size();
+    }
     for_each_callback([this, &error](auto& lock, auto& callback) {
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
@@ -373,6 +392,7 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
 
 void CollectionNotifier::attach_to(std::shared_ptr<Transaction> sg)
 {
+    REALM_ASSERT(!m_has_run);
     do_attach_to(*sg);
     m_sg = std::move(sg);
 }
