@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a crash when delivering notifications over a nested hierarchy of lists of Mixed that contain links. ([#4803](https://github.com/realm/realm-core/issues/4803), since v11.0.0)
  
 ### Breaking changes
 * None.

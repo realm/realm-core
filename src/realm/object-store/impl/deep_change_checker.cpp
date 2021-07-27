@@ -276,10 +276,23 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
             return do_check_for_collection_modifications(obj, outgoing_link_column, filtered_columns, depth);
         }
 
-        ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
+        ConstTableRef dst_table;
+        ObjKey dst_key;
+        if (outgoing_link_column.get_type() == col_type_Link) {
+            dst_table = table.get_link_target(outgoing_link_column);
+            dst_key = obj.get<ObjKey>(outgoing_link_column);
+        } else if (outgoing_link_column.get_type() == col_type_Mixed) {
+            Mixed value = obj.get<Mixed>(outgoing_link_column);
+            REALM_ASSERT(value.get_type() == type_TypedLink);
+            dst_key = value.get_link().get_obj_key();
+            dst_table = table.get_parent_group()->get_table(value.get_link().get_table_key());
+        } else {
+            REALM_UNREACHABLE();
+        }
+
         if (!dst_key) // do not descend into a null or unresolved link
             return false;
-        return check_row(*table.get_link_target(outgoing_link_column), dst_key.value, filtered_columns, depth + 1);
+        return check_row(*dst_table, dst_key.value, filtered_columns, depth + 1);
     };
 
     // Check the `links` of all `m_related_tables` and return true if any of them has a `linked_object_changed`.
