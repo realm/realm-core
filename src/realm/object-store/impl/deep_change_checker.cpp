@@ -283,10 +283,9 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
             dst_key = obj.get<ObjKey>(outgoing_link_column);
         }
         else if (outgoing_link_column.get_type() == col_type_Mixed) {
+            TableRef no_cached;
             Mixed value = obj.get<Mixed>(outgoing_link_column);
-            REALM_ASSERT(value.get_type() == type_TypedLink);
-            dst_key = value.get_link().get_obj_key();
-            dst_table = table.get_parent_group()->get_table(value.get_link().get_table_key());
+            return do_check_mixed_for_link(*table.get_parent_group(), no_cached, value, filtered_columns, depth);
         }
         else {
             REALM_UNREACHABLE();
@@ -305,6 +304,10 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
                                   const std::vector<ColKey>& filtered_columns, size_t depth)
 {
     TableKey table_key = table.get_key();
+
+    if (ObjKey(object_key).is_unresolved()) {
+        return false;
+    }
 
     // First check if the object was modified directly. We skip this if we're
     // looking at the root object because that check is done more efficiently
@@ -399,6 +402,10 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         return;
     }
 
+    if (ObjKey(object_key_value).is_unresolved()) {
+        return;
+    }
+
     auto [table_key, column_key] = key_path.at(depth);
 
     // Check for a change on the current depth level.
@@ -424,6 +431,9 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     auto check_mixed_object = [&](const Mixed& mixed_object) {
         if (mixed_object.is_type(type_Link, type_TypedLink)) {
             auto object_key = mixed_object.get<ObjKey>();
+            if (object_key.is_unresolved()) {
+                return;
+            }
             auto target_table_key = mixed_object.get_link().get_table_key();
             Group* group = table.get_parent_group();
             auto target_table = group->get_table(target_table_key);
@@ -454,8 +464,8 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     else if (column_key.is_set()) {
         if (column_type == col_type_Mixed) {
             auto set = object.get_set<Mixed>(column_key);
-            for (size_t i = 0; i < set.size(); i++) {
-                auto target_object = set.get(i);
+            for (auto it = set.begin(); it != set.end(); ++it) {
+                auto target_object = *it;
                 check_mixed_object(target_object);
             }
         }
@@ -463,34 +473,28 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
-            for (size_t i = 0; i < set.size(); i++) {
-                auto target_object = set.get(i);
+            for (auto it = set.begin(); it != set.end(); ++it) {
+                auto target_object = *it;
                 find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
             }
         }
     }
     else if (column_key.is_dictionary()) {
-        if (column_type == col_type_Mixed) {
-            auto dictionary = object.get_dictionary(column_key);
-            for (size_t i = 0; i < dictionary.size(); i++) {
-                auto target_object = dictionary.get(dictionary.get_key(i));
-                check_mixed_object(target_object);
-            }
-        }
-        else {
-            REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
-            auto dictionary = object.get_dictionary(column_key);
-            auto linked_dictionary = std::make_unique<DictionaryLinkValues>(dictionary);
-            auto target_table = table.get_link_target(column_key);
-            for (size_t i = 0; i < linked_dictionary->size(); i++) {
-                auto target_object = linked_dictionary->get_key(i);
-                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
-            }
-        }
+        // a dictionary always stores mixed values
+        auto dictionary = object.get_dictionary(column_key);
+        dictionary.for_all_values([&](Mixed val) {
+            check_mixed_object(val);
+        });
+    }
+    else if (column_type == col_type_Mixed) {
+        check_mixed_object(object.get_any(column_key));
     }
     else if (column_type == col_type_Link) {
         // A forward link will only have one target object.
         auto target_object = object.get<ObjKey>(column_key);
+        if (!target_object || target_object.is_unresolved()) {
+            return;
+        }
         auto target_table = table.get_link_target(column_key);
         find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
     }

@@ -2145,11 +2145,6 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                     set.insert(ObjLink{m_table->get_key(), get_key()});
                 }
             }
-            else if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set(c, get_key());
-            }
             else if (c.is_list()) {
                 if (c.get_type() == col_type_Mixed) {
                     auto l = linking_obj.get_list<Mixed>(c);
@@ -2169,7 +2164,21 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                 }
             }
             else {
-                REALM_UNREACHABLE(); // missing type handling
+                REALM_ASSERT(!c.is_collection());
+                if (c.get_type() == col_type_Link) {
+                    // Single link
+                    REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
+                    linking_obj.set(c, get_key());
+                }
+                else if (c.get_type() == col_type_Mixed) {
+                    // Mixed link
+                    REALM_ASSERT(linking_obj.get_any(c).is_null() ||
+                                 linking_obj.get_any(c).get_link().get_obj_key() == other.get_key());
+                    linking_obj.set(c, Mixed{ObjLink{m_table->get_key(), get_key()}});
+                }
+                else {
+                    REALM_UNREACHABLE(); // missing type handling
+                }
             }
         }
         return false;
