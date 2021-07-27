@@ -5,7 +5,6 @@
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
 #include "realm/util/base64.hpp"
-
 #define YY_NO_UNISTD_H 1
 #define YY_NO_INPUT 1
 #include "realm/parser/generated/query_flex.hpp"
@@ -2851,5 +2850,61 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
     return link_chain;
 } 
 
+using json = nlohmann::json;
+Query JsonQueryParser::query_from_json(TableRef table, json json){
+    std::unique_ptr<ParserNode> tree = get_query_node(json);
+    std::unique_ptr<Arguments> no_arguments(new NoArguments());
+    ParserDriver driver(table, *no_arguments, KeyPathMapping());
+    return QueryVisitor(&driver).visit(*tree);
+}
+
+std::unique_ptr<ParserNode> JsonQueryParser::get_query_node(json json){
+    if (json["kind"] == "comparison"){
+        if (json["operator"] == "="){
+            auto left = get_subexpr_node(json["left"]);
+            auto right = get_subexpr_node(json["right"]);
+            auto equality_node = std::make_unique<EqualityNode>(left.get(), CompareNode::EQUAL, right.get());
+            return equality_node;
+        }
+    }
+}
+
+std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
+    if (json["kind"] == "property"){
+        auto empty_path = std::make_unique<PathNode>();
+        auto prop_node = std::make_unique<PropNode>(empty_path.get(), json["name"]);
+        auto value_node = std::make_unique<ValueNode>(prop_node.get());
+        return value_node;
+    } else if (json["kind"] == "constant"){
+        std::unique_ptr<ConstantNode> const_node;
+        if (json["type"] == "int"){
+            Int test = json["value"].get<Int>();
+            const_node = constant_node(test);
+        }
+        auto value_node = std::make_unique<ValueNode>(const_node.get());
+        return value_node;
+    }
+}
+
+
 
 } // namespace realm
+
+std::unique_ptr<ConstantNode> JsonQueryParser::constant_node(realm::Mixed value) {
+    ConstantNode::Type type;
+    std::string string_value;
+    switch (value.get_type()) {
+        case realm::DataType::Type::String:
+            type = ConstantNode::Type::STRING;
+            string_value = realm::util::format("'%1'", value.get_string());
+            break;
+        case realm::DataType::Type::Int:
+            type = ConstantNode::Type::NUMBER;
+        default:
+            std::ostringstream stream;
+            stream << value;
+            string_value = stream.str();
+    }
+    auto constant_node = std::make_unique<ConstantNode>(type, string_value);
+    return constant_node;
+}

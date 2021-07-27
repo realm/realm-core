@@ -2,6 +2,7 @@
 #define DRIVER_HH
 #include <string>
 #include <map>
+#include <external/json/json.hpp>
 
 #include "realm/query_expression.hpp"
 #include "realm/parser/keypath_mapping.hpp"
@@ -584,5 +585,25 @@ private:
 };
 
 } // namespace query_parser
+
+class JsonQueryParser {
+public:
+    Query query_from_json(TableRef table, nlohmann::json json);
+private:
+    std::unique_ptr<ParserNode> get_query_node(nlohmann::json json);
+    std::unique_ptr<ValueNode> get_subexpr_node(nlohmann::json json);
+
+    // ValueNode& property(std::string name);
+
+    // ValueNode& constant(realm::Mixed value);
+
+    // EqualityNode& equals(ValueNode& left, ValueNode& right);
+
+    // AndNode& and_node(std::initializer_list<AtomPredNode&> predicates);
+
+    // OrNode& or_node(std::initializer_list<AndNode&> predicates);
+
+    std::unique_ptr<ConstantNode> constant_node(realm::Mixed value);
+};
 } // namespace realm
 #endif // ! DRIVER_HH
