@@ -281,12 +281,14 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
         if (outgoing_link_column.get_type() == col_type_Link) {
             dst_table = table.get_link_target(outgoing_link_column);
             dst_key = obj.get<ObjKey>(outgoing_link_column);
-        } else if (outgoing_link_column.get_type() == col_type_Mixed) {
+        }
+        else if (outgoing_link_column.get_type() == col_type_Mixed) {
             Mixed value = obj.get<Mixed>(outgoing_link_column);
             REALM_ASSERT(value.get_type() == type_TypedLink);
             dst_key = value.get_link().get_obj_key();
             dst_table = table.get_parent_group()->get_table(value.get_link().get_table_key());
-        } else {
+        }
+        else {
             REALM_UNREACHABLE();
         }
 
