@@ -63,10 +63,6 @@ ResultsNotifier::ResultsNotifier(Results& target)
     , m_descriptor_ordering(target.get_descriptor_ordering())
     , m_target_is_in_table_order(target.is_in_table_order())
 {
-    auto table = m_query->get_table();
-    if (table) {
-        set_table(table);
-    }
 }
 
 void ResultsNotifier::release_data() noexcept

@@ -355,6 +355,22 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.deletions, 0);
         }
 
+        SECTION("deleting object before first run of notifier") {
+            auto token = object.add_notification_callback(
+                [&](CollectionChangeSet c, std::exception_ptr) {
+                    change = std::move(c);
+                },
+                {});
+            // Delete via a different Realm as begin_transaction() will wait
+            // for the notifier to run
+            r2->begin_transaction();
+            r2->read_group().get_table("class_table")->begin()->remove();
+            r2->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.deletions, 0);
+            write([] {});
+        }
+
         SECTION("clearing the table sends a change notification") {
             auto token = require_change(object);
             write([&] {

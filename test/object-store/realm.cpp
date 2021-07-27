@@ -562,6 +562,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
                 realm_ref = std::move(ref);
             });
             util::EventLoop::main().run_until([&] {
+                std::lock_guard<std::mutex> lock(mutex);
                 return bool(realm_ref);
             });
             SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));

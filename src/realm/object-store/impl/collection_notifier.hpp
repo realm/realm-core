@@ -178,7 +178,6 @@ public:
 
 protected:
     void add_changes(CollectionChangeBuilder change) REQUIRES(!m_callback_mutex);
-    void set_table(ConstTableRef table) REQUIRES(!m_callback_mutex);
     std::unique_lock<std::mutex> lock_target();
     Transaction& source_shared_group();
     // signal that the underlying source object of the collection has been deleted
@@ -192,28 +191,24 @@ protected:
                                                                                  ConstTableRef)
         REQUIRES(!m_callback_mutex);
 
-    // Creates and returns a `ObjectKeyPathChangeChecker` which behaves slighty different that `DeepChangeChecker`
+    // Creates and returns a `ObjectKeyPathChangeChecker` which behaves slightly different that `DeepChangeChecker`
     // and `KeyPathChecker` which are used for `Collection`s.
     std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
-    get_object_modification_checker(TransactionChangeInfo const&, ConstTableRef) REQUIRES(m_callback_mutex);
+    get_object_modification_checker(TransactionChangeInfo const&, ConstTableRef) REQUIRES(!m_callback_mutex);
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
     void recalculate_key_path_array() REQUIRES(m_callback_mutex);
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to each of them.
-    bool any_callbacks_filtered() const noexcept REQUIRES(m_callback_mutex);
+    bool any_callbacks_filtered() const noexcept;
     // Checks `KeyPathArray` filters on all `m_callbacks` and returns true if at least one key path
     // filter is attached to all of them.
-    bool all_callbacks_filtered() const noexcept REQUIRES(m_callback_mutex);
+    bool all_callbacks_filtered() const noexcept;
 
     void update_related_tables(Table const& table) REQUIRES(m_callback_mutex);
 
     // A summary of all `KeyPath`s attached to the `m_callbacks`.
     KeyPathArray m_key_path_array;
-
-    // When updating `m_key_path_array` we need to also check if all callbacks have a filter.
-    // This information is later used in `DeepChangeChecker`.
-    bool m_all_callbacks_filtered = false;
 
     // The actual change, calculated in run() and delivered in prepare_handover()
     CollectionChangeBuilder m_change;
@@ -222,7 +217,7 @@ protected:
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     // Due to the keypath filtered notifications we need to update the related tables every time the callbacks do see
-    // a change since the list of related tables is filtered by the key paths used for the notifcations.
+    // a change since the list of related tables is filtered by the key paths used for the notifications.
     bool m_did_modify_callbacks = true;
 
     // Currently registered callbacks and a mutex which must always be held
@@ -255,6 +250,11 @@ private:
     bool m_error = false;
     bool m_has_delivered_root_deletion_event = false;
 
+    // Cached check for if callbacks have keypath filters which can be used
+    // only on the worker thread, but without acquiring the callback mutex
+    bool m_all_callbacks_filtered = false;
+    bool m_any_callbacks_filtered = false;
+
     // All `NotificationCallback`s added to this `CollectionNotifier` via `add_callback()`.
     std::vector<NotificationCallback> m_callbacks;
 
@@ -267,14 +267,14 @@ private:
     // Iteration variable for looping over callbacks. remove_callback() will
     // sometimes update this to ensure that removing a callback while iterating
     // over the callbacks will not skip an unrelated callback.
-    size_t m_callback_index = -1;
+    size_t m_callback_index GUARDED_BY(m_callback_mutex) = -1;
     // The number of callbacks which were present when the notifier was packaged
     // for delivery which are still present.
     // Updated by packaged_for_delivery and remove_callback(), and used in
     // for_each_callback() to avoid calling callbacks registered during delivery.
-    size_t m_callback_count = -1;
+    size_t m_callback_count GUARDED_BY(m_callback_mutex) = -1;
 
-    uint64_t m_next_token = 0;
+    uint64_t m_next_token GUARDED_BY(m_callback_mutex) = 0;
 };
 
 // A smart pointer to a CollectionNotifier that unregisters the notifier when
