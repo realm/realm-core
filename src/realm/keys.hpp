@@ -128,11 +128,6 @@ struct ColKey {
     {
         return get_attrs().test(col_attr_Collection);
     }
-    ColKey& operator=(int64_t val) noexcept
-    {
-        value = val;
-        return *this;
-    }
     bool operator==(const ColKey& rhs) const noexcept
     {
         return value == rhs.value;
@@ -196,11 +191,6 @@ struct ObjKey {
     ObjKey get_unresolved() const
     {
         return ObjKey(-2 - value);
-    }
-    ObjKey& operator=(int64_t val) noexcept
-    {
-        value = val;
-        return *this;
     }
     bool operator==(const ObjKey& rhs) const noexcept
     {
