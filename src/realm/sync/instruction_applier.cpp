@@ -412,13 +412,13 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             visit_payload(instr.value, visitor);
         },
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("Update: Invalid path (list)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("Update: Invalid path (dictionary)");
         },
-        [&](SetBase&) {
+        [](SetBase&) {
             bad_transaction_log("Update: Invalid path (set)");
         }};
 
@@ -442,19 +442,19 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
             }
         },
         // FIXME: Implement increments of array elements, dictionary values.
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("AddInteger: Invalid path (list)");
         },
-        [&](LstBase&, size_t) {
+        [](LstBase&, size_t) {
             bad_transaction_log("AddInteger: Invalid path (list, index)");
         },
-        [&](SetBase&) {
+        [](SetBase&) {
             bad_transaction_log("AddInteger: Invalid path (set)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("AddInteger: Invalid path (dictionary)");
         },
-        [&](Dictionary&, Mixed) {
+        [](Dictionary&, Mixed) {
             bad_transaction_log("AddInteger: Invalid path (dictionary, key)");
         },
     };
@@ -676,29 +676,29 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                             field_name, table_name);
                     }
                 },
-                [&](const Instruction::Payload::Dictionary&) {
+                [](const Instruction::Payload::Dictionary&) {
                     bad_transaction_log("Dictionary payload for ArrayInsert");
                 },
-                [&](const Instruction::Payload::Erased&) {
+                [](const Instruction::Payload::Erased&) {
                     bad_transaction_log("Dictionary erase payload for ArrayInsert");
                 },
             };
 
             visit_payload(instr.value, inserter);
         },
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("Invalid path for ArrayInsert (list)");
         },
-        [&](SetBase&) {
+        [](SetBase&) {
             bad_transaction_log("Invalid path for ArrayInsert (set)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("Invalid path for ArrayInsert (dictionary)");
         },
-        [&](Dictionary&, Mixed) {
+        [](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for ArrayInsert (dictionary, key)");
         },
-        [&](Obj&, ColKey) {
+        [](Obj&, ColKey) {
             bad_transaction_log("Invalid path for ArrayInsert (obj, col)");
         }};
 
@@ -726,19 +726,19 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
             }
             list.move(index, instr.ndx_2);
         },
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("Invalid path for ArrayMove (list)");
         },
-        [&](SetBase&) {
+        [](SetBase&) {
             bad_transaction_log("Invalid path for ArrayMove (set)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("Invalid path for ArrayMove (dictionary)");
         },
-        [&](Dictionary&, Mixed) {
+        [](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for ArrayMove (dictionary, key)");
         },
-        [&](Obj&, ColKey) {
+        [](Obj&, ColKey) {
             bad_transaction_log("Invalid path for ArrayMove (obj, col)");
         }};
     resolve_path(instr, "ArrayMove", std::move(callback));
@@ -746,8 +746,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    resolve_path(
-        instr, "ArrayErase",
+    auto callback =
         util::overload{[&](LstBase& list, size_t index) {
                            if (index >= instr.prior_size) {
                                bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
@@ -763,42 +762,49 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
                            list.remove(index, index + 1);
                        },
-                       [&](LstBase&) {
+                       [](LstBase&) {
                            bad_transaction_log("Invalid path for ArrayErase (list)");
                        },
-                       [&](SetBase&) {
+                       [](SetBase&) {
                            bad_transaction_log("Invalid path for ArrayErase (set)");
                        },
-                       [&](Dictionary&) {
+                       [](Dictionary&) {
                            bad_transaction_log("Invalid path for ArrayErase (dictionary)");
                        },
-                       [&](Dictionary&, Mixed) {
+                       [](Dictionary&, Mixed) {
                            bad_transaction_log("Invalid path for ArrayErase (dictionary, key)");
                        },
-                       [&](Obj&, ColKey) {
+                       [](Obj&, ColKey) {
                            bad_transaction_log("Invalid path for ArrayErase (obj, col)");
-                       }});
+                       }};
+    resolve_path(instr, "ArrayErase", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::Clear& instr)
 {
+    // Normally we would std::move in a callback from util::overload
+    // but VS 2019 debug mode does not compile this correctly and produces
+    // a runtime exception stating that the stack is corrupted. To get around
+    // this without disabling runtime checks, we construct the callback in place
+    // which for some reason works.
+    // TODO: after upgrading VS (> Version 16.6.5) check if this can be changed.
     resolve_path(instr, "Clear",
-                 util::overload{[&](LstBase& list) {
+                 util::overload{[](LstBase& list) {
                                     list.clear();
                                 },
-                                [&](Dictionary& dict) {
+                                [](Dictionary& dict) {
                                     dict.clear();
                                 },
-                                [&](SetBase& set) {
+                                [](SetBase& set) {
                                     set.clear();
                                 },
-                                [&](LstBase&, size_t) {
+                                [](LstBase&, size_t) {
                                     bad_transaction_log("Invalid path for Clear (list, index)");
                                 },
-                                [&](Dictionary&, Mixed) {
+                                [](Dictionary&, Mixed) {
                                     bad_transaction_log("Invalid path for Clear (dictionary, key)");
                                 },
-                                [&](Obj&, ColKey&) {
+                                [](Obj&, ColKey&) {
                                     bad_transaction_log("Invalid path for Clear (object, column)");
                                 }});
 }
@@ -883,7 +889,7 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             bad_transaction_log("Invalid path for SetInsert (object, column)");
         }};
 
-    resolve_path(instr, "SetInsert", callback);
+    resolve_path(instr, "SetInsert", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::SetErase& instr)
@@ -966,7 +972,7 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             bad_transaction_log("Invalid path for SetErase (object, column)");
         }};
 
-    resolve_path(instr, "SetErase", callback);
+    resolve_path(instr, "SetErase", std::move(callback));
 }
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
