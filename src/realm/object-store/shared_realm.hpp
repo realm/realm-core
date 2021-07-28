@@ -355,7 +355,10 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // For synchronized realms, the file written will have the client file ident removed.
+    // For synchronized realms, the file written will have the client file ident removed. Furthermore
+    // it is required that all local changes are synchronized with the server before the copy can
+    // be written. This is to be sure that the file can be used as a stating point for a newly
+    // installed application. The function will throw if there are pending uploads.
     void write_copy(StringData path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
