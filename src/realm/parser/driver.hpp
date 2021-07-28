@@ -37,11 +37,11 @@ public:
 
 class AndNode : public ParserNode {
 public:
-    std::vector<AtomPredNode*> atom_preds;
+    std::vector<std::unique_ptr<AtomPredNode>> atom_preds;
 
-    AndNode(AtomPredNode* node)
+    AndNode(std::unique_ptr<AtomPredNode>&& node)
     {
-        atom_preds.emplace_back(node);
+        atom_preds.emplace_back(std::move(node));
     }
     Query visit(ParserDriver*);
     void accept(NodeVisitor& visitor) override;
@@ -49,11 +49,11 @@ public:
 
 class OrNode : public ParserNode {
 public:
-    std::vector<AndNode*> and_preds;
+    std::vector<std::unique_ptr<AndNode>> and_preds;
 
-    OrNode(AndNode* node)
+    OrNode(std::unique_ptr<AndNode>&& node)
     {
-        and_preds.emplace_back(node);
+        and_preds.emplace_back(std::move(node));
     }
     Query visit(ParserDriver*);
     void accept(NodeVisitor& visitor) override;
@@ -61,10 +61,10 @@ public:
 
 class NotNode : public AtomPredNode {
 public:
-    AtomPredNode* atom_pred = nullptr;
+    std::unique_ptr<AtomPredNode> atom_pred = nullptr;
 
-    NotNode(AtomPredNode* expr)
-        : atom_pred(expr)
+    NotNode(std::unique_ptr<AtomPredNode>&& expr)
+        : atom_pred(std::move(expr))
     {
     }
     Query visit(ParserDriver*) override;
@@ -73,10 +73,10 @@ public:
 
 class ParensNode : public AtomPredNode {
 public:
-    OrNode* pred = nullptr;
+    std::unique_ptr<OrNode> pred = nullptr;
 
-    ParensNode(OrNode* expr)
-        : pred(expr)
+    ParensNode(std::unique_ptr<OrNode>&& expr)
+        : pred(std::move(expr))
     {
     }
     Query visit(ParserDriver*) override;
@@ -100,15 +100,15 @@ public:
 
 class ValueNode : public ParserNode {
 public:
-    ConstantNode* constant = nullptr;
-    PropertyNode* prop = nullptr;
+    std::unique_ptr<ConstantNode> constant = nullptr;
+    std::unique_ptr<PropertyNode> prop = nullptr;
 
-    ValueNode(ConstantNode* node)
-        : constant(node)
+    ValueNode(std::unique_ptr<ConstantNode>&& node)
+        : constant(std::move(node))
     {
     }
-    ValueNode(PropertyNode* node)
-        : prop(node)
+    ValueNode(std::unique_ptr<PropertyNode>&& node)
+        : prop(std::move(node))
     {
     }
     void accept(NodeVisitor& visitor) override;
@@ -153,15 +153,15 @@ public:
 
 class EqualityNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<std::unique_ptr<ValueNode>> values;
     int op;
     bool case_sensitive = true;
 
-    EqualityNode(ValueNode* left, int t, ValueNode* right)
+    EqualityNode(std::unique_ptr<ValueNode>&& left, int t, std::unique_ptr<ValueNode>&& right)
         : op(t)
     {
-        values.emplace_back(left);
-        values.emplace_back(right);
+        values.emplace_back(std::move(left));
+        values.emplace_back(std::move(right));
     }
     Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
@@ -169,14 +169,14 @@ public:
 
 class RelationalNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<std::unique_ptr<ValueNode>> values;
     int op;
 
-    RelationalNode(ValueNode* left, int t, ValueNode* right)
+    RelationalNode(std::unique_ptr<ValueNode>&& left, int t, std::unique_ptr<ValueNode>&& right)
         : op(t)
     {
-        values.emplace_back(left);
-        values.emplace_back(right);
+        values.emplace_back(std::move(left));
+        values.emplace_back(std::move(right));
     }
     Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
@@ -184,15 +184,15 @@ public:
 
 class StringOpsNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<std::unique_ptr<ValueNode>> values;
     int op;
     bool case_sensitive = true;
 
-    StringOpsNode(ValueNode* left, int t, ValueNode* right)
+    StringOpsNode(std::unique_ptr<ValueNode>&& left, int t, std::unique_ptr<ValueNode>&& right)
         : op(t)
     {
-        values.emplace_back(left);
-        values.emplace_back(right);
+        values.emplace_back(std::move(left));
+        values.emplace_back(std::move(right));
     }
     Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
@@ -252,14 +252,14 @@ public:
 
 class ListAggrNode : public PropertyNode {
 public:
-    PathNode* path;
+    std::unique_ptr<PathNode> path;
     std::string identifier;
-    AggrNode* aggr_op;
+    std::unique_ptr<AggrNode> aggr_op;
 
-    ListAggrNode(PathNode* node, std::string id, AggrNode* aggr)
-        : path(node)
+    ListAggrNode(std::unique_ptr<PathNode>&& node, std::string id, std::unique_ptr<AggrNode>&& aggr)
+        : path(std::move(node))
         , identifier(id)
-        , aggr_op(aggr)
+        , aggr_op(std::move(aggr))
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
@@ -268,15 +268,15 @@ public:
 
 class LinkAggrNode : public PropertyNode {
 public:
-    PathNode* path;
+    std::unique_ptr<PathNode> path;
     std::string link;
-    AggrNode* aggr_op;
+    std::unique_ptr<AggrNode> aggr_op;
     std::string prop;
 
-    LinkAggrNode(PathNode* node, std::string id1, AggrNode* aggr, std::string id2)
-        : path(node)
+    LinkAggrNode(std::unique_ptr<PathNode>&& node, std::string id1, std::unique_ptr<AggrNode>&& aggr, std::string id2)
+        : path(std::move(node))
         , link(id1)
-        , aggr_op(aggr)
+        , aggr_op(std::move(aggr))
         , prop(id2)
     {
     }
@@ -286,29 +286,29 @@ public:
 
 class PropNode : public PropertyNode {
 public:
-    PathNode* path;
+    std::unique_ptr<PathNode> path;
     std::string identifier;
     ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
-    PostOpNode* post_op = nullptr;
-    ConstantNode* index = nullptr;
+    std::unique_ptr<PostOpNode> post_op = nullptr;
+    std::unique_ptr<ConstantNode> index = nullptr;
 
-    PropNode(PathNode* node, std::string id, ConstantNode* idx, PostOpNode* po_node)
-        : path(node)
+    PropNode(std::unique_ptr<PathNode>&& node, std::string id, std::unique_ptr<ConstantNode> idx, std::unique_ptr<PostOpNode>&& po_node)
+        : path(std::move(node))
         , identifier(id)
-        , post_op(po_node)
-        , index(idx)
+        , post_op(std::move(po_node))
+        , index(std::move(idx))
     {
     }
-    PropNode(PathNode* node, std::string id, PostOpNode* po_node,
+    PropNode(std::unique_ptr<PathNode>&& node, std::string id, std::unique_ptr<PostOpNode>&& po_node,
              ExpressionComparisonType ct = ExpressionComparisonType::Any)
-        : path(node)
+        : path(std::move(node))
         , identifier(id)
         , comp_type(ct)
-        , post_op(po_node)
+        , post_op(std::move(po_node))
     {
     }
-    PropNode(PathNode* node, std::string id)
-        : path(node)
+    PropNode(std::unique_ptr<PathNode>&& node, std::string id)
+        : path(std::move(node))
         , identifier(id)
         , comp_type(ExpressionComparisonType::Any)
     {
@@ -319,14 +319,14 @@ public:
 
 class SubqueryNode : public PropertyNode {
 public:
-    PropNode* prop = nullptr;
+    std::unique_ptr<PropNode> prop = nullptr;
     std::string variable_name;
-    OrNode* subquery = nullptr;
+    std::unique_ptr<OrNode> subquery = nullptr;
 
-    SubqueryNode(PropNode* node, std::string var_name, OrNode* query)
-        : prop(node)
+    SubqueryNode(std::unique_ptr<PropNode>&& node, std::string var_name, std::unique_ptr<OrNode>&& query)
+        : prop(std::move(node))
         , variable_name(var_name)
-        , subquery(query)
+        , subquery(std::move(query))
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
@@ -370,13 +370,13 @@ public:
 
 class DescriptorOrderingNode : public ParserNode {
 public:
-    std::vector<DescriptorNode*> orderings;
+    std::vector<std::unique_ptr<DescriptorNode>> orderings;
 
     DescriptorOrderingNode() = default;
     ~DescriptorOrderingNode() override;
-    void add_descriptor(DescriptorNode* n)
+    void add_descriptor(std::unique_ptr<DescriptorNode>&& n)
     {
-        orderings.push_back(n);
+        orderings.push_back(std::move(n));
     }
     std::unique_ptr<DescriptorOrdering> visit(ParserDriver* drv);
     void accept(NodeVisitor& visitor) override;
@@ -441,7 +441,7 @@ public:
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
-    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
+    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(std::vector<std::unique_ptr<ValueNode>>&& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
     std::string translate(LinkChain&, const std::string&);
@@ -558,7 +558,7 @@ private:
     void visitRelational(RelationalNode& relational_node) override;
     void visitStringOps(StringOpsNode& string_ops_node) override;
     void visitTrueOrFalse(TrueOrFalseNode& true_or_false_node) override;
-    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
+    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(std::vector<std::unique_ptr<ValueNode>>&& values);
     ParserDriver* drv;
     realm::LinkChain link;
 };

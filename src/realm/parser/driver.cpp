@@ -281,7 +281,7 @@ Query OrNode::visit(ParserDriver* drv)
 
     Query q(drv->m_base_table);
     q.group();
-    for (auto it : and_preds) {
+    for (auto &it : and_preds) {
         q.Or();
         q.and_query(it->visit(drv));
     }
@@ -296,7 +296,7 @@ Query AndNode::visit(ParserDriver* drv)
         return atom_preds[0]->visit(drv);
     }
     Query q(drv->m_base_table);
-    for (auto it : atom_preds) {
+    for (auto &it : atom_preds) {
         q.and_query(it->visit(drv));
     }
     return q;
@@ -307,7 +307,7 @@ void AndNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitAnd(AndNode& node) {
-    for (auto pred : node.atom_preds) {
+    for (auto &pred : node.atom_preds) {
         pred->accept(*this);
     }
 }
@@ -317,7 +317,7 @@ void OrNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitOr(OrNode& node) {
-    for (auto pred : node.and_preds) {
+    for (auto &pred : node.and_preds) {
         this->visitAnd(*pred);
     }
 }
@@ -362,8 +362,7 @@ void NodeVisitor::visitValue(ValueNode& node) {
     if (node.constant != nullptr) {
         this->visitConstant(*node.constant);
     } else {
-        auto prop = node.prop;
-        prop->accept(*this);
+        node.prop->accept(*this);
     }
 }
 
@@ -372,7 +371,7 @@ void EqualityNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitEquality(EqualityNode& node) {
-    for (auto value : node.values) {
+    for (auto& value : node.values) {
         value->accept(*this);
     }
 }
@@ -382,7 +381,7 @@ void RelationalNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitRelational(RelationalNode& node) {
-    for (auto value : node.values) {
+    for (auto& value : node.values) {
         value->accept(*this);
     }
 }
@@ -392,7 +391,7 @@ void StringOpsNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitStringOps(StringOpsNode& node) {
-    for (auto value : node.values) {
+    for (auto& value : node.values) {
         value->accept(*this);
     }
 }
@@ -475,7 +474,7 @@ void DescriptorOrderingNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node) {
-    for (auto ordering : node.orderings) {
+    for (auto& ordering : node.orderings) {
         this->visitDescriptor(*ordering);
     }
 }
@@ -491,7 +490,7 @@ void verify_only_string_types(DataType type, const std::string& op_string)
 
 Query EqualityNode::visit(ParserDriver* drv)
 {
-    auto [left, right] = drv->cmp(values);
+    auto [left, right] = drv->cmp(std::move(values));
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
@@ -621,7 +620,7 @@ Query EqualityNode::visit(ParserDriver* drv)
 
 Query RelationalNode::visit(ParserDriver* drv)
 {
-    auto [left, right] = drv->cmp(values);
+    auto [left, right] = drv->cmp(std::move(values));
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
@@ -693,7 +692,7 @@ Query RelationalNode::visit(ParserDriver* drv)
 
 Query StringOpsNode::visit(ParserDriver* drv)
 {
-    auto [left, right] = drv->cmp(values);
+    auto [left, right] = drv->cmp(std::move(values));
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
@@ -1351,7 +1350,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
 {
     auto target = drv->m_base_table;
     std::unique_ptr<DescriptorOrdering> ordering;
-    for (auto cur_ordering : orderings) {
+    for (auto& cur_ordering : orderings) {
         if (!ordering)
             ordering = std::make_unique<DescriptorOrdering>();
         if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
@@ -1433,15 +1432,15 @@ ParserDriver::~ParserDriver()
 }
 
 
-std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(const std::vector<ValueNode*>& values)
+std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
 {
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
 
-    auto left_constant = values[0]->constant;
-    auto right_constant = values[1]->constant;
-    auto left_prop = values[0]->prop;
-    auto right_prop = values[1]->prop;
+    auto left_constant = std::move(values[0]->constant);
+    auto right_constant = std::move(values[1]->constant);
+    auto left_prop = std::move(values[0]->prop);
+    auto right_prop = std::move(values[1]->prop);
 
     if (left_constant && right_constant) {
         throw InvalidQueryError("Cannot compare two constants");
@@ -1808,13 +1807,13 @@ Query QueryVisitor::visit(ParserNode& node) {
 }
 
 void QueryVisitor::visitAnd(AndNode& node){
-    auto atom_preds = node.atom_preds;
+    auto &atom_preds = node.atom_preds;
     if (atom_preds.size() == 1) {
         atom_preds[0]->accept(*this);
         return;
     }
     realm::Query q(drv->m_base_table);
-    for (auto it : atom_preds) {
+    for (auto &it : atom_preds) {
         it->accept(*this);
         q.and_query(query);
     }
@@ -1822,14 +1821,14 @@ void QueryVisitor::visitAnd(AndNode& node){
 } 
 
 void QueryVisitor::visitOr(OrNode& node){
-    auto and_preds = node.and_preds;
+    auto &and_preds = node.and_preds;
     if (and_preds.size() == 1) {
         visitAnd(*and_preds[0]);
         return;
     }
     realm::Query q(drv->m_base_table);
     q.group();
-    for (auto it : and_preds) {
+    for (auto &it : and_preds) {
         q.Or();
         visitAnd(*it);
         q.and_query(query);
@@ -1847,10 +1846,9 @@ void QueryVisitor::visitNot(NotNode& node){
 }
 
 void QueryVisitor::visitEquality(EqualityNode& node){
-    auto values = node.values;
     auto op = node.op;
     auto case_sensitive = node.case_sensitive;
-    auto [left, right] = cmp(values);
+    auto [left, right] = cmp(std::move(node.values));
     auto left_type = left->get_type();
     auto right_type = right->get_type();
 
@@ -1997,9 +1995,8 @@ void QueryVisitor::visitEquality(EqualityNode& node){
 }
 
 void QueryVisitor::visitRelational(RelationalNode& node){
-    auto values = node.values;
     auto op = node.op;
-    auto [left, right] = cmp(values);
+    auto [left, right] = cmp(std::move(node.values));
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
@@ -2076,10 +2073,9 @@ void QueryVisitor::visitRelational(RelationalNode& node){
 }
 
 void QueryVisitor::visitStringOps(StringOpsNode& node){
-    auto values = node.values;
     auto op = node.op;
     auto case_sensitive = node.case_sensitive;
-    auto [left, right] = drv->cmp(values);
+    auto [left, right] = drv->cmp(std::move(node.values));
 
     auto left_type = left->get_type();
     auto right_type = right->get_type();
@@ -2177,15 +2173,15 @@ void QueryVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
     query = q;
 } 
 
-std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(const std::vector<ValueNode*>& values)
+std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
 {
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
 
-    auto left_constant = values[0]->constant;
-    auto right_constant = values[1]->constant;
-    auto left_prop = values[0]->prop;
-    auto right_prop = values[1]->prop;
+    auto left_constant = std::move(values[0]->constant);
+    auto right_constant = std::move(values[1]->constant);
+    auto left_prop = std::move(values[0]->prop);
+    auto right_prop = std::move(values[1]->prop);
 
     if (left_constant && right_constant) {
         throw InvalidQueryError("Cannot compare two constants");
@@ -2210,10 +2206,10 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
 }
 
 std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(DescriptorOrderingNode& node){
-    auto orderings = node.orderings;
+    auto orderings = std::move(node.orderings);
     auto target = drv->m_base_table;
     std::unique_ptr<DescriptorOrdering> ordering;
-    for (auto cur_ordering : orderings) {
+    for (auto& cur_ordering : orderings) {
         if (!ordering)
             ordering = std::make_unique<DescriptorOrdering>();
         if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
@@ -2661,10 +2657,10 @@ void SubexprVisitor::visitListAggr(ListAggrNode& node){
 } 
 
 void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
-    auto path = node.path;
+    auto path = std::move(node.path);
     auto prop = node.prop;
     auto link = node.link;
-    auto aggr_op = node.aggr_op;
+    auto aggr_op = std::move(node.aggr_op);
     LinkChain link_chain = getLinkChain(*path);
     auto subexprtmp = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexprtmp.get());
@@ -2702,10 +2698,10 @@ void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
 
 void SubexprVisitor::visitProp(PropNode& node){
     auto identifier = node.identifier;
-    auto path = node.path;
+    auto path = std::move(node.path);
     auto comp_type = node.comp_type;
-    auto index = node.index;
-    auto post_op = node.post_op;
+    auto index = std::move(node.index);
+    auto post_op = std::move(node.post_op);
     bool is_keys = false;
     if (identifier[0] == '@') {
         if (identifier == "@values") {
@@ -2754,7 +2750,7 @@ void SubexprVisitor::visitProp(PropNode& node){
         if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
             // If 'length' is the operator, the last id in the path must be the name
             // of a list property
-            auto prop = path->path_elems.back();
+            auto prop = std::move(path->path_elems.back());
             path->path_elems.pop_back();
             std::unique_ptr<Subexpr> column{getLinkChain(*path, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(column.get())) {
@@ -2770,8 +2766,8 @@ void SubexprVisitor::visitProp(PropNode& node){
 
 void SubexprVisitor::visitSubquery(SubqueryNode& node){
     auto variable_name = node.variable_name;
-    auto prop = node.prop;
-    auto subquery = node.subquery;
+    auto prop = std::move(node.prop);
+    auto subquery = std::move(node.subquery);
     if (variable_name.size() < 2 || variable_name[0] != '$') {
         throw SyntaxError(util::format("The subquery variable '%1' is invalid. The variable must start with "
                                        "'$' and cannot be empty; for example '$x'.",
@@ -2863,7 +2859,7 @@ std::unique_ptr<ParserNode> JsonQueryParser::get_query_node(json json){
         if (json["operator"] == "="){
             auto left = get_subexpr_node(json["left"]);
             auto right = get_subexpr_node(json["right"]);
-            auto equality_node = std::make_unique<EqualityNode>(left.get(), CompareNode::EQUAL, right.get());
+            auto equality_node = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
             return equality_node;
         }
     }
@@ -2872,8 +2868,8 @@ std::unique_ptr<ParserNode> JsonQueryParser::get_query_node(json json){
 std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
     if (json["kind"] == "property"){
         auto empty_path = std::make_unique<PathNode>();
-        auto prop_node = std::make_unique<PropNode>(empty_path.get(), json["name"]);
-        auto value_node = std::make_unique<ValueNode>(prop_node.get());
+        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), json["name"]);
+        auto value_node = std::make_unique<ValueNode>(std::move(prop_node));
         return value_node;
     } else if (json["kind"] == "constant"){
         std::unique_ptr<ConstantNode> const_node;
@@ -2881,7 +2877,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
             Int test = json["value"].get<Int>();
             const_node = constant_node(test);
         }
-        auto value_node = std::make_unique<ValueNode>(const_node.get());
+        auto value_node = std::make_unique<ValueNode>(std::move(const_node));
         return value_node;
     }
 }
