@@ -204,7 +204,7 @@ void make_property_required(Group& group, Table& table, Property property)
 {
     property.type &= ~PropertyType::Nullable;
     table.remove_column(property.column_key);
-    property.column_key = add_column(group, table, property).value;
+    property.column_key = add_column(group, table, property);
 }
 
 void add_search_index(Table& table, Property property)
