@@ -76,6 +76,10 @@ class Dictionary : public object_store::Collection {
 public:
     using Iterator = realm::Dictionary::Iterator;
     using Collection::Collection;
+    Dictionary()
+        : Collection(PropertyType::Dictionary)
+    {
+    }
 
     bool operator==(const Dictionary& rgt) const noexcept;
     bool operator!=(const Dictionary& rgt) const noexcept;

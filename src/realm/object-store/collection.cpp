@@ -33,7 +33,10 @@ Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_
 {
 }
 
-Collection::Collection() noexcept {}
+Collection::Collection(PropertyType type) noexcept
+    : m_type(type)
+{
+}
 
 Collection::Collection(const Object& parent_obj, const Property* prop)
     : m_realm(parent_obj.get_realm())
@@ -121,7 +124,14 @@ void Collection::validate(const Obj& obj) const
 void Collection::verify_attached() const
 {
     if (!is_valid()) {
-        throw InvalidatedException();
+        std::string coll_type = "Collection";
+        if (is_array(m_type))
+            coll_type = "List";
+        else if (is_dictionary(m_type))
+            coll_type = "Dictionary";
+        else if (is_set(m_type))
+            coll_type = "Set";
+        throw InvalidatedException(util::format("Access to invalidated %1 object", coll_type));
     }
 }
 

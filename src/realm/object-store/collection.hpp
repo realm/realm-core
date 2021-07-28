@@ -38,7 +38,7 @@ class ListNotifier;
 namespace object_store {
 class Collection {
 public:
-    Collection() noexcept;
+    Collection(PropertyType type) noexcept;
     Collection(const Object& parent_obj, const Property* prop);
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
@@ -48,8 +48,8 @@ public:
     // or the containing object being deleted)
     // All non-noexcept functions can throw this
     struct InvalidatedException : public std::logic_error {
-        InvalidatedException()
-            : std::logic_error("Access to invalidated List object")
+        InvalidatedException(const std::string& msg)
+            : std::logic_error(msg)
         {
         }
     };
