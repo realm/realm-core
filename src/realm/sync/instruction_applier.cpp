@@ -702,7 +702,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             bad_transaction_log("Invalid path for ArrayInsert (obj, col)");
         }};
 
-    resolve_path(instr, "ArrayInsert", callback);
+    resolve_path(instr, "ArrayInsert", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
@@ -873,19 +873,19 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [&](LstBase&, size_t) {
+        [](LstBase&, size_t) {
             bad_transaction_log("Invalid path for SetInsert (list, index)");
         },
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("Invalid path for SetInsert (list)");
         },
-        [&](Dictionary&, Mixed) {
+        [](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
         },
-        [&](Obj&, ColKey) {
+        [](Obj&, ColKey) {
             bad_transaction_log("Invalid path for SetInsert (object, column)");
         }};
 
@@ -956,19 +956,19 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [&](LstBase&, size_t) {
+        [](LstBase&, size_t) {
             bad_transaction_log("Invalid path for SetErase (list, index)");
         },
-        [&](LstBase&) {
+        [](LstBase&) {
             bad_transaction_log("Invalid path for SetErase (list)");
         },
-        [&](Dictionary&, Mixed) {
+        [](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for SetErase (dictionary, key)");
         },
-        [&](Dictionary&) {
+        [](Dictionary&) {
             bad_transaction_log("Invalid path for SetErase (dictionary, key)");
         },
-        [&](Obj&, ColKey) {
+        [](Obj&, ColKey) {
             bad_transaction_log("Invalid path for SetErase (object, column)");
         }};
 
