@@ -2049,6 +2049,17 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
             obj.set(col, link.get_obj_key());
         }
     };
+    auto get_link = [&](Obj obj, ColKey col) -> ObjLink {
+        if (col.get_type() == col_type_Mixed) {
+            Mixed val = obj.get<Mixed>(col);
+            if (val.is_type(type_TypedLink)) {
+                return val.get_link();
+            }
+            return {};
+        }
+        REALM_ASSERT(col.get_type() == col_type_Link);
+        return ObjLink{dst_table_key, obj.get<ObjKey>(col)};
+    };
 
     auto cols = table->get_column_keys();
     SECTION("direct changes are tracked") {
@@ -2090,6 +2101,9 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
                 set_link(objects[1], link_column, {dst_table_key, objects[2].get_key()});
                 set_link(objects[2], link_column, {dst_table_key, objects[4].get_key()});
                 r->commit_transaction();
+                REQUIRE(get_link(objects[0], link_column) == ObjLink{dst_table_key, objects[1].get_key()});
+                REQUIRE(get_link(objects[1], link_column) == ObjLink{dst_table_key, objects[2].get_key()});
+                REQUIRE(get_link(objects[2], link_column) == ObjLink{dst_table_key, objects[4].get_key()});
             }
             ColKey next_link_col = cols[1 + ((col_ndx - 1) % 3)];
             SECTION("two links set") {

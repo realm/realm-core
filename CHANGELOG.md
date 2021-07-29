@@ -10,6 +10,7 @@
 * Fixed a crash when delivering notifications over a nested hierarchy of lists of Mixed that contain links. ([#4803](https://github.com/realm/realm-core/issues/4803), since v11.0.0)
 * Fixed key path filtered notifications throwing on null links and asserting on unresolved links. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.1.0)
 * Fixed a crash when an object which is linked to by a Mixed is invalidated (sync only). ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
+* Fixed a rare crash when setting a mixed link for the first time which would trigger if the link was to the same table and adding the backlink column caused a BPNode split. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
 
 ### Breaking changes
 * None.

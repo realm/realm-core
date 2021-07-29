@@ -1762,6 +1762,8 @@ void Obj::set_int(ColKey col_key, int64_t value)
 
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
+    update_if_needed();
+
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1941,6 +1943,9 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
             backlink_col_key = m_table->get_opposite_column(col_key);
         }
         target_obj.add_backlink(backlink_col_key, m_key);
+        // it is possible that this was a link to the same table and that adding a backlink column has
+        // caused the need to update this object as well.
+        update_if_needed();
     }
 }
 
