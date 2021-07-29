@@ -275,21 +275,14 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
         if (outgoing_link_column.is_collection()) {
             return do_check_for_collection_modifications(obj, outgoing_link_column, filtered_columns, depth);
         }
-
-        ConstTableRef dst_table;
-        ObjKey dst_key;
-        if (outgoing_link_column.get_type() == col_type_Link) {
-            dst_table = table.get_link_target(outgoing_link_column);
-            dst_key = obj.get<ObjKey>(outgoing_link_column);
-        }
-        else if (outgoing_link_column.get_type() == col_type_Mixed) {
+        if (outgoing_link_column.get_type() == col_type_Mixed) {
             TableRef no_cached;
             Mixed value = obj.get<Mixed>(outgoing_link_column);
             return do_check_mixed_for_link(*table.get_parent_group(), no_cached, value, filtered_columns, depth);
         }
-        else {
-            REALM_UNREACHABLE();
-        }
+        REALM_ASSERT_EX(outgoing_link_column.get_type() == col_type_Link, outgoing_link_column.get_type());
+        ConstTableRef dst_table = table.get_link_target(outgoing_link_column);
+        ObjKey dst_key = obj.get<ObjKey>(outgoing_link_column);
 
         if (!dst_key) // do not descend into a null or unresolved link
             return false;
@@ -303,11 +296,9 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
 bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
                                   const std::vector<ColKey>& filtered_columns, size_t depth)
 {
-    TableKey table_key = table.get_key();
+    REALM_ASSERT(!ObjKey(object_key).is_unresolved());
 
-    if (ObjKey(object_key).is_unresolved()) {
-        return false;
-    }
+    TableKey table_key = table.get_key();
 
     // First check if the object was modified directly. We skip this if we're
     // looking at the root object because that check is done more efficiently
@@ -353,6 +344,12 @@ bool DeepChangeChecker::operator()(ObjKeyType key)
         return true;
     }
 
+    // In production code it shouldn't be possible for a notifier to call this on
+    // an invalidated object, but we do have tests for it just in case.
+    if (ObjKey(key).is_unresolved()) {
+        return false;
+    }
+
     // The object itself wasn't modified, so move on to check if any of the
     // objects it links to were modified.
     return check_row(m_root_table, key, m_filtered_columns, 0);
@@ -371,6 +368,12 @@ bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
 {
     std::vector<int64_t> changed_columns;
 
+    // In production code it shouldn't be possible for a notifier to call this on
+    // an invalidated object, but we do have tests for it just in case.
+    if (ObjKey(object_key).is_unresolved()) {
+        return false;
+    }
+
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);
     }
@@ -382,6 +385,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
                                                           const KeyPath& key_path, size_t depth, const Table& table,
                                                           const ObjKeyType& object_key_value)
 {
+    REALM_ASSERT(!ObjKey(object_key_value).is_unresolved());
 
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
@@ -399,10 +403,6 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             }
         }
 
-        return;
-    }
-
-    if (ObjKey(object_key_value).is_unresolved()) {
         return;
     }
 
@@ -464,17 +464,15 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     else if (column_key.is_set()) {
         if (column_type == col_type_Mixed) {
             auto set = object.get_set<Mixed>(column_key);
-            for (auto it = set.begin(); it != set.end(); ++it) {
-                auto target_object = *it;
-                check_mixed_object(target_object);
+            for (auto& mixed_val : set) {
+                check_mixed_object(mixed_val);
             }
         }
         else {
             REALM_ASSERT(column_type == col_type_Link || column_type == col_type_LinkList);
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
-            for (auto it = set.begin(); it != set.end(); ++it) {
-                auto target_object = *it;
+            for (auto& target_object : set) {
                 find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
             }
         }

@@ -2094,7 +2094,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
         {
             size_t col_ndx = GENERATE(1, 2, 3);
             ColKey link_column = cols[col_ndx];
-            SECTION("one link set") {
+            SECTION(util::format("one link set: %1", col_ndx)) {
                 did_run_section = true;
                 r->begin_transaction();
                 set_link(objects[0], link_column, {dst_table_key, objects[1].get_key()});
@@ -2106,7 +2106,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
                 REQUIRE(get_link(objects[2], link_column) == ObjLink{dst_table_key, objects[4].get_key()});
             }
             ColKey next_link_col = cols[1 + ((col_ndx - 1) % 3)];
-            SECTION("two links set") {
+            SECTION(util::format("two links set: %1", col_ndx)) {
                 did_run_section = true;
                 r->begin_transaction();
                 set_link(objects[0], link_column, {dst_table_key, objects[1].get_key()});
@@ -2118,7 +2118,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
                 set_link(objects[2], next_link_col, {dst_table_key, objects[4].get_key()});
                 r->commit_transaction();
             }
-            SECTION("circular link") {
+            SECTION(util::format("circular link: %1", col_ndx)) {
                 did_run_section = true;
                 r->begin_transaction();
                 set_link(objects[0], link_column, {dst_table_key, objects[0].get_key()});
@@ -2148,7 +2148,6 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
             objects[1].set(cols[3], Mixed{ObjLink(dst_table_key, objects[2].get_key())});
             objects[2].set(cols[3], Mixed{ObjLink(dst_table_key, objects[4].get_key())});
             r->commit_transaction();
-            relation_updater();
         }
         relation_updater();
 
