@@ -1580,11 +1580,11 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
-    Query query = QueryVisitor(&driver).visit(*driver.result);
+    // Query query = QueryVisitor(&driver).visit(*driver.result);
     // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
-    return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
+    // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
     // return visitor.query.set_ordering(driver.ordering->visit(&driver));
-    // return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+    return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
 Subexpr* LinkChain::column(const std::string& col)

@@ -110,22 +110,22 @@ using namespace realm::query_parser;
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop
-%type  <ConstantNode*> constant
-%type  <PropertyNode*> prop
-%type  <PostOpNode*> post_op
-%type  <AggrNode*> aggr_op
-%type  <ValueNode*> value
-%type  <TrueOrFalseNode*> boolexpr
+%type  <std::unique_ptr<ConstantNode>> constant
+%type  <std::unique_ptr<PropertyNode>> prop
+%type  <std::unique_ptr<PostOpNode>> post_op
+%type  <std::unique_ptr<AggrNode>> aggr_op
+%type  <std::unique_ptr<ValueNode>> value
+%type  <std::unique_ptr<TrueOrFalseNode>> boolexpr
 %type  <int> comp_type
-%type  <OrNode*> pred
-%type  <AtomPredNode*> atom_pred
-%type  <AndNode*> and_pred
-%type  <PathNode*> path
-%type  <DescriptorOrderingNode*> pred_suffix
-%type  <DescriptorNode*> sort sort_param distinct distinct_param limit
-%type  <SubqueryNode*> subquery
+%type  <std::unique_ptr<OrNode>> pred
+%type  <std::unique_ptr<AtomPredNode>> atom_pred
+%type  <std::unique_ptr<AndNode>> and_pred
+%type  <std::unique_ptr<PathNode>> path
+%type  <std::unique_ptr<DescriptorOrderingNode>> pred_suffix
+%type  <std::unique_ptr<DescriptorNode>> sort sort_param distinct distinct_param limit
+%type  <std::unique_ptr<SubqueryNode>> subquery
 %type  <std::string> path_elem id
-%type  <PropNode*> simple_prop
+%type  <std::unique_ptr<PropNode>> simple_prop
 
 %destructor { } <int>
 
@@ -140,76 +140,76 @@ using namespace realm::query_parser;
 %right NOT;
 
 query
-    : pred pred_suffix { drv.result = $1; drv.ordering = $2; };
+    : pred pred_suffix { drv.result = std::move($1); drv.ordering = std::move($2); };
 
 pred
-    : and_pred                  { $$ = drv.m_parse_nodes.create<OrNode>($1); }
-    | pred "||" and_pred        { $1->and_preds.emplace_back($3); $$ = $1; }
+    : and_pred                  { $$ = std::make_unique<OrNode>(std::move($1)); }
+    | pred "||" and_pred        { $1->and_preds.emplace_back(std::move($3)); $$ = std::move($1); }
 
 and_pred
-    : atom_pred                 { $$ = drv.m_parse_nodes.create<AndNode>($1); }
-    | and_pred "&&" atom_pred   { $1->atom_preds.emplace_back($3); $$ = $1; }
+    : atom_pred                 { $$ = std::make_unique<AndNode>(std::move($1)); }
+    | and_pred "&&" atom_pred   { $1->atom_preds.emplace_back(std::move($3)); $$ = std::move($1); }
 
 atom_pred
-    : value equality value      { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
+    : value equality value      { $$ = std::make_unique<EqualityNode>(std::move($1),$2,std::move($3)); }
     | value equality CASE value {
-                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>($1, $2, $4);
+                                    auto tmp = std::make_unique<EqualityNode>(std::move($1),$2,std::move($4));
                                     tmp->case_sensitive = false;
-                                    $$ = tmp;
+                                    $$ = std::move(tmp);
                                 }
-    | value relational value    { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
-    | value stringop value      { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $3); }
+    | value relational value    { $$ = std::make_unique<RelationalNode>(std::move($1),$2,std::move($3)); }
+    | value stringop value      { $$ = std::make_unique<StringOpsNode>(std::move($1),$2,std::move($3)); }
     | value stringop CASE value {
-                                    auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
+                                    auto tmp = std::make_unique<StringOpsNode>(std::move($1),$2,std::move($4));
                                     tmp->case_sensitive = false;
-                                    $$ = tmp;
+                                    $$ = std::move(tmp);
                                 }
     | value BETWEEN list        {
                                     error("The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.");
                                     YYERROR;
                                 }
-    | NOT atom_pred             { $$ = drv.m_parse_nodes.create<NotNode>($2); }
-    | '(' pred ')'              { $$ = drv.m_parse_nodes.create<ParensNode>($2); }
-    | boolexpr                  { $$ =$1; }
+    | NOT atom_pred             { $$ = std::make_unique<NotNode>(std::move($2)); }
+    | '(' pred ')'              { $$ = std::make_unique<ParensNode>(std::move($2)); }
+    | boolexpr                  { $$ = std::move($1); }
 
 value
-    : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
-    | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
+    : constant                  { $$ = std::make_unique<ValueNode>(std::move($1));}
+    | prop                      { $$ = std::make_unique<ValueNode>(std::move($1));}
 
 prop
-    : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
-    | path id '[' constant ']' post_op { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $4, $6); }
-    | comp_type path id post_op { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, $4, ExpressionComparisonType($1)); }
-    | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
-    | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
-    | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }
-    | subquery                  { $$ = $1; }
+    : path id post_op           { $$ = std::make_unique<PropNode>(std::move($1),$2,std::move($3)); }
+    | path id '[' constant ']' post_op { $$ = std::make_unique<PropNode>(std::move($1),$2,std::move($4), std::move($6)); }
+    | comp_type path id post_op { $$ = std::make_unique<PropNode>(std::move($2), $3, std::move($4),ExpressionComparisonType($1));}
+    | path BACKLINK post_op     { $$ = std::make_unique<PropNode>(std::move($1), "@links" , std::move($3)); }
+    | path id '.' aggr_op '.'  id   { $$ = std::make_unique<LinkAggrNode>(std::move($1), $2, std::move($4), $6); }
+    | path id '.' aggr_op       { $$ = std::make_unique<ListAggrNode>(std::move($1), $2, std::move($4)); }
+    | subquery                  { $$ = std::move($1); }
 
 simple_prop
-    : path id                   { $$ = drv.m_parse_nodes.create<PropNode>($1, $2); }
+    : path id                   { $$ = std::make_unique<PropNode>(std::move($1),$2); }
 
 subquery
-    : SUBQUERY '(' simple_prop ',' id ',' pred ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
+    : SUBQUERY '(' simple_prop ',' id ',' pred ')' '.' SIZE   { $$ = std::make_unique<SubqueryNode>(std::move($3), $5, std::move($7)); }
 
 pred_suffix
-    : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}
-    | pred_suffix sort          { $1->add_descriptor($2); $$ = $1; }
-    | pred_suffix distinct      { $1->add_descriptor($2); $$ = $1; }
-    | pred_suffix limit         { $1->add_descriptor($2); $$ = $1; }
+    : %empty                    { $$ = std::make_unique<DescriptorOrderingNode>();}
+    | pred_suffix sort          { $1->add_descriptor(std::move($2)); $$ = std::move($1); }
+    | pred_suffix distinct      { $1->add_descriptor(std::move($2)); $$ = std::move($1); }
+    | pred_suffix limit         { $1->add_descriptor(std::move($2)); $$ = std::move($1); }
 
-distinct: DISTINCT '(' distinct_param ')' { $$ = $3; }
+distinct: DISTINCT '(' distinct_param ')' { $$ = std::move($3); }
 
 distinct_param
-    : path id                   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::DISTINCT); $$->add($1->path_elems, $2);}
-    | distinct_param ',' path id { $1->add($3->path_elems, $4); $$ = $1; }
+    : path id                   { $$ = std::make_unique<DescriptorNode>(DescriptorNode::DISTINCT); $$->add($1->path_elems, $2);}
+    | distinct_param ',' path id { $1->add($3->path_elems, $4); $$ = std::move($1); }
 
-sort: SORT '(' sort_param ')'    { $$ = $3; }
+sort: SORT '(' sort_param ')'    { $$ = std::move($3); }
 
 sort_param
-    : path id direction         { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT); $$->add($1->path_elems, $2, $3);}
-    | sort_param ',' path id direction  { $1->add($3->path_elems, $4, $5); $$ = $1; }
+    : path id direction         { $$ = std::make_unique<DescriptorNode>(DescriptorNode::SORT); $$->add($1->path_elems, $2, $3);}
+    | sort_param ',' path id direction  { $1->add($3->path_elems, $4, $5); $$ = std::move($1); }
 
-limit: LIMIT '(' NATURAL0 ')'   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::LIMIT, $3); }
+limit: LIMIT '(' NATURAL0 ')'   { $$ = std::make_unique<DescriptorNode>(DescriptorNode::LIMIT, $3); }
 
 direction
     : ASCENDING                 { $$ = true; }
@@ -222,26 +222,26 @@ list_content
     | list_content ',' constant
 
 constant
-    : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
-    | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
-    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
-    | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
-    | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
-    | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
-    | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
-    | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
-    | TYPED_LINK                { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
-    | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
-    | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
-    | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
-    | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
+    : NATURAL0                  { $$ = std::make_unique<ConstantNode>(ConstantNode::NUMBER, $1); }
+    | NUMBER                    { $$ = std::make_unique<ConstantNode>(ConstantNode::NUMBER, $1); }
+    | INFINITY                  { $$ = std::make_unique<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
+    | NAN                       { $$ = std::make_unique<ConstantNode>(ConstantNode::NAN_VAL, $1); }
+    | STRING                    { $$ = std::make_unique<ConstantNode>(ConstantNode::STRING, $1); }
+    | BASE64                    { $$ = std::make_unique<ConstantNode>(ConstantNode::BASE64, $1); }
+    | FLOAT                     { $$ = std::make_unique<ConstantNode>(ConstantNode::FLOAT, $1); }
+    | TIMESTAMP                 { $$ = std::make_unique<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
+    | UUID                      { $$ = std::make_unique<ConstantNode>(ConstantNode::UUID_T, $1); }
+    | OID                       { $$ = std::make_unique<ConstantNode>(ConstantNode::OID, $1); }
+    | LINK                      { $$ = std::make_unique<ConstantNode>(ConstantNode::LINK, $1); }
+    | TYPED_LINK                { $$ = std::make_unique<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
+    | TRUE                      { $$ = std::make_unique<ConstantNode>(ConstantNode::TRUE, ""); }
+    | FALSE                     { $$ = std::make_unique<ConstantNode>(ConstantNode::FALSE, ""); }
+    | NULL_VAL                  { $$ = std::make_unique<ConstantNode>(ConstantNode::NULL_VAL, ""); }
+    | ARG                       { $$ = std::make_unique<ConstantNode>(ConstantNode::ARG, $1); }
 
 boolexpr
-    : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }
-    | "falsepredicate"          { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(false); }
+    : "truepredicate"           { $$ = std::make_unique<TrueOrFalseNode>(true); }
+    | "falsepredicate"          { $$ = std::make_unique<TrueOrFalseNode>(false); }
 
 comp_type
     : ANY                       { $$ = int(ExpressionComparisonType::Any); }
@@ -250,14 +250,14 @@ comp_type
 
 post_op
     : %empty                    { $$ = nullptr; }
-    | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::SIZE);}
-    | '.' TYPE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::TYPE);}
+    | '.' SIZE                  { $$ = std::make_unique<PostOpNode>($2, PostOpNode::SIZE);}
+    | '.' TYPE                  { $$ = std::make_unique<PostOpNode>($2, PostOpNode::TYPE);}
 
 aggr_op
-    : MAX                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);}
-    | MIN                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MIN);}
-    | SUM                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::SUM);}
-    | AVG                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::AVG);}
+    : MAX                       { $$ = std::make_unique<AggrNode>(AggrNode::MAX);}
+    | MIN                       { $$ = std::make_unique<AggrNode>(AggrNode::MIN);}
+    | SUM                       { $$ = std::make_unique<AggrNode>(AggrNode::SUM);}
+    | AVG                       { $$ = std::make_unique<AggrNode>(AggrNode::AVG);}
 
 equality
     : EQUAL                     { $$ = CompareNode::EQUAL; }
@@ -277,8 +277,8 @@ stringop
     | LIKE                      { $$ = CompareNode::LIKE; }
 
 path
-    : %empty                    { $$ = drv.m_parse_nodes.create<PathNode>(); }
-    | path path_elem            { $1->add_element($2); $$ = $1; }
+    : %empty                    { $$ = std::make_unique<PathNode>(); }
+    | path path_elem            { $1->add_element(std::move($2)); $$ = std::move($1); }
 
 path_elem
     : id '.'                    { $$ = $1; }

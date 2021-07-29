@@ -415,8 +415,8 @@ public:
     ~ParserDriver();
 
     util::serializer::SerialisationState m_serializer_state;
-    OrNode* result = nullptr;
-    DescriptorOrderingNode* ordering = nullptr;
+    std::unique_ptr<OrNode> result = nullptr;
+    std::unique_ptr<DescriptorOrderingNode> ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
     query_parser::KeyPathMapping m_mapping;
