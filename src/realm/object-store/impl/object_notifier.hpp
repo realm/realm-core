@@ -24,9 +24,7 @@
 #include <realm/keys.hpp>
 #include <realm/table.hpp>
 
-namespace realm {
-
-namespace _impl {
+namespace realm::_impl {
 class ObjectNotifier : public CollectionNotifier {
 public:
     ObjectNotifier(std::shared_ptr<Realm> realm, TableKey table_key, ObjKey obj_key);
@@ -42,10 +40,7 @@ private:
     void do_attach_to(Transaction& sg) override;
 
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
-
-    bool object_was_deleted(const ObjectChangeSet& object_change_set);
 };
-} // namespace _impl
-} // namespace realm
+} // namespace realm::_impl
 
 #endif // REALM_OS_OBJECT_NOTIFIER_HPP

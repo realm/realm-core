@@ -1004,7 +1004,7 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
     }
 
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
 }
 

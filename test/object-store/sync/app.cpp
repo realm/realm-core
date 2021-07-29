@@ -4170,9 +4170,11 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         auto app = sync_manager.app();
 
         {
+            std::mutex mutex;
             std::shared_ptr<SyncUser> cur_user;
             app->log_in_with_credentials(AppCredentials::anonymous(),
                                          [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                             std::lock_guard lock(mutex);
                                              CHECK(user);
                                              CHECK(!error);
                                              cur_user = std::move(user);
@@ -4181,6 +4183,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
             state.wait_for(TestState::profile_2);
             util::EventLoop::main().run_until([&] {
+                std::lock_guard lock(mutex);
                 return cur_user != nullptr;
             });
             CHECK(cur_user);

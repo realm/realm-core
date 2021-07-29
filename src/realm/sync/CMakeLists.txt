@@ -7,7 +7,6 @@ set(SYNC_SOURCES
     noinst/client_impl_base.cpp
     noinst/client_reset.cpp
     noinst/client_reset_operation.cpp
-    noinst/common_dir.cpp
     noinst/compact_changesets.cpp
     noinst/compression.cpp
     noinst/file_descriptors.cpp
@@ -97,7 +96,6 @@ set(NOINST_HEADERS
     noinst/client_impl_base.hpp
     noinst/client_reset.hpp
     noinst/command_line_util.hpp
-    noinst/common_dir.hpp
     noinst/compact_changesets.hpp
     noinst/compression.hpp
     noinst/integer_codec.hpp

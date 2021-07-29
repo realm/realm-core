@@ -703,38 +703,38 @@ TEST(Table_AggregateFuzz)
         // Test methods on Table
         {
             // Table::max
-            key = 123;
+            key = ObjKey(123);
             f = table->maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             ts = table->maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // Table::min
-            key = 123;
+            key = ObjKey(123);
             f = table->minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             ts = table->minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
@@ -769,38 +769,38 @@ TEST(Table_AggregateFuzz)
         // Test methods on TableView
         {
             // TableView::max
-            key = 123;
+            key = ObjKey(123);
             f = table->where().find_all().maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->where().find_all().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             ts = table->where().find_all().maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
-            key = 123;
+            key = ObjKey(123);
             f = table->where().find_all().minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->where().find_all().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             ts = table->where().find_all().minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
@@ -810,7 +810,7 @@ TEST(Table_AggregateFuzz)
             double d;
 
             // number of non-null values used in computing the avg or sum
-            key = 123;
+            key = ObjKey(123);
 
             // TableView::avg
             d = table->where().find_all().average_float(float_col, &cnt);
@@ -836,19 +836,19 @@ TEST(Table_AggregateFuzz)
         // Test methods on Query
         {
             // TableView::max
-            key = 123;
+            key = ObjKey(123);
             f = table->where().maximum_float(float_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(largest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->where().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             // Note: Method arguments different from metholds on other column types
             ts = table->where().maximum_timestamp(date_col, &key);
             CHECK_EQUAL(key, largest_pos);
@@ -856,19 +856,19 @@ TEST(Table_AggregateFuzz)
                 CHECK_EQUAL(ts, table->get_object(largest_pos).get<Timestamp>(date_col));
 
             // TableView::min
-            key = 123;
+            key = ObjKey(123);
             f = table->where().minimum_float(float_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(f, table->get_object(smallest_pos).get<float>(float_col));
 
-            key = 123;
+            key = ObjKey(123);
             i = table->where().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
                 CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
 
-            key = 123;
+            key = ObjKey(123);
             // Note: Method arguments different from metholds on other column types
             ts = table->where().minimum_timestamp(date_col, &key);
             CHECK_EQUAL(key, smallest_pos);
@@ -2040,43 +2040,43 @@ TEST(Table_Aggregates3)
         ObjKey pos;
         if (nullable) {
             // max
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_int(col_price), 3);
             CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_float(col_shipping), 30.f);
             CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_double(col_rating), 2.2);
             CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
             CHECK_EQUAL(pos, ObjKey(1));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_timestamp(col_date), Timestamp(6, 6));
             CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
             CHECK_EQUAL(pos, ObjKey(2));
 
             // min
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_int(col_price), 1);
             CHECK_EQUAL(table->minimum_int(col_price, &pos), 1);
             CHECK_EQUAL(pos, ObjKey(0));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_float(col_shipping), 30.f);
             CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_double(col_rating), 1.1);
             CHECK_EQUAL(table->minimum_double(col_rating, &pos), 1.1);
             CHECK_EQUAL(pos, ObjKey(0));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_timestamp(col_date), Timestamp(2, 2));
             CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(2, 2));
             CHECK_EQUAL(pos, ObjKey(0));
@@ -2104,36 +2104,36 @@ TEST(Table_Aggregates3)
         }
         else { // not nullable
             // max
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_int(col_price, &pos), 3);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_float(col_shipping, &pos), 30.f);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_double(col_rating, &pos), 2.2);
             CHECK_EQUAL(pos, ObjKey(1));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->maximum_timestamp(col_date, &pos), Timestamp(6, 6));
             CHECK_EQUAL(pos, ObjKey(2));
 
             // min
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_int(col_price, &pos), 0);
             CHECK_EQUAL(pos, ObjKey(1));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_float(col_shipping, &pos), 0.f);
             CHECK_EQUAL(pos, ObjKey(0));
 
-            pos = 123;
+            pos = ObjKey(123);
             CHECK_EQUAL(table->minimum_double(col_rating, &pos), 0.);
             CHECK_EQUAL(pos, ObjKey(2));
 
-            pos = 123;
+            pos = ObjKey(123);
             // Timestamp(0, 0) is default value for non-nullable column
             CHECK_EQUAL(table->minimum_timestamp(col_date, &pos), Timestamp(0, 0));
             CHECK_EQUAL(pos, ObjKey(1));

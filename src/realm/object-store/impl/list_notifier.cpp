@@ -34,9 +34,6 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_obj(list.get_owner_key())
     , m_prev_size(list.size())
 {
-    if (m_type == PropertyType::Object) {
-        set_table(list.get_target_table());
-    }
 }
 
 void ListNotifier::release_data() noexcept
@@ -71,8 +68,7 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     util::CheckedLockGuard lock(m_callback_mutex);
     if (m_did_modify_callbacks && m_type == PropertyType::Object) {
         auto& list = static_cast<LnkLst&>(*m_list);
-        const Table& table = *(list.get_table());
-        update_related_tables(table);
+        update_related_tables(*list.get_table());
     }
 
     return true;

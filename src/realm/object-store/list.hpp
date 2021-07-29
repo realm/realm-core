@@ -39,6 +39,10 @@ struct ObjKey;
 class List : public object_store::Collection {
 public:
     using object_store::Collection::Collection;
+    List()
+        : Collection(PropertyType::Array)
+    {
+    }
 
     List(const List&);
     List& operator=(const List&);

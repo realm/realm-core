@@ -76,6 +76,10 @@ class Dictionary : public object_store::Collection {
 public:
     using Iterator = realm::Dictionary::Iterator;
     using Collection::Collection;
+    Dictionary()
+        : Collection(PropertyType::Dictionary)
+    {
+    }
 
     bool operator==(const Dictionary& rgt) const noexcept;
     bool operator!=(const Dictionary& rgt) const noexcept;
@@ -87,6 +91,7 @@ public:
 
     Obj insert_embedded(StringData key);
     void erase(StringData key);
+    bool try_erase(StringData key);
     void remove_all();
     Obj get_object(StringData key);
     Mixed get_any(StringData key);

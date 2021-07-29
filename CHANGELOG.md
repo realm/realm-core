@@ -1,10 +1,16 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Shift more of the work done when first initializing a collection notifier to the background worker thread rather than doing it on the main thread.
+* Report if Realm::delete_files() actually deleted the Realm file, separately from if any errors occurred.
+* Add Dictionary::try_erase(), which returns false if the key is not found rather than throwing.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed a segfault in sync compiled by MSVC 2019. ([#4624](https://github.com/realm/realm-core/issues/4624), since v10.4.0)
+* Removing a change callback from a Results would sometimes block the calling thread while the query for that Results was running on the background worker thread (since v11.1.0).
+* Object observers did not handle the object being deleted properly, which could result in assertion failures mentioning "m_table" in ObjectNotifier ([#4824](https://github.com/realm/realm-core/issues/4824), since v11.1.0).
+* Accessing an invalidated dictionary will throw a confusing error message ([#4805](https://github.com/realm/realm-core/issues/4805), since v11.0.0).
  
 ### Breaking changes
 * None.
@@ -17,6 +23,7 @@
 * Remove the STATE message request and handling from the client and test sever. The current server was always responding with empty state anyhow. Clients will now consider receiving this message as an error because they never request it.
 * Handling for async open, involving state files is mostly removed.
 * When a client reset occured, we would create a metadata Realm to handle state download but this isn't needed anymore so it is removed.
+* Realm::write_copy_without_client_file_id and Realm::write_copy are merged. For synchronized realms, the file written will have the client file ident removed. Furthermore it is required that all local changes are synchronized with the server before the copy can. The function will throw if there are pending uploads.
 
 ----------------------------------------------
 

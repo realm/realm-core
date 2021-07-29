@@ -769,7 +769,7 @@ void RealmCoordinator::wait_for_change_release()
     m_db->wait_for_change_release();
 }
 
-// Thread-safety analsys doesn't reasonably handle calling functions on different
+// Thread-safety analysis doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier) NO_THREAD_SAFETY_ANALYSIS
 {
@@ -939,6 +939,7 @@ void RealmCoordinator::run_async_notifiers()
     }
 
     if (!m_notifier_sg) {
+        REALM_ASSERT(m_notifiers.empty());
         REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_sg = m_db->start_read();
     }
@@ -1057,7 +1058,10 @@ void RealmCoordinator::run_async_notifiers()
     }
     change_info.advance_to_final(version);
 
-    // Attach the new notifiers to the main SG and move them to the main list
+    // Now that they're at the same version, switch the new notifiers over to
+    // the main Transaction used for background work rather than the temporary one
+    REALM_ASSERT(new_notifiers.empty() || m_notifier_sg->get_version_of_current_transaction() ==
+                                              new_notifier_transaction->get_version_of_current_transaction());
     for (auto& notifier : new_notifiers) {
         notifier->attach_to(m_notifier_sg);
         notifier->run();
