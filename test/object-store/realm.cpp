@@ -545,6 +545,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         SyncTestFile config3(init_sync_manager.app(), "default");
         config3.schema = config.schema;
         config3.cache = false;
+        uint64_t client_file_id;
 
         // Create some content
         auto origin = Realm::get_shared_realm(config);
@@ -566,7 +567,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
                 return bool(realm_ref);
             });
             SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-            realm->write_copy_without_client_file_id(config3.path, BinaryData());
+            client_file_id = realm->read_group().get_sync_file_id();
+            realm->write_copy(config3.path, BinaryData());
         }
 
         // Create some more content on the server
@@ -578,6 +580,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
         wait_for_download(*realm);
+        // Make sure we have got a new client file id
+        REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
         REQUIRE(realm->read_group().get_table("class_object")->size() == 2);
 
         // Check that we can continue committing to this realm

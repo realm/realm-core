@@ -712,21 +712,14 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
     verify_thread();
     try {
-        read_group().write(path, key.data());
-    }
-    catch (...) {
-        _impl::translate_file_exception(path);
-    }
-}
-
-void Realm::write_copy_without_client_file_id(StringData path, BinaryData key, bool allow_overwrite)
-{
-    if (key.data() && key.size() != 64) {
-        throw InvalidEncryptionKeyException();
-    }
-    verify_thread();
-    try {
-        m_coordinator->write_copy(path, key, allow_overwrite);
+        Transaction& tr = transaction();
+        auto repl = tr.get_replication();
+        if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
+            m_coordinator->write_copy(path, key, false);
+        }
+        else {
+            tr.write(path, key.data());
+        }
     }
     catch (...) {
         _impl::translate_file_exception(path);
