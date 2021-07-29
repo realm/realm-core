@@ -2,23 +2,27 @@
 
 ### Enhancements
 * Shift more of the work done when first initializing a collection notifier to the background worker thread rather than doing it on the main thread.
+* Report if Realm::delete_files() actually deleted the Realm file, separately from if any errors occurred.
+* Add Dictionary::try_erase(), which returns false if the key is not found rather than throwing.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed a segfault in sync compiled by MSVC 2019. ([#4624](https://github.com/realm/realm-core/issues/4624), since v10.4.0)
 * Removing a change callback from a Results would sometimes block the calling thread while the query for that Results was running on the background worker thread (since v11.1.0).
 * Object observers did not handle the object being deleted properly, which could result in assertion failures mentioning "m_table" in ObjectNotifier ([#4824](https://github.com/realm/realm-core/issues/4824), since v11.1.0).
 * Fixed a crash when delivering notifications over a nested hierarchy of lists of Mixed that contain links. ([#4803](https://github.com/realm/realm-core/issues/4803), since v11.0.0)
 * Fixed key path filtered notifications throwing on null links and asserting on unresolved links. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.1.0)
 * Fixed a crash when an object which is linked to by a Mixed is invalidated (sync only). ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
 * Fixed a rare crash when setting a mixed link for the first time which would trigger if the link was to the same table and adding the backlink column caused a BPNode split. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
-
+* Accessing an invalidated dictionary will throw a confusing error message ([#4805](https://github.com/realm/realm-core/issues/4805), since v11.0.0).
+ 
 ### Breaking changes
 * None.
 
 -----------
 
 ### Internals
-* None.
+* Realm::write_copy_without_client_file_id and Realm::write_copy are merged. For synchronized realms, the file written will have the client file ident removed. Furthermore it is required that all local changes are synchronized with the server before the copy can. The function will throw if there are pending uploads.
 
 ----------------------------------------------
 

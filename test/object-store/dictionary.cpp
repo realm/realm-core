@@ -160,7 +160,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("verify_attached()") {
         object_store::Dictionary unattached;
         REQUIRE_NOTHROW(dict.verify_attached());
-        REQUIRE_THROWS_AS(unattached.verify_attached(), realm::List::InvalidatedException);
+        REQUIRE_THROWS_WITH(unattached.verify_attached(), "Access to invalidated Dictionary object");
     }
 
     SECTION("verify_in_transaction()") {
@@ -229,8 +229,21 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
             REQUIRE(dict.contains(key));
             dict.erase(key);
             REQUIRE(!dict.contains(key));
+            REQUIRE_THROWS(dict.erase(key));
         }
         REQUIRE(dict.size() == 0);
+        REQUIRE_THROWS(dict.erase(keys[0]));
+    }
+
+    SECTION("try_erase()") {
+        for (auto key : keys) {
+            REQUIRE(dict.contains(key));
+            REQUIRE(dict.try_erase(key));
+            REQUIRE(!dict.contains(key));
+            REQUIRE_FALSE(dict.try_erase(key));
+        }
+        REQUIRE(dict.size() == 0);
+        REQUIRE_FALSE(dict.try_erase(keys[0]));
     }
 
     SECTION("contains()") {
