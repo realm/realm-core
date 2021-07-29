@@ -7,6 +7,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed a segfault in sync compiled by MSVC 2019. ([#4624](https://github.com/realm/realm-core/issues/4624), since v10.4.0)
 * Removing a change callback from a Results would sometimes block the calling thread while the query for that Results was running on the background worker thread (since v11.1.0).
 * Object observers did not handle the object being deleted properly, which could result in assertion failures mentioning "m_table" in ObjectNotifier ([#4824](https://github.com/realm/realm-core/issues/4824), since v11.1.0).
 * Accessing an invalidated dictionary will throw a confusing error message ([#4805](https://github.com/realm/realm-core/issues/4805), since v11.0.0).
