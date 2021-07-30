@@ -600,8 +600,7 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config,
-                                                      bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
 {
     auto& client = get_sync_client(); // Throws
 
@@ -611,7 +610,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, force_client_resync, this);
+    auto shared_session = SyncSession::create(client, path, sync_config, this);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become

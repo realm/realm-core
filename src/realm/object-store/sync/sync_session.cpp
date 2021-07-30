@@ -414,11 +414,9 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync,
-                         SyncManager* sync_manager)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, SyncManager* sync_manager)
     : m_state(&State::inactive)
     , m_config(std::move(config))
-    , m_force_client_resync(force_client_resync)
     , m_realm_path(std::move(realm_path))
     , m_client(client)
     , m_sync_manager(sync_manager)
@@ -483,8 +481,7 @@ void SyncSession::handle_error(SyncError error)
         switch (m_config.client_resync_mode) {
             case ClientResyncMode::Manual:
                 break;
-            case ClientResyncMode::DiscardLocal:
-            case ClientResyncMode::Recover: {
+            case ClientResyncMode::DiscardLocal: {
                 // Performing a client resync requires tearing down our current
                 // sync session and creating a new one with a forced client
                 // reset. This will result in session completion handlers firing
@@ -496,8 +493,7 @@ void SyncSession::handle_error(SyncError error)
                 // when the session becomes active again.
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_resync = true;
-
+                    m_force_client_reset = true;
                     CompletionCallbacks callbacks;
                     std::swap(m_completion_callbacks, callbacks);
                     advance_state(lock, State::inactive);
@@ -734,14 +730,11 @@ void SyncSession::do_create_sync_session()
     }
     session_config.custom_http_headers = m_config.custom_http_headers;
 
-    if (m_force_client_resync) {
+    if (m_force_client_reset) {
         std::string metadata_dir = m_realm_path + ".resync";
         util::try_make_dir(metadata_dir);
-
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
-        if (m_config.client_resync_mode != ClientResyncMode::Recover)
-            config.recover_local_changes = false;
         session_config.client_reset_config = config;
     }
 

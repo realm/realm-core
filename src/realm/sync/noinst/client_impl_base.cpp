@@ -1537,36 +1537,6 @@ void Connection::receive_ident_message(session_ident_type session_ident, SaltedF
         close_due_to_protocol_error(ec); // Throws
 }
 
-void Connection::receive_client_version_message(session_ident_type session_ident, version_type client_version)
-{
-    Session* sess = get_session(session_ident);
-    if (REALM_UNLIKELY(!sess)) {
-        logger.error("Bad session identifier in CLIENT_VERSION message, "
-                     "session_ident=%1",
-                     session_ident);                                 // Throws
-        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
-        return;
-    }
-
-    sess->receive_client_version_message(client_version);
-}
-
-void Connection::receive_state_message(session_ident_type session_ident, version_type server_version,
-                                       salt_type server_version_salt, uint_fast64_t begin_offset,
-                                       uint_fast64_t end_offset, uint_fast64_t max_offset, BinaryData chunk)
-{
-    Session* sess = get_session(session_ident);
-    if (REALM_UNLIKELY(!sess)) {
-        logger.error("Bad session identifier in STATE message, session_ident = %1",
-                     session_ident);                                 // Throws
-        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
-        return;
-    }
-
-    sess->receive_state_message(server_version, server_version_salt, begin_offset, end_offset, max_offset, chunk);
-}
-
-
 void Connection::receive_download_message(session_ident_type session_ident, const SyncProgress& progress,
                                           std::uint_fast64_t downloadable_bytes,
                                           const ReceivedChangesets& received_changesets)
@@ -1820,13 +1790,6 @@ const util::Optional<sync::Session::Config::ClientReset>& Session::get_client_re
     return m_client_reset_config;
 }
 
-
-void Session::on_state_download_progress(uint_fast64_t, uint_fast64_t)
-{
-    // No-op unless overridden.
-}
-
-
 void Session::on_upload_completion()
 {
     // No-op unless overridden.
@@ -1874,41 +1837,30 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
-    REALM_ASSERT(!m_client_state_download);
+    REALM_ASSERT(!m_client_reset_operation);
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
         const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
-        if (client_reset_config && file_exists) {
-            m_client_reset = true;
-            m_client_reset_recover_local_changes = client_reset_config->recover_local_changes;
-        }
 
         logger.info("client_reset_config = %1, Realm exists = %2, "
-                    "async open = %3, client reset = %4",
+                    "client reset = %3",
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
-                    (client_reset_config && !file_exists) ? "true" : "false",
-                    m_client_reset ? "true" : "false"); // Throws
+                    (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config) {
             if (!util::File::exists(client_reset_config->metadata_dir)) {
                 logger.error("Client reset config requires an existing metadata directory"); // Throws
                 REALM_TERMINATE("No metadata directory");
             }
-            logger.info("Client reset config, metadata_dir = '%1', "
-                        "recover_local_changes = %2, "
-                        "require_recent_state_realm = %3",
-                        client_reset_config->metadata_dir,
-                        client_reset_config->recover_local_changes ? "true" : "false",
-                        client_reset_config->require_recent_state_realm ? "true" : "false"); // Throws
-            m_state_download_in_progress = true;
-            m_client_state_download.reset(new _impl::ClientStateDownload(logger, get_realm_path(),
-                                                                         client_reset_config->metadata_dir,
-                                                                         client_reset_config->recover_local_changes,
-                                                                         get_encryption_key())); // Throws
+            logger.info("Client reset config, metadata_dir = '%1', ",
+                        client_reset_config->metadata_dir); // Throws
+            m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
+                                                                           client_reset_config->metadata_dir,
+                                                                           get_encryption_key())); // Throws
         }
 
-        if (!m_state_download_in_progress) {
+        if (!m_client_reset_operation) {
             const ClientHistoryBase& history = access_realm();                             // Throws
             history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
@@ -2022,20 +1974,7 @@ void Session::send_message()
                         return;
                     }
                     if (have_client_file_ident()) {
-                        bool should_send_client_version_request_message =
-                            (m_client_reset && m_client_reset_recover_local_changes &&
-                             !m_client_version_request_message_sent);
-                        if (should_send_client_version_request_message) {
-                            send_client_version_request_message(); // Throws
-                        }
-                        else if (m_state_download_in_progress) {
-                            REALM_ASSERT(m_client_state_download);
-                            if (!m_state_request_message_sent)
-                                send_state_request_message(); // Throws
-                        }
-                        else {
-                            send_ident_message(); // Throws
-                        }
+                        send_ident_message(); // Throws
                     }
                     return;
                 }
@@ -2118,97 +2057,6 @@ void Session::send_ident_message()
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
-}
-
-void Session::send_client_version_request_message()
-{
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_bind_message_sent);
-    REALM_ASSERT(!m_state_request_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(have_client_file_ident());
-    REALM_ASSERT(m_client_state_download);
-    REALM_ASSERT(util::File::exists(get_realm_path()));
-
-    SaltedFileIdent client_file_ident;
-    {
-        version_type current_client_version;                                     // Dummy
-        SyncProgress progress;                                                   // Dummy
-        const ClientHistoryBase& history = access_realm();                       // Throws
-        history.get_status(current_client_version, client_file_ident, progress); // Throws
-    }
-
-    m_client_version_request_message_sent = true;
-
-    if (client_file_ident.ident == 0) {
-        // The response would always be client_version = 0.
-        logger.debug("Skipping the CLIENT_VERSION_REQUEST since client_file_ident=0");
-        enlist_to_send();
-    }
-    else {
-        logger.debug("Sending: CLIENT_VERSION_REQUEST(client_file_ident=%1, "
-                     "client_file_ident_salt=%2)",
-                     client_file_ident.ident,
-                     client_file_ident.salt); // Throws
-
-        ClientProtocol& protocol = m_conn.get_client_protocol();
-        OutputBuffer& out = m_conn.get_output_buffer();
-        session_ident_type session_ident = m_ident;
-        protocol.make_client_version_request_message(out, session_ident, client_file_ident); // Throws
-        m_conn.initiate_write_message(out, this);                                            // Throws
-        // No enlist_to_send() since the client must wait for the server.
-    }
-}
-
-void Session::send_state_request_message()
-{
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_bind_message_sent);
-    REALM_ASSERT(!m_state_request_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(have_client_file_ident());
-    REALM_ASSERT(m_client_state_download);
-    REALM_ASSERT(get_client_reset_config());
-
-    session_ident_type session_ident = m_ident;
-
-    SaltedVersion partial_transfer_server_version = {m_client_state_download->get_server_version(),
-                                                     m_client_state_download->get_server_version_salt()};
-
-    uint_fast64_t end_offset = m_client_state_download->get_end_offset();
-    bool need_recent = m_client_reset || get_client_reset_config()->require_recent_state_realm;
-
-    std::int_fast32_t min_file_format_version = 0;
-    std::int_fast32_t max_file_format_version = 0;
-    std::int_fast32_t min_history_schema_version = 0;
-    std::int_fast32_t max_history_schema_version = 0;
-    {
-        using gf = GroupFriend;
-        int current_file_format_version = 0;
-        int history_type = Replication::hist_SyncClient;
-        min_file_format_version =
-            gf::get_target_file_format_version_for_session(current_file_format_version, history_type);
-        min_history_schema_version = get_client_history_schema_version();
-    }
-
-    logger.debug("Sending: STATE_REQUEST(partial_transfer_server_version=%1, "
-                 "partial_transfer_server_version_salt=%2, end_offset=%3, "
-                 "need_recent=%4, min_file_format_version=%5, max_file_format_version=%6, "
-                 "min_history_schema_version=%7, max_history_schema_version=%8)",
-                 partial_transfer_server_version.version, partial_transfer_server_version.salt, end_offset,
-                 need_recent, min_file_format_version, max_file_format_version, min_history_schema_version,
-                 max_history_schema_version); // Throws
-
-    ClientProtocol& protocol = m_conn.get_client_protocol();
-    int protocol_version = m_conn.get_negotiated_protocol_version();
-    OutputBuffer& out = m_conn.get_output_buffer();
-    protocol.make_state_request_message(protocol_version, out, session_ident, partial_transfer_server_version,
-                                        end_offset, need_recent, min_file_format_version, max_file_format_version,
-                                        min_history_schema_version, max_history_schema_version);
-    m_conn.initiate_write_message(out, this); // Throws
-
-    m_state_request_message_sent = true;
-    // No enlist_to_send() since the client must wait for the server.
 }
 
 void Session::send_upload_message()
@@ -2443,141 +2291,36 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         logger.error("Bad client file identifier salt in IDENT message");
         return ClientError::bad_client_file_ident_salt;
     }
-    if (REALM_LIKELY(!get_client().is_dry_run())) {
-        if (m_state_download_in_progress) {
-            REALM_ASSERT(m_client_state_download);
-            m_client_state_download->set_salted_file_ident(client_file_ident);
-        }
-        else {
-            ClientHistoryBase& history = access_realm(); // Throws
-            bool fix_up_object_ids = true;
-            history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
-        }
-    }
 
     m_client_file_ident = client_file_ident;
-    // Ready to send the STATE_REQUEST, IDENT (or REFRESH) message
-    ensure_enlisted_to_send(); // Throws
-    return std::error_code{};  // Success
-}
 
-
-void Session::receive_client_version_message(version_type client_version)
-{
-    logger.debug("Received: CLIENT_VERSION(client_version=%1)", client_version); // Throws
-
-    if (m_deactivation_initiated)
-        return;
-
-    if (!m_client_version_request_message_sent) {
-        logger.error("Illegal: CLIENT_VERSION message received "
-                     "before CLIENT_VERSION_REQUEST message sent."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
+    if (REALM_UNLIKELY(get_client().is_dry_run())) {
+        // Ready to send the IDENT (or REFRESH) message
+        ensure_enlisted_to_send(); // Throws
+        return std::error_code{};  // Success
     }
 
-    if (m_state_request_message_sent) {
-        logger.error("Illegal: CLIENT_VERSION message received after STATE_REQUEST message sent."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
+    auto client_reset_if_needed = [&]() -> bool {
+        // ClientResetOperation::finilize() will return true only if the operation actually did
+        // a client reset. It may choose not to do a reset if the local Realm does not exist
+        // at this point (in that case there is nothing to reset). But in any case, we must
+        // clean up m_client_reset_operation at this point as sync should be able to continue from
+        // this point forward.
+        auto client_reset_operation = std::move(m_client_reset_operation); // accept ownership to clean up
 
-    if (m_ident_message_sent) {
-        logger.error("Illegal: CLIENT_VERSION message received after IDENT message sent."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
+        if (!client_reset_operation || !client_reset_operation->finalize(client_file_ident)) {
+            return false;
+        }
+        realm::VersionID client_reset_old_version;
+        realm::VersionID client_reset_new_version;
 
-    if (m_error_message_received) {
-        logger.error("Illegal: CLIENT_VERSION message received after ERROR message."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    if (m_unbound_message_received) {
-        logger.error("Illegal: CLIENT_VERSION message received after UNBOUND message."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    REALM_ASSERT(m_client_state_download);
-
-    m_client_state_download->set_client_reset_client_version(client_version);
-
-    enlist_to_send();
-}
-
-
-void Session::receive_state_message(version_type server_version, salt_type server_version_salt,
-                                    uint_fast64_t begin_offset, uint_fast64_t end_offset, uint_fast64_t max_offset,
-                                    BinaryData chunk)
-{
-    logger.debug("Received: STATE(server_version=%1, server_version_salt=%2, "
-                 "begin_offset=%3, end_offset=%4, max_offset=%5, chunk size=%6)",
-                 server_version, server_version_salt, begin_offset, end_offset, max_offset, chunk.size()); // Throws
-
-    if (m_deactivation_initiated)
-        return;
-
-    if (!m_state_request_message_sent) {
-        logger.error("Illegal: STATE message received before STATE_REQUEST message sent."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    if (!m_state_download_in_progress) {
-        logger.error("Illegal: STATE message received without state download in progress."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    if (m_ident_message_sent) {
-        logger.error("Illegal: STATE message received after IDENT message sent."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    if (m_error_message_received) {
-        logger.error("Illegal: STATE message received after ERROR message."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    if (m_unbound_message_received) {
-        logger.error("Illegal: STATE message received after UNBOUND message."); // Throws
-        m_conn.close_due_to_protocol_error(ClientError::bad_message_order);
-        return;
-    }
-
-    REALM_ASSERT(m_client_state_download);
-
-    bool legal_state_info = m_client_state_download->receive_state(server_version, server_version_salt, begin_offset,
-                                                                   end_offset, max_offset, chunk);
-
-    if (REALM_UNLIKELY(!legal_state_info)) {
-        logger.error("Illegal state message content");
-        m_conn.close_due_to_protocol_error(ClientError::bad_state_message);
-        return;
-    }
-
-    bool client_reset_is_complete = false;
-    realm::VersionID client_reset_old_version;
-    realm::VersionID client_reset_new_version;
-
-    if (m_client_state_download->is_complete()) {
-        // The State Realm is complete and can be used.
-        logger.debug("Async open or client reset is completed, path=%1",
-                     get_realm_path()); // Throws
-        m_state_download_in_progress = false;
+        logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
         const ClientHistoryBase& history = access_realm();                           // Throws
         history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
         REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
         REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
-        REALM_ASSERT(m_progress.latest_server_version.version == server_version);
-        REALM_ASSERT(m_progress.latest_server_version.salt == server_version_salt);
-        REALM_ASSERT(m_progress.download.server_version == server_version);
         REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
         REALM_ASSERT(m_progress.upload.client_version == 0);
         REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
@@ -2586,27 +2329,25 @@ void Session::receive_state_message(version_type server_version, salt_type serve
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
         REALM_ASSERT(m_last_version_selected_for_upload == 0);
-        m_download_progress = {server_version, 0};
 
-        if (m_client_state_download->is_client_reset()) {
-            client_reset_is_complete = true;
-            client_reset_old_version = m_client_state_download->get_client_reset_old_version();
-            client_reset_new_version = m_client_state_download->get_client_reset_new_version();
+        client_reset_old_version = client_reset_operation->get_client_reset_old_version();
+        client_reset_new_version = client_reset_operation->get_client_reset_new_version();
+
+        if (m_sync_transact_reporter) {
+            m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
         }
-
-        m_client_state_download.reset();
-        enlist_to_send();
+        return true;
+    };
+    if (!client_reset_if_needed()) {
+        ClientHistoryBase& history = access_realm(); // Throws
+        bool fix_up_object_ids = true;
+        history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
     }
 
-    uint_fast64_t downloaded_bytes = end_offset;
-    uint_fast64_t downloadable_bytes = max_offset;
-    on_state_download_progress(downloaded_bytes, downloadable_bytes);
-
-    if (client_reset_is_complete && m_sync_transact_reporter) {
-        m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
-    }
+    // Ready to send the IDENT (or REFRESH) message
+    ensure_enlisted_to_send(); // Throws
+    return std::error_code{};  // Success
 }
-
 
 void Session::receive_download_message(const SyncProgress& progress, std::uint_fast64_t downloadable_bytes,
                                        const ReceivedChangesets& received_changesets)
@@ -2922,7 +2663,7 @@ void Session::check_for_upload_completion()
     REALM_ASSERT(!m_deactivation_initiated);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
-    if (m_state_download_in_progress)
+    if (m_client_reset_operation)
         return;
 
     // Upload process must have reached end of history

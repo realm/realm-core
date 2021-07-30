@@ -238,7 +238,6 @@ public:
     ClientHistoryBase& access_realm() override final;
     util::Optional<std::array<char, 64>> get_encryption_key() const noexcept override final;
     const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
-    void on_state_download_progress(uint_fast64_t, uint_fast64_t) override final;
     void initiate_integrate_changesets(std::uint_fast64_t, const ReceivedChangesets&) override final;
     void on_upload_completion() override final;
     void on_download_completion() override final;
@@ -427,7 +426,6 @@ private:
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
                      std::string multiplex_ident);
 
-    void on_state_download_progress(uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes);
     void on_sync_progress();
     void on_upload_completion();
     void on_download_completion();
@@ -1071,12 +1069,6 @@ const util::Optional<sync::Session::Config::ClientReset>& SessionImpl::get_clien
     return m_wrapper.m_client_reset_config;
 }
 
-inline void SessionImpl::on_state_download_progress(std::uint_fast64_t downloaded_bytes,
-                                                    std::uint_fast64_t downloadable_bytes)
-{
-    m_wrapper.on_state_download_progress(downloaded_bytes, downloadable_bytes);
-}
-
 inline void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
                                                        const ReceivedChangesets& changesets)
 {
@@ -1526,30 +1518,6 @@ void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_a
     ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, std::move(multiplex_ident)};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_initiated = true;
-}
-
-void SessionWrapper::on_state_download_progress(uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes)
-{
-    REALM_ASSERT(!m_reliable_download_progress);
-    uint_fast64_t uploaded_bytes = 0;
-    uint_fast64_t uploadable_bytes = 0;
-    uint_fast64_t snapshot_version = 0;
-    uint_fast64_t total_bytes = downloadable_bytes;
-
-    m_sess->logger.debug("on_state_download_progress, downloaded = %1, "
-                         "downloadable(total) = %2, uploaded = %3, "
-                         "uploadable = %4, reliable_download_progress = %5, "
-                         "snapshot version = %6",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
-                         m_reliable_download_progress, snapshot_version); // Throws
-
-    if (m_progress_handler) {
-        // FIXME: Why is this boolean status communicated to the application as
-        // a 64-bit integer? Also, the name `progress_version` is confusing.
-        std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
-        m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
-                           snapshot_version);
-    }
 }
 
 inline void SessionWrapper::on_sync_progress()

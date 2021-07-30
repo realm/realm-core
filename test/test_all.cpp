@@ -132,8 +132,6 @@ const char* file_order[] = {
     "test_array.cpp",
     "test_lang_bind_helper_sync.cpp",
     "test_sync.cpp",
-    "test_sync_partial.cpp",
-    "test_sync_multiserver.cpp",
     "test_backup.cpp",
     "test_sync_fuzz.cpp"
 };

@@ -6,7 +6,7 @@ set(SYNC_SOURCES
     noinst/client_history_impl.cpp
     noinst/client_impl_base.cpp
     noinst/client_reset.cpp
-    noinst/client_state_download.cpp
+    noinst/client_reset_operation.cpp
     noinst/compact_changesets.cpp
     noinst/compression.cpp
     noinst/file_descriptors.cpp
