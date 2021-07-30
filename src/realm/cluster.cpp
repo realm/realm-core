@@ -279,10 +279,10 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
     // Insert backlink if link is not null
     if (target_link) {
         Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
-        Obj target_obj = origin_table->get_parent_group()->get_object(target_link);
-        auto target_table = target_obj.get_table();
+        auto target_table = origin_table->get_parent_group()->get_table(target_link.get_table_key());
+
         ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
-        target_obj.add_backlink(backlink_col_key, origin_key);
+        target_table->get_object(target_link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
     }
 }
 
