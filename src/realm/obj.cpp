@@ -1762,8 +1762,6 @@ void Obj::set_int(ColKey col_key, int64_t value)
 
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
 {
-    update_if_needed();
-
     ColKey::Idx backlink_col_ndx = backlink_col_key.get_index();
     Allocator& alloc = get_alloc();
     alloc.bump_content_version();
@@ -1933,19 +1931,23 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
-        auto target_obj = m_table->get_parent_group()->get_object(new_link);
+        auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
         ColKey backlink_col_key;
         auto type = col_key.get_type();
         if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            backlink_col_key = target_obj.get_table()->find_or_add_backlink_column(col_key, get_table_key());
+            // This may modify the target table
+            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
+            // it is possible that this was a link to the same table and that adding a backlink column has
+            // caused the need to update this object as well.
+            update_if_needed();
         }
         else {
             backlink_col_key = m_table->get_opposite_column(col_key);
         }
+        auto obj_key = new_link.get_obj_key();
+        auto target_obj =
+            obj_key.is_unresolved() ? target_table->get_tombstone(obj_key) : target_table->get_object(obj_key);
         target_obj.add_backlink(backlink_col_key, m_key);
-        // it is possible that this was a link to the same table and that adding a backlink column has
-        // caused the need to update this object as well.
-        update_if_needed();
     }
 }
 
