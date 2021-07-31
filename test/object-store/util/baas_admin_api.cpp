@@ -301,6 +301,10 @@ app::Response do_http_request(const app::Request& request)
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
+    else if (request.method == app::HttpMethod::patch) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
+    }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
@@ -440,7 +444,7 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
     return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
 }
 
-void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string& app_id)
 {
     auto endpoint = AdminAPIEndpoint(
         util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/logout", m_base_url, m_group_id, app_id, user_id),
@@ -449,7 +453,7 @@ void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std
     REALM_ASSERT(response.http_status_code == 204);
 }
 
-void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
     auto endpoint = AdminAPIEndpoint(
         util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
@@ -458,7 +462,7 @@ void AdminAPISession::disable_user_sessions(const std::string& user_id, const st
     REALM_ASSERT(response.http_status_code == 204);
 }
 
-void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
     auto endpoint = AdminAPIEndpoint(
         util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/enable", m_base_url, m_group_id, app_id, user_id),
@@ -468,7 +472,7 @@ void AdminAPISession::enable_user_sessions(const std::string& user_id, const std
 }
 
 // returns false for an invalid/expired access token
-bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string app_id)
+bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string& app_id)
 {
     auto endpoint = AdminAPIEndpoint(
         util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/verify_token", m_base_url, m_group_id, app_id),
@@ -491,6 +495,82 @@ bool AdminAPISession::verify_access_token(const std::string& access_token, const
         }
     }
     return false;
+}
+
+std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services", m_base_url, m_group_id, app_id), m_access_token);
+    auto response = endpoint.get_json();
+    std::vector<AdminAPISession::Service> services;
+    for (auto service : response) {
+        services.push_back(
+            {service["_id"], service["name"], service["type"], service["version"], service["last_modified"]});
+    }
+    return services;
+}
+
+
+AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& app_id)
+{
+    auto services = get_services(app_id);
+    auto sync_service = std::find_if(services.begin(), services.end(), [&](auto s) {
+        return s.type == "mongodb";
+    });
+    REALM_ASSERT(sync_service != services.end());
+    return *sync_service;
+}
+
+void AdminAPISession::disable_sync(const std::string& app_id)
+{
+    auto sync_service = get_sync_service(app_id);
+    auto config = get_config(app_id, sync_service);
+    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
+                                                  m_base_url, m_group_id, app_id, sync_service.id),
+                                     m_access_token);
+
+    // FIXME: are the other fields required?
+    endpoint.patch_json({"sync", {"state", "disabled"}});
+}
+
+void AdminAPISession::enable_sync(const std::string& app_id)
+{
+    auto sync_service = get_sync_service(app_id);
+    auto config = get_config(app_id, sync_service);
+    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
+                                                  m_base_url, m_group_id, app_id, sync_service.id),
+                                     m_access_token);
+
+    // FIXME: are the other fields required?
+    endpoint.patch_json({"sync", {"state", "enabled"}});
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& app_id,
+                                                           const AdminAPISession::Service& service)
+{
+    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
+                                                  m_base_url, m_group_id, app_id, service.id),
+                                     m_access_token);
+    auto response = endpoint.get_json();
+    AdminAPISession::ServiceConfig config;
+    try {
+        auto sync = response["sync"];
+        std::cout << "config: " << sync << std::endl;
+        config.database_name = sync["database_name"];
+        // config.partition = sync["partition"];
+        config.state = sync["state"];
+    }
+    catch (const std::exception& e) {
+        REALM_ASSERT_EX(false, e.what());
+    }
+    return config;
+}
+
+bool AdminAPISession::is_sync_enabled(const std::string& app_id)
+{
+    auto sync_service = get_sync_service(app_id);
+    auto config = get_config(app_id, sync_service);
+    return config.state == "enabled";
 }
 
 AdminAPIEndpoint AdminAPISession::apps() const

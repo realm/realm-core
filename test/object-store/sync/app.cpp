@@ -29,6 +29,7 @@
 
 #include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
+#include "sync_test_utils.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 
@@ -54,90 +55,22 @@ using util::Optional;
 
 using namespace std::string_view_literals;
 
-// temporarily disable these tests for now,
-// but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
-#ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
-#endif
-
 #if REALM_ENABLE_AUTH_TESTS
+
 namespace {
-// This will create a new test app in the baas server at base_url to be used in tests throughout
-// tis file.
+
+// This will create a new test app in the baas server at base_url
+// to be used in tests throughout this file.
 AppSession get_runtime_app_session(std::string base_url)
 {
     static const AppSession cached_app_session = [&] {
         auto cached_app_session = create_app(default_app_config(base_url));
-        std::cout << "found app_id: " << cached_app_session.client_app_id << " in stitch config" << std::endl;
         return cached_app_session;
     }();
     return cached_app_session;
 }
 
-class IntTestTransport : public GenericNetworkTransport {
-public:
-    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
-    {
-        completion_block(do_http_request(request));
-    }
-};
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
-    // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
-}
-#endif
-
-struct AutoVerifiedEmailCredentials {
-    AutoVerifiedEmailCredentials()
-    {
-        // emails with this prefix will pass through the baas app due to the register function
-        email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        password = random_string(10);
-    }
-    std::string email;
-    std::string password;
-};
-
-void timed_wait_for(std::function<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(2000))
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    util::EventLoop::main().run_until([&] {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        return condition();
-    });
-}
-
-AutoVerifiedEmailCredentials create_user_and_login(SharedApp app)
-{
-    REQUIRE(app);
-    AutoVerifiedEmailCredentials creds;
-    app->provider_client<App::UsernamePasswordProviderClient>().register_email(creds.email, creds.password,
-                                                                               [&](Optional<app::AppError> error) {
-                                                                                   CHECK(!error);
-                                                                               });
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                     REQUIRE(user);
-                                     CHECK(!error);
-                                 });
-    return creds;
-}
-
-} // namespace
-// MARK: - Login with Credentials Tests
+} // anonymous namespace
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 

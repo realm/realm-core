@@ -23,6 +23,8 @@
 #include "realm/object-store/schema.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 
+#include "sync/sync_test_utils.hpp"
+
 #include "external/json/json.hpp"
 
 #ifdef REALM_ENABLE_AUTH_TESTS
@@ -63,10 +65,30 @@ public:
                                  const std::string& password);
 
     AdminAPIEndpoint apps() const;
-    void revoke_user_sessions(const std::string& user_id, const std::string app_id);
-    void disable_user_sessions(const std::string& user_id, const std::string app_id);
-    void enable_user_sessions(const std::string& user_id, const std::string app_id);
-    bool verify_access_token(const std::string& access_token, const std::string app_id);
+    void revoke_user_sessions(const std::string& user_id, const std::string& app_id);
+    void disable_user_sessions(const std::string& user_id, const std::string& app_id);
+    void enable_user_sessions(const std::string& user_id, const std::string& app_id);
+    bool verify_access_token(const std::string& access_token, const std::string& app_id);
+
+    struct Service {
+        std::string id;
+        std::string name;
+        std::string type;
+        int64_t version;
+        int64_t last_modified;
+    };
+    struct ServiceConfig {
+        std::string database_name;
+        std::string partition;
+        std::string state;
+    };
+    std::vector<Service> get_services(const std::string& app_id);
+    Service get_sync_service(const std::string& app_id);
+    ServiceConfig get_config(const std::string& app_id, const Service& service);
+    void disable_sync(const std::string& app_id);
+    void enable_sync(const std::string& app_id);
+    bool is_sync_enabled(const std::string& app_id);
+
 
 private:
     AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
@@ -130,6 +152,15 @@ struct AppSession {
     AppCreateConfig config;
 };
 AppSession create_app(const AppCreateConfig& config);
+
+class IntTestTransport : public app::GenericNetworkTransport {
+public:
+    void send_request_to_server(const app::Request request,
+                                std::function<void(const app::Response)> completion_block) override
+    {
+        completion_block(do_http_request(request));
+    }
+};
 
 } // namespace realm
 
