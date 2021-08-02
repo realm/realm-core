@@ -2871,35 +2871,56 @@ void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<Atom
         or_node->and_preds.emplace_back(std::move(right));
         auto parens = std::make_unique<ParensNode>(std::move(or_node));
         preds.emplace_back(std::move(parens));
-    } else if (fragment["kind"] == "eq"){
-        auto left = get_value_node(fragment["left"]);
-        auto right = get_value_node(fragment["right"]);
-        auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
-        preds.emplace_back(std::move(eq));
-    } else if (fragment["kind"] == "gt"){
-        auto left = get_value_node(fragment["left"]);
-        auto right = get_value_node(fragment["right"]);
-        auto gt = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER, std::move(right));
-        preds.emplace_back(std::move(gt));
-    } 
+    } else {
+        build_compare(fragment, preds);
+    }
 }
 
 
-std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json json){
-    if (json["kind"] == "property"){
+void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds){
+    auto left = get_value_node(fragment["left"]);
+    auto right = get_value_node(fragment["right"]);
+    if (fragment["kind"] == "eq"){
+        auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
+        preds.emplace_back(std::move(eq));
+    } else if (fragment["kind"] == "neq"){
+        auto neq = std::make_unique<EqualityNode>(std::move(left), CompareNode::NOT_EQUAL, std::move(right));
+        preds.emplace_back(std::move(neq));
+    } else if (fragment["kind"] == "gt"){
+        auto gt = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER, std::move(right));
+        preds.emplace_back(std::move(gt));
+    } else if (fragment["kind"] == "gte"){
+        auto gte = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER_EQUAL, std::move(right));
+        preds.emplace_back(std::move(gte));
+    } else if (fragment["kind"] == "lt"){
+        auto lt = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS, std::move(right));
+        preds.emplace_back(std::move(lt));
+    } else if (fragment["kind"] == "lte"){
+        auto lte = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS_EQUAL, std::move(right));
+        preds.emplace_back(std::move(lte));
+    }
+}
+
+
+std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragment){
+    if (fragment["kind"] == "property"){
         auto empty_path = std::make_unique<PathNode>();
-        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), json["value"]);
+        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), fragment["value"]);
         auto value_node = std::make_unique<ValueNode>(std::move(prop_node));
         return value_node;
     }
-    if (json["kind"] == "constant"){
+    if (fragment["kind"] == "constant"){
         std::unique_ptr<ConstantNode> const_node;
-        if (json["type"] == "int"){
-            int value = json["value"].get<int>();
+        if (fragment["type"] == "string"){
+            std::string value = fragment["value"].get<std::string>();
             const_node = get_constant_node(value);
         }
-        if (json["type"] == "string"){
-            std::string value = json["value"].get<std::string>();
+        if (fragment["type"] == "int"){
+            int value = fragment["value"].get<int>();
+            const_node = get_constant_node(value);
+        }
+        if (fragment["type"] == "float"){
+            float value = fragment["value"].get<float>();
             const_node = get_constant_node(value);
         }
         auto value_node = std::make_unique<ValueNode>(std::move(const_node));
@@ -2911,6 +2932,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json json){
 std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed value) {
     ConstantNode::Type type;
     std::string string_value;
+    std::ostringstream stream;
     switch (value.get_type()) {
         case realm::DataType::Type::String:
             type = ConstantNode::Type::STRING;
@@ -2918,8 +2940,15 @@ std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed va
             break;
         case realm::DataType::Type::Int:
             type = ConstantNode::Type::NUMBER;
+            stream << value;
+            string_value = stream.str();
+            break;
+        case realm::DataType::Type::Float:
+            type = ConstantNode::Type::FLOAT;
+            stream << value;
+            string_value = stream.str();
+            break;
         default:
-            std::ostringstream stream;
             stream << value;
             string_value = stream.str();
     }
