@@ -1580,7 +1580,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
-    // Query query = QueryVisitor(&driver).visit(*driver.result);
+    //Query query = QueryVisitor(&driver).visit(*driver.result);
     // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
     // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
     // return visitor.query.set_ordering(driver.ordering->visit(&driver));
@@ -2846,36 +2846,61 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
     return link_chain;
 } 
 
+
 using json = nlohmann::json;
 Query JsonQueryParser::query_from_json(TableRef table, json json){
-    std::unique_ptr<ParserNode> tree = get_query_node(json);
+    auto and_node = std::make_unique<AndNode>();
+    build_pred(json["whereClause"], and_node->atom_preds);
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
     ParserDriver driver(table, *no_arguments, KeyPathMapping());
-    return QueryVisitor(&driver).visit(*tree);
+    PrintingVisitor(std::cout).visitAnd(*and_node);
+    return QueryVisitor(&driver).visit(*and_node);
 }
 
-std::unique_ptr<ParserNode> JsonQueryParser::get_query_node(json json){
-    if (json["kind"] == "comparison"){
-        if (json["operator"] == "="){
-            auto left = get_subexpr_node(json["left"]);
-            auto right = get_subexpr_node(json["right"]);
-            auto equality_node = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
-            return equality_node;
-        }
-    }
+
+void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds) {
+    if (fragment["kind"] == "and"){
+        build_pred(fragment["left"], preds);
+        build_pred(fragment["right"], preds);
+    } else if (fragment["kind"] == "or"){
+        auto left = std::make_unique<AndNode>();
+        auto right = std::make_unique<AndNode>();
+        build_pred(fragment["left"], left->atom_preds);
+        build_pred(fragment["right"], right->atom_preds);
+        auto or_node = std::make_unique<OrNode>(std::move(left));
+        or_node->and_preds.emplace_back(std::move(right));
+        auto parens = std::make_unique<ParensNode>(std::move(or_node));
+        preds.emplace_back(std::move(parens));
+    } else if (fragment["kind"] == "eq"){
+        auto left = get_value_node(fragment["left"]);
+        auto right = get_value_node(fragment["right"]);
+        auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
+        preds.emplace_back(std::move(eq));
+    } else if (fragment["kind"] == "gt"){
+        auto left = get_value_node(fragment["left"]);
+        auto right = get_value_node(fragment["right"]);
+        auto gt = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER, std::move(right));
+        preds.emplace_back(std::move(gt));
+    } 
 }
 
-std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
+
+std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json json){
     if (json["kind"] == "property"){
         auto empty_path = std::make_unique<PathNode>();
-        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), json["name"]);
+        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), json["value"]);
         auto value_node = std::make_unique<ValueNode>(std::move(prop_node));
         return value_node;
-    } else if (json["kind"] == "constant"){
+    }
+    if (json["kind"] == "constant"){
         std::unique_ptr<ConstantNode> const_node;
         if (json["type"] == "int"){
-            Int test = json["value"].get<Int>();
-            const_node = constant_node(test);
+            int value = json["value"].get<int>();
+            const_node = get_constant_node(value);
+        }
+        if (json["type"] == "string"){
+            std::string value = json["value"].get<std::string>();
+            const_node = get_constant_node(value);
         }
         auto value_node = std::make_unique<ValueNode>(std::move(const_node));
         return value_node;
@@ -2883,10 +2908,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
 }
 
 
-
-} // namespace realm
-
-std::unique_ptr<ConstantNode> JsonQueryParser::constant_node(realm::Mixed value) {
+std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed value) {
     ConstantNode::Type type;
     std::string string_value;
     switch (value.get_type()) {
@@ -2904,3 +2926,5 @@ std::unique_ptr<ConstantNode> JsonQueryParser::constant_node(realm::Mixed value)
     auto constant_node = std::make_unique<ConstantNode>(type, string_value);
     return constant_node;
 }
+
+} // namespace realm

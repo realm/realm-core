@@ -43,6 +43,7 @@ public:
     {
         atom_preds.emplace_back(std::move(node));
     }
+    AndNode(){}
     Query visit(ParserDriver*);
     void accept(NodeVisitor& visitor) override;
 };
@@ -113,6 +114,7 @@ public:
     }
     void accept(NodeVisitor& visitor) override;
 };
+
 
 class ConstantNode : public ParserNode {
 public:
@@ -590,20 +592,10 @@ class JsonQueryParser {
 public:
     Query query_from_json(TableRef table, nlohmann::json json);
 private:
-    std::unique_ptr<ParserNode> get_query_node(nlohmann::json json);
-    std::unique_ptr<ValueNode> get_subexpr_node(nlohmann::json json);
-
-    // ValueNode& property(std::string name);
-
-    // ValueNode& constant(realm::Mixed value);
-
-    // EqualityNode& equals(ValueNode& left, ValueNode& right);
-
-    // AndNode& and_node(std::initializer_list<AtomPredNode&> predicates);
-
-    // OrNode& or_node(std::initializer_list<AndNode&> predicates);
-
-    std::unique_ptr<ConstantNode> constant_node(realm::Mixed value);
+    void build_pred(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    std::unique_ptr<AndNode> get_and_node(nlohmann::json json);
+    std::unique_ptr<ValueNode> get_value_node(nlohmann::json json);
+    std::unique_ptr<ConstantNode> get_constant_node(realm::Mixed value);
 };
 } // namespace realm
 #endif // ! DRIVER_HH
