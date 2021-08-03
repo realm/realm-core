@@ -275,13 +275,14 @@ Query ParensNode::visit(ParserDriver* drv)
 
 Query OrNode::visit(ParserDriver* drv)
 {
-    if (and_preds.size() == 1) {
-        return and_preds[0]->visit(drv);
+    if (atom_preds.size() == 1) {
+        return atom_preds[0]->visit(drv);
     }
 
     Query q(drv->m_base_table);
+    //MAY NOT WORK
     q.group();
-    for (auto &it : and_preds) {
+    for (auto &it : atom_preds) {
         q.Or();
         q.and_query(it->visit(drv));
     }
@@ -317,8 +318,8 @@ void OrNode::accept(NodeVisitor& visitor) {
 }
 
 void NodeVisitor::visitOr(OrNode& node) {
-    for (auto &pred : node.and_preds) {
-        this->visitAnd(*pred);
+    for (auto &pred : node.atom_preds) {
+        pred->accept(*this);
     }
 }
 
@@ -1821,16 +1822,16 @@ void QueryVisitor::visitAnd(AndNode& node){
 } 
 
 void QueryVisitor::visitOr(OrNode& node){
-    auto &and_preds = node.and_preds;
-    if (and_preds.size() == 1) {
-        visitAnd(*and_preds[0]);
+    auto &atom_preds = node.atom_preds;
+    if (atom_preds.size() == 1) {
+        atom_preds[0]->accept(*this);
         return;
     }
     realm::Query q(drv->m_base_table);
     q.group();
-    for (auto &it : and_preds) {
+    for (auto &it : atom_preds) {
         q.Or();
-        visitAnd(*it);
+        it->accept(*this);
         q.and_query(query);
     }
     q.end_group();

@@ -144,7 +144,7 @@ query
 
 pred
     : and_pred                  { $$ = std::make_unique<OrNode>(std::move($1)); }
-    | pred "||" and_pred        { $1->and_preds.emplace_back(std::move($3)); $$ = std::move($1); }
+    | pred "||" and_pred        { $1->atom_preds.emplace_back(std::move($3)); $$ = std::move($1); }
 
 and_pred
     : atom_pred                 { $$ = std::make_unique<AndNode>(std::move($1)); }

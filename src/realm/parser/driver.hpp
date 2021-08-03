@@ -35,7 +35,7 @@ public:
     virtual Query visit(ParserDriver*) = 0;
 };
 
-class AndNode : public ParserNode {
+class AndNode : public AtomPredNode {
 public:
     std::vector<std::unique_ptr<AtomPredNode>> atom_preds;
 
@@ -44,20 +44,20 @@ public:
         atom_preds.emplace_back(std::move(node));
     }
     AndNode(){}
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
-class OrNode : public ParserNode {
+class OrNode : public AtomPredNode {
 public:
-    std::vector<std::unique_ptr<AndNode>> and_preds;
+    std::vector<std::unique_ptr<AtomPredNode>> atom_preds;
 
-    OrNode(std::unique_ptr<AndNode>&& node)
+    OrNode(std::unique_ptr<AtomPredNode>&& node)
     {
-        and_preds.emplace_back(std::move(node));
+        atom_preds.emplace_back(std::move(node));
     }
     OrNode(){}
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
