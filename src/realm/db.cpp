@@ -26,6 +26,7 @@
 #include <sstream>
 #include <type_traits>
 #include <random>
+#include <deque>
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/group_writer.hpp>
@@ -1576,12 +1577,8 @@ void DB::release_all_read_locks() noexcept
 void DB::close(bool allow_open_read_transactions)
 {
     // make helper thread terminate
-    if (m_commit_helper_thread) {
-        m_commit_helper_terminated = true;
-        m_commit_helper_changed.notify_one();
-        m_commit_helper_thread->join();
-        m_commit_helper_thread = nullptr;
-    }
+    m_commit_helper.reset();
+
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())
             return;
@@ -1668,6 +1665,129 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // info->~SharedInfo(); // DO NOT Call destructor
         m_file.close();
     }
+}
+
+class DB::AsyncCommitHelper {
+public:
+    AsyncCommitHelper(DB* db)
+        : m_db(db)
+    {
+    }
+    ~AsyncCommitHelper()
+    {
+        if (!m_terminated) {
+            m_terminated = true;
+            m_changed.notify_one();
+            m_thread->join();
+        }
+    }
+    void start_thread()
+    {
+        if (m_terminated) {
+            std::unique_lock lg(m_mutex);
+            if (m_terminated) {
+                m_thread = std::make_unique<std::thread>([this]() {
+                    main();
+                });
+                m_terminated = false;
+            }
+        }
+    }
+    void begin_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_writes.emplace_back(std::move(fn));
+        m_changed.notify_one();
+    }
+
+    void end_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_mx_release.emplace(std::move(fn));
+        m_changed.notify_one();
+    }
+
+    void sync_to_disk(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_sync.emplace(std::move(fn));
+        m_changed.notify_one();
+    }
+
+
+private:
+    DB* m_db;
+    std::unique_ptr<std::thread> m_thread;
+    std::mutex m_mutex;
+    std::condition_variable m_changed;
+    std::deque<std::function<void()>> m_pending_writes;
+    std::optional<std::function<void()>> m_pending_sync;
+    std::optional<std::function<void()>> m_pending_mx_release;
+    bool m_terminated = true;
+
+    void main();
+};
+
+void DB::AsyncCommitHelper::main()
+{
+    while (true) {
+        // idling:
+        {
+            std::unique_lock lg(m_mutex);
+            while (m_pending_writes.empty() && !m_terminated)
+                m_changed.wait(lg);
+        }
+        if (m_terminated)
+            break;
+        {
+            // acquire write mutex
+            m_db->do_begin_write();
+            std::function<void()> callback;
+            {
+                std::unique_lock lg(m_mutex);
+                REALM_ASSERT(!m_pending_writes.empty());
+                callback = m_pending_writes.front();
+                m_pending_writes.pop_front();
+            }
+            callback();
+        }
+        // wait for request for release of mutex or for sync to disk:
+        std::unique_lock lg(m_mutex);
+        while (!m_pending_sync && !m_pending_mx_release && !m_terminated)
+            m_changed.wait(lg);
+        if (m_terminated)
+            break;
+        if (m_pending_sync) {
+            std::function<void()> cb = m_pending_sync.value();
+            m_pending_sync.reset();
+            lg.unlock();
+            cb();
+        }
+        else if (m_pending_mx_release) {
+            m_db->do_end_write();
+            std::function<void()> cb = m_pending_mx_release.value();
+            m_pending_mx_release.reset();
+            lg.unlock();
+            cb();
+        }
+    }
+}
+
+
+void DB::async_begin_write(std::function<void()> fn)
+{
+    m_commit_helper->start_thread();
+    m_commit_helper->begin_write(fn);
+}
+
+void DB::async_end_write(std::function<void()> fn)
+{
+    m_commit_helper->end_write(fn);
+}
+
+void DB::async_sync_to_disk(std::function<void()> fn)
+{
+    m_commit_helper->sync_to_disk(fn);
 }
 
 bool DB::has_changed(TransactionRef tr)
@@ -2146,7 +2266,7 @@ void DB::do_end_write() noexcept
 }
 
 
-Replication::version_type DB::do_commit(Transaction& transaction, bool without_sync)
+Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to_disk)
 {
     version_type current_version;
     {
@@ -2163,7 +2283,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool without_s
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
         try {
-            low_level_commit(new_version, transaction, without_sync); // Throws
+            low_level_commit(new_version, transaction, commit_to_disk); // Throws
         }
         catch (...) {
             repl->abort_transact();
@@ -2178,7 +2298,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool without_s
 }
 
 
-VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool without_sync)
+VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool commit_to_disk)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2187,7 +2307,7 @@ VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool wit
 
     flush_accessors_for_commit();
 
-    DB::version_type version = db->do_commit(*this, without_sync); // Throws
+    DB::version_type version = db->do_commit(*this, commit_to_disk); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
@@ -2276,7 +2396,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 }
 
 
-void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool only_partial)
+void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2333,7 +2453,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
-                if (!only_partial)
+                if (commit_to_disk)
                     out.commit(new_top_ref); // Throws
                 break;
             case Durability::MemOnly:
@@ -2822,6 +2942,7 @@ std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, 
 inline DB::DB(const DBOptions& options)
     : m_key(options.encryption_key)
     , m_upgrade_callback(std::move(options.upgrade_callback))
+    , m_commit_helper(std::make_unique<AsyncCommitHelper>(this))
 {
 }
 

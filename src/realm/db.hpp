@@ -24,7 +24,6 @@
 #include <limits>
 #include <unordered_map>
 #include <thread>
-#include <deque>
 #include <condition_variable>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -405,6 +404,7 @@ protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
 private:
+    class AsyncCommitHelper;
     // Member variables
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
@@ -444,6 +444,9 @@ private:
     std::function<void(int, int)> m_upgrade_callback;
 
     std::shared_ptr<metrics::Metrics> m_metrics;
+
+    std::unique_ptr<AsyncCommitHelper> m_commit_helper;
+
     /// Attach this DB instance to the specified database file.
     ///
     /// While at least one instance of DB exists for a specific
@@ -524,7 +527,7 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit(Transaction&, bool without_sync = false);
+    version_type do_commit(Transaction&, bool commit_to_disk = true);
     void do_end_write() noexcept;
 
     // make sure the given index is within the currently mapped area.
@@ -532,7 +535,7 @@ private:
     bool grow_reader_mapping(uint_fast32_t index);
 
     // Must be called only by someone that has a lock on the write mutex.
-    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool only_partial = false);
+    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk = true);
 
     void do_async_commits();
 
@@ -552,78 +555,10 @@ private:
 
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
 
-    std::unique_ptr<std::thread> m_commit_helper_thread;
-    std::mutex m_commit_helper_mx;
-    std::condition_variable m_commit_helper_changed;
-    std::deque<std::function<void()>> m_pending_writes;
-    std::optional<std::function<void()>> m_pending_sync;
-    std::optional<std::function<void()>> m_pending_mx_release;
-    bool m_commit_helper_terminated = true;
+    void async_begin_write(std::function<void()> fn);
+    void async_end_write(std::function<void()> fn);
+    void async_sync_to_disk(std::function<void()> fn);
 
-    void async_begin_write(std::function<void()> fn)
-    {
-        std::unique_lock lg(m_commit_helper_mx);
-        if (m_commit_helper_thread.get() == nullptr) {
-            m_commit_helper_terminated = false;
-            m_commit_helper_thread = std::make_unique<std::thread>([&]() {
-                while (true) {
-                    // idling:
-                    {
-                        std::unique_lock lg(m_commit_helper_mx);
-                        while (m_pending_writes.empty() && !m_commit_helper_terminated)
-                            m_commit_helper_changed.wait(lg);
-                    }
-                    if (m_commit_helper_terminated)
-                        break;
-                    {
-                        // acquire write mutex
-                        do_begin_write();
-                        std::function<void()> callback;
-                        {
-                            std::unique_lock lg(m_commit_helper_mx);
-                            REALM_ASSERT(!m_pending_writes.empty());
-                            callback = m_pending_writes.front();
-                            m_pending_writes.pop_front();
-                        }
-                        callback();
-                    }
-                    // wait for request for release of mutex or for sync to disk:
-                    std::unique_lock lg(m_commit_helper_mx);
-                    while (!m_pending_sync && !m_pending_mx_release && !m_commit_helper_terminated)
-                        m_commit_helper_changed.wait(lg);
-                    if (m_commit_helper_terminated)
-                        break;
-                    if (m_pending_sync) {
-                        std::function<void()> cb = m_pending_sync.value();
-                        m_pending_sync.reset();
-                        lg.unlock();
-                        cb();
-                    }
-                    else if (m_pending_mx_release) {
-                        do_end_write();
-                        std::function<void()> cb = m_pending_mx_release.value();
-                        m_pending_mx_release.reset();
-                        lg.unlock();
-                        cb();
-                    }
-                }
-            });
-        }
-        m_pending_writes.emplace_back(std::move(fn));
-        m_commit_helper_changed.notify_one();
-    }
-    void async_end_write(std::function<void()> fn)
-    {
-        std::unique_lock lg(m_commit_helper_mx);
-        m_pending_mx_release.emplace(std::move(fn));
-        m_commit_helper_changed.notify_one();
-    }
-    void async_sync_to_disk(std::function<void()> fn)
-    {
-        std::unique_lock lg(m_commit_helper_mx);
-        m_pending_sync.emplace(std::move(fn));
-        m_commit_helper_changed.notify_one();
-    }
     friend class Transaction;
 };
 

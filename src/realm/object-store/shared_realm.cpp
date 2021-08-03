@@ -757,14 +757,14 @@ Realm::async_handle Realm::async_commit(const std::function<void()>& the_done_bl
             m_async_commit_barrier_requested = true;
         }
 
-        m_coordinator->commit_write(*this, /* with_lock_held: */ true, /* without_sync: */ true);
+        m_coordinator->commit_write(*this, /* with_lock_held: */ true, /* commit_to_disk: */ false);
 
         return 0;
     }
     else {
         // we're called from outside the callback loop so we have to take care of
         // releasing any lock and of keeping callbacks coming.
-        m_coordinator->commit_write(*this, true, true);
+        m_coordinator->commit_write(*this, true, false);
         if (allow_grouping) {
             run_writes();
         }
