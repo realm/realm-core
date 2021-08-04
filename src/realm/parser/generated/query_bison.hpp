@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.7.4.
+// A Bison parser, made by GNU Bison 3.7.6.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -136,9 +136,9 @@
 
 /* Suppress unused-variable warnings by "using" E.  */
 #if ! defined lint || defined __GNUC__
-# define YYUSE(E) ((void) (E))
+# define YY_USE(E) ((void) (E))
 #else
-# define YYUSE(E) /* empty */
+# define YY_USE(E) /* empty */
 #endif
 
 #if defined __GNUC__ && ! defined __ICC && 407 <= __GNUC__ * 100 + __GNUC_MINOR__
@@ -412,60 +412,14 @@ namespace yy {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
-      // aggr_op
-      char dummy1[sizeof (AggrNode*)];
-
-      // and_pred
-      char dummy2[sizeof (AndNode*)];
-
-      // atom_pred
-      char dummy3[sizeof (AtomPredNode*)];
-
-      // constant
-      char dummy4[sizeof (ConstantNode*)];
-
-      // distinct
-      // distinct_param
-      // sort
-      // sort_param
-      // limit
-      char dummy5[sizeof (DescriptorNode*)];
-
-      // pred_suffix
-      char dummy6[sizeof (DescriptorOrderingNode*)];
-
-      // pred
-      char dummy7[sizeof (OrNode*)];
-
-      // path
-      char dummy8[sizeof (PathNode*)];
-
-      // post_op
-      char dummy9[sizeof (PostOpNode*)];
-
-      // simple_prop
-      char dummy10[sizeof (PropNode*)];
-
-      // prop
-      char dummy11[sizeof (PropertyNode*)];
-
-      // subquery
-      char dummy12[sizeof (SubqueryNode*)];
-
-      // boolexpr
-      char dummy13[sizeof (TrueOrFalseNode*)];
-
-      // value
-      char dummy14[sizeof (ValueNode*)];
-
       // direction
-      char dummy15[sizeof (bool)];
+      char dummy1[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy16[sizeof (int)];
+      char dummy2[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -491,7 +445,53 @@ namespace yy {
       // "key or value"
       // path_elem
       // id
-      char dummy17[sizeof (std::string)];
+      char dummy3[sizeof (std::string)];
+
+      // aggr_op
+      char dummy4[sizeof (std::unique_ptr<AggrNode>)];
+
+      // and_pred
+      char dummy5[sizeof (std::unique_ptr<AndNode>)];
+
+      // atom_pred
+      char dummy6[sizeof (std::unique_ptr<AtomPredNode>)];
+
+      // constant
+      char dummy7[sizeof (std::unique_ptr<ConstantNode>)];
+
+      // distinct
+      // distinct_param
+      // sort
+      // sort_param
+      // limit
+      char dummy8[sizeof (std::unique_ptr<DescriptorNode>)];
+
+      // pred_suffix
+      char dummy9[sizeof (std::unique_ptr<DescriptorOrderingNode>)];
+
+      // pred
+      char dummy10[sizeof (std::unique_ptr<OrNode>)];
+
+      // path
+      char dummy11[sizeof (std::unique_ptr<PathNode>)];
+
+      // post_op
+      char dummy12[sizeof (std::unique_ptr<PostOpNode>)];
+
+      // simple_prop
+      char dummy13[sizeof (std::unique_ptr<PropNode>)];
+
+      // prop
+      char dummy14[sizeof (std::unique_ptr<PropertyNode>)];
+
+      // subquery
+      char dummy15[sizeof (std::unique_ptr<SubqueryNode>)];
+
+      // boolexpr
+      char dummy16[sizeof (std::unique_ptr<TrueOrFalseNode>)];
+
+      // value
+      char dummy17[sizeof (std::unique_ptr<ValueNode>)];
     };
 
     /// The size of the largest semantic type.
@@ -733,66 +733,6 @@ namespace yy {
       {
         switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.move< AggrNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.move< ConstantNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.move< DescriptorNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.move< DescriptorOrderingNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.move< PathNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.move< PostOpNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.move< PropertyNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.move< SubqueryNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.move< TrueOrFalseNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.move< ValueNode* > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.move< bool > (std::move (that.value));
         break;
@@ -831,6 +771,66 @@ namespace yy {
         value.move< std::string > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.move< std::unique_ptr<AggrNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.move< std::unique_ptr<AndNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.move< std::unique_ptr<AtomPredNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.move< std::unique_ptr<ConstantNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.move< std::unique_ptr<DescriptorNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.move< std::unique_ptr<DescriptorOrderingNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.move< std::unique_ptr<OrNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.move< std::unique_ptr<PathNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.move< std::unique_ptr<PostOpNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< std::unique_ptr<PropNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.move< std::unique_ptr<PropertyNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< std::unique_ptr<SubqueryNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.move< std::unique_ptr<TrueOrFalseNode> > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.move< std::unique_ptr<ValueNode> > (std::move (that.value));
+        break;
+
       default:
         break;
     }
@@ -849,174 +849,6 @@ namespace yy {
 #else
       basic_symbol (typename Base::kind_type t)
         : Base (t)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AggrNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AggrNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AndNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AndNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AtomPredNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AtomPredNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, ConstantNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const ConstantNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, DescriptorNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const DescriptorNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, DescriptorOrderingNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const DescriptorOrderingNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, OrNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const OrNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PathNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PathNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PostOpNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PostOpNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PropNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PropNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, PropertyNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const PropertyNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, SubqueryNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const SubqueryNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, TrueOrFalseNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const TrueOrFalseNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, ValueNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const ValueNode*& v)
-        : Base (t)
-        , value (v)
       {}
 #endif
 
@@ -1056,6 +888,174 @@ namespace yy {
       {}
 #endif
 
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<AggrNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<AggrNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<AndNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<AndNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<AtomPredNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<AtomPredNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<ConstantNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<ConstantNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<DescriptorNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<DescriptorNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<DescriptorOrderingNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<DescriptorOrderingNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<OrNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<OrNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<PathNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<PathNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<PostOpNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<PostOpNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<PropNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<PropNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<PropertyNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<PropertyNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<SubqueryNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<SubqueryNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<TrueOrFalseNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<TrueOrFalseNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, std::unique_ptr<ValueNode>&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const std::unique_ptr<ValueNode>& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
       /// Destroy the symbol.
       ~basic_symbol ()
       {
@@ -1063,7 +1063,7 @@ namespace yy {
       }
 
       /// Destroy contents, and record that is empty.
-      void clear ()
+      void clear () YY_NOEXCEPT
       {
         // User destructor.
         symbol_kind_type yykind = this->kind ();
@@ -1094,66 +1094,6 @@ namespace yy {
         // Value type destructor.
 switch (yykind)
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.template destroy< AggrNode* > ();
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.template destroy< AndNode* > ();
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.template destroy< AtomPredNode* > ();
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.template destroy< ConstantNode* > ();
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.template destroy< DescriptorNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.template destroy< DescriptorOrderingNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.template destroy< OrNode* > ();
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.template destroy< PathNode* > ();
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.template destroy< PostOpNode* > ();
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.template destroy< PropNode* > ();
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.template destroy< PropertyNode* > ();
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.template destroy< SubqueryNode* > ();
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.template destroy< TrueOrFalseNode* > ();
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.template destroy< ValueNode* > ();
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.template destroy< bool > ();
         break;
@@ -1190,6 +1130,66 @@ switch (yykind)
       case symbol_kind::SYM_path_elem: // path_elem
       case symbol_kind::SYM_id: // id
         value.template destroy< std::string > ();
+        break;
+
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.template destroy< std::unique_ptr<AggrNode> > ();
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.template destroy< std::unique_ptr<AndNode> > ();
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.template destroy< std::unique_ptr<AtomPredNode> > ();
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.template destroy< std::unique_ptr<ConstantNode> > ();
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.template destroy< std::unique_ptr<DescriptorNode> > ();
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.template destroy< std::unique_ptr<DescriptorOrderingNode> > ();
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.template destroy< std::unique_ptr<OrNode> > ();
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.template destroy< std::unique_ptr<PathNode> > ();
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.template destroy< std::unique_ptr<PostOpNode> > ();
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.template destroy< std::unique_ptr<PropNode> > ();
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.template destroy< std::unique_ptr<PropertyNode> > ();
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.template destroy< std::unique_ptr<SubqueryNode> > ();
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.template destroy< std::unique_ptr<TrueOrFalseNode> > ();
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.template destroy< std::unique_ptr<ValueNode> > ();
         break;
 
       default:
@@ -1245,7 +1245,7 @@ switch (yykind)
       by_kind (kind_type t);
 
       /// Record that this symbol is empty.
-      void clear ();
+      void clear () YY_NOEXCEPT;
 
       /// Steal the symbol kind from \a that.
       void move (by_kind& that);
@@ -2181,8 +2181,8 @@ switch (yykind)
     {
     public:
       context (const parser& yyparser, const symbol_type& yyla);
-      const symbol_type& lookahead () const { return yyla_; }
-      symbol_kind_type token () const { return yyla_.kind (); }
+      const symbol_type& lookahead () const YY_NOEXCEPT { return yyla_; }
+      symbol_kind_type token () const YY_NOEXCEPT { return yyla_.kind (); }
       /// Put in YYARG at most YYARGN of the expected tokens, and return the
       /// number of tokens stored in YYARG.  If YYARG is null, return the
       /// number of expected tokens (guaranteed to be less than YYNTOKENS).
@@ -2254,7 +2254,7 @@ switch (yykind)
     static const signed char yypgoto_[];
 
     // YYDEFGOTO[NTERM-NUM].
-    static const short yydefgoto_[];
+    static const unsigned char yydefgoto_[];
 
     // YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
     // positive, shift that token.  If negative, reduce the rule whose
@@ -2576,66 +2576,6 @@ switch (yykind)
   {
     switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.copy< AggrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.copy< AndNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.copy< AtomPredNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.copy< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.copy< DescriptorNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.copy< DescriptorOrderingNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.copy< OrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.copy< PathNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.copy< PostOpNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.copy< PropNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.copy< PropertyNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.copy< SubqueryNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.copy< TrueOrFalseNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.copy< ValueNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.copy< bool > (YY_MOVE (that.value));
         break;
@@ -2674,6 +2614,66 @@ switch (yykind)
         value.copy< std::string > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.copy< std::unique_ptr<AggrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.copy< std::unique_ptr<AndNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.copy< std::unique_ptr<AtomPredNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.copy< std::unique_ptr<ConstantNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.copy< std::unique_ptr<DescriptorNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.copy< std::unique_ptr<DescriptorOrderingNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.copy< std::unique_ptr<OrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.copy< std::unique_ptr<PathNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.copy< std::unique_ptr<PostOpNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.copy< std::unique_ptr<PropNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.copy< std::unique_ptr<PropertyNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.copy< std::unique_ptr<SubqueryNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.copy< std::unique_ptr<TrueOrFalseNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.copy< std::unique_ptr<ValueNode> > (YY_MOVE (that.value));
+        break;
+
       default:
         break;
     }
@@ -2703,66 +2703,6 @@ switch (yykind)
     super_type::move (s);
     switch (this->kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.move< AggrNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.move< ConstantNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.move< DescriptorNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.move< DescriptorOrderingNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.move< PathNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.move< PostOpNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.move< PropertyNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.move< SubqueryNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.move< TrueOrFalseNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.move< ValueNode* > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.move< bool > (YY_MOVE (s.value));
         break;
@@ -2801,6 +2741,66 @@ switch (yykind)
         value.move< std::string > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.move< std::unique_ptr<AggrNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.move< std::unique_ptr<AndNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.move< std::unique_ptr<AtomPredNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.move< std::unique_ptr<ConstantNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.move< std::unique_ptr<DescriptorNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.move< std::unique_ptr<DescriptorOrderingNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.move< std::unique_ptr<OrNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.move< std::unique_ptr<PathNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.move< std::unique_ptr<PostOpNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< std::unique_ptr<PropNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.move< std::unique_ptr<PropertyNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< std::unique_ptr<SubqueryNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.move< std::unique_ptr<TrueOrFalseNode> > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.move< std::unique_ptr<ValueNode> > (YY_MOVE (s.value));
+        break;
+
       default:
         break;
     }
@@ -2834,7 +2834,7 @@ switch (yykind)
 
   inline
   void
-  parser::by_kind::clear ()
+  parser::by_kind::clear () YY_NOEXCEPT
   {
     kind_ = symbol_kind::SYM_YYEMPTY;
   }

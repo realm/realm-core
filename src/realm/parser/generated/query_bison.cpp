@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.7.4.
+// A Bison parser, made by GNU Bison 3.7.6.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -111,7 +111,7 @@ using namespace realm::query_parser;
 #else // !YYDEBUG
 
 # define YYCDEBUG if (false) std::cerr
-# define YY_SYMBOL_PRINT(Title, Symbol)  YYUSE (Symbol)
+# define YY_SYMBOL_PRINT(Title, Symbol)  YY_USE (Symbol)
 # define YY_REDUCE_PRINT(Rule)           static_cast<void> (0)
 # define YY_STACK_PRINT()                static_cast<void> (0)
 
@@ -194,66 +194,6 @@ namespace yy {
   {
     switch (that.kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.YY_MOVE_OR_COPY< AggrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.YY_MOVE_OR_COPY< AndNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.YY_MOVE_OR_COPY< AtomPredNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.YY_MOVE_OR_COPY< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.YY_MOVE_OR_COPY< DescriptorNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.YY_MOVE_OR_COPY< DescriptorOrderingNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.YY_MOVE_OR_COPY< OrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.YY_MOVE_OR_COPY< PathNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.YY_MOVE_OR_COPY< PostOpNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.YY_MOVE_OR_COPY< PropNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.YY_MOVE_OR_COPY< PropertyNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.YY_MOVE_OR_COPY< SubqueryNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.YY_MOVE_OR_COPY< TrueOrFalseNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.YY_MOVE_OR_COPY< ValueNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.YY_MOVE_OR_COPY< bool > (YY_MOVE (that.value));
         break;
@@ -292,6 +232,66 @@ namespace yy {
         value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.YY_MOVE_OR_COPY< std::unique_ptr<AggrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.YY_MOVE_OR_COPY< std::unique_ptr<AndNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.YY_MOVE_OR_COPY< std::unique_ptr<AtomPredNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.YY_MOVE_OR_COPY< std::unique_ptr<ConstantNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.YY_MOVE_OR_COPY< std::unique_ptr<DescriptorNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.YY_MOVE_OR_COPY< std::unique_ptr<DescriptorOrderingNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.YY_MOVE_OR_COPY< std::unique_ptr<OrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.YY_MOVE_OR_COPY< std::unique_ptr<PathNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.YY_MOVE_OR_COPY< std::unique_ptr<PostOpNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.YY_MOVE_OR_COPY< std::unique_ptr<PropNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.YY_MOVE_OR_COPY< std::unique_ptr<PropertyNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.YY_MOVE_OR_COPY< std::unique_ptr<SubqueryNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.YY_MOVE_OR_COPY< std::unique_ptr<TrueOrFalseNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.YY_MOVE_OR_COPY< std::unique_ptr<ValueNode> > (YY_MOVE (that.value));
+        break;
+
       default:
         break;
     }
@@ -307,66 +307,6 @@ namespace yy {
   {
     switch (that.kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.move< AggrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.move< ConstantNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.move< DescriptorNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.move< DescriptorOrderingNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.move< PathNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.move< PostOpNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.move< PropertyNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.move< SubqueryNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.move< TrueOrFalseNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.move< ValueNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.move< bool > (YY_MOVE (that.value));
         break;
@@ -405,6 +345,66 @@ namespace yy {
         value.move< std::string > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.move< std::unique_ptr<AggrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.move< std::unique_ptr<AndNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.move< std::unique_ptr<AtomPredNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.move< std::unique_ptr<ConstantNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.move< std::unique_ptr<DescriptorNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.move< std::unique_ptr<DescriptorOrderingNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.move< std::unique_ptr<OrNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.move< std::unique_ptr<PathNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.move< std::unique_ptr<PostOpNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< std::unique_ptr<PropNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.move< std::unique_ptr<PropertyNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< std::unique_ptr<SubqueryNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.move< std::unique_ptr<TrueOrFalseNode> > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.move< std::unique_ptr<ValueNode> > (YY_MOVE (that.value));
+        break;
+
       default:
         break;
     }
@@ -420,66 +420,6 @@ namespace yy {
     state = that.state;
     switch (that.kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.copy< AggrNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.copy< AndNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.copy< AtomPredNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.copy< ConstantNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.copy< DescriptorNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.copy< DescriptorOrderingNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.copy< OrNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.copy< PathNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.copy< PostOpNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.copy< PropNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.copy< PropertyNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.copy< SubqueryNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.copy< TrueOrFalseNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.copy< ValueNode* > (that.value);
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.copy< bool > (that.value);
         break;
@@ -518,6 +458,66 @@ namespace yy {
         value.copy< std::string > (that.value);
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.copy< std::unique_ptr<AggrNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.copy< std::unique_ptr<AndNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.copy< std::unique_ptr<AtomPredNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.copy< std::unique_ptr<ConstantNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.copy< std::unique_ptr<DescriptorNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.copy< std::unique_ptr<DescriptorOrderingNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.copy< std::unique_ptr<OrNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.copy< std::unique_ptr<PathNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.copy< std::unique_ptr<PostOpNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.copy< std::unique_ptr<PropNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.copy< std::unique_ptr<PropertyNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.copy< std::unique_ptr<SubqueryNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.copy< std::unique_ptr<TrueOrFalseNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.copy< std::unique_ptr<ValueNode> > (that.value);
+        break;
+
       default:
         break;
     }
@@ -531,66 +531,6 @@ namespace yy {
     state = that.state;
     switch (that.kind ())
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        value.move< AggrNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        value.move< ConstantNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        value.move< DescriptorNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        value.move< DescriptorOrderingNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_path: // path
-        value.move< PathNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        value.move< PostOpNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        value.move< PropNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        value.move< PropertyNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        value.move< SubqueryNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        value.move< TrueOrFalseNode* > (that.value);
-        break;
-
-      case symbol_kind::SYM_value: // value
-        value.move< ValueNode* > (that.value);
-        break;
-
       case symbol_kind::SYM_direction: // direction
         value.move< bool > (that.value);
         break;
@@ -629,6 +569,66 @@ namespace yy {
         value.move< std::string > (that.value);
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        value.move< std::unique_ptr<AggrNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        value.move< std::unique_ptr<AndNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        value.move< std::unique_ptr<AtomPredNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        value.move< std::unique_ptr<ConstantNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        value.move< std::unique_ptr<DescriptorNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        value.move< std::unique_ptr<DescriptorOrderingNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        value.move< std::unique_ptr<OrNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_path: // path
+        value.move< std::unique_ptr<PathNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        value.move< std::unique_ptr<PostOpNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< std::unique_ptr<PropNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        value.move< std::unique_ptr<PropertyNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< std::unique_ptr<SubqueryNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        value.move< std::unique_ptr<TrueOrFalseNode> > (that.value);
+        break;
+
+      case symbol_kind::SYM_value: // value
+        value.move< std::unique_ptr<ValueNode> > (that.value);
+        break;
+
       default:
         break;
     }
@@ -653,7 +653,7 @@ namespace yy {
   parser::yy_print_ (std::ostream& yyo, const basic_symbol<Base>& yysym) const
   {
     std::ostream& yyoutput = yyo;
-    YYUSE (yyoutput);
+    YY_USE (yyoutput);
     if (yysym.empty ())
       yyo << "empty symbol";
     else
@@ -912,55 +912,55 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_pred: // pred
-                 { yyo << yysym.value.template as < OrNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<OrNode> > (); }
         break;
 
       case symbol_kind::SYM_and_pred: // and_pred
-                 { yyo << yysym.value.template as < AndNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<AndNode> > (); }
         break;
 
       case symbol_kind::SYM_atom_pred: // atom_pred
-                 { yyo << yysym.value.template as < AtomPredNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<AtomPredNode> > (); }
         break;
 
       case symbol_kind::SYM_value: // value
-                 { yyo << yysym.value.template as < ValueNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<ValueNode> > (); }
         break;
 
       case symbol_kind::SYM_prop: // prop
-                 { yyo << yysym.value.template as < PropertyNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<PropertyNode> > (); }
         break;
 
       case symbol_kind::SYM_simple_prop: // simple_prop
-                 { yyo << yysym.value.template as < PropNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<PropNode> > (); }
         break;
 
       case symbol_kind::SYM_subquery: // subquery
-                 { yyo << yysym.value.template as < SubqueryNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<SubqueryNode> > (); }
         break;
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
-                 { yyo << yysym.value.template as < DescriptorOrderingNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorOrderingNode> > (); }
         break;
 
       case symbol_kind::SYM_distinct: // distinct
-                 { yyo << yysym.value.template as < DescriptorNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
         break;
 
       case symbol_kind::SYM_distinct_param: // distinct_param
-                 { yyo << yysym.value.template as < DescriptorNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
         break;
 
       case symbol_kind::SYM_sort: // sort
-                 { yyo << yysym.value.template as < DescriptorNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
         break;
 
       case symbol_kind::SYM_sort_param: // sort_param
-                 { yyo << yysym.value.template as < DescriptorNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
         break;
 
       case symbol_kind::SYM_limit: // limit
-                 { yyo << yysym.value.template as < DescriptorNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
         break;
 
       case symbol_kind::SYM_direction: // direction
@@ -976,11 +976,11 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_constant: // constant
-                 { yyo << yysym.value.template as < ConstantNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<ConstantNode> > (); }
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
-                 { yyo << yysym.value.template as < TrueOrFalseNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<TrueOrFalseNode> > (); }
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
@@ -988,11 +988,11 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_post_op: // post_op
-                 { yyo << yysym.value.template as < PostOpNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<PostOpNode> > (); }
         break;
 
       case symbol_kind::SYM_aggr_op: // aggr_op
-                 { yyo << yysym.value.template as < AggrNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<AggrNode> > (); }
         break;
 
       case symbol_kind::SYM_equality: // equality
@@ -1008,7 +1008,7 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_path: // path
-                 { yyo << yysym.value.template as < PathNode* > (); }
+                 { yyo << yysym.value.template as < std::unique_ptr<PathNode> > (); }
         break;
 
       case symbol_kind::SYM_path_elem: // path_elem
@@ -1243,66 +1243,6 @@ namespace yy {
          when using variants.  */
       switch (yyr1_[yyn])
     {
-      case symbol_kind::SYM_aggr_op: // aggr_op
-        yylhs.value.emplace< AggrNode* > ();
-        break;
-
-      case symbol_kind::SYM_and_pred: // and_pred
-        yylhs.value.emplace< AndNode* > ();
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        yylhs.value.emplace< AtomPredNode* > ();
-        break;
-
-      case symbol_kind::SYM_constant: // constant
-        yylhs.value.emplace< ConstantNode* > ();
-        break;
-
-      case symbol_kind::SYM_distinct: // distinct
-      case symbol_kind::SYM_distinct_param: // distinct_param
-      case symbol_kind::SYM_sort: // sort
-      case symbol_kind::SYM_sort_param: // sort_param
-      case symbol_kind::SYM_limit: // limit
-        yylhs.value.emplace< DescriptorNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
-        yylhs.value.emplace< DescriptorOrderingNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        yylhs.value.emplace< OrNode* > ();
-        break;
-
-      case symbol_kind::SYM_path: // path
-        yylhs.value.emplace< PathNode* > ();
-        break;
-
-      case symbol_kind::SYM_post_op: // post_op
-        yylhs.value.emplace< PostOpNode* > ();
-        break;
-
-      case symbol_kind::SYM_simple_prop: // simple_prop
-        yylhs.value.emplace< PropNode* > ();
-        break;
-
-      case symbol_kind::SYM_prop: // prop
-        yylhs.value.emplace< PropertyNode* > ();
-        break;
-
-      case symbol_kind::SYM_subquery: // subquery
-        yylhs.value.emplace< SubqueryNode* > ();
-        break;
-
-      case symbol_kind::SYM_boolexpr: // boolexpr
-        yylhs.value.emplace< TrueOrFalseNode* > ();
-        break;
-
-      case symbol_kind::SYM_value: // value
-        yylhs.value.emplace< ValueNode* > ();
-        break;
-
       case symbol_kind::SYM_direction: // direction
         yylhs.value.emplace< bool > ();
         break;
@@ -1341,6 +1281,66 @@ namespace yy {
         yylhs.value.emplace< std::string > ();
         break;
 
+      case symbol_kind::SYM_aggr_op: // aggr_op
+        yylhs.value.emplace< std::unique_ptr<AggrNode> > ();
+        break;
+
+      case symbol_kind::SYM_and_pred: // and_pred
+        yylhs.value.emplace< std::unique_ptr<AndNode> > ();
+        break;
+
+      case symbol_kind::SYM_atom_pred: // atom_pred
+        yylhs.value.emplace< std::unique_ptr<AtomPredNode> > ();
+        break;
+
+      case symbol_kind::SYM_constant: // constant
+        yylhs.value.emplace< std::unique_ptr<ConstantNode> > ();
+        break;
+
+      case symbol_kind::SYM_distinct: // distinct
+      case symbol_kind::SYM_distinct_param: // distinct_param
+      case symbol_kind::SYM_sort: // sort
+      case symbol_kind::SYM_sort_param: // sort_param
+      case symbol_kind::SYM_limit: // limit
+        yylhs.value.emplace< std::unique_ptr<DescriptorNode> > ();
+        break;
+
+      case symbol_kind::SYM_pred_suffix: // pred_suffix
+        yylhs.value.emplace< std::unique_ptr<DescriptorOrderingNode> > ();
+        break;
+
+      case symbol_kind::SYM_pred: // pred
+        yylhs.value.emplace< std::unique_ptr<OrNode> > ();
+        break;
+
+      case symbol_kind::SYM_path: // path
+        yylhs.value.emplace< std::unique_ptr<PathNode> > ();
+        break;
+
+      case symbol_kind::SYM_post_op: // post_op
+        yylhs.value.emplace< std::unique_ptr<PostOpNode> > ();
+        break;
+
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        yylhs.value.emplace< std::unique_ptr<PropNode> > ();
+        break;
+
+      case symbol_kind::SYM_prop: // prop
+        yylhs.value.emplace< std::unique_ptr<PropertyNode> > ();
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        yylhs.value.emplace< std::unique_ptr<SubqueryNode> > ();
+        break;
+
+      case symbol_kind::SYM_boolexpr: // boolexpr
+        yylhs.value.emplace< std::unique_ptr<TrueOrFalseNode> > ();
+        break;
+
+      case symbol_kind::SYM_value: // value
+        yylhs.value.emplace< std::unique_ptr<ValueNode> > ();
+        break;
+
       default:
         break;
     }
@@ -1356,50 +1356,50 @@ namespace yy {
           switch (yyn)
             {
   case 2: // query: pred pred_suffix
-                       { drv.result = yystack_[1].value.as < OrNode* > (); drv.ordering = yystack_[0].value.as < DescriptorOrderingNode* > (); }
+                       { drv.result = std::move(yystack_[1].value.as < std::unique_ptr<OrNode> > ()); drv.ordering = std::move(yystack_[0].value.as < std::unique_ptr<DescriptorOrderingNode> > ()); }
     break;
 
   case 3: // pred: and_pred
-                                { yylhs.value.as < OrNode* > () = drv.m_parse_nodes.create<OrNode>(yystack_[0].value.as < AndNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<OrNode> > () = std::make_unique<OrNode>(std::move(yystack_[0].value.as < std::unique_ptr<AndNode> > ())); }
     break;
 
   case 4: // pred: pred "||" and_pred
-                                { yystack_[2].value.as < OrNode* > ()->and_preds.emplace_back(yystack_[0].value.as < AndNode* > ()); yylhs.value.as < OrNode* > () = yystack_[2].value.as < OrNode* > (); }
+                                { yystack_[2].value.as < std::unique_ptr<OrNode> > ()->atom_preds.emplace_back(std::move(yystack_[0].value.as < std::unique_ptr<AndNode> > ())); yylhs.value.as < std::unique_ptr<OrNode> > () = std::move(yystack_[2].value.as < std::unique_ptr<OrNode> > ()); }
     break;
 
   case 5: // and_pred: atom_pred
-                                { yylhs.value.as < AndNode* > () = drv.m_parse_nodes.create<AndNode>(yystack_[0].value.as < AtomPredNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AndNode> > () = std::make_unique<AndNode>(std::move(yystack_[0].value.as < std::unique_ptr<AtomPredNode> > ())); }
     break;
 
   case 6: // and_pred: and_pred "&&" atom_pred
-                                { yystack_[2].value.as < AndNode* > ()->atom_preds.emplace_back(yystack_[0].value.as < AtomPredNode* > ()); yylhs.value.as < AndNode* > () = yystack_[2].value.as < AndNode* > (); }
+                                { yystack_[2].value.as < std::unique_ptr<AndNode> > ()->atom_preds.emplace_back(std::move(yystack_[0].value.as < std::unique_ptr<AtomPredNode> > ())); yylhs.value.as < std::unique_ptr<AndNode> > () = std::move(yystack_[2].value.as < std::unique_ptr<AndNode> > ()); }
     break;
 
   case 7: // atom_pred: value equality value
-                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<EqualityNode>(yystack_[2].value.as < ValueNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ValueNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::make_unique<EqualityNode>(std::move(yystack_[2].value.as < std::unique_ptr<ValueNode> > ()),yystack_[1].value.as < int > (),std::move(yystack_[0].value.as < std::unique_ptr<ValueNode> > ())); }
     break;
 
   case 8: // atom_pred: value equality "[c]" value
                                 {
-                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>(yystack_[3].value.as < ValueNode* > (), yystack_[2].value.as < int > (), yystack_[0].value.as < ValueNode* > ());
+                                    auto tmp = std::make_unique<EqualityNode>(std::move(yystack_[3].value.as < std::unique_ptr<ValueNode> > ()),yystack_[2].value.as < int > (),std::move(yystack_[0].value.as < std::unique_ptr<ValueNode> > ()));
                                     tmp->case_sensitive = false;
-                                    yylhs.value.as < AtomPredNode* > () = tmp;
+                                    yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::move(tmp);
                                 }
     break;
 
   case 9: // atom_pred: value relational value
-                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<RelationalNode>(yystack_[2].value.as < ValueNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ValueNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::make_unique<RelationalNode>(std::move(yystack_[2].value.as < std::unique_ptr<ValueNode> > ()),yystack_[1].value.as < int > (),std::move(yystack_[0].value.as < std::unique_ptr<ValueNode> > ())); }
     break;
 
   case 10: // atom_pred: value stringop value
-                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<StringOpsNode>(yystack_[2].value.as < ValueNode* > (), yystack_[1].value.as < int > (), yystack_[0].value.as < ValueNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::make_unique<StringOpsNode>(std::move(yystack_[2].value.as < std::unique_ptr<ValueNode> > ()),yystack_[1].value.as < int > (),std::move(yystack_[0].value.as < std::unique_ptr<ValueNode> > ())); }
     break;
 
   case 11: // atom_pred: value stringop "[c]" value
                                 {
-                                    auto tmp = drv.m_parse_nodes.create<StringOpsNode>(yystack_[3].value.as < ValueNode* > (), yystack_[2].value.as < int > (), yystack_[0].value.as < ValueNode* > ());
+                                    auto tmp = std::make_unique<StringOpsNode>(std::move(yystack_[3].value.as < std::unique_ptr<ValueNode> > ()),yystack_[2].value.as < int > (),std::move(yystack_[0].value.as < std::unique_ptr<ValueNode> > ()));
                                     tmp->case_sensitive = false;
-                                    yylhs.value.as < AtomPredNode* > () = tmp;
+                                    yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::move(tmp);
                                 }
     break;
 
@@ -1411,103 +1411,103 @@ namespace yy {
     break;
 
   case 13: // atom_pred: "!" atom_pred
-                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<NotNode>(yystack_[0].value.as < AtomPredNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::make_unique<NotNode>(std::move(yystack_[0].value.as < std::unique_ptr<AtomPredNode> > ())); }
     break;
 
   case 14: // atom_pred: '(' pred ')'
-                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<ParensNode>(yystack_[1].value.as < OrNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::make_unique<ParensNode>(std::move(yystack_[1].value.as < std::unique_ptr<OrNode> > ())); }
     break;
 
   case 15: // atom_pred: boolexpr
-                                { yylhs.value.as < AtomPredNode* > () =yystack_[0].value.as < TrueOrFalseNode* > (); }
+                                { yylhs.value.as < std::unique_ptr<AtomPredNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<TrueOrFalseNode> > ()); }
     break;
 
   case 16: // value: constant
-                                { yylhs.value.as < ValueNode* > () = drv.m_parse_nodes.create<ValueNode>(yystack_[0].value.as < ConstantNode* > ());}
+                                { yylhs.value.as < std::unique_ptr<ValueNode> > () = std::make_unique<ValueNode>(std::move(yystack_[0].value.as < std::unique_ptr<ConstantNode> > ()));}
     break;
 
   case 17: // value: prop
-                                { yylhs.value.as < ValueNode* > () = drv.m_parse_nodes.create<ValueNode>(yystack_[0].value.as < PropertyNode* > ());}
+                                { yylhs.value.as < std::unique_ptr<ValueNode> > () = std::make_unique<ValueNode>(std::move(yystack_[0].value.as < std::unique_ptr<PropertyNode> > ()));}
     break;
 
   case 18: // prop: path id post_op
-                                { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<PropNode>(yystack_[2].value.as < PathNode* > (), yystack_[1].value.as < std::string > (), yystack_[0].value.as < PostOpNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<PropNode>(std::move(yystack_[2].value.as < std::unique_ptr<PathNode> > ()),yystack_[1].value.as < std::string > (),std::move(yystack_[0].value.as < std::unique_ptr<PostOpNode> > ())); }
     break;
 
   case 19: // prop: path id '[' constant ']' post_op
-                                       { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<PropNode>(yystack_[5].value.as < PathNode* > (), yystack_[4].value.as < std::string > (), yystack_[2].value.as < ConstantNode* > (), yystack_[0].value.as < PostOpNode* > ()); }
+                                       { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<PropNode>(std::move(yystack_[5].value.as < std::unique_ptr<PathNode> > ()),yystack_[4].value.as < std::string > (),std::move(yystack_[2].value.as < std::unique_ptr<ConstantNode> > ()), std::move(yystack_[0].value.as < std::unique_ptr<PostOpNode> > ())); }
     break;
 
   case 20: // prop: comp_type path id post_op
-                                { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<PropNode>(yystack_[2].value.as < PathNode* > (), yystack_[1].value.as < std::string > (), yystack_[0].value.as < PostOpNode* > (), ExpressionComparisonType(yystack_[3].value.as < int > ())); }
+                                { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<PropNode>(std::move(yystack_[2].value.as < std::unique_ptr<PathNode> > ()), yystack_[1].value.as < std::string > (), std::move(yystack_[0].value.as < std::unique_ptr<PostOpNode> > ()),ExpressionComparisonType(yystack_[3].value.as < int > ()));}
     break;
 
   case 21: // prop: path "@links" post_op
-                                { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<PropNode>(yystack_[2].value.as < PathNode* > (), "@links", yystack_[0].value.as < PostOpNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<PropNode>(std::move(yystack_[2].value.as < std::unique_ptr<PathNode> > ()), "@links" , std::move(yystack_[0].value.as < std::unique_ptr<PostOpNode> > ())); }
     break;
 
   case 22: // prop: path id '.' aggr_op '.' id
-                                    { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<LinkAggrNode>(yystack_[5].value.as < PathNode* > (), yystack_[4].value.as < std::string > (), yystack_[2].value.as < AggrNode* > (), yystack_[0].value.as < std::string > ()); }
+                                    { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<LinkAggrNode>(std::move(yystack_[5].value.as < std::unique_ptr<PathNode> > ()), yystack_[4].value.as < std::string > (), std::move(yystack_[2].value.as < std::unique_ptr<AggrNode> > ()), yystack_[0].value.as < std::string > ()); }
     break;
 
   case 23: // prop: path id '.' aggr_op
-                                { yylhs.value.as < PropertyNode* > () = drv.m_parse_nodes.create<ListAggrNode>(yystack_[3].value.as < PathNode* > (), yystack_[2].value.as < std::string > (), yystack_[0].value.as < AggrNode* > ()); }
+                                { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::make_unique<ListAggrNode>(std::move(yystack_[3].value.as < std::unique_ptr<PathNode> > ()), yystack_[2].value.as < std::string > (), std::move(yystack_[0].value.as < std::unique_ptr<AggrNode> > ())); }
     break;
 
   case 24: // prop: subquery
-                                { yylhs.value.as < PropertyNode* > () = yystack_[0].value.as < SubqueryNode* > (); }
+                                { yylhs.value.as < std::unique_ptr<PropertyNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<SubqueryNode> > ()); }
     break;
 
   case 25: // simple_prop: path id
-                                { yylhs.value.as < PropNode* > () = drv.m_parse_nodes.create<PropNode>(yystack_[1].value.as < PathNode* > (), yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<PropNode> > () = std::make_unique<PropNode>(std::move(yystack_[1].value.as < std::unique_ptr<PathNode> > ()),yystack_[0].value.as < std::string > ()); }
     break;
 
   case 26: // subquery: "subquery" '(' simple_prop ',' id ',' pred ')' '.' "@size"
-                                                              { yylhs.value.as < SubqueryNode* > () = drv.m_parse_nodes.create<SubqueryNode>(yystack_[7].value.as < PropNode* > (), yystack_[5].value.as < std::string > (), yystack_[3].value.as < OrNode* > ()); }
+                                                              { yylhs.value.as < std::unique_ptr<SubqueryNode> > () = std::make_unique<SubqueryNode>(std::move(yystack_[7].value.as < std::unique_ptr<PropNode> > ()), yystack_[5].value.as < std::string > (), std::move(yystack_[3].value.as < std::unique_ptr<OrNode> > ())); }
     break;
 
   case 27: // pred_suffix: %empty
-                                { yylhs.value.as < DescriptorOrderingNode* > () = drv.m_parse_nodes.create<DescriptorOrderingNode>();}
+                                { yylhs.value.as < std::unique_ptr<DescriptorOrderingNode> > () = std::make_unique<DescriptorOrderingNode>();}
     break;
 
   case 28: // pred_suffix: pred_suffix sort
-                                { yystack_[1].value.as < DescriptorOrderingNode* > ()->add_descriptor(yystack_[0].value.as < DescriptorNode* > ()); yylhs.value.as < DescriptorOrderingNode* > () = yystack_[1].value.as < DescriptorOrderingNode* > (); }
+                                { yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()->add_descriptor(std::move(yystack_[0].value.as < std::unique_ptr<DescriptorNode> > ())); yylhs.value.as < std::unique_ptr<DescriptorOrderingNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()); }
     break;
 
   case 29: // pred_suffix: pred_suffix distinct
-                                { yystack_[1].value.as < DescriptorOrderingNode* > ()->add_descriptor(yystack_[0].value.as < DescriptorNode* > ()); yylhs.value.as < DescriptorOrderingNode* > () = yystack_[1].value.as < DescriptorOrderingNode* > (); }
+                                { yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()->add_descriptor(std::move(yystack_[0].value.as < std::unique_ptr<DescriptorNode> > ())); yylhs.value.as < std::unique_ptr<DescriptorOrderingNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()); }
     break;
 
   case 30: // pred_suffix: pred_suffix limit
-                                { yystack_[1].value.as < DescriptorOrderingNode* > ()->add_descriptor(yystack_[0].value.as < DescriptorNode* > ()); yylhs.value.as < DescriptorOrderingNode* > () = yystack_[1].value.as < DescriptorOrderingNode* > (); }
+                                { yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()->add_descriptor(std::move(yystack_[0].value.as < std::unique_ptr<DescriptorNode> > ())); yylhs.value.as < std::unique_ptr<DescriptorOrderingNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<DescriptorOrderingNode> > ()); }
     break;
 
   case 31: // distinct: "distinct" '(' distinct_param ')'
-                                          { yylhs.value.as < DescriptorNode* > () = yystack_[1].value.as < DescriptorNode* > (); }
+                                          { yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<DescriptorNode> > ()); }
     break;
 
   case 32: // distinct_param: path id
-                                { yylhs.value.as < DescriptorNode* > () = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::DISTINCT); yylhs.value.as < DescriptorNode* > ()->add(yystack_[1].value.as < PathNode* > ()->path_elems, yystack_[0].value.as < std::string > ());}
+                                { yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::make_unique<DescriptorNode>(DescriptorNode::DISTINCT); yylhs.value.as < std::unique_ptr<DescriptorNode> > ()->add(yystack_[1].value.as < std::unique_ptr<PathNode> > ()->path_elems, yystack_[0].value.as < std::string > ());}
     break;
 
   case 33: // distinct_param: distinct_param ',' path id
-                                 { yystack_[3].value.as < DescriptorNode* > ()->add(yystack_[1].value.as < PathNode* > ()->path_elems, yystack_[0].value.as < std::string > ()); yylhs.value.as < DescriptorNode* > () = yystack_[3].value.as < DescriptorNode* > (); }
+                                 { yystack_[3].value.as < std::unique_ptr<DescriptorNode> > ()->add(yystack_[1].value.as < std::unique_ptr<PathNode> > ()->path_elems, yystack_[0].value.as < std::string > ()); yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::move(yystack_[3].value.as < std::unique_ptr<DescriptorNode> > ()); }
     break;
 
   case 34: // sort: "sort" '(' sort_param ')'
-                                 { yylhs.value.as < DescriptorNode* > () = yystack_[1].value.as < DescriptorNode* > (); }
+                                 { yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<DescriptorNode> > ()); }
     break;
 
   case 35: // sort_param: path id direction
-                                { yylhs.value.as < DescriptorNode* > () = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT); yylhs.value.as < DescriptorNode* > ()->add(yystack_[2].value.as < PathNode* > ()->path_elems, yystack_[1].value.as < std::string > (), yystack_[0].value.as < bool > ());}
+                                { yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::make_unique<DescriptorNode>(DescriptorNode::SORT); yylhs.value.as < std::unique_ptr<DescriptorNode> > ()->add(yystack_[2].value.as < std::unique_ptr<PathNode> > ()->path_elems, yystack_[1].value.as < std::string > (), yystack_[0].value.as < bool > ());}
     break;
 
   case 36: // sort_param: sort_param ',' path id direction
-                                        { yystack_[4].value.as < DescriptorNode* > ()->add(yystack_[2].value.as < PathNode* > ()->path_elems, yystack_[1].value.as < std::string > (), yystack_[0].value.as < bool > ()); yylhs.value.as < DescriptorNode* > () = yystack_[4].value.as < DescriptorNode* > (); }
+                                        { yystack_[4].value.as < std::unique_ptr<DescriptorNode> > ()->add(yystack_[2].value.as < std::unique_ptr<PathNode> > ()->path_elems, yystack_[1].value.as < std::string > (), yystack_[0].value.as < bool > ()); yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::move(yystack_[4].value.as < std::unique_ptr<DescriptorNode> > ()); }
     break;
 
   case 37: // limit: "limit" '(' "natural0" ')'
-                                { yylhs.value.as < DescriptorNode* > () = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::LIMIT, yystack_[1].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<DescriptorNode> > () = std::make_unique<DescriptorNode>(DescriptorNode::LIMIT, yystack_[1].value.as < std::string > ()); }
     break;
 
   case 38: // direction: "ascending"
@@ -1519,75 +1519,75 @@ namespace yy {
     break;
 
   case 43: // constant: "natural0"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 44: // constant: "number"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::NUMBER, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 45: // constant: "infinity"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::INFINITY_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 46: // constant: "NaN"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::NAN_VAL, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 47: // constant: "string"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::STRING, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 48: // constant: "base64"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::BASE64, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 49: // constant: "float"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::FLOAT, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 50: // constant: "date"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::TIMESTAMP, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 51: // constant: "UUID"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::UUID_T, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 52: // constant: "ObjectId"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::OID, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 53: // constant: "link"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 54: // constant: "typed link"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TYPED_LINK, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::TYPED_LINK, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 55: // constant: "true"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::TRUE, ""); }
     break;
 
   case 56: // constant: "false"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::FALSE, ""); }
     break;
 
   case 57: // constant: "null"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::NULL_VAL, ""); }
     break;
 
   case 58: // constant: "argument"
-                                { yylhs.value.as < ConstantNode* > () = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, yystack_[0].value.as < std::string > ()); }
+                                { yylhs.value.as < std::unique_ptr<ConstantNode> > () = std::make_unique<ConstantNode>(ConstantNode::ARG, yystack_[0].value.as < std::string > ()); }
     break;
 
   case 59: // boolexpr: "truepredicate"
-                                { yylhs.value.as < TrueOrFalseNode* > () = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }
+                                { yylhs.value.as < std::unique_ptr<TrueOrFalseNode> > () = std::make_unique<TrueOrFalseNode>(true); }
     break;
 
   case 60: // boolexpr: "falsepredicate"
-                                { yylhs.value.as < TrueOrFalseNode* > () = drv.m_parse_nodes.create<TrueOrFalseNode>(false); }
+                                { yylhs.value.as < std::unique_ptr<TrueOrFalseNode> > () = std::make_unique<TrueOrFalseNode>(false); }
     break;
 
   case 61: // comp_type: "any"
@@ -1603,31 +1603,31 @@ namespace yy {
     break;
 
   case 64: // post_op: %empty
-                                { yylhs.value.as < PostOpNode* > () = nullptr; }
+                                { yylhs.value.as < std::unique_ptr<PostOpNode> > () = nullptr; }
     break;
 
   case 65: // post_op: '.' "@size"
-                                { yylhs.value.as < PostOpNode* > () = drv.m_parse_nodes.create<PostOpNode>(yystack_[0].value.as < std::string > (), PostOpNode::SIZE);}
+                                { yylhs.value.as < std::unique_ptr<PostOpNode> > () = std::make_unique<PostOpNode>(yystack_[0].value.as < std::string > (), PostOpNode::SIZE);}
     break;
 
   case 66: // post_op: '.' "@type"
-                                { yylhs.value.as < PostOpNode* > () = drv.m_parse_nodes.create<PostOpNode>(yystack_[0].value.as < std::string > (), PostOpNode::TYPE);}
+                                { yylhs.value.as < std::unique_ptr<PostOpNode> > () = std::make_unique<PostOpNode>(yystack_[0].value.as < std::string > (), PostOpNode::TYPE);}
     break;
 
   case 67: // aggr_op: "@max"
-                                { yylhs.value.as < AggrNode* > () = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);}
+                                { yylhs.value.as < std::unique_ptr<AggrNode> > () = std::make_unique<AggrNode>(AggrNode::MAX);}
     break;
 
   case 68: // aggr_op: "@min"
-                                { yylhs.value.as < AggrNode* > () = drv.m_parse_nodes.create<AggrNode>(AggrNode::MIN);}
+                                { yylhs.value.as < std::unique_ptr<AggrNode> > () = std::make_unique<AggrNode>(AggrNode::MIN);}
     break;
 
   case 69: // aggr_op: "@sun"
-                                { yylhs.value.as < AggrNode* > () = drv.m_parse_nodes.create<AggrNode>(AggrNode::SUM);}
+                                { yylhs.value.as < std::unique_ptr<AggrNode> > () = std::make_unique<AggrNode>(AggrNode::SUM);}
     break;
 
   case 70: // aggr_op: "@average"
-                                { yylhs.value.as < AggrNode* > () = drv.m_parse_nodes.create<AggrNode>(AggrNode::AVG);}
+                                { yylhs.value.as < std::unique_ptr<AggrNode> > () = std::make_unique<AggrNode>(AggrNode::AVG);}
     break;
 
   case 71: // equality: "=="
@@ -1675,11 +1675,11 @@ namespace yy {
     break;
 
   case 82: // path: %empty
-                                { yylhs.value.as < PathNode* > () = drv.m_parse_nodes.create<PathNode>(); }
+                                { yylhs.value.as < std::unique_ptr<PathNode> > () = std::make_unique<PathNode>(); }
     break;
 
   case 83: // path: path path_elem
-                                { yystack_[1].value.as < PathNode* > ()->add_element(yystack_[0].value.as < std::string > ()); yylhs.value.as < PathNode* > () = yystack_[1].value.as < PathNode* > (); }
+                                { yystack_[1].value.as < std::unique_ptr<PathNode> > ()->add_element(std::move(yystack_[0].value.as < std::string > ())); yylhs.value.as < std::unique_ptr<PathNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<PathNode> > ()); }
     break;
 
   case 84: // path_elem: id '.'
@@ -2117,10 +2117,10 @@ namespace yy {
      -77,   -66,   -77,   -77,   -77,   -77,   -33,   -77,   -53
   };
 
-  const short
+  const unsigned char
   parser::yydefgoto_[] =
   {
-      -1,    25,    26,    27,    28,    29,    30,    69,    31,    41,
+       0,    25,    26,    27,    28,    29,    30,    69,    31,    41,
       76,   119,    77,   117,    78,   144,    81,    99,    32,    33,
       34,    90,   114,    55,    56,    57,    35,    67,    68
   };
