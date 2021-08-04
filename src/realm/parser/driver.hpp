@@ -342,11 +342,13 @@ public:
     enum Type { SORT, DISTINCT, LIMIT };
     std::vector<std::vector<std::string>> columns;
     std::vector<bool> ascending;
+    SortDescriptor::MergeMode merge_mode;
+    
     size_t limit = size_t(-1);
     Type type;
 
-    DescriptorNode(Type t)
-        : type(t)
+    DescriptorNode(Type t, SortDescriptor::MergeMode merge_mode = SortDescriptor::MergeMode::prepend)
+        : merge_mode(merge_mode), type(t)
     {
     }
     DescriptorNode(Type t, const std::string& str)
@@ -551,7 +553,7 @@ using base = NodeVisitor;
 public:
     QueryVisitor(ParserDriver *drv): drv(drv){}
     Query visit(ParserNode& node);
-    std::unique_ptr<DescriptorOrdering> getDescriptorOrdering(DescriptorOrderingNode& node);
+    std::unique_ptr<DescriptorOrdering> getDescriptorOrdering(std::unique_ptr<DescriptorOrderingNode>& node);
     realm::Query query;
     std::unique_ptr<DescriptorOrdering> descriptor_ordering;
 private:
@@ -596,6 +598,7 @@ public:
 private:
     void build_pred(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
     void build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    void build_descriptor(nlohmann::json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings);
     std::unique_ptr<ValueNode> get_value_node(nlohmann::json json);
     std::unique_ptr<ConstantNode> get_constant_node(realm::Mixed value);
 };

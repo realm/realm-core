@@ -1386,7 +1386,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
             }
             else {
                 ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
-                                      SortDescriptor::MergeMode::prepend);
+                                      cur_ordering->merge_mode);
             }
         }
     }
@@ -2211,8 +2211,8 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
     return {std::move(left), std::move(right)};
 }
 
-std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(DescriptorOrderingNode& node){
-    auto orderings = std::move(node.orderings);
+std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(std::unique_ptr<DescriptorOrderingNode>& node){
+    auto orderings = std::move(node->orderings);
     auto target = drv->m_base_table;
     std::unique_ptr<DescriptorOrdering> ordering;
     for (auto& cur_ordering : orderings) {
@@ -2250,7 +2250,7 @@ std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(Descript
             }
             else {
                 ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
-                                      SortDescriptor::MergeMode::prepend);
+                                      cur_ordering->merge_mode);
             }
         }
     }
@@ -2856,11 +2856,18 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
 using json = nlohmann::json;
 Query JsonQueryParser::query_from_json(TableRef table, json json){
     auto and_node = std::make_unique<AndNode>();
-    build_pred(json["whereClause"], and_node->atom_preds);
+    auto don = std::make_unique<DescriptorOrderingNode>();
+    for (auto predicate : json["whereClauses"]){
+        build_pred(predicate["expression"], and_node->atom_preds);
+    }
+    for (auto ordering : json["orderingClauses"]){
+        build_descriptor(ordering, don->orderings);
+    }
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
     ParserDriver driver(table, *no_arguments, KeyPathMapping());
     PrintingVisitor(std::cout).visitAnd(*and_node);
-    return QueryVisitor(&driver).visit(*and_node);
+    std::unique_ptr<DescriptorOrdering> order = QueryVisitor(&driver).getDescriptorOrdering(don);
+    return QueryVisitor(&driver).visit(*and_node).set_ordering(std::move(order));
 }
 
 
@@ -2882,6 +2889,13 @@ void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<Atom
     } else {
         build_compare(fragment, preds);
     }
+}
+
+void JsonQueryParser::build_descriptor(json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings){
+    auto ordering = std::make_unique<DescriptorNode>(DescriptorNode::SORT, SortDescriptor::MergeMode::append);
+    auto empty_path = std::make_unique<PathNode>();
+    ordering->add(empty_path->path_elems, fragment["property"], fragment["isAscending"]);
+    orderings.emplace_back(std::move(ordering));
 }
 
 
