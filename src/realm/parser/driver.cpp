@@ -1588,6 +1588,11 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
+Query Table::query_new(const std::string& query_string) const
+{
+    return JsonQueryParser().query_from_json(m_own_ref, query_string);
+}
+
 Subexpr* LinkChain::column(const std::string& col)
 {
     auto col_key = m_current_table->get_column_key(col);
