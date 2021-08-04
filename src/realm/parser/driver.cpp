@@ -1581,10 +1581,10 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
-    //Query query = QueryVisitor(&driver).visit(*driver.result);
-    // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
-    // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
-    // return visitor.query.set_ordering(driver.ordering->visit(&driver));
+
+    // Query query = QueryVisitor(&driver).visit(*driver.result);
+    // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(driver.ordering));
+
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
@@ -2760,9 +2760,10 @@ void SubexprVisitor::visitProp(PropNode& node){
             path->path_elems.pop_back();
             std::unique_ptr<Subexpr> column{getLinkChain(*path, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(column.get())) {
-                if (auto length_expr = list->get_element_length())
+                if (auto length_expr = list->get_element_length()){
                     subexpr = std::move(length_expr);
                     return;
+                }
             }
         }
         throw InvalidQueryError(e.what());
@@ -2884,7 +2885,7 @@ void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<Atom
         preds.emplace_back(std::move(or_node));
     } else if (fragment["kind"] == "not"){
         auto not_node = std::make_unique<NotNode>();
-        build_pred(fragment["expr"], not_node->atom_preds);
+        build_pred(fragment["expression"], not_node->atom_preds);
         preds.emplace_back(std::move(not_node));
     } else {
         build_compare(fragment, preds);
