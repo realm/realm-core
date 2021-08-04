@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* InstructionApplier exceptions now contain information about what object/changeset was being applied when the exception was thrown. ([#4836](https://github.com/realm/realm-core/issues/4836))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
