@@ -50,7 +50,9 @@ set(REALM_PARSER_EXTRAS
     query_flex.ll
 )
 
-if(NOT MSVC)
+if(MSVC)
+    set_source_files_properties(generated/query_bison.cpp PROPERTIES COMPILE_OPTIONS "/Zc:__cplusplus")
+else()
     set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code")
 endif()
 
