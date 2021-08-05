@@ -34,7 +34,8 @@ REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& m
                          "origin_file_ident: %5, timestamp: %6)",
                          msg, m_log->get_string(m_last_table_name), m_log->version,
                          m_log->last_integrated_remote_version, m_log->origin_file_ident, m_log->origin_timestamp)};
-    } else if (m_log) {
+    }
+    else if (m_log) {
         // If all we have is a changeset, then we should log whatever we can about it.
         throw BadChangesetError{util::format("%1 (version: %2, last_integrated_remote_version: %3, "
                                              "origin_file_ident: %4, timestamp: %5)",
