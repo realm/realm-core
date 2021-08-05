@@ -280,9 +280,8 @@ Query OrNode::visit(ParserDriver* drv)
     }
 
     Query q(drv->m_base_table);
-    //MAY NOT WORK
     q.group();
-    for (auto &it : atom_preds) {
+    for (auto& it : atom_preds) {
         q.Or();
         q.and_query(it->visit(drv));
     }
@@ -297,153 +296,186 @@ Query AndNode::visit(ParserDriver* drv)
         return atom_preds[0]->visit(drv);
     }
     Query q(drv->m_base_table);
-    for (auto &it : atom_preds) {
+    for (auto& it : atom_preds) {
         q.and_query(it->visit(drv));
     }
     return q;
 }
 
-void AndNode::accept(NodeVisitor& visitor) {
+void AndNode::accept(NodeVisitor& visitor)
+{
     visitor.visitAnd(*this);
 }
 
-void NodeVisitor::visitAnd(AndNode& node) {
-    for (auto &pred : node.atom_preds) {
+void NodeVisitor::visitAnd(AndNode& node)
+{
+    for (auto& pred : node.atom_preds) {
         pred->accept(*this);
     }
 }
 
-void OrNode::accept(NodeVisitor& visitor) {
+void OrNode::accept(NodeVisitor& visitor)
+{
     visitor.visitOr(*this);
 }
 
-void NodeVisitor::visitOr(OrNode& node) {
-    for (auto &pred : node.atom_preds) {
+void NodeVisitor::visitOr(OrNode& node)
+{
+    for (auto& pred : node.atom_preds) {
         pred->accept(*this);
     }
 }
 
-void NotNode::accept(NodeVisitor& visitor) {
+void NotNode::accept(NodeVisitor& visitor)
+{
     visitor.visitNot(*this);
 }
 
-void NodeVisitor::visitNot(NotNode& node) {
+void NodeVisitor::visitNot(NotNode& node)
+{
     node.atom_preds[0]->accept(*this);
 }
 
-void TrueOrFalseNode::accept(NodeVisitor& visitor) {
+void TrueOrFalseNode::accept(NodeVisitor& visitor)
+{
     visitor.visitTrueOrFalse(*this);
 }
 
-void NodeVisitor::visitTrueOrFalse(TrueOrFalseNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitTrueOrFalse(TrueOrFalseNode&)
+{
+    // leaf node, no further traversal
 }
 
-void ParensNode::accept(NodeVisitor& visitor) {
+void ParensNode::accept(NodeVisitor& visitor)
+{
     visitor.visitParens(*this);
 }
 
-void NodeVisitor::visitParens(ParensNode& node) {
+void NodeVisitor::visitParens(ParensNode& node)
+{
     this->visitOr(*node.pred);
 }
 
-void ConstantNode::accept(NodeVisitor& visitor) {
+void ConstantNode::accept(NodeVisitor& visitor)
+{
     visitor.visitConstant(*this);
 }
 
-void NodeVisitor::visitConstant(ConstantNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitConstant(ConstantNode&)
+{
+    // leaf node, no further traversal
 }
 
-void ValueNode::accept(NodeVisitor& visitor) {
+void ValueNode::accept(NodeVisitor& visitor)
+{
     visitor.visitValue(*this);
 }
 
-void NodeVisitor::visitValue(ValueNode& node) {
+void NodeVisitor::visitValue(ValueNode& node)
+{
     if (node.constant != nullptr) {
         this->visitConstant(*node.constant);
-    } else {
+    }
+    else {
         node.prop->accept(*this);
     }
 }
 
-void EqualityNode::accept(NodeVisitor& visitor) {
+void EqualityNode::accept(NodeVisitor& visitor)
+{
     visitor.visitEquality(*this);
 }
 
-void NodeVisitor::visitEquality(EqualityNode& node) {
+void NodeVisitor::visitEquality(EqualityNode& node)
+{
     for (auto& value : node.values) {
         value->accept(*this);
     }
 }
 
-void RelationalNode::accept(NodeVisitor& visitor) {
+void RelationalNode::accept(NodeVisitor& visitor)
+{
     visitor.visitRelational(*this);
 }
 
-void NodeVisitor::visitRelational(RelationalNode& node) {
+void NodeVisitor::visitRelational(RelationalNode& node)
+{
     for (auto& value : node.values) {
         value->accept(*this);
     }
 }
 
-void StringOpsNode::accept(NodeVisitor& visitor) {
+void StringOpsNode::accept(NodeVisitor& visitor)
+{
     visitor.visitStringOps(*this);
 }
 
-void NodeVisitor::visitStringOps(StringOpsNode& node) {
+void NodeVisitor::visitStringOps(StringOpsNode& node)
+{
     for (auto& value : node.values) {
         value->accept(*this);
     }
 }
 
-void PostOpNode::accept(NodeVisitor& visitor) {
+void PostOpNode::accept(NodeVisitor& visitor)
+{
     visitor.visitPostOp(*this);
 }
 
-void NodeVisitor::visitPostOp(PostOpNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitPostOp(PostOpNode&)
+{
+    // leaf node, no further traversal
 }
 
-void AggrNode::accept(NodeVisitor& visitor) {
+void AggrNode::accept(NodeVisitor& visitor)
+{
     visitor.visitAggr(*this);
 }
 
-void NodeVisitor::visitAggr(AggrNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitAggr(AggrNode&)
+{
+    // leaf node, no further traversal
 }
 
-void PathNode::accept(NodeVisitor& visitor) {
+void PathNode::accept(NodeVisitor& visitor)
+{
     visitor.visitPath(*this);
 }
 
-void NodeVisitor::visitPath(PathNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitPath(PathNode&)
+{
+    // leaf node, no further traversal
 }
 
-void ListAggrNode::accept(NodeVisitor& visitor) {
+void ListAggrNode::accept(NodeVisitor& visitor)
+{
     visitor.visitListAggr(*this);
 }
 
-void NodeVisitor::visitListAggr(ListAggrNode& node) {
+void NodeVisitor::visitListAggr(ListAggrNode& node)
+{
     this->visitPath(*node.path);
     this->visitAggr(*node.aggr_op);
 }
 
-void LinkAggrNode::accept(NodeVisitor& visitor) {
+void LinkAggrNode::accept(NodeVisitor& visitor)
+{
     visitor.visitLinkAggr(*this);
 }
 
-void NodeVisitor::visitLinkAggr(LinkAggrNode& node) {
+void NodeVisitor::visitLinkAggr(LinkAggrNode& node)
+{
     this->visitPath(*node.path);
     this->visitAggr(*node.aggr_op);
 }
 
-void PropNode::accept(NodeVisitor& visitor) {
+void PropNode::accept(NodeVisitor& visitor)
+{
     visitor.visitProp(*this);
 }
 
-void NodeVisitor::visitProp(PropNode& node) {
+void NodeVisitor::visitProp(PropNode& node)
+{
     this->visitPath(*node.path);
     if (node.post_op != nullptr) {
         this->visitPostOp(*node.post_op);
@@ -453,28 +485,34 @@ void NodeVisitor::visitProp(PropNode& node) {
     }
 }
 
-void SubqueryNode::accept(NodeVisitor& visitor) {
+void SubqueryNode::accept(NodeVisitor& visitor)
+{
     visitor.visitSubquery(*this);
 }
 
-void NodeVisitor::visitSubquery(SubqueryNode& node) {
+void NodeVisitor::visitSubquery(SubqueryNode& node)
+{
     this->visitProp(*node.prop);
     this->visitOr(*node.subquery);
 }
 
-void DescriptorNode::accept(NodeVisitor& visitor) {
+void DescriptorNode::accept(NodeVisitor& visitor)
+{
     visitor.visitDescriptor(*this);
 }
 
-void NodeVisitor::visitDescriptor(DescriptorNode&) {
-    //leaf node, no further traversal
+void NodeVisitor::visitDescriptor(DescriptorNode&)
+{
+    // leaf node, no further traversal
 }
 
-void DescriptorOrderingNode::accept(NodeVisitor& visitor) {
+void DescriptorOrderingNode::accept(NodeVisitor& visitor)
+{
     visitor.visitDescriptorOrdering(*this);
 }
 
-void NodeVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node) {
+void NodeVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node)
+{
     for (auto& ordering : node.orderings) {
         this->visitDescriptor(*ordering);
     }
@@ -1433,7 +1471,8 @@ ParserDriver::~ParserDriver()
 }
 
 
-std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
+std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>>
+ParserDriver::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
 {
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
@@ -1725,116 +1764,138 @@ SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery)
     return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
 }
 
-void PrintingVisitor::visitAnd(AndNode& node){
+void PrintingVisitor::visitAnd(AndNode& node)
+{
     out << "AndNode(";
     base::visitAnd(node);
     out << ")";
-} 
-void PrintingVisitor::visitOr(OrNode& node){
+}
+void PrintingVisitor::visitOr(OrNode& node)
+{
     out << "OrNode(";
     base::visitOr(node);
     out << ")";
 }
-void PrintingVisitor::visitNot(NotNode& node){
+void PrintingVisitor::visitNot(NotNode& node)
+{
     out << "NotNode(";
     base::visitNot(node);
     out << ")";
 }
-void PrintingVisitor::visitParens(ParensNode& node){
+void PrintingVisitor::visitParens(ParensNode& node)
+{
     out << "ParensNode(";
     base::visitParens(node);
     out << ")";
-} 
-void PrintingVisitor::visitConstant(ConstantNode& node){
+}
+void PrintingVisitor::visitConstant(ConstantNode& node)
+{
     out << "ConstantNode: type = " << node.type << " value = " << node.text;
-} 
-void PrintingVisitor::visitEquality(EqualityNode& node){
+}
+void PrintingVisitor::visitEquality(EqualityNode& node)
+{
     out << "EqualityNode(";
     base::visitEquality(node);
     out << ")";
 }
-void PrintingVisitor::visitRelational(RelationalNode& node){
+void PrintingVisitor::visitRelational(RelationalNode& node)
+{
     out << "RelationalNode(";
     base::visitRelational(node);
     out << ")";
 }
-void PrintingVisitor::visitStringOps(StringOpsNode& node){
+void PrintingVisitor::visitStringOps(StringOpsNode& node)
+{
     out << "StringOpsNode(";
     base::visitStringOps(node);
     out << ")";
-} 
-void PrintingVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
+}
+void PrintingVisitor::visitTrueOrFalse(TrueOrFalseNode& node)
+{
     out << "TrueOrFalseNode : value = " << node.true_or_false << " ";
-} 
-void PrintingVisitor::visitPostOp(PostOpNode& node){
+}
+void PrintingVisitor::visitPostOp(PostOpNode& node)
+{
     out << "PostOpNode: opType = " << node.op_type << " opName = " << node.op_name << " ";
-} 
-void PrintingVisitor::visitAggr(AggrNode& node){
+}
+void PrintingVisitor::visitAggr(AggrNode& node)
+{
     out << "AggrNode: type = " << node.type;
-} 
-void PrintingVisitor::visitPath(PathNode& node){
+}
+void PrintingVisitor::visitPath(PathNode& node)
+{
     out << "PathNode: path_elems = {";
-    for (auto i: node.path_elems)
-    out << i << ", ";
+    for (auto i : node.path_elems)
+        out << i << ", ";
     out << "} ";
-} 
-void PrintingVisitor::visitListAggr(ListAggrNode& node){
+}
+void PrintingVisitor::visitListAggr(ListAggrNode& node)
+{
     out << "ListAggrNode(";
     base::visitListAggr(node);
     out << ")";
-} 
-void PrintingVisitor::visitLinkAggr(LinkAggrNode& node){
+}
+void PrintingVisitor::visitLinkAggr(LinkAggrNode& node)
+{
     out << "LinkAggrNode(";
     base::visitLinkAggr(node);
     out << ")";
-} 
-void PrintingVisitor::visitProp(PropNode& node){
-    out << "PropNode(identifier = " << node.identifier << " comp_type: = " << static_cast<unsigned>(node.comp_type) << " ";
+}
+void PrintingVisitor::visitProp(PropNode& node)
+{
+    out << "PropNode(identifier = " << node.identifier << " comp_type: = " << static_cast<unsigned>(node.comp_type)
+        << " ";
     base::visitProp(node);
     out << ")";
-} 
-void PrintingVisitor::visitSubquery(SubqueryNode& node){
+}
+void PrintingVisitor::visitSubquery(SubqueryNode& node)
+{
     out << "SubQueryNode(";
     base::visitSubquery(node);
     out << ")";
-} 
-void PrintingVisitor::visitDescriptor(DescriptorNode& node){
+}
+void PrintingVisitor::visitDescriptor(DescriptorNode& node)
+{
     out << "DescriptorNode, type = " << node.type;
-} 
-void PrintingVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node){
+}
+void PrintingVisitor::visitDescriptorOrdering(DescriptorOrderingNode& node)
+{
     out << "DescriptorOrderingNode(";
     base::visitDescriptorOrdering(node);
     out << ")";
-} 
+}
 
-Query QueryVisitor::visit(ParserNode& node) {
+Query QueryVisitor::visit(ParserNode& node)
+{
     node.accept(*this);
     return std::move(query);
 }
 
-void QueryVisitor::visitAnd(AndNode& node){
-    auto &atom_preds = node.atom_preds;
+void QueryVisitor::visitAnd(AndNode& node)
+{
+    auto& atom_preds = node.atom_preds;
     if (atom_preds.size() == 1) {
         atom_preds[0]->accept(*this);
         return;
     }
     realm::Query q(drv->m_base_table);
-    for (auto &it : atom_preds) {
+    for (auto& it : atom_preds) {
         it->accept(*this);
         q.and_query(query);
     }
     query = q;
-} 
+}
 
-void QueryVisitor::visitOr(OrNode& node){
-    auto &atom_preds = node.atom_preds;
+void QueryVisitor::visitOr(OrNode& node)
+{
+    auto& atom_preds = node.atom_preds;
     if (atom_preds.size() == 1) {
         atom_preds[0]->accept(*this);
         return;
     }
     realm::Query q(drv->m_base_table);
     q.group();
-    for (auto &it : atom_preds) {
+    for (auto& it : atom_preds) {
         q.Or();
         it->accept(*this);
         q.and_query(query);
@@ -1843,7 +1904,8 @@ void QueryVisitor::visitOr(OrNode& node){
     query = q;
 }
 
-void QueryVisitor::visitNot(NotNode& node){
+void QueryVisitor::visitNot(NotNode& node)
+{
     node.atom_preds[0]->accept(*this);
     realm::Query q = drv->m_base_table->where();
     q.Not();
@@ -1851,7 +1913,8 @@ void QueryVisitor::visitNot(NotNode& node){
     query = q;
 }
 
-void QueryVisitor::visitEquality(EqualityNode& node){
+void QueryVisitor::visitEquality(EqualityNode& node)
+{
     auto op = node.op;
     auto case_sensitive = node.case_sensitive;
     auto [left, right] = cmp(std::move(node.values));
@@ -1977,10 +2040,12 @@ void QueryVisitor::visitEquality(EqualityNode& node){
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
-                query = realm::Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(right), std::move(left))));
+                query =
+                    realm::Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(right), std::move(left))));
                 return;
             case CompareNode::NOT_EQUAL:
-                query = realm::Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(right), std::move(left))));
+                query = realm::Query(
+                    std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(right), std::move(left))));
                 return;
         }
     }
@@ -1992,15 +2057,16 @@ void QueryVisitor::visitEquality(EqualityNode& node){
                 query = Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(right), std::move(left))));
                 return;
             case CompareNode::NOT_EQUAL:
-                query = Query(
-                    std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(right), std::move(left))));
+                query =
+                    Query(std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(right), std::move(left))));
                 return;
         }
     }
     query = {};
 }
 
-void QueryVisitor::visitRelational(RelationalNode& node){
+void QueryVisitor::visitRelational(RelationalNode& node)
+{
     auto op = node.op;
     auto [left, right] = cmp(std::move(node.values));
 
@@ -2066,19 +2132,23 @@ void QueryVisitor::visitRelational(RelationalNode& node){
             query = realm::Query(std::unique_ptr<Expression>(new Compare<Less>(std::move(right), std::move(left))));
             return;
         case CompareNode::LESS:
-            query = realm::Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(right), std::move(left))));
+            query =
+                realm::Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(right), std::move(left))));
             return;
         case CompareNode::GREATER_EQUAL:
-            query = realm::Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(right), std::move(left))));
+            query =
+                realm::Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(right), std::move(left))));
             return;
         case CompareNode::LESS_EQUAL:
-            query = realm::Query(std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(right), std::move(left))));
+            query = realm::Query(
+                std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(right), std::move(left))));
             return;
     }
     query = {};
 }
 
-void QueryVisitor::visitStringOps(StringOpsNode& node){
+void QueryVisitor::visitStringOps(StringOpsNode& node)
+{
     auto op = node.op;
     auto case_sensitive = node.case_sensitive;
     auto [left, right] = drv->cmp(std::move(node.values));
@@ -2133,7 +2203,8 @@ void QueryVisitor::visitStringOps(StringOpsNode& node){
     if (case_sensitive) {
         switch (op) {
             case CompareNode::BEGINSWITH:
-                query = Query(std::unique_ptr<Expression>(new Compare<BeginsWith>(std::move(right), std::move(left))));
+                query =
+                    Query(std::unique_ptr<Expression>(new Compare<BeginsWith>(std::move(right), std::move(left))));
                 return;
             case CompareNode::ENDSWITH:
                 query = Query(std::unique_ptr<Expression>(new Compare<EndsWith>(std::move(right), std::move(left))));
@@ -2149,16 +2220,16 @@ void QueryVisitor::visitStringOps(StringOpsNode& node){
     else {
         switch (op) {
             case CompareNode::BEGINSWITH:
-                query = Query(
-                    std::unique_ptr<Expression>(new Compare<BeginsWithIns>(std::move(right), std::move(left))));
+                query =
+                    Query(std::unique_ptr<Expression>(new Compare<BeginsWithIns>(std::move(right), std::move(left))));
                 return;
             case CompareNode::ENDSWITH:
-                query = Query(
-                    std::unique_ptr<Expression>(new Compare<EndsWithIns>(std::move(right), std::move(left))));
+                query =
+                    Query(std::unique_ptr<Expression>(new Compare<EndsWithIns>(std::move(right), std::move(left))));
                 return;
             case CompareNode::CONTAINS:
-                query = Query(
-                    std::unique_ptr<Expression>(new Compare<ContainsIns>(std::move(right), std::move(left))));
+                query =
+                    Query(std::unique_ptr<Expression>(new Compare<ContainsIns>(std::move(right), std::move(left))));
                 return;
             case CompareNode::LIKE:
                 query = Query(std::unique_ptr<Expression>(new Compare<LikeIns>(std::move(right), std::move(left))));
@@ -2166,8 +2237,9 @@ void QueryVisitor::visitStringOps(StringOpsNode& node){
         }
     }
     query = {};
-} 
-void QueryVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
+}
+void QueryVisitor::visitTrueOrFalse(TrueOrFalseNode& node)
+{
     auto true_or_false = node.true_or_false;
     Query q = drv->m_base_table->where();
     if (true_or_false) {
@@ -2177,9 +2249,10 @@ void QueryVisitor::visitTrueOrFalse(TrueOrFalseNode& node){
         q.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
     }
     query = q;
-} 
+}
 
-std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
+std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>>
+QueryVisitor::cmp(std::vector<std::unique_ptr<ValueNode>>&& values)
 {
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
@@ -2195,7 +2268,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
     if (right_constant) {
         // Take left first - it cannot be a constant
         left = SubexprVisitor(drv).visit(*left_prop);
-        right = SubexprVisitor(drv, left->get_type()).visit(*right_constant); 
+        right = SubexprVisitor(drv, left->get_type()).visit(*right_constant);
         verify_conditions(left.get(), right.get(), drv->m_serializer_state);
     }
     else {
@@ -2211,7 +2284,8 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> QueryVisitor::cmp(
     return {std::move(left), std::move(right)};
 }
 
-std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(std::unique_ptr<DescriptorOrderingNode>& node){
+std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(std::unique_ptr<DescriptorOrderingNode>& node)
+{
     auto orderings = std::move(node->orderings);
     auto target = drv->m_base_table;
     std::unique_ptr<DescriptorOrdering> ordering;
@@ -2255,15 +2329,17 @@ std::unique_ptr<DescriptorOrdering> QueryVisitor::getDescriptorOrdering(std::uni
         }
     }
     return ordering;
-} 
+}
 
-std::unique_ptr<realm::Subexpr> SubexprVisitor::visit(ParserNode& node) {
+std::unique_ptr<realm::Subexpr> SubexprVisitor::visit(ParserNode& node)
+{
     // base::visit(*node);
     node.accept(*this);
     return std::move(subexpr);
 }
 
-void SubexprVisitor::visitConstant(ConstantNode& node){
+void SubexprVisitor::visitConstant(ConstantNode& node)
+{
     auto text = node.text;
     auto type = node.type;
     auto hint = this->t;
@@ -2565,9 +2641,10 @@ void SubexprVisitor::visitConstant(ConstantNode& node){
                          get_data_type_name(hint), explain_value_message));
     }
     subexpr = std::unique_ptr<Subexpr>{ret};
-} 
+}
 
-void SubexprVisitor::visitPostOp(PostOpNode& node){
+void SubexprVisitor::visitPostOp(PostOpNode& node)
+{
     auto op_type = node.op_type;
     auto op_name = node.op_name;
     if (op_type == PostOpNode::SIZE) {
@@ -2612,9 +2689,10 @@ void SubexprVisitor::visitPostOp(PostOpNode& node){
                                              get_data_type_name(DataType(subexpr->get_type()))));
     }
     REALM_UNREACHABLE();
-} 
+}
 
-void SubexprVisitor::visitAggr(AggrNode& node){
+void SubexprVisitor::visitAggr(AggrNode& node)
+{
     auto type = node.type;
     std::unique_ptr<Subexpr> agg;
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr.get())) {
@@ -2654,15 +2732,17 @@ void SubexprVisitor::visitAggr(AggrNode& node){
             util::format("Cannot use aggregate '%1' for this type of property", agg_op_type_to_str(type)));
     }
     subexpr = std::move(agg);
-} 
+}
 
-void SubexprVisitor::visitListAggr(ListAggrNode& node){
+void SubexprVisitor::visitListAggr(ListAggrNode& node)
+{
     LinkChain link_chain = getLinkChain(*node.path);
     subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, node.identifier));
     visitAggr(*node.aggr_op);
-} 
+}
 
-void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
+void SubexprVisitor::visitLinkAggr(LinkAggrNode& node)
+{
     auto path = std::move(node.path);
     auto prop = node.prop;
     auto link = node.link;
@@ -2700,9 +2780,10 @@ void SubexprVisitor::visitLinkAggr(LinkAggrNode& node){
     }
     subexpr = std::move(sub_column);
     visitAggr(*aggr_op);
-} 
+}
 
-void SubexprVisitor::visitProp(PropNode& node){
+void SubexprVisitor::visitProp(PropNode& node)
+{
     auto identifier = node.identifier;
     auto path = std::move(node.path);
     auto comp_type = node.comp_type;
@@ -2760,7 +2841,7 @@ void SubexprVisitor::visitProp(PropNode& node){
             path->path_elems.pop_back();
             std::unique_ptr<Subexpr> column{getLinkChain(*path, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(column.get())) {
-                if (auto length_expr = list->get_element_length()){
+                if (auto length_expr = list->get_element_length()) {
                     subexpr = std::move(length_expr);
                     return;
                 }
@@ -2769,9 +2850,10 @@ void SubexprVisitor::visitProp(PropNode& node){
         throw InvalidQueryError(e.what());
     }
     REALM_UNREACHABLE();
-} 
+}
 
-void SubexprVisitor::visitSubquery(SubqueryNode& node){
+void SubexprVisitor::visitSubquery(SubqueryNode& node)
+{
     auto variable_name = node.variable_name;
     auto prop = std::move(node.prop);
     auto subquery = std::move(node.subquery);
@@ -2812,10 +2894,11 @@ void SubexprVisitor::visitSubquery(SubqueryNode& node){
     drv->m_base_table = previous_table;
 
     subexpr = std::unique_ptr<Subexpr>(lc.subquery(query));
-} 
+}
 
 
-LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType comp_type){
+LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType comp_type)
+{
     LinkChain link_chain = LinkChain(drv->m_base_table, comp_type);
     auto path_elems = node.path_elems;
     for (std::string path_elem : path_elems) {
@@ -2851,17 +2934,18 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
         }
     }
     return link_chain;
-} 
+}
 
 
 using json = nlohmann::json;
-Query JsonQueryParser::query_from_json(TableRef table, json json){
+Query JsonQueryParser::query_from_json(TableRef table, json json)
+{
     auto and_node = std::make_unique<AndNode>();
     auto don = std::make_unique<DescriptorOrderingNode>();
-    for (auto predicate : json["whereClauses"]){
+    for (auto predicate : json["whereClauses"]) {
         build_pred(predicate["expression"], and_node->atom_preds);
     }
-    for (auto ordering : json["orderingClauses"]){
+    for (auto ordering : json["orderingClauses"]) {
         build_descriptor(ordering, don->orderings);
     }
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
@@ -2872,27 +2956,32 @@ Query JsonQueryParser::query_from_json(TableRef table, json json){
 }
 
 
-void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds) {
-    if (fragment["kind"] == "and"){
+void JsonQueryParser::build_pred(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds)
+{
+    if (fragment["kind"] == "and") {
         auto and_node = std::make_unique<AndNode>();
         build_pred(fragment["left"], and_node->atom_preds);
         build_pred(fragment["right"], and_node->atom_preds);
         preds.emplace_back(std::move(and_node));
-    } else if (fragment["kind"] == "or"){
+    }
+    else if (fragment["kind"] == "or") {
         auto or_node = std::make_unique<OrNode>();
         build_pred(fragment["left"], or_node->atom_preds);
         build_pred(fragment["right"], or_node->atom_preds);
         preds.emplace_back(std::move(or_node));
-    } else if (fragment["kind"] == "not"){
+    }
+    else if (fragment["kind"] == "not") {
         auto not_node = std::make_unique<NotNode>();
         build_pred(fragment["expression"], not_node->atom_preds);
         preds.emplace_back(std::move(not_node));
-    } else {
+    }
+    else {
         build_compare(fragment, preds);
     }
 }
 
-void JsonQueryParser::build_descriptor(json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings){
+void JsonQueryParser::build_descriptor(json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings)
+{
     auto ordering = std::make_unique<DescriptorNode>(DescriptorNode::SORT, SortDescriptor::MergeMode::append);
     auto empty_path = std::make_unique<PathNode>();
     ordering->add(empty_path->path_elems, fragment["property"], fragment["isAscending"]);
@@ -2900,49 +2989,56 @@ void JsonQueryParser::build_descriptor(json fragment, std::vector<std::unique_pt
 }
 
 
-void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds){
+void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds)
+{
     auto left = get_value_node(fragment["left"]);
     auto right = get_value_node(fragment["right"]);
-    if (fragment["kind"] == "eq"){
+    if (fragment["kind"] == "eq") {
         auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
         preds.emplace_back(std::move(eq));
-    } else if (fragment["kind"] == "neq"){
+    }
+    else if (fragment["kind"] == "neq") {
         auto neq = std::make_unique<EqualityNode>(std::move(left), CompareNode::NOT_EQUAL, std::move(right));
         preds.emplace_back(std::move(neq));
-    } else if (fragment["kind"] == "gt"){
+    }
+    else if (fragment["kind"] == "gt") {
         auto gt = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER, std::move(right));
         preds.emplace_back(std::move(gt));
-    } else if (fragment["kind"] == "gte"){
+    }
+    else if (fragment["kind"] == "gte") {
         auto gte = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER_EQUAL, std::move(right));
         preds.emplace_back(std::move(gte));
-    } else if (fragment["kind"] == "lt"){
+    }
+    else if (fragment["kind"] == "lt") {
         auto lt = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS, std::move(right));
         preds.emplace_back(std::move(lt));
-    } else if (fragment["kind"] == "lte"){
+    }
+    else if (fragment["kind"] == "lte") {
         auto lte = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS_EQUAL, std::move(right));
         preds.emplace_back(std::move(lte));
     }
 }
 
 
-std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragment){
-    if (fragment["kind"] == "property"){
+std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragment)
+{
+    if (fragment["kind"] == "property") {
         auto empty_path = std::make_unique<PathNode>();
         auto prop_node = std::make_unique<PropNode>(std::move(empty_path), fragment["value"]);
         auto value_node = std::make_unique<ValueNode>(std::move(prop_node));
         return value_node;
     }
-    if (fragment["kind"] == "constant"){
+    if (fragment["kind"] == "constant") {
         std::unique_ptr<ConstantNode> const_node;
-        if (fragment["type"] == "string"){
+        if (fragment["type"] == "string") {
             std::string value = fragment["value"].get<std::string>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "int"){
+        if (fragment["type"] == "int") {
             int value = fragment["value"].get<int>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "float"){
+        if (fragment["type"] == "float") {
             float value = fragment["value"].get<float>();
             const_node = get_constant_node(value);
         }
@@ -2952,7 +3048,8 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
 }
 
 
-std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed value) {
+std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed value)
+{
     ConstantNode::Type type;
     std::string string_value;
     std::ostringstream stream;
