@@ -1629,7 +1629,8 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 
 Query Table::query_new(const std::string& query_string) const
 {
-    return JsonQueryParser().query_from_json(m_own_ref, query_string);
+    auto jsonObj = nlohmann::json::parse(query_string);
+    return JsonQueryParser().query_from_json(m_own_ref, jsonObj);
 }
 
 Subexpr* LinkChain::column(const std::string& col)
