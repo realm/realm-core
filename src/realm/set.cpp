@@ -219,6 +219,15 @@ void Set<Mixed>::do_erase(size_t ndx)
     }
 }
 
+template <>
+void Set<Mixed>::do_clear()
+{
+    size_t ndx = size();
+    while (ndx--) {
+        do_erase(ndx);
+    }
+}
+
 void LnkSet::remove_target_row(size_t link_ndx)
 {
     // Deleting the object will automatically remove all links

@@ -97,7 +97,7 @@ sync_session(std::shared_ptr<SyncUser> user, const std::string& path, ErrorHandl
     std::shared_ptr<SyncSession> session;
     {
         auto realm = Realm::get_shared_realm(config);
-        session = user->sync_manager().get_session(config.path, *config.sync_config);
+        session = user->sync_manager()->get_session(config.path, *config.sync_config);
     }
     return session;
 }

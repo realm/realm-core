@@ -45,7 +45,6 @@ void ClientFileAccessCache::Slot::open()
 
     sync::ClientReplication::Config config;
     config.owner_is_sync_agent = true;
-    config.changeset_cooker = m_changeset_cooker;
     std::unique_ptr<sync::ClientReplication> history =
         sync::make_client_replication(realm_path, std::move(config)); // Throws
     DBOptions shared_group_options;

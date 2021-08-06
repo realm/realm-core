@@ -280,8 +280,6 @@ def doCheckInDocker(Map options = [:]) {
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
 
-            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/config.json\""
-
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
                     buildEnv.inside(dockerArgs) {
@@ -307,7 +305,7 @@ def doCheckInDocker(Map options = [:]) {
                 // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
                 // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
                 // if there's really a new feature you need from the latest stitch, upgrade this manually
-                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/test/object-store/mongodb"]) { networkName ->
+                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG) { networkName ->
                     buildSteps("--network=${networkName}")
                 }
 
@@ -704,7 +702,6 @@ def doBuildMacOs(Map options = [:]) {
         CMAKE_BUILD_TYPE: options.buildType,
         CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
         REALM_ENABLE_SYNC: options.enableSync,
-        OSX_ARM64: 'ON',
     ]
     if (!options.runTests) {
         cmakeOptions << [
@@ -745,7 +742,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -799,7 +796,6 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_VERSION=${gitDescribeVersion} \\
                                   -D REALM_SKIP_SHARED_LIB=ON \\
                                   -D REALM_BUILD_LIB_ONLY=ON \\
-                                  -D OSX_ARM64=1 \\
                                   -G Ninja ..
                         """
                     runAndCollectWarnings(
@@ -826,13 +822,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            // Builds for Apple devices have to be done with the oldest Xcode
-            // version we support because bitcode is not backwards-compatible.
-            // This doesn't apply to simulators, and Xcode 12 supports more
-            // architectures than 11, so we want to use 12 for simulator builds.
-            def xcodeVersion = sdk.contains('simulator') ? '12' : '11'
-
-            withEnv(["DEVELOPER_DIR=/Applications/Xcode-${xcodeVersion}.app/Contents/Developer/"]) {
+            withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """

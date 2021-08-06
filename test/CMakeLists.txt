@@ -77,6 +77,7 @@ set(CORE_TEST_SOURCES
     test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
+    test_util_functional.cpp
     test_util_from_chars.cpp
     test_util_inspect.cpp
     test_util_logger.cpp
@@ -243,6 +244,7 @@ if(REALM_ENABLE_SYNC)
 	    test_allocation_metrics.cpp
 	    test_array_sync.cpp
 	    test_async_open.cpp
+	    test_client_reset.cpp
 	    test_changeset_encoding.cpp
 	    test_crypto.cpp
 	    test_compact_changesets.cpp
@@ -256,7 +258,6 @@ if(REALM_ENABLE_SYNC)
 	    test_scratch_allocator.cpp
 	    test_stable_ids.cpp
 	    test_sync.cpp
-	    test_sync_cooked_history.cpp
 	    test_sync_auth.cpp
 	    test_sync_server_history_compaction.cpp
 	    test_sync_history_migration.cpp

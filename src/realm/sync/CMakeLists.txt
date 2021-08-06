@@ -6,8 +6,7 @@ set(SYNC_SOURCES
     noinst/client_history_impl.cpp
     noinst/client_impl_base.cpp
     noinst/client_reset.cpp
-    noinst/client_state_download.cpp
-    noinst/common_dir.cpp
+    noinst/client_reset_operation.cpp
     noinst/compact_changesets.cpp
     noinst/compression.cpp
     noinst/file_descriptors.cpp
@@ -15,7 +14,6 @@ set(SYNC_SOURCES
     noinst/protocol_codec.cpp
     access_token.cpp
     auth.cpp
-    changeset_cooker.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -75,7 +73,6 @@ set(IMPL_INSTALL_HEADERS
 set(SYNC_INSTALL_HEADERS
     config.hpp
     encrypt/fingerprint.hpp
-    changeset_cooker.hpp
     changeset_encoder.hpp
     changeset_parser.hpp
     changeset.hpp
@@ -99,7 +96,6 @@ set(NOINST_HEADERS
     noinst/client_impl_base.hpp
     noinst/client_reset.hpp
     noinst/command_line_util.hpp
-    noinst/common_dir.hpp
     noinst/compact_changesets.hpp
     noinst/compression.hpp
     noinst/integer_codec.hpp

@@ -39,6 +39,10 @@ namespace object_store {
 class Set : public Collection {
 public:
     using Collection::Collection;
+    Set()
+        : Collection(PropertyType::Set)
+    {
+    }
 
     Set(const Set&);
     Set& operator=(const Set&);

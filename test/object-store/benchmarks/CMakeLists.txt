@@ -30,7 +30,7 @@ add_executable(object-store-benchmarks ${SOURCES} ${HEADERS})
 
 target_include_directories(object-store-benchmarks PRIVATE 
     ${CATCH_INCLUDE_DIR}
-    ../util
+    ..
 )
 
 if(REALM_ENABLE_SYNC)

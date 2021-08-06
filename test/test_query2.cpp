@@ -2411,11 +2411,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     // becuase 0 rows exist.
     auto test_tv = [&]() {
         // int
-        match = 123;
+        match = ObjKey(123);
         tv.maximum_int(col_price, &match);
         CHECK_EQUAL(match, realm::null_key);
 
-        match = 123;
+        match = ObjKey(123);
         tv.minimum_int(col_price, &match);
         CHECK_EQUAL(match, realm::null_key);
 
@@ -2425,11 +2425,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
         CHECK_EQUAL(count, 0);
 
         // float
-        match = 123;
+        match = ObjKey(123);
         tv.maximum_float(col_shipping, &match);
         CHECK_EQUAL(match, realm::null_key);
 
-        match = 123;
+        match = ObjKey(123);
         tv.minimum_float(col_shipping, &match);
         CHECK_EQUAL(match, realm::null_key);
 
@@ -2439,11 +2439,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
         CHECK_EQUAL(count, 0);
 
         // double
-        match = 123;
+        match = ObjKey(123);
         tv.maximum_double(col_rating, &match);
         CHECK_EQUAL(match, realm::null_key);
 
-        match = 123;
+        match = ObjKey(123);
         tv.minimum_double(col_rating, &match);
         CHECK_EQUAL(match, realm::null_key);
 
@@ -2453,11 +2453,11 @@ TEST(Query_Null_BetweenMinMax_Nullable)
         CHECK_EQUAL(count, 0);
 
         // date
-        match = 123;
+        match = ObjKey(123);
         tv.maximum_timestamp(col_date, &match);
         CHECK_EQUAL(match, realm::null_key);
 
-        match = 123;
+        match = ObjKey(123);
         tv.minimum_timestamp(col_date, &match);
         CHECK_EQUAL(match, realm::null_key);
     };

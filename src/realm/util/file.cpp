@@ -1088,12 +1088,31 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (status) {
         int err = errno;
         REALM_ASSERT_EX(status == -1, status);
-        if (exclusive && err == ENOENT) {
+        if (err == ENOENT) {
             // The management directory doesn't exist, so there's clearly no
-            // readers. This can happen when calling DB::call_with_lock().
-            return true;
+            // readers. This can happen when calling DB::call_with_lock() or
+            // if the management directory has been removed by DB::call_with_lock()
+            if (exclusive) {
+                return true;
+            }
+            // open shared:
+            // We need the fifo in order to make a shared lock. If we have it
+            // in a management directory, we may need to create that first:
+            if (!m_fifo_dir_path.empty())
+                try_make_dir(m_fifo_dir_path);
+            // now we can try creating the FIFO again
+            status = mkfifo(m_fifo_path.c_str(), 0666);
+            if (status) {
+                // If we fail it must be because it already exists
+                err = errno;
+                REALM_ASSERT_EX(err == EEXIST, err);
+            }
         }
-        REALM_ASSERT_EX(err == EEXIST, err);
+        else {
+            // if we failed to create the fifo and not because dir is missing,
+            // it must be because the fifo already exists!
+            REALM_ASSERT_EX(err == EEXIST, err);
+        }
     }
     if (exclusive) {
         // check if any shared locks are already taken by trying to open the pipe for writing

@@ -5,8 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
-* Fixed issues around key-based dictionary notifications holding on to a transaction ([#4744](https://github.com/realm/realm-core/issues/4744), since v11.0.1)
+* None.
  
 ### Breaking changes
 * None.
@@ -15,6 +14,122 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 11.2.0 Release notes
+
+### Enhancements
+* Shift more of the work done when first initializing a collection notifier to the background worker thread rather than doing it on the main thread. ([#4826](https://github.com/realm/realm-core/issues/4826))
+* Report if Realm::delete_files() actually deleted the Realm file, separately from if any errors occurred. ([#4771](https://github.com/realm/realm-core/issues/4771))
+* Add Dictionary::try_erase(), which returns false if the key is not found rather than throwing. ([#4781](https://github.com/realm/realm-core/issues/4781))
+
+### Fixed
+* Fixed a segfault in sync compiled by MSVC 2019. ([#4624](https://github.com/realm/realm-core/issues/4624), since v10.4.0)
+* Removing a change callback from a Results would sometimes block the calling thread while the query for that Results was running on the background worker thread. ([#4826](https://github.com/realm/realm-core/issues/4826), since v11.1.0).
+* Object observers did not handle the object being deleted properly, which could result in assertion failures mentioning "m_table" in ObjectNotifier ([#4824](https://github.com/realm/realm-core/issues/4824), since v11.1.0).
+* Fixed a crash when delivering notifications over a nested hierarchy of lists of Mixed that contain links. ([#4803](https://github.com/realm/realm-core/issues/4803), since v11.0.0)
+* Fixed key path filtered notifications throwing on null links and asserting on unresolved links. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.1.0)
+* Fixed a crash when an object which is linked to by a Mixed is invalidated (sync only). ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
+* Fixed a rare crash when setting a mixed link for the first time which would trigger if the link was to the same table and adding the backlink column caused a BPNode split. ([#4828](https://github.com/realm/realm-core/pull/4828), since v11.0.0)
+* Accessing an invalidated dictionary will throw a confusing error message ([#4805](https://github.com/realm/realm-core/issues/4805), since v11.0.0).
+ 
+-----------
+
+### Internals
+* Remove ClientResyncMode::Recover option. This doesn't work and shouldn't be used by anyone currently.
+* Remove sync support for CLIENT_VERSION request; it isn't used.
+* Remove the STATE message request and handling from the client and test sever. The current server was always responding with empty state anyhow. Clients will now consider receiving this message as an error because they never request it.
+* Handling for async open, involving state files is mostly removed.
+* When a client reset occured, we would create a metadata Realm to handle state download but this isn't needed anymore so it is removed.
+* Realm::write_copy_without_client_file_id and Realm::write_copy are merged. For synchronized realms, the file written will have the client file ident removed. Furthermore it is required that all local changes are synchronized with the server before the copy can. The function will throw if there are pending uploads.
+
+----------------------------------------------
+
+# 11.1.1 Release notes
+
+### Enhancements
+* Improve performance of creating collection notifiers for Realms with a complex schema. In the SDKs this means that the first run of a synchronous query, first call to observe() on a collection, or any call to find_async() will do significantly less work on the calling thread.
+* Improve performance of calculating changesets for notifications, particularly for deeply nested object graphs and objects which have List or Set properties with small numbers of objects in the collection.
+
+### Fixed
+* Opening a synchronized Realm created with a version older than v11.1.0 would fail due to a schema change in the metadata Realm which did not bump the schema version (since v11.1.0).
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* Removed the unused ChangesetCooker from the sync client. ([#4811](https://github.com/realm/realm-core/pull/4811))
+
+----------------------------------------------
+
+# 11.1.0 Release notes
+
+### Enhancements
+* Change notifications can now be filtered via a key path. This keypath is passed via the `add_notification_callback` on `Object`, `Set`, `List` and `Result`.
+  If such a key path was provided when adding a notification callback it will only ever be executed when a changed property was covered by this filter.
+  Multiple key path filters can be provided when adding a single notification callback.
+
+### Fixed
+* User profile now correctly persists between runs.
+ 
+### Breaking changes
+* User profile fields are now methods instead of fields.
+
+-----------
+
+### Internals
+* Added UniqueFunction type ([#4815](https://github.com/realm/realm-core/pull/4815))
+
+----------------------------------------------
+
+# 11.0.4 Release notes
+
+### Fixed
+* Fixed an assertion failure when listening for changes to a list of primitive Mixed which contains links. ([#4767](https://github.com/realm/realm-core/issues/4767), since the beginning of Mixed v11.0.0)
+* Fixed an assertion failure when listening for changes to a dictionary or set which contains an invalidated link. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
+* Fixed an endless recursive loop that could cause a stack overflow when computing changes on a set of objects which contained cycles. ([#4770](https://github.com/realm/realm-core/pull/4770), since the beginning of v11)
+* Add collision handling to Dictionary implementation ([#4776](https://github.com/realm/realm-core/issues/4776), since the beginning of Dictionary v11.0.0)
+* Fixed a crash after clearing a list or set of Mixed containing links to objects ([#4774](https://github.com/realm/realm-core/issues/4774), since the beginning of v11)
+* Fixed a recursive loop which would eventually crash trying to refresh a user app token when it had been revoked by an admin. Now this situation logs the user out and reports an error. ([#4745](https://github.com/realm/realm-core/issues/4745), since v10.0.0).
+* Fixed a race between calling realm::delete_files and concurent opening of the realm file.([#4768](https://github.com/realm/realm-core/pull/4768))
+* Fixed a retain cycle on Apple devices that would prevent the SyncClient from ever being stopped. This is likely only relevant for Unity applications which would observe that as the editor hanging on macOS after script recompilation. ([realm-dotnet#2482](https://github.com/realm/realm-dotnet/issues/2482))
+
+-----------
+
+### Internals
+* Renamed targets on SPM file from `Core`, `QueryParser` to `RealmCore` and `RealmQueryParser` to avoid conflicts with other libraries products. ([#4763](https://github.com/realm/realm-core/issues/4763), since v10.8.1)
+
+----------------------------------------------
+
+# 11.0.3 Release notes
+
+### Fixed
+* Destroying the SyncManager in ObjectStore no longer causes segfaults in async callbacks in SyncUser/SyncSession ([4615](https://github.com/realm/realm-core/issues/4615))
+* None.
+* When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
+* Fix crashes when sync logging is set to trace or higher (since 11.0.2).
+* Fix crash when changing nullability of primary key column ([#4759](https://github.com/realm/realm-core/issues/4759), since v11.0.0-beta.6)
+
+-----------
+
+### Internals
+* Releases for Apple platforms are now built with Xcode 12.2.
+
+----------------------------------------------
+
+# 11.0.2 Release notes
+
+### Fixed
+* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
+* Fixed issues around key-based dictionary notifications holding on to a transaction ([#4744](https://github.com/realm/realm-core/issues/4744), since v11.0.1)
+ 
+-----------
+
+### Internals
+* Refactor the string formatting logic for logging, reducing the compiled size of the library. May require adoption downstream.
 
 ----------------------------------------------
 
@@ -199,6 +314,19 @@
 
 ----------------------------------------------
 
+# 10.8.1 Release notes
+
+### Fixed
+* Fixed the string based query parser not supporting integer constants above 32 bits on a 32 bit platform. ([realm-js #3773](https://github.com/realm/realm-js/issues/3773), since v10.4.0 with the introduction of the new query parser)
+* When replacing an embedded object, we must emit a sync instruction that sets the link to the embedded object to null so that it is properly cleared. ([#4740](https://github.com/realm/realm-core/issues/4740)
+ 
+-----------
+
+### Internals
+* Releases for Apple platforms are now built with Xcode 12.2.
+
+----------------------------------------------
+
 # 10.8.0 Release notes
 
 ### Enhancements
@@ -214,7 +342,6 @@
 
 ### Internals
 * DB::write_copy will not use write transaction
-* Refactor the string formatting logic for logging, reducing the compiled size of the library.
 
 ----------------------------------------------
 

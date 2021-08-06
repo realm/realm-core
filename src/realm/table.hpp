@@ -282,7 +282,7 @@ public:
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
-    size_t get_object_ndx(ObjKey key) const
+    size_t get_object_ndx(ObjKey key) const noexcept
     {
         return m_clusters.get_ndx(key);
     }

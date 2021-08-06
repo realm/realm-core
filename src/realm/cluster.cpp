@@ -279,10 +279,10 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
     // Insert backlink if link is not null
     if (target_link) {
         Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
-        Obj target_obj = origin_table->get_parent_group()->get_object(target_link);
-        auto target_table = target_obj.get_table();
+        auto target_table = origin_table->get_parent_group()->get_table(target_link.get_table_key());
+
         ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
-        target_obj.add_backlink(backlink_col_key, origin_key);
+        target_table->get_object(target_link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
     }
 }
 
@@ -744,19 +744,19 @@ inline void Cluster::do_erase_key(size_t ndx, ColKey col_key, CascadeState& stat
     values.erase(ndx);
 }
 
-size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
+size_t Cluster::get_ndx(ObjKey k, size_t ndx) const noexcept
 {
     size_t index;
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw KeyNotFound("Key not found in get_ndx");
+            return realm::npos;
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw KeyNotFound("Key not found in get_ndx (compact)");
+            return realm::npos;
         }
     }
     return index + ndx;
@@ -765,6 +765,8 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::erase");
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -916,6 +918,8 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
+    if (ndx == realm::npos)
+        throw KeyNotFound("Key not found in Cluster::nullify_incoming_links");
 
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before
@@ -1262,7 +1266,25 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
         m_tree_top.for_each_and_every_column([&](ColKey col) {
             size_t j = col.get_index().val + 1;
             if (col.get_attrs().test(col_attr_List)) {
-                std::cout << ", list";
+                ref_type ref = Array::get_as_ref(j);
+                ArrayRef refs(m_alloc);
+                refs.init_from_ref(ref);
+                std::cout << ", {";
+                ref = refs.get(i);
+                if (ref) {
+                    if (col.get_type() == col_type_Int) {
+                        // This is easy to handle
+                        Array ints(m_alloc);
+                        ints.init_from_ref(ref);
+                        for (size_t n = 0; n < ints.size(); n++) {
+                            std::cout << ints.get(n) << ", ";
+                        }
+                    }
+                    else {
+                        std::cout << col.get_type();
+                    }
+                }
+                std::cout << "}";
                 return false;
             }
 

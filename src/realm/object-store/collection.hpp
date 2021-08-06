@@ -38,7 +38,7 @@ class ListNotifier;
 namespace object_store {
 class Collection {
 public:
-    Collection() noexcept;
+    Collection(PropertyType type) noexcept;
     Collection(const Object& parent_obj, const Property* prop);
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
@@ -48,8 +48,8 @@ public:
     // or the containing object being deleted)
     // All non-noexcept functions can throw this
     struct InvalidatedException : public std::logic_error {
-        InvalidatedException()
-            : std::logic_error("Access to invalidated List object")
+        InvalidatedException(const std::string& msg)
+            : std::logic_error(msg)
         {
         }
     };
@@ -101,7 +101,19 @@ public:
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
 
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    /**
+     * Adds a `CollectionChangeCallback` to this `Collection`. The `CollectionChangeCallback` is exectuted when
+     * insertions, modifications or deletions happen on this `Collection`.
+     *
+     * @param callback The function to execute when a insertions, modification or deletion in this `Collection` was
+     * detected.
+     * @param key_path_array A filter that can be applied to make sure the `CollectionChangeCallback` is only executed
+     * when the property in the filter is changed but not otherwise.
+     *
+     * @return A `NotificationToken` that is used to identify this callback.
+     */
+    NotificationToken add_notification_callback(CollectionChangeCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
 
     // The object being added to the collection is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {

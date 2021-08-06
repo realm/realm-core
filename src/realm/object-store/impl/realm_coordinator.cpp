@@ -88,7 +88,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
     return {};
 }
 
-void RealmCoordinator::create_sync_session(bool force_client_resync)
+void RealmCoordinator::create_sync_session()
 {
 #if REALM_ENABLE_SYNC
     if (m_sync_session)
@@ -108,8 +108,7 @@ void RealmCoordinator::create_sync_session(bool force_client_resync)
             "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
     }
 
-    m_sync_session = m_config.sync_config->user->sync_manager().get_session(m_config.path, *m_config.sync_config,
-                                                                            force_client_resync);
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(
@@ -124,8 +123,6 @@ void RealmCoordinator::create_sync_session(bool force_client_resync)
                     self->m_notifier->notify_others();
             }
         });
-#else
-    static_cast<void>(force_client_resync);
 #endif
 }
 
@@ -204,10 +201,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
-                                                config.path);
-            }
-            if (m_config.sync_config->transformer != config.sync_config->transformer) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.",
                                                 config.path);
             }
             if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {
@@ -333,7 +326,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
     if (realm->config().sync_config)
-        create_sync_session(false);
+        create_sync_session();
 
     if (!m_audit_context && audit_factory)
         m_audit_context = audit_factory();
@@ -365,9 +358,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    // FIXME: Re-enable once the server reintroduces support for State Realms.
-    // bool exists = File::exists(m_config.path);
-    create_sync_session(false /* exists */);
+    create_sync_session();
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -376,9 +367,7 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     REALM_ASSERT(config.sync_config);
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    // FIXME: Re-enable once the server reintroduces support for State Realms.
-    // bool exists = File::exists(m_config.path);
-    create_sync_session(false /* exists */);
+    create_sync_session();
 }
 
 #endif
@@ -776,7 +765,7 @@ void RealmCoordinator::wait_for_change_release()
     m_db->wait_for_change_release();
 }
 
-// Thread-safety analsys doesn't reasonably handle calling functions on different
+// Thread-safety analysis doesn't reasonably handle calling functions on different
 // instances of this type
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier) NO_THREAD_SAFETY_ANALYSIS
 {
@@ -946,6 +935,7 @@ void RealmCoordinator::run_async_notifiers()
     }
 
     if (!m_notifier_sg) {
+        REALM_ASSERT(m_notifiers.empty());
         REALM_ASSERT(!m_notifier_skip_version.version);
         m_notifier_sg = m_db->start_read();
     }
@@ -1064,7 +1054,10 @@ void RealmCoordinator::run_async_notifiers()
     }
     change_info.advance_to_final(version);
 
-    // Attach the new notifiers to the main SG and move them to the main list
+    // Now that they're at the same version, switch the new notifiers over to
+    // the main Transaction used for background work rather than the temporary one
+    REALM_ASSERT(new_notifiers.empty() || m_notifier_sg->get_version_of_current_transaction() ==
+                                              new_notifier_transaction->get_version_of_current_transaction());
     for (auto& notifier : new_notifiers) {
         notifier->attach_to(m_notifier_sg);
         notifier->run();
@@ -1227,7 +1220,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
-    create_sync_session(false);
+    create_sync_session();
     util::CheckedLockGuard lock(m_transaction_callback_mutex);
     m_transaction_callback = std::move(fn);
 }

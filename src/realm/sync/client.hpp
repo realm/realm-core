@@ -108,12 +108,6 @@ public:
         /// in this mode.
         bool dry_run = false;
 
-        /// The default changeset cooker to be used by new sessions. Can be
-        /// overridden by Session::Config::changeset_cooker.
-        ///
-        /// \sa make_client_replication(), TrivialChangesetCooker.
-        std::shared_ptr<ChangesetCooker> changeset_cooker;
-
         /// The maximum number of milliseconds to allow for a connection to
         /// become fully established. This includes the time to resolve the
         /// network address, the TCP connect operation, the SSL handshake, and
@@ -495,22 +489,6 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// If not null, overrides whatever is specified by
-        /// Client::Config::changeset_cooker.
-        ///
-        /// The shared ownership over the cooker will be relinquished shortly
-        /// after the destruction of the session object as long as the event
-        /// loop of the client is being executed (Client::run()).
-        ///
-        /// CAUTION: ChangesetCooker::cook_changeset() of the specified cooker
-        /// may get called before the call to bind() returns, and it may get
-        /// called (or continue to execute) after the session object is
-        /// destroyed. Please see "Callback semantics" section under Client for
-        /// more on this.
-        ///
-        /// \sa make_client_replication(), TrivialChangesetCooker.
-        std::shared_ptr<ChangesetCooker> changeset_cooker;
-
         /// The encryption key the DB will be opened with.
         util::Optional<std::array<char, 64>> encryption_key;
 
@@ -536,11 +514,6 @@ public:
         /// disturbing for the application than any DOWNLOAD message. The
         /// application can listen to change notifications from the client
         /// reset exactly as in a DOWNLOAD message.
-        ///
-        /// The client reset will recover non-uploaded changes in the local
-        /// Realm if and only if 'recover_local_changes' is true. In case,
-        /// 'recover_local_changes' is false, the local Realm state will hence
-        /// be set to the server's state (server wins).
         ///
         /// Async open and client reset require a private directory for
         /// metadata. This directory must be specified in the option
@@ -590,22 +563,8 @@ public:
         /// void async_wait_for_download_completion(WaitOperCompletionHandler)
         /// or
         /// bool wait_for_download_complete_or_client_stopped().
-        ///
-        /// The option 'require_recent_state_realm' is used for async open to
-        /// request a recent state Realm. A recent state Realm is never empty
-        /// (unless there is no data), and is recent in the sense that it was
-        /// produced by the current incarnation of the server. Recent does not
-        /// mean the absolutely newest possible state Realm, since that might
-        /// lead to too excessive work on the server. Setting
-        /// 'require_recent_state_realm' to true might lead to more work
-        /// performed by the server but it ensures that more data is downloaded
-        /// using async open instead of ordinary synchronization. It is
-        /// recommended to set 'require_recent_state_realm' to true. Client
-        /// reset always downloads a recent state Realm.
         struct ClientReset {
             std::string metadata_dir;
-            bool recover_local_changes = true;
-            bool require_recent_state_realm = true;
         };
         util::Optional<ClientReset> client_reset_config;
 

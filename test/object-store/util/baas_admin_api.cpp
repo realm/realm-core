@@ -26,6 +26,7 @@
 #include <catch2/catch.hpp>
 #include <curl/curl.h>
 
+#include "realm/object_id.hpp"
 #include "realm/util/scope_exit.hpp"
 #include "realm/util/string_buffer.hpp"
 
@@ -292,6 +293,10 @@ app::Response do_http_request(const app::Request& request)
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
+    else if (request.method == app::HttpMethod::patch) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
+    }
     else if (request.method == app::HttpMethod::del) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
@@ -435,6 +440,59 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
     return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
 }
 
+void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/logout", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
+void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
+void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/enable", m_base_url, m_group_id, app_id, user_id),
+        m_access_token);
+    auto response = endpoint.put("");
+    REALM_ASSERT(response.http_status_code == 204);
+}
+
+// returns false for an invalid/expired access token
+bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string app_id)
+{
+    auto endpoint = AdminAPIEndpoint(
+        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/verify_token", m_base_url, m_group_id, app_id),
+        m_access_token);
+    nlohmann::json request_body{
+        {"token", access_token},
+    };
+    auto response = endpoint.post(request_body.dump());
+    if (response.http_status_code == 200) {
+        auto resp_json = nlohmann::json::parse(response.body.empty() ? "{}" : response.body);
+        try {
+            // if these fields are found, then the token is valid according to the server.
+            // if it is invalid or expired then an error response is sent.
+            int64_t issued_at = resp_json["iat"];
+            int64_t expires_at = resp_json["exp"];
+            return issued_at != 0 && expires_at != 0;
+        }
+        catch (...) {
+            return false;
+        }
+    }
+    return false;
+}
+
 AdminAPIEndpoint AdminAPISession::apps() const
 {
     return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps", m_base_url, m_group_id), m_access_token);
@@ -442,11 +500,14 @@ AdminAPIEndpoint AdminAPISession::apps() const
 
 AppCreateConfig default_app_config(const std::string& base_url)
 {
-    constexpr const char* update_user_data_func = R"(
+    ObjectId id = ObjectId::gen();
+    std::string db_name = util::format("test_data_%1", id.to_string());
+
+    std::string update_user_data_func = util::format(R"(
         exports = async function(data) {
             const user = context.user;
             const mongodb = context.services.get("BackingDB");
-            const userDataCollection = mongodb.db("test_data").collection("UserData");
+            const userDataCollection = mongodb.db("%1").collection("UserData");
             await userDataCollection.updateOne(
                                                { "user_id": user.id },
                                                { "$set": data },
@@ -454,7 +515,8 @@ AppCreateConfig default_app_config(const std::string& base_url)
                                                );
             return true;
         };
-    )";
+    )",
+                                                     db_name);
 
     constexpr const char* sum_func = R"(
         exports = function(...args) {
@@ -532,7 +594,7 @@ AppCreateConfig default_app_config(const std::string& base_url)
         "unique_user@domain.com",
         "password",
         "mongodb://localhost:26000",
-        "test_data",
+        db_name,
         std::move(default_schema),
         std::move(partition_key),
         true,
@@ -553,13 +615,14 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         false, false,
     };
 
+    ObjectId id = ObjectId::gen();
     return AppCreateConfig{
         name,
         base_url,
         "unique_user@domain.com",
         "password",
         "mongodb://localhost:26000",
-        util::format("test_data_%1", name),
+        util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
         true,                        // dev_mode_enabled
@@ -571,7 +634,7 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
     };
 }
 
-std::string create_app(const AppCreateConfig& config)
+AppSession create_app(const AppCreateConfig& config)
 {
     auto session = AdminAPISession::login(config.base_url, config.admin_username, config.admin_password);
     auto create_app_resp = session.apps().post_json(nlohmann::json{{"name", config.app_name}});
@@ -744,7 +807,7 @@ std::string create_app(const AppCreateConfig& config)
         {"version", 1},
     });
 
-    return client_app_id;
+    return {client_app_id, app_id, session, config};
 }
 
 #ifdef REALM_MONGODB_ENDPOINT

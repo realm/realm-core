@@ -33,7 +33,10 @@ Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_
 {
 }
 
-Collection::Collection() noexcept {}
+Collection::Collection(PropertyType type) noexcept
+    : m_type(type)
+{
+}
 
 Collection::Collection(const Object& parent_obj, const Property* prop)
     : m_realm(parent_obj.get_realm())
@@ -121,7 +124,14 @@ void Collection::validate(const Obj& obj) const
 void Collection::verify_attached() const
 {
     if (!is_valid()) {
-        throw InvalidatedException();
+        std::string coll_type = "Collection";
+        if (is_array(m_type))
+            coll_type = "List";
+        else if (is_dictionary(m_type))
+            coll_type = "Dictionary";
+        else if (is_set(m_type))
+            coll_type = "Set";
+        throw InvalidatedException(util::format("Access to invalidated %1 object", coll_type));
     }
 }
 
@@ -188,7 +198,8 @@ Results Collection::snapshot() const
 }
 
 
-NotificationToken Collection::add_notification_callback(CollectionChangeCallback cb) &
+NotificationToken Collection::add_notification_callback(CollectionChangeCallback callback,
+                                                        KeyPathArray key_path_array) &
 {
     verify_attached();
     m_realm->verify_notifications_available();
@@ -204,7 +215,7 @@ NotificationToken Collection::add_notification_callback(CollectionChangeCallback
         m_notifier = std::make_shared<_impl::ListNotifier>(m_realm, *m_coll_base, m_type);
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+    return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
 }
 
 namespace {

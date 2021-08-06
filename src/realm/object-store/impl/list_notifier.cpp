@@ -34,9 +34,6 @@ ListNotifier::ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& l
     , m_obj(list.get_owner_key())
     , m_prev_size(list.size())
 {
-    if (m_type == PropertyType::Object) {
-        set_table(list.get_target_table());
-    }
 }
 
 void ListNotifier::release_data() noexcept
@@ -64,6 +61,16 @@ bool ListNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     info.lists.push_back({m_table, m_obj.value, m_col.value, &m_change});
 
     m_info = &info;
+
+    // When adding or removing a callback, the related tables can change due to the way we calculate related tables
+    // when key path filters are set, hence we need to recalculate every time the callbacks are changed.
+    // We only need to do this for lists that link to other lists. Lists of primitives cannot have related tables.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks && m_type == PropertyType::Object) {
+        auto& list = static_cast<LnkLst&>(*m_list);
+        update_related_tables(*list.get_table());
+    }
+
     return true;
 }
 

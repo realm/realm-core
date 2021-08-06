@@ -211,19 +211,23 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         const List list = List(frozen_realm, table->get_object(0), int_list_col);
         auto list_results = list.as_results();
 
-        Results frozen_res = list_results.freeze(frozen_realm);
-        JoiningThread thread1([&] {
-            REQUIRE(frozen_res.is_frozen());
-            REQUIRE(frozen_res.size() == 5);
-            REQUIRE(frozen_res.get<Int>(0) == 42);
-        });
+        SECTION("unsorted") {
+            Results frozen_res = list_results.freeze(frozen_realm);
+            JoiningThread thread1([&] {
+                REQUIRE(frozen_res.is_frozen());
+                REQUIRE(frozen_res.size() == 5);
+                REQUIRE(frozen_res.get<Int>(0) == 42);
+            });
+        }
 
-        Results sorted_frozen_res = list.sort({{"self", false}}).freeze(frozen_realm);
-        JoiningThread thread2([&] {
-            REQUIRE(sorted_frozen_res.is_frozen());
-            REQUIRE(sorted_frozen_res.size() == 5);
-            REQUIRE(sorted_frozen_res.get<Int>(0) == 46);
-        });
+        SECTION("sorted") {
+            Results sorted_frozen_res = list.sort({{"self", false}}).freeze(frozen_realm);
+            JoiningThread thread2([&] {
+                REQUIRE(sorted_frozen_res.is_frozen());
+                REQUIRE(sorted_frozen_res.size() == 5);
+                REQUIRE(sorted_frozen_res.get<Int>(0) == 46);
+            });
+        }
     }
 
     SECTION("Result constructor - Dictionary") {

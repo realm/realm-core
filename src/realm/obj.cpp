@@ -209,7 +209,7 @@ T Obj::_get(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
-    typename ColumnTypeTraits<T>::cluster_leaf_type values(get_alloc());
+    typename ColumnTypeTraits<T>::cluster_leaf_type values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
 
@@ -221,7 +221,7 @@ ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
-    ArrayKey values(get_alloc());
+    ArrayKey values(_get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
     values.init_from_ref(ref);
 
@@ -1622,9 +1622,21 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
     auto target_key = result.get_key();
     ObjKey old_key = get<ObjKey>(col_key); // Will update if needed
-    if (!t.is_embedded() && old_key != ObjKey()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (old_key != ObjKey()) {
+        if (!t.is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+
+        // If this is an embedded object and there was already an embedded object here, then we need to
+        // emit an instruction to set the old embedded object to null to clear the old object on other
+        // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
+        // and then array operations will have a corrupted prior_size.
+        if (Replication* repl = get_replication()) {
+            repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
+                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        }
     }
+
     if (target_key != old_key) {
         CascadeState state;
 
@@ -1919,15 +1931,22 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
-        auto target_obj = m_table->get_parent_group()->get_object(new_link);
+        auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
         ColKey backlink_col_key;
         auto type = col_key.get_type();
         if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
-            backlink_col_key = target_obj.get_table()->find_or_add_backlink_column(col_key, get_table_key());
+            // This may modify the target table
+            backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
+            // it is possible that this was a link to the same table and that adding a backlink column has
+            // caused the need to update this object as well.
+            update_if_needed();
         }
         else {
             backlink_col_key = m_table->get_opposite_column(col_key);
         }
+        auto obj_key = new_link.get_obj_key();
+        auto target_obj =
+            obj_key.is_unresolved() ? target_table->get_tombstone(obj_key) : target_table->get_object(obj_key);
         target_obj.add_backlink(backlink_col_key, m_key);
     }
 }
@@ -2133,17 +2152,40 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                     set.insert(ObjLink{m_table->get_key(), get_key()});
                 }
             }
-            else if (c.get_type() == col_type_Link) {
-                // Single link
-                REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
-                linking_obj.set(c, get_key());
+            else if (c.is_list()) {
+                if (c.get_type() == col_type_Mixed) {
+                    auto l = linking_obj.get_list<Mixed>(c);
+                    auto n = l.find_first(ObjLink{m_table->get_key(), other.get_key()});
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, ObjLink{m_table->get_key(), get_key()});
+                }
+                else if (c.get_type() == col_type_LinkList) {
+                    // Link list
+                    auto l = linking_obj.get_list<ObjKey>(c);
+                    auto n = l.find_first(other.get_key());
+                    REALM_ASSERT(n != realm::npos);
+                    l.set(n, get_key());
+                }
+                else {
+                    REALM_UNREACHABLE(); // missing type handling
+                }
             }
             else {
-                // Link list
-                auto l = linking_obj.get_list<ObjKey>(c);
-                auto n = l.find_first(other.get_key());
-                REALM_ASSERT(n != realm::npos);
-                l.set(n, get_key());
+                REALM_ASSERT(!c.is_collection());
+                if (c.get_type() == col_type_Link) {
+                    // Single link
+                    REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
+                    linking_obj.set(c, get_key());
+                }
+                else if (c.get_type() == col_type_Mixed) {
+                    // Mixed link
+                    REALM_ASSERT(linking_obj.get_any(c).is_null() ||
+                                 linking_obj.get_any(c).get_link().get_obj_key() == other.get_key());
+                    linking_obj.set(c, Mixed{ObjLink{m_table->get_key(), get_key()}});
+                }
+                else {
+                    REALM_UNREACHABLE(); // missing type handling
+                }
             }
         }
         return false;
@@ -2281,6 +2323,11 @@ size_t Obj::colkey2spec_ndx(ColKey key)
 ColKey Obj::get_primary_key_column() const
 {
     return m_table->get_primary_key_column();
+}
+
+ref_type Obj::Internal::get_ref(const Obj& obj, ColKey col_key)
+{
+    return to_ref(obj._get<int64_t>(col_key.get_index()));
 }
 
 } // namespace realm

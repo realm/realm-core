@@ -38,13 +38,14 @@
 #include <vector>
 
 using namespace realm;
+using realm::util::Any;
 
 struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Property const& prop)
-        : CppContext(parent, prop)
+    TestContext(TestContext& parent, Obj obj, realm::Property const& prop)
+        : CppContext(parent, obj, prop)
         , defaults(parent.defaults)
     {
     }
@@ -85,7 +86,7 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     SECTION("reports inserts/deletes for simple reorderings") {
         auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
                         std::function<bool(size_t)> modifications) {
-            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications);
+            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications, false);
         };
         std::vector<int64_t> indices = {};
         constexpr size_t indices_size = 10000;

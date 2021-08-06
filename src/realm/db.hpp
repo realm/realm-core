@@ -22,9 +22,6 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
-#include <unordered_map>
-#include <thread>
-#include <condition_variable>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
@@ -350,7 +347,7 @@ public:
         return m_metrics;
     }
 
-    // Try to grab a exclusive lock of the given realm path's lock file. If the lock
+    // Try to grab an exclusive lock of the given realm path's lock file. If the lock
     // can be acquired, the callback will be executed with the lock and then return true.
     // Otherwise false will be returned directly.
     // The lock taken precludes races with other threads or processes accessing the
@@ -360,7 +357,7 @@ public:
     using CallbackWithLock = std::function<void(const std::string& realm_path)>;
     static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
 
-    enum CoreFileType : uint64_t {
+    enum CoreFileType : uint8_t {
         Lock,
         Storage,
         Management,
@@ -369,19 +366,27 @@ public:
         LogA, // This is a legacy version of `Log`.
         LogB, // This is a legacy version of `Log`.
     };
-    /// Return a list of files and directories core may use in the given realm file path.
-    /// The first element of the pair in the returned list is the path as string,
-    /// the second one indicates if the path is a directory or not.
-    /// It is safe to delete those returned files/directories in the call_with_lock's callback except for the lock
-    /// itself.
+
+    /// Get the path for the given type of file for a base Realm file path.
+    /// \param realm_path The path for the main Realm file.
+    /// \param type The type of associated file to get the path for.
+    /// \return The base path with the appropriate type-specific suffix appended to it.
+    static std::string get_core_file(const std::string& realm_path, CoreFileType type);
+
+    /// Delete a Realm file and all associated control files.
     ///
-    /// \param realm_path If provided the full path to the file including
-    ///                   the given path will be returned by this function.
+    /// This function does not perform any locking and requires external
+    /// synchronization to ensure that it is safe to call. If called within
+    /// call_with_lock(), \p delete_lockfile must be false as the lockfile is not
+    /// safe to delete while it is in use.
     ///
-    /// \return A map of all core files, providing the path (first) and an indicator
-    ///         if they are a folder or not (second).
-    static std::unordered_map<CoreFileType, std::pair<std::string, bool>>
-    get_core_files(const std::string& realm_path = "");
+    /// \param base_path The Realm file to delete, which auxiliary file paths will be derived from.
+    /// \param[out] did_delete_realm If non-null, will be set to true if the Realm file was deleted (even if a
+    ///             subsequent deletion failed)
+    /// \param delete_lockfile By default the lock file is not deleted as it is unsafe to
+    ///        do so. If this is true, the lock file is deleted along with the other files.
+    static void delete_files(const std::string& base_path, bool* did_delete_realm = nullptr,
+                             bool delete_lockfile = false);
 
     struct ReadLockInfo {
         uint_fast64_t m_version = std::numeric_limits<version_type>::max();

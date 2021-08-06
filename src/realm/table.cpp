@@ -2197,7 +2197,7 @@ int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
         aggregate<int64_t>(st, col_key);
     }
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2207,7 +2207,7 @@ float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<float> st;
     aggregate<float>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2217,7 +2217,7 @@ double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<double> st;
     aggregate<double>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2227,7 +2227,7 @@ Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<Decimal128> st;
     aggregate<Decimal128>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2237,7 +2237,7 @@ Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<Timestamp> st;
     aggregate<Timestamp>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2247,7 +2247,7 @@ Mixed Table::minimum_mixed(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMin<Mixed> st;
     aggregate<Mixed>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_min();
 }
@@ -2265,7 +2265,7 @@ int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
         aggregate<int64_t>(st, col_key);
     }
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_max();
 }
@@ -2275,7 +2275,7 @@ float Table::maximum_float(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<float> st;
     aggregate<float>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_max();
 }
@@ -2285,7 +2285,7 @@ double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<double> st;
     aggregate<double>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_max();
 }
@@ -2311,7 +2311,7 @@ Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
 
     traverse_clusters(f);
     if (return_ndx) {
-        *return_ndx = ret_key;
+        *return_ndx = ObjKey(ret_key);
     }
     return max;
 }
@@ -2321,7 +2321,7 @@ Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<Timestamp> st;
     aggregate<Timestamp>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_max();
 }
@@ -2331,7 +2331,7 @@ Mixed Table::maximum_mixed(ColKey col_key, ObjKey* return_ndx) const
     QueryStateMax<Mixed> st;
     aggregate<Mixed>(st, col_key);
     if (return_ndx) {
-        *return_ndx = st.m_minmax_key;
+        *return_ndx = ObjKey(st.m_minmax_key);
     }
     return st.get_max();
 }
@@ -3870,18 +3870,18 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         throw;
     }
 
-    erase_root_column(col_key);
-    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
-
-    if (si)
-        do_add_search_index(new_col);
-
     if (is_pk_col) {
         // If we go from non nullable to nullable, no values change,
         // so it is safe to preserve the pk column. Otherwise it is not
         // safe as a null entry might have been converted to default value.
         do_set_primary_key_column(nullable ? new_col : ColKey{});
     }
+
+    erase_root_column(col_key);
+    m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
+
+    if (si)
+        do_add_search_index(new_col);
 
     return new_col;
 }

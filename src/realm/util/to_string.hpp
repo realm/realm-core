@@ -107,7 +107,7 @@ public:
     }
     Printable(StringData value);
 
-    template <typename T>
+    template <typename T, typename = std::enable_if_t<!std::is_constructible_v<Printable, T>>>
     Printable(T const& value)
         : m_type(Type::Callback)
         , m_callback({static_cast<const void*>(&value), [](std::ostream& os, const void* ptr) {

@@ -27,6 +27,8 @@
 #include <type_traits>
 #include <random>
 #include <deque>
+#include <thread>
+#include <condition_variable>
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/group_writer.hpp>
@@ -644,8 +646,7 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        auto core_files = DB::get_core_files(file);
-        i = ::open((core_files[DB::CoreFileType::Log].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = ::open(get_core_file(CoreFileType::Log).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -764,10 +765,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         dg.release();
         return;
     }
-    auto core_files = DB::get_core_files(path);
-    m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
-    m_coordination_dir = core_files[DB::CoreFileType::Management].first;
-    try_make_dir(m_coordination_dir);
+    m_lockfile_path = get_core_file(path, CoreFileType::Lock);
+    m_coordination_dir = get_core_file(path, CoreFileType::Management);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
@@ -810,7 +809,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
-        m_file.set_fifo_path(m_coordination_dir + "/lock.fifo");
+        m_file.set_fifo_path(m_coordination_dir, "lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -850,6 +849,15 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 #else
         m_file.lock_shared(); // Throws
 #endif
+        // The coordination/management dir is created as a side effect of the lock
+        // operation above if needed for lock emulation. But it may also be needed
+        // for other purposes, so make sure it exists.
+        // in worst case there'll be a race on creating this directory.
+        // This should be safe but a waste of resources.
+        // Unfortunately it cannot be created at an earlier point, because
+        // it may then be deleted during the above lock_shared() operation.
+        try_make_dir(m_coordination_dir);
+
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or
@@ -2521,13 +2529,12 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto core_files = DB::get_core_files(realm_path);
-    auto lockfile_path(core_files[DB::CoreFileType::Lock].first);
+    auto lockfile_path = get_core_file(realm_path, CoreFileType::Lock);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
-    lockfile.set_fifo_path(realm_path + ".management/lock.fifo");
+    lockfile.set_fifo_path(realm_path + ".management", "lock.fifo");
     if (lockfile.try_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
@@ -2535,21 +2542,43 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::unordered_map<DB::CoreFileType, std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::string DB::get_core_file(const std::string& base_path, CoreFileType type)
 {
-    std::unordered_map<CoreFileType, std::pair<std::string, bool>> core_files;
-
-    core_files[DB::CoreFileType::Lock] = std::make_pair(realm_path + ".lock", false);
-    core_files[DB::CoreFileType::Storage] = std::make_pair(realm_path, false);
-    core_files[DB::CoreFileType::Management] = std::make_pair(realm_path + ".management", true);
-    core_files[DB::CoreFileType::Note] = std::make_pair(realm_path + ".note", false);
-    core_files[DB::CoreFileType::Log] = std::make_pair(realm_path + ".log", false);
-    core_files[DB::CoreFileType::LogA] = std::make_pair(realm_path + ".log_a", false);
-    core_files[DB::CoreFileType::LogB] = std::make_pair(realm_path + ".log_b", false);
-
-    return core_files;
+    switch (type) {
+        case CoreFileType::Lock:
+            return base_path + ".lock";
+        case CoreFileType::Storage:
+            return base_path;
+        case CoreFileType::Management:
+            return base_path + ".management";
+        case CoreFileType::Note:
+            return base_path + ".note";
+        case CoreFileType::Log:
+            return base_path + ".log";
+        case CoreFileType::LogA:
+            return base_path + ".log_a";
+        case CoreFileType::LogB:
+            return base_path + ".log_b";
+    }
+    REALM_UNREACHABLE();
 }
 
+void DB::delete_files(const std::string& base_path, bool* did_delete, bool delete_lockfile)
+{
+    if (File::try_remove(get_core_file(base_path, CoreFileType::Storage)) && did_delete) {
+        *did_delete = true;
+    }
+
+    File::try_remove(get_core_file(base_path, CoreFileType::Note));
+    File::try_remove(get_core_file(base_path, CoreFileType::Log));
+    File::try_remove(get_core_file(base_path, CoreFileType::LogA));
+    File::try_remove(get_core_file(base_path, CoreFileType::LogB));
+    util::try_remove_dir_recursive(get_core_file(base_path, CoreFileType::Management));
+
+    if (delete_lockfile) {
+        File::try_remove(get_core_file(base_path, CoreFileType::Lock));
+    }
+}
 void TransactionDeleter(Transaction* t)
 {
     t->close();

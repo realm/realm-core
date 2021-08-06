@@ -141,8 +141,7 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
-    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config,
-                                             bool force_client_resync = false);
+    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -223,6 +222,13 @@ public:
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
+
+protected:
+    friend class SyncUser;
+    friend class SyncSesson;
+
+    using std::enable_shared_from_this<SyncManager>::shared_from_this;
+    using std::enable_shared_from_this<SyncManager>::weak_from_this;
 
 private:
     friend class app::App;
