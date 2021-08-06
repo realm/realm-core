@@ -3018,6 +3018,22 @@ void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::un
         auto lte = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS_EQUAL, std::move(right));
         preds.emplace_back(std::move(lte));
     }
+    else if (fragment["kind"] == "beginsWith") {
+        auto begins_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::BEGINSWITH, std::move(right));
+        preds.emplace_back(std::move(begins_with));
+    }
+    else if (fragment["kind"] == "endsWith") {
+        auto ends_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::ENDSWITH, std::move(right));
+        preds.emplace_back(std::move(ends_with));
+    }
+    else if (fragment["kind"] == "contains") {
+        auto contains = std::make_unique<StringOpsNode>(std::move(left), CompareNode::CONTAINS, std::move(right));
+        preds.emplace_back(std::move(contains));
+    }
+    else if (fragment["kind"] == "like") {
+        auto like = std::make_unique<StringOpsNode>(std::move(left), CompareNode::LIKE, std::move(right));
+        preds.emplace_back(std::move(like));
+    }
 }
 
 
@@ -3025,7 +3041,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
 {
     if (fragment["kind"] == "property") {
         auto empty_path = std::make_unique<PathNode>();
-        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), fragment["value"]);
+        auto prop_node = std::make_unique<PropNode>(std::move(empty_path), fragment["name"]);
         auto value_node = std::make_unique<ValueNode>(std::move(prop_node));
         return value_node;
     }
