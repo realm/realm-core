@@ -801,7 +801,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
         if (index) {
             if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
                 auto t = s->get_type();
-                auto idx = index->visit(drv, t);
+                auto idx = static_cast<QueryParserConstantNode*>(index.get())->visit(drv, t);
                 Mixed key = idx->get_mixed();
                 subexpr = s->key(key).clone();
             }
@@ -1002,7 +1002,7 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
     return agg;
 }
 
-std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
+std::unique_ptr<Subexpr> QueryParserConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     Subexpr* ret = nullptr;
     std::string explain_value_message = text;
@@ -1304,6 +1304,175 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return std::unique_ptr<Subexpr>{ret};
 }
 
+QueryValue QueryParserConstantNode::reduce(DataType hint) {
+    std::string explain_value_message = text;
+    switch (type) {
+        case Type::NUMBER: {
+            if (hint == type_Decimal) {
+                return Decimal128(text);
+            }
+            else {
+                return strtoll(text.c_str(), nullptr, 0);
+            }
+        }
+        case Type::FLOAT: {
+            switch (hint) {
+                case type_Float: {
+                    return strtof(text.c_str(), nullptr);
+                }
+                case type_Decimal:
+                    return Decimal128(text);
+                default:
+                    return strtod(text.c_str(), nullptr);
+            }
+        }
+        case Type::INFINITY_VAL: {
+            bool negative = text[0] == '-';
+            switch (hint) {
+                case type_Float: {
+                    auto inf = std::numeric_limits<float>::infinity();
+                    return negative ? -inf : inf;
+                }
+                case type_Double: {
+                    auto inf = std::numeric_limits<double>::infinity();
+                    return negative ? -inf : inf;
+                }
+                case type_Decimal:
+                    return Decimal128(text);
+                default:
+                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
+            }
+        }
+        case Type::NAN_VAL: {
+            switch (hint) {
+                case type_Float:
+                    return type_punning<float>(0x7fc00000);
+                case type_Double:
+                    return type_punning<double>(0x7ff8000000000000);
+                case type_Decimal:
+                    return Decimal128::nan("0");
+                default:
+                    REALM_UNREACHABLE();
+            }
+        }
+        case Type::STRING: {
+            std::string str = text.substr(1, text.size() - 2);
+            switch (hint) {
+                case type_Int:
+                    return string_to<int64_t>(str);
+                case type_Float:
+                    return string_to<float>(str);
+                    break;
+                case type_Double:
+                    return string_to<double>(str);
+                case type_Decimal:
+                    return Decimal128(str);
+                default:
+                    if (hint == type_TypeOfValue) {
+                        try {
+                            return TypeOfValue(str);
+                        }
+                        catch (const std::runtime_error& e) {
+                            throw InvalidQueryArgError(e.what());
+                        }
+                    }
+                    else {
+                        return str;
+                    }
+            }
+        }
+        case Type::BASE64: {
+            const size_t encoded_size = text.size() - 5;
+            size_t buffer_size = util::base64_decoded_size(encoded_size);
+            std::vector<char> decode_buffer;
+            decode_buffer.resize(buffer_size);
+            StringData window(text.c_str() + 4, encoded_size);
+            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+            if (!decoded_size) {
+                throw SyntaxError("Invalid base64 value");
+            }
+            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+            decode_buffer.resize(*decoded_size); // truncate
+
+            if (hint == type_String) {
+                return StringData(decode_buffer.data(), decode_buffer.size());
+            }
+            else {
+                return BinaryData(decode_buffer.data(), decode_buffer.size());
+            }
+        }
+        case Type::TIMESTAMP: {
+            auto s = text;
+            int64_t seconds;
+            int32_t nanoseconds;
+            if (s[0] == 'T') {
+                size_t colon_pos = s.find(":");
+                std::string s1 = s.substr(1, colon_pos - 1);
+                std::string s2 = s.substr(colon_pos + 1);
+                seconds = strtol(s1.c_str(), nullptr, 0);
+                nanoseconds = int32_t(strtol(s2.c_str(), nullptr, 0));
+            }
+            else {
+                // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
+                struct tm tmp = tm();
+                char sep = s.find("@") < s.size() ? '@' : 'T';
+                std::string fmt = "%d-%d-%d"s + sep + "%d:%d:%d:%d"s;
+                int cnt = sscanf(s.c_str(), fmt.c_str(), &tmp.tm_year, &tmp.tm_mon, &tmp.tm_mday, &tmp.tm_hour,
+                                 &tmp.tm_min, &tmp.tm_sec, &nanoseconds);
+                REALM_ASSERT(cnt >= 6);
+                tmp.tm_year -= 1900; // epoch offset (see man mktime)
+                tmp.tm_mon -= 1;     // converts from 1-12 to 0-11
+
+                if (tmp.tm_year < 0) {
+                    // platform timegm functions do not throw errors, they return -1 which is also a valid time
+                    throw InvalidQueryError("Conversion of dates before 1900 is not supported.");
+                }
+
+                seconds = platform_timegm(tmp); // UTC time
+                if (cnt == 6) {
+                    nanoseconds = 0;
+                }
+                if (nanoseconds < 0) {
+                    throw SyntaxError("The nanoseconds of a Timestamp cannot be negative.");
+                }
+                if (seconds < 0) { // seconds determines the sign of the nanoseconds part
+                    nanoseconds *= -1;
+                }
+            }
+            return get_timestamp_if_valid(seconds, nanoseconds);
+        }
+        case Type::UUID_T:
+            return UUID(text.substr(5, text.size() - 6));
+        case Type::OID:
+            return ObjectId(text.substr(4, text.size() - 5).c_str());
+        case Type::LINK:
+            return ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0));
+        case Type::TYPED_LINK: {
+            size_t colon_pos = text.find(":");
+            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
+            auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
+            return ObjLink(TableKey(table_key_val), ObjKey(obj_key_val));
+        }
+        case Type::NULL_VAL: {
+            if (hint == type_String) {
+                return StringData(); // Null string
+            }
+            else if (hint == type_Binary) {
+                return BinaryData(); // Null binary
+            }
+            else {
+                return realm::null();
+            }
+        }
+        case Type::TRUE:
+            return true;
+        case Type::FALSE:
+            return false;
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
 LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
@@ -1437,10 +1606,10 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
 
-    auto left_constant = std::move(values[0]->constant);
-    auto right_constant = std::move(values[1]->constant);
-    auto left_prop = std::move(values[0]->prop);
-    auto right_prop = std::move(values[1]->prop);
+    auto* left_constant = static_cast<QueryParserConstantNode*>(values[0]->constant.get());
+    auto* right_constant = static_cast<QueryParserConstantNode*>(values[1]->constant.get());
+    auto& left_prop = *values[0]->prop;
+    auto& right_prop = *values[1]->prop;
 
     if (left_constant && right_constant) {
         throw InvalidQueryError("Cannot compare two constants");
@@ -1448,17 +1617,17 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
 
     if (right_constant) {
         // Take left first - it cannot be a constant
-        left = left_prop->visit(this);
+        left = left_prop.visit(this);
         right = right_constant->visit(this, left->get_type());
         verify_conditions(left.get(), right.get(), m_serializer_state);
     }
     else {
-        right = right_prop->visit(this);
+        right = right_prop.visit(this);
         if (left_constant) {
             left = left_constant->visit(this, right->get_type());
         }
         else {
-            left = left_prop->visit(this);
+            left = left_prop.visit(this);
         }
         verify_conditions(right.get(), left.get(), m_serializer_state);
     }
@@ -1562,6 +1731,171 @@ std::string check_escapes(const char* str)
 
 } // namespace query_parser
 
+namespace {
+class QueryParserVisitor : public NodeVisitor {
+public:
+    QueryParserVisitor(ParserDriver& drv)
+        : m_drv(drv)
+        {
+
+        }
+
+    void visitEquality(EqualityNode& node) override {
+        NodeVisitor::visitEquality(node);
+        cmp(*node.values[0], *node.values[1]);
+    }
+
+    void visitRelational(RelationalNode& node) override {
+        NodeVisitor::visitRelational(node);
+        cmp(*node.values[0], *node.values[1]);
+    }
+
+    void visitStringOps(StringOpsNode& node) override {
+        NodeVisitor::visitStringOps(node);
+        cmp(*node.values[0], *node.values[1]);
+    }
+
+private:
+    ParserDriver& m_drv;
+
+    void cmp(ValueNode& left, ValueNode& right) {
+        auto left_constant = dynamic_cast<QueryParserConstantNode*>(left.constant.get());
+        auto right_constant = dynamic_cast<QueryParserConstantNode*>(right.constant.get());
+
+        if (left_constant && right_constant) {
+            throw InvalidQueryError("Cannot compare two constants");
+        }
+
+        if (right_constant) {
+            right.constant = cmp(*left.prop, *right_constant);
+        } else if (left_constant) {
+            left.constant = cmp(*right.prop, *left_constant);
+        }
+    }
+
+    std::unique_ptr<ConstantNode> cmp(PropertyNode& property, QueryParserConstantNode& constant) {
+        DataType t = inferType(property);
+        QueryValue value;
+        if (constant.type == QueryParserConstantNode::ARG) {
+            value = resolveArgument(constant.text, t);
+        }
+        else {
+            value = constant.reduce(t);
+        }
+        return std::make_unique<ConstantNode>(value);
+    }
+
+    DataType inferType(PropertyNode& property) {
+        // TODO: manually infer the type of the property, until then cheat by using the existing visit logic
+        return property.visit(&m_drv)->get_type();
+    }
+
+    QueryValue resolveArgument(const std::string& text, DataType hint) {
+        util::Optional<QueryValue> arg_value;
+        std::string explain_value_message = text;
+        size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
+        if (m_drv.m_args.is_argument_null(arg_no)) {
+            explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
+            arg_value = realm::null();
+        }
+        else {
+            auto type = m_drv.m_args.type_for_argument(arg_no);
+            explain_value_message =
+                util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
+            switch (type) {
+                case type_Int:
+                    arg_value = QueryValue(m_drv.m_args.long_for_argument(arg_no));
+                    break;
+                case type_String:
+                    arg_value = QueryValue(m_drv.m_args.string_for_argument(arg_no));
+                    break;
+                case type_Binary:
+                    arg_value = QueryValue(m_drv.m_args.binary_for_argument(arg_no));
+                    break;
+                case type_Bool:
+                    arg_value = QueryValue(m_drv.m_args.bool_for_argument(arg_no));
+                    break;
+                case type_Float:
+                    arg_value = QueryValue(m_drv.m_args.float_for_argument(arg_no));
+                    break;
+                case type_Double: {
+                    // In realm-js all number type arguments are returned as double. If we don't cast to the
+                    // expected type, we would in many cases miss the option to use the optimized query node
+                    // instead of the general Compare class.
+                    double val = m_drv.m_args.double_for_argument(arg_no);
+                    switch (hint) {
+                        case type_Int:
+                        case type_Bool: {
+                            int64_t int_val = int64_t(val);
+                            // Only return an integer if it precisely represents val
+                            if (double(int_val) == val)
+                                arg_value = QueryValue(int_val);
+                            else
+                                arg_value = QueryValue(val);
+                            break;
+                        }
+                        case type_Float:
+                            arg_value = QueryValue(float(val));
+                            break;
+                        default:
+                            arg_value = QueryValue(val);
+                            break;
+                    }
+                    break;
+                }
+                case type_Timestamp: {
+                    try {
+                        arg_value = QueryValue(m_drv.m_args.timestamp_for_argument(arg_no));
+                    }
+                    catch (const std::exception&) {
+                        arg_value = QueryValue(m_drv.m_args.objectid_for_argument(arg_no));
+                    }
+                    break;
+                }
+                case type_ObjectId: {
+                    try {
+                        arg_value = QueryValue(m_drv.m_args.objectid_for_argument(arg_no));
+                    }
+                    catch (const std::exception&) {
+                        arg_value = QueryValue(m_drv.m_args.timestamp_for_argument(arg_no));
+                    }
+                    break;
+                }
+                case type_Decimal:
+                    arg_value = QueryValue(m_drv.m_args.decimal128_for_argument(arg_no));
+                    break;
+                case type_UUID:
+                    arg_value = QueryValue(m_drv.m_args.uuid_for_argument(arg_no));
+                    break;
+                case type_Link:
+                    arg_value = QueryValue(m_drv.m_args.object_index_for_argument(arg_no));
+                    break;
+                case type_TypedLink:
+                    if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
+                        arg_value = QueryValue(m_drv.m_args.objlink_for_argument(arg_no));
+                        break;
+                    }
+                    explain_value_message =
+                        util::format("%1 which links to %2", explain_value_message,
+                                        print_pretty_objlink(m_drv.m_args.objlink_for_argument(arg_no),
+                                                            m_drv.m_base_table->get_parent_group(), &m_drv));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (!arg_value) {
+            throw InvalidQueryError(
+                util::format("Unsupported comparison between property of type '%1' and constant value: %2",
+                                get_data_type_name(hint), explain_value_message));
+        }
+
+        return *arg_value;
+    }
+};
+}
+
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
 {
     MixedArguments args(arguments);
@@ -1580,11 +1914,13 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
+    QueryParserVisitor(driver).visitOr(*driver.result);
+    return QueryVisitor(&driver).visit(*driver.result).set_ordering(driver.ordering->visit(&driver));
     // Query query = QueryVisitor(&driver).visit(*driver.result);
     // std::unique_ptr<DescriptorOrdering> ordering = QueryVisitor(&driver).get_descriptor_ordering(*driver.ordering);
     // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(*driver.ordering));
     // return visitor.query.set_ordering(driver.ordering->visit(&driver));
-    return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+    //return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
 Subexpr* LinkChain::column(const std::string& col)
@@ -1740,7 +2076,7 @@ void PrintingVisitor::visitParens(ParensNode& node){
     out << ")";
 } 
 void PrintingVisitor::visitConstant(ConstantNode& node){
-    out << "ConstantNode: type = " << node.type << " value = " << node.text;
+    out << "ConstantNode: " << node.value;
 } 
 void PrintingVisitor::visitEquality(EqualityNode& node){
     out << "EqualityNode(";
@@ -2257,308 +2593,49 @@ std::unique_ptr<realm::Subexpr> SubexprVisitor::visit(ParserNode& node) {
     return std::move(subexpr);
 }
 
-void SubexprVisitor::visitConstant(ConstantNode& node){
-    auto text = node.text;
-    auto type = node.type;
-    auto hint = this->t;
-    Subexpr* ret = nullptr;
-    std::string explain_value_message = text;
-    switch (type) {
-        case ConstantNode::Type::NUMBER: {
-            if (hint == type_Decimal) {
-                ret = new Value<Decimal128>(Decimal128(text));
-            }
-            else {
-                ret = new Value<int64_t>(strtoll(text.c_str(), nullptr, 0));
-            }
+void SubexprVisitor::visitConstant(ConstantNode& node) {
+    if (node.value.is_null()) {
+        subexpr = std::make_unique<Value<null>>(null());
+    } else switch (node.value.get_type()) {
+        case type_Int:
+            subexpr = std::make_unique<Value<int64_t>>(node.value.get<int64_t>());
             break;
-        }
-        case ConstantNode::Type::FLOAT: {
-            switch (hint) {
-                case type_Float: {
-                    ret = new Value<float>(strtof(text.c_str(), nullptr));
-                    break;
-                }
-                case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(text));
-                    break;
-                default:
-                    ret = new Value<double>(strtod(text.c_str(), nullptr));
-                    break;
-            }
+        case type_Bool:
+            subexpr = std::make_unique<Value<bool>>(node.value.get<bool>());
             break;
-        }
-        case ConstantNode::Type::INFINITY_VAL: {
-            bool negative = text[0] == '-';
-            switch (hint) {
-                case type_Float: {
-                    auto inf = std::numeric_limits<float>::infinity();
-                    ret = new Value<float>(negative ? -inf : inf);
-                    break;
-                }
-                case type_Double: {
-                    auto inf = std::numeric_limits<double>::infinity();
-                    ret = new Value<double>(negative ? -inf : inf);
-                    break;
-                }
-                case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(text));
-                    break;
-                default:
-                    throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
-                    break;
-            }
+        case type_String:
+            subexpr = std::make_unique<ConstantStringValue>(node.value.get<StringData>());
             break;
-        }
-        case ConstantNode::Type::NAN_VAL: {
-            switch (hint) {
-                case type_Float:
-                    ret = new Value<float>(type_punning<float>(0x7fc00000));
-                    break;
-                case type_Double:
-                    ret = new Value<double>(type_punning<double>(0x7ff8000000000000));
-                    break;
-                case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128::nan("0"));
-                    break;
-                default:
-                    REALM_UNREACHABLE();
-                    break;
-            }
+        case type_Binary:
+            subexpr = std::make_unique<Value<BinaryData>>(node.value.get<BinaryData>());
             break;
-        }
-        case ConstantNode::Type::STRING: {
-            std::string str = text.substr(1, text.size() - 2);
-            switch (hint) {
-                case type_Int:
-                    ret = new Value<int64_t>(string_to<int64_t>(str));
-                    break;
-                case type_Float:
-                    ret = new Value<float>(string_to<float>(str));
-                    break;
-                case type_Double:
-                    ret = new Value<double>(string_to<double>(str));
-                    break;
-                case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(str.c_str()));
-                    break;
-                default:
-                    if (hint == type_TypeOfValue) {
-                        try {
-                            ret = new Value<TypeOfValue>(TypeOfValue(str));
-                        }
-                        catch (const std::runtime_error& e) {
-                            throw InvalidQueryArgError(e.what());
-                        }
-                    }
-                    else {
-                        ret = new ConstantStringValue(str);
-                    }
-                    break;
-            }
+        case type_Timestamp:
+            subexpr = std::make_unique<Value<Timestamp>>(node.value.get<Timestamp>());
             break;
-        }
-        case ConstantNode::Type::BASE64: {
-            const size_t encoded_size = text.size() - 5;
-            size_t buffer_size = util::base64_decoded_size(encoded_size);
-            drv->m_args.buffer_space.push_back({});
-            auto& decode_buffer = drv->m_args.buffer_space.back();
-            decode_buffer.resize(buffer_size);
-            StringData window(text.c_str() + 4, encoded_size);
-            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
-            if (!decoded_size) {
-                throw SyntaxError("Invalid base64 value");
-            }
-            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
-            decode_buffer.resize(*decoded_size); // truncate
-
-            if (hint == type_String) {
-                ret = new ConstantStringValue(StringData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Binary) {
-                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
-            if (hint == type_Mixed) {
-                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
+        case type_Float:
+            subexpr = std::make_unique<Value<float>>(node.value.get<float>());
             break;
-        }
-        case ConstantNode::Type::TIMESTAMP: {
-            auto s = text;
-            int64_t seconds;
-            int32_t nanoseconds;
-            if (s[0] == 'T') {
-                size_t colon_pos = s.find(":");
-                std::string s1 = s.substr(1, colon_pos - 1);
-                std::string s2 = s.substr(colon_pos + 1);
-                seconds = strtol(s1.c_str(), nullptr, 0);
-                nanoseconds = int32_t(strtol(s2.c_str(), nullptr, 0));
-            }
-            else {
-                // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
-                struct tm tmp = tm();
-                char sep = s.find("@") < s.size() ? '@' : 'T';
-                std::string fmt = "%d-%d-%d"s + sep + "%d:%d:%d:%d"s;
-                int cnt = sscanf(s.c_str(), fmt.c_str(), &tmp.tm_year, &tmp.tm_mon, &tmp.tm_mday, &tmp.tm_hour,
-                                 &tmp.tm_min, &tmp.tm_sec, &nanoseconds);
-                REALM_ASSERT(cnt >= 6);
-                tmp.tm_year -= 1900; // epoch offset (see man mktime)
-                tmp.tm_mon -= 1;     // converts from 1-12 to 0-11
-
-                if (tmp.tm_year < 0) {
-                    // platform timegm functions do not throw errors, they return -1 which is also a valid time
-                    throw InvalidQueryError("Conversion of dates before 1900 is not supported.");
-                }
-
-                seconds = platform_timegm(tmp); // UTC time
-                if (cnt == 6) {
-                    nanoseconds = 0;
-                }
-                if (nanoseconds < 0) {
-                    throw SyntaxError("The nanoseconds of a Timestamp cannot be negative.");
-                }
-                if (seconds < 0) { // seconds determines the sign of the nanoseconds part
-                    nanoseconds *= -1;
-                }
-            }
-            ret = new Value<Timestamp>(get_timestamp_if_valid(seconds, nanoseconds));
+        case type_Double:
+            subexpr = std::make_unique<Value<double>>(node.value.get<double>());
             break;
-        }
-        case ConstantNode::Type::UUID_T:
-            ret = new Value<UUID>(UUID(text.substr(5, text.size() - 6)));
+        case type_Decimal:
+            subexpr = std::make_unique<Value<Decimal128>>(node.value.get<Decimal128>());
             break;
-        case ConstantNode::Type::OID:
-            ret = new Value<ObjectId>(ObjectId(text.substr(4, text.size() - 5).c_str()));
+        case type_Link:
+            subexpr = std::make_unique<Value<ObjKey>>(node.value.get<ObjKey>());
             break;
-        case ConstantNode::Type::LINK: {
-            ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
+        case type_TypedLink:
+            subexpr = std::make_unique<Value<ObjLink>>(node.value.get<ObjLink>());
             break;
-        }
-        case ConstantNode::Type::TYPED_LINK: {
-            size_t colon_pos = text.find(":");
-            auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
-            auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
-            ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
+        case type_ObjectId:
+            subexpr = std::make_unique<Value<ObjectId>>(node.value.get<ObjectId>());
             break;
-        }
-        case ConstantNode::Type::NULL_VAL:
-            if (hint == type_String) {
-                ret = new ConstantStringValue(StringData()); // Null string
-            }
-            else if (hint == type_Binary) {
-                ret = new Value<Binary>(BinaryData()); // Null string
-            }
-            else {
-                ret = new Value<null>(realm::null());
-            }
+        case type_UUID:
+            subexpr = std::make_unique<Value<UUID>>(node.value.get<UUID>());
             break;
-        case ConstantNode::Type::TRUE:
-            ret = new Value<Bool>(true);
-            break;
-        case ConstantNode::Type::FALSE:
-            ret = new Value<Bool>(false);
-            break;
-        case ConstantNode::Type::ARG: {
-            size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
-            if (drv->m_args.is_argument_null(arg_no)) {
-                explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
-                ret = new Value<null>(realm::null());
-            }
-            else {
-                auto type = drv->m_args.type_for_argument(arg_no);
-                explain_value_message =
-                    util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
-                switch (type) {
-                    case type_Int:
-                        ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
-                        break;
-                    case type_String:
-                        ret = new ConstantStringValue(drv->m_args.string_for_argument(arg_no));
-                        break;
-                    case type_Binary:
-                        ret = new ConstantBinaryValue(drv->m_args.binary_for_argument(arg_no));
-                        break;
-                    case type_Bool:
-                        ret = new Value<Bool>(drv->m_args.bool_for_argument(arg_no));
-                        break;
-                    case type_Float:
-                        ret = new Value<float>(drv->m_args.float_for_argument(arg_no));
-                        break;
-                    case type_Double: {
-                        // In realm-js all number type arguments are returned as double. If we don't cast to the
-                        // expected type, we would in many cases miss the option to use the optimized query node
-                        // instead of the general Compare class.
-                        double val = drv->m_args.double_for_argument(arg_no);
-                        switch (hint) {
-                            case type_Int:
-                            case type_Bool: {
-                                int64_t int_val = int64_t(val);
-                                // Only return an integer if it precisely represents val
-                                if (double(int_val) == val)
-                                    ret = new Value<int64_t>(int_val);
-                                else
-                                    ret = new Value<double>(val);
-                                break;
-                            }
-                            case type_Float:
-                                ret = new Value<float>(float(val));
-                                break;
-                            default:
-                                ret = new Value<double>(val);
-                                break;
-                        }
-                        break;
-                    }
-                    case type_Timestamp: {
-                        try {
-                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
-                        }
-                        catch (const std::exception&) {
-                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
-                        }
-                        break;
-                    }
-                    case type_ObjectId: {
-                        try {
-                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
-                        }
-                        catch (const std::exception&) {
-                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
-                        }
-                        break;
-                    }
-                    case type_Decimal:
-                        ret = new Value<Decimal128>(drv->m_args.decimal128_for_argument(arg_no));
-                        break;
-                    case type_UUID:
-                        ret = new Value<UUID>(drv->m_args.uuid_for_argument(arg_no));
-                        break;
-                    case type_Link:
-                        ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
-                        break;
-                    case type_TypedLink:
-                        if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
-                            ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
-                            break;
-                        }
-                        explain_value_message =
-                            util::format("%1 which links to %2", explain_value_message,
-                                         print_pretty_objlink(drv->m_args.objlink_for_argument(arg_no),
-                                                              drv->m_base_table->get_parent_group(), drv));
-                        break;
-                    default:
-                        break;
-                }
-            }
-            break;
-        }
+        default:
+            REALM_UNREACHABLE();
     }
-    if (!ret) {
-        throw InvalidQueryError(
-            util::format("Unsupported comparison between property of type '%1' and constant value: %2",
-                         get_data_type_name(hint), explain_value_message));
-    }
-    subexpr = std::unique_ptr<Subexpr>{ret};
 } 
 
 void SubexprVisitor::visitPostOp(PostOpNode& node){
@@ -2887,20 +2964,5 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_subexpr_node(json json){
 } // namespace realm
 
 std::unique_ptr<ConstantNode> JsonQueryParser::constant_node(realm::Mixed value) {
-    ConstantNode::Type type;
-    std::string string_value;
-    switch (value.get_type()) {
-        case realm::DataType::Type::String:
-            type = ConstantNode::Type::STRING;
-            string_value = realm::util::format("'%1'", value.get_string());
-            break;
-        case realm::DataType::Type::Int:
-            type = ConstantNode::Type::NUMBER;
-        default:
-            std::ostringstream stream;
-            stream << value;
-            string_value = stream.str();
-    }
-    auto constant_node = std::make_unique<ConstantNode>(type, string_value);
-    return constant_node;
+    return std::make_unique<ConstantNode>(value);
 }

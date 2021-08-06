@@ -11,7 +11,7 @@
   # include <string>
   namespace realm::query_parser {
     class ParserDriver;
-    class ConstantNode;
+    class QueryParserConstantNode;
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
@@ -110,7 +110,7 @@ using namespace realm::query_parser;
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
 %type  <int> equality relational stringop
-%type  <std::unique_ptr<ConstantNode>> constant
+%type  <std::unique_ptr<QueryParserConstantNode>> constant
 %type  <std::unique_ptr<PropertyNode>> prop
 %type  <std::unique_ptr<PostOpNode>> post_op
 %type  <std::unique_ptr<AggrNode>> aggr_op
@@ -222,22 +222,22 @@ list_content
     | list_content ',' constant
 
 constant
-    : NATURAL0                  { $$ = std::make_unique<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | NUMBER                    { $$ = std::make_unique<ConstantNode>(ConstantNode::NUMBER, $1); }
-    | INFINITY                  { $$ = std::make_unique<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
-    | NAN                       { $$ = std::make_unique<ConstantNode>(ConstantNode::NAN_VAL, $1); }
-    | STRING                    { $$ = std::make_unique<ConstantNode>(ConstantNode::STRING, $1); }
-    | BASE64                    { $$ = std::make_unique<ConstantNode>(ConstantNode::BASE64, $1); }
-    | FLOAT                     { $$ = std::make_unique<ConstantNode>(ConstantNode::FLOAT, $1); }
-    | TIMESTAMP                 { $$ = std::make_unique<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
-    | UUID                      { $$ = std::make_unique<ConstantNode>(ConstantNode::UUID_T, $1); }
-    | OID                       { $$ = std::make_unique<ConstantNode>(ConstantNode::OID, $1); }
-    | LINK                      { $$ = std::make_unique<ConstantNode>(ConstantNode::LINK, $1); }
-    | TYPED_LINK                { $$ = std::make_unique<ConstantNode>(ConstantNode::TYPED_LINK, $1); }
-    | TRUE                      { $$ = std::make_unique<ConstantNode>(ConstantNode::TRUE, ""); }
-    | FALSE                     { $$ = std::make_unique<ConstantNode>(ConstantNode::FALSE, ""); }
-    | NULL_VAL                  { $$ = std::make_unique<ConstantNode>(ConstantNode::NULL_VAL, ""); }
-    | ARG                       { $$ = std::make_unique<ConstantNode>(ConstantNode::ARG, $1); }
+    : NATURAL0                  { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::NUMBER, $1); }
+    | NUMBER                    { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::NUMBER, $1); }
+    | INFINITY                  { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::INFINITY_VAL, $1); }
+    | NAN                       { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::NAN_VAL, $1); }
+    | STRING                    { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::STRING, $1); }
+    | BASE64                    { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::BASE64, $1); }
+    | FLOAT                     { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::FLOAT, $1); }
+    | TIMESTAMP                 { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::TIMESTAMP, $1); }
+    | UUID                      { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::UUID_T, $1); }
+    | OID                       { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::OID, $1); }
+    | LINK                      { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::LINK, $1); }
+    | TYPED_LINK                { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::TYPED_LINK, $1); }
+    | TRUE                      { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::TRUE, ""); }
+    | FALSE                     { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::FALSE, ""); }
+    | NULL_VAL                  { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::NULL_VAL, ""); }
+    | ARG                       { $$ = std::make_unique<QueryParserConstantNode>(QueryParserConstantNode::ARG, $1); }
 
 boolexpr
     : "truepredicate"           { $$ = std::make_unique<TrueOrFalseNode>(true); }

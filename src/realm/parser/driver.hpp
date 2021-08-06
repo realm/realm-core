@@ -98,23 +98,20 @@ public:
     static constexpr int IN = 10;
 };
 
-class ValueNode : public ParserNode {
+class ConstantNode : public ParserNode {
 public:
-    std::unique_ptr<ConstantNode> constant = nullptr;
-    std::unique_ptr<PropertyNode> prop = nullptr;
+    ConstantNode(QueryValue value)
+        : value(value)
+    {
 
-    ValueNode(std::unique_ptr<ConstantNode>&& node)
-        : constant(std::move(node))
-    {
     }
-    ValueNode(std::unique_ptr<PropertyNode>&& node)
-        : prop(std::move(node))
-    {
-    }
+
     void accept(NodeVisitor& visitor) override;
+
+    QueryValue value;
 };
 
-class ConstantNode : public ParserNode {
+class QueryParserConstantNode : public ConstantNode {
 public:
     enum Type {
         NUMBER,
@@ -134,21 +131,38 @@ public:
         ARG
     };
 
-    Type type;
     std::string text;
+    Type type;
 
-    ConstantNode(Type t, const std::string& str)
-        : type(t)
+    QueryParserConstantNode(Type t, const std::string& str)
+        : ConstantNode(realm::null())
         , text(str)
+        , type(t)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
-    void accept(NodeVisitor& visitor) override;
+    QueryValue reduce(DataType hint);
 };
 
 class PropertyNode : public ParserNode {
 public:
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
+};
+
+class ValueNode : public ParserNode {
+public:
+    std::unique_ptr<ConstantNode> constant = nullptr;
+    std::unique_ptr<PropertyNode> prop = nullptr;
+
+    ValueNode(std::unique_ptr<ConstantNode>&& node)
+        : constant(std::move(node))
+    {
+    }
+    ValueNode(std::unique_ptr<PropertyNode>&& node)
+        : prop(std::move(node))
+    {
+    }
+    void accept(NodeVisitor& visitor) override;
 };
 
 class EqualityNode : public CompareNode {
