@@ -2298,7 +2298,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
 }
 
 
-VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool commit_to_disk)
+VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2322,7 +2322,7 @@ VersionID Transaction::commit_and_continue_as_read(bool with_held_lock, bool com
     db->release_read_lock(m_read_lock);
     m_read_lock = new_read_lock;
 
-    if (!with_held_lock)
+    if (!m_holds_write_mutex)
         db->do_end_write();
 
     // Remap file if it has grown, and update refs in underlying node structure
@@ -3001,6 +3001,7 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         // is allowed to re-request it.
         db->release_read_lock(read_lock);
         db->do_end_write();
+        m_holds_write_mutex = false;
         when_synchronized();
         m_is_synchronizing = false;
     });

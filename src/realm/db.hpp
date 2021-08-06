@@ -603,9 +603,9 @@ public:
     void end_read();
 
     // Live transactions state changes, often taking an observer functor:
-    VersionID commit_and_continue_as_read(bool with_held_lock = false, bool without_sync = false);
+    VersionID commit_and_continue_as_read(bool commit_to_disk = true);
     template <class O>
-    void rollback_and_continue_as_read(O* observer, bool with_held_lock = false);
+    void rollback_and_continue_as_read(O* observer);
     void rollback_and_continue_as_read()
     {
         _impl::NullInstructionObserver* o = nullptr;
@@ -619,7 +619,7 @@ public:
         advance_read(o, target_version);
     }
     template <class O>
-    bool promote_to_write(O* observer, bool nonblocking = false, bool with_held_lock = false);
+    bool promote_to_write(O* observer, bool nonblocking = false);
     bool promote_to_write(bool nonblocking = false)
     {
         _impl::NullInstructionObserver* o = nullptr;
@@ -695,31 +695,6 @@ public:
     };
 
     // methods for use with async interface for cont. transactions
-    template <class O>
-    void promote_to_write_with_lock_held(O* observer)
-    {
-        promote_to_write(observer, false, true);
-    }
-    void promote_to_write_with_lock_held()
-    {
-        _impl::NullInstructionObserver* o = nullptr;
-        promote_to_write_with_lock_held(o);
-    }
-    void commit_and_continue_with_lock_held()
-    {
-        // don't release lock, don't sync to disk:
-        commit_and_continue_as_read(true, true);
-    }
-    template <class O>
-    void rollback_with_lock_held(O* observer)
-    {
-        rollback_and_continue_as_read(observer, true);
-    }
-    void rollback_with_lock_held()
-    {
-        _impl::NullInstructionObserver* o = nullptr;
-        rollback_with_lock_held(o);
-    }
     DB::ReadLockInfo grab_read_lock()
     {
         DB::ReadLockInfo rli;
@@ -966,12 +941,12 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
 }
 
 template <class O>
-inline bool Transaction::promote_to_write(O* observer, bool nonblocking, bool with_held_lock)
+inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 {
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    if (!with_held_lock) {
+    if (!m_holds_write_mutex) {
         if (nonblocking) {
             bool succes = db->do_try_begin_write();
             if (!succes) {
@@ -1003,7 +978,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking, bool wi
             create_empty_group(); // Throws
     }
     catch (...) {
-        if (!with_held_lock)
+        if (!m_holds_write_mutex)
             db->do_end_write();
         m_history = nullptr;
         throw;
@@ -1014,7 +989,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking, bool wi
 }
 
 template <class O>
-inline void Transaction::rollback_and_continue_as_read(O* observer, bool with_held_lock)
+inline void Transaction::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
@@ -1049,7 +1024,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer, bool with_he
     update_allocator_wrappers(false);
     advance_transact(top_ref, reversed_in, false); // Throws
 
-    if (!with_held_lock)
+    if (!m_holds_write_mutex)
         db->do_end_write();
 
     repl->abort_transact();

@@ -705,7 +705,7 @@ void RealmCoordinator::wake_up_notifier_worker()
     }
 }
 
-void RealmCoordinator::commit_write(Realm& realm, bool with_lock_held, bool commit_to_disk)
+void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
 {
     REALM_ASSERT(!m_config.immutable());
     REALM_ASSERT(realm.is_in_transaction());
@@ -717,7 +717,7 @@ void RealmCoordinator::commit_write(Realm& realm, bool with_lock_held, bool comm
         // perform a write and notify us before we get the chance to set the
         // skip version
         util::CheckedLockGuard l(m_notifier_mutex);
-        new_version = tr.commit_and_continue_as_read(with_lock_held, commit_to_disk);
+        new_version = tr.commit_and_continue_as_read(commit_to_disk);
 
         // The skip version must always be the notifier transaction's current
         // version plus one, as we can only skip a prefix and not intermediate
@@ -1163,7 +1163,7 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
     return version != sg->get_version_of_current_transaction();
 }
 
-void RealmCoordinator::promote_to_write(Realm& realm, bool with_lock_held)
+void RealmCoordinator::promote_to_write(Realm& realm)
 {
     REALM_ASSERT(!realm.is_in_transaction());
 
@@ -1173,7 +1173,7 @@ void RealmCoordinator::promote_to_write(Realm& realm, bool with_lock_held)
 
     // FIXME: we probably won't actually want a strong pointer here
     auto tr = Realm::Internal::get_transaction_ref(realm);
-    transaction::begin(tr, realm.m_binding_context.get(), notifiers, with_lock_held);
+    transaction::begin(tr, realm.m_binding_context.get(), notifiers);
 }
 
 void RealmCoordinator::process_available_async(Realm& realm)

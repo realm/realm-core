@@ -773,26 +773,26 @@ TEST_CASE("SharedRealm: async_writes") {
     auto realm = Realm::get_shared_realm(config);
     int write_nr = 0;
     int commit_nr = 0;
-    realm->async_transaction(false, [&]() {
+    realm->async_begin_transaction(false, [&]() {
         REQUIRE(write_nr == 0);
         ++write_nr;
         auto table = realm->read_group().get_table("class_object");
         auto col = table->get_column_key("value");
         table->create_object().set(col, 45);
-        realm->async_commit([&]() {
+        realm->async_commit_transaction([&]() {
             REQUIRE(commit_nr == 0);
             ++commit_nr;
         });
     });
     for (int expected = 1; expected < 1000; ++expected) {
-        realm->async_transaction(false, [&, expected]() {
+        realm->async_begin_transaction(false, [&, expected]() {
             REQUIRE(write_nr == expected);
             ++write_nr;
             auto table = realm->read_group().get_table("class_object");
             auto col = table->get_column_key("value");
             auto o = table->get_object(0);
             o.set(col, o.get<int64_t>(col) + 37);
-            realm->async_commit(
+            realm->async_commit_transaction(
                 [&]() {
                     ++commit_nr;
                     done = commit_nr == 1000;
@@ -860,7 +860,7 @@ TEST_CASE("SharedRealm: async_writes_2") {
         auto table = realm->read_group().get_table("class_object");
         auto col = table->get_column_key("value");
         table->create_object().set(col, 45);
-        realm->async_commit([&]() {
+        realm->async_commit_transaction([&]() {
             REQUIRE(commit_nr == 0);
             ++commit_nr;
         });
@@ -871,15 +871,15 @@ TEST_CASE("SharedRealm: async_writes_2") {
         auto col = table->get_column_key("value");
         auto o = table->get_object(0);
         o.set(col, o.get<int64_t>(col) + 37);
-        realm->async_commit([&]() {
+        realm->async_commit_transaction([&]() {
             ++commit_nr;
             done = true;
         });
     });
-    realm->async_transaction(true, [&]() {
+    realm->async_begin_transaction(true, [&]() {
         *t1_rdy = true;
     });
-    realm->async_transaction(true, [&]() {
+    realm->async_begin_transaction(true, [&]() {
         *t2_rdy = true;
     });
     util::EventLoop::main().run_until([&] {
