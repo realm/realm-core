@@ -645,6 +645,11 @@ void Realm::run_async_completions()
 
 void Realm::run_writes()
 {
+    if (!m_transaction) {
+        // Realm might have been closed
+        m_async_write_q.clear();
+        return;
+    }
     REALM_ASSERT(m_transaction->holds_write_mutex());
     REALM_ASSERT(!m_transaction->is_synchronizing());
     m_is_running_async_writes = true;
@@ -715,8 +720,8 @@ Realm::async_handle Realm::async_begin_transaction(bool notify_only, const std::
 
     // make sure we have a (at least a) read transaction
     auto& trans = transaction();
-    auto retain_self = shared_from_this();
-    m_async_write_q.push_back({retain_self, std::move(the_write_block), notify_only});
+    std::weak_ptr<Realm> weak_self = shared_from_this();
+    m_async_write_q.push_back({std::move(the_write_block), notify_only});
     if (m_is_running_async_writes) {
         return 0;
     }
@@ -724,20 +729,20 @@ Realm::async_handle Realm::async_begin_transaction(bool notify_only, const std::
     REALM_ASSERT(m_scheduler);
     REALM_ASSERT(m_scheduler->can_schedule_writes());
     // TODO: We should not do this so often:
-    m_scheduler->set_schedule_writes_callback([r = this]() {
-        r->run_writes();
+    m_scheduler->set_schedule_writes_callback([weak_self]() {
+        if (auto r = weak_self.lock())
+            r->run_writes();
     });
-    m_scheduler->set_schedule_completions_callback([r = this]() {
-        r->run_async_completions();
+    m_scheduler->set_schedule_completions_callback([weak_self]() {
+        if (auto r = weak_self.lock())
+            r->run_async_completions();
     });
     if (!m_has_requested_write_mutex) {
         m_has_requested_write_mutex = true;
-        trans.async_request_write_mutex([&]() {
-            // must also hold inside "run_writes":
-            REALM_ASSERT(trans.holds_write_mutex());
-            REALM_ASSERT(!trans.is_synchronizing());
+        trans.async_request_write_mutex([weak_self]() {
             // callback happens on a different thread so...:
-            run_writes_on_proper_thread();
+            if (auto r = weak_self.lock())
+                r->run_writes_on_proper_thread();
         });
     }
     return 0;
