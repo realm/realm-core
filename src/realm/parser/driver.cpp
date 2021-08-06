@@ -2951,7 +2951,6 @@ Query JsonQueryParser::query_from_json(TableRef table, json json)
     }
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
     ParserDriver driver(table, *no_arguments, KeyPathMapping());
-    PrintingVisitor(std::cout).visitAnd(*and_node);
     std::unique_ptr<DescriptorOrdering> order = QueryVisitor(&driver).getDescriptorOrdering(don);
     return QueryVisitor(&driver).visit(*and_node).set_ordering(std::move(order));
 }
