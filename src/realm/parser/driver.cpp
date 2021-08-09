@@ -3058,6 +3058,14 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
             float value = fragment["value"].get<float>();
             const_node = get_constant_node(value);
         }
+        if (fragment["type"] == "long") {
+            int64_t value = fragment["value"].get<int64_t>();
+            const_node = get_constant_node(value);
+        }
+        if (fragment["type"] == "double") {
+            double value = fragment["value"].get<double>();
+            const_node = get_constant_node(value);
+        }
         auto value_node = std::make_unique<ValueNode>(std::move(const_node));
         return value_node;
     }
@@ -3078,6 +3086,10 @@ std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed va
             type = ConstantNode::Type::NUMBER;
             stream << value;
             string_value = stream.str();
+            break;
+        case realm::DataType::Type::Double:
+            type = ConstantNode::Type::FLOAT;
+            string_value = std::to_string(value.get_double());
             break;
         case realm::DataType::Type::Float:
             type = ConstantNode::Type::FLOAT;
