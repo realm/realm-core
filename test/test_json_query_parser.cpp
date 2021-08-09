@@ -10,9 +10,11 @@ using json = nlohmann::json;
 json int_const = { {"kind", "constant"}, {"value", 3}, {"type", "int"} };
 json string_const = { {"kind", "constant"}, {"value", "Bob"}, {"type", "string"} };
 json float_const = { {"kind", "constant"}, {"value", 2.22}, {"type", "float"} };
+json long_const = { {"kind", "constant"}, {"value", LONG_MAX}, {"type", "long"} };
 json int_prop = { {"kind", "property"}, {"name", "age"}, {"type", "int"} };
 json string_prop = { {"kind", "property"}, {"name", "name"}, {"type", "string"} };
 json float_prop = { {"kind", "property"}, {"name", "fee"}, {"type", "float"} };
+json long_prop = { {"kind", "property"}, {"name", "salary"}, {"type", "long"} };
 
 //string_ops consts
 json begins_with_const = { {"kind", "constant"}, {"value", "Bi"}, {"type", "string"} };
@@ -43,6 +45,13 @@ json float_gt = { {"kind", "gt"}, {"left", float_prop}, {"right", float_const}};
 json float_gte = { {"kind", "gte"}, {"left", float_prop}, {"right", float_const}};
 json float_lt = { {"kind", "lt"}, {"left", float_prop}, {"right", float_const}};
 json float_lte = { {"kind", "lte"}, {"left", float_prop}, {"right", float_const}};
+
+json long_eq = { {"kind", "eq"}, {"left", long_prop}, {"right", long_const}};
+json long_neq = { {"kind", "neq"}, {"left", long_prop}, {"right", long_const}};
+json long_gt = { {"kind", "gt"}, {"left", long_prop}, {"right", long_const}};
+json long_gte = { {"kind", "gte"}, {"left", long_prop}, {"right", long_const}};
+json long_lt = { {"kind", "lt"}, {"left", long_prop}, {"right", long_const}};
+json long_lte = { {"kind", "lte"}, {"left", long_prop}, {"right", long_const}};
 
 //commutative expressions
 json int_commutative_eq = { {"kind", "eq"}, {"left", int_const}, {"right", int_prop}};
@@ -96,14 +105,16 @@ TEST(test_json_query_parser_simple)
     TableRef t = g.add_table(table_name);
     t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
-    t->add_column(type_Float, "fee", true);
+    t->add_column(type_Float, "fee");
+    t->add_column(type_Int, "salary");
 
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
+    std::vector<long> salary = {10000, LONG_MAX, -3000, 2134, 5000};
     std::vector<ObjKey> keys;
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), float(fees[i]));
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), float(fees[i]), int64_t(salary[i]));
     }
 
     verify_query(test_context, t, simple_query(int_eq), 1);
@@ -126,6 +137,13 @@ TEST(test_json_query_parser_simple)
     verify_query(test_context, t, simple_query(float_gte), 4);
     verify_query(test_context, t, simple_query(float_lt), 1);
     verify_query(test_context, t, simple_query(float_lte), 2);
+
+    verify_query(test_context, t, simple_query(long_eq), 1);
+    verify_query(test_context, t, simple_query(long_neq), 4);
+    verify_query(test_context, t, simple_query(long_gt), 0);
+    verify_query(test_context, t, simple_query(long_gte), 1);
+    verify_query(test_context, t, simple_query(long_lt), 4);
+    verify_query(test_context, t, simple_query(long_lte), 5);
 
     verify_query(test_context, t, simple_query(int_commutative_eq), 1);
     verify_query(test_context, t, simple_query(string_commutative_eq), 1);
@@ -166,8 +184,6 @@ json multiple_where(std::vector<json> whereClauses){
         expr["expression"] = e;
         q["whereClauses"].emplace_back(expr);
     }
-    std::string test = q.dump();
-    std::cout << test << std::endl;
     return q;
 }
 
