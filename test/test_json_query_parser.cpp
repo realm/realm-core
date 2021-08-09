@@ -158,6 +158,19 @@ json not_query(json pred){
     return j;
 }
 
+json multiple_where(std::vector<json> whereClauses){
+    json q;
+    q["whereClauses"] = json::array();
+    for (json e: whereClauses){
+        json expr = json::object();
+        expr["expression"] = e;
+        q["whereClauses"].emplace_back(expr);
+    }
+    std::string test = q.dump();
+    std::cout << test << std::endl;
+    return q;
+}
+
 TEST(test_json_query_parser_logical){
     Group g;
     std::string table_name = "person";
@@ -183,6 +196,14 @@ TEST(test_json_query_parser_logical){
     verify_query(test_context, t, not_query(string_neq), 1);
     verify_query(test_context, t, not_query(float_gt), 2);
     verify_query(test_context, t, not_query(int_lte), 1);
+
+    std::vector<json> whereClauses;
+    whereClauses.emplace_back(string_lt);
+    whereClauses.emplace_back(int_lt);
+    //should logically be the same as (string_lt && int_lt)
+    verify_query(test_context, t, multiple_where(whereClauses), 1);
+
+
 }
 
 TableView get_sorted_view(TableRef t, json json)
