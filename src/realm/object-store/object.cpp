@@ -36,7 +36,6 @@ CreatePolicy CreatePolicy::SetLink = {/*.create =*/true, /*.copy =*/false, /*.up
 
 Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
 {
-    REALM_ASSERT(frozen_realm->is_frozen());
     return Object(frozen_realm, frozen_realm->import_copy_of(m_obj));
 }
 

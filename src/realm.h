@@ -1256,8 +1256,6 @@ RLM_API bool realm_object_delete(realm_object_t*);
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
  *
- * Note: Will assert that frozen_realm is in fact frozen.
- *
  * @return A frozen copy of the live object.
  */
 RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm);
@@ -1426,8 +1424,6 @@ RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
  * Map the list into a frozen Realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
- *
- * Note: Will assert that frozen_realm is in fact frozen.
  *
  * @return A frozen copy of the live list.
  */
@@ -1836,8 +1832,6 @@ RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
  * Map the results into a frozen realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
- *
- * Note: Will assert that frozen_realm is in fact frozen.
  *
  * @return A frozen copy of the Results.
  */
