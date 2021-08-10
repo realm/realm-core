@@ -81,9 +81,6 @@ public:
 
     Results filter(Query q) const;
 
-    // Return a Results representing a snapshot of this List.
-    Results snapshot() const;
-
     // Returns a frozen copy of this List.
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
     List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
