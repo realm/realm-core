@@ -1790,4 +1790,40 @@ TEST(StringIndex_QuerySingleObject)
     CHECK_EQUAL(q.count(), 0);
 }
 
+TEST(StringIndex_MixedEqualBitPattern)
+{
+    Group g;
+    auto table = g.add_table("foo");
+    auto col = table->add_column(type_Mixed, "any");
+    table->add_search_index(col);
+
+    Mixed val1(int64_t(0x6867666564636261));
+    table->create_object().set(col, Mixed("abcdefgh"));
+    // From single value to list
+    table->create_object().set(col, val1);
+
+    auto tv = table->where().equal(col, val1).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_object(0).get_any(col), val1);
+
+    table->clear();
+    table->create_object().set(col, Mixed("abcdefgh"));
+    table->create_object().set(col, Mixed("abcdefgh"));
+    // Insert in existing list
+    table->create_object().set(col, val1);
+
+    tv = table->where().equal(col, val1).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_object(0).get_any(col), val1);
+    tv = table->where().equal(col, Mixed("abcdefgh")).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    // Add another one into existing list
+    table->create_object().set(col, val1);
+    tv = table->where().equal(col, val1).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_object(0).get_any(col), val1);
+    CHECK_EQUAL(tv.get_object(1).get_any(col), val1);
+}
+
 #endif // TEST_INDEX_STRING

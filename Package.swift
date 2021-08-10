@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.8.1"
+let versionStr = "11.2.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -59,9 +59,6 @@ let syncExcludes: [String] = [
     "realm/sync/server_index_command.cpp",
     "realm/sync/stat_command.cpp",
     "realm/sync/verify_server_file_command.cpp",
-
-    // Misc unused
-    "realm/sync/changeset_cooker.cpp"
 ]
 
 let notSyncServerSources: [String] = [
@@ -130,8 +127,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_history_impl.cpp",
     "realm/sync/noinst/client_impl_base.cpp",
     "realm/sync/noinst/client_reset.cpp",
-    "realm/sync/noinst/client_state_download.cpp",
-    "realm/sync/noinst/common_dir.cpp",
+    "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/compact_changesets.cpp",
     "realm/sync/noinst/compression.cpp",
     "realm/sync/noinst/file_descriptors.cpp",
@@ -208,7 +204,6 @@ let bidExcludes: [String] = [
     "bid128_tgamma.c",
     "bid128_to_int16.c",
     "bid128_to_int32.c",
-    "bid128_to_int64.c",
     "bid128_to_int8.c",
     "bid128_to_uint16.c",
     "bid128_to_uint32.c",
@@ -373,6 +368,7 @@ let bidExcludes: [String] = [
 let headers: [String] = [
     "dogless.hpp",
     "realm.hpp",
+    "realm/aggregate_ops.hpp",
     "realm/alloc.hpp",
     "realm/alloc_slab.hpp",
     "realm/array.hpp",
@@ -467,7 +463,6 @@ let headers: [String] = [
     "realm/object-store/impl/object_notifier.hpp",
     "realm/object-store/impl/realm_coordinator.hpp",
     "realm/object-store/impl/results_notifier.hpp",
-    "realm/object-store/impl/set_notifier.hpp",
     "realm/object-store/impl/transact_log_handler.hpp",
     "realm/object-store/impl/weak_realm_notifier.hpp",
     "realm/object-store/impl/windows/external_commit_helper.hpp",
@@ -547,7 +542,6 @@ let headers: [String] = [
     "realm/sync/access_token.hpp",
     "realm/sync/auth.hpp",
     "realm/sync/changeset.hpp",
-    "realm/sync/changeset_cooker.hpp",
     "realm/sync/changeset_encoder.hpp",
     "realm/sync/changeset_parser.hpp",
     "realm/sync/client.hpp",
@@ -569,9 +563,8 @@ let headers: [String] = [
     "realm/sync/noinst/client_history_impl.hpp",
     "realm/sync/noinst/client_impl_base.hpp",
     "realm/sync/noinst/client_reset.hpp",
-    "realm/sync/noinst/client_state_download.hpp",
+    "realm/sync/noinst/client_reset_operation.hpp",
     "realm/sync/noinst/command_line_util.hpp",
-    "realm/sync/noinst/common_dir.hpp",
     "realm/sync/noinst/compact_changesets.hpp",
     "realm/sync/noinst/compression.hpp",
     "realm/sync/noinst/file_descriptors.hpp",
@@ -629,6 +622,7 @@ let headers: [String] = [
     "realm/util/fixed_size_buffer.hpp",
     "realm/util/flat_map.hpp",
     "realm/util/from_chars.hpp",
+    "realm/util/functional.hpp",
     "realm/util/function_ref.hpp",
     "realm/util/get_file_size.hpp",
     "realm/util/hex_dump.hpp",
@@ -837,6 +831,8 @@ let package = Package(
                 "notifications-fuzzer",
                 "query.json",
                 "sync-1.x.realm",
+                "sync-metadata-v4.realm",
+                "sync-metadata-v5.realm",
                 "sync/session/session_util.hpp",
                 "sync/sync_test_utils.hpp",
                 "test_backup-olden-and-golden.realm",

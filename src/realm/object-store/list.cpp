@@ -42,27 +42,10 @@ struct ListType<Obj> {
 namespace realm {
 using namespace _impl;
 
-List::List() noexcept = default;
-List::~List() = default;
-
 List::List(const List&) = default;
 List& List::operator=(const List&) = default;
 List::List(List&&) = default;
 List& List::operator=(List&&) = default;
-
-List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-    : Collection(std::move(r), parent_obj, col)
-    , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
-    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
-{
-}
-
-List::List(std::shared_ptr<Realm> r, const LstBase& list)
-    : Collection(std::move(r), list)
-    , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
-    , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
-{
-}
 
 Query List::get_query() const
 {
@@ -73,7 +56,7 @@ ConstTableRef List::get_table() const
 {
     verify_attached();
     if (m_type == PropertyType::Object)
-        return m_list_base->get_target_table();
+        return list_base().get_target_table();
     throw std::runtime_error("not implemented");
 }
 
@@ -164,20 +147,20 @@ void List::move(size_t source_ndx, size_t dest_ndx)
     if (source_ndx == dest_ndx)
         return;
 
-    m_list_base->move(source_ndx, dest_ndx);
+    list_base().move(source_ndx, dest_ndx);
 }
 
 void List::remove(size_t row_ndx)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx);
-    m_list_base->remove(row_ndx, row_ndx + 1);
+    list_base().remove(row_ndx, row_ndx + 1);
 }
 
 void List::remove_all()
 {
     verify_in_transaction();
-    m_list_base->clear();
+    list_base().clear();
 }
 
 template <typename T>
@@ -193,25 +176,25 @@ void List::insert_any(size_t row_ndx, Mixed value)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx, true);
-    m_list_base->insert_any(row_ndx, value);
+    list_base().insert_any(row_ndx, value);
 }
 
 void List::set_any(size_t row_ndx, Mixed value)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx);
-    m_list_base->set_any(row_ndx, value);
+    list_base().set_any(row_ndx, value);
 }
 
 Mixed List::get_any(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return m_list_base->get_any(row_ndx);
+    return list_base().get_any(row_ndx);
 }
 
 size_t List::find_any(Mixed value) const
 {
-    return m_list_base->find_any(value);
+    return list_base().find_any(value);
 }
 
 template <>
@@ -263,7 +246,7 @@ void List::swap(size_t ndx1, size_t ndx2)
     verify_in_transaction();
     verify_valid_row(ndx1);
     verify_valid_row(ndx2);
-    m_list_base->swap(ndx1, ndx2);
+    list_base().swap(ndx1, ndx2);
 }
 
 void List::delete_at(size_t row_ndx)
@@ -273,7 +256,7 @@ void List::delete_at(size_t row_ndx)
     if (m_type == PropertyType::Object)
         as<Obj>().remove_target_row(row_ndx);
     else
-        m_list_base->remove(row_ndx, row_ndx + 1);
+        list_base().remove(row_ndx, row_ndx + 1);
 }
 
 void List::delete_all()
@@ -282,36 +265,13 @@ void List::delete_all()
     if (m_type == PropertyType::Object)
         as<Obj>().remove_all_target_rows();
     else
-        m_list_base->clear();
-}
-
-Results List::sort(SortDescriptor order) const
-{
-    verify_attached();
-    if ((m_type == PropertyType::Object)) {
-        return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), util::none, std::move(order));
-    }
-    else {
-        DescriptorOrdering o;
-        o.append_sort(order);
-        return Results(m_realm, m_list_base, std::move(o));
-    }
-}
-
-Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
-{
-    return as_results().sort(keypaths);
+        list_base().clear();
 }
 
 Results List::filter(Query q) const
 {
     verify_attached();
-    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), get_query().and_query(std::move(q)));
-}
-
-Results List::snapshot() const
-{
-    return as_results().snapshot();
+    return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_coll_base), get_query().and_query(std::move(q)));
 }
 
 // The simpler definition of void_t below does not work in gcc 4.9 due to a bug
@@ -366,12 +326,11 @@ util::Optional<Mixed> List::max(ColKey col) const
     if (get_type() == PropertyType::Object)
         return as_results().max(col);
     size_t out_ndx = not_found;
-    auto result = m_list_base->max(&out_ndx);
-    if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
-                                                             "max");
+    auto result = list_base().max(&out_ndx);
+    if (!result) {
+        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "max");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 util::Optional<Mixed> List::min(ColKey col) const
@@ -380,12 +339,11 @@ util::Optional<Mixed> List::min(ColKey col) const
         return as_results().min(col);
 
     size_t out_ndx = not_found;
-    auto result = m_list_base->min(&out_ndx);
-    if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
-                                                             "min");
+    auto result = list_base().min(&out_ndx);
+    if (!result) {
+        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "min");
     }
-    return out_ndx == not_found ? none : util::make_optional(result);
+    return out_ndx == not_found ? none : result;
 }
 
 Mixed List::sum(ColKey col) const
@@ -393,12 +351,11 @@ Mixed List::sum(ColKey col) const
     if (get_type() == PropertyType::Object)
         return *as_results().sum(col);
 
-    auto result = m_list_base->sum();
-    if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
-                                                             "sum");
+    auto result = list_base().sum();
+    if (!result) {
+        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "sum");
     }
-    return result;
+    return *result;
 }
 
 util::Optional<Mixed> List::average(ColKey col) const
@@ -406,31 +363,29 @@ util::Optional<Mixed> List::average(ColKey col) const
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
     size_t count = 0;
-    auto result = m_list_base->avg(&count);
-    if (result.is_null()) {
-        throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(),
-                                                             "average");
+    auto result = list_base().avg(&count);
+    if (!result) {
+        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "average");
     }
-    return count == 0 ? none : util::make_optional(result);
+    return count == 0 ? none : result;
 }
 
 bool List::operator==(List const& rgt) const noexcept
 {
-    return m_list_base->get_table() == rgt.m_list_base->get_table() &&
-           m_list_base->get_key() == rgt.m_list_base->get_key() &&
-           m_list_base->get_col_key() == rgt.m_list_base->get_col_key();
+    return list_base().get_table() == rgt.list_base().get_table() &&
+           list_base().get_owner_key() == rgt.list_base().get_owner_key() &&
+           list_base().get_col_key() == rgt.list_base().get_col_key();
 }
 
 List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
 {
-    REALM_ASSERT(frozen_realm->is_frozen());
-    return List(frozen_realm, *frozen_realm->import_copy_of(*m_list_base));
+    return List(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
 }
 
 List List::thaw(std::shared_ptr<Realm> const& live_realm) const
 {
     REALM_ASSERT(!live_realm->is_frozen());
-    return List(live_realm, *live_realm->import_copy_of(*m_list_base));
+    return List(live_realm, *live_realm->import_copy_of(*m_coll_base));
 }
 
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \
@@ -462,24 +417,9 @@ REALM_PRIMITIVE_LIST_TYPE(util::Optional<UUID>)
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm
 
-namespace {
-size_t hash_combine()
-{
-    return 0;
-}
-template <typename T, typename... Rest>
-size_t hash_combine(const T& v, Rest... rest)
-{
-    size_t h = hash_combine(rest...);
-    h ^= std::hash<T>()(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    return h;
-}
-} // namespace
-
 namespace std {
 size_t hash<List>::operator()(List const& list) const
 {
-    auto& impl = *list.m_list_base;
-    return hash_combine(impl.get_key().value, impl.get_table()->get_key().value, impl.get_col_key().value);
+    return list.hash();
 }
 } // namespace std

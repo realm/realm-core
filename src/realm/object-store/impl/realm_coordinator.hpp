@@ -245,7 +245,7 @@ private:
     void open_db();
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
-    void create_sync_session(bool force_client_resync);
+    void create_sync_session();
     std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config,
                                                std::shared_ptr<util::Scheduler> scheduler = nullptr)
         REQUIRES(m_realm_mutex);

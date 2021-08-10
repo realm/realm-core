@@ -354,6 +354,7 @@ tasks:
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -361,6 +362,7 @@ tasks:
       test_filter: StorageTests
 
 - name: benchmark-common-tasks
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -368,6 +370,7 @@ tasks:
       path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
 
 - name: benchmark-crud
+  exec_timeout_secs: 1800
   tags: [ "benchmark" ]
   commands:
   - func: "run benchmark"
@@ -376,6 +379,7 @@ tasks:
 
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
@@ -384,10 +388,9 @@ tasks:
 
 - name: object-store-tests
   tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
-    vars:
-      enable_logging: true
   # If we need to start a local copy of baas, do it in the background here in a separate script.
   # Evergreen should take care of the lifetime of the processes we start here automatically.
   - command: shell.exec

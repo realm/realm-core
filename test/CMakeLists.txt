@@ -77,6 +77,7 @@ set(CORE_TEST_SOURCES
     test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
+    test_util_functional.cpp
     test_util_from_chars.cpp
     test_util_inspect.cpp
     test_util_logger.cpp
@@ -87,8 +88,8 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
-    test_uuid.cpp
-    test_version.cpp)
+	test_uuid.cpp
+    test_mixed_null_assertions.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
 	list(APPEND CORE_TEST_SOURCES test_encrypted_file_mapping.cpp)
@@ -195,7 +196,6 @@ if(REALM_ENABLE_SYNC)
 	    util/crypt_key.cpp
 	    util/demangle.cpp
 	    util/dump_changesets.cpp
-	    util/jsmn.cpp
 	    util/misc.cpp
 	    util/mock_metrics.cpp
 	    util/quote.cpp
@@ -216,7 +216,6 @@ if(REALM_ENABLE_SYNC)
 	    util/check_system_error.hpp
 	    util/crypt_key.hpp
 	    util/demangle.hpp
-	    util/jsmn.hpp
 	    util/misc.hpp
 	    util/mock_metrics.hpp
 	    util/number_names.hpp
@@ -245,6 +244,7 @@ if(REALM_ENABLE_SYNC)
 	    test_allocation_metrics.cpp
 	    test_array_sync.cpp
 	    test_async_open.cpp
+	    test_client_reset.cpp
 	    test_changeset_encoding.cpp
 	    test_crypto.cpp
 	    test_compact_changesets.cpp
@@ -258,7 +258,6 @@ if(REALM_ENABLE_SYNC)
 	    test_scratch_allocator.cpp
 	    test_stable_ids.cpp
 	    test_sync.cpp
-	    test_sync_cooked_history.cpp
 	    test_sync_auth.cpp
 	    test_sync_server_history_compaction.cpp
 	    test_sync_history_migration.cpp

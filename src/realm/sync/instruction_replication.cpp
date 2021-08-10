@@ -107,7 +107,7 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         return Instruction::Payload{};
     }
 
-    if (value.get_type() == type_Link) {
+    if (value.is_type(type_Link)) {
         ConstTableRef target_table = table.get_link_target(col_key);
         if (target_table->is_embedded()) {
             // FIXME: Include target table name to support Mixed of Embedded Objects.
@@ -119,13 +119,17 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
         link.target = primary_key_for_object(*target_table, value.get<ObjKey>());
         return Instruction::Payload{link};
     }
-    else if (value.get_type() == type_TypedLink) {
+    else if (value.is_type(type_TypedLink)) {
         auto obj_link = value.get<ObjLink>();
         ConstTableRef target_table = m_transaction->get_table(obj_link.get_table_key());
         REALM_ASSERT(target_table);
 
         if (target_table->is_embedded()) {
-            REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            ConstTableRef static_target_table = table.get_link_target(col_key);
+
+            if (static_target_table != target_table)
+                REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+            return Instruction::Payload::ObjectValue{};
         }
 
         Instruction::Payload::Link link;
@@ -273,7 +277,7 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
     }
 }
 
-void SyncReplication::create_object_with_primary_key(const Table* table, GlobalKey oid, Mixed value)
+void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey oid, Mixed value)
 {
     if (table->is_embedded()) {
         // Trying to create an object with a primary key in an embedded table.
@@ -411,10 +415,10 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -435,10 +439,10 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -481,10 +485,10 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -607,10 +611,10 @@ void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed&
 {
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
             return;
         }
-        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
             return;
         }
     }
@@ -711,7 +715,7 @@ bool SyncReplication::select_table(const Table& table)
 
 bool SyncReplication::select_collection(const CollectionBase& view)
 {
-    if (view.get_key().is_unresolved()) {
+    if (view.get_owner_key().is_unresolved()) {
         return false;
     }
 
@@ -775,7 +779,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             instr.path.m_path.reserve(size * 2);
         };
 
-        auto visitor = [&](const Obj& path_obj, ColKey next_field, size_t index) {
+        auto visitor = [&](const Obj& path_obj, ColKey next_field, Mixed index) {
             auto element_table = path_obj.get_table();
             if (element_table->is_embedded()) {
                 StringData field_name = element_table->get_column_name(next_field);
@@ -788,7 +792,11 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             }
 
             if (next_field.is_list()) {
-                instr.path.push_back(uint32_t(index));
+                instr.path.push_back(uint32_t(index.get_int()));
+            }
+            else if (next_field.is_dictionary()) {
+                InternString interned_field_name = m_encoder.intern_string(index.get_string());
+                instr.path.push_back(interned_field_name);
             }
         };
 
@@ -828,7 +836,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
 {
     ConstTableRef source_table = list.get_table();
-    ObjKey source_obj = list.get_key();
+    ObjKey source_obj = list.get_owner_key();
     ColKey source_field = list.get_col_key();
     populate_path_instr(instr, *source_table, source_obj, source_field);
 }

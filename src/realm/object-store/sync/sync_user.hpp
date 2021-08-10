@@ -40,7 +40,6 @@ namespace app {
 struct AppError;
 class MongoClient;
 } // namespace app
-
 class SyncSession;
 class SyncManager;
 
@@ -75,30 +74,96 @@ struct RealmJWT {
 
 struct SyncUserProfile {
     // The full name of the user.
-    util::Optional<std::string> name;
+    util::Optional<std::string> name() const
+    {
+        if (m_data.find("name") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("name"));
+    }
     // The email address of the user.
-    util::Optional<std::string> email;
+    util::Optional<std::string> email() const
+    {
+        if (m_data.find("email") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("email"));
+    }
     // A URL to the user's profile picture.
-    util::Optional<std::string> picture_url;
+    util::Optional<std::string> picture_url() const
+    {
+        if (m_data.find("picture_url") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("picture_url"));
+    }
     // The first name of the user.
-    util::Optional<std::string> first_name;
+    util::Optional<std::string> first_name() const
+    {
+        if (m_data.find("first_name") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("first_name"));
+    }
     // The last name of the user.
-    util::Optional<std::string> last_name;
+    util::Optional<std::string> last_name() const
+    {
+        if (m_data.find("last_name") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("last_name"));
+    }
     // The gender of the user.
-    util::Optional<std::string> gender;
+    util::Optional<std::string> gender() const
+    {
+        if (m_data.find("gender") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("gender"));
+    }
     // The birthdate of the user.
-    util::Optional<std::string> birthday;
+    util::Optional<std::string> birthday() const
+    {
+        if (m_data.find("birthday") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("birthday"));
+    }
     // The minimum age of the user.
-    util::Optional<std::string> min_age;
+    util::Optional<std::string> min_age() const
+    {
+        if (m_data.find("min_age") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("min_age"));
+    }
     // The maximum age of the user.
-    util::Optional<std::string> max_age;
+    util::Optional<std::string> max_age() const
+    {
+        if (m_data.find("max_age") == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>(m_data.at("max_age"));
+    }
 
-    SyncUserProfile(util::Optional<std::string> name, util::Optional<std::string> email,
-                    util::Optional<std::string> picture_url, util::Optional<std::string> first_name,
-                    util::Optional<std::string> last_name, util::Optional<std::string> gender,
-                    util::Optional<std::string> birthday, util::Optional<std::string> min_age,
-                    util::Optional<std::string> max_age);
+    bson::Bson operator[](const std::string& key) const
+    {
+        return m_data.at(key);
+    }
+
+    bson::BsonDocument data() const
+    {
+        return m_data;
+    }
+
+    SyncUserProfile(bson::BsonDocument&& data)
+        : m_data(std::move(data))
+    {
+    }
     SyncUserProfile() = default;
+
+private:
+    bson::BsonDocument m_data;
 };
 
 // A struct that represents an identity that a `User` is linked to
@@ -135,8 +200,9 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state, const std::string device_id,
-             std::shared_ptr<SyncManager> sync_manager);
+             std::string access_token, SyncUser::State state, const std::string device_id, SyncManager* sync_manager);
+
+    ~SyncUser();
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -226,14 +292,15 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<SyncManager> sync_manager() const
-    {
-        return m_sync_manager;
-    }
+    std::shared_ptr<SyncManager> sync_manager() const;
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name);
+
+protected:
+    friend class SyncManager;
+    void detach_from_sync_manager();
 
 private:
     static SyncUserContextFactory s_binding_context_factory;
@@ -277,7 +344,7 @@ private:
 
     const std::string m_device_id;
 
-    std::shared_ptr<SyncManager> m_sync_manager;
+    SyncManager* m_sync_manager;
 };
 
 } // namespace realm

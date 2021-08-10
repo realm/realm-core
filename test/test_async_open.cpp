@@ -43,7 +43,6 @@ TEST(AsyncOpen_NonExistingRealm)
     {
         Session::Config::ClientReset client_reset_config;
         client_reset_config.metadata_dir = std::string(metadata_dir);
-        client_reset_config.require_recent_state_realm = false;
         session_config.client_reset_config = client_reset_config;
     }
     Session session = fixture.make_session(path, session_config);
@@ -108,7 +107,6 @@ TEST(AsyncOpen_DisableStateRealms)
     {
         Session::Config::ClientReset client_reset_config;
         client_reset_config.metadata_dir = std::string(metadata_dir_2);
-        client_reset_config.require_recent_state_realm = false;
         session_config.client_reset_config = client_reset_config;
     }
     Session session = fixture.make_session(path_2, session_config);
@@ -167,7 +165,6 @@ TEST(AsyncOpen_StateRealmManagement)
     {
         Session::Config::ClientReset client_reset_config;
         client_reset_config.metadata_dir = std::string(metadata_dir_2);
-        client_reset_config.require_recent_state_realm = true;
         Session::Config session_config;
         session_config.client_reset_config = client_reset_config;
         Session session = fixture.make_session(path_2, session_config);

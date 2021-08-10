@@ -63,10 +63,6 @@ ResultsNotifier::ResultsNotifier(Results& target)
     , m_descriptor_ordering(target.get_descriptor_ordering())
     , m_target_is_in_table_order(target.is_in_table_order())
 {
-    auto table = m_query->get_table();
-    if (table) {
-        set_table(table);
-    }
 }
 
 void ResultsNotifier::release_data() noexcept
@@ -99,6 +95,14 @@ bool ResultsNotifier::get_tableview(TableView& out)
 bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 {
     m_info = &info;
+
+    // When adding or removing a callback the related tables can change due to the way we calculate related tables
+    // when key path filters are set hence we need to recalculate every time the callbacks are changed.
+    util::CheckedLockGuard lock(m_callback_mutex);
+    if (m_did_modify_callbacks) {
+        update_related_tables(*(m_query->get_table()));
+    }
+
     return m_query->get_table() && has_run() && have_callbacks();
 }
 
@@ -238,6 +242,7 @@ ListResultsNotifier::ListResultsNotifier(Results& target)
     : ResultsNotifierBase(target.get_realm())
     , m_list(target.get_collection())
 {
+    REALM_ASSERT(target.get_type() != PropertyType::Object);
     auto& ordering = target.get_descriptor_ordering();
     for (size_t i = 0, sz = ordering.size(); i < sz; i++) {
         auto descr = ordering[i];
@@ -273,7 +278,7 @@ bool ListResultsNotifier::do_add_required_change_info(TransactionChangeInfo& inf
         return false; // origin row was deleted after the notification was added
 
     info.lists.push_back(
-        {m_list->get_table()->get_key(), m_list->get_key().value, m_list->get_col_key().value, &m_change});
+        {m_list->get_table()->get_key(), m_list->get_owner_key().value, m_list->get_col_key().value, &m_change});
 
     m_info = &info;
     return true;

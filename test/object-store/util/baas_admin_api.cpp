@@ -293,6 +293,10 @@ app::Response do_http_request(const app::Request& request)
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
+    else if (request.method == app::HttpMethod::patch) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
+    }
     else if (request.method == app::HttpMethod::del) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());

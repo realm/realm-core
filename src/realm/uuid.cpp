@@ -16,9 +16,11 @@
  *
  **************************************************************************/
 
+#include <realm.hpp>
 #include <realm/uuid.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
+#include "realm/util/base64.hpp"
 #include <atomic>
 #include <cctype>
 
@@ -106,6 +108,18 @@ std::string UUID::to_string() const
         }
     }
     return ret;
+}
+
+std::string UUID::to_base64() const
+{
+    char bytes[UUID::num_bytes];
+    std::copy(std::begin(m_bytes), std::end(m_bytes), std::begin(bytes));
+    char* bytes_ptr = &bytes[0];
+
+    util::StringBuffer encode_buffer;
+    encode_buffer.resize(util::base64_encoded_size(UUID::num_bytes));
+    util::base64_encode(bytes_ptr, UUID::num_bytes, encode_buffer.data(), encode_buffer.size());
+    return encode_buffer.str();
 }
 
 } // namespace realm

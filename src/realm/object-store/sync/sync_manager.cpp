@@ -158,7 +158,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
             auto& provider_type = user_data.provider_type;
             auto user =
                 std::make_shared<SyncUser>(user_data.refresh_token, identity, provider_type, user_data.access_token,
-                                           user_data.state, user_data.device_id, shared_from_this());
+                                           user_data.state, user_data.device_id, this);
             user->update_identities(user_data.identities);
             m_users.emplace_back(std::move(user));
         }
@@ -215,6 +215,9 @@ void SyncManager::reset_for_testing()
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
+        for (auto& user : m_users) {
+            user->detach_from_sync_manager();
+        }
         m_users.clear();
         m_current_user = nullptr;
     }
@@ -326,7 +329,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
         // No existing user.
         auto new_user =
             std::make_shared<SyncUser>(std::move(refresh_token), user_id, provider_type, std::move(access_token),
-                                       SyncUser::State::LoggedIn, device_id, shared_from_this());
+                                       SyncUser::State::LoggedIn, device_id, this);
         m_users.emplace(m_users.begin(), new_user);
         if (!m_metadata_manager)
             m_current_user = new_user;
@@ -352,7 +355,11 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
     std::lock_guard<std::mutex> lock(m_user_mutex);
     m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
                                  [](auto& user) {
-                                     return user->state() == SyncUser::State::Removed;
+                                     bool should_remove = (user->state() == SyncUser::State::Removed);
+                                     if (should_remove) {
+                                         user->detach_from_sync_manager();
+                                     }
+                                     return should_remove;
                                  }),
                   m_users.end());
     return m_users;
@@ -444,6 +451,41 @@ void SyncManager::remove_user(const std::string& user_id)
             metadata.mark_for_removal();
         }
     }
+}
+
+SyncManager::~SyncManager()
+{
+    // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
+    // session->shutdown_and_wait() will modify th m_sessions map.
+    auto current_sessions = [&] {
+        std::lock_guard<std::mutex> lk(m_session_mutex);
+        std::vector<std::shared_ptr<SyncSession>> current_sessions;
+        std::transform(m_sessions.begin(), m_sessions.end(), std::back_inserter(current_sessions),
+                       [](const auto& session_kv) {
+                           return session_kv.second;
+                       });
+        return current_sessions;
+    }();
+
+    for (auto& session : current_sessions) {
+        session->detach_from_sync_manager();
+    }
+
+    // At this point we should have drained all the sessions.
+#ifdef REALM_DEBUG
+    {
+        std::lock_guard<std::mutex> lk(m_session_mutex);
+        REALM_ASSERT(m_sessions.empty());
+    }
+#endif
+
+    for (auto& user : m_users) {
+        user->detach_from_sync_manager();
+    }
+
+    // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+    if (m_sync_client)
+        m_sync_client->stop();
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
@@ -558,8 +600,7 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config,
-                                                      bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
 {
     auto& client = get_sync_client(); // Throws
 
@@ -569,7 +610,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, force_client_resync);
+    auto shared_session = SyncSession::create(client, path, sync_config, this);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
@@ -633,7 +674,7 @@ SyncClient& SyncManager::get_sync_client() const
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
-    return std::make_unique<SyncClient>(make_logger(), m_config, shared_from_this());
+    return std::make_unique<SyncClient>(make_logger(), m_config, weak_from_this());
 }
 
 std::string SyncManager::client_uuid() const

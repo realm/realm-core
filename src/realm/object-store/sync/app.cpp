@@ -142,6 +142,8 @@ App::App(const Config& config)
     m_sync_manager = std::make_shared<SyncManager>();
 }
 
+App::~App() {}
+
 void App::configure(const SyncClientConfig& sync_client_config)
 {
     // change the scheme in the base url to ws from http to satisfy the sync client
@@ -560,15 +562,8 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
             auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
 
-            sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
-                                                           get_optional<std::string>(profile_data, "email"),
-                                                           get_optional<std::string>(profile_data, "picture_url"),
-                                                           get_optional<std::string>(profile_data, "first_name"),
-                                                           get_optional<std::string>(profile_data, "last_name"),
-                                                           get_optional<std::string>(profile_data, "gender"),
-                                                           get_optional<std::string>(profile_data, "birthday"),
-                                                           get_optional<std::string>(profile_data, "min_age"),
-                                                           get_optional<std::string>(profile_data, "max_age")));
+            sync_user->update_user_profile(
+                SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(profile_data.dump()))));
 
             sync_user->set_state(SyncUser::State::LoggedIn);
             m_sync_manager->set_current_user(sync_user->identity());

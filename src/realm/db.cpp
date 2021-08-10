@@ -643,8 +643,7 @@ void spawn_daemon(const std::string& file)
         for (i = m - 1; i >= 0; --i)
             close(i);
 #ifdef REALM_ENABLE_LOGFILE
-        auto core_files = DB::get_core_files(file);
-        i = ::open((core_files[DB::CoreFileType::Log].first).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = ::open(get_core_file(CoreFileType::Log).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
@@ -763,9 +762,8 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         dg.release();
         return;
     }
-    auto core_files = DB::get_core_files(path);
-    m_lockfile_path = core_files[DB::CoreFileType::Lock].first;
-    m_coordination_dir = core_files[DB::CoreFileType::Management].first;
+    m_lockfile_path = get_core_file(path, CoreFileType::Lock);
+    m_coordination_dir = get_core_file(path, CoreFileType::Management);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
@@ -1231,7 +1229,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // with a bumped SharedInfo file format version, if there isn't.
                 if (info->file_format_version != target_file_format_version) {
                     std::stringstream ss;
-                    ss << "File format version deosn't match: " << info->file_format_version << " "
+                    ss << "File format version doesn't match: " << info->file_format_version << " "
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
@@ -2400,8 +2398,7 @@ void DB::reserve(size_t size)
 
 bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback)
 {
-    auto core_files = DB::get_core_files(realm_path);
-    auto lockfile_path(core_files[DB::CoreFileType::Lock].first);
+    auto lockfile_path = get_core_file(realm_path, CoreFileType::Lock);
 
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
@@ -2414,21 +2411,43 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     return false;
 }
 
-std::unordered_map<DB::CoreFileType, std::pair<std::string, bool>> DB::get_core_files(const std::string& realm_path)
+std::string DB::get_core_file(const std::string& base_path, CoreFileType type)
 {
-    std::unordered_map<CoreFileType, std::pair<std::string, bool>> core_files;
-
-    core_files[DB::CoreFileType::Lock] = std::make_pair(realm_path + ".lock", false);
-    core_files[DB::CoreFileType::Storage] = std::make_pair(realm_path, false);
-    core_files[DB::CoreFileType::Management] = std::make_pair(realm_path + ".management", true);
-    core_files[DB::CoreFileType::Note] = std::make_pair(realm_path + ".note", false);
-    core_files[DB::CoreFileType::Log] = std::make_pair(realm_path + ".log", false);
-    core_files[DB::CoreFileType::LogA] = std::make_pair(realm_path + ".log_a", false);
-    core_files[DB::CoreFileType::LogB] = std::make_pair(realm_path + ".log_b", false);
-
-    return core_files;
+    switch (type) {
+        case CoreFileType::Lock:
+            return base_path + ".lock";
+        case CoreFileType::Storage:
+            return base_path;
+        case CoreFileType::Management:
+            return base_path + ".management";
+        case CoreFileType::Note:
+            return base_path + ".note";
+        case CoreFileType::Log:
+            return base_path + ".log";
+        case CoreFileType::LogA:
+            return base_path + ".log_a";
+        case CoreFileType::LogB:
+            return base_path + ".log_b";
+    }
+    REALM_UNREACHABLE();
 }
 
+void DB::delete_files(const std::string& base_path, bool* did_delete, bool delete_lockfile)
+{
+    if (File::try_remove(get_core_file(base_path, CoreFileType::Storage)) && did_delete) {
+        *did_delete = true;
+    }
+
+    File::try_remove(get_core_file(base_path, CoreFileType::Note));
+    File::try_remove(get_core_file(base_path, CoreFileType::Log));
+    File::try_remove(get_core_file(base_path, CoreFileType::LogA));
+    File::try_remove(get_core_file(base_path, CoreFileType::LogB));
+    util::try_remove_dir_recursive(get_core_file(base_path, CoreFileType::Management));
+
+    if (delete_lockfile) {
+        File::try_remove(get_core_file(base_path, CoreFileType::Lock));
+    }
+}
 void TransactionDeleter(Transaction* t)
 {
     t->close();
@@ -2788,6 +2807,19 @@ LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
         return obj.get_linkset_ptr(ck);
     }
     return std::make_unique<LnkSet>();
+}
+
+LinkCollectionPtr Transaction::import_copy_of(const LinkCollectionPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_owning_obj())) {
+        ColKey ck = original->get_owning_col_key();
+        return obj.get_linkcollection_ptr(ck);
+    }
+    // return some empty collection where size() == 0
+    // the type shouldn't matter
+    return std::make_unique<LnkLst>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)

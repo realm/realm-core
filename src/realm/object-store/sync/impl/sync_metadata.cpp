@@ -30,6 +30,7 @@
 #endif
 
 #include <realm/db.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/table.hpp>
 
 namespace {
@@ -50,16 +51,7 @@ static const char* const c_sync_state = "state";
 static const char* const c_sync_device_id = "device_id";
 
 /* User Profile keys */
-static const char* const c_sync_profile = "profile";
-static const char* const c_sync_profile_name = "name";
-static const char* const c_sync_profile_first_name = "first_name";
-static const char* const c_sync_profile_last_name = "last_name";
-static const char* const c_sync_profile_picture_url = "picture_url";
-static const char* const c_sync_profile_email = "email";
-static const char* const c_sync_profile_gender = "gender";
-static const char* const c_sync_profile_birthday = "birthday";
-static const char* const c_sync_profile_min_age = "min_age";
-static const char* const c_sync_profile_max_age = "max_age";
+static const char* const c_sync_profile_data = "profile_data";
 
 /* Identity keys */
 static const char* const c_sync_user_id = "id";
@@ -85,16 +77,6 @@ realm::Schema make_schema()
     using namespace realm;
     return Schema{{c_sync_identityMetadata,
                    {{c_sync_user_id, PropertyType::String}, {c_sync_provider_type, PropertyType::String}}},
-                  {c_sync_profile,
-                   {{c_sync_profile_name, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_first_name, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_last_name, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_picture_url, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_gender, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_birthday, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_email, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_max_age, PropertyType::String | PropertyType::Nullable},
-                    {c_sync_profile_min_age, PropertyType::String | PropertyType::Nullable}}},
                   {c_sync_userMetadata,
                    {{c_sync_identity, PropertyType::String},
                     {c_sync_local_uuid, PropertyType::String},
@@ -103,9 +85,9 @@ realm::Schema make_schema()
                     {c_sync_provider_type, PropertyType::String},
                     {c_sync_access_token, PropertyType::String | PropertyType::Nullable},
                     {c_sync_identities, PropertyType::Object | PropertyType::Array, c_sync_identityMetadata},
-                    {c_sync_profile, PropertyType::Object | PropertyType::Nullable, c_sync_profile},
                     {c_sync_state, PropertyType::Int},
-                    {c_sync_device_id, PropertyType::String}}},
+                    {c_sync_device_id, PropertyType::String},
+                    {c_sync_profile_data, PropertyType::String}}},
                   {c_sync_fileActionMetadata,
                    {
                        {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -136,7 +118,7 @@ namespace realm {
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 4;
+    constexpr uint64_t SCHEMA_VERSION = 5;
 
     Realm::Config config;
     config.automatic_change_notifications = false;
@@ -194,13 +176,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
 
     object_schema = realm->schema().find(c_sync_current_user_identity);
     m_current_user_identity_schema = {object_schema->persisted_properties[0].column_key};
-
-    object_schema = realm->schema().find(c_sync_profile);
-    m_profile_schema = {
-        object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
-        object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
-        object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key,
-        object_schema->persisted_properties[6].column_key, object_schema->persisted_properties[7].column_key};
 
     object_schema = realm->schema().find(c_sync_app_metadata);
     m_app_metadata_schema = {
@@ -617,6 +592,18 @@ void SyncUserMetadata::set_device_id(const std::string& device_id)
     m_realm->commit_transaction();
 }
 
+SyncUserProfile SyncUserMetadata::profile() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    StringData result = m_obj.get<String>("profile_data");
+    if (result.size() == 0) {
+        return SyncUserProfile();
+    }
+    return SyncUserProfile(static_cast<bson::BsonDocument>(bson::parse(std::string(result))));
+}
+
 void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
 {
     if (m_invalid)
@@ -625,34 +612,9 @@ void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-
-    Obj obj;
-    if (m_obj.is_null(m_schema.idx_profile)) {
-        obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
-    }
-    else {
-        obj = m_obj.get_linked_object(m_schema.idx_profile);
-    }
-
-    if (profile.name)
-        obj.set(c_sync_profile_name, *profile.name);
-    if (profile.first_name)
-        obj.set(c_sync_profile_first_name, *profile.first_name);
-    if (profile.last_name)
-        obj.set(c_sync_profile_last_name, *profile.last_name);
-    if (profile.gender)
-        obj.set(c_sync_profile_gender, *profile.gender);
-    if (profile.picture_url)
-        obj.set(c_sync_profile_picture_url, *profile.picture_url);
-    if (profile.birthday)
-        obj.set(c_sync_profile_birthday, *profile.birthday);
-    if (profile.min_age)
-        obj.set(c_sync_profile_min_age, *profile.min_age);
-    if (profile.max_age)
-        obj.set(c_sync_profile_max_age, *profile.max_age);
-    if (profile.email)
-        obj.set(c_sync_profile_email, *profile.email);
-
+    std::stringstream data;
+    data << profile.data();
+    m_obj.set("profile_data", data.str());
     m_realm->commit_transaction();
 }
 

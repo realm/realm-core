@@ -21,6 +21,7 @@
 #include <realm/table.hpp>
 #include <realm/group.hpp>
 #include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 using namespace realm;
 
@@ -201,6 +202,11 @@ void ArrayBacklink::verify() const
             Obj src_obj = src_table->get_object(get_backlink(i, j));
             if (src_attr.test(col_attr_List)) {
                 REALM_ASSERT(src_obj.get_list<ObjKey>(src_col_key).find_first(target_key) != npos);
+            }
+            else if (src_attr.test(col_attr_Dictionary)) {
+                // The link is stored as type_TypedLink in Dictionary
+                ObjLink link(target_table->get_key(), target_key);
+                REALM_ASSERT(src_obj.get_dictionary(src_col_key).find_any(link) != npos);
             }
             else {
                 REALM_ASSERT(src_obj.get_unfiltered_link(src_col_key) == target_key);

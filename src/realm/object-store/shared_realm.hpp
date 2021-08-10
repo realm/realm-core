@@ -359,9 +359,11 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // For synchronized realms, the file written will have the client file ident removed.
+    // For synchronized realms, the file written will have the client file ident removed. Furthermore
+    // it is required that all local changes are synchronized with the server before the copy can
+    // be written. This is to be sure that the file can be used as a stating point for a newly
+    // installed application. The function will throw if there are pending uploads.
     void write_copy(StringData path, BinaryData encryption_key);
-    void write_copy_without_client_file_id(StringData path, BinaryData encryption_key, bool allow_overwrite = false);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;
@@ -394,12 +396,13 @@ public:
      * could be the result and checking for a single process state is not possible here.
      *
      * @param realm_file_path The path to the Realm file. All files will be derived from this.
+     * @param[out] did_delete_realm If non-null, set to true if the primary Realm file was deleted.
      *
      * @throws PermissionDenied if the operation was not permitted.
      * @throws AccessError for any other error while trying to delete the file or folder.
      * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
      */
-    static void delete_files(const std::string& realm_file_path);
+    static void delete_files(const std::string& realm_file_path, bool* did_delete_realm = nullptr);
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -597,8 +600,8 @@ public:
 
 class DeleteOnOpenRealmException : public std::logic_error {
 public:
-    DeleteOnOpenRealmException(std::string lock_file_path)
-        : std::logic_error("Cannot delete files of an open Realm. " + lock_file_path + " is still in use.")
+    DeleteOnOpenRealmException(const std::string& path)
+        : std::logic_error(util::format("Cannot delete files of an open Realm: '%1' is still in use.", path))
     {
     }
 };

@@ -82,7 +82,6 @@ public:
 
 private:
     _impl::ClientFileAccessCache m_file_access_cache;
-    const std::shared_ptr<ChangesetCooker> m_default_changeset_cooker;
     const bool m_one_connection_per_session;
     util::network::Trigger m_actualize_and_finalize;
     util::network::DeadlineTimer m_keep_running_timer;
@@ -239,7 +238,6 @@ public:
     ClientHistoryBase& access_realm() override final;
     util::Optional<std::array<char, 64>> get_encryption_key() const noexcept override final;
     const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
-    void on_state_download_progress(uint_fast64_t, uint_fast64_t) override final;
     void initiate_integrate_changesets(std::uint_fast64_t, const ReceivedChangesets&) override final;
     void on_upload_completion() override final;
     void on_download_completion() override final;
@@ -423,14 +421,11 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    static auto choose_cooker(ClientImpl& client, const Session::Config& config) -> std::shared_ptr<ChangesetCooker>;
-
     static ClientImplBase::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
 
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
                      std::string multiplex_ident);
 
-    void on_state_download_progress(uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes);
     void on_sync_progress();
     void on_upload_completion();
     void on_download_completion();
@@ -525,7 +520,6 @@ inline SessionWrapperQueue::~SessionWrapperQueue()
 inline ClientImpl::ClientImpl(Client::Config config)
     : ClientImplBase{make_client_impl_base_config(config)}                            // Throws
     , m_file_access_cache{config.max_open_files, config.disable_sync_to_disk, logger} // Throws
-    , m_default_changeset_cooker{std::move(config.changeset_cooker)}
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -1075,12 +1069,6 @@ const util::Optional<sync::Session::Config::ClientReset>& SessionImpl::get_clien
     return m_wrapper.m_client_reset_config;
 }
 
-inline void SessionImpl::on_state_download_progress(std::uint_fast64_t downloaded_bytes,
-                                                    std::uint_fast64_t downloadable_bytes)
-{
-    m_wrapper.on_state_download_progress(downloaded_bytes, downloadable_bytes);
-}
-
 inline void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
                                                        const ReceivedChangesets& changesets)
 {
@@ -1128,8 +1116,7 @@ void SessionImpl::on_resumed()
 
 SessionWrapper::SessionWrapper(ClientImpl& client, std::string realm_path, Session::Config config)
     : m_client{client}
-    , m_file_slot{client.m_file_access_cache, std::move(realm_path), config.encryption_key,
-                  choose_cooker(client, config)}
+    , m_file_slot{client.m_file_access_cache, std::move(realm_path), config.encryption_key}
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -1513,16 +1500,6 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
         m_sync_transact_handler(old_version, new_version); // Throws
 }
 
-
-auto SessionWrapper::choose_cooker(ClientImpl& client, const Session::Config& config)
-    -> std::shared_ptr<ChangesetCooker>
-{
-    if (config.changeset_cooker)
-        return config.changeset_cooker;
-    return client.m_default_changeset_cooker;
-}
-
-
 auto SessionWrapper::make_session_impl_config(SyncTransactReporter& transact_reporter, Session::Config& config)
     -> ClientImplBase::Session::Config
 {
@@ -1541,30 +1518,6 @@ void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_a
     ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, std::move(multiplex_ident)};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_initiated = true;
-}
-
-void SessionWrapper::on_state_download_progress(uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes)
-{
-    REALM_ASSERT(!m_reliable_download_progress);
-    uint_fast64_t uploaded_bytes = 0;
-    uint_fast64_t uploadable_bytes = 0;
-    uint_fast64_t snapshot_version = 0;
-    uint_fast64_t total_bytes = downloadable_bytes;
-
-    m_sess->logger.debug("on_state_download_progress, downloaded = %1, "
-                         "downloadable(total) = %2, uploaded = %3, "
-                         "uploadable = %4, reliable_download_progress = %5, "
-                         "snapshot version = %6",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
-                         m_reliable_download_progress, snapshot_version); // Throws
-
-    if (m_progress_handler) {
-        // FIXME: Why is this boolean status communicated to the application as
-        // a 64-bit integer? Also, the name `progress_version` is confusing.
-        std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
-        m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
-                           snapshot_version);
-    }
 }
 
 inline void SessionWrapper::on_sync_progress()

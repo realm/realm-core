@@ -89,10 +89,11 @@ public:
     void ensure_general_form() override;
     void insert_column(ColKey col) override;
     void remove_column(ColKey col) override;
+    size_t nb_columns() const override;
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
     bool try_get(ObjKey k, State& state) const override;
     ObjKey get(size_t ndx, State& state) const override;
-    size_t get_ndx(ObjKey key, size_t ndx) const override;
+    size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
     size_t erase(ObjKey k, CascadeState& state) override;
     void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
@@ -157,7 +158,7 @@ private:
         return true;
     }
 
-    ref_type _get_child_ref(size_t ndx) const
+    ref_type _get_child_ref(size_t ndx) const noexcept
     {
         return Array::get_as_ref(ndx + s_first_node_index);
     }
@@ -382,11 +383,11 @@ ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
     return {};
 }
 
-size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
+size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const noexcept
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw KeyNotFound("Child not found in get_ndx");
+        return realm::npos;
     }
 
     // First figure out how many objects there are in nodes before actual one
@@ -542,6 +543,24 @@ void ClusterNodeInner::remove_column(ColKey col)
     }
 }
 
+size_t ClusterNodeInner::nb_columns() const
+{
+    ref_type ref = _get_child_ref(0);
+    char* header = m_alloc.translate(ref);
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
+    MemRef mem(header, ref, m_alloc);
+    if (child_is_leaf) {
+        Cluster leaf(0, m_alloc, m_tree_top);
+        leaf.init(mem);
+        return leaf.nb_columns();
+    }
+    else {
+        ClusterNodeInner node(m_alloc, m_tree_top);
+        node.init(mem);
+        return node.nb_columns();
+    }
+}
+
 void ClusterNodeInner::add(ref_type ref, int64_t key_value)
 {
     if (m_keys.is_attached()) {
@@ -577,8 +596,8 @@ bool ClusterNodeInner::get_leaf(ObjKey key, ClusterNode::IteratorState& state) c
 
     size_t sz = node_size();
     while (child_ndx < sz) {
-        int64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
-        ObjKey new_key(key_offset < key.value ? key.value - key_offset : 0);
+        uint64_t key_offset = m_keys.is_attached() ? m_keys.get(child_ndx) : (child_ndx << m_shift_factor);
+        ObjKey new_key(key_offset < uint64_t(key.value) ? key.value - key_offset : 0);
         state.m_key_offset += key_offset;
 
         ref_type child_ref = _get_child_ref(child_ndx);
@@ -919,7 +938,7 @@ ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
     return state;
 }
 
-size_t ClusterTree::get_ndx(ObjKey k) const
+size_t ClusterTree::get_ndx(ObjKey k) const noexcept
 {
     return m_root->get_ndx(k, 0);
 }
@@ -1049,12 +1068,11 @@ ClusterTree::Iterator::Iterator(const Iterator& other)
 
 size_t ClusterTree::Iterator::get_position()
 {
-    try {
-        return m_tree.get_ndx(m_key);
-    }
-    catch (...) {
+    auto ndx = m_tree.get_ndx(m_key);
+    if (ndx == realm::npos) {
         throw std::logic_error("Outdated iterator");
     }
+    return ndx;
 }
 
 ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
