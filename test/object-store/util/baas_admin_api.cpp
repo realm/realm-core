@@ -521,47 +521,64 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
     return *sync_service;
 }
 
-void AdminAPISession::disable_sync(const std::string& app_id)
+nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
-    auto sync_service = get_sync_service(app_id);
-    auto config = get_config(app_id, sync_service);
-    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
-                                                  m_base_url, m_group_id, app_id, sync_service.id),
-                                     m_access_token);
-
-    // FIXME: are the other fields required?
-    endpoint.patch_json({"sync", {"state", "disabled"}});
+    return nlohmann::json{
+        {"database_name", config.database_name}, {"partition", config.partition}, {"state", config.state}};
 }
 
-void AdminAPISession::enable_sync(const std::string& app_id)
+AdminAPIEndpoint AdminAPISession::service_config_endpoint(const std::string& app_id, const std::string& service_id)
 {
-    auto sync_service = get_sync_service(app_id);
-    auto config = get_config(app_id, sync_service);
-    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
-                                                  m_base_url, m_group_id, app_id, sync_service.id),
-                                     m_access_token);
+    return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config", m_base_url,
+                                         m_group_id, app_id, service_id),
+                            m_access_token);
+}
 
-    // FIXME: are the other fields required?
-    endpoint.patch_json({"sync", {"state", "enabled"}});
+AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& app_id, const std::string& service_id,
+                                                             AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    if (sync_config.state != "") {
+        sync_config.state = "";
+        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    }
+    return sync_config;
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::pause_sync(const std::string& app_id, const std::string& service_id,
+                                                           AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    if (sync_config.state != "disabled") {
+        sync_config.state = "disabled";
+        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    }
+    return sync_config;
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::enable_sync(const std::string& app_id, const std::string& service_id,
+                                                            AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    sync_config.state = "enabled";
+    endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    return sync_config;
 }
 
 AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& app_id,
                                                            const AdminAPISession::Service& service)
 {
-    auto endpoint = AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config",
-                                                  m_base_url, m_group_id, app_id, service.id),
-                                     m_access_token);
+    auto endpoint = service_config_endpoint(app_id, service.id);
     auto response = endpoint.get_json();
     AdminAPISession::ServiceConfig config;
     try {
         auto sync = response["sync"];
-        std::cout << "config: " << sync << std::endl;
-        config.database_name = sync["database_name"];
-        // config.partition = sync["partition"];
         config.state = sync["state"];
+        config.database_name = sync["database_name"];
+        config.partition = sync["partition"];
     }
-    catch (const std::exception& e) {
-        REALM_ASSERT_EX(false, e.what());
+    catch (const std::exception&) {
+        // ignored - the config for a disabled sync service will be empty
     }
     return config;
 }

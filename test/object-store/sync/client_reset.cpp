@@ -140,17 +140,26 @@ TEST_CASE("app: client reset integration", "[sync][app][client reset]") {
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         std::atomic<bool> called{false};
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.is_client_reset_requested());
-            called = true;
+            // ignore "end of input" and other sync errors that might occur when the sync service is killed
+            if (error.is_client_reset_requested()) {
+                called = true;
+            }
         };
+        {
+            auto r1 = realm::Realm::get_shared_realm(config);
+            auto session1 = app->current_user()->session_for_on_disk_path(r1->config().path);
+            wait_for_download(*r1);
+        }
+        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+
         auto r1 = realm::Realm::get_shared_realm(config);
         auto session1 = app->current_user()->session_for_on_disk_path(r1->config().path);
-
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        app_session.admin_api.disable_sync(app_session.server_app_id);
-        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
-        app_session.admin_api.enable_sync(app_session.server_app_id);
-        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
 
         util::EventLoop::main().run_until([&] {
             return called.load();

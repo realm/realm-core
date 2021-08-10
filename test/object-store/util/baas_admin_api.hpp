@@ -79,16 +79,16 @@ public:
     };
     struct ServiceConfig {
         std::string database_name;
-        std::string partition;
+        nlohmann::json partition;
         std::string state;
     };
     std::vector<Service> get_services(const std::string& app_id);
     Service get_sync_service(const std::string& app_id);
     ServiceConfig get_config(const std::string& app_id, const Service& service);
-    void disable_sync(const std::string& app_id);
-    void enable_sync(const std::string& app_id);
+    ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
+    ServiceConfig pause_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
+    ServiceConfig enable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
     bool is_sync_enabled(const std::string& app_id);
-
 
 private:
     AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
@@ -97,6 +97,8 @@ private:
         , m_group_id(std::move(group_id))
     {
     }
+
+    AdminAPIEndpoint service_config_endpoint(const std::string& app_id, const std::string& service_id);
 
     std::string m_base_url;
     std::string m_access_token;
