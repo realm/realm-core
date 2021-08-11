@@ -1693,9 +1693,20 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         ObjectSchema("TopLevel",
                      {
                          {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
-                         {"embedded", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded"},
+                         {"array_of_objs", PropertyType::Object | PropertyType::Array, "TopLevel_array_of_objs"},
+                         {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"},
+                         {"embedded_dict", PropertyType::Object | PropertyType::Dictionary | PropertyType::Nullable,
+                          "TopLevel_embedded_dict"},
                      }),
-        ObjectSchema("TopLevel_embedded", ObjectSchema::IsEmbedded{true},
+        ObjectSchema("TopLevel_array_of_objs", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+        ObjectSchema("TopLevel_embedded_obj", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+        ObjectSchema("TopLevel_embedded_dict", ObjectSchema::IsEmbedded{true},
                      {
                          {"array", PropertyType::Int | PropertyType::Array},
                      }),
@@ -1723,7 +1734,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         realm_config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson("foo"));
         realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cout << error.message << std::endl;
+            std::cerr << error.message << std::endl;
         };
         realm_config.schema_version = 1;
         realm_config.path = base_path + "/default.realm";
@@ -1731,12 +1742,16 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         return realm_config;
     };
 
-    auto top_level_id = ObjectId::gen();
+    auto array_of_objs_id = ObjectId::gen();
+    auto embedded_obj_id = ObjectId::gen();
+    auto dict_obj_id = ObjectId::gen();
     auto email = util::format("realm_tests_do_autoverify-test@example.com");
     auto password = std::string{"password"};
 
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        TestSyncManager::Config tsm_config(app_config);
+        tsm_config.verbose_sync_client_logging = true;
+        TestSyncManager sync_manager(tsm_config, {});
         auto app = sync_manager.app();
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
             email, password, [&](Optional<app::AppError> error) {
@@ -1753,31 +1768,65 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         CppContext c(realm);
         realm->begin_transaction();
-        auto obj = Object::create(c, realm, "TopLevel",
-                                  util::Any(AnyDict{
-                                      {valid_pk_name, top_level_id},
-                                      {"embedded", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
-                                  }),
-                                  CreatePolicy::ForceCreate);
-        realm->commit_transaction();
+        auto array_of_objs =
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{
+                               {valid_pk_name, array_of_objs_id},
+                               {"array_of_objs", AnyVector{AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}},
+                           }),
+                           CreatePolicy::ForceCreate);
 
-        realm->begin_transaction();
-        obj.set_property_value(c, "embedded",
-                               util::Any(AnyDict{{
-                                   "array",
-                                   AnyVector{INT64_C(3), INT64_C(4)},
-                               }}),
-                               realm::CreatePolicy::UpdateAll);
+        auto embedded_obj =
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{
+                               {valid_pk_name, embedded_obj_id},
+                               {"embedded_obj", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
+                           }),
+                           CreatePolicy::ForceCreate);
+
+        auto dict_obj = Object::create(
+            c, realm, "TopLevel",
+            util::Any(AnyDict{
+                {valid_pk_name, dict_obj_id},
+                {"embedded_dict", AnyDict{{"foo", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}}},
+            }),
+            CreatePolicy::ForceCreate);
+
         realm->commit_transaction();
+        {
+            realm->begin_transaction();
+            embedded_obj.set_property_value(c, "embedded_obj",
+                                            util::Any(AnyDict{{
+                                                "array",
+                                                AnyVector{INT64_C(3), INT64_C(4)},
+                                            }}),
+                                            realm::CreatePolicy::UpdateAll);
+            realm->commit_transaction();
+        }
+
+        {
+            realm->begin_transaction();
+            List array(array_of_objs, array_of_objs.get_object_schema().property_for_name("array_of_objs"));
+            CppContext c2(realm, &array.get_object_schema());
+            array.set(c2, 0, util::Any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
+            realm->commit_transaction();
+        }
+
+        {
+            realm->begin_transaction();
+            object_store::Dictionary dict(dict_obj, dict_obj.get_object_schema().property_for_name("embedded_dict"));
+            CppContext c2(realm, &dict.get_object_schema());
+            dict.insert(c2, "foo", util::Any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
+            realm->commit_transaction();
+        }
 
         std::promise<void> promise;
         auto future = promise.get_future();
         auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
-        session->wait_for_download_completion(
-            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
-                REALM_ASSERT(!ec);
-                shared_promise->set_value();
-            });
+        session->wait_for_upload_completion([shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
+            REALM_ASSERT(!ec);
+            shared_promise->set_value();
+        });
 
         future.wait();
     }
@@ -1802,18 +1851,44 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
         session->wait_for_download_completion(
             [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
-                REALM_ASSERT(!ec);
+                CHECK(!ec);
                 shared_promise->set_value();
             });
 
         future.wait();
-        CppContext c(realm);
-        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{top_level_id});
-        auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded"));
-        auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
-        CHECK(array_list.size() == 2);
-        CHECK(array_list.get<int64_t>(0) == int64_t(3));
-        CHECK(array_list.get<int64_t>(1) == int64_t(4));
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{embedded_obj_id});
+            auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
+            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(3));
+            CHECK(array_list.get<int64_t>(1) == int64_t(4));
+        }
+
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{array_of_objs_id});
+            auto embedded_list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
+            CppContext c2(realm, &embedded_list.get_object_schema());
+            auto embedded_array_obj = any_cast<Object&&>(embedded_list.get(c2, 0));
+            auto array_list = any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(5));
+            CHECK(array_list.get<int64_t>(1) == int64_t(6));
+        }
+
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{dict_obj_id});
+            object_store::Dictionary dict(obj, obj.get_object_schema().property_for_name("embedded_dict"));
+            CppContext c2(realm, &dict.get_object_schema());
+            auto embedded_obj = any_cast<Object&&>(dict.get(c2, "foo"));
+            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(7));
+            CHECK(array_list.get<int64_t>(1) == int64_t(8));
+        }
     }
 }
 

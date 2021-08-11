@@ -371,6 +371,16 @@ Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 Obj LnkLst::create_and_set_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
+    if (t.is_embedded() && m_list.get(ndx) != ObjKey{}) {
+        // If this is an embedded object and there was already an embedded object here, then we need to
+        // emit an instruction to set the old embedded object to null to clear the old object on other
+        // sync clients. Without this, you'll only see the Set ObjectValue instruction, which is idempotent,
+        // and then array operations will have a corrupted prior_size.
+        auto o = t.create_linked_object();
+        m_list.remove(ndx);
+        m_list.insert(ndx, o.get_key());
+        return o;
+    }
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
     m_list.set(ndx, o.get_key());
     return o;
