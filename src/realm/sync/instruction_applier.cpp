@@ -8,7 +8,7 @@
 namespace realm::sync {
 namespace {
 
-void throw_bad_transaction_log(std::string msg)
+REALM_NORETURN void throw_bad_transaction_log(std::string msg)
 {
     throw BadChangesetError{std::move(msg)};
 }
