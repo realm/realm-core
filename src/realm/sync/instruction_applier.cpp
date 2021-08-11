@@ -9,6 +9,9 @@ namespace realm::sync {
 
 REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& msg) const
 {
+    const auto throw_error = [](std::string msg) {
+        throw BadChangesetError{std::move(msg)};
+    };
     if (m_last_object_key) {
         // If the last_object_key is valid then we should have a changeset and a current table
         REALM_ASSERT(m_log);
@@ -20,29 +23,28 @@ REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& m
         }
         const instr::Path* cur_path = m_current_path ? &(*m_current_path) : nullptr;
         m_log->print_path(ss, m_last_table_name, *m_last_object_key, field_name, cur_path);
-        throw BadChangesetError{
-            util::format("%1 (instruction target: %2, version: %3, last_integrated_remote_version: %4, "
-                         "origin_file_ident: %5, timestamp: %6)",
-                         msg, ss.str(), m_log->version, m_log->last_integrated_remote_version,
-                         m_log->origin_file_ident, m_log->origin_timestamp)};
+        throw_error(util::format("%1 (instruction target: %2, version: %3, last_integrated_remote_version: %4, "
+                                 "origin_file_ident: %5, timestamp: %6)",
+                                 msg, ss.str(), m_log->version, m_log->last_integrated_remote_version,
+                                 m_log->origin_file_ident, m_log->origin_timestamp));
     }
     else if (m_last_table_name) {
         // We should have a changeset if we have a table name defined.
         REALM_ASSERT(m_log);
-        throw BadChangesetError{
-            util::format("%1 (instruction table: %2, version: %3, last_integrated_remote_version: %4, "
-                         "origin_file_ident: %5, timestamp: %6)",
-                         msg, m_log->get_string(m_last_table_name), m_log->version,
-                         m_log->last_integrated_remote_version, m_log->origin_file_ident, m_log->origin_timestamp)};
+        throw_error(util::format("%1 (instruction table: %2, version: %3, last_integrated_remote_version: %4, "
+                                 "origin_file_ident: %5, timestamp: %6)",
+                                 msg, m_log->get_string(m_last_table_name), m_log->version,
+                                 m_log->last_integrated_remote_version, m_log->origin_file_ident,
+                                 m_log->origin_timestamp));
     }
     else if (m_log) {
         // If all we have is a changeset, then we should log whatever we can about it.
-        throw BadChangesetError{util::format("%1 (version: %2, last_integrated_remote_version: %3, "
-                                             "origin_file_ident: %4, timestamp: %5)",
-                                             msg, m_log->version, m_log->last_integrated_remote_version,
-                                             m_log->origin_file_ident, m_log->origin_timestamp)};
+        throw_error(util::format("%1 (version: %2, last_integrated_remote_version: %3, "
+                                 "origin_file_ident: %4, timestamp: %5)",
+                                 msg, m_log->version, m_log->last_integrated_remote_version, m_log->origin_file_ident,
+                                 m_log->origin_timestamp));
     }
-    throw BadChangesetError{msg};
+    throw_error(std::move(msg));
 }
 
 template <class... Params>
@@ -86,9 +88,30 @@ TableRef InstructionApplier::table_for_class_name(StringData class_name) const
     return m_transaction.get_table(class_name_to_table_name(class_name, buffer));
 }
 
+template <typename T>
+struct TemporarySwapOut {
+    explicit TemporarySwapOut(T& target)
+        : target(target)
+        , backup()
+    {
+        std::swap(target, backup);
+    }
+
+    ~TemporarySwapOut()
+    {
+        std::swap(backup, target);
+    }
+
+    T& target;
+    T backup;
+};
+
 void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
+
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     auto add_table = util::overload{
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
@@ -128,6 +151,8 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 void InstructionApplier::operator()(const Instruction::EraseTable& instr)
 {
     auto table_name = get_table_name(instr);
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_transaction.has_table(table_name)))) {
         // FIXME: Should EraseTable be considered idempotent?
@@ -495,6 +520,9 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     using Type = Instruction::Payload::Type;
     using CollectionType = Instruction::AddColumn::CollectionType;
 
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
+
     auto table = get_table(instr, "AddColumn");
     auto col_name = get_string(instr.field);
 
@@ -602,12 +630,15 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 {
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
+
     auto table = get_table(instr, "EraseColumn");
     auto col_name = get_string(instr.field);
 
     ColKey col = table->get_column_key(col_name);
     if (!col) {
-        bad_transaction_log("EraseColumn '%1.%2' which doesn't exist");
+        bad_transaction_log("EraseColumn '%1.%2' which doesn't exist", table->get_name(), col_name);
     }
 
     table->remove_column(col);
