@@ -437,7 +437,7 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
             Instruction::ArrayInsert insert_instr;
             populate_path_instr(insert_instr, list, static_cast<uint32_t>(ndx));
-            insert_instr.prior_size = erase_instr.prior_size - 1 ;
+            insert_instr.prior_size = erase_instr.prior_size - 1;
             insert_instr.value = as_payload(list, value);
             emit(insert_instr);
         }
