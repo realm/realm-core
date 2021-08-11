@@ -1750,7 +1750,6 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
     {
         TestSyncManager::Config tsm_config(app_config);
-        tsm_config.verbose_sync_client_logging = true;
         TestSyncManager sync_manager(tsm_config, {});
         auto app = sync_manager.app();
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
