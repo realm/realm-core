@@ -12,11 +12,14 @@ json string_const = { {"kind", "constant"}, {"value", "Bob"}, {"type", "string"}
 json float_const = { {"kind", "constant"}, {"value", 2.22}, {"type", "float"} };
 json long_const = { {"kind", "constant"}, {"value", LONG_MAX}, {"type", "long"} };
 json double_const = { {"kind", "constant"}, {"value", 2.2222222}, {"type", "double"} };
+json bool_const_true = { {"kind", "constant"}, {"value", true}, {"type", "bool"} };
+json bool_const_false = { {"kind", "constant"}, {"value", false}, {"type", "bool"} };
 json int_prop = { {"kind", "property"}, {"name", "age"}, {"type", "int"} };
 json string_prop = { {"kind", "property"}, {"name", "name"}, {"type", "string"} };
 json float_prop = { {"kind", "property"}, {"name", "fee"}, {"type", "float"} };
 json long_prop = { {"kind", "property"}, {"name", "salary"}, {"type", "long"} };
 json double_prop = { {"kind", "property"}, {"name", "longitude"}, {"type", "double"} };
+json bool_prop = { {"kind", "property"}, {"name", "isInteresting"}, {"type", "bool"} };
 
 //null consts 
 json int_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "int"} };
@@ -100,6 +103,9 @@ json sort_string_desc {{"isAscending", false}, {"property", "name"}};
 json sort_float_asc {{"isAscending", true}, {"property", "fee"}};
 json sort_float_desc {{"isAscending", false}, {"property", "fee"}};
 
+//bool comparisons
+json bool_eq_true = { {"kind", "eq"}, {"left", bool_const_true}, {"right", bool_prop}};
+json bool_eq_false = { {"kind", "eq"}, {"left", bool_const_false}, {"right", bool_prop}};
 
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef table, json json, size_t num_results)
 {
@@ -132,16 +138,18 @@ TEST(test_json_query_parser_simple)
     ColKey string_col = t->add_column(type_String, "name", true);
     ColKey float_col = t->add_column(type_Float, "fee", true);
     ColKey long_col = t->add_column(type_Int, "salary", true);
-    ColKey double_col = t->add_column(type_Double, "longitude", true);
+    ColKey double_col= t->add_column(type_Double, "longitude", true);
+    t->add_column(type_Bool, "isInteresting", true);
 
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<float> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<long> salary = {10000, LONG_MAX, -3000, 2134, 5000};
     std::vector<double> longitude = {2.0, 2.23, 2.2222222, 2.25, 3.73};
+    std::vector<bool> isInteresting = {true, false, true, false, true};
     std::vector<ObjKey> keys;
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), float(fees[i]), int64_t(salary[i]), double(longitude[i]));
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), float(fees[i]), int64_t(salary[i]), double(longitude[i]), bool(isInteresting[i]));
     }
 
     verify_query(test_context, t, simple_query(int_eq), 1);
@@ -196,6 +204,9 @@ TEST(test_json_query_parser_simple)
     verify_query(test_context, t, simple_query(float_null_eq), 0);
     verify_query(test_context, t, simple_query(long_null_eq), 0);
     verify_query(test_context, t, simple_query(double_null_eq), 0);
+
+    verify_query(test_context, t, simple_query(bool_eq_true), 3);
+    verify_query(test_context, t, simple_query(bool_eq_false), 2);
 
     t->create_object().set(int_col, 1);
     t->create_object().set(string_col, "foo").set(float_col, 2.27f).set(long_col, 10).set(double_col, 10.3);
