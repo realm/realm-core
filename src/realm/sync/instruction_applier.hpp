@@ -149,6 +149,7 @@ inline void InstructionApplier::end_apply() noexcept
     m_last_table = TableRef{};
     m_last_field = ColKey{};
     m_last_object.reset();
+    m_last_object_key.reset();
     m_last_list.reset();
 }
 
