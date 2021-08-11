@@ -3046,6 +3046,10 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
     }
     if (fragment["kind"] == "constant") {
         std::unique_ptr<ConstantNode> const_node;
+        if (fragment["value"].is_null()){
+            const_node = get_constant_node(Mixed());
+            return std::make_unique<ValueNode>(std::move(const_node));
+        }
         if (fragment["type"] == "string") {
             std::string value = fragment["value"].get<std::string>();
             const_node = get_constant_node(value);
@@ -3066,8 +3070,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
             double value = fragment["value"].get<double>();
             const_node = get_constant_node(value);
         }
-        auto value_node = std::make_unique<ValueNode>(std::move(const_node));
-        return value_node;
+        return std::make_unique<ValueNode>(std::move(const_node));
     }
 }
 
@@ -3077,6 +3080,9 @@ std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed va
     ConstantNode::Type type;
     std::string string_value;
     std::ostringstream stream;
+    if (value.is_null()){
+        return std::make_unique<ConstantNode>(ConstantNode::Type::NULL_VAL, "null");
+    }
     switch (value.get_type()) {
         case realm::DataType::Type::String:
             type = ConstantNode::Type::STRING;

@@ -18,6 +18,13 @@ json float_prop = { {"kind", "property"}, {"name", "fee"}, {"type", "float"} };
 json long_prop = { {"kind", "property"}, {"name", "salary"}, {"type", "long"} };
 json double_prop = { {"kind", "property"}, {"name", "longitude"}, {"type", "double"} };
 
+//null consts 
+json int_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "int"} };
+json string_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "string"} };
+json float_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "float"} };
+json long_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "long"} };
+json double_null_const = { {"kind", "constant"}, {"value", nullptr}, {"type", "double"} };
+
 //string_ops consts
 json begins_with_const = { {"kind", "constant"}, {"value", "Bi"}, {"type", "string"} };
 json ends_with_const = { {"kind", "constant"}, {"value", "e"}, {"type", "string"} };
@@ -63,6 +70,13 @@ json double_gt = { {"kind", "gt"}, {"left", double_prop}, {"right", double_const
 json double_gte = { {"kind", "gte"}, {"left", double_prop}, {"right", double_const}};
 json double_lt = { {"kind", "lt"}, {"left", double_prop}, {"right", double_const}};
 json double_lte = { {"kind", "lte"}, {"left", double_prop}, {"right", double_const}};
+
+//null comparisons
+json int_null_eq = { {"kind", "eq"}, {"left", int_prop}, {"right", int_null_const}};
+json string_null_eq = { {"kind", "eq"}, {"left", string_prop}, {"right", string_null_const}};
+json float_null_eq = { {"kind", "eq"}, {"left", float_prop}, {"right", float_null_const}};
+json long_null_eq = { {"kind", "eq"}, {"left", long_prop}, {"right", long_null_const}};
+json double_null_eq = { {"kind", "eq"}, {"left", double_prop}, {"right", double_null_const}};
 
 //commutative expressions
 json int_commutative_eq = { {"kind", "eq"}, {"left", int_const}, {"right", int_prop}};
@@ -114,11 +128,11 @@ TEST(test_json_query_parser_simple)
     Group g;
     std::string table_name = "person";
     TableRef t = g.add_table(table_name);
-    t->add_column(type_Int, "age");
-    t->add_column(type_String, "name");
-    t->add_column(type_Float, "fee");
-    t->add_column(type_Int, "salary");
-    t->add_column(type_Double, "longitude");
+    ColKey int_col = t->add_column(type_Int, "age", true);
+    ColKey string_col = t->add_column(type_String, "name", true);
+    ColKey float_col = t->add_column(type_Float, "fee", true);
+    ColKey long_col = t->add_column(type_Int, "salary", true);
+    ColKey double_col = t->add_column(type_Double, "longitude", true);
 
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<float> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
@@ -176,6 +190,20 @@ TEST(test_json_query_parser_simple)
     verify_query(test_context, t, simple_query(string_ends_with), 2);
     verify_query(test_context, t, simple_query(string_contains), 3);
     verify_query(test_context, t, simple_query(string_like), 2);
+
+    verify_query(test_context, t, simple_query(int_null_eq), 0);
+    verify_query(test_context, t, simple_query(string_null_eq), 0);
+    verify_query(test_context, t, simple_query(float_null_eq), 0);
+    verify_query(test_context, t, simple_query(long_null_eq), 0);
+    verify_query(test_context, t, simple_query(double_null_eq), 0);
+
+    t->create_object().set(int_col, 1);
+    t->create_object().set(string_col, "foo").set(float_col, 2.27f).set(long_col, 10).set(double_col, 10.3);
+    verify_query(test_context, t, simple_query(int_null_eq), 1);
+    verify_query(test_context, t, simple_query(string_null_eq), 1);
+    verify_query(test_context, t, simple_query(float_null_eq), 1);
+    verify_query(test_context, t, simple_query(long_null_eq), 1);
+    verify_query(test_context, t, simple_query(double_null_eq), 1);
 }
 
 json logical_query(std::string kind, json pred1, json pred2){
