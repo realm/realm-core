@@ -6,12 +6,17 @@
 #include <realm/group.hpp>
 
 namespace realm::sync {
+namespace {
+
+void throw_bad_transaction_log(std::string msg)
+{
+    throw BadChangesetError{std::move(msg)};
+}
+
+} // namespace
 
 REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& msg) const
 {
-    const auto throw_error = [](std::string msg) {
-        throw BadChangesetError{std::move(msg)};
-    };
     if (m_last_object_key) {
         // If the last_object_key is valid then we should have a changeset and a current table
         REALM_ASSERT(m_log);
@@ -23,28 +28,29 @@ REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& m
         }
         const instr::Path* cur_path = m_current_path ? &(*m_current_path) : nullptr;
         m_log->print_path(ss, m_last_table_name, *m_last_object_key, field_name, cur_path);
-        throw_error(util::format("%1 (instruction target: %2, version: %3, last_integrated_remote_version: %4, "
-                                 "origin_file_ident: %5, timestamp: %6)",
-                                 msg, ss.str(), m_log->version, m_log->last_integrated_remote_version,
-                                 m_log->origin_file_ident, m_log->origin_timestamp));
+        throw_bad_transaction_log(
+            util::format("%1 (instruction target: %2, version: %3, last_integrated_remote_version: %4, "
+                         "origin_file_ident: %5, timestamp: %6)",
+                         msg, ss.str(), m_log->version, m_log->last_integrated_remote_version,
+                         m_log->origin_file_ident, m_log->origin_timestamp));
     }
     else if (m_last_table_name) {
         // We should have a changeset if we have a table name defined.
         REALM_ASSERT(m_log);
-        throw_error(util::format("%1 (instruction table: %2, version: %3, last_integrated_remote_version: %4, "
-                                 "origin_file_ident: %5, timestamp: %6)",
-                                 msg, m_log->get_string(m_last_table_name), m_log->version,
-                                 m_log->last_integrated_remote_version, m_log->origin_file_ident,
-                                 m_log->origin_timestamp));
+        throw_bad_transaction_log(
+            util::format("%1 (instruction table: %2, version: %3, last_integrated_remote_version: %4, "
+                         "origin_file_ident: %5, timestamp: %6)",
+                         msg, m_log->get_string(m_last_table_name), m_log->version,
+                         m_log->last_integrated_remote_version, m_log->origin_file_ident, m_log->origin_timestamp));
     }
     else if (m_log) {
         // If all we have is a changeset, then we should log whatever we can about it.
-        throw_error(util::format("%1 (version: %2, last_integrated_remote_version: %3, "
-                                 "origin_file_ident: %4, timestamp: %5)",
-                                 msg, m_log->version, m_log->last_integrated_remote_version, m_log->origin_file_ident,
-                                 m_log->origin_timestamp));
+        throw_bad_transaction_log(util::format("%1 (version: %2, last_integrated_remote_version: %3, "
+                                               "origin_file_ident: %4, timestamp: %5)",
+                                               msg, m_log->version, m_log->last_integrated_remote_version,
+                                               m_log->origin_file_ident, m_log->origin_timestamp));
     }
-    throw_error(std::move(msg));
+    throw_bad_transaction_log(std::move(msg));
 }
 
 template <class... Params>
