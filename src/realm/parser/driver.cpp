@@ -2995,6 +2995,7 @@ void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::un
     auto right = get_value_node(fragment["right"]);
     if (fragment["kind"] == "eq") {
         auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
+        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
         preds.emplace_back(std::move(eq));
     }
     else if (fragment["kind"] == "neq") {
@@ -3019,18 +3020,22 @@ void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::un
     }
     else if (fragment["kind"] == "beginsWith") {
         auto begins_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::BEGINSWITH, std::move(right));
+        begins_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
         preds.emplace_back(std::move(begins_with));
     }
     else if (fragment["kind"] == "endsWith") {
         auto ends_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::ENDSWITH, std::move(right));
+        ends_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
         preds.emplace_back(std::move(ends_with));
     }
     else if (fragment["kind"] == "contains") {
         auto contains = std::make_unique<StringOpsNode>(std::move(left), CompareNode::CONTAINS, std::move(right));
+        contains->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
         preds.emplace_back(std::move(contains));
     }
     else if (fragment["kind"] == "like") {
         auto like = std::make_unique<StringOpsNode>(std::move(left), CompareNode::LIKE, std::move(right));
+        like->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
         preds.emplace_back(std::move(like));
     }
 }

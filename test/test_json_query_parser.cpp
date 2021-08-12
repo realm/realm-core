@@ -34,6 +34,12 @@ json ends_with_const = { {"kind", "constant"}, {"value", "e"}, {"type", "string"
 json contains_const = { {"kind", "constant"}, {"value", "J"}, {"type", "string"} };
 json like_const = { {"kind", "constant"}, {"value", "*e"}, {"type", "string"} };
 
+json begins_with_const_non_case = { {"kind", "constant"}, {"value", "b"}, {"type", "string"} };
+json ends_with_const_non_case = { {"kind", "constant"}, {"value", "E"}, {"type", "string"} };
+json contains_const_non_case = { {"kind", "constant"}, {"value", "O"}, {"type", "string"} };
+json like_const_non_case = { {"kind", "constant"}, {"value", "b*"}, {"type", "string"} };
+json string_const_non_case = { {"kind", "constant"}, {"value", "joel"}, {"type", "string"} };
+
 //int comparisons
 json int_eq = { {"kind", "eq"}, {"left", int_prop}, {"right", int_const}};
 json int_neq = { {"kind", "neq"}, {"left", int_prop}, {"right", int_const}};
@@ -94,6 +100,14 @@ json string_begins_with = { {"kind", "beginsWith"}, {"left", string_prop}, {"rig
 json string_ends_with = { {"kind", "endsWith"}, {"left", string_prop}, {"right", ends_with_const}};
 json string_contains = { {"kind", "contains"}, {"left", string_prop}, {"right", contains_const}};
 json string_like = { {"kind", "like"}, {"left", string_prop}, {"right", like_const}};
+
+//case insensitive ops
+json string_begins_with_non_case = { {"kind", "beginsWith"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", begins_with_const_non_case}};
+json string_ends_with_non_case = { {"kind", "endsWith"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", ends_with_const_non_case}};
+json string_contains_non_case = { {"kind", "contains"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", contains_const_non_case}};
+json string_like_non_case = { {"kind", "like"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", like_const_non_case}};
+json string_eq_non_case = { {"kind", "eq"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", string_const_non_case}};
+
 
 //sort operations
 json sort_int_asc {{"isAscending", true}, {"property", "age"}};
@@ -198,6 +212,12 @@ TEST(test_json_query_parser_simple)
     verify_query(test_context, t, simple_query(string_ends_with), 2);
     verify_query(test_context, t, simple_query(string_contains), 3);
     verify_query(test_context, t, simple_query(string_like), 2);
+
+    verify_query(test_context, t, simple_query(string_begins_with_non_case), 2);
+    verify_query(test_context, t, simple_query(string_ends_with_non_case), 2);
+    verify_query(test_context, t, simple_query(string_contains_non_case), 3);
+    verify_query(test_context, t, simple_query(string_like_non_case), 2);
+    verify_query(test_context, t, simple_query(string_eq_non_case), 1);
 
     verify_query(test_context, t, simple_query(int_null_eq), 0);
     verify_query(test_context, t, simple_query(string_null_eq), 0);
