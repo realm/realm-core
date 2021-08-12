@@ -95,6 +95,8 @@ void RealmCoordinator::create_sync_session()
         return;
 
     open_db();
+    if (m_sync_session)
+        return;
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
@@ -417,6 +419,21 @@ void RealmCoordinator::open_db()
 {
     if (m_db)
         return;
+
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config) {
+        // If we previously opened this Realm, we may have a lingering sync
+        // session which outlived its RealmCoordinator. If that happens we
+        // want to reuse it instead of creating a new DB.
+        auto existing_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
+        if (existing_session) {
+            m_sync_session = existing_session;
+            m_db = SyncSession::Internal::get_db(*existing_session);
+            m_sync_session->revive_if_needed();
+            return;
+        }
+    }
+#endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
     try {

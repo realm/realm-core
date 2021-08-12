@@ -471,11 +471,15 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             });
         }
 
-        //        SECTION("transitions back to Active if the session is revived") {
-        //            auto session2 = sync_manager->get_session(config.path, *config.sync_config);
-        //            REQUIRE(session->state() == SyncSession::PublicState::Active);
-        //            REQUIRE(session2 == session);
-        //        }
+        SECTION("transitions back to Active if the session is revived") {
+            std::shared_ptr<SyncSession> session2;
+            {
+                auto realm = Realm::get_shared_realm(config);
+                session2 = user->sync_manager()->get_existing_session(config.path);
+            }
+            REQUIRE(session->state() == SyncSession::PublicState::Active);
+            REQUIRE(session2 == session);
+        }
 
         SECTION("transitions to Inactive if a fatal error occurs") {
             std::error_code code =
