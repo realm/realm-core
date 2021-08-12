@@ -106,7 +106,7 @@ json string_begins_with_non_case = { {"kind", "beginsWith"}, {"caseSensitivity",
 json string_ends_with_non_case = { {"kind", "endsWith"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", ends_with_const_non_case}};
 json string_contains_non_case = { {"kind", "contains"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", contains_const_non_case}};
 json string_like_non_case = { {"kind", "like"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", like_const_non_case}};
-json string_eq_non_case = { {"kind", "eq"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", string_const_non_case}};
+json string_eq_non_case = { {"kind", "eqString"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", string_const_non_case}};
 
 
 //sort operations
