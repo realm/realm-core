@@ -1732,7 +1732,7 @@ private:
     std::mutex m_mutex;
     std::condition_variable m_changed;
     std::deque<std::function<void()>> m_pending_writes;
-    std::optional<std::function<void()>> m_pending_sync;
+    util::Optional<std::function<void()>> m_pending_sync;
     bool m_pending_mx_release = false;
     bool m_terminated = true;
     bool m_has_write_mutex = false;
@@ -2871,6 +2871,19 @@ TransactionRef DB::start_write(bool nonblocking)
     return TransactionRef(tr, TransactionDeleter);
 }
 
+void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired)
+{
+    tr->m_async_stage = Transaction::AsyncState::Requesting;
+    // TODO make async
+    std::weak_ptr<Transaction> weak_tr = tr;
+    async_begin_write([weak_tr, when_acquired]() {
+        if (auto tr = weak_tr.lock()) {
+            tr->m_async_stage = Transaction::AsyncState::HasLock;
+            when_acquired();
+        }
+    });
+}
+
 Obj Transaction::import_copy_of(const Obj& original)
 {
     if (bool(original) && original.is_valid()) {
@@ -3041,4 +3054,4 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         when_synchronized();
         m_async_stage = AsyncState::Idle;
     });
-};
+}

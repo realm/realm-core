@@ -658,7 +658,7 @@ void Realm::check_pending_write_requests()
 {
     if (!m_async_write_q.empty()) {
         // more writes to run later, so re-request the write mutex:
-        m_transaction->async_request_write_mutex([&]() {
+        m_coordinator->async_request_write_mutex(m_transaction, [&]() {
             // callback happens on a different thread so...:
             run_writes_on_proper_thread();
         });
@@ -712,7 +712,7 @@ void Realm::run_writes()
         try {
             write_desc.writer();
         }
-        catch (const std::exception& e) {
+        catch (const std::exception&) {
             // The version check below will cause a rollback to be performed if a commit
             // was not done
         }
@@ -753,13 +753,14 @@ void Realm::async_begin_transaction(const std::function<void()>& the_write_block
     REALM_ASSERT(!m_is_running_async_commit_completions);
 
     // make sure we have a (at least a) read transaction
-    auto& trans = transaction();
+    transaction();
     std::weak_ptr<Realm> weak_self = shared_from_this();
     m_async_write_q.push_back({std::move(the_write_block), notify_only});
 
     if (!m_is_running_async_writes) {
         REALM_ASSERT(m_scheduler);
         REALM_ASSERT(m_scheduler->can_schedule_writes());
+        REALM_ASSERT(m_scheduler->can_schedule_completions());
         // TODO: We should not do this so often:
         m_scheduler->set_schedule_writes_callback([weak_self]() {
             if (auto r = weak_self.lock())
@@ -770,7 +771,7 @@ void Realm::async_begin_transaction(const std::function<void()>& the_write_block
                 r->run_async_completions();
         });
         if (!m_transaction->is_async()) {
-            trans.async_request_write_mutex([weak_self]() {
+            m_coordinator->async_request_write_mutex(m_transaction, [weak_self]() {
                 // callback happens on a different thread so...:
                 if (auto r = weak_self.lock())
                     r->run_writes_on_proper_thread();

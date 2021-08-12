@@ -229,6 +229,10 @@ public:
     // an invalid TransactionRef is returned.
     TransactionRef start_write(bool nonblocking = false);
 
+    // ask for write mutex. Callback takes place when mutex has been acquired.
+    // callback may occur on ANOTHER THREAD. Must not be called if write mutex
+    // has already been acquired.
+    void async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired);
 
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
@@ -674,19 +678,7 @@ public:
     bool holds_write_mutex() const noexcept
     {
         return m_async_stage == AsyncState::HasLock || m_async_stage == AsyncState::HasCommits;
-    };
-    // ask for write mutex. Callback takes place when mutex has been acquired.
-    // callback may occur on ANOTHER THREAD. Must not be called if write mutex
-    // has already been acquired.
-    void async_request_write_mutex(std::function<void()> when_acquired)
-    {
-        m_async_stage = AsyncState::Requesting;
-        // TODO make async
-        get_db()->async_begin_write([&, when_acquired]() {
-            m_async_stage = AsyncState::HasLock;
-            when_acquired();
-        });
-    };
+    }
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
     void async_request_sync_to_storage(std::function<void()> when_synchronized);
@@ -696,13 +688,13 @@ public:
         REALM_ASSERT(m_async_stage == AsyncState::HasLock);
         m_async_stage = AsyncState::Idle;
         get_db()->async_end_write();
-    };
+    }
 
     // true if sync to disk has been requested
     bool is_synchronizing() const noexcept
     {
         return m_async_stage == AsyncState::Syncing;
-    };
+    }
 
     // methods for use with async interface for cont. transactions
     DB::ReadLockInfo grab_read_lock()
@@ -710,11 +702,11 @@ public:
         DB::ReadLockInfo rli;
         get_db()->grab_read_lock(rli, VersionID());
         return rli;
-    };
+    }
     void release_read_lock(DB::ReadLockInfo& read_lock)
     {
         get_db()->release_read_lock(read_lock);
-    };
+    }
 
 private:
     enum class AsyncState { Idle, Requesting, HasLock, HasCommits, Syncing };

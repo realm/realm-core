@@ -107,7 +107,7 @@ struct CAPIScheduler : Scheduler {
         return false;
     }
 
-    bool is_same_as(const Scheduler* other) const noexcept
+    bool is_same_as(const Scheduler* other) const noexcept final
     {
         if (auto rhs = dynamic_cast<const CAPIScheduler*>(other)) {
             bool same_callbacks = m_free == rhs->m_free && m_notify == rhs->m_notify &&
@@ -138,19 +138,6 @@ struct CAPIScheduler : Scheduler {
             m_set_notify_callback(m_userdata, ptr, free_notify_cpp_callback, invoke_notify_cpp_callback);
         }
     }
-
-    void schedule_writes() override{};
-    void schedule_completions() override{};
-    bool can_schedule_writes() const noexcept override
-    {
-        return false;
-    };
-    bool can_schedule_completions() const noexcept override
-    {
-        return false;
-    };
-    void set_schedule_writes_callback(std::function<void()>) override{};
-    void set_schedule_completions_callback(std::function<void()>) override{};
 };
 
 struct DefaultFactory {

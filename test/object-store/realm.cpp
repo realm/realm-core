@@ -57,14 +57,19 @@ public:
         Realm::Internal::begin_read(*shared_realm, version);
     }
 };
+
+static bool operator==(IndexSet const& a, IndexSet const& b)
+{
+    return std::equal(a.as_indexes().begin(), a.as_indexes().end(), b.as_indexes().begin(), b.as_indexes().end());
+}
 } // namespace realm
 
 using namespace realm;
 
 namespace {
-class KVOContext : public BindingContext {
+class Observer : public BindingContext {
 public:
-    KVOContext(Obj& obj)
+    Observer(Obj& obj)
     {
         m_result.push_back(ObserverState{obj.get_table()->get_key(), obj.get_key().value, nullptr});
     }
@@ -91,11 +96,6 @@ private:
         m_result = observers;
     }
 };
-
-static bool operator==(IndexSet const& a, IndexSet const& b)
-{
-    return std::equal(a.as_indexes().begin(), a.as_indexes().end(), b.as_indexes().begin(), b.as_indexes().end());
-}
 } // namespace
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
@@ -472,19 +472,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
         void set_notify_callback(std::function<void()>) override {}
         void notify() override {}
-
-        void schedule_writes() override{};
-        void schedule_completions() override{};
-        bool can_schedule_writes() const noexcept override
-        {
-            return false;
-        };
-        bool can_schedule_completions() const noexcept override
-        {
-            return false;
-        };
-        void set_schedule_writes_callback(std::function<void()>) override{};
-        void set_schedule_completions_callback(std::function<void()>) override{};
 
     protected:
         size_t m_id;
@@ -940,7 +927,7 @@ TEST_CASE("SharedRealm: async_writes") {
             list.add(i);
         realm->commit_transaction();
 
-        KVOContext observer(obj);
+        Observer observer(obj);
         observer.realm = realm;
         realm->m_binding_context.reset(&observer);
 
@@ -961,7 +948,7 @@ TEST_CASE("SharedRealm: async_writes") {
 
 class LooperDelegate {
 public:
-    LooperDelegate(){};
+    LooperDelegate() {}
     void run_once()
     {
         for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {

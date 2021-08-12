@@ -107,19 +107,19 @@ public:
     void schedule_writes() override
     {
         uv_async_send(m_write_handle);
-    };
+    }
     void schedule_completions() override
     {
         uv_async_send(m_completion_handle);
-    };
+    }
     bool can_schedule_writes() const noexcept override
     {
         return true;
-    };
+    }
     bool can_schedule_completions() const noexcept override
     {
-        return false;
-    };
+        return true;
+    }
     void set_schedule_writes_callback(std::function<void()> fn) override
     {
         if (m_write_handle && m_write_handle->data) {
@@ -128,7 +128,7 @@ public:
             // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
         }
         m_write_handle = add_callback(std::move(fn));
-    };
+    }
     void set_schedule_completions_callback(std::function<void()> fn) override
     {
         if (m_completion_handle && m_completion_handle->data) {
@@ -137,7 +137,7 @@ public:
             // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
         }
         m_completion_handle = add_callback(std::move(fn));
-    };
+    }
 
     void set_timeout_callback(uint64_t timeout, std::function<void()> fn) override
     {

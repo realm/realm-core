@@ -41,18 +41,18 @@ public:
     void set_notify_callback(std::function<void()>) override {}
     void notify() override {}
 
-    void schedule_writes() override{};
-    void schedule_completions() override{};
+    void schedule_writes() override {}
+    void schedule_completions() override {}
     bool can_schedule_writes() const noexcept override
     {
         return false;
-    };
+    }
     bool can_schedule_completions() const noexcept override
     {
         return false;
-    };
-    void set_schedule_writes_callback(std::function<void()>) override{};
-    void set_schedule_completions_callback(std::function<void()>) override{};
+    }
+    void set_schedule_writes_callback(std::function<void()>) override {}
+    void set_schedule_completions_callback(std::function<void()>) override {}
 
 private:
     std::thread::id m_id = std::this_thread::get_id();
