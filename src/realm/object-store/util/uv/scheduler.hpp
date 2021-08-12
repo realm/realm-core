@@ -139,6 +139,24 @@ public:
         m_completion_handle = add_callback(std::move(fn));
     };
 
+    void set_timeout_callback(uint64_t timeout, std::function<void()> fn) override
+    {
+        if (m_timer && m_timer->data)
+            return;
+
+        auto m_timer = new uv_timer_t;
+        m_timer->data = new Data{std::move(fn), {false}};
+
+        uv_timer_init(uv_default_loop(), m_timer);
+        uv_timer_start(
+            m_timer,
+            [](uv_timer_t* handle) {
+                auto& data = *static_cast<Data*>(handle->data);
+                data.callback();
+            },
+            timeout, 0);
+    }
+
 private:
     struct Data {
         std::function<void()> callback;
@@ -147,6 +165,7 @@ private:
     uv_async_t* m_notification_handle = nullptr;
     uv_async_t* m_write_handle = nullptr;
     uv_async_t* m_completion_handle = nullptr;
+    uv_timer_t* m_timer = nullptr;
     std::thread::id m_id = std::this_thread::get_id();
 };
 

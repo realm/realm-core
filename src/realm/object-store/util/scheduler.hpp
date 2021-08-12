@@ -84,6 +84,8 @@ public:
     virtual void set_schedule_writes_callback(std::function<void()>) = 0;
     virtual void set_schedule_completions_callback(std::function<void()>) = 0;
 
+    virtual void set_timeout_callback(uint64_t, std::function<void()>) {}
+
     // virtual int enqueue_write(std::function<void()>& block) = 0;
 
     [[deprecated("Use Scheduler::make_frozen() instead")]] static std::shared_ptr<Scheduler>

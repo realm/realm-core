@@ -312,7 +312,7 @@ public:
     //   associated with the current realm. It will run after the write
     //   mutex has been acquired.
     // * If 'notify_only' is false, 'the_block' should end by calling commit_transaction(),
-    //   cancel_transaction() or async_commit().
+    //   cancel_transaction() or async_commit_transaction().
     // * If 'notify_only' is false, returning without one of these calls will be equivalent to calling
     //   cancel_transaction().
     // * If 'notify_only' is true, 'the_block' should only be used for signalling that
@@ -321,9 +321,8 @@ public:
     //   while the write mutex is held by someone else.
     // * Write blocks from multiple calls to async_transaction() will be
     //   executed in order.
-    // * A later call to begin_transaction() will wait for any earlier write blocks.
-    using async_handle = int;
-    async_handle async_begin_transaction(bool notify_only, const std::function<void()>& the_block);
+    // * A later call to async_begin_transaction() will wait for any earlier write blocks.
+    void async_begin_transaction(const std::function<void()>& the_block, bool notify_only = false);
 
     // Asynchronous commit.
     // * 'the_done_block' is queued for execution on the scheduler associated with
@@ -335,12 +334,11 @@ public:
     //   intervening synchronization of stable storage.
     // * Such a sequence of commits form a group. In case of a platform crash,
     //   either none or all of the commits in a group will reach stable storage.
-    async_handle async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping = false);
+    void async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping = false);
 
-    // Cancel a queued code block (either for an async_transaction or for an async_commit)
-    // * Cancelling a commit will not abort the commit, it will only cancel the callback
-    //   informing of commit completion.
-    void async_cancel(async_handle);
+    // Returns true when async transactiona has been created and the result of the last
+    // commit has not yet reached permanent storage.
+    bool is_in_async_transaction() const noexcept;
 
     // Returns a frozen copy for the current version of this Realm
     SharedRealm freeze();
@@ -550,12 +548,13 @@ private:
     bool m_is_running_async_writes = false;
     bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;
-    bool m_has_requested_write_mutex = false;
     bool m_async_commit_barrier_requested = false;
     void run_writes_on_proper_thread();
     void run_writes();
     void run_async_completions_on_proper_thread();
     void run_async_completions();
+    void check_pending_write_requests();
+    void end_current_write();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
