@@ -4063,7 +4063,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                         completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
-
                         CHECK(login_hit);
 
                         auto access_token = request.headers.at("Authorization");
