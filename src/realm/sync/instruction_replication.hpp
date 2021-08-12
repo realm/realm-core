@@ -124,7 +124,7 @@ private:
     bool m_short_circuit = false;
 
     ChangesetEncoder m_encoder;
-    DB* m_sg = nullptr;
+    DB* m_db = nullptr;
     Transaction* m_transaction;
 
     // Consistency checks:

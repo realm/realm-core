@@ -1681,10 +1681,40 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
 
 // MARK: - Sync Tests
 
-TEST_CASE("app: set new embedded object", "[sync][app]") {
+App::Config make_app_config(const std::string client_app_id)
+{
     auto factory = []() -> std::unique_ptr<GenericNetworkTransport> {
         return std::make_unique<IntTestTransport>();
     };
+    return App::Config{client_app_id,
+                       factory,
+                       get_base_url(),
+                       util::none,
+                       Optional<std::string>("A Local App Version"),
+                       util::none,
+                       "Object Store Platform Tests",
+                       "Object Store Platform Version Blah",
+                       "An sdk version"};
+}
+
+realm::Realm::Config make_realm_config(const std::shared_ptr<SyncUser> user, const Schema& schema,
+                                       const std::string base_path)
+{
+    realm::Realm::Config realm_config;
+    realm_config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson("foo"));
+    realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+    realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+        std::cerr << error.message << std::endl;
+    };
+    realm_config.schema_version = 1;
+    realm_config.path = base_path + "/default.realm";
+    realm_config.schema = schema;
+    return realm_config;
+}
+
+// MARK: - Sync Tests
+TEST_CASE("app: mixed lists with object links", "[sync][app]") {
+
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
@@ -1693,50 +1723,35 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         ObjectSchema("TopLevel",
                      {
                          {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
-                         {"embedded", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded"},
+                         {"mixed_array", PropertyType::Mixed | PropertyType::Array | PropertyType::Nullable},
                      }),
-        ObjectSchema("TopLevel_embedded", ObjectSchema::IsEmbedded{true},
+        ObjectSchema("Target",
                      {
-                         {"array", PropertyType::Int | PropertyType::Array},
+                         {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+                         {"value", PropertyType::Int},
                      }),
     };
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
     auto app_session = create_app(server_app_config);
-
-    auto app_config = App::Config{app_session.client_app_id,
-                                  factory,
-                                  base_url,
-                                  util::none,
-                                  Optional<std::string>("A Local App Version"),
-                                  util::none,
-                                  "Object Store Platform Tests",
-                                  "Object Store Platform Version Blah",
-                                  "An sdk version"};
+    auto app_config = make_app_config(app_session.client_app_id);
 
     auto base_path = util::make_temp_dir() + app_config.app_id;
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
 
-    auto make_realm_config = [&](const std::shared_ptr<SyncUser> user) {
-        realm::Realm::Config realm_config;
-        realm_config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson("foo"));
-        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cout << error.message << std::endl;
-        };
-        realm_config.schema_version = 1;
-        realm_config.path = base_path + "/default.realm";
-        realm_config.schema = server_app_config.schema;
-        return realm_config;
-    };
-
-    auto top_level_id = ObjectId::gen();
     auto email = util::format("realm_tests_do_autoverify-test@example.com");
     auto password = std::string{"password"};
-
+    auto obj_id = ObjectId::gen();
+    auto target_id = ObjectId::gen();
+    auto mixed_list_values = AnyVector{
+        Mixed{int64_t(1234)},
+        Mixed{},
+        Mixed{target_id},
+    };
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        TestSyncManager::Config tsm_config(app_config);
+        TestSyncManager sync_manager(tsm_config, {});
         auto app = sync_manager.app();
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
             email, password, [&](Optional<app::AppError> error) {
@@ -1748,38 +1763,24 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
                                          CHECK(!error);
                                      });
 
-        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user(), schema, base_path));
         auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
 
         CppContext c(realm);
         realm->begin_transaction();
-        auto obj = Object::create(c, realm, "TopLevel",
-                                  util::Any(AnyDict{
-                                      {valid_pk_name, top_level_id},
-                                      {"embedded", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
-                                  }),
-                                  CreatePolicy::ForceCreate);
+        auto target_obj =
+            Object::create(c, realm, "Target",
+                           util::Any(AnyDict{{valid_pk_name, target_id}, {"value", static_cast<int64_t>(1234)}}));
+        mixed_list_values.push_back(Mixed(target_obj.obj().get_link()));
+
+        auto array_of_objs = Object::create(c, realm, "TopLevel",
+                                            util::Any(AnyDict{
+                                                {valid_pk_name, obj_id},
+                                                {"mixed_array", mixed_list_values},
+                                            }),
+                                            CreatePolicy::ForceCreate);
         realm->commit_transaction();
-
-        realm->begin_transaction();
-        obj.set_property_value(c, "embedded",
-                               util::Any(AnyDict{{
-                                   "array",
-                                   AnyVector{INT64_C(3), INT64_C(4)},
-                               }}),
-                               realm::CreatePolicy::UpdateAll);
-        realm->commit_transaction();
-
-        std::promise<void> promise;
-        auto future = promise.get_future();
-        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
-        session->wait_for_download_completion(
-            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
-                REALM_ASSERT(!ec);
-                shared_promise->set_value();
-            });
-
-        future.wait();
+        CHECK(!wait_for_upload(*realm));
     }
 
     {
@@ -1794,26 +1795,184 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
                                          CHECK(!error);
                                      });
 
-        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user()));
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user(), schema, base_path));
         auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
 
-        std::promise<void> promise;
-        auto future = promise.get_future();
-        auto shared_promise = std::make_shared<std::promise<void>>(std::move(promise));
-        session->wait_for_download_completion(
-            [shared_promise = std::move(shared_promise)](std::error_code ec) mutable {
-                REALM_ASSERT(!ec);
-                shared_promise->set_value();
-            });
-
-        future.wait();
+        CHECK(!wait_for_download(*realm));
         CppContext c(realm);
-        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{top_level_id});
-        auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded"));
-        auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
-        CHECK(array_list.size() == 2);
-        CHECK(array_list.get<int64_t>(0) == int64_t(3));
-        CHECK(array_list.get<int64_t>(1) == int64_t(4));
+        auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
+        auto list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "mixed_array"));
+        for (size_t idx = 0; idx < list.size(); ++idx) {
+            Mixed mixed = list.get_any(idx);
+            CHECK(mixed == any_cast<Mixed>(mixed_list_values[idx]));
+        }
+    }
+}
+
+TEST_CASE("app: set new embedded object", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        ObjectSchema("TopLevel",
+                     {
+                         {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+                         {"array_of_objs", PropertyType::Object | PropertyType::Array, "TopLevel_array_of_objs"},
+                         {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"},
+                         {"embedded_dict", PropertyType::Object | PropertyType::Dictionary | PropertyType::Nullable,
+                          "TopLevel_embedded_dict"},
+                     }),
+        ObjectSchema("TopLevel_array_of_objs", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+        ObjectSchema("TopLevel_embedded_obj", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+        ObjectSchema("TopLevel_embedded_dict", ObjectSchema::IsEmbedded{true},
+                     {
+                         {"array", PropertyType::Int | PropertyType::Array},
+                     }),
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = make_app_config(app_session.client_app_id);
+
+    auto base_path = util::make_temp_dir() + app_config.app_id;
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
+
+    auto array_of_objs_id = ObjectId::gen();
+    auto embedded_obj_id = ObjectId::gen();
+    auto dict_obj_id = ObjectId::gen();
+    auto email = util::format("realm_tests_do_autoverify-test@example.com");
+    auto password = std::string{"password"};
+
+    {
+        TestSyncManager::Config tsm_config(app_config);
+        TestSyncManager sync_manager(tsm_config, {});
+        auto app = sync_manager.app();
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
+            email, password, [&](Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user(), schema, base_path));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        auto array_of_objs =
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{
+                               {valid_pk_name, array_of_objs_id},
+                               {"array_of_objs", AnyVector{AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}},
+                           }),
+                           CreatePolicy::ForceCreate);
+
+        auto embedded_obj =
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{
+                               {valid_pk_name, embedded_obj_id},
+                               {"embedded_obj", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}},
+                           }),
+                           CreatePolicy::ForceCreate);
+
+        auto dict_obj = Object::create(
+            c, realm, "TopLevel",
+            util::Any(AnyDict{
+                {valid_pk_name, dict_obj_id},
+                {"embedded_dict", AnyDict{{"foo", AnyDict{{"array", AnyVector{INT64_C(1), INT64_C(2)}}}}}},
+            }),
+            CreatePolicy::ForceCreate);
+
+        realm->commit_transaction();
+        {
+            realm->begin_transaction();
+            embedded_obj.set_property_value(c, "embedded_obj",
+                                            util::Any(AnyDict{{
+                                                "array",
+                                                AnyVector{INT64_C(3), INT64_C(4)},
+                                            }}),
+                                            realm::CreatePolicy::UpdateAll);
+            realm->commit_transaction();
+        }
+
+        {
+            realm->begin_transaction();
+            List array(array_of_objs, array_of_objs.get_object_schema().property_for_name("array_of_objs"));
+            CppContext c2(realm, &array.get_object_schema());
+            array.set(c2, 0, util::Any{AnyDict{{"array", AnyVector{INT64_C(5), INT64_C(6)}}}});
+            realm->commit_transaction();
+        }
+
+        {
+            realm->begin_transaction();
+            object_store::Dictionary dict(dict_obj, dict_obj.get_object_schema().property_for_name("embedded_dict"));
+            CppContext c2(realm, &dict.get_object_schema());
+            dict.insert(c2, "foo", util::Any{AnyDict{{"array", AnyVector{INT64_C(7), INT64_C(8)}}}});
+            realm->commit_transaction();
+        }
+        CHECK(!wait_for_upload(*realm));
+    }
+
+    {
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(user);
+                                         CHECK(!error);
+                                     });
+
+        auto realm = realm::Realm::get_shared_realm(make_realm_config(app->current_user(), schema, base_path));
+        auto session = app->current_user()->session_for_on_disk_path(realm->config().path);
+
+        CHECK(!wait_for_download(*realm));
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{embedded_obj_id});
+            auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
+            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(3));
+            CHECK(array_list.get<int64_t>(1) == int64_t(4));
+        }
+
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{array_of_objs_id});
+            auto embedded_list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
+            CppContext c2(realm, &embedded_list.get_object_schema());
+            auto embedded_array_obj = any_cast<Object&&>(embedded_list.get(c2, 0));
+            auto array_list = any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(5));
+            CHECK(array_list.get<int64_t>(1) == int64_t(6));
+        }
+
+        {
+            CppContext c(realm);
+            auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{dict_obj_id});
+            object_store::Dictionary dict(obj, obj.get_object_schema().property_for_name("embedded_dict"));
+            CppContext c2(realm, &dict.get_object_schema());
+            auto embedded_obj = any_cast<Object&&>(dict.get(c2, "foo"));
+            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
+            CHECK(array_list.size() == 2);
+            CHECK(array_list.get<int64_t>(0) == int64_t(7));
+            CHECK(array_list.get<int64_t>(1) == int64_t(8));
+        }
     }
 }
 
@@ -3904,7 +4063,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                         completion_block({200, 0, {}, user_json(good_access_token).dump()});
                     }
                     else if (request.url.find("/profile") != std::string::npos) {
-
                         CHECK(login_hit);
 
                         auto access_token = request.headers.at("Authorization");
