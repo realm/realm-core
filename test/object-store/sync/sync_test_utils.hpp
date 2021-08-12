@@ -28,6 +28,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 
 #include "util/event_loop.hpp"
+#include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
 // disable the tests that rely on having baas available on the network
@@ -62,6 +63,40 @@ void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
 AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app);
 
 #endif // REALM_ENABLE_AUTH_TESTS
+
+namespace reset_utils {
+
+struct TestClientReset {
+    using callback_t = std::function<void(SharedRealm)>;
+    TestClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config);
+    virtual ~TestClientReset();
+    TestClientReset* setup(callback_t&& on_setup);
+    TestClientReset* make_local_changes(callback_t&& changes_local);
+    TestClientReset* make_remote_changes(callback_t&& changes_remote);
+    TestClientReset* on_post_local_changes(callback_t&& post_local);
+    TestClientReset* on_post_reset(callback_t&& post_reset);
+
+    virtual void run() = 0;
+
+protected:
+    realm::Realm::Config m_local_config;
+    realm::Realm::Config m_remote_config;
+
+    callback_t m_on_setup;
+    callback_t m_make_local_changes;
+    callback_t m_make_remote_changes;
+    callback_t m_on_post_local;
+    callback_t m_on_post_reset;
+    bool m_did_run = false;
+};
+
+std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
+                                                               Realm::Config remote_config,
+                                                               TestSyncManager& test_sync_manager);
+std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config,
+                                                              Realm::Config remote_config);
+
+} // namespace reset_utils
 
 } // namespace realm
 

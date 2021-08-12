@@ -18,6 +18,9 @@
 
 #include "sync_test_utils.hpp"
 
+#include <realm/object-store/object_store.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
+
 namespace realm {
 
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
@@ -116,5 +119,231 @@ AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app)
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+namespace reset_utils {
+
+TableRef get_table(Realm& realm, StringData object_type)
+{
+    return realm::ObjectStore::table_for_object_type(realm.read_group(), object_type);
+}
+
+Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> primary_key = util::none)
+{
+    auto table = get_table(realm, object_type);
+    REQUIRE(table);
+    static int64_t pk = 0;
+    return table->create_object_with_primary_key(primary_key ? *primary_key : pk++);
+}
+
+struct TestServerClientReset : public TestClientReset {
+    TestServerClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config,
+                          TestSyncManager& test_sync_manager)
+        : TestClientReset(local_config, remote_config)
+        , m_test_sync_manager(test_sync_manager)
+    {
+    }
+
+    void run() override
+    {
+        m_did_run = true;
+        using namespace std::literals::chrono_literals;
+        auto& server = m_test_sync_manager.sync_server();
+        auto sync_manager = m_test_sync_manager.app()->sync_manager();
+
+        auto realm = Realm::get_shared_realm(m_local_config);
+        auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
+        {
+            realm->begin_transaction();
+
+            if (m_on_setup) {
+                m_on_setup(realm);
+            }
+
+            auto obj = create_object(*realm, "object");
+            auto col = obj.get_table()->get_column_key("value");
+            obj.set(col, 1);
+            obj.set(col, 2);
+            obj.set(col, 3);
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            session->log_out();
+
+            // Make a change while offline so that log compaction will cause a
+            // client reset
+            realm->begin_transaction();
+            obj.set(col, 4);
+            if (m_make_local_changes) {
+                m_make_local_changes(realm);
+            }
+            realm->commit_transaction();
+        }
+
+        // Make writes from another client while advancing the time so that
+        // the server performs log compaction
+        {
+            auto realm2 = Realm::get_shared_realm(m_remote_config);
+
+            for (int i = 0; i < 2; ++i) {
+                wait_for_download(*realm2);
+                realm2->begin_transaction();
+                auto table = get_table(*realm2, "object");
+                auto col = table->get_column_key("value");
+                table->begin()->set(col, i + 5);
+                realm2->commit_transaction();
+                wait_for_upload(*realm2);
+                server.advance_clock(10s);
+            }
+
+            realm2->begin_transaction();
+            if (m_make_remote_changes) {
+                m_make_remote_changes(realm2);
+            }
+            realm2->commit_transaction();
+            wait_for_upload(*realm2);
+            server.advance_clock(10s);
+            realm2->close();
+        }
+
+        // Resuming sync on the first realm should now result in a client reset
+        session->revive_if_needed();
+        if (m_on_post_local) {
+            m_on_post_local(realm);
+        }
+        wait_for_download(*realm);
+        if (m_on_post_reset) {
+            m_on_post_reset(realm);
+        }
+    }
+
+private:
+    TestSyncManager& m_test_sync_manager;
+};
+
+struct FakeLocalClientReset : public TestClientReset {
+    FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+        : TestClientReset(local_config, remote_config)
+    {
+        // turn off sync, we only fake it
+        m_local_config.sync_config = {};
+        m_remote_config.sync_config = {};
+    }
+
+    void run() override
+    {
+        m_did_run = true;
+        auto realm = Realm::get_shared_realm(m_local_config);
+        realm->begin_transaction();
+        if (m_on_setup) {
+            m_on_setup(realm);
+        }
+        realm->commit_transaction();
+        constexpr int64_t shared_pk = -42;
+        {
+            realm->begin_transaction();
+            auto obj = create_object(*realm, "object", shared_pk);
+            auto col = obj.get_table()->get_column_key("value");
+            obj.set(col, 1);
+            obj.set(col, 2);
+            obj.set(col, 3);
+            realm->commit_transaction();
+
+            realm->begin_transaction();
+            obj.set(col, 4);
+            if (m_make_local_changes) {
+                m_make_local_changes(realm);
+            }
+            realm->commit_transaction();
+            if (m_on_post_local) {
+                m_on_post_local(realm);
+            }
+        }
+
+        {
+            m_remote_config.schema = m_local_config.schema;
+            auto realm2 = Realm::get_shared_realm(m_remote_config);
+            realm2->begin_transaction();
+            if (m_on_setup) {
+                m_on_setup(realm2);
+            }
+
+            // fake a sync by creating an object with the same pk
+            create_object(*realm2, "object", shared_pk);
+
+            for (int i = 0; i < 2; ++i) {
+                auto table = get_table(*realm2, "object");
+                auto col = table->get_column_key("value");
+                table->begin()->set(col, i + 5);
+            }
+
+            if (m_make_remote_changes) {
+                m_make_remote_changes(realm2);
+            }
+
+            realm->begin_transaction();
+
+            TestLogger logger;
+            _impl::client_reset::transfer_group((Transaction&)realm2->read_group(), (Transaction&)realm->read_group(),
+                                                logger);
+            realm->commit_transaction();
+            realm2->cancel_transaction();
+            realm2->close();
+            if (m_on_post_reset) {
+                m_on_post_reset(realm);
+            }
+        }
+    }
+};
+
+
+TestClientReset::TestClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+    : m_local_config(local_config)
+    , m_remote_config(remote_config)
+{
+}
+TestClientReset::~TestClientReset()
+{
+    // make sure we didn't forget to call run()
+    REALM_ASSERT(m_did_run || !(m_make_local_changes || m_make_remote_changes || m_on_post_local || m_on_post_reset));
+}
+
+TestClientReset* TestClientReset::setup(callback_t&& on_setup)
+{
+    m_on_setup = std::move(on_setup);
+    return this;
+}
+TestClientReset* TestClientReset::make_local_changes(callback_t&& changes_local)
+{
+    m_make_local_changes = std::move(changes_local);
+    return this;
+}
+TestClientReset* TestClientReset::make_remote_changes(callback_t&& changes_remote)
+{
+    m_make_remote_changes = std::move(changes_remote);
+    return this;
+}
+TestClientReset* TestClientReset::on_post_local_changes(callback_t&& post_local)
+{
+    m_on_post_local = std::move(post_local);
+    return this;
+}
+TestClientReset* TestClientReset::on_post_reset(callback_t&& post_reset)
+{
+    m_on_post_reset = std::move(post_reset);
+    return this;
+}
+
+std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
+                                                               Realm::Config remote_config,
+                                                               TestSyncManager& test_sync_manager)
+{
+    return std::make_unique<TestServerClientReset>(local_config, remote_config, test_sync_manager);
+}
+
+std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config, Realm::Config remote_config)
+{
+    return std::make_unique<FakeLocalClientReset>(local_config, remote_config);
+}
+
+} // namespace reset_utils
 
 } // namespace realm
