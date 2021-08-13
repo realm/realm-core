@@ -169,6 +169,7 @@ struct SyncTestFile : TestFile {
 
     SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
                  std::string user_name = "test");
+    SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
 };
 
 struct TestSyncManager {
@@ -178,7 +179,7 @@ struct TestSyncManager {
 #else
         static constexpr bool default_logging = false;
 #endif
-        Config();
+        Config() {}
         Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
         Config(std::string, std::string,
                realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
@@ -186,9 +187,10 @@ struct TestSyncManager {
         realm::app::App::Config app_config;
         std::string base_path;
         std::string base_url;
-        realm::SyncManager::MetadataMode metadata_mode;
-        bool should_teardown_test_directory;
+        realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+        bool should_teardown_test_directory = true;
         bool verbose_sync_client_logging = default_logging;
+        bool override_sync_route = true;
     };
 
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
@@ -209,23 +211,15 @@ private:
     bool m_should_teardown_test_directory = true;
 };
 
-inline TestSyncManager::Config::Config()
-    : metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
-    , should_teardown_test_directory(true)
-{
-}
-
 inline TestSyncManager::Config::Config(std::string bp, realm::SyncManager::MetadataMode mdm)
     : base_path(bp)
     , metadata_mode(mdm)
-    , should_teardown_test_directory(true)
 {
 }
 
 inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm::SyncManager::MetadataMode mdm)
     : base_path(bp)
     , metadata_mode(mdm)
-    , should_teardown_test_directory(true)
 {
     realm::app::App::Config app_cfg;
     app_cfg.app_id = app_id;
@@ -235,7 +229,6 @@ inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm
 inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg)
     : app_config(app_cfg)
     , metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
-    , should_teardown_test_directory(true)
 {
 }
 

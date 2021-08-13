@@ -114,7 +114,6 @@ const std::error_category& client_error_category() noexcept;
 std::error_code make_client_error_code(ClientErrorCode) noexcept;
 
 struct AppError {
-
     std::error_code error_code;
     util::Optional<int> http_status_code;
 
