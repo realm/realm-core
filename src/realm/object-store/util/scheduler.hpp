@@ -90,7 +90,10 @@ public:
     virtual void set_schedule_writes_callback(std::function<void()>) {}
     virtual void set_schedule_completions_callback(std::function<void()>) {}
 
-    virtual void set_timeout_callback(uint64_t, std::function<void()>) {}
+    virtual bool set_timeout_callback(uint64_t, std::function<void()>)
+    {
+        return false;
+    }
 
     // virtual int enqueue_write(std::function<void()>& block) = 0;
 

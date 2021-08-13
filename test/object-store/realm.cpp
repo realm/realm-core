@@ -838,27 +838,29 @@ TEST_CASE("SharedRealm: async_writes") {
     }
     SECTION("realm closed") {
         bool timeout = false;
-        realm->scheduler()->set_timeout_callback(100, [&timeout]() {
+        auto has_timer = realm->scheduler()->set_timeout_callback(100, [&timeout]() {
             timeout = true;
         });
-        realm->async_begin_transaction([&]() {
-            // We should never get here as the realm is closed
-            REQUIRE(write_nr == 0);
-            ++write_nr;
-            done = true;
-            auto table = realm->read_group().get_table("class_object");
-            auto col = table->get_column_key("value");
-            table->create_object().set(col, 45);
-            realm->async_commit_transaction([&]() {
-                REQUIRE(commit_nr == 0);
-                ++commit_nr;
+        if (has_timer) {
+            realm->async_begin_transaction([&]() {
+                // We should never get here as the realm is closed
+                REQUIRE(write_nr == 0);
+                ++write_nr;
+                done = true;
+                auto table = realm->read_group().get_table("class_object");
+                auto col = table->get_column_key("value");
+                table->create_object().set(col, 45);
+                realm->async_commit_transaction([&]() {
+                    REQUIRE(commit_nr == 0);
+                    ++commit_nr;
+                });
             });
-        });
-        realm->close();
-        util::EventLoop::main().run_until([&] {
-            return done || timeout;
-        });
-        REQUIRE(!done);
+            realm->close();
+            util::EventLoop::main().run_until([&] {
+                return done || timeout;
+            });
+            REQUIRE(!done);
+        }
     }
     SECTION("notify only with no further actions") {
         realm->async_begin_transaction(
