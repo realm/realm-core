@@ -80,6 +80,7 @@ set(CORE_TEST_SOURCES
     test_util_functional.cpp
     test_util_from_chars.cpp
     test_util_inspect.cpp
+    test_util_intrusive_ptr.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp
     test_util_overload.cpp

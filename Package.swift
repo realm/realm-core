@@ -630,6 +630,7 @@ let headers: [String] = [
     "realm/util/inspect.hpp",
     "realm/util/interprocess_condvar.hpp",
     "realm/util/interprocess_mutex.hpp",
+    "realm/util/intrusive_ptr.hpp",
     "realm/util/json_parser.hpp",
     "realm/util/load_file.hpp",
     "realm/util/logger.hpp",
