@@ -1110,6 +1110,17 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 1);
     }
 
+    SECTION("notifications created in async transaction are sent asynchronously") {
+        realm->async_begin_transaction([&] {
+            realm->commit_transaction();
+        });
+        REQUIRE(change_count == 0);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 0;
+        });
+        REQUIRE(change_count == 1);
+    }
+
     SECTION("refresh() from within changes_available() refreshes") {
         context->changes_available_fn = [&] {
             REQUIRE(realm->refresh());

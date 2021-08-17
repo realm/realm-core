@@ -383,6 +383,8 @@ public:
         return m_auto_refresh;
     }
     void notify();
+    void run_writes();
+    void run_async_completions();
 
     void invalidate();
 
@@ -550,9 +552,7 @@ private:
     bool m_is_running_async_commit_completions = false;
     bool m_async_commit_barrier_requested = false;
     void run_writes_on_proper_thread();
-    void run_writes();
     void run_async_completions_on_proper_thread();
-    void run_async_completions();
     void check_pending_write_requests();
     void end_current_write();
 

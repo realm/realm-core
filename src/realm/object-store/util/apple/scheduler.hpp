@@ -47,7 +47,7 @@ public:
     }
     void set_schedule_completions_callback(std::function<void()> fn) override
     {
-        if (m_write_signal)
+        if (m_completion_signal)
             return; // danger!
         set_callback(m_completion_signal, fn);
     }
