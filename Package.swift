@@ -90,7 +90,7 @@ let notSyncServerSources: [String] = [
     "realm/decimal128.cpp",
     "realm/dictionary.cpp",
     "realm/disable_sync_to_disk.cpp",
-    "relam/error_codes.cpp",
+    "realm/error_codes.cpp",
     "realm/exceptions.cpp",
     "realm/global_key.cpp",
     "realm/group.cpp",
@@ -112,7 +112,7 @@ let notSyncServerSources: [String] = [
     "realm/set.cpp",
     "realm/sort_descriptor.cpp",
     "realm/spec.cpp",
-    "realm/status.cpp"
+    "realm/status.cpp",
     "realm/string_data.cpp",
     "realm/sync/auth.cpp",
     "realm/sync/changeset.cpp",
@@ -541,7 +541,7 @@ let headers: [String] = [
     "realm/sort_descriptor.hpp",
     "realm/spec.hpp",
     "realm/status.hpp",
-    "relam/status_with.hpp"
+    "relam/status_with.hpp",
     "realm/string_data.hpp",
     "realm/sync/access_control.hpp",
     "realm/sync/access_token.hpp",
