@@ -1,7 +1,7 @@
 
 #include "test.hpp"
-#include <realm.hpp>
 #include <realm/parser/driver.hpp>
+#include <realm/table_view.hpp>
 
 using namespace realm;
 using json = nlohmann::json;
