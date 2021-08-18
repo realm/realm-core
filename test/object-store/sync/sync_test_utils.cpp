@@ -162,6 +162,86 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
 
+// fake seamless loss by turning off sync and calling transfer group directly
+struct FakeLocalClientReset : public TestClientReset {
+    FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+        : TestClientReset(local_config, remote_config)
+    {
+        REALM_ASSERT(m_local_config.sync_config);
+        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::SeamlessLoss);
+        // turn off sync, we only fake it
+        m_local_config.sync_config = {};
+        m_remote_config.sync_config = {};
+    }
+
+    void run() override
+    {
+        m_did_run = true;
+        auto realm = Realm::get_shared_realm(m_local_config);
+        realm->begin_transaction();
+        if (m_on_setup) {
+            m_on_setup(realm);
+        }
+        realm->commit_transaction();
+        constexpr int64_t shared_pk = -42;
+        {
+            realm->begin_transaction();
+            auto obj = create_object(*realm, "object", shared_pk);
+            auto col = obj.get_table()->get_column_key("value");
+            obj.set(col, 1);
+            obj.set(col, 2);
+            obj.set(col, 3);
+            realm->commit_transaction();
+
+            realm->begin_transaction();
+            obj.set(col, 4);
+            if (m_make_local_changes) {
+                m_make_local_changes(realm);
+            }
+            realm->commit_transaction();
+            if (m_on_post_local) {
+                m_on_post_local(realm);
+            }
+        }
+
+        {
+            m_remote_config.schema = m_local_config.schema;
+            auto realm2 = Realm::get_shared_realm(m_remote_config);
+            realm2->begin_transaction();
+            if (m_on_setup) {
+                m_on_setup(realm2);
+            }
+
+            // fake a sync by creating an object with the same pk
+            create_object(*realm2, "object", shared_pk);
+
+            for (int i = 0; i < 2; ++i) {
+                auto table = get_table(*realm2, "object");
+                auto col = table->get_column_key("value");
+                table->begin()->set(col, i + 5);
+            }
+
+            if (m_make_remote_changes) {
+                m_make_remote_changes(realm2);
+            }
+
+            realm->begin_transaction();
+
+            TestLogger logger;
+            _impl::client_reset::transfer_group((Transaction&)realm2->read_group(), (Transaction&)realm->read_group(),
+                                                logger);
+            realm->commit_transaction();
+            realm2->cancel_transaction();
+            realm2->close();
+            if (m_on_post_reset) {
+                m_on_post_reset(realm);
+            }
+        }
+    }
+};
+
+#if REALM_ENABLE_SYNC
+
 struct TestServerClientReset : public TestClientReset {
     TestServerClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config,
                           TestSyncManager& test_sync_manager)
@@ -247,6 +327,15 @@ private:
     TestSyncManager& m_test_sync_manager;
 };
 
+std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
+                                                               Realm::Config remote_config,
+                                                               TestSyncManager& test_sync_manager)
+{
+    return std::make_unique<TestServerClientReset>(local_config, remote_config, test_sync_manager);
+}
+
+#if REALM_ENABLE_AUTH_TESTS
+
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config,
                     TestSyncManager& test_sync_manager)
@@ -310,9 +399,12 @@ struct BaasClientReset : public TestClientReset {
                                               count_external = count;
                                           });
                     }
+                    if (count_external == 0) {
+                        millisleep(1000); // don't spam the server too much
+                    }
                     return count_external > 0;
                 },
-                std::chrono::seconds(60));
+                std::chrono::minutes(3));
             session->log_out();
 
             realm->begin_transaction();
@@ -391,84 +483,15 @@ private:
     TestSyncManager& m_test_sync_manager;
 };
 
+std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_config, Realm::Config remote_config,
+                                                        TestSyncManager& test_sync_manager)
+{
+    return std::make_unique<BaasClientReset>(local_config, remote_config, test_sync_manager);
+}
 
-// fake seamless loss by turning off sync and calling transfer group directly
-struct FakeLocalClientReset : public TestClientReset {
-    FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
-        : TestClientReset(local_config, remote_config)
-    {
-        REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::SeamlessLoss);
-        // turn off sync, we only fake it
-        m_local_config.sync_config = {};
-        m_remote_config.sync_config = {};
-    }
+#endif // REALM_ENABLE_AUTH_TESTS
 
-    void run() override
-    {
-        m_did_run = true;
-        auto realm = Realm::get_shared_realm(m_local_config);
-        realm->begin_transaction();
-        if (m_on_setup) {
-            m_on_setup(realm);
-        }
-        realm->commit_transaction();
-        constexpr int64_t shared_pk = -42;
-        {
-            realm->begin_transaction();
-            auto obj = create_object(*realm, "object", shared_pk);
-            auto col = obj.get_table()->get_column_key("value");
-            obj.set(col, 1);
-            obj.set(col, 2);
-            obj.set(col, 3);
-            realm->commit_transaction();
-
-            realm->begin_transaction();
-            obj.set(col, 4);
-            if (m_make_local_changes) {
-                m_make_local_changes(realm);
-            }
-            realm->commit_transaction();
-            if (m_on_post_local) {
-                m_on_post_local(realm);
-            }
-        }
-
-        {
-            m_remote_config.schema = m_local_config.schema;
-            auto realm2 = Realm::get_shared_realm(m_remote_config);
-            realm2->begin_transaction();
-            if (m_on_setup) {
-                m_on_setup(realm2);
-            }
-
-            // fake a sync by creating an object with the same pk
-            create_object(*realm2, "object", shared_pk);
-
-            for (int i = 0; i < 2; ++i) {
-                auto table = get_table(*realm2, "object");
-                auto col = table->get_column_key("value");
-                table->begin()->set(col, i + 5);
-            }
-
-            if (m_make_remote_changes) {
-                m_make_remote_changes(realm2);
-            }
-
-            realm->begin_transaction();
-
-            TestLogger logger;
-            _impl::client_reset::transfer_group((Transaction&)realm2->read_group(), (Transaction&)realm->read_group(),
-                                                logger);
-            realm->commit_transaction();
-            realm2->cancel_transaction();
-            realm2->close();
-            if (m_on_post_reset) {
-                m_on_post_reset(realm);
-            }
-        }
-    }
-};
+#endif // REALM_ENABLE_SYNC
 
 
 TestClientReset::TestClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
@@ -506,19 +529,6 @@ TestClientReset* TestClientReset::on_post_reset(callback_t&& post_reset)
 {
     m_on_post_reset = std::move(post_reset);
     return this;
-}
-
-std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
-                                                               Realm::Config remote_config,
-                                                               TestSyncManager& test_sync_manager)
-{
-    return std::make_unique<TestServerClientReset>(local_config, remote_config, test_sync_manager);
-}
-
-std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_config, Realm::Config remote_config,
-                                                        TestSyncManager& test_sync_manager)
-{
-    return std::make_unique<BaasClientReset>(local_config, remote_config, test_sync_manager);
 }
 
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config, Realm::Config remote_config)

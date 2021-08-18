@@ -65,6 +65,11 @@ set_target_properties(ObjectStoreTests PROPERTIES
     OUTPUT_NAME realm-object-store-tests
 )
 
+if(MSVC)
+    # increase the number of sections supported in an obj file for the heavily templated tests
+    target_compile_options(ObjectStoreTests PRIVATE /bigobj)
+endif()
+
 target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
 create_coverage_target(generate-coverage ObjectStoreTests)

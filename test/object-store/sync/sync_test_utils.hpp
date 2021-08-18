@@ -93,11 +93,17 @@ protected:
     bool m_did_run = false;
 };
 
+#if REALM_ENABLE_SYNC
 std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
                                                                Realm::Config remote_config,
                                                                TestSyncManager& test_sync_manager);
+#if REALM_ENABLE_AUTH_TESTS
 std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_config, Realm::Config remote_config,
                                                         TestSyncManager& test_sync_manager);
+#endif // REALM_ENABLE_AUTH_TESTS
+
+#endif // REALM_ENABLE_SYNC
+
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config,
                                                               Realm::Config remote_config);
 
