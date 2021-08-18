@@ -11,7 +11,7 @@
 
 using namespace realm;
 using namespace std::string_literals;
-
+using json = nlohmann::json;
 // Whether to generate parser debug traces.
 static bool trace_parsing = false;
 // Whether to generate scanner debug traces.
@@ -1620,16 +1620,14 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
-
-    // Query query = QueryVisitor(&driver).visit(*driver.result);
-    // return query.set_ordering(QueryVisitor(&driver).getDescriptorOrdering(driver.ordering));
-
-    return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
+    QueryVisitor query_visitor = QueryVisitor(&driver);
+    Query query = query_visitor.visit(*driver.result);
+    return query.set_ordering(query_visitor.getDescriptorOrdering(driver.ordering));
 }
 
 Query Table::query_new(const std::string& query_string) const
 {
-    auto jsonObj = nlohmann::json::parse(query_string);
+    auto jsonObj = json::parse(query_string);
     return JsonQueryParser().query_from_json(m_own_ref, jsonObj);
 }
 
@@ -2938,7 +2936,6 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
 }
 
 
-using json = nlohmann::json;
 Query JsonQueryParser::query_from_json(TableRef table, json json)
 {
     auto and_node = std::make_unique<AndNode>();
@@ -2989,63 +2986,77 @@ void JsonQueryParser::build_descriptor(json fragment, std::vector<std::unique_pt
 }
 
 
-void JsonQueryParser::build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds)
+void JsonQueryParser::build_compare(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds)
 {
     auto left = get_value_node(fragment["left"]);
     auto right = get_value_node(fragment["right"]);
     if (fragment["kind"] == "eq") {
         auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
         preds.emplace_back(std::move(eq));
+        return;
     }
     else if (fragment["kind"] == "neq") {
         auto neq = std::make_unique<EqualityNode>(std::move(left), CompareNode::NOT_EQUAL, std::move(right));
         preds.emplace_back(std::move(neq));
+        return;
     }
     else if (fragment["kind"] == "gt") {
         auto gt = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER, std::move(right));
         preds.emplace_back(std::move(gt));
+        return;
     }
     else if (fragment["kind"] == "gte") {
         auto gte = std::make_unique<RelationalNode>(std::move(left), CompareNode::GREATER_EQUAL, std::move(right));
         preds.emplace_back(std::move(gte));
+        return;
     }
     else if (fragment["kind"] == "lt") {
         auto lt = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS, std::move(right));
         preds.emplace_back(std::move(lt));
+        return;
     }
     else if (fragment["kind"] == "lte") {
         auto lte = std::make_unique<RelationalNode>(std::move(left), CompareNode::LESS_EQUAL, std::move(right));
         preds.emplace_back(std::move(lte));
+        return;
     }
     else if (fragment["kind"] == "beginsWith") {
-        auto begins_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::BEGINSWITH, std::move(right));
-        begins_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
+        auto begins_with =
+            std::make_unique<StringOpsNode>(std::move(left), CompareNode::BEGINSWITH, std::move(right));
+        begins_with->case_sensitive =
+            fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(begins_with));
+        return;
     }
     else if (fragment["kind"] == "endsWith") {
         auto ends_with = std::make_unique<StringOpsNode>(std::move(left), CompareNode::ENDSWITH, std::move(right));
-        ends_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
+        ends_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(ends_with));
+        return;
     }
     else if (fragment["kind"] == "contains") {
         auto contains = std::make_unique<StringOpsNode>(std::move(left), CompareNode::CONTAINS, std::move(right));
-        contains->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
+        contains->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(contains));
+        return;
     }
     else if (fragment["kind"] == "like") {
         auto like = std::make_unique<StringOpsNode>(std::move(left), CompareNode::LIKE, std::move(right));
-        like->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
+        like->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(like));
+        return;
     }
-    if (fragment["kind"] == "eqString") {
+    else if (fragment["kind"] == "eqString") {
         auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
-        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool) fragment["caseSensitivity"];
+        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(eq));
+        return;
     }
+    REALM_UNREACHABLE();
 }
 
 
-std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragment)
+std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(json fragment)
 {
     if (fragment["kind"] == "property") {
         auto empty_path = std::make_unique<PathNode>();
@@ -3055,7 +3066,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
     }
     if (fragment["kind"] == "constant") {
         std::unique_ptr<ConstantNode> const_node;
-        if (fragment["value"].is_null()){
+        if (fragment["value"].is_null()) {
             const_node = get_constant_node(Mixed());
             return std::make_unique<ValueNode>(std::move(const_node));
         }
@@ -3085,6 +3096,7 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(nlohmann::json fragme
         }
         return std::make_unique<ValueNode>(std::move(const_node));
     }
+    REALM_UNREACHABLE();
 }
 
 
@@ -3093,7 +3105,7 @@ std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed va
     ConstantNode::Type type;
     std::string string_value;
     std::ostringstream stream;
-    if (value.is_null()){
+    if (value.is_null()) {
         return std::make_unique<ConstantNode>(ConstantNode::Type::NULL_VAL, "null");
     }
     switch (value.get_type()) {

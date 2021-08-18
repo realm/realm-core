@@ -614,16 +614,16 @@ private:
 };
 
 } // namespace query_parser
-
+using json = nlohmann::json;
 class JsonQueryParser {
 public:
     Query query_from_json(TableRef table, nlohmann::json json);
 
 private:
-    void build_pred(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
-    void build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
-    void build_descriptor(nlohmann::json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings);
-    std::unique_ptr<ValueNode> get_value_node(nlohmann::json json);
+    void build_pred(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    void build_compare(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    void build_descriptor(json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings);
+    std::unique_ptr<ValueNode> get_value_node(json json);
     std::unique_ptr<ConstantNode> get_constant_node(realm::Mixed value);
 };
 } // namespace realm
