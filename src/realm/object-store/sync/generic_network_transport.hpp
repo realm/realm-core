@@ -91,6 +91,7 @@ enum class ServiceErrorCode {
     auth_error = 47,
     bad_request = 48,
     account_name_in_use = 49,
+    invalid_email_password = 50,
 
     unknown = -1,
     none = 0
