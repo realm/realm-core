@@ -2480,6 +2480,7 @@ void SubexprVisitor::visitConstant(ConstantNode& node)
                 struct tm tmp = tm();
                 char sep = s.find("@") < s.size() ? '@' : 'T';
                 std::string fmt = "%d-%d-%d"s + sep + "%d:%d:%d:%d"s;
+                // FIXME: see https://github.com/realm/realm-core/issues/4853
                 int cnt = sscanf(s.c_str(), fmt.c_str(), &tmp.tm_year, &tmp.tm_mon, &tmp.tm_mday, &tmp.tm_hour,
                                  &tmp.tm_min, &tmp.tm_sec, &nanoseconds);
                 REALM_ASSERT(cnt >= 6);
