@@ -50,6 +50,7 @@
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
+    class ListNode;
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
@@ -434,38 +435,42 @@ namespace yy {
       // pred_suffix
       char dummy6[sizeof (DescriptorOrderingNode*)];
 
+      // list
+      // list_content
+      char dummy7[sizeof (ListNode*)];
+
       // pred
-      char dummy7[sizeof (OrNode*)];
+      char dummy8[sizeof (OrNode*)];
 
       // path
-      char dummy8[sizeof (PathNode*)];
+      char dummy9[sizeof (PathNode*)];
 
       // post_op
-      char dummy9[sizeof (PostOpNode*)];
+      char dummy10[sizeof (PostOpNode*)];
 
       // simple_prop
-      char dummy10[sizeof (PropNode*)];
+      char dummy11[sizeof (PropNode*)];
 
       // prop
-      char dummy11[sizeof (PropertyNode*)];
+      char dummy12[sizeof (PropertyNode*)];
 
       // subquery
-      char dummy12[sizeof (SubqueryNode*)];
+      char dummy13[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy13[sizeof (TrueOrFalseNode*)];
+      char dummy14[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy14[sizeof (ValueNode*)];
+      char dummy15[sizeof (ValueNode*)];
 
       // direction
-      char dummy15[sizeof (bool)];
+      char dummy16[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy16[sizeof (int)];
+      char dummy17[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -491,7 +496,7 @@ namespace yy {
       // "key or value"
       // path_elem
       // id
-      char dummy17[sizeof (std::string)];
+      char dummy18[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -761,6 +766,11 @@ namespace yy {
         value.move< DescriptorOrderingNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.move< ListNode* > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_pred: // pred
         value.move< OrNode* > (std::move (that.value));
         break;
@@ -919,6 +929,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const DescriptorOrderingNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, ListNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const ListNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1120,6 +1142,11 @@ switch (yykind)
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
         value.template destroy< DescriptorOrderingNode* > ();
+        break;
+
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.template destroy< ListNode* > ();
         break;
 
       case symbol_kind::SYM_pred: // pred
@@ -2604,6 +2631,11 @@ switch (yykind)
         value.copy< DescriptorOrderingNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.copy< ListNode* > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_pred: // pred
         value.copy< OrNode* > (YY_MOVE (that.value));
         break;
@@ -2729,6 +2761,11 @@ switch (yykind)
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
         value.move< DescriptorOrderingNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.move< ListNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_pred: // pred
