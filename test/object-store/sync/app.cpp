@@ -282,6 +282,18 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         CHECK(user->user_profile().email() == email);
     }
 
+    SECTION("cannot login with wrong password") {
+        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, "boogeyman"),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                         CHECK(!user);
+                                         REQUIRE(error);
+                                         REQUIRE(error->error_code.value() ==
+                                                 int(ServiceErrorCode::invalid_email_password));
+                                         processed = true;
+                                     });
+        CHECK(processed);
+    }
+
     SECTION("confirm user") {
         app->provider_client<App::UsernamePasswordProviderClient>().confirm_user(
             "a_token", "a_token_id", [&](Optional<app::AppError> error) {
