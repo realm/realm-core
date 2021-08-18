@@ -64,8 +64,6 @@ public:
      */
     void ignore() const noexcept {}
 
-    uint32_t ref_count_for_testing() const noexcept;
-
 private:
     Status() = default;
 
@@ -80,14 +78,14 @@ private:
         template <typename>
         friend class ::realm::util::bind_ptr;
 
-        void bind_ptr() const noexcept
+        inline void bind_ptr() const noexcept
         {
             m_refs.fetch_add(1, std::memory_order_relaxed);
         }
 
-        void unbind_ptr() const noexcept
+        inline void unbind_ptr() const noexcept
         {
-            if (m_refs.fetch_sub(1, std::memory_order_acq_rel) == 0) {
+            if (m_refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 delete this;
             }
         }

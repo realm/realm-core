@@ -43,17 +43,10 @@ Status::Status(ErrorCodes::Error code, const char* reason)
 }
 
 Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, StringData reason)
-    : m_code(code)
+    : m_refs(0)
+    , m_code(code)
     , m_reason(reason)
 {
-}
-
-uint32_t Status::ref_count_for_testing() const noexcept
-{
-    if (!m_error) {
-        return 0;
-    }
-    return m_error->m_refs.load(std::memory_order_relaxed);
 }
 
 util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, StringData reason)
