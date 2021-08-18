@@ -46,6 +46,7 @@
 # define YY_YY_GENERATED_QUERY_BISON_HPP_INCLUDED
 // "%code requires" blocks.
 
+  # include <memory>
   # include <string>
   namespace realm::query_parser {
     class ParserDriver;

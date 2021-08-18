@@ -8,6 +8,7 @@
 %define parse.assert
 
 %code requires {
+  # include <memory>
   # include <string>
   namespace realm::query_parser {
     class ParserDriver;
