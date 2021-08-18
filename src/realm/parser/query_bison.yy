@@ -129,8 +129,10 @@ using namespace realm::query_parser;
 %type  <std::unique_ptr<PropNode>> simple_prop
 
 %destructor { } <int>
-
-%printer { yyo << $$; } <*>;
+%printer {yyo << $$;} <std::string>;
+%printer {yyo << $$;} <bool>;
+%printer {yyo << $$;} <int>;
+%printer {yyo << $$.get();} <*>; //for printing std::unique_ptr
 %printer { yyo << "<>"; } <>;
 
 %%

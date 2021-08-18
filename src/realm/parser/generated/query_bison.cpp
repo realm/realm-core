@@ -788,91 +788,91 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_ID: // "identifier"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_STRING: // "string"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_BASE64: // "base64"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_INFINITY: // "infinity"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_NAN: // "NaN"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_NATURAL0: // "natural0"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_NUMBER: // "number"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_FLOAT: // "float"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_TIMESTAMP: // "date"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_UUID: // "UUID"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_OID: // "ObjectId"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_LINK: // "link"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_TYPED_LINK: // "typed link"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_ARG: // "argument"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_BEGINSWITH: // "beginswith"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_ENDSWITH: // "endswith"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_CONTAINS: // "contains"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_LIKE: // "like"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_BETWEEN: // "between"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_SIZE: // "@size"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_TYPE: // "@type"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_KEY_VAL: // "key or value"
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_55_: // '('
@@ -912,59 +912,59 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_pred: // pred
-                 { yyo << yysym.value.template as < std::unique_ptr<OrNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<OrNode> > ().get();}
         break;
 
       case symbol_kind::SYM_and_pred: // and_pred
-                 { yyo << yysym.value.template as < std::unique_ptr<AndNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<AndNode> > ().get();}
         break;
 
       case symbol_kind::SYM_atom_pred: // atom_pred
-                 { yyo << yysym.value.template as < std::unique_ptr<AtomPredNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<AtomPredNode> > ().get();}
         break;
 
       case symbol_kind::SYM_value: // value
-                 { yyo << yysym.value.template as < std::unique_ptr<ValueNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<ValueNode> > ().get();}
         break;
 
       case symbol_kind::SYM_prop: // prop
-                 { yyo << yysym.value.template as < std::unique_ptr<PropertyNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<PropertyNode> > ().get();}
         break;
 
       case symbol_kind::SYM_simple_prop: // simple_prop
-                 { yyo << yysym.value.template as < std::unique_ptr<PropNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<PropNode> > ().get();}
         break;
 
       case symbol_kind::SYM_subquery: // subquery
-                 { yyo << yysym.value.template as < std::unique_ptr<SubqueryNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<SubqueryNode> > ().get();}
         break;
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorOrderingNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorOrderingNode> > ().get();}
         break;
 
       case symbol_kind::SYM_distinct: // distinct
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > ().get();}
         break;
 
       case symbol_kind::SYM_distinct_param: // distinct_param
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > ().get();}
         break;
 
       case symbol_kind::SYM_sort: // sort
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > ().get();}
         break;
 
       case symbol_kind::SYM_sort_param: // sort_param
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > ().get();}
         break;
 
       case symbol_kind::SYM_limit: // limit
-                 { yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<DescriptorNode> > ().get();}
         break;
 
       case symbol_kind::SYM_direction: // direction
-                 { yyo << yysym.value.template as < bool > (); }
+                 {yyo << yysym.value.template as < bool > ();}
         break;
 
       case symbol_kind::SYM_list: // list
@@ -976,47 +976,47 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_constant: // constant
-                 { yyo << yysym.value.template as < std::unique_ptr<ConstantNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<ConstantNode> > ().get();}
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
-                 { yyo << yysym.value.template as < std::unique_ptr<TrueOrFalseNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<TrueOrFalseNode> > ().get();}
         break;
 
       case symbol_kind::SYM_comp_type: // comp_type
-                 { yyo << yysym.value.template as < int > (); }
+                 {yyo << yysym.value.template as < int > ();}
         break;
 
       case symbol_kind::SYM_post_op: // post_op
-                 { yyo << yysym.value.template as < std::unique_ptr<PostOpNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<PostOpNode> > ().get();}
         break;
 
       case symbol_kind::SYM_aggr_op: // aggr_op
-                 { yyo << yysym.value.template as < std::unique_ptr<AggrNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<AggrNode> > ().get();}
         break;
 
       case symbol_kind::SYM_equality: // equality
-                 { yyo << yysym.value.template as < int > (); }
+                 {yyo << yysym.value.template as < int > ();}
         break;
 
       case symbol_kind::SYM_relational: // relational
-                 { yyo << yysym.value.template as < int > (); }
+                 {yyo << yysym.value.template as < int > ();}
         break;
 
       case symbol_kind::SYM_stringop: // stringop
-                 { yyo << yysym.value.template as < int > (); }
+                 {yyo << yysym.value.template as < int > ();}
         break;
 
       case symbol_kind::SYM_path: // path
-                 { yyo << yysym.value.template as < std::unique_ptr<PathNode> > (); }
+                 {yyo << yysym.value.template as < std::unique_ptr<PathNode> > ().get();}
         break;
 
       case symbol_kind::SYM_path_elem: // path_elem
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       case symbol_kind::SYM_id: // id
-                 { yyo << yysym.value.template as < std::string > (); }
+                 {yyo << yysym.value.template as < std::string > ();}
         break;
 
       default:
@@ -2273,16 +2273,16 @@ namespace yy {
   const short
   parser::yyrline_[] =
   {
-       0,   144,   144,   147,   148,   151,   152,   155,   156,   161,
-     162,   163,   168,   172,   173,   174,   177,   178,   181,   182,
-     183,   184,   185,   186,   187,   190,   193,   196,   197,   198,
-     199,   201,   204,   205,   207,   210,   211,   213,   216,   217,
-     219,   222,   223,   226,   227,   228,   229,   230,   231,   232,
-     233,   234,   235,   236,   237,   238,   239,   240,   241,   244,
-     245,   248,   249,   250,   253,   254,   255,   258,   259,   260,
-     261,   264,   265,   266,   269,   270,   271,   272,   275,   276,
-     277,   278,   281,   282,   285,   288,   289,   290,   291,   292,
-     293,   294,   295
+       0,   146,   146,   149,   150,   153,   154,   157,   158,   163,
+     164,   165,   170,   174,   175,   176,   179,   180,   183,   184,
+     185,   186,   187,   188,   189,   192,   195,   198,   199,   200,
+     201,   203,   206,   207,   209,   212,   213,   215,   218,   219,
+     221,   224,   225,   228,   229,   230,   231,   232,   233,   234,
+     235,   236,   237,   238,   239,   240,   241,   242,   243,   246,
+     247,   250,   251,   252,   255,   256,   257,   260,   261,   262,
+     263,   266,   267,   268,   271,   272,   273,   274,   277,   278,
+     279,   280,   283,   284,   287,   290,   291,   292,   293,   294,
+     295,   296,   297
   };
 
   void
