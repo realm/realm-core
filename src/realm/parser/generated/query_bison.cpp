@@ -222,6 +222,11 @@ namespace yy {
         value.YY_MOVE_OR_COPY< DescriptorOrderingNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.YY_MOVE_OR_COPY< ListNode* > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_pred: // pred
         value.YY_MOVE_OR_COPY< OrNode* > (YY_MOVE (that.value));
         break;
@@ -333,6 +338,11 @@ namespace yy {
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
         value.move< DescriptorOrderingNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.move< ListNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_pred: // pred
@@ -448,6 +458,11 @@ namespace yy {
         value.copy< DescriptorOrderingNode* > (that.value);
         break;
 
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.copy< ListNode* > (that.value);
+        break;
+
       case symbol_kind::SYM_pred: // pred
         value.copy< OrNode* > (that.value);
         break;
@@ -557,6 +572,11 @@ namespace yy {
 
       case symbol_kind::SYM_pred_suffix: // pred_suffix
         value.move< DescriptorOrderingNode* > (that.value);
+        break;
+
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        value.move< ListNode* > (that.value);
         break;
 
       case symbol_kind::SYM_pred: // pred
@@ -968,11 +988,11 @@ namespace yy {
         break;
 
       case symbol_kind::SYM_list: // list
-                 { yyo << "<>"; }
+                 { yyo << yysym.value.template as < ListNode* > (); }
         break;
 
       case symbol_kind::SYM_list_content: // list_content
-                 { yyo << "<>"; }
+                 { yyo << yysym.value.template as < ListNode* > (); }
         break;
 
       case symbol_kind::SYM_constant: // constant
@@ -1271,6 +1291,11 @@ namespace yy {
         yylhs.value.emplace< DescriptorOrderingNode* > ();
         break;
 
+      case symbol_kind::SYM_list: // list
+      case symbol_kind::SYM_list_content: // list_content
+        yylhs.value.emplace< ListNode* > ();
+        break;
+
       case symbol_kind::SYM_pred: // pred
         yylhs.value.emplace< OrNode* > ();
         break;
@@ -1404,10 +1429,7 @@ namespace yy {
     break;
 
   case 12: // atom_pred: value "between" list
-                                {
-                                    error("The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.");
-                                    YYERROR;
-                                }
+                                { yylhs.value.as < AtomPredNode* > () = drv.m_parse_nodes.create<BetweenNode>(yystack_[2].value.as < ValueNode* > (), yystack_[0].value.as < ListNode* > ()); }
     break;
 
   case 13: // atom_pred: "!" atom_pred
@@ -1516,6 +1538,18 @@ namespace yy {
 
   case 39: // direction: "descending"
                                 { yylhs.value.as < bool > () = false; }
+    break;
+
+  case 40: // list: '{' list_content '}'
+                                { yylhs.value.as < ListNode* > () = yystack_[1].value.as < ListNode* > (); }
+    break;
+
+  case 41: // list_content: constant
+                                { yylhs.value.as < ListNode* > () = drv.m_parse_nodes.create<ListNode>(yystack_[0].value.as < ConstantNode* > ()); }
+    break;
+
+  case 42: // list_content: list_content ',' constant
+                                { yystack_[2].value.as < ListNode* > ()->add_element(yystack_[0].value.as < ConstantNode* > ()); yylhs.value.as < ListNode* > () = yystack_[2].value.as < ListNode* > (); }
     break;
 
   case 43: // constant: "natural0"
@@ -2273,11 +2307,11 @@ namespace yy {
   const short
   parser::yyrline_[] =
   {
-       0,   143,   143,   146,   147,   150,   151,   154,   155,   160,
-     161,   162,   167,   171,   172,   173,   176,   177,   180,   181,
-     182,   183,   184,   185,   186,   189,   192,   195,   196,   197,
-     198,   200,   203,   204,   206,   209,   210,   212,   215,   216,
-     218,   221,   222,   225,   226,   227,   228,   229,   230,   231,
+       0,   145,   145,   148,   149,   152,   153,   156,   157,   162,
+     163,   164,   169,   170,   171,   172,   175,   176,   179,   180,
+     181,   182,   183,   184,   185,   188,   191,   194,   195,   196,
+     197,   199,   202,   203,   205,   208,   209,   211,   214,   215,
+     217,   221,   222,   225,   226,   227,   228,   229,   230,   231,
      232,   233,   234,   235,   236,   237,   238,   239,   240,   243,
      244,   247,   248,   249,   252,   253,   254,   257,   258,   259,
      260,   263,   264,   265,   268,   269,   270,   271,   274,   275,
