@@ -156,16 +156,16 @@ public:
         }
         else {
             Query q(r.get_query());
-            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_transaction()) {
-                // FIXME: This is overly restrictive. It's only a problem if
-                // the parent of the List or LinkingObjects was created in this
-                // write transaction, but Query doesn't expose a way to check
-                // if the source view is valid so we have to forbid it always.
-                throw std::logic_error("Cannot create a ThreadSafeReference to Results backed by a List of objects "
-                                       "or LinkingObjects inside a write transaction");
-            }
             m_transaction = r.get_realm()->duplicate();
             m_query = m_transaction->import_copy_of(q, PayloadPolicy::Stay);
+            // If the Query is derived from a collection which was created in
+            // the current write transaction then the collection cannot be
+            // handed over and would just be empty when resolved.
+            if (q.view_owner_obj_key() != m_query->view_owner_obj_key()) {
+                throw std::logic_error(
+                    "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                    "inside the write transaction which created the collection.");
+            }
         }
     }
 
