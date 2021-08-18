@@ -27,7 +27,7 @@
 
 #include "external/json/json.hpp"
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 namespace realm {
 app::Response do_http_request(const app::Request& request);
 
@@ -37,6 +37,7 @@ public:
     app::Response patch(std::string body) const;
     app::Response post(std::string body) const;
     app::Response put(std::string body) const;
+    app::Response del() const;
     nlohmann::json get_json() const;
     nlohmann::json patch_json(nlohmann::json body) const;
     nlohmann::json post_json(nlohmann::json body) const;
@@ -69,6 +70,8 @@ public:
     void disable_user_sessions(const std::string& user_id, const std::string& app_id);
     void enable_user_sessions(const std::string& user_id, const std::string& app_id);
     bool verify_access_token(const std::string& access_token, const std::string& app_id);
+    void set_development_mode_to(const std::string& app_id, bool enable);
+    void delete_app(const std::string& app_id);
 
     struct Service {
         std::string id;

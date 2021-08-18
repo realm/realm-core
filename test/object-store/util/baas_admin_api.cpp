@@ -18,7 +18,7 @@
 
 #include "baas_admin_api.hpp"
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 
 #include <iostream>
 #include <mutex>
@@ -357,6 +357,14 @@ app::Response AdminAPIEndpoint::get() const
     return do_request(std::move(req));
 }
 
+app::Response AdminAPIEndpoint::del() const
+{
+    app::Request req;
+    req.method = app::HttpMethod::del;
+    req.url = m_url;
+    return do_request(std::move(req));
+}
+
 nlohmann::json AdminAPIEndpoint::get_json() const
 {
     auto resp = get();
@@ -446,27 +454,21 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
 
 void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/logout", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["logout"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
 
 void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["disable"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
 
 void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/enable", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["enable"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
@@ -474,9 +476,7 @@ void AdminAPISession::enable_user_sessions(const std::string& user_id, const std
 // returns false for an invalid/expired access token
 bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/verify_token", m_base_url, m_group_id, app_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"]["verify_token"];
     nlohmann::json request_body{
         {"token", access_token},
     };
@@ -497,10 +497,22 @@ bool AdminAPISession::verify_access_token(const std::string& access_token, const
     return false;
 }
 
+void AdminAPISession::set_development_mode_to(const std::string& app_id, bool enable)
+{
+    auto endpoint = apps()[app_id]["sync"]["config"];
+    endpoint.put_json({{"development_mode_enabled", enable}});
+}
+
+void AdminAPISession::delete_app(const std::string& app_id)
+{
+    auto app_endpoint = apps()[app_id];
+    auto resp = app_endpoint.del();
+    REALM_ASSERT(resp.http_status_code == 204);
+}
+
 std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services", m_base_url, m_group_id, app_id), m_access_token);
+    auto endpoint = apps()[app_id]["services"];
     auto response = endpoint.get_json();
     std::vector<AdminAPISession::Service> services;
     for (auto service : response) {
@@ -529,9 +541,7 @@ nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 
 AdminAPIEndpoint AdminAPISession::service_config_endpoint(const std::string& app_id, const std::string& service_id)
 {
-    return AdminAPIEndpoint(util::format("%1/api/admin/v3.0/groups/%2/apps/%3/services/%4/config", m_base_url,
-                                         m_group_id, app_id, service_id),
-                            m_access_token);
+    return apps()[app_id]["services"][service_id]["config"];
 }
 
 AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& app_id, const std::string& service_id,

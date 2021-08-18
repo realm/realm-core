@@ -18,8 +18,8 @@
 
 #include "util/test_file.hpp"
 
+#include "baas_admin_api.hpp"
 #include "test_utils.hpp"
-
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -126,6 +126,21 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
+SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, std::string partition, realm::Schema _schema)
+{
+    if (!user)
+        throw std::runtime_error("Must provide `user` for SyncTestFile");
+
+    sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson(partition));
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError /*error*/) {
+        abort();
+    };
+    schema_version = 1;
+    schema = _schema;
+    schema_mode = SchemaMode::AdditiveExplicit;
+}
+
 // MARK: - SyncServer
 SyncServer::SyncServer(const SyncServer::Config& config)
     : m_local_root_dir(config.local_dir.empty() ? util::make_temp_dir() : config.local_dir)
@@ -219,6 +234,7 @@ std::error_code wait_for_download(Realm& realm)
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
+    , m_app_session(config.app_session)
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport_generator) {
@@ -259,10 +275,17 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 
 TestSyncManager::~TestSyncManager()
 {
-    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
-        m_app->sync_manager()->reset_for_testing();
-        util::try_remove_dir_recursive(m_base_file_path);
-        app::App::clear_cached_apps();
+    if (m_should_teardown_test_directory) {
+        if (!m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            m_app->sync_manager()->reset_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+            app::App::clear_cached_apps();
+        }
+#if REALM_ENABLE_AUTH_TESTS
+        if (m_app_session) {
+            m_app_session->admin_api.delete_app(m_app_session->server_app_id);
+        }
+#endif
     }
 }
 

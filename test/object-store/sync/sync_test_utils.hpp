@@ -58,6 +58,9 @@ struct AutoVerifiedEmailCredentials {
 void timed_wait_for(std::function<bool()> condition,
                     std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
 
+void timed_sleeping_wait_for(std::function<bool()> condition,
+                             std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
+
 void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
 
 AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app);
@@ -93,6 +96,8 @@ protected:
 std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
                                                                Realm::Config remote_config,
                                                                TestSyncManager& test_sync_manager);
+std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_config, Realm::Config remote_config,
+                                                        TestSyncManager& test_sync_manager);
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config,
                                                               Realm::Config remote_config);
 

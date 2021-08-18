@@ -27,9 +27,9 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include "sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
-#include "sync_test_utils.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 

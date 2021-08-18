@@ -40,6 +40,7 @@
 
 
 namespace realm {
+struct AppSession;
 class Schema;
 enum class SyncSessionStopPolicy;
 struct DBOptions;
@@ -169,6 +170,7 @@ struct SyncTestFile : TestFile {
 
     SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
                  std::string user_name = "test");
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, std::string partition, realm::Schema schema);
 };
 
 struct TestSyncManager {
@@ -182,19 +184,24 @@ struct TestSyncManager {
         Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
         Config(std::string, std::string,
                realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-        Config(const realm::app::App::Config&);
+        Config(const realm::app::App::Config&, realm::AppSession* = nullptr);
         realm::app::App::Config app_config;
         std::string base_path;
         std::string base_url;
         realm::SyncManager::MetadataMode metadata_mode;
         bool should_teardown_test_directory;
         bool verbose_sync_client_logging = default_logging;
+        realm::AppSession* app_session = nullptr;
     };
 
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;
+    realm::AppSession* app_session() const
+    {
+        return m_app_session;
+    }
     SyncServer& sync_server()
     {
         return m_sync_server;
@@ -207,6 +214,7 @@ private:
     SyncServer m_sync_server;
     std::string m_base_file_path;
     bool m_should_teardown_test_directory = true;
+    realm::AppSession* m_app_session = nullptr;
 };
 
 inline TestSyncManager::Config::Config()
@@ -232,10 +240,11 @@ inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm
     app_config = app_cfg;
 }
 
-inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg)
+inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg, realm::AppSession* session)
     : app_config(app_cfg)
     , metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
     , should_teardown_test_directory(true)
+    , app_session(session)
 {
 }
 
