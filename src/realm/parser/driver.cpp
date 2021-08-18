@@ -3133,8 +3133,7 @@ std::unique_ptr<ConstantNode> JsonQueryParser::get_constant_node(realm::Mixed va
             string_value = "";
             break;
         default:
-            stream << value;
-            string_value = stream.str();
+            REALM_UNREACHABLE();
     }
     auto constant_node = std::make_unique<ConstantNode>(type, string_value);
     return constant_node;

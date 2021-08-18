@@ -162,7 +162,7 @@ TEST(test_json_query_parser_simple)
     t->add_column(type_Bool, "isInteresting", true);
 
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<float> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
+    std::vector<float> fees = {2.0f, 2.23f, 2.22f, 2.25f, 3.73f};
     std::vector<long> salary = {10000, LONG_MAX, -3000, 2134, 5000};
     std::vector<double> longitude = {2.0, 2.23, 2.2222222, 2.25, 3.73};
     std::vector<bool> isInteresting = {true, false, true, false, true};
