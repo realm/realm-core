@@ -40,7 +40,7 @@ TEST(Status)
 
     CHECK_NOT_EQUAL(ok_status, err_status);
     CHECK_EQUAL(err_status, Status(ErrorCodes::RuntimeError, "runtime error 2"));
-    CHECK_NOT_EQUAL(err_status, Status(ErrorCodes::LogicErorr, "logic error"));
+    CHECK_NOT_EQUAL(err_status, Status(ErrorCodes::LogicError, "logic error"));
 
     auto caught_status = Status::OK();
     try {

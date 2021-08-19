@@ -38,7 +38,7 @@ public:
     static inline Status OK();
 
     /*
-     * You can construct a Status from a strings, C strings, and StringData's.
+     * You can construct a Status from strings, C strings, and StringData's.
      */
     Status(ErrorCodes::Error code, StringData reason);
     Status(ErrorCodes::Error code, const std::string& reason);

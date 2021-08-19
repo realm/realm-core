@@ -27,7 +27,7 @@ StringData ErrorCodes::error_string(Error code)
             return "OK";
         case ErrorCodes::RuntimeError:
             return "RuntimeError";
-        case ErrorCodes::LogicErorr:
+        case ErrorCodes::LogicError:
             return "LogicError";
         case ErrorCodes::BrokenPromise:
             return "BrokenPromise";

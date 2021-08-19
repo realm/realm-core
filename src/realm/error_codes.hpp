@@ -33,7 +33,7 @@ public:
         OK = 0,
         UnknownError = 1,
         RuntimeError = 2,
-        LogicErorr = 3,
+        LogicError = 3,
         BrokenPromise = 4,
     };
 
