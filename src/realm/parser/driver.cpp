@@ -2014,6 +2014,7 @@ void JsonQueryParser::build_compare(json fragment, std::vector<std::unique_ptr<A
     auto right = get_value_node(fragment["right"]);
     if (fragment["kind"] == "eq") {
         auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
+        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(eq));
     }
     else if (fragment["kind"] == "neq") {
@@ -2057,11 +2058,6 @@ void JsonQueryParser::build_compare(json fragment, std::vector<std::unique_ptr<A
         auto like = std::make_unique<StringOpsNode>(std::move(left), CompareNode::LIKE, std::move(right));
         like->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
         preds.emplace_back(std::move(like));
-    }
-    else if (fragment["kind"] == "eqString") {
-        auto eq = std::make_unique<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
-        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
-        preds.emplace_back(std::move(eq));
     }
 }
 

@@ -50,6 +50,8 @@ json int_lte = {{"kind", "lte"}, {"left", int_prop}, {"right", int_const}};
 
 // string comparisons
 json string_eq = {{"kind", "eq"}, {"left", string_prop}, {"right", string_const}};
+json string_eq_non_case = {
+    {"kind", "eq"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", string_const}};
 json string_neq = {{"kind", "neq"}, {"left", string_prop}, {"right", string_const}};
 json string_gt = {{"kind", "gt"}, {"left", string_prop}, {"right", string_const}};
 json string_gte = {{"kind", "gte"}, {"left", string_prop}, {"right", string_const}};
@@ -110,9 +112,6 @@ json string_contains_non_case = {
     {"kind", "contains"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", contains_const_non_case}};
 json string_like_non_case = {
     {"kind", "like"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", like_const_non_case}};
-json string_eq_non_case = {
-    {"kind", "eqString"}, {"caseSensitivity", false}, {"left", string_prop}, {"right", string_const_non_case}};
-
 
 // sort operations
 json sort_int_asc{{"isAscending", true}, {"property", "age"}};
