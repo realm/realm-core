@@ -32,7 +32,6 @@ public:
 class AtomPredNode : public ParserNode {
 public:
     ~AtomPredNode() override;
-    virtual Query visit(ParserDriver*) = 0;
 };
 
 class AndNode : public AtomPredNode {
@@ -44,7 +43,6 @@ public:
         atom_preds.emplace_back(std::move(node));
     }
     AndNode() {}
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -57,7 +55,6 @@ public:
         atom_preds.emplace_back(std::move(node));
     }
     OrNode() {}
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -70,7 +67,6 @@ public:
         atom_preds.emplace_back(std::move(expr));
     }
     NotNode() {}
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -82,7 +78,6 @@ public:
         : pred(std::move(expr))
     {
     }
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -146,13 +141,11 @@ public:
         , text(str)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
     void accept(NodeVisitor& visitor) override;
 };
 
 class PropertyNode : public ParserNode {
 public:
-    virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
 };
 
 class EqualityNode : public CompareNode {
@@ -167,7 +160,6 @@ public:
         values.emplace_back(std::move(left));
         values.emplace_back(std::move(right));
     }
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -182,7 +174,6 @@ public:
         values.emplace_back(std::move(left));
         values.emplace_back(std::move(right));
     }
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -198,7 +189,6 @@ public:
         values.emplace_back(std::move(left));
         values.emplace_back(std::move(right));
     }
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -210,7 +200,6 @@ public:
         : true_or_false(type)
     {
     }
-    Query visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -224,7 +213,6 @@ public:
         , op_name(op_literal)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -238,7 +226,6 @@ public:
         : type(t)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -246,7 +233,6 @@ class PathNode : public ParserNode {
 public:
     std::vector<std::string> path_elems;
 
-    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
     void add_element(const std::string& str)
     {
         path_elems.push_back(str);
@@ -266,7 +252,6 @@ public:
         , aggr_op(std::move(aggr))
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -284,7 +269,6 @@ public:
         , prop(id2)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -318,7 +302,6 @@ public:
         , comp_type(ExpressionComparisonType::Any)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -334,7 +317,6 @@ public:
         , subquery(std::move(query))
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -386,7 +368,6 @@ public:
     {
         orderings.push_back(std::move(n));
     }
-    std::unique_ptr<DescriptorOrdering> visit(ParserDriver* drv);
     void accept(NodeVisitor& visitor) override;
 };
 
@@ -449,8 +430,6 @@ public:
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
-    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>>
-    cmp(std::vector<std::unique_ptr<ValueNode>>&& values);
     Subexpr* column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
     std::string translate(LinkChain&, const std::string&);
@@ -614,16 +593,16 @@ private:
 };
 
 } // namespace query_parser
-using json = nlohmann::json;
+
 class JsonQueryParser {
 public:
     Query query_from_json(TableRef table, nlohmann::json json);
 
 private:
-    void build_pred(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
-    void build_compare(json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
-    void build_descriptor(json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings);
-    std::unique_ptr<ValueNode> get_value_node(json json);
+    void build_pred(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    void build_compare(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);
+    void build_descriptor(nlohmann::json fragment, std::vector<std::unique_ptr<DescriptorNode>>& orderings);
+    std::unique_ptr<ValueNode> get_value_node(nlohmann::json json);
     std::unique_ptr<ConstantNode> get_constant_node(realm::Mixed value);
 };
 } // namespace realm
