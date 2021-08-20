@@ -79,6 +79,7 @@ set(CORE_TEST_SOURCES
     test_util_error.cpp
     test_util_file.cpp
     test_util_functional.cpp
+    test_util_future.cpp
     test_util_from_chars.cpp
     test_util_inspect.cpp
     test_util_logger.cpp
