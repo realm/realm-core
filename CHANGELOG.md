@@ -15,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
 
 ----------------------------------------------
 
