@@ -766,11 +766,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
-                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
-                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
-                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
-                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+                   cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
+                   cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
+                   cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
+                   cf::UnboxedOptional<cf::String>, cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>,
+                   cf::UnboxedOptional<cf::Decimal>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;
@@ -790,7 +791,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int
          }},
         {"test type",
          {{"_id", PropertyType::Int, Property::IsPrimary{true}},
-          //{"value", TestType::property_type()},
+          {"value", TestType::property_type()},
           {"list", PropertyType::Array | TestType::property_type()},
           {"dictionary", PropertyType::Dictionary | TestType::property_type()},
           {"set", PropertyType::Set | TestType::property_type()}}},
@@ -860,6 +861,86 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset]", cf::MixedVal, cf::Int
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
 #endif
+
+    SECTION("property") {
+        REQUIRE(values.size() >= 2);
+        REQUIRE(values[0] != values[1]);
+        int64_t pk_val = 0;
+        T initial_value = values[0];
+
+        auto set_value = [](SharedRealm realm, T value) {
+            auto table = get_table(*realm, "test type");
+            REQUIRE(table);
+            REQUIRE(table->size() == 1);
+            ColKey col = table->get_column_key("value");
+            table->begin()->set<T>(col, value);
+        };
+        auto check_value = [](Obj obj, T value) {
+            ColKey col = obj.get_table()->get_column_key("value");
+            REQUIRE(obj.get<T>(col) == value);
+        };
+
+        test_reset->setup([&pk_val, &initial_value](SharedRealm realm) {
+            auto table = get_table(*realm, "test type");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            ColKey col = table->get_column_key("value");
+            obj.set<T>(col, initial_value);
+        });
+
+        auto reset_property = [&](T local_state, T remote_state) {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    set_value(local_realm, local_state);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    set_value(remote_realm, remote_state);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("_id") == pk_val);
+                    CHECK(object.is_valid());
+                    check_value(results.get<Obj>(0), local_state);
+                    check_value(object.obj(), local_state);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+                    CHECK(results.size() == 1);
+                    CHECK(object.is_valid());
+                    check_value(results.get<Obj>(0), remote_state);
+                    check_value(object.obj(), remote_state);
+                    if (local_state == remote_state) {
+                        REQUIRE_INDICES(results_changes.modifications);
+                        REQUIRE_INDICES(object_changes.modifications);
+                    }
+                    else {
+                        REQUIRE_INDICES(results_changes.modifications, 0);
+                        REQUIRE_INDICES(object_changes.modifications, 0);
+                    }
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                })
+                ->run();
+        };
+
+        SECTION("modify") {
+            reset_property(values[0], values[1]);
+        }
+        SECTION("modify opposite") {
+            reset_property(values[1], values[0]);
+        }
+        // verify whatever other test values are provided (type bool only has two)
+        for (size_t i = 2; i < values.size(); ++i) {
+            SECTION(util::format("modify to value: %1", i)) {
+                reset_property(values[0], values[i]);
+            }
+        }
+    }
 
     SECTION("lists") {
         REQUIRE(values.size() >= 2);
