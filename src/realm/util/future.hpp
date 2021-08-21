@@ -139,11 +139,8 @@ inline auto no_throw_call(Func&& func, Args&&... args) noexcept
             return Result(call(func, std::forward<Args>(args)...));
         }
     }
-    catch (const ExceptionForStatus& ex) {
-        return Result(ex.to_status());
-    }
-    catch (const std::exception& ex) {
-        return Result(Status{ErrorCodes::UnknownError, ex.what()});
+    catch (...) {
+        return Result(exception_to_status());
     }
 }
 
@@ -394,11 +391,8 @@ struct SharedStateImpl final : public SharedStateBase {
         try {
             m_data.emplace(std::forward<Args>(args)...);
         }
-        catch (const ExceptionForStatus& ex) {
-            m_status = ex.to_status();
-        }
-        catch (const std::exception& ex) {
-            m_status = Status{ErrorCodes::UnknownError, ex.what()};
+        catch (...) {
+            m_status = exception_to_status();
         }
         transition_to_finished();
     }
@@ -760,8 +754,8 @@ public:
                     try {
                         return Future<UnwrappedResult>(throwing_call(func, std::move(val)));
                     }
-                    catch (const ExceptionForStatus& ex) {
-                        return Future<UnwrappedResult>::make_ready(ex.to_status());
+                    catch (...) {
+                        return Future<UnwrappedResult>::make_ready(exception_to_status());
                     }
                 },
                 // on ready failure:
@@ -779,8 +773,8 @@ public:
                             try {
                                 throwing_call(func, std::move(*input->m_data)).propagate_result_to(output);
                             }
-                            catch (const ExceptionForStatus& ex) {
-                                output->set_status(ex.to_status());
+                            catch (...) {
+                                output->set_status(exception_to_status());
                             }
                         });
                 });
@@ -825,8 +819,8 @@ public:
                         return Future<UnwrappedResult>(
                             throwing_call(std::forward<Func>(func), Wrapper(std::move(val))));
                     }
-                    catch (const ExceptionForStatus& ex) {
-                        return Future<UnwrappedResult>::make_ready(ex.to_status());
+                    catch (...) {
+                        return Future<UnwrappedResult>::make_ready(exception_to_status());
                     }
                 },
                 // on ready failure:
@@ -835,8 +829,8 @@ public:
                         return Future<UnwrappedResult>(
                             throwing_call(std::forward<Func>(func), Wrapper(std::move(status))));
                     }
-                    catch (const ExceptionForStatus& ex) {
-                        return Future<UnwrappedResult>::make_ready(ex.to_status());
+                    catch (...) {
+                        return Future<UnwrappedResult>::make_ready(exception_to_status());
                     }
                 },
                 // on not ready yet:
@@ -849,8 +843,8 @@ public:
                                     throwing_call(func, Wrapper(std::move(input->m_status)))
                                         .propagate_result_to(output);
                                 }
-                                catch (const ExceptionForStatus& ex) {
-                                    output->set_error(ex.to_status());
+                                catch (...) {
+                                    output->set_error(exception_to_status());
                                 }
 
                                 return;
@@ -859,8 +853,8 @@ public:
                             try {
                                 throwing_call(func, Wrapper(std::move(*input->data))).propagate_result_to(output);
                             }
-                            catch (const ExceptionForStatus& ex) {
-                                output->set_error(ex.to_status());
+                            catch (...) {
+                                output->set_error(exception_to_status());
                             }
                         });
                 });
@@ -916,8 +910,8 @@ public:
                     try {
                         return Future<T>(throwing_call(func, std::move(status)));
                     }
-                    catch (const ExceptionForStatus& ex) {
-                        return Future<T>::make_ready(ex.to_status());
+                    catch (...) {
+                        return Future<T>::make_ready(exception_to_status());
                     }
                 },
                 // on not ready yet:
@@ -929,8 +923,8 @@ public:
                         try {
                             throwing_call(func, std::move(input->m_status)).propagate_result_to(output);
                         }
-                        catch (const ExceptionForStatus& ex) {
-                            output->set_status(ex.to_status());
+                        catch (...) {
+                            output->set_status(exception_to_status());
                         }
                     });
                 });

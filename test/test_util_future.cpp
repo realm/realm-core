@@ -54,8 +54,8 @@ Future<Result> async(Func&& func)
         try {
             complete_promise(&promise, func);
         }
-        catch (const ExceptionForStatus& status) {
-            promise.set_error(status.to_status());
+        catch (...) {
+            promise.set_error(exception_to_status());
         }
     }).detach();
 
@@ -1502,7 +1502,7 @@ TEST(Future_EdgeCases_looping_onError)
     int tries = 10;
     UniqueFunction<Future<int>()> read = [&] {
         return async([&] {
-                   if (--tries == 0) {
+                   if (--tries != 0) {
                        throw ExceptionForStatus(fail_status);
                    }
                    return tries;
@@ -1522,7 +1522,7 @@ TEST(Future_EdgeCases_looping_onError_with_then)
     int tries = 10;
     UniqueFunction<Future<int>()> read = [&] {
         return async([&] {
-                   if (--tries == 0) {
+                   if (--tries != 0) {
                        throw ExceptionForStatus(fail_status);
                    }
                    return tries;
