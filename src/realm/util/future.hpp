@@ -16,6 +16,8 @@
  *
  **************************************************************************/
 
+#include <condition_variable>
+#include <mutex>
 #include <type_traits>
 
 #include "realm/status.hpp"
