@@ -46,9 +46,9 @@ template <>
 class Future<void>;
 
 template <typename T>
-constexpr bool is_future = false;
+constexpr static bool is_future = false;
 template <typename T>
-constexpr bool is_future<Future<T>> = true;
+constexpr static bool is_future<Future<T>> = true;
 
 struct FakeVoid {
 };
@@ -378,6 +378,7 @@ struct SharedStateImpl final : public SharedStateBase {
         REALM_ASSERT_DEBUG(m_state.load() < SSBState::kFinished);
         REALM_ASSERT_DEBUG(other.m_state.load() == SSBState::kFinished);
         if (other.m_status.is_ok()) {
+            REALM_ASSERT_DEBUG(other.m_data);
             m_data = std::move(other.m_data);
         }
         else {
@@ -697,242 +698,6 @@ public:
             });
     }
 
-    //
-    // The remaining methods are all continuation based and take a callback and return a Future.
-    // Each method has a comment indicating the supported signatures for that callback, and a
-    // description of when the callback is invoked and how the impacts the returned Future. It may
-    // be helpful to think of Future continuation chains as a pipeline of stages that take input
-    // from earlier stages and produce output for later stages.
-    //
-    // Be aware that the callback may be invoked inline at the call-site or at the producer when
-    // setting the value. Therefore, you should avoid doing blocking work inside of a callback.
-    // Additionally, avoid acquiring any locks or mutexes that the caller already holds, otherwise
-    // you risk a deadlock. If either of these concerns apply to your callback, it should schedule
-    // itself on an executor, rather than doing work in the callback.
-    //
-    // Error handling in callbacks: all exceptions thrown propagate to the returned Future
-    // automatically.
-    //
-    // Callbacks that return Future<T> are automatically unwrapped and connected to the returned
-    // Future<T>, rather than producing a Future<Future<T>>.
-
-    /**
-     * Callbacks passed to then() are only called if the input Future completes successfully.
-     * Otherwise the error propagates automatically, bypassing the callback.
-     */
-    template <typename Func>
-    auto then(Func&& func) && noexcept
-    {
-        using Result = NormalizedCallResult<Func, T>;
-        if constexpr (!is_future<Result>) {
-            return general_impl(
-                // on ready success:
-                [&](T&& val) {
-                    return Future<Result>::make_ready(no_throw_call(func, std::move(val)));
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    return Future<Result>::make_ready(std::move(status));
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<Result>(
-                        [func = std::forward<Func>(func)](SharedState<T>* input,
-                                                          SharedState<Result>* output) mutable noexcept {
-                            if (!input->m_status.is_ok()) {
-                                output->set_status(input->m_status);
-                                return;
-                            }
-
-                            output->set_from(no_throw_call(func, std::move(*input->m_data)));
-                        });
-                });
-        }
-        else {
-            using UnwrappedResult = typename Result::value_type;
-            return general_impl(
-                // on ready success:
-                [&](T&& val) {
-                    try {
-                        return Future<UnwrappedResult>(throwing_call(func, std::move(val)));
-                    }
-                    catch (...) {
-                        return Future<UnwrappedResult>::make_ready(exception_to_status());
-                    }
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    return Future<UnwrappedResult>::make_ready(std::move(status));
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<UnwrappedResult>(
-                        [func = std::forward<Func>(func)](SharedState<T>* input,
-                                                          SharedState<UnwrappedResult>* output) mutable noexcept {
-                            if (!input->m_status.is_ok())
-                                return output->set_status(std::move(input->m_status));
-
-                            try {
-                                throwing_call(func, std::move(*input->m_data)).propagate_result_to(output);
-                            }
-                            catch (...) {
-                                output->set_status(exception_to_status());
-                            }
-                        });
-                });
-        }
-    }
-
-    template <typename Func>
-    auto on_completion(Func&& func) && noexcept
-    {
-        using Wrapper = StatusOrStatusWith<T>;
-        using Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>;
-        if constexpr (!is_future<Result>) {
-            return generalImpl(
-                // on ready success:
-                [&](T&& val) {
-                    return Future<Result>::make_ready(
-                        no_throw_call(std::forward<Func>(func), Wrapper(std::move(val))));
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    return Future<Result>::make_Ready(
-                        no_throw_call(std::forward<Func>(func), Wrapper(std::move(status))));
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<Result>(
-                        [func = std::forward<Func>(func)](SharedState<T>* input,
-                                                          SharedState<Result>* output) mutable noexcept {
-                            if (!input->status.is_ok())
-                                return output->set_from(no_throw_call(func, Wrapper(std::move(input->status))));
-
-                            output->set_from(no_throw_call(func, Wrapper(std::move(*input->data))));
-                        });
-                });
-        }
-        else {
-            using UnwrappedResult = typename Result::value_type;
-            return generalImpl(
-                // on ready success:
-                [&](T&& val) {
-                    try {
-                        return Future<UnwrappedResult>(
-                            throwing_call(std::forward<Func>(func), Wrapper(std::move(val))));
-                    }
-                    catch (...) {
-                        return Future<UnwrappedResult>::make_ready(exception_to_status());
-                    }
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    try {
-                        return Future<UnwrappedResult>(
-                            throwing_call(std::forward<Func>(func), Wrapper(std::move(status))));
-                    }
-                    catch (...) {
-                        return Future<UnwrappedResult>::make_ready(exception_to_status());
-                    }
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<UnwrappedResult>(
-                        [func = std::forward<Func>(func)](SharedState<T>* input,
-                                                          SharedState<UnwrappedResult>* output) mutable noexcept {
-                            if (!input->status.isOK()) {
-                                try {
-                                    throwing_call(func, Wrapper(std::move(input->m_status)))
-                                        .propagate_result_to(output);
-                                }
-                                catch (...) {
-                                    output->set_error(exception_to_status());
-                                }
-
-                                return;
-                            }
-
-                            try {
-                                throwing_call(func, Wrapper(std::move(*input->data))).propagate_result_to(output);
-                            }
-                            catch (...) {
-                                output->set_error(exception_to_status());
-                            }
-                        });
-                });
-        }
-    }
-
-    /**
-     * Callbacks passed to on_error() are only called if the input Future completes with an error.
-     * Otherwise, the successful result propagates automatically, bypassing the callback.
-     *
-     * The callback can either produce a replacement value (which must be a T), return a replacement
-     * Future<T> (such as a by retrying), or return/throw a replacement error.
-     *
-     * Note that this will only catch errors produced by earlier stages; it is not registering a
-     * general error handler for the entire chain.
-     */
-    template <typename Func>
-    Future<FakeVoidToVoid<T>> on_error(Func&& func) && noexcept
-    {
-        using Result = NormalizedCallResult<Func, Status>;
-        static_assert(std::is_same<VoidToFakeVoid<UnwrappedType<Result>>, T>::value,
-                      "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
-
-        if constexpr (!is_future<Result>) {
-            return general_impl(
-                // on ready success:
-                [&](T&& val) {
-                    return Future<T>::make_ready(std::move(val));
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    return Future<T>::make_ready(no_throw_call(func, std::move(status)));
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<T>([func = std::forward<Func>(func)](
-                                                    SharedState<T>* input, SharedState<T>* output) mutable noexcept {
-                        if (input->m_status.is_ok())
-                            return output->emplace_value(std::move(*input->m_data));
-
-                        output->set_from(no_throw_call(func, std::move(input->m_status)));
-                    });
-                });
-        }
-        else {
-            return general_impl(
-                // on ready success:
-                [&](T&& val) {
-                    return Future<T>::make_ready(std::move(val));
-                },
-                // on ready failure:
-                [&](Status&& status) {
-                    try {
-                        return Future<T>(throwing_call(func, std::move(status)));
-                    }
-                    catch (...) {
-                        return Future<T>::make_ready(exception_to_status());
-                    }
-                },
-                // on not ready yet:
-                [&] {
-                    return make_continuation<T>([func = std::forward<Func>(func)](
-                                                    SharedState<T>* input, SharedState<T>* output) mutable noexcept {
-                        if (input->m_status.is_ok())
-                            return output->emplace_value(std::move(*input->m_data));
-                        try {
-                            throwing_call(func, std::move(input->m_status)).propagate_result_to(output);
-                        }
-                        catch (...) {
-                            output->set_status(exception_to_status());
-                        }
-                    });
-                });
-        }
-    }
-
 private:
     template <typename T2>
     friend class Future;
@@ -982,57 +747,6 @@ private:
         });
 
         return notReady();
-    }
-
-    template <typename Result, typename OnReady>
-    inline Future<Result> make_continuation(OnReady&& on_ready)
-    {
-        REALM_ASSERT(!m_shared->m_callback && !m_shared->m_continuation);
-
-        auto continuation = make_intrusive<SharedState<Result>>();
-        continuation->thread_unsafe_inc_refs_to(2);
-        m_shared->m_continuation.reset(continuation.get(), util::bind_ptr_base::adopt_tag{});
-        m_shared->m_callback = [on_ready = std::forward<OnReady>(on_ready)](SharedStateBase* ssb) mutable noexcept {
-            const auto input = static_cast<SharedState<T>*>(ssb);
-            const auto output = static_cast<SharedState<Result>*>(ssb->m_continuation.get());
-            on_ready(input, output);
-        };
-        return Future<VoidToFakeVoid<Result>>(std::move(continuation));
-    }
-
-    void propagate_result_to(SharedState<T>* output) && noexcept
-    {
-        general_impl(
-            // on ready success:
-            [&](T&& val) {
-                output->emplace_value(std::move(val));
-            },
-            // on ready failure:
-            [&](Status&& status) {
-                output->set_status(std::move(status));
-            },
-            // on not ready yet:
-            [&] {
-                // If the output is just for continuation, bypass it and just directly fill in the
-                // SharedState that it would write to. The concurrency situation is a bit subtle
-                // here since we are the Future-side of shared, but the Promise-side of output.
-                // The rule is that p->isJustForContinuation must be acquire-read as true before
-                // examining p->continuation, and p->continuation must be written before doing the
-                // release-store of true to p->isJustForContinuation.
-                if (output->m_is_just_for_continuation.load(std::memory_order_acquire)) {
-                    m_shared->m_continuation = std::move(output->m_continuation);
-                }
-                else {
-                    m_shared->m_continuation = util::bind_ptr(output);
-                }
-                m_shared->m_is_just_for_continuation.store(true, std::memory_order_release);
-
-                m_shared->m_callback = [](SharedStateBase* ssb) noexcept {
-                    const auto input = static_cast<SharedState<T>*>(ssb);
-                    const auto output = static_cast<SharedState<T>*>(ssb->m_continuation.get());
-                    output->fill_from(std::move(*input));
-                };
-            });
     }
 
     explicit Future(util::bind_ptr<SharedState<T>> ptr)
@@ -1099,18 +813,6 @@ public:
         return std::move(inner).get_async(std::forward<Func>(func));
     }
 
-    template <typename Func> // () -> T or StatusWith<T> or Future<T>
-    auto then(Func&& func) && noexcept
-    {
-        return std::move(inner).then(std::forward<Func>(func));
-    }
-
-    template <typename Func>
-    auto on_error(Func&& func) && noexcept
-    {
-        return std::move(inner).on_error(std::forward<Func>(func));
-    }
-
     Future<void> ignoreValue() && noexcept
     {
         return std::move(*this);
@@ -1132,11 +834,6 @@ private:
     /*implicit*/ operator Future<FakeVoid>() &&
     {
         return std::move(inner);
-    }
-
-    void propagate_result_to(SharedState<void>* output) && noexcept
-    {
-        std::move(inner).propagate_result_to(output);
     }
 
     static Future<void> make_ready(StatusWith<FakeVoid> status)
