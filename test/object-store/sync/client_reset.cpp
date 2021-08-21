@@ -55,7 +55,7 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
 {
     auto table = get_table(realm, object_type);
     REQUIRE(table);
-    static int64_t pk = 0;
+    static int64_t pk = 1; // TestClientReset creates an object with pk 0 so start with something else
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
@@ -310,6 +310,39 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_INDICES(object_changes.deletions);
                 })
                 ->run();
+
+            SECTION("a Realm can be reset twice") {
+                // keep the Realm to reset (config) the same, but change out the remote (config2)
+                // to a new path because otherwise it will be reset as well which we don't want
+                config2 = SyncTestFile(app->current_user(), partition.value, schema);
+                test_reset = make_reset();
+                test_reset
+                    ->setup([&](SharedRealm realm) {
+                        TableRef table = get_table(*realm, "object");
+                        REQUIRE(table->size() == 1);
+                        REQUIRE(table->begin()->get<Int>("value") == 6);
+                    })
+                    ->on_post_local_changes([&](SharedRealm) {
+                        // advance the object's realm because the one passed here is different
+                        REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
+                        CHECK(results.size() == 1);
+                        CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    })
+                    ->on_post_reset([&](SharedRealm) {
+                        REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
+
+                        CHECK(results.size() == 1);
+                        CHECK(results.get<Obj>(0).get<Int>("value") == 6);
+                        CHECK(object.obj().get<Int>("value") == 6);
+                        REQUIRE_INDICES(results_changes.modifications, 0);
+                        REQUIRE_INDICES(results_changes.insertions);
+                        REQUIRE_INDICES(results_changes.deletions);
+                        REQUIRE_INDICES(object_changes.modifications, 0);
+                        REQUIRE_INDICES(object_changes.insertions);
+                        REQUIRE_INDICES(object_changes.deletions);
+                    })
+                    ->run();
+            }
         }
 
         SECTION("notify callbacks") {
@@ -367,7 +400,6 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
-
         SECTION("delete and insert new") {
             constexpr int64_t new_value = 42;
             test_reset
@@ -375,8 +407,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
+                    int64_t different_pk = table->begin()->get_primary_key().get_int() + 1;
                     table->clear();
-                    auto obj = create_object(*remote, "object", partition);
+                    auto obj = create_object(*remote, "object", partition, {different_pk});
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
