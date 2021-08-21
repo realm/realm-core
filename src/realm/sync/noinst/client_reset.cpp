@@ -702,10 +702,12 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
     }
 }
 
-client_reset::LocalVersionIDs
-client_reset::perform_client_reset_diff(const std::string& path_local, const util::Optional<std::string> path_fresh,
-                                        const util::Optional<std::array<char, 64>>& encryption_key,
-                                        sync::SaltedFileIdent client_file_ident, util::Logger& logger)
+client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
+    const std::string& path_local, const util::Optional<std::string> path_fresh,
+    const util::Optional<std::array<char, 64>>& encryption_key,
+    std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
+    std::function<void(TransactionRef local)> notify_after, sync::SaltedFileIdent client_file_ident,
+    util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
                 "encryption = %2, client_file_ident.ident = %3, "
@@ -715,7 +717,23 @@ client_reset::perform_client_reset_diff(const std::string& path_local, const uti
     DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
     ClientHistoryImpl history_local{path_local};
     DBRef sg_local = DB::create(history_local, shared_group_options);
+    DBRef sg_remote;
+    std::unique_ptr<ClientHistoryImpl> history_remote;
 
+    if (path_fresh) {
+        history_remote = std::make_unique<ClientHistoryImpl>(*path_fresh);
+        sg_remote = DB::create(*history_remote, shared_group_options);
+    }
+    if (notify_before) {
+        TransactionRef local_frozen, remote_frozen;
+        if (sg_local) {
+            local_frozen = sg_local->start_frozen();
+        }
+        if (sg_remote) {
+            remote_frozen = sg_remote->start_frozen();
+        }
+        notify_before(local_frozen, remote_frozen);
+    }
     auto group_local = sg_local->start_write();
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
@@ -725,8 +743,8 @@ client_reset::perform_client_reset_diff(const std::string& path_local, const uti
 
     // changes made here are reflected in the notifier logs
     if (path_fresh) { // seamless_loss mode
-        std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(*path_fresh);
-        DBRef sg_remote = DB::create(*history_remote, shared_group_options);
+        REALM_ASSERT(sg_remote);
+        REALM_ASSERT(history_remote);
         auto wt_remote = sg_remote->start_write();
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
@@ -767,6 +785,13 @@ client_reset::perform_client_reset_diff(const std::string& path_local, const uti
                  "new_version.index = %4",
                  old_version_local.version, old_version_local.index, new_version_local.version,
                  new_version_local.index);
+    if (notify_after) {
+        TransactionRef local_frozen;
+        if (sg_local) {
+            local_frozen = sg_local->start_frozen();
+        }
+        notify_after(local_frozen);
+    }
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }

@@ -38,8 +38,6 @@ struct ResetPathPair {
     // takes a fresh or local path and distinguishes the two
     ResetPathPair(std::string path)
     {
-        // FIXME: this needs to go into a separate temp/metadata directory
-        // because users could potentially choose the same name for a different Realm.
         const std::string fresh_suffix = ".fresh";
         const size_t suffix_len = fresh_suffix.size();
         if (path.size() > suffix_len && path.substr(path.size() - suffix_len, suffix_len) == fresh_suffix) {
@@ -55,12 +53,17 @@ struct ResetPathPair {
     std::string fresh_path;
 };
 
-ClientResetOperation::ClientResetOperation(util::Logger& logger, const std::string& realm_path, bool seamless_loss,
-                                           util::Optional<std::array<char, 64>> encryption_key)
+ClientResetOperation::ClientResetOperation(
+    util::Logger& logger, const std::string& realm_path, bool seamless_loss,
+    util::Optional<std::array<char, 64>> encryption_key,
+    std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
+    std::function<void(TransactionRef local)> notify_after)
     : logger{logger}
     , m_realm_path{realm_path}
     , m_seamless_loss(seamless_loss)
     , m_encryption_key{encryption_key}
+    , m_notify_before(notify_before)
+    , m_notify_after(notify_after)
 {
     logger.debug("Create ClientStateDownload, realm_path = %1, seamless_loss = %2", realm_path, seamless_loss);
 #ifdef REALM_ENABLE_ENCRYPTION
@@ -132,8 +135,9 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 
         client_reset::LocalVersionIDs local_version_ids;
         try {
-            local_version_ids = client_reset::perform_client_reset_diff(m_realm_path, fresh_path, m_encryption_key,
-                                                                        m_salted_file_ident, logger);
+            local_version_ids =
+                client_reset::perform_client_reset_diff(m_realm_path, fresh_path, m_encryption_key, m_notify_before,
+                                                        m_notify_after, m_salted_file_ident, logger);
         }
         catch (util::File::AccessError& e) {
             logger.error("In finalize_client_reset, the client reset failed, "
@@ -145,7 +149,19 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
         m_client_reset_old_version = local_version_ids.old_version;
         m_client_reset_new_version = local_version_ids.new_version;
 
-        // FIXME: clean up the fresh Realm
+        try {
+            // clean up the fresh Realm
+            // we don't mind leaving the fresh lock file around because trying to delete it
+            // here could cause a race if there are multiple resets ongoing
+            DB::call_with_lock(*fresh_path, [&](const std::string& path) {
+                constexpr bool delete_lockfile = false;
+                DB::delete_files(path, nullptr, delete_lockfile);
+            });
+        }
+        catch (...) {
+            // ignored, this is just a best effort
+        }
+
         return true;
     }
     return false;

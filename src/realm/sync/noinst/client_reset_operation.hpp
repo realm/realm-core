@@ -17,7 +17,9 @@ public:
     util::Logger& logger;
 
     ClientResetOperation(util::Logger& logger, const std::string& realm_path, bool seamless_loss,
-                         util::Optional<std::array<char, 64>> encryption_key);
+                         util::Optional<std::array<char, 64>> encryption_key,
+                         std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
+                         std::function<void(TransactionRef local)> notify_after);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
@@ -46,6 +48,8 @@ private:
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;
+    std::function<void(TransactionRef local, TransactionRef remote)> m_notify_before;
+    std::function<void(TransactionRef local)> m_notify_after;
 };
 
 // Implementation

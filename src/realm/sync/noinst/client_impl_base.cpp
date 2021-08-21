@@ -1848,9 +1848,10 @@ void Session::activate()
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config && !m_client_reset_operation) {
-            m_client_reset_operation.reset(new _impl::ClientResetOperation(logger, get_realm_path(),
-                                                                           client_reset_config->seamless_loss,
-                                                                           get_encryption_key())); // Throws
+            m_client_reset_operation.reset(
+                new _impl::ClientResetOperation(logger, get_realm_path(), client_reset_config->seamless_loss,
+                                                get_encryption_key(), client_reset_config->notify_before_client_reset,
+                                                client_reset_config->notify_after_client_reset)); // Throws
         }
 
         if (!m_client_reset_operation) {

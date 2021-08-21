@@ -736,6 +736,8 @@ void SyncSession::do_create_sync_session()
     if (m_force_client_reset) {
         sync::Session::Config::ClientReset config;
         config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
+        config.notify_after_client_reset = m_config.notify_after_client_reset;
+        config.notify_before_client_reset = m_config.notify_before_client_reset;
         session_config.client_reset_config = config;
         m_realm_path = _impl::ClientResetOperation::open_session_for_path(m_realm_path, config.seamless_loss,
                                                                           m_config.realm_encryption_key);

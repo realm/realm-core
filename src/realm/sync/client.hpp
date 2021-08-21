@@ -492,6 +492,7 @@ public:
         /// The encryption key the DB will be opened with.
         util::Optional<std::array<char, 64>> encryption_key;
 
+        /// FIXME: update this
         /// ClientReset is used for both async open and client reset. If
         /// client_reset is not util::none, the sync client will perform
         /// async open for this session if the local Realm does not exist, and
@@ -565,6 +566,8 @@ public:
         /// bool wait_for_download_complete_or_client_stopped().
         struct ClientReset {
             bool seamless_loss = false;
+            std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+            std::function<void(TransactionRef local)> notify_after_client_reset;
         };
         util::Optional<ClientReset> client_reset_config;
 

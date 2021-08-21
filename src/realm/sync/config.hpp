@@ -33,6 +33,8 @@
 
 namespace realm {
 
+class Transaction;
+using TransactionRef = std::shared_ptr<Transaction>;
 class Group;
 class SyncUser;
 class SyncSession;
@@ -139,9 +141,11 @@ struct SyncConfig {
     std::map<std::string, std::string> custom_http_headers;
 
     // The name of the directory which Realms should be backed up to following
-    // a client reset
+    // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
+    std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+    std::function<void(TransactionRef local)> notify_after_client_reset;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

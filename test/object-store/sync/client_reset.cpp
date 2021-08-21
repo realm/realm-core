@@ -312,6 +312,62 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
+        SECTION("notify callbacks") {
+            bool before_was_called = false;
+            bool after_was_called = false;
+            config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+                before_was_called = true;
+                REQUIRE(local);
+                auto local_table = local->get_table("class_object");
+                REQUIRE(local_table);
+                REQUIRE(local_table->size() == 1);
+                REQUIRE(local_table->begin()->get<Int>("value") == 4);
+
+                REQUIRE(remote);
+                auto remote_table = remote->get_table("class_object");
+                REQUIRE(remote_table);
+                REQUIRE(remote_table->size() == 1);
+                REQUIRE(remote_table->begin()->get<Int>("value") == 6);
+
+                REQUIRE(util::File::exists(config.path));
+                REQUIRE(util::File::exists(config.path + ".fresh"));
+            };
+            config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+                after_was_called = true;
+                REQUIRE(local);
+                auto local_table = local->get_table("class_object");
+                REQUIRE(local_table);
+                REQUIRE(local_table->size() == 1);
+                REQUIRE(local_table->begin()->get<Int>("value") == 6);
+            };
+            test_reset
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    REQUIRE(before_was_called);
+                    REQUIRE(after_was_called);
+
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 6);
+                    CHECK(object.obj().get<Int>("value") == 6);
+                    REQUIRE_INDICES(results_changes.modifications, 0);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.modifications, 0);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(config.path));
+                    REQUIRE_FALSE(util::File::exists(config.path + ".fresh"));
+                })
+                ->run();
+        }
+
+
         SECTION("delete and insert new") {
             constexpr int64_t new_value = 42;
             test_reset
