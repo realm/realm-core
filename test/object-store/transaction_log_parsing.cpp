@@ -1579,9 +1579,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 }
 
 namespace cf = realm::collection_fixtures;
-
-TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects,
-                   cf::SetOfMixedLinks, cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
+TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListOfObjects, cf::ListOfMixedLinks,
+                   cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
     TestType test_type("array", "table");
     InMemoryTestFile config;
