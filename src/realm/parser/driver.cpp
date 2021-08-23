@@ -646,8 +646,9 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return query.set_ordering(query_visitor.getDescriptorOrdering(driver.ordering));
 }
 
-Query Table::query_new(const std::string& query_string, query_parser::Arguments& args) const
+Query Table::query_new(const std::string& query_string, const std::vector<Mixed>& arguments) const
 {
+    MixedArguments args(arguments);
     auto jsonObj = json::parse(query_string);
     return JsonQueryParser().query_from_json(m_own_ref, args, jsonObj);
 }
