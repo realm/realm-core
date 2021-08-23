@@ -545,7 +545,8 @@ public:
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
-    Query query_new(const std::string& query_string, query_parser::Arguments& args) const; // TODO New method
+    Query query_new(const std::string& query_string,
+                    const std::vector<Mixed>& arguments = {}) const; // TODO New method
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
