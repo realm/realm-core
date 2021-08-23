@@ -906,17 +906,26 @@ void Realm::close()
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
 {
-    if (!util::File::exists(realm_file_path)) {
+    try {
+        auto lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
+            DB::delete_files(path, did_delete_realm);
+        });
+        if (!lock_successful) {
+            throw DeleteOnOpenRealmException(realm_file_path);
+        }
+    }
+    //catch (const util::File::NotFound&) {
+    //    // Thrown only if the parent directory of the lock file does not exist,
+    //    // which obviously indicates that we didn't need to delete anything
+    //    if (did_delete_realm) {
+    //        *did_delete_realm = false;
+    //    }
+    //}
+    catch (const realm::util::File::AccessError& file_access_error) {
+        auto foo = file_access_error.what();
         if (did_delete_realm) {
             *did_delete_realm = false;
         }
-        return;
-    }
-    auto lock_successful = DB::call_with_lock(realm_file_path, [=](auto const& path) {
-        DB::delete_files(path, did_delete_realm);
-    });
-    if (!lock_successful) {
-        throw DeleteOnOpenRealmException(realm_file_path);
     }
 }
 
