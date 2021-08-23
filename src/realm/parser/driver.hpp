@@ -596,7 +596,7 @@ private:
 
 class JsonQueryParser {
 public:
-    Query query_from_json(TableRef table, nlohmann::json json);
+    Query query_from_json(TableRef table, query_parser::Arguments& args, nlohmann::json json);
 
 private:
     void build_pred(nlohmann::json fragment, std::vector<std::unique_ptr<AtomPredNode>>& preds);

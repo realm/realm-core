@@ -646,10 +646,10 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return query.set_ordering(query_visitor.getDescriptorOrdering(driver.ordering));
 }
 
-Query Table::query_new(const std::string& query_string) const
+Query Table::query_new(const std::string& query_string, query_parser::Arguments& args) const
 {
     auto jsonObj = json::parse(query_string);
-    return JsonQueryParser().query_from_json(m_own_ref, jsonObj);
+    return JsonQueryParser().query_from_json(m_own_ref, args, jsonObj);
 }
 
 Subexpr* LinkChain::column(const std::string& col)
@@ -1958,7 +1958,7 @@ LinkChain SubexprVisitor::getLinkChain(PathNode& node, ExpressionComparisonType 
 }
 
 
-Query JsonQueryParser::query_from_json(TableRef table, json json)
+Query JsonQueryParser::query_from_json(TableRef table, query_parser::Arguments& args, json json)
 {
     auto and_node = std::make_unique<AndNode>();
     auto don = std::make_unique<DescriptorOrderingNode>();
@@ -1968,8 +1968,7 @@ Query JsonQueryParser::query_from_json(TableRef table, json json)
     for (auto ordering : json["orderingClauses"]) {
         build_descriptor(ordering, don->orderings);
     }
-    std::unique_ptr<Arguments> no_arguments(new NoArguments());
-    ParserDriver driver(table, *no_arguments, KeyPathMapping());
+    ParserDriver driver(table, args, KeyPathMapping());
     std::unique_ptr<DescriptorOrdering> order = QueryVisitor(&driver).getDescriptorOrdering(don);
     return QueryVisitor(&driver).visit(*and_node).set_ordering(std::move(order));
 }
@@ -2099,6 +2098,10 @@ std::unique_ptr<ValueNode> JsonQueryParser::get_value_node(json fragment)
         if (fragment["type"] == "bool") {
             bool value = fragment["value"].get<bool>();
             const_node = get_constant_node(value);
+        }
+        if (fragment["type"] == "arg") {
+            std::string value = fragment["value"].get<std::string>();
+            const_node = std::make_unique<ConstantNode>(ConstantNode::Type::ARG, value);
         }
         return std::make_unique<ValueNode>(std::move(const_node));
     }
