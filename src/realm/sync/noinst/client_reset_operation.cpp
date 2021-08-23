@@ -149,17 +149,19 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
         m_client_reset_old_version = local_version_ids.old_version;
         m_client_reset_new_version = local_version_ids.new_version;
 
-        try {
-            // clean up the fresh Realm
-            // we don't mind leaving the fresh lock file around because trying to delete it
-            // here could cause a race if there are multiple resets ongoing
-            DB::call_with_lock(*fresh_path, [&](const std::string& path) {
-                constexpr bool delete_lockfile = false;
-                DB::delete_files(path, nullptr, delete_lockfile);
-            });
-        }
-        catch (...) {
-            // ignored, this is just a best effort
+        if (fresh_path) {
+            try {
+                // clean up the fresh Realm
+                // we don't mind leaving the fresh lock file around because trying to delete it
+                // here could cause a race if there are multiple resets ongoing
+                DB::call_with_lock(*fresh_path, [&](const std::string& path) {
+                    constexpr bool delete_lockfile = false;
+                    DB::delete_files(path, nullptr, delete_lockfile);
+                });
+            }
+            catch (...) {
+                // ignored, this is just a best effort
+            }
         }
 
         return true;

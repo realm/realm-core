@@ -117,19 +117,24 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
     TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
     auto app = sync_manager.app();
-    create_user_and_login(app);
-    SyncTestFile config(app->current_user(), partition.value, schema);
-    create_user_and_login(app);
-    SyncTestFile config2(app->current_user(), partition.value, schema);
+    auto get_valid_config = [&]() -> SyncTestFile {
+        create_user_and_login(app);
+        return SyncTestFile(app->current_user(), partition.value, schema);
+    };
+    SyncTestFile config = get_valid_config();
+    SyncTestFile config2 = get_valid_config();
     auto make_reset = [&]() -> std::unique_ptr<reset_utils::TestClientReset> {
         return reset_utils::make_baas_client_reset(config, config2, sync_manager);
     };
 
 #else
     TestSyncManager sync_manager;
-    SyncTestFile config(sync_manager.app(), "default");
-    SyncTestFile config2(sync_manager.app(), "default");
+    auto get_valid_config = [&]() -> SyncTestFile {
+        return SyncTestFile(sync_manager.app(), "default");
+    };
+    SyncTestFile config = get_valid_config();
     config.schema = schema;
+    SyncTestFile config2 = get_valid_config();
     auto make_reset = [&]() -> std::unique_ptr<reset_utils::TestClientReset> {
         return reset_utils::make_test_server_client_reset(config, config2, sync_manager);
     };
@@ -314,23 +319,38 @@ TEST_CASE("sync: client reset", "[client reset]") {
             SECTION("a Realm can be reset twice") {
                 // keep the Realm to reset (config) the same, but change out the remote (config2)
                 // to a new path because otherwise it will be reset as well which we don't want
-                config2 = SyncTestFile(app->current_user(), partition.value, schema);
+                config2 = get_valid_config();
                 test_reset = make_reset();
                 test_reset
                     ->setup([&](SharedRealm realm) {
+                        // after a reset we already start with a value of 6
                         TableRef table = get_table(*realm, "object");
                         REQUIRE(table->size() == 1);
                         REQUIRE(table->begin()->get<Int>("value") == 6);
+                        REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
+                        CHECK(object.obj().get<Int>("value") == 6);
+                        object_changes = {};
+                        results_changes = {};
                     })
                     ->on_post_local_changes([&](SharedRealm) {
                         // advance the object's realm because the one passed here is different
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
+                        // 6 -> 4
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                        CHECK(object.obj().get<Int>("value") == 4);
+                        REQUIRE_INDICES(results_changes.modifications, 0);
+                        REQUIRE_INDICES(results_changes.insertions);
+                        REQUIRE_INDICES(results_changes.deletions);
+                        REQUIRE_INDICES(object_changes.modifications, 0);
+                        REQUIRE_INDICES(object_changes.insertions);
+                        REQUIRE_INDICES(object_changes.deletions);
+                        object_changes = {};
+                        results_changes = {};
                     })
                     ->on_post_reset([&](SharedRealm) {
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
-
+                        // 4 -> 6
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                         CHECK(object.obj().get<Int>("value") == 6);

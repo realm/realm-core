@@ -256,6 +256,7 @@ struct TestServerClientReset : public TestClientReset {
         using namespace std::literals::chrono_literals;
         auto& server = m_test_sync_manager.sync_server();
         auto sync_manager = m_test_sync_manager.app()->sync_manager();
+        constexpr int64_t pk = 0;
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
@@ -266,7 +267,7 @@ struct TestServerClientReset : public TestClientReset {
                 m_on_setup(realm);
             }
 
-            auto obj = create_object(*realm, "object");
+            auto obj = create_object(*realm, "object", {pk});
             auto col = obj.get_table()->get_column_key("value");
             obj.set(col, 1);
             obj.set(col, 2);
