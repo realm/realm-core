@@ -360,6 +360,7 @@ int main(int argc, const char** argv)
         }
 
         input_view = message.second;
+        bool download_integration_failed = false;
         mpark::visit(realm::util::overload{
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
@@ -369,7 +370,7 @@ int main(int argc, const char** argv)
                                      download_message.changesets.data(), download_message.changesets.size(),
                                      version_info, integration_error, *logger, nullptr)) {
                                  logger->error("Error applying download message to realm");
-                                 return EXIT_FAILURE;
+                                 download_integration_failed = true;
                              }
                          },
                          [&](const UploadMessage& upload_message) {
@@ -389,6 +390,9 @@ int main(int argc, const char** argv)
                              history.set_client_file_ident(ident_message.file_ident, true);
                          }},
                      message.first);
+        if (download_integration_failed) {
+            return EXIT_FAILURE;
+        }
     }
 
     return EXIT_SUCCESS;
