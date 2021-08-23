@@ -6,6 +6,7 @@
 #include "realm/query_expression.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
+#include <external/json/json.hpp>
 
 #define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
 #include "realm/parser/generated/query_bison.hpp"
@@ -429,6 +430,7 @@ public:
 
     // Run the parser on file F.  Return 0 on success.
     int parse(const std::string& str);
+    int parse(const nlohmann::json&);
 
     // Handling the scanner.
     void scan_begin(void*, bool trace_scanning);
@@ -459,6 +461,13 @@ private:
 
     static NoArguments s_default_args;
     static query_parser::KeyPathMapping s_default_mapping;
+
+    OrNode* build_pred_or(nlohmann::json fragment);
+    AndNode* build_pred_and(nlohmann::json fragment);
+    AtomPredNode* build_pred_atom(nlohmann::json fragment);
+    void add_sort_column(DescriptorNode* descriptor, nlohmann::json fragment);
+    ValueNode* get_value_node(nlohmann::json json);
+    ConstantNode* get_constant_node(realm::Mixed value);
 };
 
 template <class T>

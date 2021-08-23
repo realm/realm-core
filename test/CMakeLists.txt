@@ -49,6 +49,7 @@ set(CORE_TEST_SOURCES
     test_impl_simulated_failure.cpp
     test_index_string.cpp
     test_json.cpp
+	test_json_query_parser.cpp
     test_link_query_view.cpp
     test_links.cpp
     test_typed_links.cpp
