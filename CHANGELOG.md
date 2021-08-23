@@ -16,6 +16,7 @@
 
 ### Internals
 * Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
+* ApplyToState tool now exits with a non-zero exit code if download message application fails.
 
 ----------------------------------------------
 
