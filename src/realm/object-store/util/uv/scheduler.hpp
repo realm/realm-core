@@ -44,16 +44,6 @@ public:
         remove_handle(m_notification_handle);
         remove_handle(m_write_handle);
         remove_handle(m_completion_handle);
-        /*
-        if (m_handle && m_handle->data) {
-            static_cast<Data*>(m_handle->data)->close_requested = true;
-            uv_async_send(m_handle);
-            // Don't delete anything here as we need to delete it from within the event loop instead
-        }
-        else {
-            delete m_handle;
-        }
-        */
     }
 
     bool is_on_thread() const noexcept override

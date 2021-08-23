@@ -629,15 +629,11 @@ void Realm::wait_for_change_release()
 
 void Realm::run_writes_on_proper_thread()
 {
-    // TODO ask scheduler to trigger callback on "run_writes"
-    // run_writes();
     m_scheduler->schedule_writes();
 }
 
 void Realm::run_async_completions_on_proper_thread()
 {
-    // TODO: ask scheduler to trigger callback on "run_async_completions"
-    // run_async_completions();
     m_scheduler->schedule_completions();
 }
 
@@ -843,13 +839,9 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    if (m_transaction->holds_write_mutex()) {
-        async_commit_transaction(
-            []() {
-                // Do nothing
-            },
-            false);
-        return;
+    if (m_transaction->is_async()) {
+        REALM_ASSERT_RELEASE(!m_is_running_async_writes);
+        throw InvalidTransactionException("Can't commit synchronously while in async transaction");
     }
 
     if (auto audit = audit_context()) {
