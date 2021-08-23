@@ -364,10 +364,13 @@ int main(int argc, const char** argv)
                          [&](const DownloadMessage& download_message) {
                              realm::sync::VersionInfo version_info;
                              realm::sync::ClientReplication::IntegrationError integration_error;
-                             history.integrate_server_changesets(
-                                 download_message.progress, &download_message.downloadable_bytes,
-                                 download_message.changesets.data(), download_message.changesets.size(), version_info,
-                                 integration_error, *logger, nullptr);
+                             if (!history.integrate_server_changesets(
+                                     download_message.progress, &download_message.downloadable_bytes,
+                                     download_message.changesets.data(), download_message.changesets.size(),
+                                     version_info, integration_error, *logger, nullptr)) {
+                                 logger->error("Error applying download message to realm");
+                                 return EXIT_FAILURE;
+                             }
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {
