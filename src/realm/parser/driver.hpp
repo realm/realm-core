@@ -25,13 +25,19 @@ public:
     virtual ~ParserNode();
 };
 
+class QueryNode : public ParserNode {
+public:
+    ~QueryNode() override;
+    virtual Query visit(ParserDriver*) = 0;
+};
+
 class AtomPredNode : public ParserNode {
 public:
     ~AtomPredNode() override;
     virtual Query visit(ParserDriver*) = 0;
 };
 
-class AndNode : public ParserNode {
+class AndNode : public QueryNode {
 public:
     std::vector<AtomPredNode*> atom_preds;
 
@@ -39,10 +45,10 @@ public:
     {
         atom_preds.emplace_back(node);
     }
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
 };
 
-class OrNode : public ParserNode {
+class OrNode : public QueryNode {
 public:
     std::vector<AndNode*> and_preds;
 
@@ -50,7 +56,7 @@ public:
     {
         and_preds.emplace_back(node);
     }
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
 };
 
 class NotNode : public AtomPredNode {
@@ -420,7 +426,7 @@ public:
     ~ParserDriver();
 
     util::serializer::SerialisationState m_serializer_state;
-    OrNode* result = nullptr;
+    QueryNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;

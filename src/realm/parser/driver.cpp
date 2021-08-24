@@ -259,6 +259,8 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
 
 ParserNode::~ParserNode() {}
 
+QueryNode::~QueryNode() {}
+
 AtomPredNode::~AtomPredNode() {}
 
 Query NotNode::visit(ParserDriver* drv)
@@ -1562,7 +1564,7 @@ int ParserDriver::parse(const nlohmann::json& json)
             and_node = build_pred_and(expr);
         }
     }
-    result = m_parse_nodes.create<OrNode>(and_node);
+    result = and_node;
     ordering = m_parse_nodes.create<DescriptorOrderingNode>();
     if (json.contains("orderingClauses")) {
         auto descriptor = m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT);
