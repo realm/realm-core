@@ -125,6 +125,9 @@ json sort_float_desc{{"isAscending", false}, {"property", "fee"}};
 json bool_eq_true = {{"kind", "eq"}, {"left", bool_const_true}, {"right", bool_prop}};
 json bool_eq_false = {{"kind", "eq"}, {"left", bool_const_false}, {"right", bool_prop}};
 
+json empty_object = json::object();
+json empty_where_clause = {{"whereClauses", json::array()}};
+
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef table, json json, size_t num_results)
 {
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
@@ -187,6 +190,9 @@ TEST(test_json_query_parser_simple)
         t->get_object(keys[i]).set_all(int(i), StringData(names[i]), float(fees[i]), int64_t(salary[i]),
                                        double(longitude[i]), bool(isInteresting[i]));
     }
+
+    verify_query(test_context, t, empty_object, 5);
+    verify_query(test_context, t, empty_where_clause, 5);
 
     verify_query(test_context, t, simple_query(int_eq), 1);
     verify_query(test_context, t, simple_query(int_neq), 4);

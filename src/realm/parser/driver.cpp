@@ -1559,16 +1559,23 @@ ConstantNode* ParserDriver::get_constant_node(realm::Mixed value)
 int ParserDriver::parse(const nlohmann::json& json)
 {
     AndNode* and_node = nullptr;
-    for (auto predicate : json["whereClauses"]) {
-        auto& expr = predicate["expression"];
-        if (and_node) {
-            and_node->atom_preds.emplace_back(build_pred_atom(expr));
-        }
-        else {
-            and_node = build_pred_and(expr);
-        }
+    if (!json.contains("whereClauses") || json["whereClauses"].size() == 0) {
+        auto true_node = m_parse_nodes.create<TrueOrFalseNode>(true);
+        and_node = m_parse_nodes.create<AndNode>(true_node);
+        result = and_node;
     }
-    result = and_node;
+    else {
+        for (auto predicate : json["whereClauses"]) {
+            auto& expr = predicate["expression"];
+            if (and_node) {
+                and_node->atom_preds.emplace_back(build_pred_atom(expr));
+            }
+            else {
+                and_node = build_pred_and(expr);
+            }
+        }
+        result = and_node;
+    }
     ordering = m_parse_nodes.create<DescriptorOrderingNode>();
     if (json.contains("orderingClauses")) {
         auto descriptor = m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT);
