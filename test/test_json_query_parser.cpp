@@ -128,7 +128,7 @@ json bool_eq_false = {{"kind", "eq"}, {"left", bool_const_false}, {"right", bool
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef table, json json, size_t num_results)
 {
     std::unique_ptr<Arguments> no_arguments(new NoArguments());
-    Query q = table->query_new(json.dump(), *no_arguments);
+    Query q = table->query_new(json.dump());
     size_t q_count = q.count();
     std::string description = q.get_description("");
     CHECK_EQUAL(q_count, num_results);
@@ -139,12 +139,12 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef tab
 }
 
 Query verify_query_args(test_util::unit_test::TestContext& test_context, TableRef t, json json,
-                        const util::Any* arg_list, size_t num_args, size_t num_results)
+                        const std::vector<Mixed>& arg_list, size_t num_results)
 {
-    query_parser::AnyContext ctx;
-    realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
+    // query_parser::AnyContext ctx;
+    // realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
     std::string test = json.dump();
-    Query q = t->query_new(json.dump(), args);
+    Query q = t->query_new(json.dump(), arg_list);
     size_t q_count = q.count();
     std::string description = q.get_description("");
     CHECK_EQUAL(q_count, num_results);
@@ -257,7 +257,8 @@ TEST(test_json_query_parser_simple)
     verify_query(test_context, t, simple_query(float_null_eq), 1);
     verify_query(test_context, t, simple_query(long_null_eq), 1);
     verify_query(test_context, t, simple_query(double_null_eq), 1);
-    util::Any args[] = {Int(2), Double(2.25), String("oe"), Bool(true), Float(2.33)};
+    const std::vector<Mixed> args = {Mixed(Int(2)), Mixed(Double(2.25)), Mixed(String("oe")), Mixed(Bool(true)),
+                                     Mixed(Float(2.33))};
     std::vector<std::string> types = {"int", "double", "string", "bool", "float"};
     std::vector<json> properties = {int_prop, double_prop, string_prop, bool_prop, float_prop};
     std::vector<int> results = {1, 1, 0, 3, 0};
@@ -268,7 +269,7 @@ TEST(test_json_query_parser_simple)
         std::string arg_nbr = ss.str();
         json arg_constant = {{"kind", "constant"}, {"value", arg_nbr}, {"type", "arg"}};
         json json = {{"kind", "eq"}, {"left", arg_constant}, {"right", properties[i]}};
-        verify_query_args(test_context, t, simple_query(json), args, num_args, results[i]);
+        verify_query_args(test_context, t, simple_query(json), args, results[i]);
     }
 }
 
