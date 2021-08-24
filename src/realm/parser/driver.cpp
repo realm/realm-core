@@ -1475,30 +1475,38 @@ ValueNode* ParserDriver::get_value_node(json fragment)
         if (fragment["value"].is_null()) {
             return m_parse_nodes.create<ValueNode>(get_constant_node(Mixed()));
         }
-        if (fragment["type"] == "string") {
+        else if (fragment["type"] == "string") {
             std::string value = fragment["value"].get<std::string>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "int") {
+        else if (fragment["type"] == "int") {
             int value = fragment["value"].get<int>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "float") {
+        else if (fragment["type"] == "float") {
             float value = fragment["value"].get<float>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "long") {
+        else if (fragment["type"] == "long") {
             int64_t value = fragment["value"].get<int64_t>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "double") {
+        else if (fragment["type"] == "double") {
             double value = fragment["value"].get<double>();
             const_node = get_constant_node(value);
         }
-        if (fragment["type"] == "bool") {
+        else if (fragment["type"] == "bool") {
             bool value = fragment["value"].get<bool>();
             const_node = get_constant_node(value);
         }
+        else if (fragment["type"] == "arg") {
+            std::string value = fragment["value"].get<std::string>();
+            const_node = m_parse_nodes.create<ConstantNode>(ConstantNode::Type::ARG, value);
+        }
+        else {
+            REALM_UNREACHABLE();
+        }
+
         return m_parse_nodes.create<ValueNode>(const_node);
     }
     REALM_UNREACHABLE();
