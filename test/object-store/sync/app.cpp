@@ -4256,7 +4256,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []() {
             struct transport : GenericNetworkTransport {
-
                 void send_request_to_server(const Request request,
                                             std::function<void(const Response)> completion_block)
                 {
