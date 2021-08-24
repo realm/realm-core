@@ -1685,6 +1685,16 @@ void File::MapBase::sync()
     File::sync_map(m_fd, m_addr, m_size);
 }
 
+void File::MapBase::flush()
+{
+    REALM_ASSERT(m_addr);
+#if REALM_ENABLE_ENCRYPTION
+    if (m_encrypted_mapping) {
+        m_encrypted_mapping->flush();
+    }
+#endif
+}
+
 std::time_t File::last_write_time(const std::string& path)
 {
 #ifdef _WIN32

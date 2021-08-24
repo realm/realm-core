@@ -175,6 +175,7 @@ struct StringMaker<ArrayChange> {
 };
 } // namespace Catch
 
+namespace {
 class KVOContext : public BindingContext {
 public:
     KVOContext(std::initializer_list<Obj> objects)
@@ -225,6 +226,7 @@ private:
         m_result = observers;
     }
 };
+} // namespace
 
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;

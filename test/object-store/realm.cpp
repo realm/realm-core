@@ -57,9 +57,46 @@ public:
         Realm::Internal::begin_read(*shared_realm, version);
     }
 };
+
+static bool operator==(IndexSet const& a, IndexSet const& b)
+{
+    return std::equal(a.as_indexes().begin(), a.as_indexes().end(), b.as_indexes().begin(), b.as_indexes().end());
+}
 } // namespace realm
 
 using namespace realm;
+
+namespace {
+class Observer : public BindingContext {
+public:
+    Observer(Obj& obj)
+    {
+        m_result.push_back(ObserverState{obj.get_table()->get_key(), obj.get_key().value, nullptr});
+    }
+
+    IndexSet array_change(size_t index, ColKey col_key) const noexcept
+    {
+        auto& changes = m_result[index].changes;
+        auto col = changes.find(col_key.value);
+        return col == changes.end() ? IndexSet{} : col->second.indices;
+    }
+
+private:
+    std::vector<ObserverState> m_result;
+    std::vector<void*> m_invalidated;
+
+    std::vector<ObserverState> get_observed_rows() override
+    {
+        return m_result;
+    }
+
+    void did_change(std::vector<ObserverState> const& observers, std::vector<void*> const& invalidated, bool) override
+    {
+        m_invalidated = invalidated;
+        m_result = observers;
+    }
+};
+} // namespace
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
@@ -751,6 +788,251 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
+TEST_CASE("SharedRealm: async_writes") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Int}, {"ints", PropertyType::Array | PropertyType::Int}}},
+    };
+    bool done = false;
+    auto realm = Realm::get_shared_realm(config);
+    int write_nr = 0;
+    int commit_nr = 0;
+
+    SECTION("async commit transaction") {
+        realm->async_begin_transaction([&]() {
+            REQUIRE(write_nr == 0);
+            ++write_nr;
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->async_commit_transaction([&]() {
+                REQUIRE(commit_nr == 0);
+                ++commit_nr;
+            });
+        });
+        for (int expected = 1; expected < 1000; ++expected) {
+            realm->async_begin_transaction([&, expected]() {
+                REQUIRE(write_nr == expected);
+                ++write_nr;
+                auto table = realm->read_group().get_table("class_object");
+                auto col = table->get_column_key("value");
+                auto o = table->get_object(0);
+                o.set(col, o.get<int64_t>(col) + 37);
+                realm->async_commit_transaction(
+                    [&]() {
+                        ++commit_nr;
+                        done = commit_nr == 1000;
+                    },
+                    true);
+            });
+        }
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        REQUIRE(done);
+    }
+    SECTION("realm closed") {
+        bool timeout = false;
+        auto has_timer = realm->scheduler()->set_timeout_callback(100, [&timeout]() {
+            timeout = true;
+        });
+        if (has_timer) {
+            realm->async_begin_transaction([&] {
+                // We should never get here as the realm is closed
+                done = true;
+            });
+            realm->close();
+            util::EventLoop::main().run_until([&] {
+                return done || timeout;
+            });
+            REQUIRE(!done);
+        }
+    }
+    SECTION("notify only with no further actions") {
+        realm->async_begin_transaction(
+            [&] {
+                done = true;
+            },
+            true);
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+    }
+    SECTION("syncronous commit") {
+        realm->async_begin_transaction(
+            [&]() {
+                done = true;
+            },
+            true);
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 45);
+        REQUIRE_THROWS_WITH(realm->commit_transaction(),
+                            Catch::Matchers::Contains("Can't commit synchronously while in async transaction"));
+    }
+    SECTION("syncronous transaction") {
+        realm->async_begin_transaction([&]() {
+            REQUIRE(write_nr == 0);
+            ++write_nr;
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->async_commit_transaction([&]() {
+                REQUIRE(commit_nr == 0);
+                ++commit_nr;
+                done = true;
+            });
+        });
+        REQUIRE_THROWS_WITH(
+            realm->begin_transaction(),
+            Catch::Matchers::Contains("Can't begin transaction while an async transaction is ongoing"));
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        REQUIRE(done);
+        realm->begin_transaction(); // Now is ok
+        realm->cancel_transaction();
+    }
+    SECTION("object change information") {
+        realm->begin_transaction();
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("ints");
+        auto obj = table->create_object();
+        auto list = obj.get_list<Int>(col);
+        for (int i = 0; i < 3; ++i)
+            list.add(i);
+        realm->commit_transaction();
+
+        Observer observer(obj);
+        observer.realm = realm;
+        realm->m_binding_context.reset(&observer);
+
+        realm->async_begin_transaction([&]() {
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("ints");
+            auto l = table->get_object(0).get_list<Int>(col);
+            l.clear();
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
+        realm->m_binding_context.release();
+    }
+}
+
+class LooperDelegate {
+public:
+    LooperDelegate() {}
+    void run_once()
+    {
+        for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
+            if (it->may_run && *it->may_run) {
+                it->the_job();
+                m_tasks.erase(it);
+                return;
+            }
+        }
+    }
+    std::shared_ptr<bool> add_task(const std::function<void()>& the_job)
+    {
+        Task t{std::make_shared<bool>(false), the_job};
+
+        m_tasks.push_back(t);
+        return t.may_run;
+    }
+    bool has_tasks()
+    {
+        return !m_tasks.empty();
+    }
+
+private:
+    struct Task {
+        std::shared_ptr<bool> may_run;
+        std::function<void()> the_job;
+    };
+    std::vector<Task> m_tasks;
+};
+
+TEST_CASE("SharedRealm: async_writes_2") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Int}}},
+    };
+    bool done = false;
+    auto realm = Realm::get_shared_realm(config);
+    int write_nr = 0;
+    int commit_nr = 0;
+    LooperDelegate ld;
+    std::shared_ptr<bool> t1_rdy = ld.add_task([&]() {
+        REQUIRE(write_nr == 0);
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 45);
+        realm->cancel_transaction();
+    });
+    std::shared_ptr<bool> t2_rdy = ld.add_task([&]() {
+        REQUIRE(write_nr == 1);
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 45);
+        realm->async_commit_transaction([&]() {
+            REQUIRE(commit_nr == 0);
+            ++commit_nr;
+        });
+    });
+    std::shared_ptr<bool> t3_rdy = ld.add_task([&]() {
+        ++write_nr;
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        auto o = table->get_object(0);
+        o.set(col, o.get<int64_t>(col) + 37);
+        realm->async_commit_transaction([&]() {
+            ++commit_nr;
+            done = true;
+        });
+    });
+
+    // Make some notify_only transactions
+    realm->async_begin_transaction(
+        [&]() {
+            *t1_rdy = true;
+        },
+        true);
+    realm->async_begin_transaction(
+        [&]() {
+            *t2_rdy = true;
+        },
+        true);
+    realm->async_begin_transaction(
+        [&]() {
+            *t3_rdy = true;
+        },
+        true);
+    util::EventLoop::main().run_until([&] {
+        ld.run_once();
+        return done;
+    });
+    REQUIRE(done);
+}
+
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
         return;
@@ -804,6 +1086,17 @@ TEST_CASE("SharedRealm: notifications") {
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
         r2->commit_transaction();
+        REQUIRE(change_count == 0);
+        util::EventLoop::main().run_until([&] {
+            return change_count > 0;
+        });
+        REQUIRE(change_count == 1);
+    }
+
+    SECTION("notifications created in async transaction are sent asynchronously") {
+        realm->async_begin_transaction([&] {
+            realm->async_commit_transaction([] {});
+        });
         REQUIRE(change_count == 0);
         util::EventLoop::main().run_until([&] {
             return change_count > 0;

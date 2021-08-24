@@ -56,6 +56,8 @@ public:
     //
     // This function can be called from any thread.
     virtual void notify() = 0;
+    virtual void schedule_writes() {}
+    virtual void schedule_completions() {}
     // Check if the caller is currently running on the scheduler's thread.
     //
     // This function can be called from any thread.
@@ -73,10 +75,27 @@ public:
     //
     // This function is not thread-safe.
     virtual bool can_deliver_notifications() const noexcept = 0;
+    virtual bool can_schedule_writes() const noexcept
+    {
+        return false;
+    }
+    virtual bool can_schedule_completions() const noexcept
+    {
+        return false;
+    }
     // Set the callback function which will be called by notify().
     //
     // This function is not thread-safe.
     virtual void set_notify_callback(std::function<void()>) = 0;
+    virtual void set_schedule_writes_callback(std::function<void()>) {}
+    virtual void set_schedule_completions_callback(std::function<void()>) {}
+
+    virtual bool set_timeout_callback(uint64_t, std::function<void()>)
+    {
+        return false;
+    }
+
+    // virtual int enqueue_write(std::function<void()>& block) = 0;
 
     [[deprecated("Use Scheduler::make_frozen() instead")]] static std::shared_ptr<Scheduler>
     get_frozen(VersionID version);
