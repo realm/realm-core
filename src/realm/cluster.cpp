@@ -64,8 +64,7 @@ const Table* ClusterNode::get_owning_table() const noexcept
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw KeyNotFound(
-            util::format("No object with key '%1' in table '%2'", k.value, get_owning_table()->get_name()));
+        throw KeyNotFound(util::format("No object with key '%1' in '%2'", k.value, get_owning_table()->get_name()));
     }
 }
 
@@ -623,20 +622,25 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     size_t ndx;
     ref_type ret = 0;
 
+    auto on_error = [&] {
+        throw KeyAlreadyUsed(
+            util::format("When inserting key '%1' in '%2'", k.value, get_owning_table()->get_name()));
+    };
+
     if (m_keys.is_attached()) {
         sz = m_keys.size();
         ndx = m_keys.lower_bound(uint64_t(k.value));
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
             if (k.value == current_key_value) {
-                goto error;
+                on_error();
             }
         }
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
         if (uint64_t(k.value) < sz) {
-            goto error;
+            on_error();
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
@@ -675,9 +679,6 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     }
 
     return ret;
-error:
-    throw KeyAlreadyUsed(
-        util::format("When inserting key '%1' in table '%2'", k.value, get_owning_table()->get_name()));
 }
 
 bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const noexcept
@@ -769,8 +770,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound(
-            util::format("When erasing key '%1' in table '%2'", key.value, get_owning_table()->get_name()));
+        throw KeyNotFound(util::format("When erasing key '%1' in '%2'", key.value, get_owning_table()->get_name()));
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -923,7 +923,7 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound(util::format("When nullify incoming links for key '%1' in table '%2'", key.value,
+        throw KeyNotFound(util::format("When nullify incoming links for key '%1' in '%2'", key.value,
                                        get_owning_table()->get_name()));
 
     // We must start with backlink columns in case the corresponding link
