@@ -1467,8 +1467,12 @@ void ParserDriver::add_sort_column(DescriptorNode* descriptor, nlohmann::json fr
 ValueNode* ParserDriver::get_value_node(json fragment)
 {
     if (fragment["kind"] == "property") {
-        auto empty_path = m_parse_nodes.create<PathNode>();
-        auto prop_node = m_parse_nodes.create<PropNode>(empty_path, fragment["name"]);
+        auto path = m_parse_nodes.create<PathNode>();
+        unsigned long link_size = fragment["link"].size();
+        for (unsigned long i = 0; i < link_size - 1; i++) {
+            path->add_element(fragment["link"][i]);
+        }
+        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["link"][link_size - 1]);
         auto value_node = m_parse_nodes.create<ValueNode>(prop_node);
         return value_node;
     }

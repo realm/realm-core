@@ -14,12 +14,12 @@ json long_const = {{"kind", "constant"}, {"value", LONG_MAX}, {"type", "long"}};
 json double_const = {{"kind", "constant"}, {"value", 2.2222222}, {"type", "double"}};
 json bool_const_true = {{"kind", "constant"}, {"value", true}, {"type", "bool"}};
 json bool_const_false = {{"kind", "constant"}, {"value", false}, {"type", "bool"}};
-json int_prop = {{"kind", "property"}, {"name", "age"}, {"type", "int"}};
-json string_prop = {{"kind", "property"}, {"name", "name"}, {"type", "string"}};
-json float_prop = {{"kind", "property"}, {"name", "fee"}, {"type", "float"}};
-json long_prop = {{"kind", "property"}, {"name", "salary"}, {"type", "long"}};
-json double_prop = {{"kind", "property"}, {"name", "longitude"}, {"type", "double"}};
-json bool_prop = {{"kind", "property"}, {"name", "isInteresting"}, {"type", "bool"}};
+json int_prop = {{"kind", "property"}, {"link", json::array({"age"})}, {"type", "int"}};
+json string_prop = {{"kind", "property"}, {"link", json::array({"name"})}, {"type", "string"}};
+json float_prop = {{"kind", "property"}, {"link", json::array({"fee"})}, {"type", "float"}};
+json long_prop = {{"kind", "property"}, {"link", json::array({"salary"})}, {"type", "long"}};
+json double_prop = {{"kind", "property"}, {"link", json::array({"longitude"})}, {"type", "double"}};
+json bool_prop = {{"kind", "property"}, {"link", json::array({"isInteresting"})}, {"type", "bool"}};
 
 // null consts
 json int_null_const = {{"kind", "constant"}, {"value", nullptr}, {"type", "int"}};
@@ -492,5 +492,44 @@ TEST(test_json_query_parser_sorting)
         sorts.emplace_back(sort_float_asc);
         sorts.emplace_back(sort_string_asc);
         check_tv(get_sorted_view(t, simple_query_sort(float_neq, sorts)));
+    }
+}
+
+TEST(test_json_query_parser_links)
+{
+    Group g;
+    TableRef t = g.add_table("class_Person");
+    ColKey age_col = t->add_column(type_Int, "age");
+    ColKey name_col = t->add_column(type_String, "name");
+    ColKey link_col = t->add_column(*t, "buddy");
+    std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
+    std::vector<ObjKey> people_keys;
+    t->create_objects(names.size(), people_keys);
+    for (size_t i = 0; i < t->size(); ++i) {
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(age_col, int64_t(i));
+        obj.set(name_col, StringData(names[i]));
+        obj.set(link_col, people_keys[(i + 1) % t->size()]);
+    }
+    t->get_object(people_keys[4]).set_null(link_col);
+
+    // tests:
+    // age > 0
+    // buddy.age > 0
+    // buddy.buddy.age > 0
+    // buddy.buddy.buddy.age > 0
+    // buddy.buddy.buddy.buddy.age > 0
+    // buddy.buddy.buddy.buddy.buddy.age > 0
+
+    std::vector<int> results = {4, 4, 3, 2, 1, 0};
+    for (size_t i = 0; i < results.size(); i++) {
+        json int_link_prop = {{"kind", "property"}, {"link", json::array()}, {"type", "int"}};
+        for (size_t j = 0; j < i; j++) {
+            int_link_prop["link"].push_back("buddy");
+        }
+        int_link_prop["link"].push_back("age");
+        json int_link_const = {{"kind", "constant"}, {"value", 0}, {"type", "int"}};
+        json int_link_gt = {{"kind", "gt"}, {"left", int_link_prop}, {"right", int_link_const}};
+        verify_query(test_context, t, simple_query(int_link_gt), results[i]);
     }
 }
