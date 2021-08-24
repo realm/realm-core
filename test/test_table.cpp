@@ -5280,7 +5280,7 @@ TEST(Table_ChangePKNullability)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(table->set_nullability(pk_col, false, true), message);
-    CHECK_EQUAL(message, "Table 'foo' column 'id' has null value(s)");
+    CHECK_EQUAL(message, "Objects in 'foo' has null value(s) in property 'id'");
 
     table->get_object_with_primary_key({}).remove();
     table->set_nullability(pk_col, false, true);
