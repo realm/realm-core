@@ -21,7 +21,7 @@ jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
         targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
-        node('docker') {
+        rlmNode('docker') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
@@ -76,7 +76,7 @@ jobWrapper {
 
     if (isPullRequest) {
         stage('FormatCheck') {
-            node('docker') {
+            rlmNode('docker') {
                 getArchive()
                 docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
                     echo "Checking code formatting"
@@ -216,7 +216,7 @@ jobWrapper {
             parallel parallelExecutors
         }
         stage('Aggregate Cocoa xcframeworks') {
-            node('osx') {
+            rlmNode('osx') {
                 getArchive()
                 for (cocoaStash in cocoaStashes) {
                     unstash name: cocoaStash
@@ -230,7 +230,7 @@ jobWrapper {
             }
         }
         stage('Publish to S3') {
-            node('docker') {
+            rlmNode('docker') {
                 deleteDir()
                 dir('temp') {
                     withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
@@ -273,7 +273,7 @@ def doCheckInDocker(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             def sourcesDir = pwd()
             def buildEnv = docker.build 'realm-core-linux:18.04'
@@ -361,7 +361,7 @@ def doCheckSanity(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
@@ -391,7 +391,7 @@ def doCheckSanity(Map options = [:]) {
 
 def doBuildLinux(String buildType) {
     return {
-        node('docker') {
+        rlmNode('docker') {
             getSourceArchive()
 
             docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
@@ -417,7 +417,7 @@ def doBuildLinux(String buildType) {
 
 def doBuildLinuxClang(String buildType) {
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 dir('build-dir') {
@@ -443,7 +443,7 @@ def doBuildLinuxClang(String buildType) {
 
 def doCheckValgrind() {
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
@@ -478,7 +478,7 @@ def doCheckValgrind() {
 
 def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestAction.None) {
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
@@ -589,7 +589,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('windows') {
+        rlmNode('windows') {
             getArchive()
 
             dir('build-dir') {
@@ -663,7 +663,7 @@ def optionalBuildPerformance(boolean force) {
 def buildPerformance() {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
-    node('brix && exclusive') {
+    rlmNode('brix && exclusive') {
       getArchive()
 
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
@@ -717,7 +717,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx') {
+        rlmNode('osx') {
             getArchive()
 
             dir("build-macosx-${buildType}") {
@@ -784,7 +784,7 @@ def doBuildMacOs(Map options = [:]) {
 
 def doBuildMacOsCatalyst(String buildType) {
     return {
-        node('osx') {
+        rlmNode('osx') {
             getArchive()
 
             dir("build-maccatalyst-${buildType}") {
@@ -819,7 +819,7 @@ def doBuildMacOsCatalyst(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('osx') {
+        rlmNode('osx') {
             getArchive()
 
             withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
@@ -867,7 +867,7 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
             }
     }
     return {
-        node('docker') {
+        rlmNode('docker') {
             getArchive()
             docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
                 dir('build-dir') {
@@ -921,7 +921,7 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
 
 def doBuildCoverage() {
   return {
-    node('docker') {
+    rlmNode('docker') {
       getArchive()
       docker.build('realm-core-linux:18.04').inside {
         def workspace = pwd()
