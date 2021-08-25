@@ -129,7 +129,6 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
     // if there is no existing file, there is nothing to reset
     bool local_realm_exists = util::File::exists(m_realm_path);
     if (local_realm_exists) {
-        m_salted_file_ident = salted_file_ident;
         logger.debug("finalize_client_reset:discard, realm_path = %1, local_realm_exists = %2", m_realm_path,
                      local_realm_exists);
 

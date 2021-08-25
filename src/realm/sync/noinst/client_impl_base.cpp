@@ -2294,6 +2294,11 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return std::error_code{};  // Success
     }
 
+    // access before the client reset (if applicable) because
+    // the reset can take a while and the sync session might have died
+    // by the time the reset finishes.
+    ClientHistoryBase& history = access_realm(); // Throws
+
     auto client_reset_if_needed = [&]() -> bool {
         // if downloading the fresh copy, continue as normal and do not release the client reset
         // operation yet because we must continue the reset when the fresh Realm reaches
@@ -2311,37 +2316,38 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         if (!client_reset_operation->finalize(client_file_ident)) {
             return false;
         }
-        realm::VersionID client_reset_old_version;
-        realm::VersionID client_reset_new_version;
+        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
+        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
-        // The State Realm is complete and can be used.
+        // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        const ClientHistoryBase& history = access_realm();                           // Throws
         history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
-        REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
-        REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
-        REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
-        REALM_ASSERT(m_progress.upload.client_version == 0);
-        REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
+        REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
+                        client_file_ident.ident);
+        REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
+                        client_file_ident.salt);
+        REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
+                        m_progress.download.last_integrated_client_version);
+        REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
+        REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
+                        m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
-        REALM_ASSERT(m_last_version_selected_for_upload == 0);
-
-        client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        client_reset_new_version = client_reset_operation->get_client_reset_new_version();
+        REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         if (m_sync_transact_reporter) {
             m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
         }
         return true;
     };
+    // if a client reset happens, it will take care of setting the file ident
+    // and if not, we do it here
     if (!client_reset_if_needed()) {
-        ClientHistoryBase& history = access_realm(); // Throws
-        bool fix_up_object_ids = true;
+        constexpr bool fix_up_object_ids = true;
         history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
     }
 

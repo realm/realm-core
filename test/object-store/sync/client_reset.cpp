@@ -420,6 +420,47 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
+        SECTION("an interrupted reset can recover on the next session") {
+            struct SessionInterruption : public std::runtime_error {
+                using std::runtime_error::runtime_error;
+            };
+            bool before_called = false;
+            bool after_called = false;
+            config.sync_config->notify_before_client_reset = [&](TransactionRef, TransactionRef) {
+                before_called = true;
+            };
+            config.sync_config->notify_after_client_reset = [&](TransactionRef) {
+                after_called = true;
+            };
+            try {
+                test_reset
+                    ->on_post_local_changes([&](SharedRealm) {
+                        throw SessionInterruption("fake interruption during reset");
+                    })
+                    ->run();
+            }
+            catch (const SessionInterruption&) {
+                REQUIRE_FALSE(before_called);
+                REQUIRE_FALSE(after_called);
+                test_reset.reset();
+                auto realm = Realm::get_shared_realm(config);
+                timed_sleeping_wait_for(
+                    [&]() -> bool {
+                        realm->begin_transaction();
+                        TableRef table = get_table(*realm, "object");
+                        REQUIRE(table);
+                        REQUIRE(table->size() == 1);
+                        auto col = table->get_column_key("value");
+                        int64_t value = table->begin()->get<Int>(col);
+                        realm->cancel_transaction();
+                        return value == 6;
+                    },
+                    std::chrono::seconds(20));
+            }
+            REQUIRE(before_called);
+            REQUIRE(after_called);
+        }
+
         SECTION("delete and insert new") {
             constexpr int64_t new_value = 42;
             test_reset

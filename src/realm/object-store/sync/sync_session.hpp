@@ -135,7 +135,7 @@ public:
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const
     {
-        return m_realm_path;
+        return m_session_realm_path;
     }
 
     // Register a callback that will be called when all pending uploads have completed.

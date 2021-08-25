@@ -758,10 +758,11 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
 
         transfer_group(*wt_remote, *group_local, logger);
 
-        // Extract the changeset produced in the remote Realm during recovery.
-        sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
-        const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
-        recovered_changeset = {buffer.data(), buffer.size()};
+#if 0 // the following would only be applicable in recovery mode, in seamless loss we don't modify the remote
+      // Extract the changeset produced in the remote Realm during recovery.
+         sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
+         const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
+         recovered_changeset = {buffer.data(), buffer.size()};
         //        {
         //            // Debug.
         //            ChunkedBinaryInputStream in{recovered_changeset};
@@ -769,6 +770,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
         //            sync::parse_changeset(in, log); // Throws
         //            log.print();
         //        }
+#endif
     }
     else { // manual discard mode
         remove_all_tables(*group_local, logger);
