@@ -1058,7 +1058,7 @@ void Table::set_embedded(bool embedded)
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
         throw std::logic_error(
-            util::format("Cannot change '%1' to embedded objects when using a primary key.", get_name()));
+            util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
     }
 
     // `has_backlink_columns` indicates if the table is embedded in any other table.
