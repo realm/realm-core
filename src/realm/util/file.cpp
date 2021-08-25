@@ -407,7 +407,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case ERROR_ACCESS_DENIED:
             throw PermissionDenied(msg, path);
         case ERROR_FILE_NOT_FOUND:
-        case ERROR_PATH_NOT_FOUND:
+        //case ERROR_PATH_NOT_FOUND:
             throw NotFound(msg, path);
         case ERROR_FILE_EXISTS:
             throw Exists(msg, path);
