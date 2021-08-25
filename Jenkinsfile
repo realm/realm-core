@@ -619,13 +619,16 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         bat '''
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
+                          copy unit-test-report.xml ..\\core-results.xml
                           realm-sync-tests.exe --no-error-exit-code
-                          copy unit-test-report.xml ..
+                          copy unit-test-report.xml ..\\sync-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
                 }
-                recordTests("Windows-${platform}-${buildType}")
+                def prefix = "Windows-${platform}-${buildType}";
+                recordTests("${prefix}-core", "core-results.xml")
+                recordTests("${prefix}-sync", "sync-results.xml")
             }
         }
     }
@@ -954,8 +957,8 @@ def doBuildCoverage() {
 /**
  *  Wraps the test recorder by adding a tag which will make the test distinguishible
  */
-def recordTests(tag) {
-    def tests = readFile('build-dir/test/unit-test-report.xml')
+def recordTests(tag, String reportName = "unit-test-report.xml") {
+    def tests = readFile("build-dir/test/${reportName}")
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
     junit testResults: 'build-dir/test/modified-test-report.xml'
