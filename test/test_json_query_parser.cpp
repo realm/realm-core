@@ -14,12 +14,12 @@ json long_const = {{"kind", "constant"}, {"value", LONG_MAX}, {"type", "long"}};
 json double_const = {{"kind", "constant"}, {"value", 2.2222222}, {"type", "double"}};
 json bool_const_true = {{"kind", "constant"}, {"value", true}, {"type", "bool"}};
 json bool_const_false = {{"kind", "constant"}, {"value", false}, {"type", "bool"}};
-json int_prop = {{"kind", "property"}, {"link", json::array({"age"})}, {"type", "int"}};
-json string_prop = {{"kind", "property"}, {"link", json::array({"name"})}, {"type", "string"}};
-json float_prop = {{"kind", "property"}, {"link", json::array({"fee"})}, {"type", "float"}};
-json long_prop = {{"kind", "property"}, {"link", json::array({"salary"})}, {"type", "long"}};
-json double_prop = {{"kind", "property"}, {"link", json::array({"longitude"})}, {"type", "double"}};
-json bool_prop = {{"kind", "property"}, {"link", json::array({"isInteresting"})}, {"type", "bool"}};
+json int_prop = {{"kind", "property"}, {"path", json::array({"age"})}};
+json string_prop = {{"kind", "property"}, {"path", json::array({"name"})}};
+json float_prop = {{"kind", "property"}, {"path", json::array({"fee"})}};
+json long_prop = {{"kind", "property"}, {"path", json::array({"salary"})}};
+json double_prop = {{"kind", "property"}, {"path", json::array({"longitude"})}};
+json bool_prop = {{"kind", "property"}, {"path", json::array({"isInteresting"})}};
 
 // null consts
 json int_null_const = {{"kind", "constant"}, {"value", nullptr}, {"type", "int"}};
@@ -529,13 +529,13 @@ TEST(test_json_query_parser_links)
 
     std::vector<int> results = {4, 4, 3, 2, 1, 0};
     for (size_t i = 0; i < results.size(); i++) {
-        json int_link_prop = {{"kind", "property"}, {"link", json::array()}, {"type", "int"}};
+        json int_path_prop = {{"kind", "property"}, {"path", json::array()}};
         for (size_t j = 0; j < i; j++) {
-            int_link_prop["link"].push_back("buddy");
+            int_path_prop["path"].push_back("buddy");
         }
-        int_link_prop["link"].push_back("age");
-        json int_link_const = {{"kind", "constant"}, {"value", 0}, {"type", "int"}};
-        json int_link_gt = {{"kind", "gt"}, {"left", int_link_prop}, {"right", int_link_const}};
-        verify_query(test_context, t, simple_query(int_link_gt), results[i]);
+        int_path_prop["path"].push_back("age");
+        json int_path_const = {{"kind", "constant"}, {"value", 0}, {"type", "int"}};
+        json int_path_gt = {{"kind", "gt"}, {"left", int_path_prop}, {"right", int_path_const}};
+        verify_query(test_context, t, simple_query(int_path_gt), results[i]);
     }
 }

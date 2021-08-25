@@ -1468,11 +1468,11 @@ ValueNode* ParserDriver::get_value_node(json fragment)
 {
     if (fragment["kind"] == "property") {
         auto path = m_parse_nodes.create<PathNode>();
-        auto link_size = fragment["link"].size();
+        auto link_size = fragment["path"].size();
         for (size_t i = 0; i < link_size - 1; i++) {
-            path->add_element(fragment["link"][i]);
+            path->add_element(fragment["path"][i]);
         }
-        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["link"][link_size - 1]);
+        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["path"][link_size - 1]);
         auto value_node = m_parse_nodes.create<ValueNode>(prop_node);
         return value_node;
     }
