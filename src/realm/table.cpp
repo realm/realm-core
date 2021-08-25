@@ -327,8 +327,8 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not an object reference property", m_current_table->get_name(),
-                                              m_current_table->get_column_name(ck)));
+        throw std::runtime_error(util::format("%1.%2 is not an object reference property",
+                                              m_current_table->get_name(), m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
 }
@@ -1045,8 +1045,7 @@ void Table::set_embedded(bool embedded)
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error(
-                util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
+            throw std::logic_error(util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
         }
     }
 
@@ -1057,8 +1056,7 @@ void Table::set_embedded(bool embedded)
 
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
-        throw std::logic_error(
-            util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
+        throw std::logic_error(util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
     }
 
     // `has_backlink_columns` indicates if the table is embedded in any other table.
@@ -1068,10 +1066,10 @@ void Table::set_embedded(bool embedded)
         return true;
     });
     if (!has_backlink_columns) {
-        throw std::logic_error(util::format(
-            "Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
-            "at least one other class.",
-            get_name()));
+        throw std::logic_error(
+            util::format("Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
+                         "at least one other class.",
+                         get_name()));
     }
     else if (size() > 0) {
         for (auto object : *this) {
