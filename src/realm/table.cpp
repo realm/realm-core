@@ -1046,7 +1046,7 @@ void Table::set_embedded(bool embedded)
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
             throw std::logic_error(
-                util::format("Cannot change '%1' to embedded objects when using Sync.", get_name()));
+                util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
         }
     }
 
