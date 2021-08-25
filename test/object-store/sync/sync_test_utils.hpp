@@ -43,6 +43,16 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
                            const std::string& auth_server);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 
+void timed_wait_for(std::function<bool()> condition,
+                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
+
+void timed_sleeping_wait_for(std::function<bool()> condition,
+                             std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
+
+#if REALM_ENABLE_SYNC
+
+void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
+
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT
@@ -55,17 +65,11 @@ struct AutoVerifiedEmailCredentials {
     std::string password;
 };
 
-void timed_wait_for(std::function<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
-
-void timed_sleeping_wait_for(std::function<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
-
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
-
 AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app);
 
 #endif // REALM_ENABLE_AUTH_TESTS
+
+#endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
 

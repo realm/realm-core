@@ -50,30 +50,6 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
-#if REALM_ENABLE_AUTH_TESTS
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
-    // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
-}
-#endif
-
-AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
-{
-    // emails with this prefix will pass through the baas app due to the register function
-    email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    password = random_string(10);
-}
-
 void timed_wait_for(std::function<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
@@ -96,6 +72,8 @@ void timed_sleeping_wait_for(std::function<bool()> condition, std::chrono::milli
     }
 }
 
+#if REALM_ENABLE_SYNC
+
 void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
 {
     std::atomic<bool> called{false};
@@ -117,6 +95,30 @@ void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
     }));
 }
 
+#if REALM_ENABLE_AUTH_TESTS
+
+#ifdef REALM_MONGODB_ENDPOINT
+std::string get_base_url()
+{
+    // allows configuration with or without quotes
+    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
+    if (base_url.size() > 0 && base_url[0] == '"') {
+        base_url.erase(0, 1);
+    }
+    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
+        base_url.erase(base_url.size() - 1);
+    }
+    return base_url;
+}
+#endif // REALM_MONGODB_ENDPOINT
+
+AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
+{
+    // emails with this prefix will pass through the baas app due to the register function
+    email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    password = random_string(10);
+}
+
 AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app)
 {
     REQUIRE(app);
@@ -134,6 +136,7 @@ AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app)
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
+#endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
 
