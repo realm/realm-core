@@ -539,3 +539,157 @@ TEST(test_json_query_parser_links)
         verify_query(test_context, t, simple_query(int_path_gt), results[i]);
     }
 }
+
+json build_link_aggr(std::vector<std::string> path, std::string aggrType, std::string compOp, json constant)
+{
+    json aggr = json::object();
+    aggr["path"] = json::array();
+    aggr["kind"] = "aggr";
+    for (std::string p : path) {
+        aggr["path"].emplace_back(p);
+    }
+    aggr["aggrType"] = aggrType;
+
+    json comp = json::object();
+    comp["kind"] = compOp;
+    comp["left"] = aggr;
+    comp["right"] = constant;
+
+    return simple_query(comp);
+}
+
+TEST(test_json_query_parser_aggregates)
+{
+    Group g;
+
+    TableRef discounts = g.add_table("class_Discounts");
+    ColKey discount_name_col = discounts->add_column(type_String, "promotion", true);
+    ColKey discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    ColKey discount_active_col = discounts->add_column(type_Bool, "active");
+
+    using discount_t = std::pair<double, bool>;
+    std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
+    std::vector<ObjKey> discount_keys;
+    discounts->create_objects(discount_info.size(), discount_keys);
+    for (size_t i = 0; i < discount_keys.size(); ++i) {
+        Obj obj = discounts->get_object(discount_keys[i]);
+        obj.set(discount_off_col, discount_info[i].first);
+        obj.set(discount_active_col, discount_info[i].second);
+    }
+    discounts->get_object(discount_keys[0]).set(discount_name_col, StringData("back to school"));
+    discounts->get_object(discount_keys[1]).set(discount_name_col, StringData("pizza lunch special"));
+    discounts->get_object(discount_keys[2]).set(discount_name_col, StringData("manager's special"));
+
+    TableRef items = g.add_table("class_Items");
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
+    ColKey item_discount_col = items->add_column(*discounts, "discount");
+    ColKey item_creation_date = items->add_column(type_Timestamp, "creation_date");
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        obj.set(item_price_float_col, float(item_info[i].second));
+        obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
+        obj.set(item_creation_date, Timestamp(static_cast<int64_t>(item_info[i].second * 10), 0));
+    }
+    items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
+    items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
+    items->get_object(item_keys[3]).set(item_discount_col, discount_keys[0]); // cereal -3.0 inactive
+
+    TableRef t = g.add_table("class_Person");
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_list(*items, "items");
+    ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+    ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
+    ColKey account_creation_date_col = t->add_column(type_Timestamp, "account_creation_date");
+
+    Obj person0 = t->create_object();
+    Obj person1 = t->create_object();
+    Obj person2 = t->create_object();
+
+    person0.set(id_col, int64_t(0));
+    person0.set(account_col, double(10.0));
+    person0.set(account_float_col, float(10.0));
+    person0.set(account_decimal_col, Decimal128(10.0));
+    person0.set(account_creation_date_col, Timestamp(30, 0));
+    person1.set(id_col, int64_t(1));
+    person1.set(account_col, double(20.0));
+    person1.set(account_float_col, float(20.0));
+    person1.set(account_decimal_col, Decimal128(20.0));
+    person1.set(account_creation_date_col, Timestamp(50, 0));
+    person2.set(id_col, int64_t(2));
+    person2.set(account_col, double(30.0));
+    person2.set(account_float_col, float(30.0));
+    person2.set(account_decimal_col, Decimal128(30.0));
+    person2.set(account_creation_date_col, Timestamp(70, 0));
+
+    LnkLst list_0 = person0.get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+    list_0.add(item_keys[3]);
+
+    LnkLst list_1 = person1.get_linklist(items_col);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1.add(item_keys[0]);
+    }
+
+    LnkLst list_2 = person2.get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[3]);
+
+    std::vector<std::string> path = {"items", "price"};
+    // items.@sum.price == 25.5
+    json sum_double_const = {{"kind", "constant"}, {"value", 25.5}, {"type", "double"}};
+    json query = build_link_aggr(path, "sum", "eq", sum_double_const);
+    verify_query(test_context, t, query, 2);
+    // items.@min.price == 4.0
+    json min_double_const = {{"kind", "constant"}, {"value", 4.0}, {"type", "double"}};
+    query = build_link_aggr(path, "min", "eq", min_double_const);
+    verify_query(test_context, t, query, 1);
+    // items.@max.price == 9.5
+    json max_double_const = {{"kind", "constant"}, {"value", 9.5}, {"type", "double"}};
+    query = build_link_aggr(path, "max", "eq", max_double_const);
+    verify_query(test_context, t, query, 2);
+    // items.@avg.price == 6.375
+    json avg_double_const = {{"kind", "constant"}, {"value", 6.375}, {"type", "double"}};
+    query = build_link_aggr(path, "avg", "eq", avg_double_const);
+    verify_query(test_context, t, query, 1);
+    // comparison towards properties
+    json prop_path = json::array();
+    prop_path.emplace_back("account_balance");
+    json prop_account_balance = {{"kind", "property"}, {"path", prop_path}};
+    // items.@sum.price > account_balance
+    query = build_link_aggr(path, "sum", "gt", prop_account_balance);
+    verify_query(test_context, t, query, 2);
+    // items.@min.price > account_balance
+    query = build_link_aggr(path, "min", "gt", prop_account_balance);
+    verify_query(test_context, t, query, 0);
+    // items.@max.price > account_balance
+    query = build_link_aggr(path, "max", "gt", prop_account_balance);
+    verify_query(test_context, t, query, 0);
+    // items.@avg.price > account_balance
+    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    verify_query(test_context, t, query, 0);
+
+    // items.@avg.name > account_balance
+    // can't aggregate strings
+    path = {"items", "name"};
+    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    CHECK_THROW(verify_query(test_context, t, query, 0), query_parser::InvalidQueryError);
+
+    // items.@avg.discount > account_balance
+    // can't aggregate links
+    path = {"items", "discount"};
+    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    CHECK_THROW(verify_query(test_context, t, query, 0), query_parser::InvalidQueryError);
+}

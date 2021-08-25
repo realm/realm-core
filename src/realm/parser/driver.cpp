@@ -1469,11 +1469,42 @@ ValueNode* ParserDriver::get_value_node(json fragment)
     if (fragment["kind"] == "property") {
         auto path = m_parse_nodes.create<PathNode>();
         auto link_size = fragment["path"].size();
-        for (size_t i = 0; i < link_size - 1; i++) {
+        auto prop_pos = link_size - 1;
+        for (size_t i = 0; i < prop_pos; i++) {
             path->add_element(fragment["path"][i]);
         }
-        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["path"][link_size - 1]);
+        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["path"][prop_pos]);
         auto value_node = m_parse_nodes.create<ValueNode>(prop_node);
+        return value_node;
+    }
+    if (fragment["kind"] == "aggr") {
+        auto path = m_parse_nodes.create<PathNode>();
+        auto link_size = fragment["path"].size();
+        auto link_pos = link_size - 2;
+        auto prop_pos = link_size - 1;
+        for (size_t i = 0; i < link_pos; i++) {
+            path->add_element(fragment["path"][i]);
+        }
+        AggrNode::Type type;
+        if (fragment["aggrType"] == "sum") {
+            type = AggrNode::Type::SUM;
+        }
+        else if (fragment["aggrType"] == "avg") {
+            type = AggrNode::Type::AVG;
+        }
+        else if (fragment["aggrType"] == "min") {
+            type = AggrNode::Type::MIN;
+        }
+        else if (fragment["aggrType"] == "max") {
+            type = AggrNode::Type::MAX;
+        }
+        else {
+            REALM_UNREACHABLE();
+        }
+        auto aggr = m_parse_nodes.create<AggrNode>(type);
+        auto link_aggr_node =
+            m_parse_nodes.create<LinkAggrNode>(path, fragment["path"][link_pos], aggr, fragment["path"][prop_pos]);
+        auto value_node = m_parse_nodes.create<ValueNode>(link_aggr_node);
         return value_node;
     }
     if (fragment["kind"] == "constant") {
