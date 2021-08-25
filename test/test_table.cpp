@@ -5278,7 +5278,9 @@ TEST(Table_ChangePKNullability)
     table->create_object_with_primary_key("");
     table->create_object_with_primary_key({});
 
-    CHECK_LOGIC_ERROR(table->set_nullability(pk_col, false, true), LogicError::column_not_nullable);
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(table->set_nullability(pk_col, false, true), message);
+    CHECK_EQUAL(message, "Objects in 'foo' has null value(s) in property 'id'");
 
     table->get_object_with_primary_key({}).remove();
     table->set_nullability(pk_col, false, true);
