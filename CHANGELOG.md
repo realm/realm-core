@@ -8,6 +8,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
+* Updated the Catch2 URL to include '.git' extension ([#4608](https://github.com/realm/realm-core/issues/4608))
 * Fixes a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
  
 ### Breaking changes
@@ -16,7 +17,8 @@
 -----------
 
 ### Internals
-* None.
+* Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
+* ApplyToState tool now exits with a non-zero exit code if download message application fails.
 
 ----------------------------------------------
 

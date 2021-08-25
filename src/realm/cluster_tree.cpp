@@ -91,7 +91,7 @@ public:
     void remove_column(ColKey col) override;
     size_t nb_columns() const override;
     ref_type insert(ObjKey k, const FieldValues& init_values, State& state) override;
-    bool try_get(ObjKey k, State& state) const override;
+    bool try_get(ObjKey k, State& state) const noexcept override;
     ObjKey get(size_t ndx, State& state) const override;
     size_t get_ndx(ObjKey key, size_t ndx) const noexcept override;
     size_t erase(ObjKey k, CascadeState& state) override;
@@ -131,7 +131,7 @@ private:
         ObjKey key;
         MemRef mem;
     };
-    bool find_child(ObjKey key, ChildInfo& ret) const
+    bool find_child(ObjKey key, ChildInfo& ret) const noexcept
     {
         if (m_keys.is_attached()) {
             auto upper = m_keys.upper_bound(uint64_t(key.value));
@@ -336,7 +336,7 @@ ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, Cl
     });
 }
 
-bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const
+bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const noexcept
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {

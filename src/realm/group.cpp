@@ -413,15 +413,13 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // forget it.
     REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
 
+    // DB::do_open() must ensure that only supported version are allowed.
+    // It does that by asking backup if the current file format version is
+    // included in the accepted versions, so be sure to align the list of
+    // versions with the logic below
+
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
-
-    // DB::do_open() must ensure this. Be sure to revisit the
-    // following upgrade logic when DB::do_open() is changed (or
-    // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 21,
-                    current_file_format_version);
-
 
     // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
