@@ -58,10 +58,9 @@ static std::vector<std::string> split_token(const std::string& jwt)
     return parts;
 }
 
-RealmJWT::RealmJWT(std::string&& token)
+RealmJWT::RealmJWT(const std::string& token)
+    : token(token)
 {
-    this->token = std::move(token);
-
     auto parts = split_token(this->token);
 
     auto json_str = base64_decode(parts[1]);
@@ -102,10 +101,9 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         }
     }
 
-    bool updated = m_sync_manager->perform_metadata_update([=](const auto& manager) {
+    bool updated = m_sync_manager->perform_metadata_update([&](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-        metadata->set_refresh_token(m_refresh_token.token);
-        metadata->set_access_token(m_access_token.token);
+        metadata->set_state_and_tokens(m_state, m_access_token.token, m_refresh_token.token);
         metadata->set_device_id(m_device_id);
         m_local_identity = metadata->local_uuid();
         this->m_user_profile = metadata->profile();
@@ -167,6 +165,67 @@ std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::strin
         m_sessions.erase(it);
     }
     return locked;
+}
+
+void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string& access_token,
+                                       const std::string& refresh_token)
+{
+    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        switch (m_state) {
+            case State::Removed:
+                REALM_ASSERT(state == State::Removed);
+                return;
+            case State::LoggedIn:
+                if (m_state == State::LoggedIn) {
+                    m_access_token = RealmJWT(access_token);
+                    m_refresh_token = RealmJWT(refresh_token);
+                }
+                else {
+                    m_access_token = RealmJWT{};
+                    m_refresh_token = RealmJWT{};
+                }
+
+                m_state = state;
+
+                break;
+            case State::LoggedOut: {
+                m_state = state;
+                if (m_state == State::LoggedIn) {
+                    m_access_token = RealmJWT(access_token);
+                    m_refresh_token = RealmJWT(refresh_token);
+
+                    sessions_to_revive.reserve(m_waiting_sessions.size());
+                    for (auto& pair : m_waiting_sessions) {
+                        if (auto ptr = pair.second.lock()) {
+                            m_sessions[pair.first] = ptr;
+                            sessions_to_revive.emplace_back(std::move(ptr));
+                        }
+                    }
+                    m_waiting_sessions.clear();
+                }
+                else {
+                    REALM_ASSERT(m_access_token == RealmJWT{});
+                    REALM_ASSERT(m_refresh_token == RealmJWT{});
+                }
+                break;
+            }
+        }
+
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+            metadata->set_state_and_tokens(m_state, access_token, refresh_token);
+        });
+    }
+    // (Re)activate all pending sessions.
+    // Note that we do this after releasing the lock, since the session may
+    // need to access protected User state in the process of binding itself.
+    for (auto& session : sessions_to_revive) {
+        session->revive_if_needed();
+    }
+
+    emit_change_to_subscribers(*this);
 }
 
 void SyncUser::update_refresh_token(std::string&& token)
@@ -282,14 +341,12 @@ void SyncUser::log_out()
             return;
         }
         m_state = State::LoggedOut;
-        m_access_token.token = "";
-        m_refresh_token.token = "";
+        m_access_token = RealmJWT{};
+        m_refresh_token = RealmJWT{};
 
         m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_state(State::LoggedOut);
-            metadata->set_access_token("");
-            metadata->set_refresh_token("");
+            metadata->set_state_and_tokens(State::LoggedOut, "", "");
         });
         sync_manager_shared = m_sync_manager->shared_from_this();
         // Move all active sessions into the waiting sessions pool. If the user is

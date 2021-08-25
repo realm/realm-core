@@ -58,13 +58,14 @@ struct RealmJWT {
     std::string token;
 
     // When the token expires.
-    int64_t expires_at;
+    int64_t expires_at = 0;
     // When the token was issued.
-    int64_t issued_at;
+    int64_t issued_at = 0;
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
-    RealmJWT(std::string&& token);
+    explicit RealmJWT(const std::string& token);
+    RealmJWT() = default;
 
     bool operator==(const RealmJWT& other) const
     {
@@ -212,6 +213,9 @@ public:
     // path for a synced Realm is an opaque implementation detail. This API is retained
     // for testing purposes, and for bindings for consumers that are servers or tools.
     std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path);
+
+    void update_state_and_tokens(SyncUser::State state, const std::string& access_token,
+                                 const std::string& refresh_token);
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
