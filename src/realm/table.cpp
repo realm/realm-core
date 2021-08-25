@@ -1069,7 +1069,7 @@ void Table::set_embedded(bool embedded)
     });
     if (!has_backlink_columns) {
         throw std::logic_error(util::format(
-            "Cannot change '%1' to embedded objects without backlink columns. Objects must be embedded in "
+            "Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
             "at least one other class.",
             get_name()));
     }
