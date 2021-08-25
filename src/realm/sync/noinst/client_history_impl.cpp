@@ -953,8 +953,10 @@ void ClientHistoryImpl::update_sync_progress(const SyncProgress& progress,
                  version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int()));
     REALM_ASSERT(progress.upload.client_version >=
                  version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int()));
-    REALM_ASSERT(progress.upload.last_integrated_server_version >=
-                 version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int()));
+    if (progress.upload.last_integrated_server_version > 0) {
+        REALM_ASSERT(progress.upload.last_integrated_server_version >=
+                     version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int()));
+    }
 
     auto uploaded_bytes = std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());
     auto previous_upload_client_version =
@@ -971,8 +973,10 @@ void ClientHistoryImpl::update_sync_progress(const SyncProgress& progress,
              RefOrTagged::make_tagged(progress.latest_server_version.salt)); // Throws
     root.set(s_progress_upload_client_version_iip,
              RefOrTagged::make_tagged(progress.upload.client_version)); // Throws
-    root.set(s_progress_upload_server_version_iip,
-             RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
+    if (progress.upload.last_integrated_server_version > 0) {
+        root.set(s_progress_upload_server_version_iip,
+                 RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
+    }
     if (downloadable_bytes) {
         root.set(s_progress_downloadable_bytes_iip,
                  RefOrTagged::make_tagged(*downloadable_bytes)); // Throws
