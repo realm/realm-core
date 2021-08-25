@@ -9,6 +9,12 @@
 namespace realm::_impl {
 
 const char* table_name_to_check = "_client_reset_status_complete";
+
+bool is_marked_as_complete(TransactionRef tr)
+{
+    return bool(tr->find_table(table_name_to_check));
+}
+
 bool fresh_copy_is_downloaded(std::string path, util::Optional<std::array<char, 64>> encryption_key)
 {
     if (!util::File::exists(path)) {
@@ -20,7 +26,7 @@ bool fresh_copy_is_downloaded(std::string path, util::Optional<std::array<char, 
     DBRef sg_local = DB::create(history_local, shared_group_options);
 
     auto group_local = sg_local->start_read();
-    return bool(group_local->find_table(table_name_to_check));
+    return is_marked_as_complete(group_local);
 }
 
 void mark_fresh_copy_as_downloaded(std::string path, util::Optional<std::array<char, 64>> encryption_key)
@@ -134,11 +140,17 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 
         client_reset::LocalVersionIDs local_version_ids;
         try {
-            local_version_ids =
-                client_reset::perform_client_reset_diff(m_realm_path, fresh_path, m_encryption_key, m_notify_before,
-                                                        m_notify_after, m_salted_file_ident, logger);
+            local_version_ids = client_reset::perform_client_reset_diff(
+                m_realm_path, fresh_path, m_encryption_key, m_notify_before, m_notify_after, is_marked_as_complete,
+                m_salted_file_ident, logger);
         }
         catch (util::File::AccessError& e) {
+            logger.error("In finalize_client_reset, the client reset failed due to a FileAccessError, "
+                         "realm path = %1, msg = %2",
+                         m_realm_path, e.what());
+            return false;
+        }
+        catch (client_reset::ClientResetFailed& e) {
             logger.error("In finalize_client_reset, the client reset failed, "
                          "realm path = %1, msg = %2",
                          m_realm_path, e.what());

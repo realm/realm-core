@@ -17,19 +17,6 @@ using namespace sync;
 
 namespace {
 
-// The recovery fails if there seems to be conflict between the
-// instructions and state.
-//
-// After failure the processing stops and the client reset will
-// drop all local changes.
-//
-// Failure is triggered by:
-// 1. Destructive schema changes.
-// 2. Creation of an already existing table with another type.
-// 3. Creation of an already existing column with another type.
-struct ClientResetFailed {
-};
-
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
 bool _copy_list(LstBasePtr src, LstBasePtr dst)
 {
@@ -706,8 +693,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     const std::string& path_local, const util::Optional<std::string> path_fresh,
     const util::Optional<std::array<char, 64>>& encryption_key,
     std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-    std::function<void(TransactionRef local)> notify_after, sync::SaltedFileIdent client_file_ident,
-    util::Logger& logger)
+    std::function<void(TransactionRef local)> notify_after, std::function<bool(TransactionRef remote)> verify_remote,
+    sync::SaltedFileIdent client_file_ident, util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
                 "encryption = %2, client_file_ident.ident = %3, "
@@ -746,6 +733,9 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
         REALM_ASSERT(sg_remote);
         REALM_ASSERT(history_remote);
         auto wt_remote = sg_remote->start_write();
+        if (!verify_remote(wt_remote)) {
+            throw ClientResetFailed(util::format("verification of fresh copy failed for: %1", *path_fresh));
+        }
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
         history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);

@@ -371,12 +371,14 @@ TEST_CASE("sync: client reset", "[client reset]") {
             config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
                 before_was_called = true;
                 REQUIRE(local);
+                REQUIRE(local->is_frozen());
                 auto local_table = local->get_table("class_object");
                 REQUIRE(local_table);
                 REQUIRE(local_table->size() == 1);
                 REQUIRE(local_table->begin()->get<Int>("value") == 4);
 
                 REQUIRE(remote);
+                REQUIRE(remote->is_frozen());
                 auto remote_table = remote->get_table("class_object");
                 REQUIRE(remote_table);
                 REQUIRE(remote_table->size() == 1);

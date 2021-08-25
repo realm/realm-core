@@ -11,6 +11,21 @@ namespace realm {
 namespace _impl {
 namespace client_reset {
 
+// The reset fails if there seems to be conflict between the
+// instructions and state.
+//
+// After failure the processing stops and the client reset will
+// drop all local changes.
+//
+// Failure is triggered by:
+// 1. Destructive schema changes.
+// 2. Creation of an already existing table with another type.
+// 3. Creation of an already existing column with another type.
+struct ClientResetFailed : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+
 // transfer_group() transfers all tables, columns, objects and values from the src
 // group to the dst group and deletes everything in the dst group that is absent in
 // the src group. An update is only performed when a comparison shows that a
@@ -28,18 +43,12 @@ void recover_schema(const Transaction& group_src, Transaction& group_dst, util::
 void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
-// the Realm in 'path_local' given the Realm 'path_remote' as the source of truth.
-// Local changes in 'path_local' with client version greater than
-// 'client_version' will be recovered as well as possible. The reset Realm will have its
-// client file ident set to 'client_file_ident'. Recovered changesets will be produced
-// with the new client file ident. The download progress in the Realm will be set to
-// 'server_version', and the downloadable bytes set to 'downloadable_bytes'.
-//
-// The last argument, 'should_commit_remote' is for testing purposes. If true, a
-// write transaction in 'path_remote' will be committed resulting in the two Realms
-// having equal group content. This equality can be checked in tests. In production, it
-// is unnecessary to commit in the remote Realm, since it will be discarded
-// immediately after.
+// the Realm in 'path_local' given the Realm 'path_fresh' as the source of truth.
+// If the fresh path is not provided, discard mode is assumed and all data in the local
+// Realm is removed.
+// If the fresh path is provided, the local Realm is changed such that its state is equal
+// to the fresh Realm. Then the local Realm will have its client file ident set to
+// 'client_file_ident'
 //
 // The function returns the old version and the new version of the local Realm to
 // be used to report the sync transaction to the user.
@@ -52,6 +61,7 @@ perform_client_reset_diff(const std::string& path_local, const util::Optional<st
                           const util::Optional<std::array<char, 64>>& encryption_key,
                           std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
                           std::function<void(TransactionRef local)> notify_after,
+                          std::function<bool(TransactionRef remote)> verify_remote,
                           sync::SaltedFileIdent client_file_ident, util::Logger& logger);
 
 } // namespace client_reset
