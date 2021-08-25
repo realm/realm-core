@@ -327,7 +327,7 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not an object property", m_current_table->get_name(),
+        throw std::runtime_error(util::format("%1.%2 is not an object reference property", m_current_table->get_name(),
                                               m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
