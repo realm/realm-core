@@ -67,10 +67,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-TEST(File_ShouldFailTests)
-{
-    CHECK(false);
-}
 
 TEST(File_ExistsAndRemove)
 {
