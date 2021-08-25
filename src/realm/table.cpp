@@ -327,8 +327,8 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not a link column", m_current_table->get_name(),
-                                              m_current_table->get_column_name(ck)));
+        throw std::runtime_error(util::format("%1.%2 is not an object reference property",
+                                              m_current_table->get_name(), m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
 }
@@ -1045,7 +1045,7 @@ void Table::set_embedded(bool embedded)
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error("Cannot change table to embedded when using Sync.");
+            throw std::logic_error(util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
         }
     }
 
@@ -1056,7 +1056,7 @@ void Table::set_embedded(bool embedded)
 
     // Embedded objects cannot have a primary key.
     if (get_primary_key_column()) {
-        throw std::logic_error("Cannot change table to embedded when using a primary key.");
+        throw std::logic_error(util::format("Cannot change '%1' to embedded when using a primary key.", get_name()));
     }
 
     // `has_backlink_columns` indicates if the table is embedded in any other table.
@@ -1066,17 +1066,21 @@ void Table::set_embedded(bool embedded)
         return true;
     });
     if (!has_backlink_columns) {
-        throw std::logic_error("Cannot change table to embedded without backlink columns. Table must be embedded in "
-                               "at least one other table.");
+        throw std::logic_error(
+            util::format("Cannot change '%1' to embedded without backlink columns. Objects must be embedded in "
+                         "at least one other class.",
+                         get_name()));
     }
     else if (size() > 0) {
         for (auto object : *this) {
             size_t backlink_count = object.get_backlink_count();
             if (backlink_count == 0) {
-                throw std::logic_error("At least one object does not have a backlink (data would get lost).");
+                throw std::logic_error(util::format(
+                    "At least one object in '%1' does not have a backlink (data would get lost).", get_name()));
             }
             else if (backlink_count > 1) {
-                throw std::logic_error("At least one object does have multiple backlinks.");
+                throw std::logic_error(
+                    util::format("At least one object in '%1' does have multiple backlinks.", get_name()));
             }
         }
     }
@@ -1562,7 +1566,8 @@ bool Table::migrate_objects()
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
         if (!(col_ndx < col_refs.size())) {
-            throw std::runtime_error("File corrupted by previous upgrade attempt");
+            throw std::runtime_error(
+                util::format("Objects in '%1' corrupted by previous upgrade attempt", get_name()));
         }
 
         if (!col_refs.get(col_ndx)) {
@@ -3535,7 +3540,8 @@ void Table::set_primary_key_column(ColKey col_key)
 
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
-            throw std::logic_error("Cannot change pk column in sync client");
+            throw std::logic_error(
+                util::format("Cannot change primary key property in '%1' when realm is synchronized", get_name()));
         }
     }
 
@@ -3644,7 +3650,7 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    auto func = [key_from, key_to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+    auto func = [&](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         typename ColumnTypeTraits<F>::cluster_leaf_type from_arr(allocator);
@@ -3655,7 +3661,8 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
         for (size_t i = 0; i < sz; i++) {
             if (from_nullability && from_arr.is_null(i)) {
                 if (throw_on_null) {
-                    throw realm::LogicError(realm::LogicError::column_not_nullable);
+                    throw std::runtime_error(util::format("Objects in '%1' has null value(s) in property '%2'",
+                                                          get_name(), get_column_name(key_from)));
                 }
                 else {
                     to_arr.set(i, ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
@@ -3676,7 +3683,7 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
 {
     Allocator& allocator = this->get_alloc();
     bool from_nullability = is_nullable(key_from);
-    auto func = [key_from, key_to, throw_on_null, from_nullability, &allocator](Cluster* cluster) {
+    auto func = [&](Cluster* cluster) {
         size_t sz = cluster->node_size();
 
         ArrayInteger from_arr(allocator);
@@ -3702,7 +3709,9 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
                     }
                     else {
                         if (throw_on_null) {
-                            throw realm::LogicError(realm::LogicError::column_not_nullable);
+                            throw std::runtime_error(
+                                util::format("Objects in '%1' has null value(s) in list property '%2'", get_name(),
+                                             get_column_name(key_from)));
                         }
                         else {
                             to_list.add(ColumnTypeTraits<T>::cluster_leaf_type::default_value(false));
@@ -3864,7 +3873,7 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     try {
         convert_column(col_key, new_col, throw_on_null);
     }
-    catch (LogicError&) {
+    catch (...) {
         // remove any partially filled column
         remove_column(new_col);
         throw;

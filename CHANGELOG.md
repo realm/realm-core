@@ -1,14 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
-* InstructionApplier exceptions now contain information about what object/changeset was being applied when the exception was thrown. ([#4836](https://github.com/realm/realm-core/issues/4836))
-* Added ServiceErrorCode for wrong username/password.  ([#4581](https://github.com/realm/realm-core/issues/4581))
-* Query parser now accepts "BETWEEN" operator. Can be used like "Age BETWEEN {20, 60}" which means "'Age' must be in the open interval ]20;60[".
 * Add a "seamless loss" mode to client reset where local changes are overwritten by the server's state without having to handle the reset manually. ([#4809](https://github.com/realm/realm-core/pull/4809))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
+* None.
  
 ### Breaking changes
 * None.
@@ -17,6 +14,25 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 11.3.0 Release notes
+
+### Enhancements
+* InstructionApplier exceptions now contain information about what object/changeset was being applied when the exception was thrown. ([#4836](https://github.com/realm/realm-core/issues/4836))
+* Added ServiceErrorCode for wrong username/password.  ([#4581](https://github.com/realm/realm-core/issues/4581))
+* Query parser now accepts "BETWEEN" operator. Can be used like "Age BETWEEN {20, 60}" which means "'Age' must be in the open interval ]20;60[". ([#4268](https://github.com/realm/realm-core/issues/4268))
+
+### Fixed
+* Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
+* Updated the Catch2 URL to include '.git' extension ([#4608](https://github.com/realm/realm-core/issues/4608))
+
+-----------
+
+### Internals
+* Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
+* ApplyToState tool now exits with a non-zero exit code if download message application fails.
 
 ----------------------------------------------
 

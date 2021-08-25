@@ -229,6 +229,11 @@ public:
 
     size_t size() const noexcept;
 
+    static int get_current_file_format_version()
+    {
+        return g_current_file_format_version;
+    }
+
     int get_history_schema_version() noexcept;
 
     Replication* get_replication() const

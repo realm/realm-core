@@ -63,6 +63,7 @@ set(CORE_TEST_SOURCES
     test_safe_int_ops.cpp
     test_self.cpp
     test_shared.cpp
+    test_status.cpp
     test_string_data.cpp
     test_table_view.cpp
     test_thread.cpp
