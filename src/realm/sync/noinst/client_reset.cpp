@@ -254,8 +254,8 @@ void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
     logger.debug("remove_all_tables, dst size = %1", tr_dst.size());
     // Remove the tables to be removed.
     for (auto table_key : tr_dst.get_table_keys()) {
-        TableRef table = tr_dst.get_table(table_key);
-        if (table->get_name().begins_with("class_")) {
+        if (tr_dst.table_is_public(table_key)) {
+            TableRef table = tr_dst.get_table(table_key);
             sync::erase_table(tr_dst, table);
         }
     }
@@ -268,9 +268,9 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
     for (auto table_key : group_dst.get_table_keys()) {
-        StringData table_name = group_dst.get_table_name(table_key);
-        if (!table_name.begins_with("class"))
+        if (!group_dst.table_is_public(table_key))
             continue;
+        StringData table_name = group_dst.get_table_name(table_key);
         logger.debug("key = %1, table_name = %2", table_key.value, table_name);
         ConstTableRef table_src = group_src.get_table(table_name);
         if (!table_src) {
@@ -311,10 +311,9 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Remove all columns that link to one of the tables to be removed.
     for (auto table_key : group_dst.get_table_keys()) {
-        TableRef table_dst = group_dst.get_table(table_key);
-        StringData table_name = table_dst->get_name();
-        if (!table_name.begins_with("class"))
+        if (!group_dst.table_is_public(table_key))
             continue;
+        TableRef table_dst = group_dst.get_table(table_key);
         std::vector<std::string> columns_to_remove;
         for (ColKey col_key : table_dst->get_column_keys()) {
             DataType column_type = table_dst->get_column_type(col_key);
@@ -340,10 +339,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         bool has_pk = sync::table_has_primary_key(*table_src);
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
@@ -361,12 +360,12 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     {
         size_t num_tables_src = 0;
         for (auto table_key : group_src.get_table_keys()) {
-            if (group_src.get_table_name(table_key).begins_with("class"))
+            if (group_src.table_is_public(table_key))
                 ++num_tables_src;
         }
         size_t num_tables_dst = 0;
         for (auto table_key : group_dst.get_table_keys()) {
-            if (group_dst.get_table_name(table_key).begins_with("class"))
+            if (group_dst.table_is_public(table_key))
                 ++num_tables_dst;
         }
         REALM_ASSERT(num_tables_src == num_tables_dst);
@@ -376,10 +375,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_dst);
         std::vector<std::string> columns_to_remove;
@@ -417,12 +416,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Add columns in dst if present in src and absent in dst.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with(
-                "class")) // FIXME: This is an imprecise check. A more correct version would check for `class_`, but
-                          // this should be done by a shared function somewhere. Maybe one exists already.
-            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_dst);
         for (ColKey col_key : table_src->get_column_keys()) {
@@ -466,10 +463,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     // We will also have to remove all objects created locally as they should have
     // new keys because the client file id is changed.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         auto table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         logger.debug("Removing objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
 
@@ -490,10 +487,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Add objects that are present in src but absent in dst.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         auto table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         logger.debug("Adding objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
 
@@ -517,10 +514,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Diff all the values and update if needed.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
@@ -625,10 +622,10 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
     // First the missing tables are created. Columns must be created later due
     // to links.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         if (table_dst) {
             // Disagreement of table type is ignored.
@@ -649,10 +646,10 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
 
     // Create the missing columns.
     for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class"))
-            continue;
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_dst);
         for (ColKey col_key : table_src->get_column_keys()) {
