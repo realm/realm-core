@@ -881,7 +881,7 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
         case Type::ObjectValue:
             [[fallthrough]];
         case Type::GlobalKey:
-            REALM_TERMINATE("Invalid data type");
+            REALM_TERMINATE(util::format("Invalid data type: %1", int8_t(type)).c_str());
     }
     return type_Int; // Make compiler happy
 }
