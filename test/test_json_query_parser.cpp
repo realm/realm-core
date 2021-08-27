@@ -540,11 +540,12 @@ TEST(test_json_query_parser_links)
     }
 }
 
-json build_link_aggr(std::vector<std::string> path, std::string aggrType, std::string compOp, json constant)
+json build_aggr(std::vector<std::string> path, std::string kind, std::string aggrType, std::string compOp,
+                json constant)
 {
     json aggr = json::object();
     aggr["path"] = json::array();
-    aggr["kind"] = "aggr";
+    aggr["kind"] = kind;
     for (std::string p : path) {
         aggr["path"].emplace_back(p);
     }
@@ -566,6 +567,8 @@ TEST(test_json_query_parser_aggregates)
     ColKey discount_name_col = discounts->add_column(type_String, "promotion", true);
     ColKey discount_off_col = discounts->add_column(type_Double, "reduced_by");
     ColKey discount_active_col = discounts->add_column(type_Bool, "active");
+    ColKey col_int_list = discounts->add_column_list(type_Int, "days_discounted");
+    ColKey col_double_list = discounts->add_column_list(type_Double, "days_discounted_double");
 
     using discount_t = std::pair<double, bool>;
     std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
@@ -575,6 +578,10 @@ TEST(test_json_query_parser_aggregates)
         Obj obj = discounts->get_object(discount_keys[i]);
         obj.set(discount_off_col, discount_info[i].first);
         obj.set(discount_active_col, discount_info[i].second);
+        for (size_t j = 0; j <= i; j++) {
+            obj.get_list<Int>(col_int_list).add(j);
+            obj.get_list<Double>(col_double_list).add(j / (double)2);
+        }
     }
     discounts->get_object(discount_keys[0]).set(discount_name_col, StringData("back to school"));
     discounts->get_object(discount_keys[1]).set(discount_name_col, StringData("pizza lunch special"));
@@ -650,46 +657,83 @@ TEST(test_json_query_parser_aggregates)
     std::vector<std::string> path = {"items", "price"};
     // items.@sum.price == 25.5
     json sum_double_const = {{"kind", "constant"}, {"value", 25.5}, {"type", "double"}};
-    json query = build_link_aggr(path, "sum", "eq", sum_double_const);
+    json query = build_aggr(path, "linkAggr", "sum", "eq", sum_double_const);
     verify_query(test_context, t, query, 2);
     // items.@min.price == 4.0
     json min_double_const = {{"kind", "constant"}, {"value", 4.0}, {"type", "double"}};
-    query = build_link_aggr(path, "min", "eq", min_double_const);
+    query = build_aggr(path, "linkAggr", "min", "eq", min_double_const);
     verify_query(test_context, t, query, 1);
     // items.@max.price == 9.5
     json max_double_const = {{"kind", "constant"}, {"value", 9.5}, {"type", "double"}};
-    query = build_link_aggr(path, "max", "eq", max_double_const);
+    query = build_aggr(path, "linkAggr", "max", "eq", max_double_const);
     verify_query(test_context, t, query, 2);
     // items.@avg.price == 6.375
     json avg_double_const = {{"kind", "constant"}, {"value", 6.375}, {"type", "double"}};
-    query = build_link_aggr(path, "avg", "eq", avg_double_const);
+    query = build_aggr(path, "linkAggr", "avg", "eq", avg_double_const);
     verify_query(test_context, t, query, 1);
     // comparison towards properties
     json prop_path = json::array();
     prop_path.emplace_back("account_balance");
     json prop_account_balance = {{"kind", "property"}, {"path", prop_path}};
     // items.@sum.price > account_balance
-    query = build_link_aggr(path, "sum", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "sum", "gt", prop_account_balance);
     verify_query(test_context, t, query, 2);
     // items.@min.price > account_balance
-    query = build_link_aggr(path, "min", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "min", "gt", prop_account_balance);
     verify_query(test_context, t, query, 0);
     // items.@max.price > account_balance
-    query = build_link_aggr(path, "max", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "max", "gt", prop_account_balance);
     verify_query(test_context, t, query, 0);
     // items.@avg.price > account_balance
-    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "avg", "gt", prop_account_balance);
     verify_query(test_context, t, query, 0);
 
     // items.@avg.name > account_balance
     // can't aggregate strings
     path = {"items", "name"};
-    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "avg", "gt", prop_account_balance);
     CHECK_THROW(verify_query(test_context, t, query, 0), query_parser::InvalidQueryError);
 
     // items.@avg.discount > account_balance
     // can't aggregate links
     path = {"items", "discount"};
-    query = build_link_aggr(path, "avg", "gt", prop_account_balance);
+    query = build_aggr(path, "linkAggr", "avg", "gt", prop_account_balance);
     CHECK_THROW(verify_query(test_context, t, query, 0), query_parser::InvalidQueryError);
+
+    path = {"days_discounted"};
+
+    json min_int_const = {{"kind", "constant"}, {"value", 0}, {"type", "int"}};
+    query = build_aggr(path, "collectionAggr", "min", "eq", min_int_const);
+    verify_query(test_context, discounts, query, 4);
+
+    json max_int_const = {{"kind", "constant"}, {"value", 3}, {"type", "int"}};
+    query = build_aggr(path, "collectionAggr", "max", "eq", max_int_const);
+    verify_query(test_context, discounts, query, 1);
+
+    json sum_int_const = {{"kind", "constant"}, {"value", 6}, {"type", "int"}};
+    query = build_aggr(path, "collectionAggr", "sum", "eq", sum_int_const);
+    verify_query(test_context, discounts, query, 1);
+
+    json avg_const = {{"kind", "constant"}, {"value", 1.5}, {"type", "double"}};
+    query = build_aggr(path, "collectionAggr", "avg", "eq", avg_const);
+    verify_query(test_context, discounts, query, 1);
+
+
+    path = {"days_discounted_double"};
+
+    min_double_const = {{"kind", "constant"}, {"value", 0}, {"type", "double"}};
+    query = build_aggr(path, "collectionAggr", "min", "eq", min_double_const);
+    verify_query(test_context, discounts, query, 4);
+
+    max_double_const = {{"kind", "constant"}, {"value", 1.5}, {"type", "double"}};
+    query = build_aggr(path, "collectionAggr", "max", "eq", max_double_const);
+    verify_query(test_context, discounts, query, 1);
+
+    sum_double_const = {{"kind", "constant"}, {"value", 3}, {"type", "double"}};
+    query = build_aggr(path, "collectionAggr", "sum", "eq", sum_double_const);
+    verify_query(test_context, discounts, query, 1);
+
+    avg_double_const = {{"kind", "constant"}, {"value", 0.75}, {"type", "double"}};
+    query = build_aggr(path, "collectionAggr", "avg", "eq", avg_double_const);
+    verify_query(test_context, discounts, query, 1);
 }
