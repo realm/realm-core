@@ -27,6 +27,7 @@
 
 #include <realm/db.hpp>
 #include <realm/util/any.hpp>
+#include <realm/util/functional.hpp>
 
 #include <string>
 #include <type_traits>
@@ -451,15 +452,13 @@ std::vector<Obj> get_linked_objects(T collection)
                 links.push_back(dst_table->get_object(lnk));
             }
         }
-        else if (!value.is_null()) {
-            REALM_UNREACHABLE();
-        }
+        // null values and any other non-link value are ignored
     }
     return links;
 }
 
 struct LinkedCollectionBase {
-    LinkedCollectionBase(std::string property_name, std::string dest_name)
+    LinkedCollectionBase(const std::string& property_name, const std::string& dest_name)
         : m_prop_name(property_name)
         , m_dest_name(dest_name)
     {
@@ -467,7 +466,7 @@ struct LinkedCollectionBase {
 
     void set_relation_updater(std::function<void()> updater)
     {
-        m_relation_updater = updater;
+        m_relation_updater = std::move(updater);
     }
 
     ColKey get_link_col_key(TableRef source_table)
@@ -484,11 +483,11 @@ struct LinkedCollectionBase {
 
     std::string m_prop_name;
     std::string m_dest_name;
-    std::function<void()> m_relation_updater;
+    util::UniqueFunction<void()> m_relation_updater;
 };
 
 struct ListOfObjects : public LinkedCollectionBase {
-    ListOfObjects(std::string property_name, std::string dest_name)
+    ListOfObjects(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }
@@ -541,7 +540,7 @@ struct ListOfObjects : public LinkedCollectionBase {
 };
 
 struct ListOfMixedLinks : public LinkedCollectionBase {
-    ListOfMixedLinks(std::string property_name, std::string dest_name)
+    ListOfMixedLinks(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }
@@ -603,7 +602,7 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
 };
 
 struct SetOfObjects : public LinkedCollectionBase {
-    SetOfObjects(std::string property_name, std::string dest_name)
+    SetOfObjects(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }
@@ -652,7 +651,7 @@ struct SetOfObjects : public LinkedCollectionBase {
 };
 
 struct SetOfMixedLinks : public LinkedCollectionBase {
-    SetOfMixedLinks(std::string property_name, std::string dest_name)
+    SetOfMixedLinks(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }
@@ -710,7 +709,7 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
 };
 
 struct DictionaryOfObjects : public LinkedCollectionBase {
-    DictionaryOfObjects(std::string property_name, std::string dest_name)
+    DictionaryOfObjects(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }
@@ -773,7 +772,7 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
 };
 
 struct DictionaryOfMixedLinks : public LinkedCollectionBase {
-    DictionaryOfMixedLinks(std::string property_name, std::string dest_name)
+    DictionaryOfMixedLinks(const std::string& property_name, const std::string& dest_name)
         : LinkedCollectionBase(property_name, dest_name)
     {
     }

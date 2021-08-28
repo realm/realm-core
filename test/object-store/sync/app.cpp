@@ -121,28 +121,6 @@ void timed_wait_for(std::function<bool()> condition,
     });
 }
 
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
-{
-    std::atomic<bool> called{false};
-    session->wait_for_upload_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-    REQUIRE(called);
-    called.store(false);
-    session->wait_for_download_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-}
-
-
 AutoVerifiedEmailCredentials create_user_and_login(SharedApp app)
 {
     REQUIRE(app);
@@ -2058,8 +2036,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         config.schema = realm::Schema({dog_schema, person_schema});
         return config;
     };
-    auto get_dogs = [&](realm::SharedRealm r, std::shared_ptr<SyncSession> session) -> Results {
-        wait_for_sync_changes(session);
+    auto get_dogs = [&](realm::SharedRealm r) -> Results {
+        wait_for_upload(*r);
+        wait_for_download(*r);
         return realm::Results(r, r->read_group().get_table("class_Dog"));
     };
 
@@ -2083,19 +2062,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
 
             // clear state from previous runs
             {
-                Results dogs = get_dogs(r, session);
+                Results dogs = get_dogs(r);
                 r->begin_transaction();
                 dogs.clear();
                 r->commit_transaction();
             }
 
-            REQUIRE(get_dogs(r, session).size() == 0);
+            REQUIRE(get_dogs(r).size() == 0);
             create_one_dog(r);
-            REQUIRE(get_dogs(r, session).size() == 1);
+            REQUIRE(get_dogs(r).size() == 1);
         }
 
         // reset sync manager, deleting local data
@@ -2107,8 +2085,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = reinit.app()->current_user()->session_for_on_disk_path(r->config().path);
-            Results dogs = get_dogs(r, session);
+            Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
@@ -2124,19 +2101,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
 
             // clear state from previous runs
             {
-                Results dogs = get_dogs(r, session);
+                Results dogs = get_dogs(r);
                 r->begin_transaction();
                 dogs.clear();
                 r->commit_transaction();
             }
 
-            REQUIRE(get_dogs(r, session).size() == 0);
+            REQUIRE(get_dogs(r).size() == 0);
             create_one_dog(r);
-            REQUIRE(get_dogs(r, session).size() == 1);
+            REQUIRE(get_dogs(r).size() == 1);
         }
         REQUIRE(util::try_remove_dir_recursive(base_path));
         REQUIRE(util::try_make_dir(base_path));
@@ -2150,7 +2126,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             auto config = setup_and_get_config(reinit.app());
             auto r = realm::Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(r->config().path);
-            Results dogs = get_dogs(r, session);
+            Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
@@ -2166,20 +2142,19 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             auto creds = create_user_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
 
             // clear state from previous runs
             {
-                Results dogs = get_dogs(r, session);
+                Results dogs = get_dogs(r);
                 r->begin_transaction();
                 dogs.clear();
                 r->commit_transaction();
             }
 
-            REQUIRE(get_dogs(r, session).size() == 0);
+            REQUIRE(get_dogs(r).size() == 0);
             create_one_dog(r);
 
-            REQUIRE(get_dogs(r, session).size() == 1);
+            REQUIRE(get_dogs(r).size() == 1);
             realm::sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
             realm::sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
             REQUIRE(error_state == realm::sync::AccessToken::ParseError::none);
@@ -2225,10 +2200,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 }
             };
             auto r = realm::Realm::get_shared_realm(config);
-            auto session = app->current_user()->session_for_on_disk_path(r->config().path);
             REQUIRE(std::find(begin(seen_states), end(seen_states),
                               SyncSession::PublicState::WaitingForAccessToken) != end(seen_states));
-            Results dogs = get_dogs(r, session);
+            Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
@@ -2327,8 +2301,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             {
                 // check that there are no errors initiating a session now by making sure upload/download succeeds
                 auto r = realm::Realm::get_shared_realm(config);
-                auto session = user->session_for_on_disk_path(r->config().path);
-                Results dogs = get_dogs(r, session);
+                Results dogs = get_dogs(r);
             }
         }
 
@@ -2366,8 +2339,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 // check that there are no errors initiating a new sync session by making sure upload/download
                 // succeeds
                 auto r = realm::Realm::get_shared_realm(config);
-                auto session = user->session_for_on_disk_path(r->config().path);
-                Results dogs = get_dogs(r, session);
+                Results dogs = get_dogs(r);
             }
         }
     }
@@ -2386,7 +2358,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);
-        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
         REQUIRE_NOTHROW(timed_wait_for([&] {
             return error_did_occur.load();
         }));
@@ -2542,12 +2513,23 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
     }
 }
 
+void timed_sleeping_wait_for(std::function<bool()> condition,
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30))
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    while (!condition()) {
+        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
+            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        }
+        millisleep(1);
+    }
+}
+
 namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collections]", cf::ListOfObjects,
                    cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
                    cf::DictionaryOfMixedLinks)
 {
-
     std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
@@ -2558,14 +2540,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
 
     TestType test_type("collection", "dest");
     Schema schema = {{"source",
-                      {{valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
-                       {"source_int", PropertyType::Int},
+                      {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
                        {"realm_id", PropertyType::String | PropertyType::Nullable},
                        test_type.property()}},
                      {"dest",
                       {
-                          {valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
-                          {"dest_int", PropertyType::Int},
+                          {valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
                           {"realm_id", PropertyType::String | PropertyType::Nullable},
                       }}};
 
@@ -2586,10 +2566,10 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
 
-    auto setup_and_get_config = [&base_path, &schema, &partition](std::shared_ptr<App> app,
+    auto setup_and_get_config = [&base_path, &schema, &partition](std::shared_ptr<SyncUser> user,
                                                                   std::string local_path) -> realm::Realm::Config {
         realm::Realm::Config config;
-        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson(partition));
+        config.sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson(partition));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
             std::cout << error.message << std::endl;
@@ -2600,19 +2580,28 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         return config;
     };
 
-    auto get_source_objects = [&](realm::SharedRealm r, std::shared_ptr<SyncSession> session) -> Results {
-        wait_for_sync_changes(session);
-        return realm::Results(r, r->read_group().get_table("class_source"));
+    auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
+        timed_sleeping_wait_for([&]() -> bool {
+            r->refresh();
+            TableRef dest = r->read_group().get_table(table_name);
+            size_t cur_count = dest->size();
+            return cur_count == count;
+        });
     };
+    auto wait_for_num_outgoing_links_to_equal = [&](realm::SharedRealm r, Obj obj, size_t count) {
+        timed_sleeping_wait_for([&]() -> bool {
+            r->refresh();
+            return test_type.size_of_collection(obj) == count;
+        });
+    };
+
     CppContext c;
-    int64_t counter = 0;
-    auto create_one_source_object = [&](realm::SharedRealm r, std::vector<ObjLink> links = {}) {
+    auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
         r->begin_transaction();
-        auto object = Object::create(c, r, "source",
-                                     util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-                                                              {"source_int", counter++},
-                                                              {"realm_id", std::string(partition)}}),
-                                     CreatePolicy::ForceCreate);
+        auto object = Object::create(
+            c, r, "source",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
 
         for (auto link : links) {
             test_type.add_link(object.obj(), link);
@@ -2620,13 +2609,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         r->commit_transaction();
     };
 
-    auto create_one_dest_object = [&](realm::SharedRealm r) -> ObjLink {
+    auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
         r->begin_transaction();
-        auto obj = Object::create(c, r, "dest",
-                                  util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-                                                           {"dest_int", counter++},
-                                                           {"realm_id", std::string(partition)}}),
-                                  CreatePolicy::ForceCreate);
+        auto obj = Object::create(
+            c, r, "dest",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
         r->commit_transaction();
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
@@ -2634,7 +2622,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
         std::vector<int64_t> actual;
         for (auto obj : links) {
-            actual.push_back(obj.get<Int>("dest_int"));
+            actual.push_back(obj.get<Int>(valid_pk_name));
         }
         std::sort(actual.begin(), actual.end());
         std::sort(expected.begin(), expected.end());
@@ -2646,81 +2634,80 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         auto app = sync_manager.app();
 
         create_user_and_login(app);
-        auto r1 = realm::Realm::get_shared_realm(setup_and_get_config(app, "r1.realm"));
-        auto session1 = app->current_user()->session_for_on_disk_path(r1->config().path);
+        std::shared_ptr<SyncUser> user1 = app->current_user();
+        auto r1 = realm::Realm::get_shared_realm(setup_and_get_config(user1, "r1.realm"));
+        Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
 
         create_user_and_login(app);
-        auto r2 = realm::Realm::get_shared_realm(setup_and_get_config(app, "r2.realm"));
-        auto session2 = app->current_user()->session_for_on_disk_path(r2->config().path);
-
+        std::shared_ptr<SyncUser> user2 = app->current_user();
+        auto r2 = realm::Realm::get_shared_realm(setup_and_get_config(user2, "r2.realm"));
+        Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
+        constexpr int64_t source_pk = 0;
+        constexpr int64_t dest_pk_1 = 1;
+        constexpr int64_t dest_pk_2 = 2;
+        constexpr int64_t dest_pk_3 = 3;
         { // add a container collection with three valid links
-            REQUIRE(get_source_objects(r1, session1).size() == 0);
-            ObjLink dest1 = create_one_dest_object(r1);
-            ObjLink dest2 = create_one_dest_object(r1);
-            ObjLink dest3 = create_one_dest_object(r1);
-            create_one_source_object(r1, {dest1, dest2, dest3});
-            Results objects = get_source_objects(r1, session1);
-            REQUIRE(objects.size() == 1);
-            REQUIRE(objects.get(0).get<Int>("source_int") == 3);
-            REQUIRE(objects.get(0).get<String>("realm_id") == partition);
-            require_links_to_match_ids(test_type.get_links(objects.get(0)), {0, 1, 2});
+            REQUIRE(r1_source_objs.size() == 0);
+            ObjLink dest1 = create_one_dest_object(r1, dest_pk_1);
+            ObjLink dest2 = create_one_dest_object(r1, dest_pk_2);
+            ObjLink dest3 = create_one_dest_object(r1, dest_pk_3);
+            create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
+            REQUIRE(r1_source_objs.size() == 1);
+            REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            REQUIRE(r1_source_objs.get(0).get<String>("realm_id") == partition);
+            require_links_to_match_ids(test_type.get_links(r1_source_objs.get(0)), {dest_pk_1, dest_pk_2, dest_pk_3});
         }
 
+        size_t expected_coll_size = 3;
         std::vector<int64_t> remaining_dest_object_ids;
         { // erase one of the destination objects
-            Results objects = get_source_objects(r2, session2);
-            REQUIRE(objects.size() == 1);
-            REQUIRE(objects.get(0).get<Int>("source_int") == 3);
-            REQUIRE(objects.get(0).get<String>("realm_id") == partition);
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == 3);
-            auto linked_objects = test_type.get_links(objects.get(0));
-            require_links_to_match_ids(linked_objects, {0, 1, 2});
+            wait_for_num_objects_to_equal(r2, "class_source", 1);
+            wait_for_num_objects_to_equal(r2, "class_dest", 3);
+            REQUIRE(r2_source_objs.size() == 1);
+            REQUIRE(r2_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == 3);
+            auto linked_objects = test_type.get_links(r2_source_objs.get(0));
+            require_links_to_match_ids(linked_objects, {dest_pk_1, dest_pk_2, dest_pk_3});
             r2->begin_transaction();
             linked_objects[0].remove();
             r2->commit_transaction();
-            remaining_dest_object_ids = {linked_objects[1].template get<Int>("dest_int"),
-                                         linked_objects[2].template get<Int>("dest_int")};
-            size_t expected_size = test_type.will_erase_removed_object_links() ? 2 : 3;
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == expected_size);
-            wait_for_sync_changes(session2);
+            remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name),
+                                         linked_objects[2].template get<Int>(valid_pk_name)};
+            expected_coll_size = test_type.will_erase_removed_object_links() ? 2 : 3;
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == expected_coll_size);
         }
 
         { // remove a link from the collection
-            Results objects = get_source_objects(r1, session1);
-            REQUIRE(objects.size() == 1);
-            size_t expected_size = test_type.will_erase_removed_object_links() ? 2 : 3;
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == expected_size);
-            auto linked_objects = test_type.get_links(objects.get(0));
+            wait_for_num_objects_to_equal(r1, "class_dest", 2);
+            REQUIRE(r1_source_objs.size() == 1);
+            REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
+            auto linked_objects = test_type.get_links(r1_source_objs.get(0));
             require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
             r1->begin_transaction();
-            test_type.remove_link(objects.get(0),
+            test_type.remove_link(r1_source_objs.get(0),
                                   ObjLink{linked_objects[0].get_table()->get_key(), linked_objects[0].get_key()});
             r1->commit_transaction();
-            remaining_dest_object_ids = {linked_objects[1].template get<Int>("dest_int")};
-            wait_for_sync_changes(session1);
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == expected_size - 1);
+            --expected_coll_size;
+            remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name)};
+            REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
         }
 
         { // clear the collection
-            Results objects = get_source_objects(r2, session2);
-            REQUIRE(objects.size() == 1);
-            REQUIRE(objects.get(0).get<Int>("source_int") == 3);
-            REQUIRE(objects.get(0).get<String>("realm_id") == partition);
-            auto linked_objects = test_type.get_links(objects.get(0));
+            REQUIRE(r2_source_objs.size() == 1);
+            REQUIRE(r2_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            wait_for_num_outgoing_links_to_equal(r2, r2_source_objs.get(0), expected_coll_size);
+            auto linked_objects = test_type.get_links(r2_source_objs.get(0));
             require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
             r2->begin_transaction();
-            test_type.clear_collection(objects.get(0));
+            test_type.clear_collection(r2_source_objs.get(0));
             r2->commit_transaction();
-            wait_for_sync_changes(session2);
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == 0);
+            expected_coll_size = 0;
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == expected_coll_size);
         }
 
         { // expect an empty collection
-            Results objects = get_source_objects(r1, session1);
-            REQUIRE(objects.size() == 1);
-            REQUIRE(objects.get(0).get<Int>("source_int") == 3);
-            REQUIRE(objects.get(0).get<String>("realm_id") == partition);
-            REQUIRE(test_type.size_of_collection(objects.get(0)) == 0);
+            REQUIRE(r1_source_objs.size() == 1);
+            wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
         }
     }
 }
