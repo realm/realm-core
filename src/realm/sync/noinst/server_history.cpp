@@ -850,8 +850,16 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
     if (download_progress.server_version > current_server_version)
         return BootstrapError::bad_download_server_version;
     auto last_integrated_client_version = version_type(m_acc->cf_client_versions.get(client_file_index));
-    if (download_progress.last_integrated_client_version > last_integrated_client_version)
-        return BootstrapError::bad_download_client_version;
+    if (download_progress.last_integrated_client_version > last_integrated_client_version) {
+        if (last_integrated_client_version == 0) {
+            // We assume we are booting on a pre-downloaded client file
+            last_integrated_client_version = download_progress.last_integrated_client_version;
+            recip_hist_base_version = download_progress.server_version;
+        }
+        else {
+            return BootstrapError::bad_download_client_version;
+        }
+    }
 
     // Validate `server_version`
     {
@@ -1014,7 +1022,9 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
     download_progress = download_progress_2;
     cumulative_byte_size_current = std::uint_fast64_t(cumulative_byte_size_current_2);
     cumulative_byte_size_total = std::uint_fast64_t(cumulative_byte_size_total_2);
-    upload_progress = UploadCursor{upload_client_version, upload_server_version};
+    if (upload_client_version > upload_progress.client_version) {
+        upload_progress = UploadCursor{upload_client_version, upload_server_version};
+    }
 
     return true;
 }
