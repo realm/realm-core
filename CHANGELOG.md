@@ -1,8 +1,8 @@
 # 11.3.1 Release notes
 
 ### Fixed
-* Fixed an assertion failure in the sync client when applying an AddColumn instruction for a Mixed column when that column already exists locally. ([#4873](https://github.com/realm/realm-core/issues/4873), since the introduction of Mixed in v11)
-* Fixes a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
+* Fixed "Invalid data type" assertion failure in the sync client when applying an AddColumn instruction for a Mixed column when that column already exists locally. ([#4873](https://github.com/realm/realm-core/issues/4873), since v11.0.0)
+* Fixed a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
  
 ----------------------------------------------
 
