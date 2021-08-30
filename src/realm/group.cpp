@@ -1787,12 +1787,12 @@ void Group::advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream& in,
     // database.
     //
     // Initially, when this function is invoked, we cannot assume any
-    // correspondance between the accessor state and the underlying node
+    // correspondence between the accessor state and the underlying node
     // structure. We can assume that the hierarchy is in a state of minimal
     // consistency, and that it can be brought to a state of structural
-    // correspondace using information in the transaction logs. When structural
-    // correspondace is achieved, we can reliably refresh the accessor hierarchy
-    // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
+    // correspondence using information in the transaction logs. When structural
+    // correspondence is achieved, we can reliably refresh the accessor hierarchy
+    // (Table::refresh_accessor_tree()) to bring it back to a fully consistent
     // state. See AccessorConsistencyLevels.
     //
     // Much of the information in the transaction logs is not used in this
