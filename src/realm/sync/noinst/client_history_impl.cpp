@@ -103,7 +103,6 @@ auto ClientHistoryImpl::get_next_local_changeset(version_type current_version, v
 
 void ClientHistoryImpl::set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                                      sync::SaltedVersion server_version,
-                                                     std::uint_fast64_t downloaded_bytes,
                                                      BinaryData uploadable_changeset)
 {
     ensure_updated(current_version); // Throws
@@ -130,7 +129,7 @@ void ClientHistoryImpl::set_client_reset_adjustments(version_type current_versio
     root.set(s_progress_upload_server_version_iip,
              RefOrTagged::make_tagged(upload_progress.last_integrated_server_version)); // Throws
     root.set(s_progress_downloaded_bytes_iip,
-             RefOrTagged::make_tagged(downloaded_bytes)); // Throws
+             RefOrTagged::make_tagged(0)); // Throws
     root.set(s_progress_downloadable_bytes_iip,
              RefOrTagged::make_tagged(0)); // Throws
     root.set(s_progress_uploaded_bytes_iip,

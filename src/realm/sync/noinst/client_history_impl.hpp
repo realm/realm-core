@@ -104,8 +104,7 @@ public:
     /// this history object must be in a write transaction when this function
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                      sync::SaltedVersion server_version, uint_fast64_t downloaded_bytes,
-                                      BinaryData uploadable_changeset);
+                                      sync::SaltedVersion server_version, BinaryData uploadable_changeset);
 
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
     /// of local origin. This should only be used for testing and defaults to calling

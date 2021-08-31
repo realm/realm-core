@@ -404,7 +404,7 @@ struct BaasClientReset : public TestClientReset {
                                           });
                     }
                     if (count_external == 0) {
-                        millisleep(1000); // don't spam the server too much
+                        millisleep(2000); // don't spam the server too much
                     }
                     return count_external > 0;
                 },

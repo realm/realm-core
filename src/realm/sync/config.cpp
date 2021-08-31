@@ -54,12 +54,21 @@ bool SyncError::is_client_reset_requested() const
     if (error_code.category() != realm::sync::protocol_error_category()) {
         return false;
     }
-    // Documented here: https://realm.io/docs/realm-object-server/#client-recovery-from-a-backup
-    return (error_code == ProtocolError::bad_server_file_ident ||
-            error_code == ProtocolError::bad_client_file_ident || error_code == ProtocolError::bad_server_version ||
-            error_code == ProtocolError::diverging_histories || error_code == ProtocolError::client_file_expired ||
-            error_code == ProtocolError::invalid_schema_change);
+    // clang-format off
+    // keep this list in sync with SyncSession::handle_error()
+    return (error_code == ProtocolError::bad_client_file ||
+            error_code == ProtocolError::bad_client_file_ident ||
+            error_code == ProtocolError::bad_origin_file_ident ||
+            error_code == ProtocolError::bad_server_file_ident ||
+            error_code == ProtocolError::bad_server_version ||
+            error_code == ProtocolError::client_file_blacklisted ||
+            error_code == ProtocolError::client_file_expired ||
+            error_code == ProtocolError::diverging_histories ||
+            error_code == ProtocolError::invalid_schema_change ||
+            error_code == ProtocolError::server_file_deleted ||
+            error_code == ProtocolError::user_blacklisted);
 }
+// clang-format on
 
 SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
     : user(std::move(user))

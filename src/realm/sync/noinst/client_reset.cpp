@@ -762,9 +762,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     else { // manual discard mode
         remove_all_tables(*group_local, logger);
     }
-    uint_fast64_t downloaded_bytes = 0; // FIXME: check this
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
-                                               downloaded_bytes, recovered_changeset);
+                                               recovered_changeset);
 
     // Finally, the local Realm is committed.
     group_local->commit_and_continue_as_read();

@@ -492,43 +492,28 @@ public:
         /// The encryption key the DB will be opened with.
         util::Optional<std::array<char, 64>> encryption_key;
 
-        /// FIXME: update this
-        /// ClientReset is used for both async open and client reset. If
-        /// client_reset is not util::none, the sync client will perform
-        /// async open for this session if the local Realm does not exist, and
-        /// client reset if the local Realm exists. If client_reset is
-        /// util::none, an ordinary sync session will take place.
+        /// The presence of the ClientReset config indicates an ongoing or
+        /// requested client reset operation. If client_reset is util::none or
+        /// if the local Realm does not exist, an ordinary sync session will
+        /// take place.
         ///
-        /// A session will perform async open by downloading a state Realm, and
-        /// some metadata, from the server, patching up the metadata part of
-        /// the Realm and finally move the downloaded Realm into the path of
-        /// the local Realm. After completion of async open, the application
-        /// can open and use the Realm.
-        ///
-        /// A session will perform client reset by downloading a state Realm, and
-        /// some metadata, from the server. After download, the state Realm will
-        /// be integrated into the local Realm in a write transaction. The
-        /// application is free to use the local realm during the entire client
-        /// reset. Like a DOWNLOAD message, the application will not be able
-        /// to perform a write transaction at the same time as the sync client
+        /// A session will perform client reset by downloading a fresh copy of
+        /// the Realm from the server at a different file path location. After
+        /// download, the fresh Realm will be integrated into the local
+        /// Realm in a write transaction. The application is free to use the
+        /// local realm during the entire client reset. Like a DOWNLOAD
+        /// message, the application will not be able to perform a write
+        /// transaction at the same time as the sync client
         /// performs its own write transaction. Client reset is not more
         /// disturbing for the application than any DOWNLOAD message. The
         /// application can listen to change notifications from the client
         /// reset exactly as in a DOWNLOAD message.
         ///
-        /// Async open and client reset require a private directory for
-        /// metadata. This directory must be specified in the option
-        /// 'metadata_dir'. The metadata_dir must not be touched during async
-        /// open or client reset. The metadata_dir can safely be removed at
-        /// times where async open or client reset do not take place. The sync
-        /// client attempts to clean up metadata_dir. The metadata_dir can be
-        /// reused across app restarts to resume an interrupted download. It is
-        /// recommended to leave the metadata_dir unchanged except when it is
-        /// known that async open or client reset is done.
-        ///
-        /// The recommended usage of async open is to use it for the initial
-        /// bootstrap if Realm usage is not needed until after the server state
-        /// has been downloaded.
+        /// Client reset downloads its fresh Realm copy for a Realm
+        /// at path "xyx.realm" to "xyz.realm.fresh". There is state within
+        /// the fresh copy to denote that the download is completed such
+        /// that if the client is stopped during download of the fresh copy,
+        /// if may continue on the next session.
         ///
         /// The recommended usage of client reset is after a previous session
         /// encountered an error that implies the need for a client reset. It
@@ -540,24 +525,19 @@ public:
         /// after restart and switch to client reset if needed.
         ///
         /// Error codes that imply the need for a client reset are the session
-        /// level error codes:
-        ///
-        /// bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
-        /// bad_server_version           = 209, // Bad server version (IDENT, UPLOAD)
-        /// bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
-        /// diverging_histories          = 211, // Diverging histories (IDENT)
+        /// level error codes described by SyncError::is_client_reset_requested()
         ///
         /// However, other errors such as bad changeset (UPLOAD) could also be resolved
         /// with a client reset. Client reset can even be used without any prior error
         /// if so desired.
         ///
-        /// After completion of async open and client reset, the sync client
-        /// will continue synchronizing with the server in the usual fashion.
+        /// After completion of a client reset, the sync client will continue
+        /// synchronizing with the server in the usual fashion.
         ///
-        /// The progress of async open and client reset can be tracked with the
+        /// The progress of client reset can be tracked with the
         /// standard progress handler.
         ///
-        /// Async open and client reset are done when the progress handler
+        /// Client reset is done when the progress handler
         /// arguments satisfy "progress_version > 0". However, if the
         /// application wants to ensure that it has all data present on the
         /// server, it should wait for download completion using either

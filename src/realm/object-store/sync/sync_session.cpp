@@ -482,6 +482,8 @@ void SyncSession::handle_error(SyncError error)
     if (error.is_client_reset_requested()) {
         switch (m_config.client_resync_mode) {
             case ClientResyncMode::Manual:
+                next_state = NextStateAfterError::inactive;
+                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
             case ClientResyncMode::SeamlessLoss:
             case ClientResyncMode::DiscardLocal: {
@@ -510,8 +512,7 @@ void SyncSession::handle_error(SyncError error)
             }
         }
     }
-
-    if (error_code.category() == realm::sync::protocol_error_category()) {
+    else if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
         switch (static_cast<ProtocolError>(error_code.value())) {
             // Connection level errors
@@ -574,14 +575,18 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::client_file_blacklisted:
-            case ProtocolError::diverging_histories:
-            case ProtocolError::server_file_deleted:
-            case ProtocolError::user_blacklisted:
             case ProtocolError::client_file_expired:
+            case ProtocolError::diverging_histories:
             case ProtocolError::invalid_schema_change:
-                next_state = NextStateAfterError::inactive;
-                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
-                break;
+            case ProtocolError::server_file_deleted:
+            case ProtocolError::user_blacklisted: {
+                // All these should be kept in sync with the list found in
+                // SyncError::is_client_reset_requested()
+                // If this code is reached, then the list is out of sync
+                // because the reset should have been handled above.
+                std::string msg = util::format("client reset code mismatch for '%1'", error_code.value());
+                REALM_TERMINATE(msg.c_str());
+            }
         }
     }
     else if (error_code.category() == realm::sync::client_error_category()) {
