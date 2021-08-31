@@ -395,7 +395,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                     session_user->log_out();
                 }
                 if (session->m_config.error_handler) {
-                    auto user_facing_error = SyncError(realm::sync::ProtocolError::permission_denied,
+                    auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication,
                                                        "Unable to refresh the user access token.", true);
                     session->m_config.error_handler(session, user_facing_error);
                 }

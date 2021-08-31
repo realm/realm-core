@@ -1972,7 +1972,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::permission_denied));
+                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
                 REQUIRE(error.message == "Unable to refresh the user access token.");
             };
 
