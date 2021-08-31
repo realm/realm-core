@@ -636,7 +636,8 @@ bool SyncManager::do_has_existing_sessions()
     });
 }
 
-void SyncManager::wait_for_sessions_to_terminate() {
+void SyncManager::wait_for_sessions_to_terminate()
+{
     auto& client = get_sync_client(); // Throws
     client.wait_for_session_terminations();
 }
