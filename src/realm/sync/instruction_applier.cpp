@@ -126,9 +126,9 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 sync::create_table(m_transaction, table_name);
             }
             else {
-
                 if (!is_valid_key_type(spec.type)) {
-                    bad_transaction_log("Invalid primary key type");
+                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.type),
+                                        table_name);
                 }
                 DataType pk_type = get_data_type(spec.type);
                 StringData pk_field = get_string(spec.field);
@@ -578,7 +578,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     }
 
     if (instr.type != Type::Link) {
-        DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
+        DataType type = get_data_type(instr.type);
         switch (instr.collection_type) {
             case CollectionType::Single: {
                 table->add_column(type, col_name, instr.nullable);
@@ -589,7 +589,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Dictionary: {
-                DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
+                DataType key_type = get_data_type(instr.key_type);
                 table->add_column_dictionary(type, col_name, instr.nullable, key_type);
                 break;
             }

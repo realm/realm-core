@@ -174,7 +174,8 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
         // The next time we request it, it'll be created anew.
         // The call to `get_session()` should result in `SyncUser::register_session()` being called.
-        auto session = app->sync_manager()->get_session(on_disk_path, *config);
+        auto session = sync_session(
+            user, path, [](auto, auto) {}, SyncSessionStopPolicy::Immediately, &on_disk_path);
         CHECK(session);
         session = user->session_for_on_disk_path(on_disk_path);
         CHECK(session);
@@ -471,7 +472,11 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         }
 
         SECTION("transitions back to Active if the session is revived") {
-            auto session2 = sync_manager->get_session(config.path, *config.sync_config);
+            std::shared_ptr<SyncSession> session2;
+            {
+                auto realm = Realm::get_shared_realm(config);
+                session2 = user->sync_manager()->get_existing_session(config.path);
+            }
             REQUIRE(session->state() == SyncSession::PublicState::Active);
             REQUIRE(session2 == session);
         }
@@ -505,71 +510,6 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
 
         session->close();
         REQUIRE(sessions_are_inactive(*session));
-    }
-}
-
-TEST_CASE("sync: encrypt local realm file", "[sync]") {
-    if (!EventLoop::has_implementation())
-        return;
-
-    // Disable file-related functionality and metadata functionality for testing purposes.
-    TestSyncManager init_sync_manager;
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-    std::array<char, 64> encryption_key;
-    encryption_key.fill(12);
-
-    SECTION("open a session with realm file encryption and then open the same file directly") {
-        SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
-        std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
-        config.sync_config->realm_encryption_key = encryption_key;
-
-        // open a session and wait for it to fully download to its local realm file
-        {
-            std::atomic<bool> handler_called(false);
-            auto session = sync_manager->get_session(config.path, *config.sync_config);
-            EventLoop::main().run_until([&] {
-                return sessions_are_active(*session);
-            });
-            session->wait_for_download_completion([&](auto) {
-                handler_called = true;
-            });
-            EventLoop::main().run_until([&] {
-                return handler_called == true;
-            });
-            session->close();
-            EventLoop::main().run_until([&] {
-                return sessions_are_inactive(*session);
-            });
-        }
-
-        // open a Realm with the same config, if the session didn't use the encryption key this should fail
-        {
-            Realm::get_shared_realm(config);
-        }
-    }
-
-    SECTION("errors if encryption keys are different") {
-        {
-            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
-            config.sync_config->realm_encryption_key = encryption_key;
-
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-        }
-
-        {
-            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
-            std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
-
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-        }
-
-        {
-            SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
-            config.sync_config->realm_encryption_key = encryption_key;
-            config.encryption_key.push_back(9);
-
-            REQUIRE_THROWS(Realm::get_shared_realm(config));
-        }
     }
 }
 
@@ -765,7 +705,7 @@ TEST_CASE("sync: client reset") {
 
     auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
         auto realm = Realm::get_shared_realm(config);
-        auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
+        auto session = sync_manager->get_existing_session(realm->config().path);
         {
             realm->begin_transaction();
 
@@ -852,8 +792,6 @@ TEST_CASE("sync: client reset") {
 
     SECTION("should honor encryption key for downloaded Realm") {
         config.encryption_key.resize(64, 'a');
-        config.sync_config->realm_encryption_key = std::array<char, 64>();
-        config.sync_config->realm_encryption_key->fill('a');
         config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
         auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});

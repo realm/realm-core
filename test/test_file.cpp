@@ -392,6 +392,13 @@ TEST(File_NotFound)
 }
 
 
+TEST(File_PathNotFound)
+{
+    File file;
+    CHECK_THROW(file.open(""), File::NotFound);
+}
+
+
 TEST(File_Exists)
 {
     TEST_PATH(path);

@@ -395,7 +395,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                     session_user->log_out();
                 }
                 if (session->m_config.error_handler) {
-                    auto user_facing_error = SyncError(realm::sync::ProtocolError::permission_denied,
+                    auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication,
                                                        "Unable to refresh the user access token.", true);
                     session->m_config.error_handler(session, user_facing_error);
                 }
@@ -414,10 +414,10 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, SyncManager* sync_manager)
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, SyncManager* sync_manager)
     : m_state(&State::inactive)
     , m_config(std::move(config))
-    , m_realm_path(std::move(realm_path))
+    , m_db(std::move(db))
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -706,7 +706,6 @@ void SyncSession::do_create_sync_session()
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
     session_config.realm_identifier = m_config.partition_value;
-    session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
@@ -731,14 +730,13 @@ void SyncSession::do_create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        std::string metadata_dir = m_realm_path + ".resync";
-        util::try_make_dir(metadata_dir);
         sync::Session::Config::ClientReset config;
-        config.metadata_dir = metadata_dir;
-        session_config.client_reset_config = config;
+        config.metadata_dir = m_db->get_path() + ".resync";
+        util::try_make_dir(config.metadata_dir);
+        session_config.client_reset_config = std::move(config);
     }
 
-    m_session = m_client.make_session(m_realm_path, std::move(session_config));
+    m_session = m_client.make_session(m_db, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 
@@ -871,7 +869,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_sync_manager->unregister_session(m_realm_path);
+    m_sync_manager->unregister_session(m_db->get_path());
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
@@ -974,6 +972,11 @@ SyncSession::ConnectionState SyncSession::connection_state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     return m_connection_state;
+}
+
+std::string const& SyncSession::path() const
+{
+    return m_db->get_path();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

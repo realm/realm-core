@@ -40,10 +40,6 @@ public:
         : m_transformer(sync::make_transformer())
     {
     }
-    bool owner_is_sync_server() const noexcept override
-    {
-        return true;
-    }
     std::mt19937_64& server_history_get_random() noexcept override
     {
         return m_random;

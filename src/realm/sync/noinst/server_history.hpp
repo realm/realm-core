@@ -473,7 +473,6 @@ public:
     void upgrade_history_schema(int) override;
     _impl::History* _get_history_write() override;
     std::unique_ptr<_impl::History> _create_history_read() override;
-    bool is_sync_agent() const noexcept override;
 
     // Overriding member functions in TrivialReplication
     version_type prepare_changeset(const char*, std::size_t, version_type) override;
@@ -636,7 +635,7 @@ private:
     // a high probability).
     salt_type m_salt_for_new_server_versions;
 
-    DB* m_shared_group = nullptr;
+    DB* m_db = nullptr;
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
@@ -784,7 +783,6 @@ public:
 
 class ServerHistory::Context {
 public:
-    virtual bool owner_is_sync_server() const noexcept = 0;
     virtual std::mt19937_64& server_history_get_random() noexcept = 0;
 
     // @{
@@ -909,7 +907,7 @@ inline ServerHistory::ServerHistory(const std::string& realm_path, Context& cont
 template <class H>
 bool ServerHistory::transact(H handler, sync::VersionInfo& version_info)
 {
-    auto wt = m_shared_group->start_write();       // Throws
+    auto wt = m_db->start_write();                 // Throws
     if (handler(*wt)) {                            // Throws
         version_info.realm_version = wt->commit(); // Throws
         version_info.sync_version = get_salted_server_version();

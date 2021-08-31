@@ -56,10 +56,15 @@ void ClusterNode::IteratorState::init(State& s, ObjKey key)
     m_current_leaf.set_offset(m_key_offset);
 }
 
+const Table* ClusterNode::get_owning_table() const noexcept
+{
+    return m_tree_top.get_owning_table();
+}
+
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw KeyNotFound("No such object");
+        throw KeyNotFound(util::format("No object with key '%1' in '%2'", k.value, get_owning_table()->get_name()));
     }
 }
 
@@ -480,11 +485,6 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
 
 Cluster::~Cluster() {}
 
-const Table* Cluster::get_owning_table() const
-{
-    return m_tree_top.get_owning_table();
-}
-
 ColKey Cluster::get_col_key(size_t ndx_in_parent) const
 {
     ColKey::Idx col_ndx{unsigned(ndx_in_parent - 1)}; // <- leaf_index here. Opaque.
@@ -620,6 +620,12 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     int64_t current_key_value = -1;
     size_t sz;
     size_t ndx;
+    ref_type ret = 0;
+
+    auto on_error = [&] {
+        throw KeyAlreadyUsed(
+            util::format("When inserting key '%1' in '%2'", k.value, get_owning_table()->get_name()));
+    };
 
     if (m_keys.is_attached()) {
         sz = m_keys.size();
@@ -627,14 +633,14 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
         if (ndx < sz) {
             current_key_value = m_keys.get(ndx);
             if (k.value == current_key_value) {
-                throw KeyAlreadyUsed("When inserting");
+                on_error();
             }
         }
     }
     else {
         sz = size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged integer
         if (uint64_t(k.value) < sz) {
-            throw KeyAlreadyUsed("When inserting");
+            on_error();
         }
         // Key value is bigger than all other values, should be put last
         ndx = sz;
@@ -642,8 +648,6 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
             ensure_general_form();
         }
     }
-
-    ref_type ret = 0;
 
     REALM_ASSERT_DEBUG(sz <= cluster_node_size);
     if (REALM_LIKELY(sz < cluster_node_size)) {
@@ -677,7 +681,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     return ret;
 }
 
-bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const
+bool Cluster::try_get(ObjKey k, ClusterNode::State& state) const noexcept
 {
     state.mem = get_mem();
     if (m_keys.is_attached()) {
@@ -766,7 +770,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound("Key not found in Cluster::erase");
+        throw KeyNotFound(util::format("When erasing key '%1' in '%2'", key.value, get_owning_table()->get_name()));
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -919,7 +923,8 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
     if (ndx == realm::npos)
-        throw KeyNotFound("Key not found in Cluster::nullify_incoming_links");
+        throw KeyNotFound(util::format("When nullify incoming links for key '%1' in '%2'", key.value,
+                                       get_owning_table()->get_name()));
 
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that we can nullify links before

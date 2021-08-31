@@ -81,10 +81,6 @@ namespace {
 
 class TestServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    bool owner_is_sync_server() const noexcept override final
-    {
-        return false;
-    }
     std::mt19937_64& server_history_get_random() noexcept override final
     {
         return m_random;
@@ -94,6 +90,26 @@ private:
     std::mt19937_64 m_random;
 };
 
+#define TEST_CLIENT_DB(name)                                                                                         \
+    SHARED_GROUP_TEST_PATH(name##_path);                                                                             \
+    auto name = DB::create(make_client_replication(name##_path));
+
+template <typename Function>
+void write_transaction_notifying_session(DBRef db, Session& session, Function&& function)
+{
+    WriteTransaction wt(db);
+    function(wt);
+    auto new_version = wt.commit();
+    session.nonsync_transact_notify(new_version);
+}
+
+ClientReplication& get_history(DBRef db)
+{
+    auto history = dynamic_cast<ClientReplication*>(db->get_replication());
+    REALM_ASSERT(history);
+    return *history;
+}
+
 
 TEST(Sync_BadVirtualPath)
 {
@@ -102,9 +118,9 @@ TEST(Sync_BadVirtualPath)
     //  MongoDB Realm server will behave differently
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    SHARED_GROUP_TEST_PATH(path_3);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+    TEST_CLIENT_DB(db_3);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
@@ -125,15 +141,15 @@ TEST(Sync_BadVirtualPath)
             fixture.stop();
     };
 
-    Session session_1 = fixture.make_session(path_1);
+    Session session_1 = fixture.make_session(db_1);
     session_1.set_connection_state_change_listener(listener);
     fixture.bind_session(session_1, "/test.realm");
 
-    Session session_2 = fixture.make_session(path_2);
+    Session session_2 = fixture.make_session(db_2);
     session_2.set_connection_state_change_listener(listener);
     fixture.bind_session(session_2, "/../test");
 
-    Session session_3 = fixture.make_session(path_3);
+    Session session_3 = fixture.make_session(db_3);
     session_3.set_connection_state_change_listener(listener);
     fixture.bind_session(session_3, "/test%abc ");
 
@@ -147,12 +163,11 @@ TEST(Sync_BadVirtualPath)
 TEST(Sync_AsyncWaitForUploadCompletion)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db, "/test");
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
@@ -168,28 +183,18 @@ TEST(Sync_AsyncWaitForUploadCompletion)
     wait();
 
     // Nonempty
-    {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt(sg);
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_foo");
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
-    }
+    });
     wait();
 
     // Already done
     wait();
 
     // More
-    {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt(sg);
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_bar");
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
-    }
+    });
     wait();
 }
 
@@ -197,15 +202,10 @@ TEST(Sync_AsyncWaitForUploadCompletion)
 TEST(Sync_AsyncWaitForDownloadCompletion)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
@@ -217,30 +217,25 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
         bowl.get_stone();
     };
 
-    // Noting to download
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    // Nothing to download
+    Session session_1 = fixture.make_bound_session(db_1, "/test");
     wait(session_1);
 
     // Again
     wait(session_1);
 
     // Upload something via session 2
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
-    {
-        WriteTransaction wt(sg_2);
+    Session session_2 = fixture.make_bound_session(db_2, "/test");
+    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_foo");
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
-    }
+    });
     session_2.wait_for_upload_complete_or_client_stopped();
 
     // Wait for session 1 to download it
     wait(session_1);
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 
@@ -251,19 +246,16 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     wait(session_2);
 
     // Upload something via session 1
-    {
-        WriteTransaction wt(sg_1);
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_bar");
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
-    }
+    });
     session_1.wait_for_upload_complete_or_client_stopped();
 
     // Wait for session 2 to download it
     wait(session_2);
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 }
@@ -272,15 +264,10 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
 TEST(Sync_AsyncWaitForSyncCompletion)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
 
     auto wait = [&](Session& session) {
         BowlOfStonesSemaphore bowl;
@@ -292,40 +279,32 @@ TEST(Sync_AsyncWaitForSyncCompletion)
         bowl.get_stone();
     };
 
-    // Noting to synchronize
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    // Nothing to synchronize
+    Session session_1 = fixture.make_bound_session(db_1);
     wait(session_1);
 
     // Again
     wait(session_1);
 
     // Generate changes to be downloaded (uploading via session 2)
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
-    {
-        WriteTransaction wt(sg_2);
+    Session session_2 = fixture.make_bound_session(db_2);
+    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_foo");
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
-    }
+    });
     session_2.wait_for_upload_complete_or_client_stopped();
 
     // Generate changes to be uploaded
-    {
-        WriteTransaction wt(sg_1);
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_bar");
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
-    }
+    });
 
     // Nontrivial synchronization (upload and download required)
     wait(session_1);
     wait(session_2);
 
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 }
@@ -334,7 +313,7 @@ TEST(Sync_AsyncWaitForSyncCompletion)
 TEST(Sync_AsyncWaitCancellation)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
@@ -351,7 +330,7 @@ TEST(Sync_AsyncWaitCancellation)
         bowl.add_stone();
     };
     {
-        Session session = fixture.make_bound_session(path, "/test");
+        Session session = fixture.make_bound_session(db, "/test");
         session.async_wait_for_upload_completion(upload_completion_handler);
         session.async_wait_for_download_completion(download_completion_handler);
         session.async_wait_for_sync_completion(sync_completion_handler);
@@ -368,28 +347,22 @@ TEST(Sync_AsyncWaitCancellation)
 TEST(Sync_WaitForUploadCompletion)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture{dir, test_context};
     std::string virtual_path = "/test";
     std::string server_path = fixture.map_virtual_to_real_path(virtual_path);
     fixture.start();
 
     // Empty
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     // Since the Realm is empty, the following wait operation can complete
     // without the client ever having been in contact with the server
     session.wait_for_upload_complete_or_client_stopped();
 
     // Nonempty
-    {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt(sg);
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_foo");
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
-    }
+    });
     // Since the Realm is no longer empty, the following wait operation cannot
     // complete until the client has been in contact with the server, and caused
     // the server to create the server-side file
@@ -400,14 +373,9 @@ TEST(Sync_WaitForUploadCompletion)
     session.wait_for_upload_complete_or_client_stopped();
 
     // More changes
-    {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt(sg);
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_bar");
-        version_type new_version = wt.commit();
-        session.nonsync_transact_notify(new_version);
-    }
+    });
     session.wait_for_upload_complete_or_client_stopped();
 }
 
@@ -415,22 +383,19 @@ TEST(Sync_WaitForUploadCompletion)
 TEST(Sync_WaitForUploadCompletionAfterEmptyTransaction)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    DBRef sg = DB::create(*history);
+    Session session = fixture.make_bound_session(db);
     for (int i = 0; i < 100; ++i) {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         version_type new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
         session.wait_for_upload_complete_or_client_stopped();
     }
     {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         sync::create_table(wt, "class_foo");
         version_type new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
@@ -442,40 +407,30 @@ TEST(Sync_WaitForUploadCompletionAfterEmptyTransaction)
 TEST(Sync_WaitForDownloadCompletion)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
-
     // Noting to download
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1);
     session_1.wait_for_download_complete_or_client_stopped();
 
     // Again
     session_1.wait_for_download_complete_or_client_stopped();
 
     // Upload something via session 2
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
-    {
-        WriteTransaction wt(sg_2);
+    Session session_2 = fixture.make_bound_session(db_2);
+    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_foo");
-        version_type new_version = wt.commit();
-        session_2.nonsync_transact_notify(new_version);
-    }
+    });
     session_2.wait_for_upload_complete_or_client_stopped();
 
     // Wait for session 1 to download it
     session_1.wait_for_download_complete_or_client_stopped();
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 
@@ -486,19 +441,16 @@ TEST(Sync_WaitForDownloadCompletion)
     session_2.wait_for_download_complete_or_client_stopped();
 
     // Upload something via session 1
-    {
-        WriteTransaction wt(sg_1);
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_bar");
-        version_type new_version = wt.commit();
-        session_1.nonsync_transact_notify(new_version);
-    }
+    });
     session_1.wait_for_upload_complete_or_client_stopped();
 
     // Wait for session 2 to download it
     session_2.wait_for_download_complete_or_client_stopped();
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 }
@@ -507,22 +459,20 @@ TEST(Sync_WaitForDownloadCompletion)
 TEST(Sync_WaitForDownloadCompletionAfterEmptyTransaction)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
 
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    DBRef sg = DB::create(*history);
     {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         wt.commit();
     }
     fixture.start();
     for (int i = 0; i < 8; ++i) {
-        Session session = fixture.make_bound_session(path, "/test");
+        Session session = fixture.make_bound_session(db, "/test");
         session.wait_for_download_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
         {
-            WriteTransaction wt(sg);
+            WriteTransaction wt(db);
             wt.commit();
         }
         session.wait_for_download_complete_or_client_stopped();
@@ -534,12 +484,11 @@ TEST(Sync_WaitForDownloadCompletionAfterEmptyTransaction)
 TEST(Sync_WaitForDownloadCompletionManyConcurrent)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     constexpr int num_threads = 8;
     std::thread threads[num_threads];
     for (int i = 0; i < num_threads; ++i) {
@@ -556,12 +505,12 @@ TEST(Sync_WaitForDownloadCompletionManyConcurrent)
 TEST(Sync_WaitForSessionTerminations)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_bound_session(path, "/test");
+    Session session = fixture.make_bound_session(db, "/test");
     session.wait_for_download_complete_or_client_stopped();
     // Note: Atomicity would not be needed if
     // Session::async_wait_for_download_completion() was assumed to work.
@@ -587,7 +536,7 @@ TEST(Sync_AuthFailure)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(ProtocolError::bad_authentication, ec);
@@ -597,20 +546,13 @@ TEST(Sync_AuthFailure)
         fixture.set_client_side_error_handler(std::move(error_handler));
         fixture.start();
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         std::string wrong_signed_user_token{g_signed_test_user_token};
         wrong_signed_user_token[0] = 'a';
         fixture.bind_session(session, "/test", wrong_signed_user_token);
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -623,7 +565,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
 
         using ConnectionState = Session::ConnectionState;
@@ -641,19 +583,12 @@ TEST(Sync_TokenWithoutExpirationAllowed)
 
         fixture.start();
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         session.set_connection_state_change_listener(listener);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_unspecified);
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -666,7 +601,7 @@ TEST(Sync_TokenWithNullExpirationAllowed)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code, bool, const std::string&) {
             fixture.stop();
@@ -675,17 +610,12 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_null);
         {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
+            write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
                 sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
+            });
         }
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
@@ -699,7 +629,7 @@ TEST(Sync_UnexpiredTokenValidAndExpires)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(ProtocolError::token_expired, ec);
@@ -711,19 +641,12 @@ TEST(Sync_UnexpiredTokenValidAndExpires)
 
         fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
 
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
         session.wait_for_download_complete_or_client_stopped();
@@ -737,7 +660,7 @@ TEST(Sync_RefreshExpiredToken)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(ProtocolError::token_expired, ec);
@@ -749,19 +672,12 @@ TEST(Sync_RefreshExpiredToken)
 
         fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
 
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
         session.refresh(g_signed_test_user_token_expiration_unspecified);
@@ -774,7 +690,7 @@ TEST(Sync_RefreshExpiredToken)
 TEST(Sync_RefreshChangeUserNotAllowed)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
@@ -786,7 +702,7 @@ TEST(Sync_RefreshChangeUserNotAllowed)
     fixture.set_client_side_error_handler(error_handler);
     fixture.start();
 
-    Session session = fixture.make_session(path);
+    Session session = fixture.make_session(db);
     fixture.bind_session(session, "/test", g_user_0_path_test_token);
     session.wait_for_download_complete_or_client_stopped();
 
@@ -801,7 +717,7 @@ TEST(Sync_CannotBindWithExpiredToken)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(ProtocolError::token_expired, ec);
@@ -812,18 +728,11 @@ TEST(Sync_CannotBindWithExpiredToken)
         fixture.start();
         fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -836,7 +745,7 @@ TEST(Sync_CannotRefreshWithExpiredToken)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(ProtocolError::token_expired, ec);
@@ -847,18 +756,11 @@ TEST(Sync_CannotRefreshWithExpiredToken)
         fixture.start();
         fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_unspecified);
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            {
-                WriteTransaction wt(sg);
-                sync::create_table(wt, "class_foo");
-                version_type new_version = wt.commit();
-                session.nonsync_transact_notify(new_version);
-            }
-        }
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
+            sync::create_table(wt, "class_foo");
+        });
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
         session.refresh(g_signed_test_user_token_expiration_specified);
@@ -875,7 +777,7 @@ TEST(Sync_CanRefreshTokenAfterExpirationError)
     // Session::wait_for_download_complete_or_client_stopped().
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
 
     BowlOfStonesSemaphore bowl;
@@ -889,7 +791,7 @@ TEST(Sync_CanRefreshTokenAfterExpirationError)
 
     fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
 
-    Session session = fixture.make_session(path);
+    Session session = fixture.make_session(db);
     fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
     bowl.get_stone();
     session.refresh(g_signed_test_user_token_expiration_unspecified);
@@ -900,25 +802,19 @@ TEST(Sync_CanRefreshTokenAfterExpirationError)
 TEST(Sync_Upload)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
 
     {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-        {
-            WriteTransaction wt(sg);
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             table->add_column(type_Int, "i");
-            version_type new_version = wt.commit();
-            session.nonsync_transact_notify(new_version);
-        }
+        });
         for (int i = 0; i < 100; ++i) {
-            WriteTransaction wt(sg);
+            WriteTransaction wt(db);
             TableRef table = wt.get_table("class_foo");
             table->create_object();
             version_type new_version = wt.commit();
@@ -934,12 +830,8 @@ TEST(Sync_Replication)
 {
     // Replicate changes in file 1 to file 2.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -952,24 +844,20 @@ TEST(Sync_Replication)
             sync_transact_callback_version = new_version.version;
         };
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
+        Session session_1 = fixture.make_bound_session(db_1);
 
-        Session session_2 = fixture.make_session(path_2);
+        Session session_2 = fixture.make_session(db_2);
         session_2.set_sync_transact_callback(std::move(sync_transact_callback));
         fixture.bind_session(session_2, "/test");
 
         // Create schema
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             table->add_column(type_Int, "i");
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         for (int i = 0; i < 100; ++i) {
-            WriteTransaction wt(sg_1);
+            WriteTransaction wt(db_1);
             TableRef table = wt.get_table("class_foo");
             table->create_object();
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
@@ -982,13 +870,13 @@ TEST(Sync_Replication)
         session_2.wait_for_download_complete_or_client_stopped();
 
         {
-            ReadTransaction rt(sg_2);
+            ReadTransaction rt(db_2);
             CHECK_EQUAL(rt.get_version(), sync_transact_callback_version);
         }
     }
 
-    ReadTransaction rt_1(sg_1);
-    ReadTransaction rt_2(sg_2);
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
     const Group& group_1 = rt_1;
     const Group& group_2 = rt_2;
     group_1.verify();
@@ -1002,27 +890,23 @@ TEST(Sync_Replication)
 TEST(Sync_Merge)
 {
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
         MultiClientServerFixture fixture(2, 1, dir, test_context);
         fixture.start();
 
-        Session session_1 = fixture.make_session(0, path_1);
+        Session session_1 = fixture.make_session(0, db_1);
         fixture.bind_session(session_1, 0, "/test");
 
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_2 = fixture.make_session(1, db_2);
         fixture.bind_session(session_2, 0, "/test");
 
         // Create schema on both clients.
-        auto create_schema = [](Session& sess, DBRef sg) {
-            WriteTransaction wt(sg);
+        auto create_schema = [](Session& sess, DBRef db) {
+            WriteTransaction wt(db);
             if (wt.has_table("class_foo"))
                 return;
             TableRef table = sync::create_table(wt, "class_foo");
@@ -1030,25 +914,19 @@ TEST(Sync_Merge)
             version_type new_version = wt.commit();
             sess.nonsync_transact_notify(new_version);
         };
-        create_schema(session_1, sg_1);
-        create_schema(session_2, sg_2);
+        create_schema(session_1, db_1);
+        create_schema(session_2, db_2);
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
             table->create_object().set("i", 5);
             table->create_object().set("i", 6);
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
-        {
-            WriteTransaction wt(sg_2);
+        });
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = wt.get_table("class_foo");
             table->create_object().set("i", 7);
             table->create_object().set("i", 8);
-            version_type new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
@@ -1056,8 +934,8 @@ TEST(Sync_Merge)
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
-    ReadTransaction rt_1(sg_1);
-    ReadTransaction rt_2(sg_2);
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
     const Group& group_1 = rt_1;
     const Group& group_2 = rt_2;
     group_1.verify();
@@ -1070,12 +948,8 @@ TEST(Sync_Merge)
 
 TEST(Sync_DetectSchemaMismatch_ColumnType)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1097,8 +971,8 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1106,23 +980,17 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             ColKey col_ndx = table->add_column(type_Int, "column");
             table->create_object().set<int64_t>(col_ndx, 123);
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             ColKey col_ndx = table->add_column(type_String, "column");
             table->create_object().set(col_ndx, "Hello, World!");
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1133,12 +1001,8 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
 
 TEST(Sync_DetectSchemaMismatch_Nullability)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1160,8 +1024,8 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1169,25 +1033,19 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             bool nullable = false;
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
             table->create_object().set<int64_t>(col_ndx, 123);
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             bool nullable = true;
             ColKey col_ndx = table->add_column(type_Int, "column", nullable);
             table->create_object().set<int64_t>(col_ndx, 123);
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1198,12 +1056,8 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
 
 TEST(Sync_DetectSchemaMismatch_Links)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1225,8 +1079,8 @@ TEST(Sync_DetectSchemaMismatch_Links)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1234,23 +1088,17 @@ TEST(Sync_DetectSchemaMismatch_Links)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_bar");
             table->add_column(*target, "column");
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_baz");
             table->add_column(*target, "column");
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1261,12 +1109,8 @@ TEST(Sync_DetectSchemaMismatch_Links)
 
 TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1288,8 +1132,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1297,19 +1141,13 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             sync::create_table_with_primary_key(wt, "class_foo", type_Int, "a");
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             sync::create_table_with_primary_key(wt, "class_foo", type_Int, "b");
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1320,12 +1158,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
 
 TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1347,8 +1181,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1356,19 +1190,13 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             sync::create_table_with_primary_key(wt, "class_foo", type_Int, "a");
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             sync::create_table_with_primary_key(wt, "class_foo", type_String, "a");
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1379,12 +1207,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
 
 TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -1409,8 +1233,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
             fixture.stop();
         };
 
-        Session session_1 = fixture.make_session(0, path_1);
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_1 = fixture.make_session(0, db_1);
+        Session session_2 = fixture.make_session(1, db_2);
 
         session_1.set_connection_state_change_listener(listener);
         session_2.set_connection_state_change_listener(listener);
@@ -1418,21 +1242,15 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
         fixture.bind_session(session_1, 0, "/test");
         fixture.bind_session(session_2, 0, "/test");
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             bool nullable = false;
             sync::create_table_with_primary_key(wt, "class_foo", type_Int, "a", nullable);
-            auto new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
 
-        {
-            WriteTransaction wt(sg_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             bool nullable = true;
             sync::create_table_with_primary_key(wt, "class_foo", type_Int, "a", nullable);
-            auto new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -1447,44 +1265,32 @@ TEST(Sync_LateBind)
     // Test that a session can be initiated at a point in time where the client
     // already has established a connection to the server.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
         ClientServerFixture fixture(dir, test_context);
         fixture.start();
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
-        {
-            WriteTransaction wt(sg_1);
+        Session session_1 = fixture.make_bound_session(db_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             sync::create_table(wt, "class_foo");
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
+        });
         session_1.wait_for_upload_complete_or_client_stopped();
 
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
-        {
-            WriteTransaction wt(sg_2);
+        Session session_2 = fixture.make_bound_session(db_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             sync::create_table(wt, "class_bar");
-            version_type new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_2.wait_for_upload_complete_or_client_stopped();
 
         session_1.wait_for_download_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
-    ReadTransaction rt_1(sg_1);
-    ReadTransaction rt_2(sg_2);
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
     const Group& group_1 = rt_1;
     const Group& group_2 = rt_2;
     group_1.verify();
@@ -1500,26 +1306,19 @@ TEST(Sync_EarlyUnbind)
     // keeps the connection to the server open.
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    SHARED_GROUP_TEST_PATH(path_3);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+    TEST_CLIENT_DB(db_3);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     // Session 1 is here only to keep the connection alive
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/dummy");
+    Session session_1 = fixture.make_bound_session(db_1, "/dummy");
     {
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
-        {
-            std::unique_ptr<Replication> history = make_client_replication(path_2);
-            DBRef sg = DB::create(*history);
-            WriteTransaction wt(sg);
+        Session session_2 = fixture.make_bound_session(db_2);
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             sync::create_table(wt, "class_foo");
-            version_type new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         session_2.wait_for_upload_complete_or_client_stopped();
         // Session 2 is now connected, but will be abandoned at end of scope
     }
@@ -1527,8 +1326,7 @@ TEST(Sync_EarlyUnbind)
         // Starting a new session 3 forces closure of all previously abandoned
         // sessions, in turn forcing session 2 to be enlisted for writing its
         // UNBIND before session 3 is enlisted for writing BIND.
-        Session session_3 = fixture.make_session(path_3);
-        fixture.bind_session(session_3, "/test");
+        Session session_3 = fixture.make_bound_session(db_3);
         // We now use MARK messages to wait for a complete unbind of session
         // 2. The client is guaranteed to receive the UNBIND response for session
         // 2 before it receives the MARK response for session 3.
@@ -1543,18 +1341,16 @@ TEST(Sync_FastRebind)
     // sessions for the same Realm file.
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     // Session 1 is here only to keep the connection alive
-    Session session_1 = fixture.make_bound_session(path_1, "/dummy");
-    std::unique_ptr<Replication> history = make_client_replication(path_2);
-    DBRef sg = DB::create(*history);
+    Session session_1 = fixture.make_bound_session(db_1, "/dummy");
     {
-        Session session_2 = fixture.make_bound_session(path_2, "/test");
-        WriteTransaction wt(sg);
+        Session session_2 = fixture.make_bound_session(db_2, "/test");
+        WriteTransaction wt(db_2);
         TableRef table = sync::create_table(wt, "class_foo");
         table->add_column(type_Int, "i");
         table->create_object();
@@ -1563,8 +1359,8 @@ TEST(Sync_FastRebind)
         session_2.wait_for_upload_complete_or_client_stopped();
     }
     for (int i = 0; i < 100; ++i) {
-        Session session_2 = fixture.make_bound_session(path_2, "/test");
-        WriteTransaction wt(sg);
+        Session session_2 = fixture.make_bound_session(db_2, "/test");
+        WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_foo");
         table->begin()->set<int64_t>("i", i);
         version_type new_version = wt.commit();
@@ -1581,17 +1377,15 @@ TEST(Sync_UnbindBeforeActivation)
     // server receives the IDENT message.
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     // Session 1 is here only to keep the connection alive
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1);
     for (int i = 0; i < 1000; ++i) {
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
+        Session session_2 = fixture.make_bound_session(db_2);
         session_2.wait_for_upload_complete_or_client_stopped();
     }
 }
@@ -1600,38 +1394,38 @@ TEST(Sync_UnbindBeforeActivation)
 TEST(Sync_AbandonUnboundSessions)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    SHARED_GROUP_TEST_PATH(path_3);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+    TEST_CLIENT_DB(db_3);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
     int n = 32;
     for (int i = 0; i < n; ++i) {
-        fixture.make_session(path_1);
-        fixture.make_session(path_2);
-        fixture.make_session(path_3);
+        fixture.make_session(db_1);
+        fixture.make_session(db_2);
+        fixture.make_session(db_3);
     }
 
     for (int i = 0; i < n; ++i) {
-        fixture.make_session(path_1);
-        Session session = fixture.make_session(path_2);
-        fixture.make_session(path_3);
+        fixture.make_session(db_1);
+        Session session = fixture.make_session(db_2);
+        fixture.make_session(db_3);
         fixture.bind_session(session, "/test");
     }
 
     for (int i = 0; i < n; ++i) {
-        fixture.make_session(path_1);
-        Session session = fixture.make_session(path_2);
-        fixture.make_session(path_3);
+        fixture.make_session(db_1);
+        Session session = fixture.make_session(db_2);
+        fixture.make_session(db_3);
         fixture.bind_session(session, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     for (int i = 0; i < n; ++i) {
-        fixture.make_session(path_1);
-        Session session = fixture.make_session(path_2);
-        fixture.make_session(path_3);
+        fixture.make_session(db_1);
+        Session session = fixture.make_session(db_2);
+        fixture.make_session(db_3);
         fixture.bind_session(session, "/test");
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -1677,75 +1471,58 @@ TEST(Sync_AbandonUnboundSessions)
 TEST_IF(Sync_NonDeterministicMerge, false)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_a1);
-    SHARED_GROUP_TEST_PATH(path_a2);
-    SHARED_GROUP_TEST_PATH(path_a3);
-    SHARED_GROUP_TEST_PATH(path_b1);
-    SHARED_GROUP_TEST_PATH(path_b2);
-    SHARED_GROUP_TEST_PATH(path_b3);
-
-    std::unique_ptr<Replication> history_a1 = make_client_replication(path_a1);
-    DBRef sg_a1 = DB::create(*history_a1);
-    std::unique_ptr<Replication> history_a2 = make_client_replication(path_a2);
-    DBRef sg_a2 = DB::create(*history_a2);
-    std::unique_ptr<Replication> history_a3 = make_client_replication(path_a3);
-    DBRef sg_a3 = DB::create(*history_a3);
-    std::unique_ptr<Replication> history_b1 = make_client_replication(path_b1);
-    DBRef sg_b1 = DB::create(*history_b1);
-    std::unique_ptr<Replication> history_b2 = make_client_replication(path_b2);
-    DBRef sg_b2 = DB::create(*history_b2);
-    std::unique_ptr<Replication> history_b3 = make_client_replication(path_b3);
-    DBRef sg_b3 = DB::create(*history_b3);
+    TEST_CLIENT_DB(db_a1);
+    TEST_CLIENT_DB(db_a2);
+    TEST_CLIENT_DB(db_a3);
+    TEST_CLIENT_DB(db_b1);
+    TEST_CLIENT_DB(db_b2);
+    TEST_CLIENT_DB(db_b3);
 
     ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
     // Part a of the test.
     {
-        WriteTransaction wt{sg_a1};
+        WriteTransaction wt{db_a1};
 
         TableRef table_target = create_table(wt, "class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
         CHECK_EQUAL(col_ndx, 1);
-        ObjKey row0 = table_target->create_object();
-        ObjKey row1 = table_target->create_object();
-        ObjKey row2 = table_target->create_object();
-        table_target->get_object(row0).set(col_ndx, 123);
-        table_target->get_object(row1).set(col_ndx, 456);
-        table_target->get_object(row2).set(col_ndx, 789);
+        Obj row0 = table_target->create_object();
+        Obj row1 = table_target->create_object();
+        Obj row2 = table_target->create_object();
+        row0.set(col_ndx, 123);
+        row1.set(col_ndx, 456);
+        row2.set(col_ndx, 789);
 
         TableRef table_source = create_table(wt, "class_source");
         col_ndx = table_source->add_column_link(type_LinkList, "target_link",
                                                 *table_target);
         CHECK_EQUAL(col_ndx, 1);
-        ObjKey key = table_source->create_object();
-        Obj obj = table_source->get_object(key);
+        Obj obj = table_source->create_object();
         auto ll = obj.get_linklist(col_ndx);
-        ll.insert(0, row2);
+        ll.insert(0, row2.get_key());
         CHECK_EQUAL(ll.size(), 1);
         wt.commit();
     }
 
     {
-        Session session = fixture.make_session(path_a1);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a1, "/server-path-a");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_a2);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a2, "/server-path-a");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_a3);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a3, "/server-path-a");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        WriteTransaction wt{sg_a1};
+        WriteTransaction wt{db_a1};
         TableRef table = wt.get_table("class_target");
         table->remove_object(table->begin());
         CHECK_EQUAL(table->size(), 2);
@@ -1753,7 +1530,7 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        WriteTransaction wt{sg_a2};
+        WriteTransaction wt{db_a2};
         TableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         CHECK_EQUAL(ll->size(), 1);
@@ -1764,7 +1541,7 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        WriteTransaction wt{sg_a3};
+        WriteTransaction wt{db_a3};
         TableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         CHECK_EQUAL(ll->size(), 1);
@@ -1775,32 +1552,28 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        Session session = fixture.make_session(path_a1);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a1, "/server-path-a");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_a2);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a2, "/server-path-a");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_a3);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a3, "/server-path-a");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_a1);
-        fixture.bind_session(session, "/server-path-a");
+        Session session = fixture.make_bound_session(db_a1, "/server-path-a");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     // Part b of the test.
     {
-        WriteTransaction wt{sg_b1};
+        WriteTransaction wt{db_b1};
 
         TableRef table_target = create_table(wt, "class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
@@ -1824,25 +1597,22 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        Session session = fixture.make_session(path_b1);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b1, "/server-path-b");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_b2);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b2, "/server-path-b");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_b3);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b3, "/server-path-b");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        WriteTransaction wt{sg_b1};
+        WriteTransaction wt{db_b1};
         TableRef table = wt.get_table("class_target");
         table->move_last_over(0);
         CHECK_EQUAL(table->size(), 2);
@@ -1850,7 +1620,7 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        WriteTransaction wt{sg_b2};
+        WriteTransaction wt{db_b2};
         TableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         CHECK_EQUAL(ll->size(), 1);
@@ -1861,7 +1631,7 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     }
 
     {
-        WriteTransaction wt{sg_b3};
+        WriteTransaction wt{db_b3};
         TableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         CHECK_EQUAL(ll->size(), 1);
@@ -1874,26 +1644,22 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     // The crucial difference between part a and b is that client 3
     // uploads it changes first in part b and last in part a.
     {
-        Session session = fixture.make_session(path_b3);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b3, "/server-path-b");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_b1);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b1, "/server-path-b");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_b2);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b2, "/server-path-b");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session = fixture.make_session(path_b1);
-        fixture.bind_session(session, "/server-path-b");
+        Session session = fixture.make_bound_session(db_b1, "/server-path-b");
         session.wait_for_download_complete_or_client_stopped();
     }
 
@@ -1904,14 +1670,14 @@ TEST_IF(Sync_NonDeterministicMerge, false)
     size_t size_link_list_b;
 
     {
-        ReadTransaction wt{sg_a1};
+        ReadTransaction wt{db_a1};
         ConstTableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         size_link_list_a = ll->size();
     }
 
     {
-        ReadTransaction wt{sg_b1};
+        ReadTransaction wt{db_b1};
         ConstTableRef table = wt.get_table("class_source");
         auto ll = table->get_linklist(1, 0);
         size_link_list_b = ll->size();
@@ -1932,22 +1698,19 @@ TEST(Sync_Randomized)
 {
     constexpr size_t num_clients = 7;
 
-    auto client_test_program = [](DBRef sg, Session& session) {
+    auto client_test_program = [](DBRef db, Session& session) {
         // Create the schema
-        {
-            WriteTransaction wt(sg);
+        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
             if (wt.has_table("class_foo"))
                 return;
             TableRef table = sync::create_table(wt, "class_foo");
             table->add_column(type_Int, "i");
             table->create_object();
-            version_type new_version = wt.commit();
-            session.nonsync_transact_notify(new_version);
-        }
+        });
 
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         for (int i = 0; i < 100; ++i) {
-            WriteTransaction wt(sg);
+            WriteTransaction wt(db);
             if (random.chance(4, 5)) {
                 TableRef table = wt.get_table("class_foo");
                 if (random.chance(1, 5)) {
@@ -1967,22 +1730,18 @@ TEST(Sync_Randomized)
     fixture.start();
 
     std::unique_ptr<DBTestPathGuard> client_path_guards[num_clients];
-    std::unique_ptr<Replication> client_histories[num_clients];
     DBRef client_shared_groups[num_clients];
     for (size_t i = 0; i < num_clients; ++i) {
-        std::ostringstream out;
-        out << ".client_" << i << ".realm";
-        std::string suffix = out.str();
+        std::string suffix = util::format(".client_%1.realm", i);
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         client_path_guards[i].reset(new DBTestPathGuard(test_path));
-        client_histories[i] = make_client_replication(test_path);
-        client_shared_groups[i] = DB::create(*client_histories[i]);
+        client_shared_groups[i] = DB::create(make_client_replication(test_path));
     }
 
     std::unique_ptr<Session> sessions[num_clients];
     for (size_t i = 0; i < num_clients; ++i) {
-        std::string path = *client_path_guards[i];
-        sessions[i].reset(new Session(fixture.make_session(int(i), path)));
+        auto db = client_shared_groups[i];
+        sessions[i].reset(new Session(fixture.make_session(int(i), db)));
         fixture.bind_session(*sessions[i], 0, "/test");
     }
 
@@ -2037,7 +1796,7 @@ TEST(Sync_Randomized)
 TEST(Sync_ReadFailureSimulation)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
+    TEST_CLIENT_DB(db);
 
     // Check that read failure simulation works on the client-side
     {
@@ -2052,7 +1811,7 @@ TEST(Sync_ReadFailureSimulation)
                 client_side_read_did_fail = true;
             };
             fixture.set_client_side_error_handler(error_handler);
-            Session session = fixture.make_bound_session(client_path, "/test");
+            Session session = fixture.make_bound_session(db, "/test");
             fixture.start();
             session.wait_for_download_complete_or_client_stopped();
         }
@@ -2063,17 +1822,13 @@ TEST(Sync_ReadFailureSimulation)
     // the server-side
 }
 
-#endif
+#endif // REALM_DEBUG
 
 
 TEST(Sync_FailingReadsOnClientSide)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -2086,46 +1841,32 @@ TEST(Sync_FailingReadsOnClientSide)
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
+        Session session_1 = fixture.make_bound_session(db_1);
 
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
+        Session session_2 = fixture.make_bound_session(db_2);
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             table->add_column(type_Int, "i");
             table->create_object();
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
-        {
-            WriteTransaction wt(sg_2);
+        });
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_bar");
             table->add_column(type_Int, "i");
             table->create_object();
-            version_type new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         for (int i = 0; i < 100; ++i) {
             session_1.wait_for_upload_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
             for (int i = 0; i < 10; ++i) {
-                {
-                    WriteTransaction wt(sg_1);
+                write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_foo");
                     table->begin()->set("i", i);
-                    version_type new_version = wt.commit();
-                    session_1.nonsync_transact_notify(new_version);
-                }
-                {
-                    WriteTransaction wt(sg_2);
+                });
+                write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_bar");
                     table->begin()->set("i", i);
-                    version_type new_version = wt.commit();
-                    session_2.nonsync_transact_notify(new_version);
-                }
+                });
             }
         }
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -2134,8 +1875,8 @@ TEST(Sync_FailingReadsOnClientSide)
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
-    ReadTransaction rt_1(sg_1);
-    ReadTransaction rt_2(sg_2);
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
     const Group& group_1 = rt_1;
     const Group& group_2 = rt_2;
     group_1.verify();
@@ -2146,12 +1887,8 @@ TEST(Sync_FailingReadsOnClientSide)
 
 TEST(Sync_FailingReadsOnServerSide)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
         TEST_DIR(dir);
@@ -2164,46 +1901,32 @@ TEST(Sync_FailingReadsOnServerSide)
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
+        Session session_1 = fixture.make_bound_session(db_1);
 
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
+        Session session_2 = fixture.make_bound_session(db_2);
 
-        {
-            WriteTransaction wt(sg_1);
+        write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_foo");
             table->add_column(type_Int, "i");
             table->create_object();
-            version_type new_version = wt.commit();
-            session_1.nonsync_transact_notify(new_version);
-        }
-        {
-            WriteTransaction wt(sg_2);
+        });
+        write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
             TableRef table = sync::create_table(wt, "class_bar");
             table->add_column(type_Int, "i");
             table->create_object();
-            version_type new_version = wt.commit();
-            session_2.nonsync_transact_notify(new_version);
-        }
+        });
         for (int i = 0; i < 100; ++i) {
             session_1.wait_for_upload_complete_or_client_stopped();
             session_2.wait_for_upload_complete_or_client_stopped();
             for (int i = 0; i < 10; ++i) {
-                {
-                    WriteTransaction wt(sg_1);
+                write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_foo");
                     table->begin()->set("i", i);
-                    version_type new_version = wt.commit();
-                    session_1.nonsync_transact_notify(new_version);
-                }
-                {
-                    WriteTransaction wt(sg_2);
+                });
+                write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
                     TableRef table = wt.get_table("class_bar");
                     table->begin()->set("i", i);
-                    version_type new_version = wt.commit();
-                    session_2.nonsync_transact_notify(new_version);
-                }
+                });
             }
         }
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -2212,8 +1935,8 @@ TEST(Sync_FailingReadsOnServerSide)
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
-    ReadTransaction rt_1(sg_1);
-    ReadTransaction rt_2(sg_2);
+    ReadTransaction rt_1(db_1);
+    ReadTransaction rt_2(db_2);
     const Group& group_1 = rt_1;
     const Group& group_2 = rt_2;
     group_1.verify();
@@ -2225,10 +1948,7 @@ TEST(Sync_FailingReadsOnServerSide)
 TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
-
-    std::unique_ptr<Replication> history = make_client_replication(client_path);
-    DBRef sg = DB::create(*history);
+    TEST_CLIENT_DB(db);
 
     std::string server_path = "/test";
     std::string server_realm_path;
@@ -2237,8 +1957,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
     {
         ClientServerFixture fixture(server_dir, test_context);
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
-        Session session = fixture.make_bound_session(client_path, server_path);
-        WriteTransaction wt{sg};
+        Session session = fixture.make_bound_session(db, server_path);
+        WriteTransaction wt{db};
         sync::create_table(wt, "class_table");
         auto new_version = wt.commit();
         session.nonsync_transact_notify(new_version);
@@ -2260,7 +1980,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdent)
             fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
-        Session session = fixture.make_bound_session(client_path, server_path);
+        Session session = fixture.make_bound_session(db, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -2594,31 +2314,29 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
 TEST(Sync_HttpApiCompact)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/db_1");
+    Session session_1 = fixture.make_bound_session(db_1, "/db_1");
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    auto sg_1 = DB::create(*history_1);
+    auto db_1 = DB::create(*history_1);
 
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/db_2");
+    Session session_2 = fixture.make_bound_session(db_2, "/db_2");
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    auto sg_2 = DB::create(*history_2);
+    auto db_2 = DB::create(*history_2);
 
-    auto create_schema = [](Session& sess, DBRef sg) {
-        WriteTransaction wt(sg);
+    auto create_schema = [](Session& sess, DBRef db) {
+        WriteTransaction wt(db);
         TableRef table = sync::create_table_with_primary_key(wt, "class_items", type_String, "a");
         table->add_column(type_Int, "i");
         version_type new_version = wt.commit();
         sess.nonsync_transact_notify(new_version);
     };
-    create_schema(session_1, sg_1);
-    create_schema(session_2, sg_2);
+    create_schema(session_1, db_1);
+    create_schema(session_2, db_2);
 
     auto insert_objects = [](WriteTransaction& wt, size_t counter, int number_of_objects) {
         TableRef table = wt.get_table("class_items");
@@ -2634,7 +2352,7 @@ TEST(Sync_HttpApiCompact)
     size_t counter = 0;
 
     for (size_t i = 0; i < 1; ++i) {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         insert_objects(wt, counter, 400);
         version_type new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -2642,7 +2360,7 @@ TEST(Sync_HttpApiCompact)
     }
 
     for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt{sg_2};
+        WriteTransaction wt{db_2};
         insert_objects(wt, counter, 300);
         version_type new_version = wt.commit();
         session_2.nonsync_transact_notify(new_version);
@@ -2669,29 +2387,27 @@ TEST(Sync_HttpApiCompact)
     CHECK_LESS(size_after_1, size_before_1);
     CHECK_LESS(size_after_2, size_before_2);
 
-    auto check_groups = [&](DBRef sg_external, const std::string& server_path) {
-        SHARED_GROUP_TEST_PATH(path);
-        Session session = fixture.make_session(path);
-        fixture.bind_session(session, server_path);
+    auto check_groups = [&](DBRef db_external, const std::string& server_path) {
+        TEST_CLIENT_DB(db);
+        Session session = fixture.make_bound_session(db, server_path);
         session.wait_for_download_complete_or_client_stopped();
 
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        auto sg = DB::create(*history);
-        ReadTransaction rt_1(sg);
-        ReadTransaction rt_2(sg_external);
+        auto db = DB::create(make_client_replication(path));
+        ReadTransaction rt_1(db);
+        ReadTransaction rt_2(db_external);
         CHECK(compare_groups(rt_1, rt_2));
         session.detach();
         fixture.wait_for_session_terminations_or_client_stopped();
     };
 
-    check_groups(sg_1, "/db_1");
-    check_groups(sg_2, "/db_2");
+    check_groups(db_1, "/db_1");
+    check_groups(db_2, "/db_2");
 
     // First cycle is complete. Repeat. The amount of data is slightly
     // changes.
 
     for (size_t i = 0; i < 2; ++i) {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         insert_objects(wt, counter, 700);
         version_type new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -2699,7 +2415,7 @@ TEST(Sync_HttpApiCompact)
     }
 
     for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt{sg_2};
+        WriteTransaction wt{db_2};
         insert_objects(wt, counter, 300);
         version_type new_version = wt.commit();
         session_2.nonsync_transact_notify(new_version);
@@ -2721,8 +2437,8 @@ TEST(Sync_HttpApiCompact)
     CHECK_LESS(size_after_1, size_before_1);
     CHECK_LESS(size_after_2, size_before_2);
 
-    check_groups(sg_1, "/db_1");
-    check_groups(sg_2, "/db_2");
+    check_groups(db_1, "/db_1");
+    check_groups(db_2, "/db_2");
 }
 
 #endif // _WIN32
@@ -2739,13 +2455,10 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     REALM_ASSERT(disable_state_realms);
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
-
-    std::unique_ptr<Replication> history = make_client_replication(client_path);
-    DBRef sg = DB::create(*history);
+    TEST_CLIENT_DB(db);
 
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         sync::create_table(wt, "class_table-1");
         wt.commit();
     }
@@ -2767,7 +2480,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     };
 
     fixture.set_client_side_error_handler(error_handler);
-    Session session = fixture.make_bound_session(client_path, server_path);
+    Session session = fixture.make_bound_session(db, server_path);
     fixture.start();
     session.wait_for_upload_complete_or_client_stopped();
 
@@ -2809,12 +2522,9 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     CHECK(!util::File::exists(server_realm_file_lock));
     CHECK(!util::File::exists(server_realm_file_management));
 
-    {
-        WriteTransaction wt{sg};
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         sync::create_table(wt, "class_table-2");
-        version_type version = wt.commit();
-        session.nonsync_transact_notify(version);
-    }
+    });
 
     session.wait_for_upload_complete_or_client_stopped();
 
@@ -2838,8 +2548,8 @@ TEST(Sync_RealmDeletionWhenStateRealmsDisabled)
 TEST(Sync_RealmDeletionEmptyDir)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path_1);
-    SHARED_GROUP_TEST_PATH(client_path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
@@ -2854,31 +2564,25 @@ TEST(Sync_RealmDeletionEmptyDir)
 
     // Create the Realm at path = /u/project/task/test. This Realm will be deleted later.
     {
-        std::unique_ptr<Replication> history = make_client_replication(client_path_1);
-        DBRef sg = DB::create(*history);
-
         {
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db_1};
             sync::create_table(wt, "class_table-1");
             wt.commit();
         }
 
-        Session session = fixture.make_bound_session(client_path_1, server_path);
+        Session session = fixture.make_bound_session(db_1, server_path);
         session.wait_for_download_complete_or_client_stopped();
     }
 
     // Create another Realm at path = /u/test. This Realm will not be deleted.
     {
-        std::unique_ptr<Replication> history = make_client_replication(client_path_2);
-        DBRef sg = DB::create(*history);
-
         {
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db_2};
             sync::create_table(wt, "class_table-1");
             wt.commit();
         }
 
-        Session session = fixture.make_bound_session(client_path_2, "/u/test");
+        Session session = fixture.make_bound_session(db_2, "/u/test");
         session.wait_for_download_complete_or_client_stopped();
     }
 
@@ -2908,10 +2612,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
 {
     TEST_DIR(server_dir);
     TEST_DIR(backup_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
-
-    std::unique_ptr<Replication> history = make_client_replication(client_path);
-    DBRef sg = DB::create(*history);
+    TEST_CLIENT_DB(db);
 
     std::string server_path = "/test";
     std::string server_realm_path;
@@ -2921,8 +2622,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
     {
         ClientServerFixture fixture(server_dir, test_context);
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
-        Session session = fixture.make_bound_session(client_path, server_path);
-        WriteTransaction wt{sg};
+        Session session = fixture.make_bound_session(db, server_path);
+        WriteTransaction wt{db};
         TableRef table = sync::create_table(wt, "class_table");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
@@ -2937,8 +2638,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
     // Make change in which will be lost when restoring snapshot
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path, server_path);
-        WriteTransaction wt{sg};
+        Session session = fixture.make_bound_session(db, server_path);
+        WriteTransaction wt{db};
         TableRef table = wt.get_table("class_table");
         table->create_object();
         auto new_version = wt.commit();
@@ -2961,7 +2662,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersion)
             fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
-        Session session = fixture.make_bound_session(client_path, server_path);
+        Session session = fixture.make_bound_session(db, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -2973,13 +2674,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
 {
     TEST_DIR(server_dir);
     TEST_DIR(backup_dir);
-    SHARED_GROUP_TEST_PATH(client_path_1);
-    SHARED_GROUP_TEST_PATH(client_path_2);
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(client_path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(client_path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     std::string server_path = "/test";
     std::string server_realm_path;
@@ -2989,9 +2685,9 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
     {
         ClientServerFixture fixture(server_dir, test_context);
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
-        Session session_1 = fixture.make_bound_session(client_path_1, server_path);
-        Session session_2 = fixture.make_bound_session(client_path_2, server_path);
-        WriteTransaction wt{sg_1};
+        Session session_1 = fixture.make_bound_session(db_1, server_path);
+        Session session_2 = fixture.make_bound_session(db_2, server_path);
+        WriteTransaction wt{db_1};
         TableRef table = sync::create_table(wt, "class_table");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
@@ -3007,8 +2703,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
     // Make change in 1st file which will be lost when restoring snapshot
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path_1, server_path);
-        WriteTransaction wt{sg_1};
+        Session session = fixture.make_bound_session(db_1, server_path);
+        WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
         table->create_object();
         auto new_version = wt.commit();
@@ -3023,8 +2719,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
     // Make a conflicting change in 2nd file relative to reverted server state
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path_2, server_path);
-        WriteTransaction wt{sg_2};
+        Session session = fixture.make_bound_session(db_2, server_path);
+        WriteTransaction wt{db_2};
         TableRef table = wt.get_table("class_table");
         table->create_object();
         auto new_version = wt.commit();
@@ -3044,7 +2740,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientVersion)
             fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
-        Session session = fixture.make_bound_session(client_path_1, server_path);
+        Session session = fixture.make_bound_session(db_1, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -3056,14 +2752,9 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
 {
     TEST_DIR(server_dir);
     TEST_DIR(backup_dir);
-    SHARED_GROUP_TEST_PATH(client_path_1);
-    SHARED_GROUP_TEST_PATH(client_path_2);
-    SHARED_GROUP_TEST_PATH(client_path_3);
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(client_path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(client_path_2);
-    std::unique_ptr<Replication> history_3 = make_client_replication(client_path_3);
-    DBRef sg = DB::create(*history_1);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+    TEST_CLIENT_DB(db_3);
 
     std::string server_path = "/test";
     std::string server_realm_path;
@@ -3073,8 +2764,8 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
     {
         ClientServerFixture fixture(server_dir, test_context);
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
-        Session session = fixture.make_bound_session(client_path_1, server_path);
-        WriteTransaction wt{sg};
+        Session session = fixture.make_bound_session(db_1, server_path);
+        WriteTransaction wt{db_1};
         TableRef table = sync::create_table(wt, "class_table_1");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
@@ -3089,7 +2780,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
     // Register 2nd file with server
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path_2, server_path);
+        Session session = fixture.make_bound_session(db_2, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -3100,7 +2791,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
     // Register 3rd conflicting file with server
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path_3, server_path);
+        Session session = fixture.make_bound_session(db_3, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -3116,7 +2807,7 @@ TEST(Sync_ErrorAfterServerRestore_BadClientFileIdentSalt)
             fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
-        Session session = fixture.make_bound_session(client_path_2, server_path);
+        Session session = fixture.make_bound_session(db_2, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -3128,16 +2819,9 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
 {
     TEST_DIR(server_dir);
     TEST_DIR(backup_dir);
-    SHARED_GROUP_TEST_PATH(client_path_1);
-    SHARED_GROUP_TEST_PATH(client_path_2);
-    SHARED_GROUP_TEST_PATH(client_path_3);
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(client_path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(client_path_2);
-    std::unique_ptr<Replication> history_3 = make_client_replication(client_path_3);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
-    DBRef sg_3 = DB::create(*history_3);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+    TEST_CLIENT_DB(db_3);
 
     std::string server_path = "/test";
     std::string server_realm_path;
@@ -3147,10 +2831,10 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
     {
         ClientServerFixture fixture(server_dir, test_context);
         server_realm_path = fixture.map_virtual_to_real_path(server_path);
-        Session session_1 = fixture.make_bound_session(client_path_1, server_path);
-        Session session_2 = fixture.make_bound_session(client_path_2, server_path);
-        Session session_3 = fixture.make_bound_session(client_path_3, server_path);
-        WriteTransaction wt{sg_1};
+        Session session_1 = fixture.make_bound_session(db_1, server_path);
+        Session session_2 = fixture.make_bound_session(db_2, server_path);
+        Session session_3 = fixture.make_bound_session(db_3, server_path);
+        WriteTransaction wt{db_1};
         TableRef table = sync::create_table(wt, "class_table");
         table->add_column(type_Int, "column");
         auto new_version = wt.commit();
@@ -3168,9 +2852,9 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
     // make 2nd file download it.
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session_1 = fixture.make_bound_session(client_path_1, server_path);
-        Session session_2 = fixture.make_bound_session(client_path_2, server_path);
-        WriteTransaction wt{sg_1};
+        Session session_1 = fixture.make_bound_session(db_1, server_path);
+        Session session_2 = fixture.make_bound_session(db_2, server_path);
+        WriteTransaction wt{db_1};
         TableRef table = wt.get_table("class_table");
         table->create_object();
         auto new_version = wt.commit();
@@ -3186,8 +2870,8 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
     // Make a conflicting change in 3rd file relative to reverted server state
     {
         ClientServerFixture fixture(server_dir, test_context);
-        Session session = fixture.make_bound_session(client_path_3, server_path);
-        WriteTransaction wt{sg_3};
+        Session session = fixture.make_bound_session(db_3, server_path);
+        WriteTransaction wt{db_3};
         TableRef table = wt.get_table("class_table");
         table->create_object();
         auto new_version = wt.commit();
@@ -3207,7 +2891,7 @@ TEST(Sync_ErrorAfterServerRestore_BadServerVersionSalt)
             fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
-        Session session = fixture.make_bound_session(client_path_2, server_path);
+        Session session = fixture.make_bound_session(db_2, server_path);
         fixture.start();
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -3241,10 +2925,9 @@ TEST(Sync_MultipleServers)
     auto run = [&](int server_index, int realm_index, int file_index) {
         try {
             std::string path = get_file_path(server_index, realm_index, file_index);
-            std::unique_ptr<Replication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
+            DBRef db = DB::create(make_client_replication(path));
             {
-                WriteTransaction wt(sg);
+                WriteTransaction wt(db);
                 TableRef table = sync::create_table(wt, "class_table");
                 table->add_column(type_Int, "server_index");
                 table->add_column(type_Int, "realm_index");
@@ -3256,10 +2939,10 @@ TEST(Sync_MultipleServers)
             std::string server_path = "/" + std::to_string(realm_index);
             for (int i = 0; i < num_sessions_per_file; ++i) {
                 int client_index = 0;
-                Session session = fixture.make_session(client_index, path);
+                Session session = fixture.make_session(client_index, db);
                 fixture.bind_session(session, server_index, server_path);
                 for (int j = 0; j < num_transacts_per_session; ++j) {
-                    WriteTransaction wt(sg);
+                    WriteTransaction wt(db);
                     TableRef table = wt.get_table("class_table");
                     Obj obj = table->create_object();
                     obj.set("server_index", server_index);
@@ -3283,8 +2966,9 @@ TEST(Sync_MultipleServers)
         try {
             int client_index = 0;
             std::string path = get_file_path(server_index, realm_index, file_index);
+            DBRef db = DB::create(make_client_replication(path));
             std::string server_path = "/" + std::to_string(realm_index);
-            Session session = fixture.make_session(client_index, path);
+            Session session = fixture.make_session(client_index, db);
             fixture.bind_session(session, server_index, server_path);
             session.wait_for_download_complete_or_client_stopped();
         }
@@ -3346,8 +3030,8 @@ TEST(Sync_MultipleServers)
             int file_index_0 = 0;
             std::string path_0 = get_file_path(int(i), int(j), file_index_0);
             std::unique_ptr<Replication> history_0 = make_client_replication(path_0);
-            DBRef sg_0 = DB::create(*history_0);
-            ReadTransaction rt_0(sg_0);
+            DBRef db_0 = DB::create(*history_0);
+            ReadTransaction rt_0(db_0);
             {
                 ConstTableRef table = rt_0.get_table("class_table");
                 if (CHECK(table)) {
@@ -3367,9 +3051,8 @@ TEST(Sync_MultipleServers)
             }
             for (int k = 1; k < num_files_per_realm; ++k) {
                 std::string path = get_file_path(int(i), int(j), k);
-                std::unique_ptr<Replication> history = make_client_replication(path);
-                DBRef sg = DB::create(*history);
-                ReadTransaction rt(sg);
+                DBRef db = DB::create(make_client_replication(path));
+                ReadTransaction rt(db);
                 CHECK(compare_groups(rt_0, rt));
             }
         }
@@ -3379,12 +3062,8 @@ TEST(Sync_MultipleServers)
 
 TEST_IF(Sync_ReadOnlyClient, false)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(server_dir);
     MultiClientServerFixture fixture(2, 1, server_dir, test_context);
@@ -3398,8 +3077,8 @@ TEST_IF(Sync_ReadOnlyClient, false)
 
     // Write some stuff from the client that can upload
     {
-        Session session_1 = fixture.make_bound_session(0, path_1, 0, "/test");
-        WriteTransaction wt(sg_1);
+        Session session_1 = fixture.make_bound_session(0, db_1, 0, "/test");
+        WriteTransaction wt(db_1);
         auto table = sync::create_table(wt, "class_foo");
         table->add_column(type_Int, "i");
         table->create_object();
@@ -3410,16 +3089,16 @@ TEST_IF(Sync_ReadOnlyClient, false)
 
     // Check that the stuff was received on the read-only client
     {
-        Session session_2 = fixture.make_bound_session(1, path_2, 0, "/test", g_signed_test_user_token_readonly);
+        Session session_2 = fixture.make_bound_session(1, db_2, 0, "/test", g_signed_test_user_token_readonly);
         session_2.wait_for_download_complete_or_client_stopped();
         {
-            ReadTransaction rt(sg_2);
+            ReadTransaction rt(db_2);
             auto table = rt.get_table("class_foo");
             CHECK_EQUAL(table->begin()->get<Int>("i"), 123);
         }
         // Try to upload something
         {
-            WriteTransaction wt(sg_2);
+            WriteTransaction wt(db_2);
             auto table = wt.get_table("class_foo");
             table->begin()->set("i", 456);
             session_2.nonsync_transact_notify(wt.commit());
@@ -3430,115 +3109,12 @@ TEST_IF(Sync_ReadOnlyClient, false)
 
     // Check that the original client was unchanged
     {
-        Session session_1 = fixture.make_bound_session(0, path_1, 0, "/test");
+        Session session_1 = fixture.make_bound_session(0, db_1, 0, "/test");
         session_1.wait_for_download_complete_or_client_stopped();
-        ReadTransaction rt(sg_1);
+        ReadTransaction rt(db_1);
         auto table = rt.get_table("class_foo");
         CHECK_EQUAL(table->begin()->get<Int>("i"), 123);
     }
-}
-
-
-TEST_IF(Sync_ClientFileIdentSpoofing, false)
-{
-    // NOTE: This test creates sessions for the same Realm file in the context
-    // of multiple Client objects which overlap in time. This is illegal use of
-    // the API (see Session class documentation). It is illegal because it
-    // generally leads to corruption in the synchronization mechanism. At some
-    // point, a check will be added to avoid such overlapping sessions, and at
-    // that time, this test will have to be deleted.
-    //
-    // Note: That check was added in https://github.com/realm/realm-sync/pull/993
-
-    TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
-
-    int num_clients = 3;
-    MultiClientServerFixture fixture{num_clients, 1, server_dir, test_context};
-    fixture.start();
-
-    {
-        Session session = fixture.make_session(0, client_path);
-        fixture.bind_session(session, 0, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    version_type current_client_version;
-    SaltedFileIdent client_file_ident;
-    SyncProgress progress;
-
-    {
-        std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
-        DBRef shared_group = DB::create(*history);
-
-        history->get_status(current_client_version, client_file_ident, progress);
-    }
-    CHECK_EQUAL(client_file_ident.ident, 1);
-
-    int active_client = 0;
-    int errors_seen[3] = {};
-
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        errors_seen[active_client]++;
-        CHECK_EQUAL(ProtocolError::bad_client_file_ident, ec);
-        fixture.get_client(active_client).stop();
-    };
-
-    file_ident_type client_file_ident_spoofed = 2;
-    salt_type client_file_ident_salt_spoofed = client_file_ident.salt + 1;
-
-    // The client file ident is spoofed to 2.
-    {
-        std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
-        DBRef shared_group = DB::create(*history);
-        bool fix_up_object_ids = true;
-        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident.salt}, fix_up_object_ids);
-    }
-
-    {
-        fixture.set_client_side_error_handler(active_client, error_handler);
-        Session session = fixture.make_session(active_client, client_path);
-        fixture.bind_session(session, 0, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-
-    active_client = 1;
-    // The client file ident secret is spoofed.
-    {
-        std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
-        DBRef shared_group = DB::create(*history);
-        bool fix_up_object_ids = true;
-        history->set_client_file_ident({client_file_ident.ident, client_file_ident_salt_spoofed}, fix_up_object_ids);
-    }
-
-    {
-        fixture.set_client_side_error_handler(active_client, error_handler);
-        Session session = fixture.make_session(active_client, client_path);
-        fixture.bind_session(session, 0, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    active_client = 2;
-    // The client file ident and client file ident secret are both invalid.
-    {
-        std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
-        DBRef shared_group = DB::create(*history);
-        bool fix_up_object_ids = true;
-        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident_salt_spoofed},
-                                       fix_up_object_ids);
-    }
-
-    {
-        fixture.set_client_side_error_handler(active_client, error_handler);
-        Session session = fixture.make_session(active_client, client_path);
-        fixture.bind_session(session, 0, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    CHECK_EQUAL(errors_seen[0], 1);
-    CHECK_EQUAL(errors_seen[1], 1);
-    CHECK_EQUAL(errors_seen[2], 1);
 }
 
 
@@ -3555,20 +3131,18 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
                 number_of_transactions);
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    auto sg = DB::create(*history);
     ColKey col_int;
     ColKey col_str;
     ColKey col_dbl;
     ColKey col_time;
 
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = sync::create_table(wt, "class_table");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
@@ -3577,12 +3151,11 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
         wt.commit();
     }
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     session.wait_for_upload_complete_or_client_stopped();
 
     for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_table");
         auto obj = tr->create_object();
         int_fast32_t number = i;
@@ -3621,13 +3194,10 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
                 number_of_transactions);
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
-
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    auto sg = DB::create(*history);
 
     ColKey col_int;
     ColKey col_str;
@@ -3636,7 +3206,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
     ObjKey obj_key;
 
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = sync::create_table(wt, "class_table");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
@@ -3646,12 +3216,11 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
         wt.commit();
     }
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     session.wait_for_upload_complete_or_client_stopped();
 
     for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_table");
         int_fast32_t number = i;
         auto obj = tr->get_object(obj_key);
@@ -3696,17 +3265,13 @@ TEST(Sync_LargeUploadDownloadPerformance)
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-
-    SHARED_GROUP_TEST_PATH(path_upload);
-    std::unique_ptr<Replication> history_upload = make_client_replication(path_upload);
-    DBRef sg_upload = DB::create(*history_upload);
-
+    TEST_CLIENT_DB(db_upload);
 
     // Populate path_upload realm with data.
     auto start_data_creation = std::chrono::steady_clock::now();
     {
         {
-            WriteTransaction wt{sg_upload};
+            WriteTransaction wt{db_upload};
             TableRef tr = sync::create_table(wt, "class_table");
             tr->add_column(type_Int, "integer column");
             tr->add_column(type_String, "string column");
@@ -3716,7 +3281,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
         }
 
         for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-            WriteTransaction wt{sg_upload};
+            WriteTransaction wt{db_upload};
             TableRef tr = wt.get_table("class_table");
             for (int_fast32_t j = 0; j < number_of_rows_per_transaction; ++j) {
                 Obj obj = tr->create_object();
@@ -3740,8 +3305,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     // Upload the data.
     auto start_session_upload = std::chrono::steady_clock::now();
 
-    Session session_upload = fixture.make_session(path_upload);
-    fixture.bind_session(session_upload, "/test");
+    Session session_upload = fixture.make_bound_session(db_upload);
     session_upload.wait_for_upload_complete_or_client_stopped();
 
     auto end_session_upload = std::chrono::steady_clock::now();
@@ -3754,23 +3318,22 @@ TEST(Sync_LargeUploadDownloadPerformance)
     // Download the data to the download realms.
     auto start_sesion_download = std::chrono::steady_clock::now();
 
-    std::vector<std::unique_ptr<DBTestPathGuard>> shared_group_test_path_guards;
+    std::vector<DBTestPathGuard> shared_group_test_path_guards;
+    std::vector<DBRef> dbs;
     std::vector<Session> sessions;
 
     for (int i = 0; i < number_of_download_clients; ++i) {
         std::string path = get_test_path(test_context.get_test_name(), std::to_string(i));
-        std::unique_ptr<DBTestPathGuard> sgg = std::make_unique<DBTestPathGuard>(path);
-        shared_group_test_path_guards.push_back(std::move(sgg));
-        Session session = fixture.make_session(path);
-        fixture.bind_session(session, "/test");
-        sessions.push_back(std::move(session));
+        shared_group_test_path_guards.emplace_back(path);
+        dbs.push_back(DB::create(make_client_replication(path)));
+        sessions.push_back(fixture.make_bound_session(dbs.back()));
     }
 
     // Wait for all Realms to finish. They might finish in another order than
     // started, but calling download_complete on a client after it finished only
     // adds a tiny amount of extra mark messages.
-    for (int i = 0; i < number_of_download_clients; ++i)
-        sessions[i].wait_for_download_complete_or_client_stopped();
+    for (auto& session : sessions)
+        session.wait_for_download_complete_or_client_stopped();
 
 
     auto end_session_download = std::chrono::steady_clock::now();
@@ -3782,15 +3345,10 @@ TEST(Sync_LargeUploadDownloadPerformance)
 
     // Check convergence.
     for (int i = 0; i < number_of_download_clients; ++i) {
-        ReadTransaction rt_1(sg_upload);
-        std::string path = *shared_group_test_path_guards[i];
-        auto sync_history = make_client_replication(path);
-        DBRef sg_2 = DB::create(*sync_history);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_upload);
+        ReadTransaction rt_2(dbs[i]);
         CHECK(compare_groups(rt_1, rt_2));
     }
-
-    fixture.stop();
 }
 
 
@@ -3803,21 +3361,16 @@ TEST_IF(Sync_4GB_Messages, false)
     const uint64_t approximate_changeset_size = uint64_t(1) << 32;
 
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1);
     session_1.wait_for_download_complete_or_client_stopped();
 
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
+    Session session_2 = fixture.make_bound_session(db_2);
     session_2.wait_for_download_complete_or_client_stopped();
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    auto sg_1 = DB::create(*history_1);
 
     const size_t single_object_data_size = size_t(1e7); // 10 MB which is below the 16 MB limit
     const size_t num_objects = size_t(approximate_changeset_size / single_object_data_size + 1);
@@ -3832,7 +3385,7 @@ TEST_IF(Sync_4GB_Messages, false)
     BinaryData bd_c(str_c.data(), single_object_data_size);
 
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
 
         TableRef tr = sync::create_table(wt, "class_simple_data");
         auto col_key = tr->add_column(type_Binary, "binary column");
@@ -3853,15 +3406,12 @@ TEST_IF(Sync_4GB_Messages, false)
         session_1.nonsync_transact_notify(new_version);
     }
     session_1.wait_for_upload_complete_or_client_stopped();
-
     session_2.wait_for_download_complete_or_client_stopped();
 
     // Check convergence.
     {
-        ReadTransaction rt_1(sg_1);
-        std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-        auto sg_2 = DB::create(*history_2);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 }
@@ -3870,12 +3420,11 @@ TEST_IF(Sync_4GB_Messages, false)
 TEST(Sync_RefreshSignedUserToken)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     session.wait_for_download_complete_or_client_stopped();
     session.refresh(g_signed_test_user_token);
     session.wait_for_download_complete_or_client_stopped();
@@ -3891,30 +3440,23 @@ TEST(Sync_RefreshSignedUserToken)
 TEST(Sync_RefreshRightAfterBind)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     for (int i = 0; i < 50; ++i) {
         session.refresh(g_signed_test_user_token_readonly);
         std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
     session.wait_for_download_complete_or_client_stopped();
-    fixture.stop();
 }
 
 
 TEST(Sync_Permissions)
 {
-    SHARED_GROUP_TEST_PATH(path_valid);
-    std::unique_ptr<Replication> history_valid = make_client_replication(path_valid);
-    DBRef sg_valid = DB::create(*history_valid);
-
-    SHARED_GROUP_TEST_PATH(path_invalid);
-    std::unique_ptr<Replication> history_invalid = make_client_replication(path_invalid);
-    DBRef sg_invalid = DB::create(*history_invalid);
+    TEST_CLIENT_DB(db_valid);
+    TEST_CLIENT_DB(db_invalid);
 
     bool did_see_error_for_valid = false;
     bool did_see_error_for_invalid = false;
@@ -3936,90 +3478,23 @@ TEST(Sync_Permissions)
     });
     fixture.start();
 
-    Session session_valid = fixture.make_bound_session(0, path_valid, 0, "/valid", g_signed_test_user_token_for_path);
+    Session session_valid = fixture.make_bound_session(0, db_valid, 0, "/valid", g_signed_test_user_token_for_path);
     Session session_invalid =
-        fixture.make_bound_session(1, path_invalid, 0, "/invalid", g_signed_test_user_token_for_path);
+        fixture.make_bound_session(1, db_invalid, 0, "/invalid", g_signed_test_user_token_for_path);
 
     // Insert some dummy data
-    WriteTransaction wt_valid{sg_valid};
+    WriteTransaction wt_valid{db_valid};
     sync::create_table(wt_valid, "class_a");
     session_valid.nonsync_transact_notify(wt_valid.commit());
     session_valid.wait_for_upload_complete_or_client_stopped();
 
-    WriteTransaction wt_invalid{sg_invalid};
+    WriteTransaction wt_invalid{db_invalid};
     sync::create_table(wt_invalid, "class_b");
     session_invalid.nonsync_transact_notify(wt_invalid.commit());
     session_invalid.wait_for_upload_complete_or_client_stopped();
 
     CHECK_NOT(did_see_error_for_valid);
     CHECK(did_see_error_for_invalid);
-}
-
-
-TEST(Sync_ManySessions)
-{
-    // Configure the client to a low maximum number of open files, and start a
-    // lot of sessions concurrently to exercise the clients cache of open Realm
-    // files.
-
-    TEST_DIR(client_dir);
-    SHARED_GROUP_TEST_PATH(path_0);
-    std::unique_ptr<Replication> history_0 = make_client_replication(path_0);
-    DBRef sg_0 = DB::create(*history_0);
-    const int num_sessions = 128;
-
-    std::vector<std::string> paths;
-    for (int i = 0; i < num_sessions; ++i) {
-        std::string path = std::string(client_dir) + "/" + std::to_string(i) + ".realm";
-        paths.emplace_back(std::move(path));
-    }
-
-    {
-        TEST_DIR(server_dir);
-        ClientServerFixture::Config config;
-        config.client_max_open_files = 16;
-        ClientServerFixture fixture(server_dir, test_context, config);
-        fixture.start();
-
-        Session session_0 = fixture.make_session(path_0);
-        fixture.bind_session(session_0, "/test");
-        std::vector<Session> sessions;
-        for (int i = 0; i < num_sessions; ++i) {
-            Session session = fixture.make_session(paths[i]);
-            fixture.bind_session(session, "/test");
-            sessions.emplace_back(std::move(session));
-        }
-
-        // Create schema
-        {
-            WriteTransaction wt(sg_0);
-            TableRef table = sync::create_table(wt, "class_foo");
-            table->add_column(type_Int, "i");
-            version_type new_version = wt.commit();
-            session_0.nonsync_transact_notify(new_version);
-        }
-        Random random(random_int<unsigned long>()); // Seed from slow global generator
-        for (int i = 0; i < 256; ++i) {
-            WriteTransaction wt(sg_0);
-            TableRef table = wt.get_table("class_foo");
-            table->create_object();
-            table->get_object(i).set("i", random.draw_int_max(32767));
-            version_type new_version = wt.commit();
-            session_0.nonsync_transact_notify(new_version);
-        }
-
-        session_0.wait_for_upload_complete_or_client_stopped();
-        for (int i = 0; i < num_sessions; ++i)
-            sessions[i].wait_for_download_complete_or_client_stopped();
-    }
-
-    ReadTransaction rt_0(sg_0);
-    for (int i = 0; i < num_sessions; ++i) {
-        std::unique_ptr<Replication> history = make_client_replication(paths[i]);
-        DBRef sg = DB::create(*history);
-        ReadTransaction rt(sg);
-        CHECK(compare_groups(rt_0, rt));
-    }
 }
 
 
@@ -4031,9 +3506,9 @@ TEST(Sync_ManySessions)
 TEST(Sync_MultiplexIdent)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_a1);
-    SHARED_GROUP_TEST_PATH(path_a2);
-    SHARED_GROUP_TEST_PATH(path_b1);
+    TEST_CLIENT_DB(db_a1);
+    TEST_CLIENT_DB(db_a2);
+    TEST_CLIENT_DB(db_b1);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     util::Logger& logger = test_context.logger;
@@ -4094,7 +3569,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a1.signed_user_token = g_signed_test_user_token;
 
-    Session session_a1{client, path_a1, session_config_a1};
+    Session session_a1{client, db_a1, session_config_a1};
     session_a1.bind();
 
     Session::Config session_config_a2;
@@ -4115,7 +3590,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a2.signed_user_token = g_signed_test_user_token;
 
-    Session session_a2{client, path_a2, session_config_a2};
+    Session session_a2{client, db_a2, session_config_a2};
     session_a2.bind();
 
     Session::Config session_config_b1;
@@ -4136,7 +3611,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_b1.signed_user_token = g_signed_test_user_token;
 
-    Session session_b1{client, path_b1, session_config_b1};
+    Session session_b1{client, db_b1, session_config_b1};
     session_b1.bind();
 
     session_a1.wait_for_download_complete_or_client_stopped();
@@ -4160,7 +3635,7 @@ TEST(Sync_MultiplexIdent)
 TEST(Sync_SSL_Certificate_1)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     ClientServerFixture::Config config;
@@ -4175,7 +3650,7 @@ TEST(Sync_SSL_Certificate_1)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "/root-ca/crt.pem";
 
-    Session session = fixture.make_session(path, session_config);
+    Session session = fixture.make_session(db, session_config);
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
 
     fixture.start();
@@ -4190,7 +3665,7 @@ TEST(Sync_SSL_Certificate_2)
 {
     bool did_fail = false;
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     ClientServerFixture::Config config;
@@ -4212,7 +3687,7 @@ TEST(Sync_SSL_Certificate_2)
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
 
-    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
@@ -4228,7 +3703,7 @@ TEST(Sync_SSL_Certificate_2)
 TEST(Sync_SSL_Certificate_3)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     ClientServerFixture::Config config;
@@ -4243,7 +3718,7 @@ TEST(Sync_SSL_Certificate_3)
     session_config.verify_servers_ssl_certificate = false;
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
 
-    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 }
@@ -4255,7 +3730,7 @@ TEST(Sync_SSL_Certificate_3)
 TEST(Sync_SSL_Certificate_DER)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     ClientServerFixture::Config config;
@@ -4270,7 +3745,7 @@ TEST(Sync_SSL_Certificate_DER)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/localhost-chain.crt.cer";
 
-    Session session = fixture.make_session(path, session_config);
+    Session session = fixture.make_session(db, session_config);
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
 
     fixture.start();
@@ -4287,7 +3762,7 @@ TEST(Sync_SSL_Certificate_DER)
 TEST(Sync_SSL_Certificate_Verify_Callback_1)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl;
@@ -4311,7 +3786,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -4327,7 +3802,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
 {
     bool did_fail = false;
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl;
@@ -4368,7 +3843,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
@@ -4382,7 +3857,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
 TEST(Sync_SSL_Certificate_Verify_Callback_3)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl = 0;
@@ -4420,7 +3895,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     Session::port_type server_port_actual = fixture.get_server().listen_endpoint().port();
@@ -4436,7 +3911,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     const std::string server_address = "www.writeurl.com";
     Session::port_type port = 443;
 
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     util::Logger& logger = test_context.logger;
     util::PrefixLogger client_logger("Client: ", logger);
@@ -4470,7 +3945,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, path, session_config);
+    Session session(client, db, session_config);
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -4479,63 +3954,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
 }
 
 #endif // REALM_HAVE_OPENSSL
-
-
-// This test lets two clients connect to the same server and same
-// server Realm. The clients use the same client-side Realm.
-// Client 0 connects first. Later when client 1 connects, the server
-// will give access to client 1 and disable the session of client 0.
-// When client 0 later sends a message, the server will reply with
-// ProtocolError::disabled_session.
-TEST_IF(Sync_DisabledSession, false)
-{
-    // NOTE: This test creates multiple concurrent sessions for the same Realm
-    // file, which is illegal use of the API (see Session class
-    // documentation). It is illegal because it generally leads to corruption in
-    // the synchronization mechanism. At some point, a check will be added to
-    // avoid such overlapping sessions, and at that time, this test will have to
-    // be deleted.
-    //
-    // Note: That check was added in https://github.com/realm/realm-sync/pull/993
-
-    TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
-
-    std::string server_addr = "localhost";
-    std::string server_path = "/test";
-
-    int num_clients = 2;
-    int num_servers = 1;
-    int server_index = 0;
-
-    MultiClientServerFixture fixture(num_clients, num_servers, server_dir, test_context);
-
-    int errors_seen = 0;
-
-    auto client_error_handler = [&](std::error_code ec, bool, const std::string&) {
-        errors_seen++;
-        CHECK_EQUAL(ProtocolError::disabled_session, ec);
-        fixture.get_client(0).stop();
-    };
-
-    // Client 0 should see one error of type disabled_session
-    fixture.set_client_side_error_handler(0, client_error_handler);
-
-    // Client 1 should see zero errors, which is the default.
-
-    fixture.start();
-
-    Session session_0 = fixture.make_bound_session(0, path, server_index, server_path);
-    session_0.wait_for_download_complete_or_client_stopped();
-
-    Session session_1 = fixture.make_bound_session(1, path, server_index, server_path);
-    session_1.wait_for_download_complete_or_client_stopped();
-
-    CHECK_EQUAL(errors_seen, 0);
-
-    session_0.wait_for_download_complete_or_client_stopped();
-    CHECK_EQUAL(errors_seen, 1);
-}
 
 
 // This test has a single client connected to a server with
@@ -4550,7 +3968,7 @@ TEST_IF(Sync_DisabledSession, false)
 TEST(Sync_UploadDownloadProgress_1)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     uint_fast64_t global_snapshot_version;
 
@@ -4571,10 +3989,7 @@ TEST(Sync_UploadDownloadProgress_1)
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
 
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
-
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
 
         auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
                                     uint_fast64_t uploadable, uint_fast64_t progress, uint_fast64_t snapshot) {
@@ -4609,7 +4024,7 @@ TEST(Sync_UploadDownloadProgress_1)
 
         uint_fast64_t commit_version;
         {
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db};
             TableRef tr = sync::create_table(wt, "class_table");
             tr->add_column(type_Int, "integer column");
             commit_version = wt.commit();
@@ -4627,7 +4042,7 @@ TEST(Sync_UploadDownloadProgress_1)
         CHECK_GREATER_EQUAL(snapshot_version, commit_version);
 
         {
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db};
             TableRef tr = wt.get_table("class_table");
             tr->create_object().set("integer column", 42);
             commit_version = wt.commit();
@@ -4642,8 +4057,6 @@ TEST(Sync_UploadDownloadProgress_1)
         CHECK_NOT_EQUAL(uploaded_bytes, uint_fast64_t(0));
         CHECK_NOT_EQUAL(uploadable_bytes, uint_fast64_t(0));
         CHECK_GREATER_EQUAL(snapshot_version, commit_version);
-
-        fixture.stop();
 
         global_snapshot_version = snapshot_version;
     }
@@ -4671,7 +4084,7 @@ TEST(Sync_UploadDownloadProgress_1)
             client.run();
         });
 
-        Session session(client, path);
+        Session session(client, db);
 
         int number_of_handler_calls = 0;
 
@@ -4718,19 +4131,14 @@ TEST(Sync_UploadDownloadProgress_1)
 TEST(Sync_UploadDownloadProgress_2)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
 
     uint_fast64_t downloaded_bytes_1 = 123; // Not zero
     uint_fast64_t downloadable_bytes_1 = 123;
@@ -4795,13 +4203,10 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(progress_version_2, 0);
     CHECK_GREATER(snapshot_version_2, 0);
 
-    {
-        WriteTransaction wt{sg_1};
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = sync::create_table(wt, "class_table");
         tr->add_column(type_Int, "integer column");
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -4823,29 +4228,20 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_1, 1);
     CHECK_GREATER(snapshot_version_2, 1);
 
-    {
-        WriteTransaction wt{sg_1};
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object().set("integer column", 42);
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
 
-    {
-        WriteTransaction wt{sg_1};
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object().set("integer column", 44);
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
 
-    {
-        WriteTransaction wt{sg_2};
+    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->create_object().set("integer column", 43);
-        version_type version = wt.commit();
-        session_2.nonsync_transact_notify(version);
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -4867,21 +4263,15 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_1, 4);
     CHECK_GREATER(snapshot_version_2, 3);
 
-    {
-        WriteTransaction wt{sg_1};
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 101);
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
 
-    {
-        WriteTransaction wt{sg_2};
+    write_transaction_notifying_session(db_2, session_2, [](WriteTransaction& wt) {
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 102);
-        version_type version = wt.commit();
-        session_2.nonsync_transact_notify(version);
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -4910,12 +4300,10 @@ TEST(Sync_UploadDownloadProgress_2)
 
     // Check convergence.
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
-
-    fixture.stop();
 }
 
 
@@ -4931,7 +4319,7 @@ TEST(Sync_UploadDownloadProgress_2)
 TEST(Sync_UploadDownloadProgress_3)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     util::Logger& logger = test_context.logger;
     util::PrefixLogger server_logger("Server: ", logger);
@@ -4954,11 +4342,8 @@ TEST(Sync_UploadDownloadProgress_3)
 
     // The server is not running.
 
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    DBRef sg = DB::create(*history);
-
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = sync::create_table(wt, "class_table");
         tr->add_column(type_Int, "integer column");
         wt.commit();
@@ -4979,7 +4364,7 @@ TEST(Sync_UploadDownloadProgress_3)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    Session session(client, path, config);
+    Session session(client, db, config);
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -5056,7 +4441,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     uint_fast64_t commited_version;
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_table");
         tr->create_object().set("integer column", 42);
         commited_version = wt.commit();
@@ -5092,14 +4477,11 @@ TEST(Sync_UploadDownloadProgress_3)
 TEST(Sync_UploadDownloadProgress_4)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         TableRef tr = sync::create_table(wt, "class_table");
         auto col = tr->add_column(type_Binary, "binary column");
         tr->create_object();
@@ -5110,7 +4492,7 @@ TEST(Sync_UploadDownloadProgress_4)
     }
 
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         TableRef tr = wt.get_table("class_table");
         auto col = tr->get_column_key("binary column");
         tr->create_object();
@@ -5125,7 +4507,7 @@ TEST(Sync_UploadDownloadProgress_4)
     ClientServerFixture fixture(server_dir, test_context, config);
     fixture.start();
 
-    Session session_1 = fixture.make_session(path_1);
+    Session session_1 = fixture.make_session(db_1);
 
     int entry_1 = 0;
 
@@ -5157,7 +4539,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     CHECK_NOT_EQUAL(entry_1, 0);
 
-    Session session_2 = fixture.make_session(path_2);
+    Session session_2 = fixture.make_session(db_2);
 
     int entry_2 = 0;
 
@@ -5195,8 +4577,6 @@ TEST(Sync_UploadDownloadProgress_4)
 
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
-
-    fixture.stop();
 }
 
 
@@ -5206,7 +4586,7 @@ TEST(Sync_UploadDownloadProgress_4)
 TEST(Sync_UploadDownloadProgress_5)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     bool cond_var_signaled = false;
     std::mutex mutex;
@@ -5215,7 +4595,7 @@ TEST(Sync_UploadDownloadProgress_5)
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    Session session = fixture.make_session(path);
+    Session session = fixture.make_session(db);
 
     auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
                                 uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
@@ -5243,8 +4623,6 @@ TEST(Sync_UploadDownloadProgress_5)
     });
 
     // The check is that we reach this point.
-
-    fixture.stop();
 }
 
 
@@ -5253,7 +4631,7 @@ TEST(Sync_UploadDownloadProgress_5)
 TEST(Sync_UploadDownloadProgress_6)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     util::Logger& logger = test_context.logger;
     util::PrefixLogger server_logger("Server: ", logger);
@@ -5294,7 +4672,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, path, session_config}};
+    std::unique_ptr<Session> session{new Session{client, db, session_config}};
 
     util::Mutex mutex;
 
@@ -5336,14 +4714,14 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     // particular session participant over the "temporally overlapping access"
     // relation.
 
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     Client::Config config;
     config.logger = &test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client{config};
-    Session session_1{client, path};
-    Session session_2{client, path};
+    Session session_1{client, db};
+    Session session_2{client, db};
     session_1.bind("realm://foo/bar", "blablabla");
     session_2.bind("realm://foo/bar", "blablabla");
     CHECK_THROW(client.run(), MultipleSyncAgents);
@@ -5353,8 +4731,8 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
 TEST(Sync_CancelReconnectDelay)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
-    SHARED_GROUP_TEST_PATH(client_path_x);
+    TEST_CLIENT_DB(db);
+    TEST_CLIENT_DB(db_x);
 
     ClientServerFixture::Config fixture_config;
     fixture_config.one_connection_per_session = false;
@@ -5369,7 +4747,7 @@ TEST(Sync_CancelReconnectDelay)
             if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
                 bowl.add_stone();
         };
-        Session session = fixture.make_session(client_path);
+        Session session = fixture.make_session(db);
         session.set_error_handler(std::move(handler));
         fixture.bind_session(session, "/test");
         session.wait_for_download_complete_or_client_stopped();
@@ -5391,7 +4769,7 @@ TEST(Sync_CancelReconnectDelay)
             if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
                 bowl.add_stone();
         };
-        Session session = fixture.make_session(client_path);
+        Session session = fixture.make_session(db);
         session.set_error_handler(std::move(handler));
         fixture.bind_session(session, "/test");
         session.wait_for_download_complete_or_client_stopped();
@@ -5414,7 +4792,7 @@ TEST(Sync_CancelReconnectDelay)
                 if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
                     bowl.add_stone();
             };
-            Session session = fixture.make_session(client_path);
+            Session session = fixture.make_session(db);
             session.set_error_handler(std::move(handler));
             fixture.bind_session(session, "/test");
             session.wait_for_download_complete_or_client_stopped();
@@ -5431,7 +4809,7 @@ TEST(Sync_CancelReconnectDelay)
 
         fixture.cancel_reconnect_delay();
         {
-            Session session = fixture.make_bound_session(client_path, "/test");
+            Session session = fixture.make_bound_session(db, "/test");
             session.wait_for_download_complete_or_client_stopped();
         }
     }
@@ -5442,7 +4820,7 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
-        Session session_x = fixture.make_bound_session(client_path_x, "/x");
+        Session session_x = fixture.make_bound_session(db_x, "/x");
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
@@ -5450,7 +4828,7 @@ TEST(Sync_CancelReconnectDelay)
             if (CHECK_EQUAL(ec, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
-        Session session = fixture.make_session(client_path);
+        Session session = fixture.make_session(db);
         session.set_error_handler(std::move(handler));
         fixture.bind_session(session, "/.."); // Illegal virtual path
         bowl.get_stone();
@@ -5465,7 +4843,7 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
-        Session session_x = fixture.make_bound_session(client_path_x, "/x");
+        Session session_x = fixture.make_bound_session(db_x, "/x");
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
@@ -5473,7 +4851,7 @@ TEST(Sync_CancelReconnectDelay)
             if (CHECK_EQUAL(ec, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
-        Session session = fixture.make_session(client_path);
+        Session session = fixture.make_session(db);
         session.set_error_handler(std::move(handler));
         fixture.bind_session(session, "/.."); // Illegal virtual path
         bowl.get_stone();
@@ -5500,13 +4878,11 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         static_cast<size_t>(6e6), static_cast<size_t>(12e6), static_cast<size_t>(5e6), static_cast<size_t>(13e6),
     };
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
-        std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-        DBRef sg_1 = DB::create(*history_1);
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[0], 'a');
@@ -5519,9 +4895,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     }
 
     {
-        std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-        DBRef sg_1 = DB::create(*history_1);
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = wt.get_table("class_table name");
         std::string str_1(binary_sizes[2], 'c');
         BinaryData bd_1(str_1.data(), str_1.size());
@@ -5533,9 +4907,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     }
 
     {
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[4], 'e');
@@ -5548,9 +4920,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     }
 
     {
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_table name");
         std::string str_1(binary_sizes[6], 'g');
         BinaryData bd_1(str_1.data(), str_1.size());
@@ -5595,14 +4965,14 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         fixture.start();
 
         {
-            Session session_1 = fixture.make_session(0, path_1);
+            Session session_1 = fixture.make_session(0, db_1);
             session_1.set_progress_handler(progress_handler_1);
             fixture.bind_session(session_1, 0, "/test");
             session_1.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_2 = fixture.make_session(1, path_2);
+            Session session_2 = fixture.make_session(1, db_2);
             session_2.set_progress_handler(progress_handler_2);
             fixture.bind_session(session_2, 0, "/test");
             session_2.wait_for_download_complete_or_client_stopped();
@@ -5610,19 +4980,15 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         }
 
         {
-            Session session_1 = fixture.make_session(0, path_1);
+            Session session_1 = fixture.make_session(0, db_1);
             session_1.set_progress_handler(progress_handler_1);
             fixture.bind_session(session_1, 0, "/test");
             session_1.wait_for_download_complete_or_client_stopped();
         }
     }
 
-    std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-    std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-    ReadTransaction read_1(sg_1);
-    ReadTransaction read_2(sg_2);
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
 
     const Group& group = read_1;
     CHECK(compare_groups(read_1, read_2));
@@ -5666,13 +5032,11 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         static_cast<size_t>(6e4), static_cast<size_t>(12e4), static_cast<size_t>(5e4), static_cast<size_t>(13e4),
     };
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
-        std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-        DBRef sg_1 = DB::create(*history_1);
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[0], 'a');
@@ -5685,9 +5049,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     }
 
     {
-        std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-        DBRef sg_1 = DB::create(*history_1);
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = wt.get_table("class_table name");
         std::string str_1(binary_sizes[2], 'c');
         BinaryData bd_1(str_1.data(), str_1.size());
@@ -5699,9 +5061,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     }
 
     {
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         std::string str_1(binary_sizes[4], 'e');
@@ -5714,9 +5074,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     }
 
     {
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_table name");
         std::string str_1(binary_sizes[6], 'g');
         BinaryData bd_1(str_1.data(), str_1.size());
@@ -5761,14 +5119,14 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         fixture.start();
 
         {
-            Session session_1 = fixture.make_session(0, path_1);
+            Session session_1 = fixture.make_session(0, db_1);
             session_1.set_progress_handler(progress_handler_1);
             fixture.bind_session(session_1, 0, "/test");
             session_1.wait_for_upload_complete_or_client_stopped();
         }
 
         {
-            Session session_2 = fixture.make_session(1, path_2);
+            Session session_2 = fixture.make_session(1, db_2);
             session_2.set_progress_handler(progress_handler_2);
             fixture.bind_session(session_2, 0, "/test");
             session_2.wait_for_download_complete_or_client_stopped();
@@ -5776,19 +5134,15 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         }
 
         {
-            Session session_1 = fixture.make_session(0, path_1);
+            Session session_1 = fixture.make_session(0, db_1);
             session_1.set_progress_handler(progress_handler_1);
             fixture.bind_session(session_1, 0, "/test");
             session_1.wait_for_download_complete_or_client_stopped();
         }
     }
 
-    std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-    std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-    ReadTransaction read_1(sg_1);
-    ReadTransaction read_2(sg_2);
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
 
     const Group& group = read_1;
     CHECK(compare_groups(read_1, read_2));
@@ -5824,15 +5178,11 @@ TEST(Sync_MergeLargeChangesets)
 {
     constexpr int number_of_rows = 200;
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         table->add_column(type_Int, "integer column");
@@ -5840,7 +5190,7 @@ TEST(Sync_MergeLargeChangesets)
     }
 
     {
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = sync::create_table(wt, "class_table name");
         table->add_column(type_Binary, "column name");
         table->add_column(type_Int, "integer column");
@@ -5848,7 +5198,7 @@ TEST(Sync_MergeLargeChangesets)
     }
 
     {
-        WriteTransaction wt(sg_1);
+        WriteTransaction wt(db_1);
         TableRef table = wt.get_table("class_table name");
         for (int i = 0; i < number_of_rows; ++i) {
             table->create_object();
@@ -5863,7 +5213,7 @@ TEST(Sync_MergeLargeChangesets)
     }
 
     {
-        WriteTransaction wt(sg_2);
+        WriteTransaction wt(db_2);
         TableRef table = wt.get_table("class_table name");
         for (int i = 0; i < number_of_rows; ++i) {
             table->create_object();
@@ -5881,9 +5231,9 @@ TEST(Sync_MergeLargeChangesets)
         TEST_DIR(dir);
         MultiClientServerFixture fixture(2, 1, dir, test_context);
 
-        Session session_1 = fixture.make_session(0, path_1);
+        Session session_1 = fixture.make_session(0, db_1);
         fixture.bind_session(session_1, 0, "/test");
-        Session session_2 = fixture.make_session(1, path_2);
+        Session session_2 = fixture.make_session(1, db_2);
         fixture.bind_session(session_2, 0, "/test");
 
         fixture.start();
@@ -5894,8 +5244,8 @@ TEST(Sync_MergeLargeChangesets)
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
-    ReadTransaction read_1(sg_1);
-    ReadTransaction read_2(sg_2);
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
     const Group& group = read_1;
     CHECK(compare_groups(read_1, read_2));
     ConstTableRef table = group.get_table("class_table name");
@@ -5910,7 +5260,7 @@ TEST(Sync_PingTimesOut)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
 
         ClientServerFixture::Config config;
         config.client_ping_period = 0;  // send ping immediately
@@ -5926,8 +5276,7 @@ TEST(Sync_PingTimesOut)
 
         fixture.start();
 
-        Session session = fixture.make_session(path);
-        fixture.bind_session(session, "/test");
+        Session session = fixture.make_bound_session(db);
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK(did_fail);
@@ -5937,7 +5286,7 @@ TEST(Sync_PingTimesOut)
 TEST(Sync_ReconnectAfterPingTimeout)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture::Config config;
     config.client_ping_period = 0;  // send ping immediately
@@ -5953,7 +5302,7 @@ TEST(Sync_ReconnectAfterPingTimeout)
     fixture.set_client_side_error_handler(std::move(error_handler));
     fixture.start();
 
-    Session session = fixture.make_bound_session(path, "/test");
+    Session session = fixture.make_bound_session(db, "/test");
     bowl.get_stone();
 }
 
@@ -5963,7 +5312,7 @@ TEST(Sync_UrgentPingIsSent)
     bool did_fail = false;
     {
         TEST_DIR(dir);
-        SHARED_GROUP_TEST_PATH(path);
+        TEST_CLIENT_DB(db);
 
         ClientServerFixture::Config config;
         config.client_pong_timeout = 0; // urgent pings time out immediately
@@ -5979,8 +5328,7 @@ TEST(Sync_UrgentPingIsSent)
 
         fixture.start();
 
-        Session session = fixture.make_session(path);
-        fixture.bind_session(session, "/test");
+        Session session = fixture.make_bound_session(db);
         session.wait_for_download_complete_or_client_stopped(); // ensure connection established
         session.cancel_reconnect_delay();                       // send an urgent ping
         session.wait_for_download_complete_or_client_stopped();
@@ -5992,7 +5340,7 @@ TEST(Sync_UrgentPingIsSent)
 TEST(Sync_ServerDiscardDeadConnections)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture::Config config;
     config.server_connection_reaper_interval = 1; // discard dead connections quickly, FIXME: 0 will not work here :(
@@ -6013,55 +5361,10 @@ TEST(Sync_ServerDiscardDeadConnections)
     fixture.set_client_side_error_handler(std::move(error_handler));
     fixture.start();
 
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
+    Session session = fixture.make_bound_session(db);
     session.wait_for_download_complete_or_client_stopped(); // ensure connection established
     fixture.set_server_connection_reaper_timeout(0);        // all connections will now be considered dead
     bowl.get_stone();
-}
-
-
-TEST_IF(Sync_EncryptClientRealmFiles, REALM_ENABLE_ENCRYPTION)
-{
-    TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
-
-    std::array<char, 64> encryption_key;
-    encryption_key.fill(1);
-
-    // open a shared group with encryption
-    {
-        std::unique_ptr<ClientReplication> history = make_client_replication(path);
-        DBRef shared_group = DB::create(*history, DBOptions(encryption_key.data()));
-    }
-
-    ClientServerFixture fixture(dir, test_context);
-    fixture.start();
-
-    /* TODO: add an error callback for when the encryption key is wrong
-        // attempt to open a session at the same path with a different encryption key
-        {
-            std::array<char, 64> wrong_key;
-            wrong_key.fill(99);
-
-            Session::Config config;
-            config.encryption_key = wrong_key;
-
-            Session session = fixture.make_session(path, config);
-            fixture.bind_session(session, "/test");
-            session.wait_for_download_complete_or_client_stopped();
-        }
-    */
-
-    // attempt to open a session at the same path with the same encryption key
-    {
-        Session::Config config;
-        config.encryption_key = encryption_key;
-
-        Session session = fixture.make_session(path, config);
-        fixture.bind_session(session, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
 }
 
 
@@ -6072,8 +5375,8 @@ TEST(Sync_Quadratic_Merge)
     REALM_ASSERT(num_instructions_1 >= 3 && num_instructions_2 >= 3);
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path_1);
-    SHARED_GROUP_TEST_PATH(client_path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     // The schema and data is created with
     // n_operations instructions. The instructions are:
@@ -6081,10 +5384,8 @@ TEST(Sync_Quadratic_Merge)
     // add column
     // create object
     // n_operations - 3 add_int instructions.
-    auto create_data = [](const std::string& client_path, size_t n_operations) {
-        std::unique_ptr<Replication> history = make_client_replication(client_path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt(sg);
+    auto create_data = [](DBRef db, size_t n_operations) {
+        WriteTransaction wt(db);
         TableRef table = sync::create_table(wt, "class_table");
         table->add_column(type_Int, "i");
         Obj obj = table->create_object();
@@ -6093,19 +5394,19 @@ TEST(Sync_Quadratic_Merge)
         wt.commit();
     };
 
-    create_data(client_path_1, num_instructions_1);
-    create_data(client_path_2, num_instructions_2);
+    create_data(db_1, num_instructions_1);
+    create_data(db_2, num_instructions_2);
 
     int num_clients = 2;
     int num_servers = 1;
     MultiClientServerFixture fixture{num_clients, num_servers, server_dir, test_context};
     fixture.start();
 
-    Session session_1 = fixture.make_session(0, client_path_1);
+    Session session_1 = fixture.make_session(0, db_1);
     fixture.bind_session(session_1, 0, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    Session session_2 = fixture.make_session(1, client_path_2);
+    Session session_2 = fixture.make_session(1, db_2);
     fixture.bind_session(session_2, 0, "/test");
     session_2.wait_for_upload_complete_or_client_stopped();
 
@@ -6117,18 +5418,15 @@ TEST(Sync_Quadratic_Merge)
 TEST(Sync_BatchedUploadMessages)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture fixture(server_dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    DBRef sg = DB::create(*history);
-
-    Session session = fixture.make_session(path);
+    Session session = fixture.make_session(db);
 
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = sync::create_table(wt, "class_foo");
         tr->add_column(type_Int, "integer column");
         wt.commit();
@@ -6137,7 +5435,7 @@ TEST(Sync_BatchedUploadMessages)
     // Create a lot of changesets. We will attempt to check that
     // they are uploaded in a few upload messages.
     for (int i = 0; i < 400; ++i) {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         TableRef tr = wt.get_table("class_foo");
         tr->create_object().set("integer column", i);
         wt.commit();
@@ -6161,34 +5459,27 @@ TEST(Sync_BatchedUploadMessages)
     session.set_progress_handler(progress_handler);
     fixture.bind_session(session, "/test");
     session.wait_for_upload_complete_or_client_stopped();
-
-    fixture.stop();
 }
 
 
 TEST(Sync_UploadLogCompactionEnabled)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture::Config config;
     config.disable_upload_compaction = false;
     ClientServerFixture fixture(server_dir, test_context, config);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
 
     // Create a changeset with lots of overwrites of the
     // same fields.
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         TableRef tr = sync::create_table(wt, "class_foo");
         tr->add_column(type_Int, "integer column");
         Obj obj0 = tr->create_object();
@@ -6221,24 +5512,22 @@ TEST(Sync_UploadLogCompactionEnabled)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
         CHECK_EQUAL(19998, table->get_object(1).get<Int>("integer column"));
     }
-
-    fixture.stop();
 }
 
 
 TEST(Sync_UploadLogCompactionDisabled)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture::Config config;
     config.disable_upload_compaction = true;
@@ -6246,15 +5535,10 @@ TEST(Sync_UploadLogCompactionDisabled)
     ClientServerFixture fixture{server_dir, test_context, config};
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-
     // Create a changeset with lots of overwrites of the
     // same fields.
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
         TableRef tr = sync::create_table(wt, "class_foo");
         auto col_int = tr->add_column(type_Int, "integer column");
         Obj obj0 = tr->create_object();
@@ -6266,7 +5550,7 @@ TEST(Sync_UploadLogCompactionDisabled)
         wt.commit();
     }
 
-    Session session_1 = fixture.make_bound_session(path_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
     auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
@@ -6280,22 +5564,20 @@ TEST(Sync_UploadLogCompactionDisabled)
             CHECK_NOT_EQUAL(0, downloadable_bytes);
     };
 
-    Session session_2 = fixture.make_session(path_2);
+    Session session_2 = fixture.make_session(db_2);
     session_2.set_progress_handler(progress_handler);
     fixture.bind_session(session_2, "/test");
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
         ConstTableRef table = rt_1.get_table("class_foo");
         CHECK_EQUAL(2, table->size());
         CHECK_EQUAL(9999, table->begin()->get<Int>("integer column"));
         CHECK_EQUAL(19998, table->get_object(1).get<Int>("integer column"));
     }
-
-    fixture.stop();
 }
 
 
@@ -6306,7 +5588,7 @@ TEST(Sync_ServerHasMoved)
     util::PrefixLogger client_logger("Client: ", logger);
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     sync::Client::Config client_config;
     client_config.logger = &client_logger;
@@ -6323,7 +5605,7 @@ TEST(Sync_ServerHasMoved)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    sync::Session session(client, path, config);
+    sync::Session session(client, db, config);
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
@@ -6395,31 +5677,28 @@ TEST(Sync_ServerHasMoved)
 TEST(Sync_ReadOnlyClientSideHistoryTrim)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
-    DBRef sg = DB::create(*history);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
     ColKey col_ndx_blob_data;
     {
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db_1};
         TableRef blobs = create_table(wt, "class_Blob");
         col_ndx_blob_data = blobs->add_column(type_Binary, "data");
         blobs->create_object();
         wt.commit();
     }
 
-    Session session_1 = fixture.make_bound_session(path_1, "/foo");
-    Session session_2 = fixture.make_bound_session(path_2, "/foo");
+    Session session_1 = fixture.make_bound_session(db_1, "/foo");
+    Session session_2 = fixture.make_bound_session(db_2, "/foo");
 
     std::string blob(0x4000, '\0');
     for (long i = 0; i < 1024; ++i) {
         {
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db_1};
             TableRef blobs = wt.get_table("class_Blob");
             blobs->begin()->set(col_ndx_blob_data, BinaryData{blob});
             version_type new_version = wt.commit();
@@ -6432,14 +5711,14 @@ TEST(Sync_ReadOnlyClientSideHistoryTrim)
     // Check that the file size is less than 4 MiB. If it is, then the history
     // must have been trimmed, as the combined size of all the blobs is at least
     // 16 MiB.
-    CHECK_LESS(util::File{path_2}.get_size(), 0x400000);
+    CHECK_LESS(util::File{db_1_path}.get_size(), 0x400000);
 }
 
 #if 0 // FIXME: enable when history and file format upgrade is implemented
 TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
+    TEST_CLIENT_DB(db);
 
     std::string virtual_path = "/test";
     std::string origin_server_path =
@@ -6465,8 +5744,8 @@ TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
         TestServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
         _impl::ServerHistory history{target_server_path, context, compaction_control};
-        SharedGroup sg{history};
-        ReadTransaction rt{sg};
+        SharedGroup db{history};
+        ReadTransaction rt{db};
         rt.get_group().verify();
     }
 }
@@ -6480,19 +5759,13 @@ TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
 TEST(Sync_ContainerInsertAndSetLogCompaction)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
 
         TableRef table_target = create_table(wt, "class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
@@ -6512,17 +5785,15 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
         wt.commit();
     }
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1);
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
+    Session session_2 = fixture.make_bound_session(db_2);
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
     }
 }
@@ -6531,19 +5802,13 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
 TEST(Sync_MultipleContainerColumns)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
-
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_2 = DB::create(*history_2);
-
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
 
         TableRef table = create_table(wt, "class_Table");
         table->add_column_list(type_String, "array1");
@@ -6564,17 +5829,15 @@ TEST(Sync_MultipleContainerColumns)
         wt.commit();
     }
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
+    Session session_1 = fixture.make_bound_session(db_1);
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
+    Session session_2 = fixture.make_bound_session(db_2);
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
+        ReadTransaction rt_1(db_1);
+        ReadTransaction rt_2(db_2);
         CHECK(compare_groups(rt_1, rt_2));
 
         ConstTableRef table = rt_1.get_table("class_Table");
@@ -6592,8 +5855,8 @@ TEST(Sync_MultipleContainerColumns)
 TEST(Sync_ConnectionStateChange)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     std::vector<ConnectionState> states_1, states_2;
@@ -6615,12 +5878,12 @@ TEST(Sync_ConnectionStateChange)
                 bowl_2.add_stone();
         };
 
-        Session session_1 = fixture.make_session(path_1);
+        Session session_1 = fixture.make_session(db_1);
         session_1.set_connection_state_change_listener(listener_1);
         fixture.bind_session(session_1, "/test");
         session_1.wait_for_download_complete_or_client_stopped();
 
-        Session session_2 = fixture.make_session(path_2);
+        Session session_2 = fixture.make_session(db_2);
         session_2.set_connection_state_change_listener(listener_2);
         fixture.bind_session(session_2, "/test");
         session_2.wait_for_download_complete_or_client_stopped();
@@ -6639,7 +5902,7 @@ TEST(Sync_ConnectionStateChange)
 TEST(Sync_ClientErrorHandler)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
@@ -6648,7 +5911,7 @@ TEST(Sync_ClientErrorHandler)
         bowl.add_stone();
     };
 
-    Session session = fixture.make_session(path);
+    Session session = fixture.make_session(db);
     session.set_error_handler(std::move(handler));
     fixture.bind_session(session, "/test");
     session.wait_for_download_complete_or_client_stopped();
@@ -6663,15 +5926,13 @@ TEST(Sync_ClientErrorHandler)
 TEST(Sync_VerifyServerHistoryAfterLargeUpload)
 {
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture fixture{server_dir, test_context};
     fixture.start();
 
     {
-        std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt{sg};
+        WriteTransaction wt{db};
         auto table = sync::create_table(wt, "class_table");
         ColKey col = table->add_column(type_Binary, "data");
 
@@ -6685,7 +5946,7 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
 
         wt.commit();
 
-        Session session = fixture.make_session(client_path);
+        Session session = fixture.make_session(db);
         fixture.bind_session(session, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -6695,9 +5956,9 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
         TestServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
         _impl::ServerHistory history{server_path, context, compaction_control};
-        DBRef sg = DB::create(history);
+        DBRef db = DB::create(history);
         {
-            ReadTransaction rt{sg};
+            ReadTransaction rt{db};
             rt.get_group().verify();
         }
     }
@@ -6712,26 +5973,24 @@ TEST(Sync_ServerSideModify_Randomize)
     int num_client_side_transacts = 1200;
 
     TEST_DIR(server_dir);
-    SHARED_GROUP_TEST_PATH(client_path);
+    TEST_CLIENT_DB(db_2);
 
     ClientServerFixture::Config config;
     ClientServerFixture fixture{server_dir, test_context, std::move(config)};
     fixture.start();
 
-    Session session = fixture.make_bound_session(client_path, "/test");
+    Session session = fixture.make_bound_session(db_2, "/test");
 
     std::string server_path = fixture.map_virtual_to_real_path("/test");
     TestServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     _impl::ServerHistory history_1{server_path, context, compaction_control};
-    std::unique_ptr<ClientReplication> history_2 = make_client_replication(client_path);
-    DBRef sg_1 = DB::create(history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    DBRef db_1 = DB::create(history_1);
 
-    auto server_side_program = [num_server_side_transacts, &sg_1, &fixture, &session] {
+    auto server_side_program = [num_server_side_transacts, &db_1, &fixture, &session] {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         for (int i = 0; i < num_server_side_transacts; ++i) {
-            WriteTransaction wt{sg_1};
+            WriteTransaction wt{db_1};
             TableRef table = wt.get_table("class_foo");
             if (!table) {
                 table = sync::create_table(wt, "class_foo");
@@ -6747,10 +6006,10 @@ TEST(Sync_ServerSideModify_Randomize)
         }
     };
 
-    auto client_side_program = [num_client_side_transacts, &sg_2, &session] {
+    auto client_side_program = [num_client_side_transacts, &db_2, &session] {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         for (int i = 0; i < num_client_side_transacts; ++i) {
-            WriteTransaction wt{sg_2};
+            WriteTransaction wt{db_2};
             TableRef table = wt.get_table("class_foo");
             if (!table) {
                 table = sync::create_table(wt, "class_foo");
@@ -6776,8 +6035,8 @@ TEST(Sync_ServerSideModify_Randomize)
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
-    ReadTransaction rt_1{sg_1};
-    ReadTransaction rt_2{sg_2};
+    ReadTransaction rt_1{db_1};
+    ReadTransaction rt_2{db_2};
     CHECK(compare_groups(rt_1, rt_2, test_context.logger));
 }
 
@@ -6791,7 +6050,7 @@ TEST(Sync_ServerSideModify_Randomize)
 // test might be enabled during testing of SSL functionality.
 TEST_IF(Sync_SSL_Certificates, false)
 {
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     const char* server_address[] = {
         "morten-krogh.us1.cloud.realm.io",
@@ -6828,7 +6087,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, path, session_config};
+        Session session{client, db, session_config};
 
         auto listener = [&](Session::ConnectionState state, const Session::ErrorInfo* error_info) {
             if (state == Session::ConnectionState::disconnected) {
@@ -6859,7 +6118,7 @@ TEST_IF(Sync_SSL_Certificates, false)
 TEST(Sync_AuthorizationHeaderName)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     ClientServerFixture::Config config;
     config.authorization_header_name = "X-Alternative-Name";
@@ -6873,20 +6132,17 @@ TEST(Sync_AuthorizationHeaderName)
     custom_http_headers["Header-Name-1"] = "Header-Value-1";
     custom_http_headers["Header-Name-2"] = "Header-Value-2";
     session_config.custom_http_headers = std::move(custom_http_headers);
-    Session session = fixture.make_session(path, session_config);
+    Session session = fixture.make_session(db, session_config);
     fixture.bind_session(session, "/test");
 
     session.wait_for_download_complete_or_client_stopped();
 }
 
 
-#ifndef _WIN32
-
-// This testcase is alrady updated to the v4.5.1
 TEST(Sync_BadChangeset)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
 
     bool did_fail = false;
     {
@@ -6896,19 +6152,16 @@ TEST(Sync_BadChangeset)
         fixture.start();
 
         {
-            Session session = fixture.make_session(path);
-            fixture.bind_session(session, "/test");
+            Session session = fixture.make_bound_session(db);
             session.wait_for_download_complete_or_client_stopped();
         }
 
         {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path);
-            DBRef sg = DB::create(*history);
-            WriteTransaction wt(sg);
+            WriteTransaction wt(db);
             TableRef table = sync::create_table(wt, "class_Foo");
             table->add_column(type_Int, "i");
             table->create_object().set_all(123);
-            const ChangesetEncoder::Buffer& buffer = history->get_instruction_encoder().buffer();
+            const ChangesetEncoder::Buffer& buffer = get_history(db).get_instruction_encoder().buffer();
             char bad_instruction = 0x3e;
             const_cast<ChangesetEncoder::Buffer&>(buffer).append(&bad_instruction, 1);
             wt.commit();
@@ -6926,7 +6179,7 @@ TEST(Sync_BadChangeset)
             did_fail = true;
         };
 
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         session.set_connection_state_change_listener(listener);
         fixture.bind_session(session, "/test");
 
@@ -6935,8 +6188,6 @@ TEST(Sync_BadChangeset)
     }
     CHECK(did_fail);
 }
-
-#endif // _WIN32
 
 
 namespace issue2104 {
@@ -6955,11 +6206,6 @@ public:
     ServerHistoryContext()
         : m_transformer{make_transformer()}
     {
-    }
-
-    bool owner_is_sync_server() const noexcept override
-    {
-        return true;
     }
 
     std::mt19937_64& server_history_get_random() noexcept override
@@ -7185,7 +6431,7 @@ TEST_IF(Sync_Issue2104, false)
     issue2104::ServerHistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     _impl::ServerHistory history{realm_path_copy, history_context, compaction_control};
-    DBRef sg = DB::create(history);
+    DBRef db = DB::create(history);
 
     VersionInfo version_info;
     bool backup_whole_realm;
@@ -7204,8 +6450,8 @@ TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
     for (int i = 0; i < 64; ++i) {
         std::string virt_path = "/test";
         {
-            SHARED_GROUP_TEST_PATH(path);
-            Session session = fixture.make_bound_session(path, virt_path);
+            TEST_CLIENT_DB(db);
+            Session session = fixture.make_bound_session(db, virt_path);
             session.wait_for_download_complete_or_client_stopped();
             session.detach();
             fixture.wait_for_session_terminations_or_client_stopped();
@@ -7228,7 +6474,7 @@ TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
 
 TEST(Sync_RunServerWithoutPublicKey)
 {
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     TEST_DIR(server_dir);
     ClientServerFixture::Config config;
     config.server_public_key_path = {};
@@ -7238,14 +6484,14 @@ TEST(Sync_RunServerWithoutPublicKey)
     // Server must accept an unsigned token when a public key is not passed to
     // it
     {
-        Session session = fixture.make_bound_session(path, "/test", g_unsigned_test_user_token);
+        Session session = fixture.make_bound_session(db, "/test", g_unsigned_test_user_token);
         session.wait_for_download_complete_or_client_stopped();
     }
 
     // Server must also accept a signed token when a public key is not passed to
     // it
     {
-        Session session = fixture.make_bound_session(path, "/test");
+        Session session = fixture.make_bound_session(db, "/test");
         session.wait_for_download_complete_or_client_stopped();
     }
 }
@@ -7253,11 +6499,9 @@ TEST(Sync_RunServerWithoutPublicKey)
 
 TEST(Sync_ServerSideEncryption)
 {
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     {
-        std::unique_ptr<Replication> history = make_client_replication(path);
-        auto sg = DB::create(*history);
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         sync::create_table(wt, "class_Test");
         wt.commit();
     }
@@ -7271,7 +6515,7 @@ TEST(Sync_ServerSideEncryption)
         ClientServerFixture fixture(server_dir, test_context, config);
         fixture.start();
 
-        Session session = fixture.make_bound_session(path, "/test");
+        Session session = fixture.make_bound_session(db, "/test");
         session.wait_for_upload_complete_or_client_stopped();
 
         server_path = fixture.map_virtual_to_real_path("/test");
@@ -7285,13 +6529,11 @@ TEST(Sync_ServerSideEncryption)
 
 TEST(Sync_ServerSideEncryptionPlusCompact)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     {
-        std::unique_ptr<Replication> history = make_client_replication(path_1);
-        auto sg = DB::create(*history);
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db_1);
         sync::create_table(wt, "class_Test");
         wt.commit();
     }
@@ -7304,7 +6546,7 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     fixture.start();
 
     {
-        Session session = fixture.make_bound_session(path_1, "/test");
+        Session session = fixture.make_bound_session(db_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
     }
 
@@ -7312,14 +6554,12 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
 
     {
-        Session session = fixture.make_bound_session(path_2, "/test");
+        Session session = fixture.make_bound_session(db_2, "/test");
         session.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        std::unique_ptr<Replication> history = make_client_replication(path_2);
-        auto sg = DB::create(*history);
-        auto rt = sg->start_read();
+        auto rt = db_2->start_read();
         CHECK(rt->has_table("class_Test"));
     }
 }
@@ -7329,13 +6569,10 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
 // the right value is returned including that no assertions are hit.
 TEST(Sync_RowForGlobalKey)
 {
-    SHARED_GROUP_TEST_PATH(path);
-
-    std::unique_ptr<Replication> history = make_client_replication(path);
-    auto sg = DB::create(*history);
+    TEST_CLIENT_DB(db);
 
     {
-        WriteTransaction wt(sg);
+        WriteTransaction wt(db);
         TableRef table = sync::create_table(wt, "class_foo");
         table->add_column(type_Int, "i");
         wt.commit();
@@ -7343,7 +6580,7 @@ TEST(Sync_RowForGlobalKey)
 
     // Check that various object_ids are not in the table.
     {
-        ReadTransaction rt(sg);
+        ReadTransaction rt(db);
         ConstTableRef table = rt.get_table("class_foo");
         CHECK(table);
 
@@ -7374,8 +6611,8 @@ TEST(Sync_RowForGlobalKey)
 TEST(Sync_LogCompaction_EraseObject_LinkList)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture::Config config;
 
     // Log comapction is true by default, but we emphasize it.
@@ -7385,13 +6622,8 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     ClientServerFixture fixture(dir, test_context, config);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    auto sg_1 = DB::create(*history_1);
-    auto sg_2 = DB::create(*history_2);
-
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
 
         TableRef table_source = create_table(wt, "class_source");
         TableRef table_target = create_table(wt, "class_target");
@@ -7408,18 +6640,15 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     }
 
     {
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
-
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
+        Session session_1 = fixture.make_bound_session(db_1);
+        Session session_2 = fixture.make_bound_session(db_2);
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        WriteTransaction wt{sg_1};
+        WriteTransaction wt{db_1};
 
         TableRef table_source = wt.get_table("class_source");
         TableRef table_target = wt.get_table("class_target");
@@ -7435,7 +6664,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     }
 
     {
-        WriteTransaction wt{sg_2};
+        WriteTransaction wt{db_2};
 
         TableRef table_source = wt.get_table("class_source");
         TableRef table_target = wt.get_table("class_target");
@@ -7452,20 +6681,18 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     }
 
     {
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, "/test");
+        Session session_1 = fixture.make_bound_session(db_1);
         session_1.wait_for_upload_complete_or_client_stopped();
     }
 
     {
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, "/test");
+        Session session_2 = fixture.make_bound_session(db_2);
         session_2.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
     }
 
     {
-        ReadTransaction rt{sg_2};
+        ReadTransaction rt{db_2};
 
         ConstTableRef table_source = rt.get_group().get_table("class_source");
         ConstTableRef table_target = rt.get_group().get_table("class_target");
@@ -7478,24 +6705,22 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
 TEST(Sync_ClientFileBlacklisting)
 {
-    SHARED_GROUP_TEST_PATH(path);
+    TEST_CLIENT_DB(db);
     TEST_DIR(server_dir);
 
     // Get a client file identifier allocated for the client-side file
     {
         ClientServerFixture fixture(server_dir, test_context);
         fixture.start();
-        Session session = fixture.make_bound_session(path, "/test");
+        Session session = fixture.make_bound_session(db, "/test");
         session.wait_for_download_complete_or_client_stopped();
     }
     file_ident_type client_file_ident;
     {
-        std::unique_ptr<ClientReplication> hist = make_client_replication(path);
-        auto sg = DB::create(*hist);
         version_type client_version;
         SaltedFileIdent client_file_ident_2;
         SyncProgress progress;
-        hist->get_status(client_version, client_file_ident_2, progress);
+        get_history(db).get_status(client_version, client_file_ident_2, progress);
         client_file_ident = client_file_ident_2.ident;
     }
 
@@ -7521,7 +6746,7 @@ TEST(Sync_ClientFileBlacklisting)
             fixture.stop();
             did_fail = true;
         };
-        Session session = fixture.make_session(path);
+        Session session = fixture.make_session(db);
         session.set_connection_state_change_listener(listener);
         fixture.bind_session(session, "/test");
         session.wait_for_download_complete_or_client_stopped();
@@ -7536,43 +6761,28 @@ TEST(Sync_ClientFileBlacklisting)
 TEST(Sync_CreateObjects_EraseObjects)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    auto sg_1 = DB::create(*history_1);
-    auto sg_2 = DB::create(*history_2);
+    Session session_1 = fixture.make_bound_session(db_1);
+    Session session_2 = fixture.make_bound_session(db_2);
 
-    Session session_1 = fixture.make_session(path_1);
-    fixture.bind_session(session_1, "/test");
-    Session session_2 = fixture.make_session(path_2);
-    fixture.bind_session(session_2, "/test");
-
-    {
-        WriteTransaction wt{sg_1};
-
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& wt) {
         TableRef table = create_table(wt, "class_persons");
         table->create_object();
         table->create_object();
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    {
-        WriteTransaction wt{sg_1};
-
+    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& wt) {
         TableRef table = wt.get_table("class_persons");
         CHECK_EQUAL(table->size(), 2);
         table->get_object(0).remove();
         table->get_object(0).remove();
-        version_type version = wt.commit();
-        session_1.nonsync_transact_notify(version);
-    }
+    });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 }
@@ -7581,23 +6791,17 @@ TEST(Sync_CreateObjects_EraseObjects)
 TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
 {
     TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
+    TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<Replication> history = make_client_replication(path_1);
-    DBRef sg = DB::create(*history);
+    Session session = fixture.make_bound_session(db);
 
-    Session session = fixture.make_session(path_1);
-    fixture.bind_session(session, "/test");
-
-    {
-        WriteTransaction wt{sg};
+    write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         TableRef table = sync::create_table_with_primary_key(wt, "class_t", type_Int, "pk");
         sync::erase_table(wt, std::move(table));
         table = sync::create_table_with_primary_key(wt, "class_t", type_String, "pk");
-        session.nonsync_transact_notify(wt.commit());
-    }
+    });
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 }
@@ -7606,7 +6810,7 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
 TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
 {
     SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_2);
 
     // Verify that if a client fails to integrate a downloaded changeset, then
     // it will keep failing during future attempts. This test once failed due to
@@ -7648,7 +6852,7 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     };
     Session::Config config;
     config.simulate_integration_error = true;
-    Session session = fixture.make_session(path_2, config);
+    Session session = fixture.make_session(db_2, config);
     session.set_connection_state_change_listener(listener);
     fixture.bind_session(session, "/test");
     session.wait_for_download_complete_or_client_stopped();
@@ -7706,21 +6910,15 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
     constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;
     DataType type = ColumnTypeTraits<TEST_TYPE>::id;
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
@@ -7736,7 +6934,7 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
     }
 
     {
-        WriteTransaction tr{sg_1};
+        WriteTransaction tr{db_1};
         auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type, "id", is_optional);
         auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type, "id", is_optional);
         table_1->add_column_list(type, "oids", is_optional);
@@ -7760,7 +6958,7 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        ReadTransaction tr{sg_2};
+        ReadTransaction tr{db_2};
         auto table_1 = tr.get_table("class_Table1");
         auto table_2 = tr.get_table("class_Table2");
         auto obj_1 = *table_1->begin();
@@ -7786,21 +6984,15 @@ TEST(Sync_Mixed)
 {
     // Test replication and synchronization of Mixed values and lists.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history_1 = make_client_replication(path_1);
-    auto history_2 = make_client_replication(path_2);
-
-    auto db_1 = DB::create(*history_1);
-    auto db_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
@@ -7871,26 +7063,19 @@ TEST(Sync_TypedLinks)
 {
     // Test replication and synchronization of Mixed values and lists.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history_1 = make_client_replication(path_1);
-    auto history_2 = make_client_replication(path_2);
-
-    auto db_1 = DB::create(*history_1);
-    auto db_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
-    {
-        WriteTransaction tr{db_1};
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
@@ -7904,9 +7089,7 @@ TEST(Sync_TypedLinks)
 
         foo1.set("link", ObjLink(bars->get_key(), bar.get_key()));
         foo2.set("link", ObjLink(fops->get_key(), fop.get_key()));
-
-        session_1.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -7941,28 +7124,21 @@ TEST(Sync_Dictionary)
 {
     // Test replication and synchronization of Mixed values and lists.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history_1 = make_client_replication(path_1);
-    auto history_2 = make_client_replication(path_2);
-
-    auto db_1 = DB::create(*history_1);
-    auto db_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
     Timestamp now{std::chrono::system_clock::now()};
 
-    {
-        WriteTransaction tr{db_1};
+    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
@@ -7978,19 +7154,13 @@ TEST(Sync_Dictionary)
         auto dict_str = foo.get_dictionary(col_dict_str);
         dict_str.insert("some", "text");
         dict_str.insert("nothing", null());
-
-        session_1.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    {
-        WriteTransaction tr{db_2};
-        // tr.get_group().to_json(std::cout);
-
+    write_transaction_notifying_session(db_2, session_2, [&](WriteTransaction& tr) {
         auto foos = tr.get_table("class_Foo");
-
         CHECK_EQUAL(foos->size(), 1);
 
         auto it = foos->begin();
@@ -8013,18 +7183,13 @@ TEST(Sync_Dictionary)
 
         dict.erase("cnt");
         dict.insert("hello", "goodbye");
-
-        session_2.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_2.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
-    {
-        WriteTransaction tr{db_1};
+    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& tr) {
         auto foos = tr.get_table("class_Foo");
-        // tr.get_group().to_json(std::cout);
-
         CHECK_EQUAL(foos->size(), 1);
 
         auto it = foos->begin();
@@ -8037,8 +7202,7 @@ TEST(Sync_Dictionary)
         CHECK_EQUAL(val.get<Timestamp>(), now);
 
         dict.clear();
-        session_1.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -8062,21 +7226,15 @@ TEST(Sync_Dictionary)
 
 TEST(Sync_Dictionary_Links)
 {
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history_1 = make_client_replication(path_1);
-    auto history_2 = make_client_replication(path_2);
-
-    auto db_1 = DB::create(*history_1);
-    auto db_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
@@ -8084,8 +7242,7 @@ TEST(Sync_Dictionary_Links)
 
     ColKey col_dict;
 
-    {
-        WriteTransaction tr{db_1};
+    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
         auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
@@ -8098,9 +7255,7 @@ TEST(Sync_Dictionary_Links)
         auto dict = foo.get_dictionary(col_dict);
         dict.insert("a", a);
         dict.insert("b", b);
-
-        session_1.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -8129,8 +7284,7 @@ TEST(Sync_Dictionary_Links)
 
     // Test that we can create tombstones for objects in dictionaries.
 
-    {
-        WriteTransaction tr{db_1};
+    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& tr) {
         auto& g = tr.get_group();
 
         auto bars = g.get_table("class_Bar");
@@ -8145,9 +7299,7 @@ TEST(Sync_Dictionary_Links)
         CHECK((*dict.find("a")).second.is_unresolved_link());
 
         CHECK(dict.find("b") != dict.end());
-
-        session_1.nonsync_transact_notify(tr.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -8178,21 +7330,15 @@ TEST(Sync_Set)
 {
     // Test replication and synchronization of Set values.
 
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history_1 = make_client_replication(path_1);
-    auto history_2 = make_client_replication(path_2);
-
-    auto db_1 = DB::create(*history_1);
-    auto db_2 = DB::create(*history_2);
-
-    Session session_1 = fixture.make_session(path_1);
-    Session session_2 = fixture.make_session(path_2);
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
@@ -8253,28 +7399,22 @@ TEST(Sync_Set)
     session_2.wait_for_download_complete_or_client_stopped();
 
     // Create a conflict. Session 1 should lose, because it has a lower peer ID.
-    {
-        WriteTransaction wt{db_1};
+    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
 
         auto ints = obj.get_set<int64_t>(col_ints);
         ints.insert(999);
+    });
 
-        session_1.nonsync_transact_notify(wt.commit());
-    }
-
-    {
-        WriteTransaction wt{db_2};
+    write_transaction_notifying_session(db_2, session_2, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
 
         auto ints = obj.get_set<int64_t>(col_ints);
         ints.insert(999);
         ints.erase(999);
-
-        session_2.nonsync_transact_notify(wt.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -8287,14 +7427,12 @@ TEST(Sync_Set)
         CHECK(compare_groups(read_1, read_2));
     }
 
-    {
-        WriteTransaction wt{db_1};
+    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& wt) {
         auto t = wt.get_table("class_Foo");
         auto obj = t->get_object_with_primary_key(0);
         auto ints = obj.get_set<int64_t>(col_ints);
         ints.clear();
-        session_1.nonsync_transact_notify(wt.commit());
-    }
+    });
 
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -8309,9 +7447,8 @@ TEST(Sync_Set)
 TEST(Sync_DanglingLinksCountInPriorSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    realm::DBOptions db_opts;
     realm::_impl::ClientHistoryImpl history{path};
-    auto local_db = realm::DB::create(history, db_opts);
+    auto local_db = realm::DB::create(history);
     auto& logger = test_context.logger;
 
     history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
@@ -8393,33 +7530,28 @@ TEST(Sync_DanglingLinksCountInPriorSize)
 
 TEST(Sync_BundledRealmFile)
 {
+    TEST_CLIENT_DB(db);
     SHARED_GROUP_TEST_PATH(path);
-    SHARED_GROUP_TEST_PATH(path_1);
 
     TEST_DIR(dir);
     fixtures::ClientServerFixture fixture{dir, test_context};
     fixture.start();
 
-    auto history = make_client_replication(path);
+    Session session = fixture.make_bound_session(db);
 
-    auto db = DB::create(*history);
-
-    Session session = fixture.make_session(path);
-    fixture.bind_session(session, "/test");
-
-    auto tr = db->start_write();
-    auto foos = tr->add_table_with_primary_key("class_Foo", type_Int, "id");
-    auto foo = foos->create_object_with_primary_key(123);
-    session.nonsync_transact_notify(tr->commit());
+    write_transaction_notifying_session(db, session, [](WriteTransaction& tr) {
+        auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto foo = foos->create_object_with_primary_key(123);
+    });
 
     // We cannot write out file if changes are not synced to server
-    CHECK_THROW_ANY(db->write_copy(path_1.c_str()));
+    CHECK_THROW_ANY(db->write_copy(path.c_str()));
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
     // Now we can
-    db->write_copy(path_1.c_str());
+    db->write_copy(path.c_str());
 }
 
 // This test is extracted from ClientReset_ThreeClients
@@ -8428,8 +7560,8 @@ TEST(Sync_BundledRealmFile)
 TEST(Sync_MergeStringPrimaryKey)
 {
     TEST_DIR(dir_1); // The server.
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
     TEST_DIR(metadata_dir_1);
     TEST_DIR(metadata_dir_2);
 
@@ -8459,16 +7591,12 @@ TEST(Sync_MergeStringPrimaryKey)
         real_path_1 = fixture.map_virtual_to_real_path(server_path);
 
         {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
-            DBRef sg = DB::create(*history);
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db_1};
             create_schema(wt);
             wt.commit();
         }
         {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
-            DBRef sg = DB::create(*history);
-            WriteTransaction wt{sg};
+            WriteTransaction wt{db_2};
             create_schema(wt);
 
             TableRef table_2 = wt.get_table("class_table_2");
@@ -8480,10 +7608,8 @@ TEST(Sync_MergeStringPrimaryKey)
             wt.commit();
         }
 
-        Session session_1 = fixture.make_session(path_1);
-        fixture.bind_session(session_1, server_path);
-        Session session_2 = fixture.make_session(path_2);
-        fixture.bind_session(session_2, server_path);
+        Session session_1 = fixture.make_bound_session(db_1, server_path);
+        Session session_2 = fixture.make_bound_session(db_2, server_path);
 
         session_1.wait_for_upload_complete_or_client_stopped();
         session_2.wait_for_upload_complete_or_client_stopped();
