@@ -115,6 +115,7 @@ struct FreeUserdata {
 };
 
 using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
+using SharedUserdata = std::shared_ptr<void>;
 } // namespace realm::c_api
 
 #endif // REALM_OBJECT_STORE_C_API_UTIL_HPP

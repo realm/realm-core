@@ -176,3 +176,10 @@ RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t* conf
 {
     config->max_number_of_active_versions = uint_fast64_t(n);
 }
+
+#if REALM_ENABLE_SYNC
+RLM_API void realm_config_set_sync_config(realm_config_t* config, realm_sync_config_t* sync_config)
+{
+    config->sync_config = std::make_shared<SyncConfig>(*sync_config);
+}
+#endif // REALM_ENABLE_SYNC

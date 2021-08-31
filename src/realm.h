@@ -65,6 +65,9 @@ typedef struct realm_results realm_results_t;
 /* Config types */
 typedef struct realm_config realm_config_t;
 typedef struct realm_sync_config realm_sync_config_t;
+typedef struct realm_app_config realm_app_config_t;
+typedef struct realm_sync_client_config realm_sync_client_config_t;
+
 typedef bool (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
 typedef bool (*realm_data_initialization_func_t)(void* userdata, realm_t* realm);
@@ -1898,5 +1901,228 @@ RLM_API realm_notification_token_t* realm_results_add_notification_callback(real
  * in a different `realm_t` instance
  */
 RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
+
+/* Logging */
+typedef struct realm_logger realm_logger_t;
+typedef enum realm_log_level {
+    RLM_LOG_LEVEL_ALL,
+    RLM_LOG_LEVEL_TRACE,
+    RLM_LOG_LEVEL_DEBUG,
+    RLM_LOG_LEVEL_DETAIL,
+    RLM_LOG_LEVEL_INFO,
+    RLM_LOG_LEVEL_WARNING,
+    RLM_LOG_LEVEL_ERROR,
+    RLM_LOG_LEVEL_FATAL,
+    RLM_LOG_LEVEL_OFF,
+} realm_log_level_e;
+typedef void (*realm_logger_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+typedef realm_log_level_e (*realm_logger_get_threshold_func_t)(void* userdata);
+typedef realm_logger_t* (*realm_logger_factory_func_t)(void* userdata, realm_log_level_e level);
+/**
+ * Define a new logger instance.
+ *
+ * @param log_func A function pointer that will be invoked whenever
+ *                 `realm_logger_log()` is called. The function does not need to
+ *                 be thread-safe in itself, but may be invoked (under lock)
+ *                 from multiple threads.
+ * @param threshold_func Get the current log level threshold for the logger. The
+ *                       function does not need to be thread-safe.
+ * @param free_func How to release @a userdata when the logger object is
+ *                  destroyed.
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_logger_t* realm_logger_new(void* userdata, realm_logger_log_func_t log_func,
+                                         realm_logger_get_threshold_func_t threshold_func,
+                                         realm_free_userdata_func_t free_func);
+
+/* HTTP transport */
+typedef enum realm_http_method {
+    RLM_HTTP_METHOD_GET,
+    RLM_HTTP_METHOD_POST,
+    RLM_HTTP_METHOD_PATCH,
+    RLM_HTTP_METHOD_PUT,
+    RLM_HTTP_METHOD_DELETE,
+} realm_http_method_e;
+
+typedef struct realm_http_header {
+    const char* name;
+    const char* value;
+} realm_http_header_t;
+
+typedef struct realm_http_request {
+    realm_http_method_e method;
+    const char* url;
+    uint64_t timeout_ms;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+    bool uses_refresh_token;
+} realm_http_request_t;
+
+typedef struct realm_http_response {
+    int status_code;
+    int custom_status_code;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+} realm_http_response_t;
+
+typedef void (*realm_http_completion_func_t)(void* userdata, const realm_http_response_t);
+typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_http_request_t, void* completion_data,
+                                          realm_http_completion_func_t completion_callback);
+
+typedef struct realm_http_transport realm_http_transport_t;
+typedef realm_http_transport_t* (*realm_http_transport_factory_func_t)(void* userdata);
+RLM_API realm_http_transport_t* realm_http_transport_new(void* userdata, realm_free_userdata_func_t,
+                                                         realm_http_request_func_t);
+
+/* App */
+typedef struct realm_app realm_app_t;
+typedef struct realm_app_credentials realm_app_credentials_t;
+typedef struct realm_user realm_user_t;
+
+typedef enum realm_auth_provider {
+    RLM_AUTH_PROVIDER_ANONYMOUS,
+    RLM_AUTH_PROVIDER_FACEBOOK,
+    RLM_AUTH_PROVIDER_GOOGLE,
+    RLM_AUTH_PROVIDER_APPLE,
+    RLM_AUTH_PROVIDER_CUSTOM,
+    RLM_AUTH_PROVIDER_USERNAME_PASSWORD,
+    RLM_AUTH_PROVIDER_FUNCTION,
+    RLM_AUTH_PROVIDER_USER_API_KEY,
+    RLM_AUTH_PROVIDER_SERVER_API_KEY,
+} realm_auth_provider_e;
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_custom(const char* token);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_username_password(const char* username,
+                                                                             const char* password);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_bson_payload);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key);
+
+RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*);
+
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
+                                                 realm_http_transport_factory_func_t http_transport_factory,
+                                                 void* transport_factory_userdata,
+                                                 realm_free_userdata_func_t transport_factory_userdata_free);
+RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms);
+RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*);
+
+RLM_API realm_app_t* realm_app_new(const realm_app_config_t*, const realm_sync_client_config_t*);
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id);
+
+RLM_API const char* realm_app_get_app_id(realm_app_t*);
+RLM_API realm_user_t* realm_app_get_current_user(realm_app_t*);
+
+/**
+ * Get the list of active users in this @a app.
+ *
+ * @param out_users A pointer to an array of `realm_user_t*`, which
+ *                  will be populated with the list of active users in the app.
+ *                  May be NULL, in which case this function can be used to
+ *                  discover the number of active users in the app.
+ * @param max The maximum number of entries to write to `out_users`.
+ * @param out_n The actual number of properties written to `out_users`.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_app_get_all_users(realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n);
+
+RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
+                                               void (*)(void* userdata, realm_user_t*, realm_error_t*),
+                                               void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_log_out_current_user(realm_app_t*, void (*)(void* userdata, realm_error_t*), void* userdata,
+                                            realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_refresh_custom_data(realm_app_t*, realm_user_t*, void (*)(void* userdata, realm_error_t*),
+                                           void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_log_out(realm_app_t*, realm_user_t*, void (*)(void* userdata, realm_error_t*), void* userdata,
+                               realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_link_user(realm_app_t*, realm_user_t*, realm_app_credentials_t*,
+                                 void (*)(void* userdata, realm_user_t*, realm_error_t*), void* userdata,
+                                 realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** new_user);
+
+RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, void (*)(void* userdata, realm_error_t*),
+                                   void* userdata, realm_free_userdata_func_t userdata_free);
+
+/* Sync */
+
+typedef enum realm_sync_session_stop_policy {
+    RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY,
+    RLM_SYNC_SESSION_STOP_POLICY_LIVE_INDEFINITELY,
+    RLM_SYNC_SESSION_STOP_POLICY_AFTER_CHANGES_UPLOADED
+} realm_sync_session_stop_policy_e;
+
+typedef enum realm_sync_client_resync_mode {
+    RLM_SYNC_CLIENT_RESYNC_MODE_DISCARD_LOCAL,
+    RLM_SYNC_CLIENT_RESYNC_MODE_MANUAL
+} realm_sync_client_resync_mode_e;
+
+typedef struct realm_sync_session realm_sync_session_t;
+
+typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
+                                             const char* pem_data, size_t pem_size, int preverify_ok, int depth);
+
+RLM_API realm_sync_config_t* realm_sync_config_new(realm_user_t*, const char* partition_value);
+RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*, realm_sync_session_stop_policy_e);
+RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, void (*)(void* userdata, realm_error_t),
+                                                 void* userdata, realm_free_userdata_func_t);
+RLM_API void realm_sync_config_set_realm_encryption_key(realm_sync_config_t*, char[64]);
+RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool);
+RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*);
+RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
+                                                       void* userdata, realm_free_userdata_func_t);
+RLM_API void realm_sync_config_set_cancel_waits_on_nonfatal_error(realm_sync_config_t*, bool);
+RLM_API void realm_sync_config_set_authorization_header_name(realm_sync_config_t*, const char*);
+RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name, const char* value);
+RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*);
+RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*, realm_sync_client_resync_mode_e);
+
+typedef enum realm_sync_client_metadata_mode {
+    RLM_SYNC_CLIENT_METADATA_MODE_DISABLED,
+    RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
+    RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED
+} realm_sync_client_metadata_mode_e;
+
+typedef enum realm_sync_client_reconnect_mode {
+    RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL,
+    RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING
+} realm_sync_client_reconnect_mode_e;
+
+RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void);
+RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*);
+RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
+                                                        realm_sync_client_metadata_mode_e);
+RLM_API void realm_sync_client_config_set_encryption_key(realm_sync_client_config_t*, const uint8_t*, size_t);
+RLM_API void realm_sync_client_config_set_reset_metadata_on_error(realm_sync_client_config_t*, bool);
+RLM_API void realm_sync_client_config_set_logger_factory(realm_sync_client_config_t*, realm_logger_factory_func_t);
+RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e);
+RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
+                                                         realm_sync_client_reconnect_mode_e);
+RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool);
+RLM_API void realm_sync_client_config_set_user_agent_binding_info(realm_sync_client_config_t*, const char*);
+RLM_API void realm_sync_client_config_set_user_agent_application_info(realm_sync_client_config_t*, const char*);
+RLM_API void realm_sync_client_config_set_connect_timeout(realm_sync_client_config_t*, uint64_t);
+RLM_API void realm_sync_client_config_set_connection_linger_time(realm_sync_client_config_t*, uint64_t);
+RLM_API void realm_sync_client_config_set_ping_keepalive_period(realm_sync_client_config_t*, uint64_t);
+RLM_API void realm_sync_client_config_set_pong_keepalive_period(realm_sync_client_config_t*, uint64_t);
+RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*, uint64_t);
+
 
 #endif // REALM_H

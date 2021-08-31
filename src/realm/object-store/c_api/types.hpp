@@ -13,6 +13,12 @@
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/sync/config.hpp>
+#endif
+
 #include <stdexcept>
 #include <string>
 
@@ -394,5 +400,75 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
     }
 };
 
+#if REALM_ENABLE_SYNC
+
+struct realm_logger : realm::c_api::WrapC {
+    std::unique_ptr<realm::util::Logger> logger;
+};
+
+struct realm_http_transport : realm::c_api::WrapC {
+    std::unique_ptr<realm::app::GenericNetworkTransport> transport;
+};
+
+struct realm_app_config : realm::c_api::WrapC, realm::app::App::Config {
+    using Config::Config;
+};
+
+struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
+    using SyncConfig::SyncConfig;
+};
+
+struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
+    using SyncClientConfig::SyncClientConfig;
+};
+
+struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
+    realm_app(realm::app::SharedApp app)
+        : realm::app::SharedApp{std::move(app)}
+    {
+    }
+
+    realm_app* clone() const override
+    {
+        return new realm_app{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_app*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_app_credentials : realm::c_api::WrapC, realm::app::AppCredentials {
+    realm_app_credentials(realm::app::AppCredentials credentials)
+        : realm::app::AppCredentials{std::move(credentials)}
+    {
+    }
+};
+
+struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
+    realm_user(std::shared_ptr<realm::SyncUser> user)
+        : std::shared_ptr<realm::SyncUser>{std::move(user)}
+    {
+    }
+
+    realm_user* clone() const override
+    {
+        return new realm_user{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+#endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP
