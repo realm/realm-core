@@ -106,8 +106,7 @@ TEST_IF(Sync_HistoryMigration, false)
     // CAUTION: This cannot be changed without also purging all the accumulated
     // test files.
     auto reference_initialize = [&](const std::string& client_path) {
-        auto history = sync::make_client_replication(client_path);
-        DBRef sg = DB::create(*history);
+        DBRef sg = DB::create(sync::make_client_replication(client_path));
         WriteTransaction wt{sg};
         TableRef table = sync::create_table_with_primary_key(wt, "class_Table", type_String, "label");
         ColKey col_key = table->add_column(type_Int, "value");
@@ -118,8 +117,7 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto modify = [&](const std::string& client_path, StringData label, int old_value, int new_value) {
-        auto history = sync::make_client_replication(client_path);
-        DBRef sg = DB::create(*history);
+        DBRef sg = DB::create(sync::make_client_replication(client_path));
         WriteTransaction wt{sg};
         Group& group = wt.get_group();
         TableRef table = group.get_table("class_Table");
@@ -167,10 +165,6 @@ TEST_IF(Sync_HistoryMigration, false)
 
     class ServerHistoryContext : public _impl::ServerHistory::Context {
     public:
-        bool owner_is_sync_server() const noexcept override final
-        {
-            return false;
-        }
         std::mt19937_64& server_history_get_random() noexcept override final
         {
             return m_random;
@@ -193,8 +187,7 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto verify_client_file = [&](const std::string& client_path) {
-        auto history = sync::make_client_replication(client_path);
-        DBRef sg = DB::create(*history);
+        DBRef sg = DB::create(sync::make_client_replication(client_path));
         ReadTransaction rt{sg};
         rt.get_group().verify();
     };
@@ -207,10 +200,8 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto compare_client_files = [&](const std::string& client_path_1, const std::string& client_path_2) {
-        auto history_1 = sync::make_client_replication(client_path_1);
-        auto history_2 = sync::make_client_replication(client_path_2);
-        DBRef sg_1 = DB::create(*history_1);
-        DBRef sg_2 = DB::create(*history_2);
+        DBRef sg_1 = DB::create(sync::make_client_replication(client_path_1));
+        DBRef sg_2 = DB::create(sync::make_client_replication(client_path_2));
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
         return compare_groups(rt_1, rt_2, test_context.logger);
@@ -340,7 +331,8 @@ TEST_IF(Sync_HistoryMigration, false)
     auto synchronize = [&](const std::string& client_path, const std::string& server_dir) {
         fixtures::ClientServerFixture fixture{server_dir, test_context};
         fixture.start();
-        sync::Session session = fixture.make_bound_session(client_path, virtual_path);
+        auto db = DB::create(sync::make_client_replication(client_path));
+        sync::Session session = fixture.make_bound_session(db, virtual_path);
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();
     };

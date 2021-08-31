@@ -1050,14 +1050,17 @@ void SimpleReporter::begin(const TestContext& context)
     logger.info(format, details.file_name, details.line_number, details.test_name, context.recurrence_index + 1);
 }
 
-void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
-                          const std::string& message)
+void SimpleReporter::fail(const TestContext& context, const char* file, long line, const std::string& message)
 {
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: ERROR in %3: %5"
                                                                              : "%1:%2: ERROR in %3#%4: %5";
-    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index + 1, message);
+    auto msg = util::format(format, file, line, details.test_name, context.recurrence_index + 1, message);
+    if (m_report_progress) {
+        m_error_messages.push_back(msg);
+    }
+    logger.info(msg.c_str());
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -1082,6 +1085,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
         logger.info("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
                     results_summary.num_failed_tests, results_summary.num_executed_tests,
                     results_summary.num_failed_checks, results_summary.num_executed_checks);
+        for (auto& str : m_error_messages) {
+            logger.info(str.c_str());
+        }
     }
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {

@@ -887,7 +887,6 @@ public:
     void enqueue(ServerFile*);
 
     // Overriding members of ServerHistory::Context
-    bool owner_is_sync_server() const noexcept override final;
     std::mt19937_64& server_history_get_random() noexcept override final;
     bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
     Clock::time_point get_compaction_clock_now() const noexcept override final;
@@ -1187,7 +1186,6 @@ public:
     void dec_num_outstanding_compaction_processes();
 
     // Overriding member functions in _impl::ServerHistory::Context
-    bool owner_is_sync_server() const noexcept override final;
     std::mt19937_64& server_history_get_random() noexcept override final;
     bool get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept override final;
     Clock::time_point get_compaction_clock_now() const noexcept override final;
@@ -4000,9 +3998,10 @@ ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const s
     : logger{"ServerFile[" + virt_path + "]: ", server.logger}               // Throws
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
-    , m_file{cache, real_path, virt_path, *this, disable_sync_to_disk}       // Throws
-    , m_client_file_blacklist{make_client_file_blacklist(server, virt_path)} // Throws
-    , m_worker_file{server.get_worker().get_file_access_cache(), real_path, virt_path, *this, disable_sync_to_disk}
+    , m_file{cache, real_path, virt_path, *this, false, disable_sync_to_disk} // Throws
+    , m_client_file_blacklist{make_client_file_blacklist(server, virt_path)}  // Throws
+    , m_worker_file{
+          server.get_worker().get_file_access_cache(), real_path, virt_path, *this, true, disable_sync_to_disk}
 {
     m_server.metrics().gauge("realms.open", ++m_server.gauges().realms_open); // Throws
 }
@@ -4539,6 +4538,7 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
     hist_ptr = m_server.make_history_for_path(path, *this);        // Throws
     DBOptions options = m_worker_file.make_shared_group_options(); // Throws
     sg_ptr = DB::create(*hist_ptr, options);                       // Throws
+    sg_ptr->claim_sync_agent();                                    // Throws
     return *hist_ptr;                                              // Throws
 }
 
@@ -4927,12 +4927,6 @@ void Worker::enqueue(ServerFile* file)
 }
 
 
-bool Worker::owner_is_sync_server() const noexcept
-{
-    return true;
-}
-
-
 std::mt19937_64& Worker::server_history_get_random() noexcept
 {
     return m_random;
@@ -5275,15 +5269,6 @@ void ServerImpl::dec_byte_size_for_pending_downstream_changesets(std::size_t byt
                  m_pending_changesets_from_downstream_byte_size); // Throws
     metrics().gauge("upload.pending.bytes",
                     double(m_pending_changesets_from_downstream_byte_size)); // Throws
-}
-
-
-bool ServerImpl::owner_is_sync_server() const noexcept
-{
-    // The worker thread is considered to be the sync agent (sync server) from
-    // the point of view of the server history class, not the network event loop
-    // thread.
-    return false;
 }
 
 

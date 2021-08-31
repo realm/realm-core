@@ -317,7 +317,7 @@ void ServerHistory::get_status(VersionInfo& version_info, bool& has_upstream_syn
                                file_ident_type& partial_file_ident,
                                version_type& partial_progress_reference_version) const
 {
-    TransactionRef rt = m_shared_group->start_read(); // Throws
+    TransactionRef rt = m_db->start_read(); // Throws
     version_type realm_version = rt->get_version();
     const_cast<ServerHistory*>(this)->set_group(rt.get());
     ensure_updated(realm_version); // Throws
@@ -340,7 +340,7 @@ void ServerHistory::get_status(VersionInfo& version_info, bool& has_upstream_syn
 
 version_type ServerHistory::get_compacted_until_version() const
 {
-    TransactionRef rt = m_shared_group->start_read(); // Throws
+    TransactionRef rt = m_db->start_read(); // Throws
     version_type realm_version = rt->get_version();
     const_cast<ServerHistory*>(this)->set_group(rt.get());
     ensure_updated(realm_version); // Throws
@@ -354,7 +354,7 @@ version_type ServerHistory::get_compacted_until_version() const
 
 void ServerHistory::allocate_file_identifiers(FileIdentAllocSlots& slots, VersionInfo& version_info)
 {
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -377,7 +377,7 @@ bool ServerHistory::register_received_file_identifier(file_ident_type received_f
                                                       file_ident_type proxy_file_ident, ClientType client_type,
                                                       salt_type& file_ident_salt, VersionInfo& version_info)
 {
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -438,7 +438,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
         bool dump_changeset_info = false;
 
         try {
-            TransactionRef tr = m_shared_group->start_write(); // Throws
+            TransactionRef tr = m_db->start_write(); // Throws
             version_type realm_version = tr->get_version_of_current_transaction().version;
             ensure_updated(realm_version); // Throws
             prepare_for_write();           // Throws
@@ -579,7 +579,7 @@ auto ServerHistory::integrate_backup_idents_and_changeset(
     result.success = false;
 
     try {
-        TransactionRef tr = m_shared_group->start_write(); // Throws
+        TransactionRef tr = m_db->start_write(); // Throws
         version_type realm_version = tr->get_version_of_current_transaction().version;
         ensure_updated(realm_version); // Throws
         prepare_for_write();           // Throws
@@ -823,7 +823,7 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
     // asks to download from a point before the base of its reciprocal history.
     auto recip_hist_base_version = version_type(m_acc->cf_rh_base_versions.get(client_file_index));
     if (download_progress.server_version < recip_hist_base_version) {
-        logger.debug("Bad dwoload progress: %1 < %2", download_progress.server_version, recip_hist_base_version);
+        logger.debug("Bad download progress: %1 < %2", download_progress.server_version, recip_hist_base_version);
         return BootstrapError::bad_download_server_version;
     }
 
@@ -895,7 +895,7 @@ auto ServerHistory::bootstrap_client_session(SaltedFileIdent client_file_ident, 
                                              UploadCursor& upload_progress, version_type& locked_server_version,
                                              Logger& logger) const -> BootstrapError
 {
-    TransactionRef tr = m_shared_group->start_read(); // Throws
+    TransactionRef tr = m_db->start_read(); // Throws
     auto realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
@@ -917,7 +917,7 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
     REALM_ASSERT(client_file_ident != 0);
     REALM_ASSERT(download_progress.server_version <= end_version);
 
-    TransactionRef tr = m_shared_group->start_read(); // Throws
+    TransactionRef tr = m_db->start_read(); // Throws
     version_type realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
@@ -1032,7 +1032,7 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
 
 void ServerHistory::add_upstream_sync_status()
 {
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -1072,7 +1072,7 @@ bool ServerHistory::compact_history(const TransactionRef& wt, Logger& logger)
 util::metered::vector<sync::Changeset> ServerHistory::get_parsed_changesets(version_type begin,
                                                                             version_type end) const
 {
-    TransactionRef rt = m_shared_group->start_read(); // Throws
+    TransactionRef rt = m_db->start_read(); // Throws
     version_type realm_version = rt->get_version();
     const_cast<ServerHistory*>(this)->set_group(rt.get());
     ensure_updated(realm_version);
@@ -1735,9 +1735,9 @@ bool ServerHistory::update_upload_progress(version_type orig_client_version, Rec
 // Overriding member in Replication
 void ServerHistory::initialize(DB& sg)
 {
-    REALM_ASSERT(!m_shared_group);
+    REALM_ASSERT(!m_db);
     SyncReplication::initialize(sg); // Throws
-    m_shared_group = &sg;
+    m_db = &sg;
 }
 
 
@@ -1810,17 +1810,9 @@ std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     auto server_hist = std::make_unique<ServerHistory>(get_database_path(), m_context, compaction_control); // Throws
-    server_hist->initialize(*m_shared_group);                                                               // Throws
+    server_hist->initialize(*m_db);                                                                         // Throws
     return std::unique_ptr<_impl::History>(server_hist.release());
     ;
-}
-
-
-// Overriding member in Replication
-bool ServerHistory::is_sync_agent() const noexcept
-{
-    bool owner_is_sync_server = m_context.owner_is_sync_server();
-    return owner_is_sync_server;
 }
 
 
@@ -1861,7 +1853,7 @@ void ServerHistory::finalize_changeset() noexcept {}
 void ServerHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
                                SyncProgress& progress) const
 {
-    TransactionRef tr = m_shared_group->start_read(); // Throws
+    TransactionRef tr = m_db->start_read(); // Throws
     version_type realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
@@ -1893,7 +1885,7 @@ void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
 {
     REALM_ASSERT(client_file_ident.ident != g_root_node_file_ident);
 
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -1930,7 +1922,7 @@ void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
 void ServerHistory::set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t*,
                                       VersionInfo& version_info)
 {
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -1951,7 +1943,7 @@ void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
                                                std::vector<UploadChangeset>& uploadable_changesets,
                                                version_type& locked_server_version) const
 {
-    TransactionRef tr = m_shared_group->start_read(); // Throws
+    TransactionRef tr = m_db->start_read(); // Throws
     version_type realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
@@ -2005,7 +1997,7 @@ bool ServerHistory::integrate_server_changesets(const SyncProgress& progress, co
 {
     REALM_ASSERT(!transact_reporter);
 
-    TransactionRef tr = m_shared_group->start_write(); // Throws
+    TransactionRef tr = m_db->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -2488,7 +2480,7 @@ void ServerHistory::create_empty_history()
     REALM_ASSERT(m_server_version_salt == 0);
     REALM_ASSERT(m_ct_history_size == 0);
     REALM_ASSERT(!m_acc);
-    Allocator& alloc = m_shared_group->get_alloc();
+    Allocator& alloc = m_db->get_alloc();
     m_acc.emplace(alloc);
     DiscardAccessorsGuard dag{*this};
     gf::prepare_history_parent(*m_group, m_acc->root, Replication::hist_SyncServer,
@@ -2757,7 +2749,7 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
 {
     HistoryContents hc;
 
-    TransactionRef tr = m_shared_group->start_read(); // Throws
+    TransactionRef tr = m_db->start_read(); // Throws
     version_type realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
@@ -2903,7 +2895,7 @@ void ServerHistory::record_current_schema_version()
     Array schema_versions{alloc};
     schema_versions.set_parent(&root, s_schema_versions_iip);
     schema_versions.init_from_parent();
-    version_type snapshot_version = m_shared_group->get_version_of_latest_snapshot();
+    version_type snapshot_version = m_db->get_version_of_latest_snapshot();
     record_current_schema_version(schema_versions, snapshot_version); // Throws
 }
 

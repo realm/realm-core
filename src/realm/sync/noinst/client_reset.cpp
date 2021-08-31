@@ -631,22 +631,18 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
     }
 }
 
-client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
-    const std::string& path_local, const util::Optional<std::array<char, 64>>& encryption_key,
-    sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version, util::Logger& logger)
+client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db, sync::SaltedFileIdent client_file_ident,
+                                                                      sync::SaltedVersion server_version,
+                                                                      util::Logger& logger)
 {
-    logger.info("Client reset, path_local = %1, "
-                "encryption = %2, client_file_ident.ident = %3, "
-                "client_file_ident.salt = %4, server_version.version = %5, "
-                "server_version.salt = %6 ",
-                path_local, (encryption_key ? "on" : "off"), client_file_ident.ident, client_file_ident.salt,
-                server_version.version, server_version.salt);
+    logger.info("Client reset: path_local = %1, client_file_ident.ident = %2, "
+                "client_file_ident.salt = %3, server_version.version = %4, "
+                "server_version.salt = %5",
+                db.get_path(), client_file_ident.ident, client_file_ident.salt, server_version.version,
+                server_version.salt);
 
-    DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
-    ClientHistoryImpl history_local{path_local};
-    DBRef sg_local = DB::create(history_local, shared_group_options);
-
-    auto group_local = sg_local->start_write();
+    auto& history = dynamic_cast<ClientHistoryImpl&>(*db.get_replication());
+    auto group_local = db.start_write();
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
@@ -658,8 +654,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     // Since recovery mode has been unsupported this is always empty.
     BinaryData recovered_changeset;
     uint_fast64_t downloaded_bytes = 0;
-    history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
-                                               downloaded_bytes, recovered_changeset);
+    history.set_client_reset_adjustments(current_version_local, client_file_ident, server_version, downloaded_bytes,
+                                         recovered_changeset);
 
     // Finally, the local Realm is committed.
     group_local->commit_and_continue_as_read();

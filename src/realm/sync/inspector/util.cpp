@@ -100,11 +100,6 @@ inspector::ServerHistoryContext::ServerHistoryContext()
 {
 }
 
-bool inspector::ServerHistoryContext::owner_is_sync_server() const noexcept
-{
-    return true;
-}
-
 std::mt19937_64& inspector::ServerHistoryContext::server_history_get_random() noexcept
 {
     return m_random;

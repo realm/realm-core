@@ -126,6 +126,20 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
+SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, bson::Bson partition, Schema schema)
+{
+    REALM_ASSERT(app);
+    sync_config = std::make_shared<SyncConfig>(app->current_user(), partition);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = [](auto, auto err) {
+        fprintf(stderr, "Unexpected sync error: %s\n", err.message.c_str());
+        abort();
+    };
+    schema_mode = SchemaMode::AdditiveExplicit;
+    schema_version = 1;
+    this->schema = std::move(schema);
+}
+
 // MARK: - SyncServer
 SyncServer::SyncServer(const SyncServer::Config& config)
     : m_local_root_dir(config.local_dir.empty() ? util::make_temp_dir() : config.local_dir)
@@ -189,8 +203,7 @@ static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(st
     std::mutex wait_mutex;
     bool wait_flag(false);
     std::error_code ec;
-    auto& session = *realm.config().sync_config->user->sync_manager()->get_session(realm.config().path,
-                                                                                   *realm.config().sync_config);
+    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
     (session.*fn)([&](std::error_code error) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;
@@ -251,8 +264,10 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
 
     m_app = app::App::get_shared_app(app_config, sc_config);
-    m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) +
-                                          "/realm-sync");
+    if (config.override_sync_route) {
+        m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) +
+                                              "/realm-sync");
+    }
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
 }

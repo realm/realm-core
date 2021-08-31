@@ -600,9 +600,10 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
+std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const SyncConfig& sync_config)
 {
     auto& client = get_sync_client(); // Throws
+    auto path = db->get_path();
 
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
@@ -610,7 +611,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, this);
+    auto shared_session = SyncSession::create(client, std::move(db), sync_config, this);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
@@ -621,7 +622,6 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
 
     return external_reference;
 }
-
 
 bool SyncManager::has_existing_sessions()
 {

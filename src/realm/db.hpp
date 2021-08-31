@@ -19,21 +19,20 @@
 #ifndef REALM_GROUP_SHARED_HPP
 #define REALM_GROUP_SHARED_HPP
 
-#include <functional>
-#include <cstdint>
-#include <limits>
-#include <realm/util/features.h>
-#include <realm/util/thread.hpp>
-#include <realm/util/interprocess_condvar.hpp>
-#include <realm/util/interprocess_mutex.hpp>
+#include <realm/db_options.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
+#include <realm/util/features.h>
+#include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_mutex.hpp>
 #include <realm/version_id.hpp>
-#include <realm/db_options.hpp>
-#include <realm/util/logger.hpp>
+
+#include <functional>
+#include <cstdint>
+#include <limits>
 
 namespace realm {
 
@@ -116,6 +115,7 @@ public:
     // file (or another file), a new DB object is needed.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const DBOptions options = DBOptions());
+    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
@@ -160,6 +160,10 @@ public:
         m_replication = repl;
     }
 
+    const std::string& get_path() const
+    {
+        return m_db_path;
+    }
 
 #ifdef REALM_DEBUG
     /// Deprecated method, only called from a unit test
@@ -388,6 +392,11 @@ public:
     static void delete_files(const std::string& base_path, bool* did_delete_realm = nullptr,
                              bool delete_lockfile = false);
 
+    /// Mark this DB as the sync agent for the file.
+    /// \throw MultipleSyncAgents if another DB is already the sync agent.
+    void claim_sync_agent();
+    void release_sync_agent();
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
@@ -395,6 +404,7 @@ private:
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
+    std::unique_ptr<Replication> m_history;
     Replication* m_replication = nullptr;
     struct SharedInfo;
     struct ReadCount;
@@ -446,8 +456,9 @@ private:
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
-
     std::shared_ptr<metrics::Metrics> m_metrics;
+    bool m_is_sync_agent = false;
+
     /// Attach this DB instance to the specified database file.
     ///
     /// While at least one instance of DB exists for a specific
@@ -852,14 +863,14 @@ inline DB::TransactStage Transaction::get_transact_stage() const noexcept
 class DB::ReadLockGuard {
 public:
     ReadLockGuard(DB& shared_group, ReadLockInfo& read_lock) noexcept
-        : m_shared_group(shared_group)
+        : m_db(shared_group)
         , m_read_lock(&read_lock)
     {
     }
     ~ReadLockGuard() noexcept
     {
         if (m_read_lock)
-            m_shared_group.release_read_lock(*m_read_lock);
+            m_db.release_read_lock(*m_read_lock);
     }
     void release() noexcept
     {
@@ -867,7 +878,7 @@ public:
     }
 
 private:
-    DB& m_shared_group;
+    DB& m_db;
     ReadLockInfo* m_read_lock;
 };
 

@@ -1,7 +1,9 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query.
+* A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
+* Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -13,8 +15,16 @@
 -----------
 
 ### Internals
-* None.
+* SyncConfig no longer has an encryption_key field, and the key from the parent Realm::Config is used instead.
 
+----------------------------------------------
+
+# 11.3.1 Release notes
+
+### Fixed
+* Fixed "Invalid data type" assertion failure in the sync client when applying an AddColumn instruction for a Mixed column when that column already exists locally. ([#4873](https://github.com/realm/realm-core/issues/4873), since v11.0.0)
+* Fixed a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
+ 
 ----------------------------------------------
 
 # 11.3.0 Release notes
@@ -27,6 +37,9 @@
 ### Fixed
 * Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
 * Updated the Catch2 URL to include '.git' extension ([#4608](https://github.com/realm/realm-core/issues/4608))
+ 
+### Breaking changes
+* None.
 
 -----------
 

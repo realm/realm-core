@@ -16,11 +16,12 @@
  *
  **************************************************************************/
 
+#include <realm/db.hpp>
+
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
-#include <realm/db.hpp>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -729,9 +730,9 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // is associated with any resources that are local to the initializing
 // process, because that would imply a leak.
 //
-// While it is not explicitely guaranteed in the man page, we shall
+// While it is not explicitly guaranteed in the man page, we shall
 // assume that is is valid to initialize a process-shared mutex twice
-// without an intervending call to pthread_mutex_destroy(). We need to
+// without an intervening call to pthread_mutex_destroy(). We need to
 // be able to reinitialize a process-shared mutex if the first
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
@@ -775,11 +776,9 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
-    bool opener_is_sync_agent = false;
     if (Replication* repl = get_replication()) {
         openers_hist_type = repl->get_history_type();
         openers_hist_schema_version = repl->get_history_schema_version();
-        opener_is_sync_agent = repl->is_sync_agent();
     }
 
     int current_file_format_version;
@@ -1234,11 +1233,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                     throw IncompatibleLockFile(ss.str());
                 }
 
-                // We need to ensure that at most one sync agent can join a
-                // session
-                if (info->sync_agent_present && opener_is_sync_agent)
-                    throw MultipleSyncAgents{};
-
                 // Even though this session participant is not the session initiator,
                 // it may be the one that has to perform the history schema upgrade.
                 // See upgrade_file_format(). However we cannot get the actual value
@@ -1280,11 +1274,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
             // make our presence noted:
             ++info->num_participants;
-
-            if (opener_is_sync_agent) {
-                REALM_ASSERT(!info->sync_agent_present);
-                info->sync_agent_present = 1; // Set to true
-            }
 
             // Keep the mappings and file open:
             alloc_detach_guard.release();
@@ -1615,15 +1604,13 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
     SharedInfo* info = m_file_map.get_addr();
     {
-        bool is_sync_agent = m_replication ? m_replication->is_sync_agent() : false;
-
         if (!lock.owns_lock())
             lock.lock();
 
         if (m_alloc.is_attached())
             m_alloc.detach();
 
-        if (is_sync_agent) {
+        if (m_is_sync_agent) {
             REALM_ASSERT(info->sync_agent_present);
             info->sync_agent_present = 0; // Set to false
         }
@@ -2867,6 +2854,15 @@ DBRef DB::create(Replication& repl, const DBOptions options)
     return retval;
 }
 
+DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions options)
+{
+    REALM_ASSERT(repl);
+    DBRef retval = std::make_shared<DBInit>(options);
+    retval->m_history = std::move(repl);
+    retval->open(*retval->m_history, options);
+    return retval;
+}
+
 DBRef DB::create(BinaryData buffer, bool take_ownership)
 {
     DBOptions options;
@@ -2874,6 +2870,29 @@ DBRef DB::create(BinaryData buffer, bool take_ownership)
     DBRef retval = std::make_shared<DBInit>(options);
     retval->open(buffer, take_ownership);
     return retval;
+}
+
+void DB::claim_sync_agent()
+{
+    REALM_ASSERT(is_attached());
+    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    SharedInfo* info = m_file_map.get_addr();
+    if (info->sync_agent_present)
+        throw MultipleSyncAgents{};
+    info->sync_agent_present = 1; // Set to true
+    m_is_sync_agent = true;
+}
+
+void DB::release_sync_agent()
+{
+    REALM_ASSERT(is_attached());
+    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    if (!m_is_sync_agent)
+        return;
+    SharedInfo* info = m_file_map.get_addr();
+    REALM_ASSERT(info->sync_agent_present);
+    info->sync_agent_present = 0;
+    m_is_sync_agent = false;
 }
 
 // HACK: Somewhat misplaced, but we have no replication.cpp
