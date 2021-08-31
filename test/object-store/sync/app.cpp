@@ -27,6 +27,7 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include "collection_fixtures.hpp"
 #include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
@@ -2196,6 +2197,173 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
         CHECK(processed);
         auto data = *user->custom_data();
         CHECK(data["favorite_color"] == "green");
+    }
+}
+
+void timed_sleeping_wait_for(std::function<bool()> condition,
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30))
+{
+    const auto wait_start = std::chrono::steady_clock::now();
+    while (!condition()) {
+        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
+            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
+        }
+        millisleep(1);
+    }
+}
+
+namespace cf = realm::collection_fixtures;
+TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collections]", cf::ListOfObjects,
+                   cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
+                   cf::DictionaryOfMixedLinks)
+{
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+    const auto partition = random_string(100);
+    TestType test_type("collection", "dest");
+    Schema schema = {{"source",
+                      {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
+                       {"realm_id", PropertyType::String | PropertyType::Nullable},
+                       test_type.property()}},
+                     {"dest",
+                      {
+                          {valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
+                          {"realm_id", PropertyType::String | PropertyType::Nullable},
+                      }}};
+    auto server_app_config = minimal_app_config(base_url, "collections_of_links", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
+    TestSyncManager sync_manager(app_config);
+    auto app = sync_manager.app();
+
+    auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
+        timed_sleeping_wait_for([&]() -> bool {
+            r->refresh();
+            TableRef dest = r->read_group().get_table(table_name);
+            size_t cur_count = dest->size();
+            return cur_count == count;
+        });
+    };
+    auto wait_for_num_outgoing_links_to_equal = [&](realm::SharedRealm r, Obj obj, size_t count) {
+        timed_sleeping_wait_for([&]() -> bool {
+            r->refresh();
+            return test_type.size_of_collection(obj) == count;
+        });
+    };
+
+    CppContext c;
+    auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
+        r->begin_transaction();
+        auto object = Object::create(
+            c, r, "source",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
+
+        for (auto link : links) {
+            test_type.add_link(object.obj(), link);
+        }
+        r->commit_transaction();
+    };
+
+    auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
+        r->begin_transaction();
+        auto obj = Object::create(
+            c, r, "dest",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
+        r->commit_transaction();
+        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+    };
+
+    auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
+        std::vector<int64_t> actual;
+        for (auto obj : links) {
+            actual.push_back(obj.get<Int>(valid_pk_name));
+        }
+        std::sort(actual.begin(), actual.end());
+        std::sort(expected.begin(), expected.end());
+        REQUIRE(actual == expected);
+    };
+
+    SECTION("integration testing") {
+        create_user_and_log_in(sync_manager.app());
+        SyncTestFile config1(app, partition, schema); // uses the current user created above
+        auto r1 = realm::Realm::get_shared_realm(config1);
+        Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
+
+        create_user_and_log_in(sync_manager.app());
+        SyncTestFile config2(app, partition, schema); // uses the user created above
+        auto r2 = realm::Realm::get_shared_realm(config2);
+        Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
+
+        constexpr int64_t source_pk = 0;
+        constexpr int64_t dest_pk_1 = 1;
+        constexpr int64_t dest_pk_2 = 2;
+        constexpr int64_t dest_pk_3 = 3;
+        { // add a container collection with three valid links
+            REQUIRE(r1_source_objs.size() == 0);
+            ObjLink dest1 = create_one_dest_object(r1, dest_pk_1);
+            ObjLink dest2 = create_one_dest_object(r1, dest_pk_2);
+            ObjLink dest3 = create_one_dest_object(r1, dest_pk_3);
+            create_one_source_object(r1, source_pk, {dest1, dest2, dest3});
+            REQUIRE(r1_source_objs.size() == 1);
+            REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            REQUIRE(r1_source_objs.get(0).get<String>("realm_id") == partition);
+            require_links_to_match_ids(test_type.get_links(r1_source_objs.get(0)), {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+
+        size_t expected_coll_size = 3;
+        std::vector<int64_t> remaining_dest_object_ids;
+        { // erase one of the destination objects
+            wait_for_num_objects_to_equal(r2, "class_source", 1);
+            wait_for_num_objects_to_equal(r2, "class_dest", 3);
+            REQUIRE(r2_source_objs.size() == 1);
+            REQUIRE(r2_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == 3);
+            auto linked_objects = test_type.get_links(r2_source_objs.get(0));
+            require_links_to_match_ids(linked_objects, {dest_pk_1, dest_pk_2, dest_pk_3});
+            r2->begin_transaction();
+            linked_objects[0].remove();
+            r2->commit_transaction();
+            remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name),
+                                         linked_objects[2].template get<Int>(valid_pk_name)};
+            expected_coll_size = test_type.will_erase_removed_object_links() ? 2 : 3;
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == expected_coll_size);
+        }
+
+        { // remove a link from the collection
+            wait_for_num_objects_to_equal(r1, "class_dest", 2);
+            REQUIRE(r1_source_objs.size() == 1);
+            REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
+            auto linked_objects = test_type.get_links(r1_source_objs.get(0));
+            require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
+            r1->begin_transaction();
+            test_type.remove_link(r1_source_objs.get(0),
+                                  ObjLink{linked_objects[0].get_table()->get_key(), linked_objects[0].get_key()});
+            r1->commit_transaction();
+            --expected_coll_size;
+            remaining_dest_object_ids = {linked_objects[1].template get<Int>(valid_pk_name)};
+            REQUIRE(test_type.size_of_collection(r1_source_objs.get(0)) == expected_coll_size);
+        }
+
+        { // clear the collection
+            REQUIRE(r2_source_objs.size() == 1);
+            REQUIRE(r2_source_objs.get(0).get<Int>(valid_pk_name) == source_pk);
+            wait_for_num_outgoing_links_to_equal(r2, r2_source_objs.get(0), expected_coll_size);
+            auto linked_objects = test_type.get_links(r2_source_objs.get(0));
+            require_links_to_match_ids(linked_objects, remaining_dest_object_ids);
+            r2->begin_transaction();
+            test_type.clear_collection(r2_source_objs.get(0));
+            r2->commit_transaction();
+            expected_coll_size = 0;
+            REQUIRE(test_type.size_of_collection(r2_source_objs.get(0)) == expected_coll_size);
+        }
+
+        { // expect an empty collection
+            REQUIRE(r1_source_objs.size() == 1);
+            wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
+        }
     }
 }
 
