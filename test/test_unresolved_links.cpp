@@ -261,6 +261,62 @@ TEST(Unresolved_LinkList)
     CHECK_EQUAL(stock_copy.get(3), mercedes.get_key());
 }
 
+TEST(Unresolved_NullKey)
+{
+    Group group;
+    auto table = group.add_table_with_primary_key("table", type_UUID, "_id", true);
+    auto list_col = table->add_column_list(*table, "links");
+
+    {
+        auto obj = table->create_object_with_primary_key(Mixed{}); // null is a valid key
+        auto list = obj.get_linklist(list_col);
+        list.insert(0, obj.get_key());
+        table->invalidate_object(obj.get_key());
+        CHECK_EQUAL(table->size(), 0);
+        auto unresolved_obj_key = table->get_objkey_from_primary_key(Mixed{});
+        CHECK(unresolved_obj_key.is_unresolved());
+    }
+
+    {
+        auto obj_resurrected = table->create_object_with_primary_key(Mixed{});
+        CHECK_NOT(obj_resurrected.get_key().is_unresolved());
+        CHECK_EQUAL(table->size(), 1);
+    }
+}
+
+TEST(Unresolved_MixedIndexed)
+{
+    Group group;
+    auto table = group.add_table_with_primary_key("table", type_UUID, "_id", true);
+    auto mixed_col = table->add_column(type_Mixed, "mixed", true);
+    table->add_search_index(mixed_col);
+
+    UUID pk2;
+    {
+        auto src_obj = table->create_object_with_primary_key(Mixed{});
+        auto dst_obj = table->create_object_with_primary_key(pk2);
+        CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), Mixed{});
+        src_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), dst_obj.get_key()}});
+        dst_obj.set<Mixed>(mixed_col, Mixed{ObjLink{table->get_key(), src_obj.get_key()}});
+        table->invalidate_object(dst_obj.get_key());
+        CHECK_EQUAL(table->size(), 1);
+        auto unresolved_obj_key = table->get_objkey_from_primary_key(pk2);
+        CHECK(unresolved_obj_key.is_unresolved());
+    }
+
+    {
+        auto obj_resurrected = table->create_object_with_primary_key(pk2);
+        CHECK_NOT(obj_resurrected.get_key().is_unresolved());
+        CHECK_EQUAL(obj_resurrected.get<Mixed>(mixed_col), Mixed{});
+        CHECK_EQUAL(table->size(), 2);
+        auto src_obj = table->get_object_with_primary_key(Mixed{});
+        CHECK(src_obj);
+        Mixed expected{ObjLink{table->get_key(), obj_resurrected.get_key()}};
+        CHECK_EQUAL(src_obj.get<Mixed>(mixed_col), expected);
+    }
+}
+
+
 TEST(Unresolved_QueryOverLinks)
 {
     Group g;
