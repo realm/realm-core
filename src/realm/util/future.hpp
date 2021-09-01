@@ -230,7 +230,8 @@ protected:
     void bind_ptr() const noexcept
     {
         // Assert that we haven't rolled over the counter here.
-        REALM_ASSERT_DEBUG(m_refs.fetch_add(1, std::memory_order_relaxed) + 1 != 0);
+        auto ref_count = m_refs.fetch_add(1, std::memory_order_relaxed) + 1;
+        REALM_ASSERT_DEBUG(ref_count != 0);
     }
 
     void unbind_ptr() const noexcept
