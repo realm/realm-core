@@ -72,7 +72,7 @@ const auto fail_status_2 = Status(ErrorCodes::Error(10001), "expected failure");
 // Tests a Future completed by completionExpr using testFunc. The Future will be completed in
 // various ways to maximize test coverage.
 template <typename CompletionFunc, typename TestFunc,
-          typename = std::enable_if_t<!std::is_void_v<std::result_of_t<CompletionFunc()>>>>
+          typename = std::enable_if_t<!std::is_void_v<std::invoke_result_t<CompletionFunc>>>>
 void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test) noexcept
 {
     using CompletionType = decltype(completion());
@@ -93,7 +93,7 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
 }
 
 template <typename CompletionFunc, typename TestFunc,
-          typename = std::enable_if_t<std::is_void_v<std::result_of_t<CompletionFunc()>>>, typename = void>
+          typename = std::enable_if_t<std::is_void_v<std::invoke_result_t<CompletionFunc>>>, typename = void>
 void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test) noexcept
 {
     using CompletionType = decltype(completion());
