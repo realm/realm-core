@@ -267,20 +267,31 @@ TEST(Unresolved_NullKey)
     auto table = group.add_table_with_primary_key("table", type_UUID, "_id", true);
     auto list_col = table->add_column_list(*table, "links");
 
+    UUID pk2;
     {
         auto obj = table->create_object_with_primary_key(Mixed{}); // null is a valid key
         auto list = obj.get_linklist(list_col);
         list.insert(0, obj.get_key());
+        auto obj2 = table->create_object_with_primary_key(pk2);
+        auto list2 = obj2.get_linklist(list_col);
+        list2.insert(0, obj.get_key());
         table->invalidate_object(obj.get_key());
-        CHECK_EQUAL(table->size(), 0);
+        CHECK_EQUAL(table->size(), 1);
         auto unresolved_obj_key = table->get_objkey_from_primary_key(Mixed{});
         CHECK(unresolved_obj_key.is_unresolved());
     }
 
     {
+        CHECK_EQUAL(table->size(), 1);
+        auto obj2 = table->get_object_with_primary_key(pk2);
+        CHECK(obj2);
+        auto list2 = obj2.get_linklist(list_col);
+        CHECK_EQUAL(list2.size(), 0); // the tombstoned object has removed itself from any forward links
         auto obj_resurrected = table->create_object_with_primary_key(Mixed{});
         CHECK_NOT(obj_resurrected.get_key().is_unresolved());
-        CHECK_EQUAL(table->size(), 1);
+        CHECK_EQUAL(table->size(), 2);
+        CHECK_EQUAL(list2.size(), 1); // the forward link was populated again after resurrection
+        CHECK_EQUAL(list2.get(0), obj_resurrected.get_key());
     }
 }
 
