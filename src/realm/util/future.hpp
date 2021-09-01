@@ -1182,7 +1182,7 @@ inline auto make_promise_future()
  */
 template <typename Func, typename... Args>
 using FutureContinuationResult =
-    typename future_details::FutureContinuationResultImpl<std::invoke_result_t<Func(Args&&...)>>;
+    typename future_details::FutureContinuationResultImpl<std::invoke_result_t<Func, Args...>>::type;
 
 //
 // Implementations of methods that couldn't be defined in the class due to ordering requirements.
