@@ -12,6 +12,7 @@
   namespace realm::query_parser {
     class ParserDriver;
     class ConstantNode;
+    class ListNode;
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
@@ -111,6 +112,7 @@ using namespace realm::query_parser;
 %type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
+%type  <ListNode*> list list_content
 %type  <PropertyNode*> prop
 %type  <PostOpNode*> post_op
 %type  <AggrNode*> aggr_op
@@ -164,10 +166,7 @@ atom_pred
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
-    | value BETWEEN list        {
-                                    error("The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.");
-                                    YYERROR;
-                                }
+    | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
     | NOT atom_pred             { $$ = drv.m_parse_nodes.create<NotNode>($2); }
     | '(' pred ')'              { $$ = drv.m_parse_nodes.create<ParensNode>($2); }
     | boolexpr                  { $$ =$1; }
@@ -215,11 +214,12 @@ direction
     : ASCENDING                 { $$ = true; }
     | DESCENDING                { $$ = false; }
 
-list : '{' list_content '}'
+list : '{' list_content '}'     { $$ = $2; }
+
 
 list_content
-    : constant
-    | list_content ',' constant
+    : constant                  { $$ = drv.m_parse_nodes.create<ListNode>($1); }
+    | list_content ',' constant { $1->add_element($3); $$ = $1; } 
 
 constant
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }

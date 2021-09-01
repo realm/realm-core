@@ -1,30 +1,66 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/set.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #include <realm/group.hpp>
 
 namespace realm::sync {
-
 namespace {
+
 REALM_NORETURN void throw_bad_transaction_log(std::string msg)
 {
     throw BadChangesetError{std::move(msg)};
 }
-REALM_NORETURN void bad_transaction_log(const char* msg)
+
+} // namespace
+
+REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& msg) const
 {
-    throw_bad_transaction_log(msg);
+    if (m_last_object_key) {
+        // If the last_object_key is valid then we should have a changeset and a current table
+        REALM_ASSERT(m_log);
+        REALM_ASSERT(m_last_table_name);
+        std::stringstream ss;
+        util::Optional<InternString> field_name;
+        if (m_last_field_name) {
+            field_name = m_last_field_name;
+        }
+        const instr::Path* cur_path = m_current_path ? &(*m_current_path) : nullptr;
+        m_log->print_path(ss, m_last_table_name, *m_last_object_key, field_name, cur_path);
+        throw_bad_transaction_log(
+            util::format("%1 (instruction target: %2, version: %3, last_integrated_remote_version: %4, "
+                         "origin_file_ident: %5, timestamp: %6)",
+                         msg, ss.str(), m_log->version, m_log->last_integrated_remote_version,
+                         m_log->origin_file_ident, m_log->origin_timestamp));
+    }
+    else if (m_last_table_name) {
+        // We should have a changeset if we have a table name defined.
+        REALM_ASSERT(m_log);
+        throw_bad_transaction_log(
+            util::format("%1 (instruction table: %2, version: %3, last_integrated_remote_version: %4, "
+                         "origin_file_ident: %5, timestamp: %6)",
+                         msg, m_log->get_string(m_last_table_name), m_log->version,
+                         m_log->last_integrated_remote_version, m_log->origin_file_ident, m_log->origin_timestamp));
+    }
+    else if (m_log) {
+        // If all we have is a changeset, then we should log whatever we can about it.
+        throw_bad_transaction_log(util::format("%1 (version: %2, last_integrated_remote_version: %3, "
+                                               "origin_file_ident: %4, timestamp: %5)",
+                                               msg, m_log->version, m_log->last_integrated_remote_version,
+                                               m_log->origin_file_ident, m_log->origin_timestamp));
+    }
+    throw_bad_transaction_log(std::move(msg));
 }
 
 template <class... Params>
-REALM_NORETURN void bad_transaction_log(const char* msg, Params&&... params)
+REALM_NORETURN void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
 {
     // FIXME: Avoid throwing in normal program flow (since changesets can come
     // in over the network, defective changesets are part of normal program
     // flow).
-    throw_bad_transaction_log(util::format(msg, std::forward<Params>(params)...));
+    bad_transaction_log(util::format(msg, std::forward<Params>(params)...));
 }
-} // namespace
 
 StringData InstructionApplier::get_string(InternString str) const
 {
@@ -58,9 +94,30 @@ TableRef InstructionApplier::table_for_class_name(StringData class_name) const
     return m_transaction.get_table(class_name_to_table_name(class_name, buffer));
 }
 
+template <typename T>
+struct TemporarySwapOut {
+    explicit TemporarySwapOut(T& target)
+        : target(target)
+        , backup()
+    {
+        std::swap(target, backup);
+    }
+
+    ~TemporarySwapOut()
+    {
+        std::swap(backup, target);
+    }
+
+    T& target;
+    T backup;
+};
+
 void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
+
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     auto add_table = util::overload{
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
@@ -69,9 +126,9 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 sync::create_table(m_transaction, table_name);
             }
             else {
-
                 if (!is_valid_key_type(spec.type)) {
-                    bad_transaction_log("Invalid primary key type");
+                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.type),
+                                        table_name);
                 }
                 DataType pk_type = get_data_type(spec.type);
                 StringData pk_field = get_string(spec.field);
@@ -100,6 +157,8 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 void InstructionApplier::operator()(const Instruction::EraseTable& instr)
 {
     auto table_name = get_table_name(instr);
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_transaction.has_table(table_name)))) {
         // FIXME: Should EraseTable be considered idempotent?
@@ -114,6 +173,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
 {
     auto table = get_table(instr);
     ColKey pk_col = table->get_primary_key_column();
+    m_last_object_key = instr.object;
 
     mpark::visit(
         util::overload{
@@ -126,7 +186,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), realm::util::none);",
                     table->get_name());
-                table->create_object_with_primary_key(util::none);
+                m_last_object = table->create_object_with_primary_key(util::none);
             },
             [&](int64_t pk) {
                 if (!pk_col) {
@@ -137,7 +197,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                                         table->get_column_type(pk_col));
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), pk);
-                table->create_object_with_primary_key(pk);
+                m_last_object = table->create_object_with_primary_key(pk);
             },
             [&](InternString pk) {
                 if (!pk_col) {
@@ -150,7 +210,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 StringData str = get_string(pk);
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), \"%2\");", table->get_name(),
                     str);
-                table->create_object_with_primary_key(str);
+                m_last_object = table->create_object_with_primary_key(str);
             },
             [&](const ObjectId& id) {
                 if (!pk_col) {
@@ -161,7 +221,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                                         table->get_column_type(pk_col));
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
-                table->create_object_with_primary_key(id);
+                m_last_object = table->create_object_with_primary_key(id);
             },
             [&](const UUID& id) {
                 if (!pk_col) {
@@ -172,7 +232,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                                         table->get_column_type(pk_col));
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
-                table->create_object_with_primary_key(id);
+                m_last_object = table->create_object_with_primary_key(id);
             },
             [&](GlobalKey key) {
                 if (pk_col) {
@@ -180,7 +240,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), GlobalKey{%2, %3});",
                     table->get_name(), key.hi(), key.lo());
-                table->create_object(key);
+                m_last_object = table->create_object(key);
             },
         },
         instr.object);
@@ -412,13 +472,13 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             visit_payload(instr.value, visitor);
         },
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("Update: Invalid path (list)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("Update: Invalid path (dictionary)");
         },
-        [](SetBase&) {
+        [&](SetBase&) {
             bad_transaction_log("Update: Invalid path (set)");
         }};
 
@@ -442,19 +502,19 @@ void InstructionApplier::operator()(const Instruction::AddInteger& instr)
             }
         },
         // FIXME: Implement increments of array elements, dictionary values.
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("AddInteger: Invalid path (list)");
         },
-        [](LstBase&, size_t) {
+        [&](LstBase&, size_t) {
             bad_transaction_log("AddInteger: Invalid path (list, index)");
         },
-        [](SetBase&) {
+        [&](SetBase&) {
             bad_transaction_log("AddInteger: Invalid path (set)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("AddInteger: Invalid path (dictionary)");
         },
-        [](Dictionary&, Mixed) {
+        [&](Dictionary&, Mixed) {
             bad_transaction_log("AddInteger: Invalid path (dictionary, key)");
         },
     };
@@ -465,6 +525,9 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 {
     using Type = Instruction::Payload::Type;
     using CollectionType = Instruction::AddColumn::CollectionType;
+
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     auto table = get_table(instr, "AddColumn");
     auto col_name = get_string(instr.field);
@@ -515,7 +578,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     }
 
     if (instr.type != Type::Link) {
-        DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
+        DataType type = get_data_type(instr.type);
         switch (instr.collection_type) {
             case CollectionType::Single: {
                 table->add_column(type, col_name, instr.nullable);
@@ -526,7 +589,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Dictionary: {
-                DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
+                DataType key_type = get_data_type(instr.key_type);
                 table->add_column_dictionary(type, col_name, instr.nullable, key_type);
                 break;
             }
@@ -573,12 +636,15 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 {
+    // Temporarily swap out the last object key so it doesn't get included in error messages
+    TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
+
     auto table = get_table(instr, "EraseColumn");
     auto col_name = get_string(instr.field);
 
     ColKey col = table->get_column_key(col_name);
     if (!col) {
-        bad_transaction_log("EraseColumn '%1.%2' which doesn't exist");
+        bad_transaction_log("EraseColumn '%1.%2' which doesn't exist", table->get_name(), col_name);
     }
 
     table->remove_column(col);
@@ -676,29 +742,29 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                             field_name, table_name);
                     }
                 },
-                [](const Instruction::Payload::Dictionary&) {
+                [&](const Instruction::Payload::Dictionary&) {
                     bad_transaction_log("Dictionary payload for ArrayInsert");
                 },
-                [](const Instruction::Payload::Erased&) {
+                [&](const Instruction::Payload::Erased&) {
                     bad_transaction_log("Dictionary erase payload for ArrayInsert");
                 },
             };
 
             visit_payload(instr.value, inserter);
         },
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("Invalid path for ArrayInsert (list)");
         },
-        [](SetBase&) {
+        [&](SetBase&) {
             bad_transaction_log("Invalid path for ArrayInsert (set)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("Invalid path for ArrayInsert (dictionary)");
         },
-        [](Dictionary&, Mixed) {
+        [&](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for ArrayInsert (dictionary, key)");
         },
-        [](Obj&, ColKey) {
+        [&](Obj&, ColKey) {
             bad_transaction_log("Invalid path for ArrayInsert (obj, col)");
         }};
 
@@ -726,19 +792,19 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
             }
             list.move(index, instr.ndx_2);
         },
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("Invalid path for ArrayMove (list)");
         },
-        [](SetBase&) {
+        [&](SetBase&) {
             bad_transaction_log("Invalid path for ArrayMove (set)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("Invalid path for ArrayMove (dictionary)");
         },
-        [](Dictionary&, Mixed) {
+        [&](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for ArrayMove (dictionary, key)");
         },
-        [](Obj&, ColKey) {
+        [&](Obj&, ColKey) {
             bad_transaction_log("Invalid path for ArrayMove (obj, col)");
         }};
     resolve_path(instr, "ArrayMove", std::move(callback));
@@ -762,19 +828,19 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
                            list.remove(index, index + 1);
                        },
-                       [](LstBase&) {
+                       [&](LstBase&) {
                            bad_transaction_log("Invalid path for ArrayErase (list)");
                        },
-                       [](SetBase&) {
+                       [&](SetBase&) {
                            bad_transaction_log("Invalid path for ArrayErase (set)");
                        },
-                       [](Dictionary&) {
+                       [&](Dictionary&) {
                            bad_transaction_log("Invalid path for ArrayErase (dictionary)");
                        },
-                       [](Dictionary&, Mixed) {
+                       [&](Dictionary&, Mixed) {
                            bad_transaction_log("Invalid path for ArrayErase (dictionary, key)");
                        },
-                       [](Obj&, ColKey) {
+                       [&](Obj&, ColKey) {
                            bad_transaction_log("Invalid path for ArrayErase (obj, col)");
                        }};
     resolve_path(instr, "ArrayErase", std::move(callback));
@@ -798,13 +864,13 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                                 [](SetBase& set) {
                                     set.clear();
                                 },
-                                [](LstBase&, size_t) {
+                                [&](LstBase&, size_t) {
                                     bad_transaction_log("Invalid path for Clear (list, index)");
                                 },
-                                [](Dictionary&, Mixed) {
+                                [&](Dictionary&, Mixed) {
                                     bad_transaction_log("Invalid path for Clear (dictionary, key)");
                                 },
-                                [](Obj&, ColKey&) {
+                                [&](Obj&, ColKey&) {
                                     bad_transaction_log("Invalid path for Clear (object, column)");
                                 }});
 }
@@ -873,19 +939,19 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [](LstBase&, size_t) {
+        [&](LstBase&, size_t) {
             bad_transaction_log("Invalid path for SetInsert (list, index)");
         },
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("Invalid path for SetInsert (list)");
         },
-        [](Dictionary&, Mixed) {
+        [&](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("Invalid path for SetInsert (dictionary, key)");
         },
-        [](Obj&, ColKey) {
+        [&](Obj&, ColKey) {
             bad_transaction_log("Invalid path for SetInsert (object, column)");
         }};
 
@@ -956,19 +1022,19 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
             visit_payload(instr.value, inserter);
         },
-        [](LstBase&, size_t) {
+        [&](LstBase&, size_t) {
             bad_transaction_log("Invalid path for SetErase (list, index)");
         },
-        [](LstBase&) {
+        [&](LstBase&) {
             bad_transaction_log("Invalid path for SetErase (list)");
         },
-        [](Dictionary&, Mixed) {
+        [&](Dictionary&, Mixed) {
             bad_transaction_log("Invalid path for SetErase (dictionary, key)");
         },
-        [](Dictionary&) {
+        [&](Dictionary&) {
             bad_transaction_log("Invalid path for SetErase (dictionary, key)");
         },
-        [](Obj&, ColKey) {
+        [&](Obj&, ColKey) {
             bad_transaction_log("Invalid path for SetErase (object, column)");
         }};
 
@@ -1042,6 +1108,13 @@ void InstructionApplier::resolve_path(const Instruction::PathInstruction& instr,
         bad_transaction_log("%1: No such object: %3 in class '%2'", instr_name,
                             format_pk(m_log->get_key(instr.object)), get_string(instr.table));
     }
+    m_current_path = instr.path;
+    m_last_field_name = instr.field;
+    auto clear_path_guard = util::make_scope_exit([&]() noexcept {
+        m_current_path.reset();
+        m_last_field_name = InternString{};
+        m_last_field = ColKey{};
+    });
 
     resolve_field(obj, instr.field, instr.path.begin(), instr.path.end(), instr_name, std::forward<F>(callback));
 }
@@ -1056,6 +1129,7 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
         bad_transaction_log("%1: No such field: '%2' in class '%3'", instr_name, field_name,
                             obj.get_table()->get_name());
     }
+    m_last_field = col;
 
     if (begin == end) {
         if (col.is_list()) {

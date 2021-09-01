@@ -39,53 +39,59 @@ class ThreadSafeReference::Payload {
 public:
     virtual ~Payload() = default;
     Payload(Realm& realm)
-        : m_transaction(realm.is_in_read_transaction() ? realm.duplicate() : nullptr)
-        , m_coordinator(Realm::Internal::get_coordinator(realm).shared_from_this())
+        : m_source_version(realm.current_transaction_version())
         , m_created_in_write_transaction(realm.is_in_transaction())
     {
     }
 
     void refresh_target_realm(Realm&);
 
-protected:
-    const TransactionRef m_transaction;
-
 private:
-    const std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+    const util::Optional<VersionID> m_source_version;
     const bool m_created_in_write_transaction;
 };
 
 void ThreadSafeReference::Payload::refresh_target_realm(Realm& realm)
 {
+    if (!m_source_version)
+        return;
     if (!realm.is_in_read_transaction()) {
-        if (m_created_in_write_transaction)
-            realm.read_group();
-        else
-            Realm::Internal::begin_read(realm, m_transaction->get_version_of_current_transaction());
+        try {
+            // If the TSR was created in a write transaction then we want to
+            // resolve it at the version created by committing that transaction.
+            // That's not possible, so we just use latest.
+            if (!m_created_in_write_transaction) {
+                Realm::Internal::begin_read(realm, *m_source_version);
+                return;
+            }
+        }
+        catch (const DB::BadVersion&) {
+            // The TSR's source version was cleaned up, so just use the latest
+        }
+        realm.read_group();
     }
     else {
         auto version = realm.read_transaction_version();
-        auto target_version = m_transaction->get_version_of_current_transaction();
-        if (version < target_version || (version == target_version && m_created_in_write_transaction))
+        if (version < m_source_version || (version == m_source_version && m_created_in_write_transaction))
             realm.refresh();
     }
 }
 
-template <>
-class ThreadSafeReference::PayloadImpl<List> : public ThreadSafeReference::Payload {
+template <typename Collection>
+class ThreadSafeReference::CollectionPayload : public ThreadSafeReference::Payload {
 public:
-    PayloadImpl(List const& list)
-        : Payload(*list.get_realm())
-        , m_key(list.get_parent_object_key())
-        , m_table_key(list.get_parent_table_key())
-        , m_col_key(list.get_parent_column_key())
+    CollectionPayload(object_store::Collection const& collection)
+        : Payload(*collection.get_realm())
+        , m_key(collection.get_parent_object_key())
+        , m_table_key(collection.get_parent_table_key())
+        , m_col_key(collection.get_parent_column_key())
     {
     }
 
-    List import_into(std::shared_ptr<Realm> const& r)
+    Collection import_into(std::shared_ptr<Realm> const& r)
     {
         Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
-        return List(r, obj, m_col_key);
+        return Collection(r, obj, m_col_key);
     }
 
 private:
@@ -95,49 +101,22 @@ private:
 };
 
 template <>
-class ThreadSafeReference::PayloadImpl<object_store::Set> : public ThreadSafeReference::Payload {
+class ThreadSafeReference::PayloadImpl<List> : public ThreadSafeReference::CollectionPayload<List> {
 public:
-    PayloadImpl(object_store::Set const& set)
-        : Payload(*set.get_realm())
-        , m_key(set.get_parent_object_key())
-        , m_table_key(set.get_parent_table_key())
-        , m_col_key(set.get_parent_column_key())
-    {
-    }
-
-    object_store::Set import_into(std::shared_ptr<Realm> const& r)
-    {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
-        return object_store::Set(r, obj, m_col_key);
-    }
-
-private:
-    ObjKey m_key;
-    TableKey m_table_key;
-    ColKey m_col_key;
+    using ThreadSafeReference::CollectionPayload<List>::CollectionPayload;
 };
 
 template <>
-class ThreadSafeReference::PayloadImpl<OsDict> : public ThreadSafeReference::Payload {
+class ThreadSafeReference::PayloadImpl<object_store::Set>
+    : public ThreadSafeReference::CollectionPayload<object_store::Set> {
 public:
-    PayloadImpl(const OsDict& dict)
-        : Payload(*dict.get_realm())
-        , m_key(dict.get_parent_object_key())
-        , m_table_key(dict.get_parent_table_key())
-        , m_col_key(dict.get_parent_column_key())
-    {
-    }
+    using ThreadSafeReference::CollectionPayload<object_store::Set>::CollectionPayload;
+};
 
-    OsDict import_into(const std::shared_ptr<Realm>& r)
-    {
-        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
-        return OsDict(r, obj, m_col_key);
-    }
-
-private:
-    ObjKey m_key;
-    TableKey m_table_key;
-    ColKey m_col_key;
+template <>
+class ThreadSafeReference::PayloadImpl<OsDict> : public ThreadSafeReference::CollectionPayload<OsDict> {
+public:
+    using ThreadSafeReference::CollectionPayload<OsDict>::CollectionPayload;
 };
 
 template <>
@@ -165,6 +144,7 @@ class ThreadSafeReference::PayloadImpl<Results> : public ThreadSafeReference::Pa
 public:
     PayloadImpl(Results const& r)
         : Payload(*r.get_realm())
+        , m_coordinator(Realm::Internal::get_coordinator(*r.get_realm()).shared_from_this())
         , m_ordering(r.get_descriptor_ordering())
     {
         if (r.get_type() != PropertyType::Object) {
@@ -176,15 +156,16 @@ public:
         }
         else {
             Query q(r.get_query());
-            if (!q.produces_results_in_table_order() && r.get_realm()->is_in_transaction()) {
-                // FIXME: This is overly restrictive. It's only a problem if
-                // the parent of the List or LinkingObjects was created in this
-                // write transaction, but Query doesn't expose a way to check
-                // if the source view is valid so we have to forbid it always.
-                throw std::logic_error("Cannot create a ThreadSafeReference to Results backed by a List of objects "
-                                       "or LinkingObjects inside a write transaction");
-            }
+            m_transaction = r.get_realm()->duplicate();
             m_query = m_transaction->import_copy_of(q, PayloadPolicy::Stay);
+            // If the Query is derived from a collection which was created in
+            // the current write transaction then the collection cannot be
+            // handed over and would just be empty when resolved.
+            if (q.view_owner_obj_key() != m_query->view_owner_obj_key()) {
+                throw std::logic_error(
+                    "Cannot create a ThreadSafeReference to Results backed by a collection of objects "
+                    "inside the write transaction which created the collection.");
+            }
         }
     }
 
@@ -222,6 +203,8 @@ public:
     }
 
 private:
+    const std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+    TransactionRef m_transaction;
     DescriptorOrdering m_ordering;
     std::unique_ptr<Query> m_query;
     ObjKey m_key;

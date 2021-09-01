@@ -1,11 +1,43 @@
 # NEXT RELEASE
 
 ### Enhancements
+* ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query.
+* A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
+* Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
 * Added methods to freeze and thaw realms, objects, results and lists.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
+
+### Breaking changes
 * None.
+
+-----------
+
+### Internals
+* SyncConfig no longer has an encryption_key field, and the key from the parent Realm::Config is used instead.
+
+----------------------------------------------
+
+# 11.3.1 Release notes
+
+### Fixed
+* Fixed "Invalid data type" assertion failure in the sync client when applying an AddColumn instruction for a Mixed column when that column already exists locally. ([#4873](https://github.com/realm/realm-core/issues/4873), since v11.0.0)
+* Fixed a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
+ 
+----------------------------------------------
+
+# 11.3.0 Release notes
+
+### Enhancements
+* InstructionApplier exceptions now contain information about what object/changeset was being applied when the exception was thrown. ([#4836](https://github.com/realm/realm-core/issues/4836))
+* Added ServiceErrorCode for wrong username/password.  ([#4581](https://github.com/realm/realm-core/issues/4581))
+* Query parser now accepts "BETWEEN" operator. Can be used like "Age BETWEEN {20, 60}" which means "'Age' must be in the open interval ]20;60[". ([#4268](https://github.com/realm/realm-core/issues/4268))
+
+### Fixed
+* Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
+* Updated the Catch2 URL to include '.git' extension ([#4608](https://github.com/realm/realm-core/issues/4608))
  
 ### Breaking changes
 * None.
@@ -13,7 +45,8 @@
 -----------
 
 ### Internals
-* None.
+* Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
+* ApplyToState tool now exits with a non-zero exit code if download message application fails.
 
 ----------------------------------------------
 

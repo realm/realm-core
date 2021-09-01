@@ -154,7 +154,7 @@ public:
     virtual void cleanup_key(ObjKey k) = 0;
     virtual void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const = 0;
     virtual bool is_string_enum_type(ColKey::Idx col_ndx) const = 0;
-    virtual const Table* get_owning_table() const = 0;
+    virtual const Table* get_owning_table() const noexcept = 0;
     virtual std::unique_ptr<ClusterNode> get_root_from_parent() = 0;
 
     void dump_objects()

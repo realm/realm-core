@@ -14,8 +14,8 @@ SyncReplication::SyncReplication(const std::string& realm_path)
 
 void SyncReplication::initialize(DB& sg)
 {
-    REALM_ASSERT(!m_sg);
-    m_sg = &sg;
+    REALM_ASSERT(!m_db);
+    m_db = &sg;
 }
 
 void SyncReplication::reset()
@@ -424,12 +424,40 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
     }
 
     if (select_collection(list)) {
-        Instruction::Update instr;
-        populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_update());
-        instr.value = as_payload(list, value);
-        instr.prior_size = uint32_t(list.size());
-        emit(instr);
+        // If this is an embedded object then we need to emit and erase/insert instruction so that the old
+        // object gets cleared, otherwise you'll only see the Update ObjectValue instruction, which is idempotent,
+        // and that will lead to corrupted prior size for array operations inside the embedded object during
+        // changeset application.
+        auto needs_insert_erase_sequence = [&] {
+            if (value.is_type(type_Link)) {
+                return list.get_target_table()->is_embedded();
+            }
+            else if (value.is_type(type_TypedLink)) {
+                return m_transaction->get_table(value.get_link().get_table_key())->is_embedded();
+            }
+            return false;
+        };
+        if (needs_insert_erase_sequence()) {
+            REALM_ASSERT(!list.is_null(ndx));
+            Instruction::ArrayErase erase_instr;
+            populate_path_instr(erase_instr, list, static_cast<uint32_t>(ndx));
+            erase_instr.prior_size = uint32_t(list.size());
+            emit(erase_instr);
+
+            Instruction::ArrayInsert insert_instr;
+            populate_path_instr(insert_instr, list, static_cast<uint32_t>(ndx));
+            insert_instr.prior_size = erase_instr.prior_size - 1;
+            insert_instr.value = as_payload(list, value);
+            emit(insert_instr);
+        }
+        else {
+            Instruction::Update instr;
+            populate_path_instr(instr, list, uint32_t(ndx));
+            REALM_ASSERT(instr.is_array_update());
+            instr.value = as_payload(list, value);
+            instr.prior_size = uint32_t(list.size());
+            emit(instr);
+        }
     }
 }
 

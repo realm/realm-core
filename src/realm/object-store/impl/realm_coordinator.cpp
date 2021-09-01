@@ -94,35 +94,18 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
-    if (!m_config.encryption_key.empty() && !m_config.sync_config->realm_encryption_key) {
-        throw std::logic_error("A realm encryption key was specified in Realm::Config but not in SyncConfig");
-    }
-    else if (m_config.sync_config->realm_encryption_key && m_config.encryption_key.empty()) {
-        throw std::logic_error("A realm encryption key was specified in SyncConfig but not in Realm::Config");
-    }
-    else if (m_config.sync_config->realm_encryption_key &&
-             !std::equal(m_config.sync_config->realm_encryption_key->begin(),
-                         m_config.sync_config->realm_encryption_key->end(), m_config.encryption_key.begin(),
-                         m_config.encryption_key.end())) {
-        throw std::logic_error(
-            "The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
-    }
-
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_config.path, *m_config.sync_config);
+    open_db();
+    if (m_sync_session)
+        return;
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-    SyncSession::Internal::set_sync_transact_callback(
-        *m_sync_session, [weak_self](VersionID old_version, VersionID new_version) {
-            if (auto self = weak_self.lock()) {
-                util::CheckedUniqueLock lock(self->m_transaction_callback_mutex);
-                if (auto transaction_callback = self->m_transaction_callback) {
-                    lock.unlock();
-                    transaction_callback(old_version, new_version);
-                }
-                if (self->m_notifier)
-                    self->m_notifier->notify_others();
-            }
-        });
+    SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
+        if (auto self = weak_self.lock()) {
+            if (self->m_notifier)
+                self->m_notifier->notify_others();
+        }
+    });
 #endif
 }
 
@@ -201,10 +184,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
-                                                config.path);
-            }
-            if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with sync session encryption key.",
                                                 config.path);
             }
         }
@@ -441,24 +420,37 @@ void RealmCoordinator::open_db()
     if (m_db)
         return;
 
+#if REALM_ENABLE_SYNC
+    if (m_config.sync_config) {
+        // If we previously opened this Realm, we may have a lingering sync
+        // session which outlived its RealmCoordinator. If that happens we
+        // want to reuse it instead of creating a new DB.
+        auto existing_session = m_config.sync_config->user->sync_manager()->get_existing_session(m_config.path);
+        if (existing_session) {
+            m_sync_session = existing_session;
+            m_db = SyncSession::Internal::get_db(*existing_session);
+            m_sync_session->revive_if_needed();
+            return;
+        }
+    }
+#endif
+
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
             return;
         }
-        if (m_config.immutable()) {
-            m_history.reset();
-        }
-        else if (server_synchronization_mode) {
+        std::unique_ptr<Replication> history;
+        if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            m_history = sync::make_client_replication(m_config.path);
+            history = sync::make_client_replication(m_config.path);
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
         }
-        else {
-            m_history = make_in_realm_history(m_config.path);
+        else if (!m_config.immutable()) {
+            history = make_in_realm_history(m_config.path);
         }
 
         DBOptions options;
@@ -471,9 +463,9 @@ void RealmCoordinator::open_db()
         options.encryption_key = m_config.encryption_key.data();
         options.allow_file_format_upgrade =
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
-        if (m_history) {
+        if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-            m_db = DB::create(*m_history, options);
+            m_db = DB::create(std::move(history), options);
         }
         else {
             m_db = DB::create(m_config.path, true, options);
@@ -712,7 +704,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // version plus one, as we can only skip a prefix and not intermediate
         // transactions. If we have a notifier for the current Realm, then we
         // waited until it finished running in begin_transaction() and this
-        // invarient holds. If we don't have any notifiers then we don't need
+        // invariant holds. If we don't have any notifiers then we don't need
         // to set the skip version, but more importantly *can't* because we
         // didn't block when starting the write and the notifier transaction
         // may still be on an older version.
@@ -1216,13 +1208,6 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     if (realm.m_binding_context)
         realm.m_binding_context->did_send_notifications();
-}
-
-void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
-{
-    create_sync_session();
-    util::CheckedLockGuard lock(m_transaction_callback_mutex);
-    m_transaction_callback = std::move(fn);
 }
 
 bool RealmCoordinator::compact()

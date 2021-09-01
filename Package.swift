@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.2.0"
+let versionStr = "11.3.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -90,6 +90,7 @@ let notSyncServerSources: [String] = [
     "realm/decimal128.cpp",
     "realm/dictionary.cpp",
     "realm/disable_sync_to_disk.cpp",
+    "realm/error_codes.cpp",
     "realm/exceptions.cpp",
     "realm/global_key.cpp",
     "realm/group.cpp",
@@ -111,6 +112,7 @@ let notSyncServerSources: [String] = [
     "realm/set.cpp",
     "realm/sort_descriptor.cpp",
     "realm/spec.cpp",
+    "realm/status.cpp",
     "realm/string_data.cpp",
     "realm/sync/auth.cpp",
     "realm/sync/changeset.cpp",
@@ -123,7 +125,6 @@ let notSyncServerSources: [String] = [
     "realm/sync/instruction_replication.cpp",
     "realm/sync/instructions.cpp",
     "realm/sync/noinst/changeset_index.cpp",
-    "realm/sync/noinst/client_file_access_cache.cpp",
     "realm/sync/noinst/client_history_impl.cpp",
     "realm/sync/noinst/client_impl_base.cpp",
     "realm/sync/noinst/client_reset.cpp",
@@ -412,6 +413,7 @@ let headers: [String] = [
     "realm/dictionary.hpp",
     "realm/dictionary_cluster_tree.hpp",
     "realm/disable_sync_to_disk.hpp",
+    "realm/error_codes.hpp",
     "realm/exceptions.hpp",
     "realm/exec/importer.hpp",
     "realm/global_key.hpp",
@@ -537,6 +539,8 @@ let headers: [String] = [
     "realm/set.hpp",
     "realm/sort_descriptor.hpp",
     "realm/spec.hpp",
+    "realm/status.hpp",
+    "relam/status_with.hpp",
     "realm/string_data.hpp",
     "realm/sync/access_control.hpp",
     "realm/sync/access_token.hpp",
@@ -559,7 +563,6 @@ let headers: [String] = [
     "realm/sync/instructions.hpp",
     "realm/sync/metrics.hpp",
     "realm/sync/noinst/changeset_index.hpp",
-    "realm/sync/noinst/client_file_access_cache.hpp",
     "realm/sync/noinst/client_history_impl.hpp",
     "realm/sync/noinst/client_impl_base.hpp",
     "realm/sync/noinst/client_reset.hpp",

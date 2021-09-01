@@ -51,8 +51,7 @@ TEST(AsyncOpen_NonExistingRealm)
     session.wait_for_download_complete_or_client_stopped();
 
     {
-        std::unique_ptr<ClientReplication> history = make_client_replication(path);
-        DBRef sg = DB::create(*history);
+        DBRef sg = DB::create(make_client_replication(path));
         ReadTransaction rt(sg);
         CHECK(rt.get_group().is_empty());
     }

@@ -101,9 +101,12 @@ public:
     {
         return false;
     }
-    const Table* get_owning_table() const final
+    const Table* get_owning_table() const noexcept final
     {
-        return nullptr; // FIXME: Should return the owning table
+        // A dictionary is not owned by a table, but by an object
+        // The generic cluster implementation relies on the fact that
+        // dictionary clusters does not have an owning table.
+        return nullptr;
     }
     std::unique_ptr<ClusterNode> get_root_from_parent() final
     {

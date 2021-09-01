@@ -649,7 +649,7 @@ void Realm::commit_transaction()
         auto prev_version = transaction().get_version_of_current_transaction();
         m_coordinator->commit_write(*this);
         audit->record_write(prev_version, transaction().get_version_of_current_transaction());
-        // m_shared_group->unpin_version(prev_version);
+        // m_db->unpin_version(prev_version);
     }
     else {
         m_coordinator->commit_write(*this);
