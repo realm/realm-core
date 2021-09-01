@@ -1301,8 +1301,10 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         recurse = replace_backlink(col_key, old_link, new_link, state);
     }
 
-
-    if (StringIndex* index = m_table->get_search_index(col_key)) {
+    StringIndex* index = m_table->get_search_index(col_key);
+    // The following check on unresolved is just a precaution as it should not
+    // be possible to hit that while Mixed is not a supported primary key type.
+    if (index && !m_key.is_unresolved()) {
         index->set<Mixed>(m_key, value);
     }
 
@@ -2259,7 +2261,8 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
         update_if_needed();
         ensure_writeable();
 
-        if (StringIndex* index = m_table->get_search_index(col_key)) {
+        StringIndex* index = m_table->get_search_index(col_key);
+        if (index && !m_key.is_unresolved()) {
             index->set(m_key, null{});
         }
 
