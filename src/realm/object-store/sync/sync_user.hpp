@@ -214,6 +214,11 @@ public:
     // for testing purposes, and for bindings for consumers that are servers or tools.
     std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path);
 
+    // Update the user's state and refresh/access tokens atomically in a Realm transaction.
+    // If the user is transitioning between LoggedIn and LoggedOut, then the access_token and
+    // refresh token must be empty, and likewise must not be empty if transitioning between
+    // logged out and logged in.
+    // Note that this is called by the SyncManager, and should not be directly called.
     void update_state_and_tokens(SyncUser::State state, const std::string& access_token,
                                  const std::string& refresh_token);
 
