@@ -9,6 +9,7 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
 * If an object with a null primary key was deleted by another sync client, the exception `KeyNotFound: No such object` could be triggered. ([#4885](https://github.com/realm/realm-core/issues/4885) since unresolved links were introduced in v10.0.0)
+* Fix a nonexistent file warning when building with Swift Package Manager (since 11.3.1).
 
 ### Breaking changes
 * None.

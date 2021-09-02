@@ -540,7 +540,7 @@ let headers: [String] = [
     "realm/sort_descriptor.hpp",
     "realm/spec.hpp",
     "realm/status.hpp",
-    "relam/status_with.hpp",
+    "realm/status_with.hpp",
     "realm/string_data.hpp",
     "realm/sync/access_control.hpp",
     "realm/sync/access_token.hpp",
