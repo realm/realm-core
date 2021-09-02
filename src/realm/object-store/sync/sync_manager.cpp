@@ -636,6 +636,12 @@ bool SyncManager::do_has_existing_sessions()
     });
 }
 
+void SyncManager::wait_for_sessions_to_terminate()
+{
+    auto& client = get_sync_client(); // Throws
+    client.wait_for_session_terminations();
+}
+
 void SyncManager::unregister_session(const std::string& path)
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
