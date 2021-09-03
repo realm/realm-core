@@ -903,7 +903,7 @@ void Realm::close()
     m_binding_context = nullptr;
     m_coordinator = nullptr;
     m_scheduler = nullptr;
-    m_config.scheduler = nullptr;
+    m_config = {};
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
