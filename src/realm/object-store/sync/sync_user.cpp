@@ -172,43 +172,27 @@ void SyncUser::update_state_and_tokens(SyncUser::State state, const std::string&
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_state = state;
+        m_access_token = access_token.empty() ? RealmJWT{} : RealmJWT(access_token);
+        m_refresh_token = refresh_token.empty() ? RealmJWT{} : RealmJWT(refresh_token);
         switch (m_state) {
             case State::Removed:
-                REALM_ASSERT(state == State::Removed);
-                return;
+                // Call set_state() rather than update_state_and_tokens to remove a user.
+                REALM_UNREACHABLE();
             case State::LoggedIn:
-                if (m_state == State::LoggedIn) {
-                    m_access_token = RealmJWT(access_token);
-                    m_refresh_token = RealmJWT(refresh_token);
+                sessions_to_revive.reserve(m_waiting_sessions.size());
+                for (auto& pair : m_waiting_sessions) {
+                    if (auto ptr = pair.second.lock()) {
+                        m_sessions[pair.first] = ptr;
+                        sessions_to_revive.emplace_back(std::move(ptr));
+                    }
                 }
-                else {
-                    m_access_token = RealmJWT{};
-                    m_refresh_token = RealmJWT{};
-                }
-
-                m_state = state;
-
+                m_waiting_sessions.clear();
                 break;
             case State::LoggedOut: {
-                m_state = state;
-                if (m_state == State::LoggedIn) {
-                    m_access_token = RealmJWT(access_token);
-                    m_refresh_token = RealmJWT(refresh_token);
-
-                    sessions_to_revive.reserve(m_waiting_sessions.size());
-                    for (auto& pair : m_waiting_sessions) {
-                        if (auto ptr = pair.second.lock()) {
-                            m_sessions[pair.first] = ptr;
-                            sessions_to_revive.emplace_back(std::move(ptr));
-                        }
-                    }
-                    m_waiting_sessions.clear();
-                }
-                else {
-                    REALM_ASSERT(m_access_token == RealmJWT{});
-                    REALM_ASSERT(m_refresh_token == RealmJWT{});
-                }
+                REALM_ASSERT(m_access_token == RealmJWT{});
+                REALM_ASSERT(m_refresh_token == RealmJWT{});
                 break;
             }
         }
