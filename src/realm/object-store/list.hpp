@@ -85,7 +85,8 @@ public:
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
     List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
 
-    // Returns a live copy of this List.
+    // Returns a live copy of this List resolved in the live_realm or an invalid List if the 
+    // list itself has been invalidated.
     // Equivalent to producing a thread-safe reference and resolving it in the live realm.
     // Will assert that the live_realm is not frozen.
     List thaw(std::shared_ptr<Realm> const& live_realm) const;

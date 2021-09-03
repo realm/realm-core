@@ -2367,11 +2367,19 @@ TEST_CASE("C API") {
             CHECK(value.type == RLM_TYPE_STRING);
             CHECK(strncmp(value.string.data, "", value.string.size) == 0);
 
-            auto thawed_obj1 = cptr_checked(realm_object_thaw(frozen_obj1.get(), realm));
+            realm_object_t *thawed_obj1;
+            CHECK(checked(realm_object_thaw(frozen_obj1.get(), realm, &thawed_obj1)));
             CHECK(thawed_obj1);
-            CHECK(checked(realm_get_value(thawed_obj1.get(), foo_str_key, &value)));
+            CHECK(checked(realm_get_value(thawed_obj1, foo_str_key, &value)));
             CHECK(value.type == RLM_TYPE_STRING);
             CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
+
+            write([&]() {
+                CHECK(checked(realm_object_delete(obj1.get())));
+            });
+            realm_object_t *deleted_obj1;
+            CHECK(checked(realm_object_thaw(frozen_obj1.get(), realm, &deleted_obj1)));
+            CHECK(deleted_obj1 == NULL);
         }
 
         SECTION("results") {
@@ -2433,9 +2441,16 @@ TEST_CASE("C API") {
             realm_list_size(list.get(), &count);
             CHECK(count == 1);
 
-            auto thawed_list = cptr_checked(realm_list_thaw(frozen_list.get(), realm));
-            realm_list_size(thawed_list.get(), &count);
+            realm_list_t *thawed_list;
+            CHECK(checked(realm_list_thaw(frozen_list.get(), realm, &thawed_list)));
+            realm_list_size(thawed_list, &count);
             CHECK(count == 1);
+
+            write([&]() {
+                CHECK(checked(realm_object_delete(obj1.get())));
+            });
+            CHECK(checked(realm_list_thaw(frozen_list.get(), realm, &thawed_list)));
+            CHECK(thawed_list == NULL);
         }
     }
 

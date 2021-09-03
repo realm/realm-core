@@ -166,12 +166,17 @@ RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, c
     });
 }
 
-RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm)
+RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm, realm_object_t** out_live_object)
 {
     return wrap_err([&]() {
         const auto& realm = *live_realm;
-        auto live_object = frozen_object->thaw(realm);
-        return new realm_object_t{std::move(live_object)};
+        const auto live_object = frozen_object->thaw(realm);
+        if (live_object.is_valid()) {
+            *out_live_object = new realm_object_t(std::move(live_object));
+        } else {
+            *out_live_object = nullptr;
+        }
+        return true;
     });
 }
 
@@ -434,12 +439,17 @@ RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const rea
     });
 }
 
-RLM_API realm_list_t* realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm)
+RLM_API bool realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm, realm_list_t** out_live_list)
 {
     return wrap_err([&]() {
         const auto& realm = *live_realm;
-        auto live_list = frozen_list->thaw(realm);
-        return new realm_list_t{std::move(live_list)};
+        const auto& live_list = frozen_list->thaw(realm);
+        if (live_list.is_valid()) {
+            *out_live_list = new realm_list_t{std::move(live_list)};
+        } else {
+            *out_live_list = nullptr;
+        }
+        return true;
     });
 }
 

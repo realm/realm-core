@@ -1267,9 +1267,13 @@ RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, c
  *
  * Note: Will assert that live_realm is not frozen.
  *
- * @return A live copy of the frozen object.
+ * @param live_realm The live realm used to resolved the live object.
+ * @param out_live_object Where the obejct pointer should be stored. The object pointer will be NULL if 
+ *                      the frozen_object has been invalidated. 
+ *
+ * @return True if no exception occured.
  */
-RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm);
+RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm, realm_object_t** out_frozen_object);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
@@ -1436,9 +1440,12 @@ RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const rea
  *
  * Note: Will assert that live_realm is not frozen.
  *
+ * @param live_realm The live realm used to resolved the live list.
+ * @param out_live_list Where the list pointer should be stored. The list pointer will be NULL if 
+ *                      the frozen_list has been invalidated. 
  * @return A live copy of the frozen list.
  */
-RLM_API realm_list_t* realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm);
+RLM_API bool realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm, realm_list_t** out_live_list);
 
 /**
  * Get the size of a list, in number of elements.
