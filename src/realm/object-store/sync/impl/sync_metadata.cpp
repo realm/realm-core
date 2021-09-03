@@ -545,6 +545,21 @@ void SyncUserMetadata::set_state(SyncUser::State state)
     m_realm->commit_transaction();
 }
 
+void SyncUserMetadata::set_state_and_tokens(SyncUser::State state, const std::string& access_token,
+                                            const std::string& refresh_token)
+{
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_obj.set(m_schema.idx_state, static_cast<int64_t>(state));
+    m_obj.set(m_schema.idx_access_token, access_token);
+    m_obj.set(m_schema.idx_refresh_token, refresh_token);
+    m_realm->commit_transaction();
+}
+
 void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
 {
     if (m_invalid)

@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed race between updating user tokens and state in persisted metadata when logging in/out. ([#4875](https://github.com/realm/realm-core/issues/4875))
  
 ### Breaking changes
 * None.
