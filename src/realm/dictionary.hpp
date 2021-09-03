@@ -75,8 +75,6 @@ public:
     void sort_keys(std::vector<size_t>& indices, bool ascending = true) const;
     void distinct_keys(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const;
 
-    void create();
-
     // first points to inserted/updated element.
     // second is true if the element was inserted
     std::pair<Iterator, bool> insert(Mixed key, Mixed value);
@@ -116,7 +114,7 @@ public:
     template <class T>
     void for_all_values(T&& f)
     {
-        if (m_clusters) {
+        if (update()) {
             ArrayMixed leaf(m_obj.get_alloc());
             // Iterate through cluster and call f on each value
             auto trv_func = [&leaf, &f](const Cluster* cluster) {
@@ -135,7 +133,7 @@ public:
     template <class T, class Func>
     void for_all_keys(Func&& f)
     {
-        if (m_clusters) {
+        if (update()) {
             typename ColumnTypeTraits<T>::cluster_leaf_type leaf(m_obj.get_alloc());
             ColKey col = m_clusters->get_keys_column_key();
             // Iterate through cluster and call f on each value
@@ -179,6 +177,8 @@ private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
     friend class DictionaryLinkValues;
+    friend struct CollectionIterator<Dictionary>;
+
     mutable std::unique_ptr<DictionaryClusterTree> m_clusters;
     DataType m_key_type = type_String;
 
@@ -188,7 +188,7 @@ private:
     static constexpr uint64_t s_hash_mask = 0x7FFFFFFFFFFFFFFFULL;
 #endif
 
-    bool init_from_parent() const final;
+    bool init_from_parent(bool allow_create) const;
     Mixed do_get(const ClusterNode::State&) const;
     Mixed do_get_key(const ClusterNode::State&) const;
     std::pair<Mixed, Mixed> do_get_pair(const ClusterNode::State&) const;
@@ -197,7 +197,12 @@ private:
     void swap_content(Array& fields1, Array& fields2, size_t index1, size_t index2);
     ObjKey handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state);
 
-    friend struct CollectionIterator<Dictionary>;
+    UpdateStatus update_if_needed() const final;
+    UpdateStatus ensure_writable(bool allow_create) final;
+    inline bool update() const
+    {
+        return update_if_needed() != UpdateStatus::Detached;
+    }
 };
 
 class Dictionary::Iterator : public ClusterTree::Iterator {
@@ -316,13 +321,13 @@ public:
     }
 
     // Overrides of ObjCollectionBase:
-    bool do_update_if_needed() const final
+    UpdateStatus do_update_if_needed() const final
     {
         return m_source.update_if_needed();
     }
-    bool do_init_from_parent() const final
+    UpdateStatus do_ensure_writable(bool allow_create) final
     {
-        return m_source.init_from_parent();
+        return m_source.ensure_writable(allow_create);
     }
     BPlusTree<ObjKey>* get_mutable_tree() const
     {

@@ -196,11 +196,17 @@ inline bool Obj::_update_if_needed() const
 
 UpdateStatus Obj::update_if_needed_with_status() const
 {
+    if (!m_table) {
+        // Table deleted
+        return UpdateStatus::Detached;
+    }
+
     auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         ClusterNode::State state = get_tree_top()->try_get(m_key);
 
         if (!state) {
+            // Object deleted
             return UpdateStatus::Detached;
         }
 
