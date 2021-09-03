@@ -1,44 +1,10 @@
 #include <realm/db.hpp>
-#include <realm/sync/encrypt/fingerprint.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 
 namespace realm::_impl {
-
-const char* table_name_to_check = "_client_reset_status_complete";
-
-bool is_marked_as_complete(TransactionRef tr)
-{
-    return bool(tr->find_table(table_name_to_check));
-}
-
-bool fresh_copy_is_downloaded(std::string path, util::Optional<std::array<char, 64>> encryption_key)
-{
-    if (!util::File::exists(path)) {
-        return false;
-    }
-
-    DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
-    ClientHistoryImpl history_local{path};
-    DBRef sg_local = DB::create(history_local, shared_group_options);
-
-    auto group_local = sg_local->start_read();
-    return is_marked_as_complete(group_local);
-}
-
-void mark_fresh_copy_as_downloaded(std::string path, util::Optional<std::array<char, 64>> encryption_key)
-{
-    DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
-    ClientHistoryImpl history_local{path};
-    DBRef sg_local = DB::create(history_local, shared_group_options);
-
-    auto group_local = sg_local->start_write();
-    group_local->get_or_add_table(table_name_to_check);
-    group_local->commit();
-}
 
 struct ResetPathPair {
     // takes a fresh or local path and distinguishes the two
@@ -60,117 +26,90 @@ struct ResetPathPair {
 };
 
 ClientResetOperation::ClientResetOperation(
-    util::Logger& logger, const std::string& realm_path, bool seamless_loss,
-    util::Optional<std::array<char, 64>> encryption_key,
+    util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
     std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
     std::function<void(TransactionRef local)> notify_after)
     : logger{logger}
-    , m_realm_path{realm_path}
+    , m_db{db}
+    , m_db_fresh(std::move(db_fresh))
     , m_seamless_loss(seamless_loss)
-    , m_encryption_key{encryption_key}
     , m_notify_before(notify_before)
     , m_notify_after(notify_after)
 {
-    logger.debug("Create ClientStateDownload, realm_path = %1, seamless_loss = %2", realm_path, seamless_loss);
-#ifdef REALM_ENABLE_ENCRYPTION
-    if (m_encryption_key)
-        m_aes_cryptor =
-            std::make_unique<util::AESCryptor>(reinterpret_cast<unsigned char*>(m_encryption_key->data()));
-#else
-    REALM_ASSERT(!encryption_key);
-#endif
+    logger.debug("Create ClientStateDownload, realm_path = %1, seamless_loss = %2", m_db.get_path(), seamless_loss);
 }
 
-void ClientResetOperation::download_complete()
+std::string ClientResetOperation::get_fresh_path_for(const std::string& realm_path)
 {
-    ResetPathPair paths(m_realm_path);
-    // it should only be possible to reach download completion on the fresh copy of the Realm
-    // because the local Realm has already recieved the reset error at some point to get here
-    REALM_ASSERT_RELEASE_EX(paths.fresh_path == m_realm_path, paths.fresh_path, paths.local_path, m_realm_path);
-    mark_fresh_copy_as_downloaded(m_realm_path, m_encryption_key);
-}
-
-std::string ClientResetOperation::open_session_for_path(std::string realm_path, bool seamless_loss,
-                                                        util::Optional<std::array<char, 64>> encryption_key)
-{
-    if (seamless_loss) {
-        ResetPathPair paths(realm_path);
-        bool local_realm_exists = util::File::exists(paths.local_path);
-        if (!local_realm_exists) {
-            return paths.local_path; // nothing to reset
-        }
-        // if sync was interrupted during the download of the fresh copy, continue that session until it is finished
-        // otherwise if the completely downloaded fresh copy is available, continue the reset on the original Realm.
-        return fresh_copy_is_downloaded(paths.fresh_path, encryption_key) ? paths.local_path : paths.fresh_path;
-    }
-    return realm_path;
-}
-
-bool ClientResetOperation::is_downloading_fresh_copy()
-{
-    ResetPathPair paths(m_realm_path);
-    return m_realm_path == paths.fresh_path;
-}
-
-bool ClientResetOperation::has_fresh_copy()
-{
-    ResetPathPair paths(m_realm_path);
-    return fresh_copy_is_downloaded(paths.fresh_path, m_encryption_key);
+    ResetPathPair paths(realm_path);
+    REALM_ASSERT_EX(paths.fresh_path != realm_path, realm_path);
+    return paths.fresh_path;
 }
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 {
-    util::Optional<std::string> fresh_path;
     if (m_seamless_loss) {
-        if (is_downloading_fresh_copy() || !has_fresh_copy()) {
-            return false;
-        }
-        ResetPathPair paths(m_realm_path);
-        REALM_ASSERT_EX(m_realm_path == paths.local_path, m_realm_path, paths.local_path, paths.fresh_path);
-        fresh_path = paths.fresh_path;
+        ResetPathPair paths(m_db.get_path());
+        REALM_ASSERT_EX(m_db.get_path() == paths.local_path, m_db.get_path(), paths.local_path, paths.fresh_path);
+        REALM_ASSERT(m_db_fresh);
     }
 
     m_salted_file_ident = salted_file_ident;
     // only do the reset if the file exists
     // if there is no existing file, there is nothing to reset
-    bool local_realm_exists = util::File::exists(m_realm_path);
+    bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
-        logger.debug("finalize_client_reset:discard, realm_path = %1, local_realm_exists = %2", m_realm_path,
+        logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2", m_db.get_path(),
                      local_realm_exists);
 
         client_reset::LocalVersionIDs local_version_ids;
         try {
-            local_version_ids = client_reset::perform_client_reset_diff(
-                m_realm_path, fresh_path, m_encryption_key, m_notify_before, m_notify_after, is_marked_as_complete,
-                m_salted_file_ident, logger);
+            local_version_ids = client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_notify_before,
+                                                                        m_notify_after, m_salted_file_ident, logger);
         }
         catch (util::File::AccessError& e) {
-            logger.error("In finalize_client_reset, the client reset failed due to a FileAccessError, "
+            logger.error("In ClientResetOperation::finalize, the client reset failed due to a FileAccessError, "
                          "realm path = %1, msg = %2",
-                         m_realm_path, e.what());
+                         m_db.get_path(), e.what());
             return false;
         }
         catch (client_reset::ClientResetFailed& e) {
-            logger.error("In finalize_client_reset, the client reset failed, "
+            logger.error("In ClientResetOperation::finalize, the client reset failed, "
                          "realm path = %1, msg = %2",
-                         m_realm_path, e.what());
+                         m_db.get_path(), e.what());
             return false;
         }
 
         m_client_reset_old_version = local_version_ids.old_version;
         m_client_reset_new_version = local_version_ids.new_version;
 
-        if (fresh_path) {
+        if (m_db_fresh) {
+            std::string path_to_clean = m_db_fresh->get_path();
             try {
+                // In order to obtain the lock and delete the realm, we first have to close
+                // the Realm. This requires that we are the only remaining ref holder, and
+                // this is expected. Releasing the last ref should release the hold on the
+                // lock file and allow us to clean up.
+                long use_count = m_db_fresh.use_count();
+                REALM_ASSERT_DEBUG_EX(m_db_fresh.use_count() == 1, m_db_fresh.use_count(), path_to_clean);
+                m_db_fresh.reset();
                 // clean up the fresh Realm
                 // we don't mind leaving the fresh lock file around because trying to delete it
                 // here could cause a race if there are multiple resets ongoing
-                DB::call_with_lock(*fresh_path, [&](const std::string& path) {
+                bool did_lock = DB::call_with_lock(path_to_clean, [&](const std::string& path) {
                     constexpr bool delete_lockfile = false;
                     DB::delete_files(path, nullptr, delete_lockfile);
                 });
+                if (!did_lock) {
+                    logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
+                                "There were %2 refs remaining.",
+                                path_to_clean, use_count);
+                }
             }
-            catch (...) {
+            catch (const std::exception& err) {
+                logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+                            "an exception: '%2'",
+                            path_to_clean, err.what());
                 // ignored, this is just a best effort
             }
         }

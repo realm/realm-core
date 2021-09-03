@@ -1062,7 +1062,9 @@ TEST_CASE("Realm::delete_files()") {
 
     SECTION("Calling delete on a folder that does not exist.") {
         auto fake_path = "/tmp/doesNotExist/realm.424242";
-        Realm::delete_files(fake_path);
+        bool did_delete = false;
+        Realm::delete_files(fake_path, &did_delete);
+        REQUIRE_FALSE(did_delete);
     }
 
     SECTION("passing did_delete is optional") {

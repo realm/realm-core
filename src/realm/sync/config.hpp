@@ -38,6 +38,8 @@ using TransactionRef = std::shared_ptr<Transaction>;
 class Group;
 class SyncUser;
 class SyncSession;
+class DB;
+using DBRef = std::shared_ptr<DB>;
 
 namespace bson {
 class Bson;
@@ -128,7 +130,6 @@ struct SyncConfig {
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    util::Optional<std::array<char, 64>> realm_encryption_key;
     bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SSLVerifyCallback> ssl_verify_callback;
@@ -146,6 +147,7 @@ struct SyncConfig {
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
     std::function<void(TransactionRef local)> notify_after_client_reset;
+    std::function<void(const std::string&, std::function<void(DBRef, std::exception_ptr)>)> get_fresh_realm_for_path;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

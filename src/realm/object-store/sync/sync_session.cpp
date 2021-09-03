@@ -396,7 +396,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                     session_user->log_out();
                 }
                 if (session->m_config.error_handler) {
-                    auto user_facing_error = SyncError(realm::sync::ProtocolError::permission_denied,
+                    auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication,
                                                        "Unable to refresh the user access token.", true);
                     session->m_config.error_handler(session, user_facing_error);
                 }
@@ -415,11 +415,10 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, SyncManager* sync_manager)
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, SyncManager* sync_manager)
     : m_state(&State::inactive)
     , m_config(std::move(config))
-    , m_session_realm_path(realm_path)
-    , m_realm_path(std::move(realm_path))
+    , m_db(std::move(db))
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -465,6 +464,35 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     });
 }
 
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err)
+{
+    // FIXME: handle err
+    // what should happen if the fresh copy is also reset?
+
+    // Performing a client resync requires tearing down our current
+    // sync session and creating a new one with a forced client
+    // reset. This will result in session completion handlers firing
+    // when the old session is torn down, which we don't want as this
+    // is supposed to be transparent to the user.
+    //
+    // To avoid this, we need to move the completion handlers aside temporarily so
+    // that moving to the inactive state doesn't clear them - they will be re-registered
+    // when the session becomes active again.
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        m_force_client_reset = true;
+        m_client_reset_fresh_copy = std::move(db);
+        CompletionCallbacks callbacks;
+        std::swap(m_completion_callbacks, callbacks);
+        // always swap back, even if advance_state throws
+        auto guard = util::make_scope_exit([&]() noexcept {
+            std::swap(callbacks, m_completion_callbacks);
+        });
+        advance_state(lock, State::inactive);
+    }
+    revive_if_needed();
+}
+
 // This method should only be called from within the error handler callback registered upon the underlying
 // `m_session`.
 void SyncSession::handle_error(SyncError error)
@@ -485,29 +513,16 @@ void SyncSession::handle_error(SyncError error)
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
-            case ClientResyncMode::SeamlessLoss:
-            case ClientResyncMode::DiscardLocal: {
-                // Performing a client resync requires tearing down our current
-                // sync session and creating a new one with a forced client
-                // reset. This will result in session completion handlers firing
-                // when the old session is torn down, which we don't want as this
-                // is supposed to be transparent to the user.
-                //
-                // To avoid this, we need to move the completion handlers aside temporarily so
-                // that moving to the inactive state doesn't clear them - they will be re-registered
-                // when the session becomes active again.
-                {
-                    std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_reset = true;
-                    CompletionCallbacks callbacks;
-                    std::swap(m_completion_callbacks, callbacks);
-                    // always swap back, even if advance_state throws
-                    auto guard = util::make_scope_exit([&]() noexcept {
-                        std::swap(callbacks, m_completion_callbacks);
-                    });
-                    advance_state(lock, State::inactive);
-                }
-                revive_if_needed();
+            case ClientResyncMode::DiscardLocal:
+                handle_fresh_realm_downloaded(nullptr, nullptr);
+                return;
+            case ClientResyncMode::SeamlessLoss: {
+                REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
+                std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
+                using namespace std::placeholders; // for _1, _2
+                m_config.get_fresh_realm_for_path(
+                    fresh_path,
+                    std::bind(std::mem_fn(&SyncSession::handle_fresh_realm_downloaded), shared_from_this(), _1, _2));
                 return;
             }
         }
@@ -714,7 +729,6 @@ void SyncSession::do_create_sync_session()
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
     session_config.realm_identifier = m_config.partition_value;
-    session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
@@ -743,12 +757,12 @@ void SyncSession::do_create_sync_session()
         config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
         config.notify_after_client_reset = m_config.notify_after_client_reset;
         config.notify_before_client_reset = m_config.notify_before_client_reset;
-        session_config.client_reset_config = config;
-        m_realm_path = _impl::ClientResetOperation::open_session_for_path(m_realm_path, config.seamless_loss,
-                                                                          m_config.realm_encryption_key);
+        config.fresh_copy = std::move(m_client_reset_fresh_copy);
+        session_config.client_reset_config = std::move(config);
+        m_force_client_reset = false;
     }
 
-    m_session = m_client.make_session(m_realm_path, std::move(session_config));
+    m_session = m_client.make_session(m_db, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 
@@ -881,7 +895,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    m_sync_manager->unregister_session(m_session_realm_path);
+    m_sync_manager->unregister_session(m_db->get_path());
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
@@ -984,6 +998,11 @@ SyncSession::ConnectionState SyncSession::connection_state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     return m_connection_state;
+}
+
+std::string const& SyncSession::path() const
+{
+    return m_db->get_path();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

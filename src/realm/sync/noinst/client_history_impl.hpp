@@ -69,8 +69,7 @@ public:
         ChunkedBinaryData changeset;
     };
 
-    ClientHistoryImpl(const std::string& realm_path, Config config = {});
-    ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client);
+    ClientHistoryImpl(const std::string& realm_path);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -121,7 +120,6 @@ public:
     void upgrade_history_schema(int) override final;
     History* _get_history_write() override;
     std::unique_ptr<History> _create_history_read() override;
-    bool is_sync_agent() const noexcept override final;
     void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
 
     // Overriding member functions in realm::TrivialReplication
@@ -138,6 +136,8 @@ public:
                                      std::size_t, VersionInfo&, IntegrationError&, util::Logger&,
                                      SyncTransactReporter*) override final;
 
+    static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
+                                          std::uint_fast64_t&, std::uint_fast64_t&);
     // Overriding member functions in realm::sync::ClientHistory
     void get_upload_download_bytes(std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                    std::uint_fast64_t&) override final;
@@ -152,7 +152,7 @@ public:
 private:
     static constexpr version_type s_initial_version = 1;
 
-    DB* m_shared_group = nullptr;
+    DB* m_db = nullptr;
 
     // FIXME: All history objects belonging to a particular client object
     // (sync::Client) should use a single shared transformer object.
@@ -161,14 +161,10 @@ private:
     /// The version on which the first changeset in the continuous transactions
     /// history is based, or if that history is empty, the version associated
     /// with currently bound snapshot. In general, `m_ct_history_base_version +
-    /// m_ct_history_size` is equal to the version, that is associated with the
+    /// m_ct_history.size()` is equal to the version that is associated with the
     /// currently bound snapshot, but after add_ct_history_entry() is called, it
     /// is equal to that plus one.
     mutable version_type m_ct_history_base_version;
-
-    /// Current number of entries in the continuous transactions history (a
-    /// cache of `m_ct_history->size()`).
-    mutable std::size_t m_ct_history_size;
 
     /// Version on which the first changeset in the synchronization history is
     /// based, or if that history is empty, the version on which the next
@@ -178,12 +174,34 @@ private:
     /// add_sync_history_entry() is called, it is equal to that plus one.
     mutable version_type m_sync_history_base_version;
 
-    /// Current number of entries in the synchronization history (a cache of
-    /// `m_changesets->size()`).q
-    mutable std::size_t m_sync_history_size;
-
+    using IntegerBpTree = BPlusTree<int64_t>;
     struct Arrays {
-        Array root;           // Root of history compartment
+        // Create the client history arrays in the target group
+        Arrays(DB&, Group& group);
+        // Initialize accessors for the existing history arrays
+        Arrays(Allocator& alloc, Group& group, ref_type ref);
+
+        void init_from_ref(ref_type ref);
+        void verify() const;
+
+        // Root of history compartment
+        Array root;
+
+        /// Continuous transactions history
+        BinaryColumn ct_history;
+
+        /// A column of changesets, one row for each entry in the history.
+        ///
+        /// FIXME: Ideally, the B+tree accessor below should have been just
+        /// Bptree<BinaryData>, but Bptree<BinaryData> seems to not allow that yet.
+        BinaryColumn changesets;
+        BinaryColumn reciprocal_transforms;
+
+        IntegerBpTree remote_versions;
+        IntegerBpTree origin_file_idents;
+        IntegerBpTree origin_timestamps;
+
+    private:
         Arrays(Allocator&) noexcept;
     };
 
@@ -224,42 +242,10 @@ private:
 
     // clang-format on
 
-    // `progress_server_version` is the latest server version, V, that has been
-    // integrated locally (client-side) prior to the currently bound snapshot,
-    // or any later server version W, such that W and all server versions
-    // between V and W are produced by the servers integration of changesets
-    // originating from this client.
-    //
-    // `progress_client_version` is the latest local client version produced by
-    // a changeset that was uploaded by this client and integrated by the server
-    // prior to `progress_server_version`.
-    //
     // The construction of the array accessors need to be delayed, because the
     // allocator (Allocator) is not known at the time of construction of the
     // ServerHistory object.
-    mutable std::unique_ptr<Arrays> m_arrays;
-
-    /// Continuous transactions history
-    mutable std::unique_ptr<BinaryColumn> m_ct_history;
-
-    /// A column of changesets, one row for each entry in the history.
-    ///
-    /// FIXME: Ideally, the B+tree accessor below should have been just
-    /// Bptree<BinaryData>, but Bptree<BinaryData> seems to not allow that yet.
-    ///
-    /// FIXME: The memory-wise indirection is an unfortunate consequence of the
-    /// fact that it is impossible to construct a BinaryColumn without already
-    /// having a ref to a valid underlying node structure. This, in turn, is an
-    /// unfortunate consequence of the fact that a column accessor contains a
-    /// dynamically allocated root node accessor, and that the type of the
-    /// required root node accessor depends on the size of the B+-tree.
-    mutable std::unique_ptr<BinaryColumn> m_changesets;
-    mutable std::unique_ptr<BinaryColumn> m_reciprocal_transforms;
-
-    using IntegerBpTree = BPlusTree<int64_t>;
-    mutable std::unique_ptr<IntegerBpTree> m_remote_versions;
-    mutable std::unique_ptr<IntegerBpTree> m_origin_file_idents;
-    mutable std::unique_ptr<IntegerBpTree> m_origin_timestamps;
+    mutable util::Optional<Arrays> m_arrays;
 
     mutable std::vector<char> m_changeset_from_server_owner;
     mutable util::Optional<HistoryEntry> m_changeset_from_server;
@@ -273,12 +259,11 @@ private:
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
-    const bool m_owner_is_sync_client;
-
     std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
 
-    version_type find_sync_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry,
-                                         version_type& last_integrated_server_version) const noexcept;
+    static version_type find_sync_history_entry(Arrays& arrays, version_type base_version, version_type begin_version,
+                                                version_type end_version, HistoryEntry& entry,
+                                                version_type& last_integrated_server_version) noexcept;
 
     // sum_of_history_entry_sizes calculates the sum of the changeset sizes of the local history
     // entries that produced a version that succeeds `begin_version` and precedes `end_version`.
@@ -298,6 +283,15 @@ private:
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
 
+    size_t sync_history_size() const noexcept
+    {
+        return m_arrays ? m_arrays->changesets.size() : 0;
+    }
+    size_t ct_history_size() const noexcept
+    {
+        return m_arrays ? m_arrays->ct_history.size() : 0;
+    }
+
     // Overriding member functions in realm::_impl::History
     void set_group(Group* group, bool updated = false) override final;
     void update_from_ref_and_version(ref_type ref, version_type version) override final;
@@ -312,20 +306,8 @@ private:
 
 // Implementation
 
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, Config config)
+inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
     : ClientReplication{realm_path}
-    , m_owner_is_sync_client{config.owner_is_sync_agent}
-{
-}
-
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client)
-    : ClientReplication{realm_path} // Throws
-    , m_owner_is_sync_client{owner_is_sync_client}
-{
-}
-
-inline ClientHistoryImpl::Arrays::Arrays(Allocator& alloc) noexcept
-    : root{alloc}
 {
 }
 

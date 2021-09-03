@@ -779,6 +779,7 @@ protected:
     virtual const std::string& get_signed_access_token() const noexcept = 0;
 
     virtual const std::string& get_realm_path() const noexcept = 0;
+    virtual DB& get_db() const noexcept = 0;
 
     /// The implementation need only ensure that the returned reference stays valid
     /// until the next invocation of access_realm() on one of the session
@@ -791,15 +792,11 @@ protected:
     /// not after initiation of deactivation.
     virtual ClientHistoryBase& access_realm() = 0;
 
-    /// Gets the encryption key used for Realm file encryption. The default
-    /// implementation returns none.
-    virtual util::Optional<std::array<char, 64>> get_encryption_key() const noexcept;
-
-    // client_reset_config() returns the config for async open and client
+    // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
-    // Config::ClientReset, the session will be initiated with a state Realm
-    // transfer from the server.
-    virtual const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept;
+    // Config::ClientReset, the session will be initiated with a fresh
+    // copy of the Realm transferred from the server.
+    virtual util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///

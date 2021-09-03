@@ -687,38 +687,26 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
 }
 
 client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
-    const std::string& path_local, const util::Optional<std::string> path_fresh,
-    const util::Optional<std::array<char, 64>>& encryption_key,
-    std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-    std::function<void(TransactionRef local)> notify_after, std::function<bool(TransactionRef remote)> verify_remote,
-    sync::SaltedFileIdent client_file_ident, util::Logger& logger)
+    DB& db_local, DBRef db_remote, std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
+    std::function<void(TransactionRef local)> notify_after, sync::SaltedFileIdent client_file_ident,
+    util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
-                "encryption = %2, client_file_ident.ident = %3, "
-                "client_file_ident.salt = %4,",
-                path_local, (encryption_key ? "on" : "off"), client_file_ident.ident, client_file_ident.salt);
+                "client_file_ident.ident = %2, "
+                "client_file_ident.salt = %3,",
+                db_local.get_path(), client_file_ident.ident, client_file_ident.salt);
 
-    DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
-    ClientHistoryImpl history_local{path_local};
-    DBRef sg_local = DB::create(history_local, shared_group_options);
-    DBRef sg_remote;
-    std::unique_ptr<ClientHistoryImpl> history_remote;
+    auto& history_local = dynamic_cast<ClientHistoryImpl&>(*db_local.get_replication());
 
-    if (path_fresh) {
-        history_remote = std::make_unique<ClientHistoryImpl>(*path_fresh);
-        sg_remote = DB::create(*history_remote, shared_group_options);
-    }
     if (notify_before) {
         TransactionRef local_frozen, remote_frozen;
-        if (sg_local) {
-            local_frozen = sg_local->start_frozen();
-        }
-        if (sg_remote) {
-            remote_frozen = sg_remote->start_frozen();
+        local_frozen = db_local.start_frozen();
+        if (db_remote) {
+            remote_frozen = db_remote->start_frozen();
         }
         notify_before(local_frozen, remote_frozen);
     }
-    auto group_local = sg_local->start_write();
+    auto group_local = db_local.start_write();
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
@@ -726,21 +714,18 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     sync::SaltedVersion fresh_server_version = {0, 0};
 
     // changes made here are reflected in the notifier logs
-    if (path_fresh) { // seamless_loss mode
-        REALM_ASSERT(sg_remote);
-        REALM_ASSERT(history_remote);
-        auto wt_remote = sg_remote->start_write();
-        if (!verify_remote(wt_remote)) {
-            throw ClientResetFailed(util::format("verification of fresh copy failed for: %1", *path_fresh));
-        }
+    if (db_remote) { // seamless_loss mode
+        REALM_ASSERT(db_remote);
+        auto& history_remote = dynamic_cast<ClientHistoryImpl&>(*db_remote->get_replication());
+        auto wt_remote = db_remote->start_write();
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-        history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+        history_remote.set_client_file_ident_in_wt(current_version_remote, client_file_ident);
 
         sync::version_type remote_version;
         SaltedFileIdent remote_ident;
         SyncProgress remote_progress;
-        history_remote->get_status(remote_version, remote_ident, remote_progress);
+        history_remote.get_status(remote_version, remote_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
 
         transfer_group(*wt_remote, *group_local, logger);
@@ -775,9 +760,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
                  new_version_local.index);
     if (notify_after) {
         TransactionRef local_frozen;
-        if (sg_local) {
-            local_frozen = sg_local->start_frozen();
-        }
+        local_frozen = db_local.start_frozen();
         notify_after(local_frozen);
     }
 

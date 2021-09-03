@@ -47,7 +47,7 @@ void timed_wait_for(std::function<bool()> condition,
                     std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
 
 void timed_sleeping_wait_for(std::function<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::milliseconds(5000));
+                             std::chrono::milliseconds max_ms = std::chrono::seconds(30));
 
 #if REALM_ENABLE_SYNC
 
@@ -59,13 +59,13 @@ void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
 std::string get_base_url();
 #endif
 
-struct AutoVerifiedEmailCredentials {
+struct AutoVerifiedEmailCredentials : app::AppCredentials {
     AutoVerifiedEmailCredentials();
     std::string email;
     std::string password;
 };
 
-AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app);
+AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 #endif // REALM_ENABLE_AUTH_TESTS
 

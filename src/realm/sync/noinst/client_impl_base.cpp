@@ -1780,13 +1780,7 @@ void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_byte
 }
 
 
-util::Optional<std::array<char, 64>> Session::get_encryption_key() const noexcept
-{
-    return none;
-}
-
-
-const util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() const noexcept
+util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() noexcept
 {
     return m_client_reset_config;
 }
@@ -1839,7 +1833,12 @@ void Session::activate()
     logger.debug("Activating"); // Throws
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
+        // The reason we need a mutable reference is because we don't want the session to keep
+        // a strong reference to the client_reset_config->fresh_copy DB. If it did, then the
+        // fresh DB would stay alive for the duration of this sync session and we want to clean
+        // it up once the reset is finished. Additionally, it will get set to a new copy on every
+        // reset so the below code is able to std::move it below.
+        util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
 
@@ -1848,10 +1847,10 @@ void Session::activate()
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config && !m_client_reset_operation) {
-            m_client_reset_operation.reset(
-                new _impl::ClientResetOperation(logger, get_realm_path(), client_reset_config->seamless_loss,
-                                                get_encryption_key(), client_reset_config->notify_before_client_reset,
-                                                client_reset_config->notify_after_client_reset)); // Throws
+            m_client_reset_operation.reset(new _impl::ClientResetOperation(
+                logger, get_db(), std::move(client_reset_config->fresh_copy), client_reset_config->seamless_loss,
+                client_reset_config->notify_before_client_reset,
+                client_reset_config->notify_after_client_reset)); // Throws
         }
 
         if (!m_client_reset_operation) {
@@ -2300,14 +2299,11 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     ClientHistoryBase& history = access_realm(); // Throws
 
     auto client_reset_if_needed = [&]() -> bool {
-        // if downloading the fresh copy, continue as normal and do not release the client reset
-        // operation yet because we must continue the reset when the fresh Realm reaches
-        // the download complete handler.
-        if (!m_client_reset_operation || m_client_reset_operation->is_downloading_fresh_copy()) {
+        if (!m_client_reset_operation) {
             return false;
         }
 
-        // ClientResetOperation::finilize() will return true only if the operation actually did
+        // ClientResetOperation::finalize() will return true only if the operation actually did
         // a client reset. It may choose not to do a reset if the local Realm does not exist
         // at this point (in that case there is nothing to reset). But in any case, we must
         // clean up m_client_reset_operation at this point as sync should be able to continue from
@@ -2702,21 +2698,6 @@ void Session::check_for_download_completion()
     if (m_download_progress.server_version < m_server_version_at_last_download_mark)
         return;
     m_last_triggering_download_mark = m_target_download_mark;
-    if (m_client_reset_operation) {
-        // At this point, we have successfully downloaded the fresh
-        // server copy of the Realm being reset. It is now ready for
-        // the diff operation to start.
-        m_client_reset_operation->download_complete();
-        // Synthesize an error in the client reset category.
-        // this will cause the session to do a soft reset and
-        // begin again on the local Realm.
-        m_conn.one_less_active_unsuspended_session(); // Throws
-        std::error_code ec = make_error_code(ProtocolError::client_file_expired);
-        bool is_fatal = true;
-        std::string message = "continue client reset with fresh file downloaded";
-        on_suspended(ec, message, is_fatal); // Throws
-        return;
-    }
     if (REALM_UNLIKELY(!m_allow_upload)) {
         // Activate the upload process now, and enable immediate reactivation
         // after a subsequent fast reconnect.

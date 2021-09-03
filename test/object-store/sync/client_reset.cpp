@@ -118,7 +118,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
     auto app = sync_manager.app();
     auto get_valid_config = [&]() -> SyncTestFile {
-        create_user_and_login(app);
+        create_user_and_log_in(app);
         return SyncTestFile(app->current_user(), partition.value, schema);
     };
     SyncTestFile config = get_valid_config();
@@ -156,7 +156,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         FAIL("Error handler should not have been called");
     };
 
@@ -180,8 +180,6 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
     SECTION("should honor encryption key for downloaded Realm") {
         config.encryption_key.resize(64, 'a');
-        config.sync_config->realm_encryption_key = std::array<char, 64>();
-        config.sync_config->realm_encryption_key->fill('a');
         config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
         make_reset()
@@ -1501,7 +1499,7 @@ TEST_CASE("app: client reset integration", "[sync][app][client reset]") {
         TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
         auto app = sync_manager.app();
 
-        create_user_and_login(app);
+        create_user_and_log_in(app);
         auto config = setup_and_get_config(app, "r1.realm");
         auto config2 = setup_and_get_config(app, "r2.realm");
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;

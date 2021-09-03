@@ -117,9 +117,10 @@ AutoVerifiedEmailCredentials::AutoVerifiedEmailCredentials()
     // emails with this prefix will pass through the baas app due to the register function
     email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     password = random_string(10);
+    static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
 }
 
-AutoVerifiedEmailCredentials create_user_and_login(app::SharedApp app)
+AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 {
     REQUIRE(app);
     AutoVerifiedEmailCredentials creds;
@@ -262,7 +263,7 @@ struct TestServerClientReset : public TestClientReset {
         constexpr int64_t pk = 0;
 
         auto realm = Realm::get_shared_realm(m_local_config);
-        auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
+        auto session = sync_manager->get_existing_session(realm->config().path);
         {
             realm->begin_transaction();
 
@@ -361,7 +362,7 @@ struct BaasClientReset : public TestClientReset {
         Partition partition = {app_session->config.partition_key.name, partition_value};
 
         auto realm = Realm::get_shared_realm(m_local_config);
-        auto session = sync_manager->get_session(realm->config().path, *realm->config().sync_config);
+        auto session = sync_manager->get_existing_session(realm->config().path);
         constexpr int64_t pk = 0;
         const std::string object_schema_name = "object";
         {
@@ -477,7 +478,7 @@ struct BaasClientReset : public TestClientReset {
             m_on_post_local(realm);
         }
         wait_for_upload(*realm);
-        wait_for_download(*realm);
+        //        wait_for_download(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

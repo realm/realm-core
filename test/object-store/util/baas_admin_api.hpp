@@ -93,6 +93,11 @@ public:
     ServiceConfig enable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
     bool is_sync_enabled(const std::string& app_id);
 
+    const std::string& base_url() const noexcept
+    {
+        return m_base_url;
+    }
+
 private:
     AdminAPISession(std::string base_url, std::string access_token, std::string group_id)
         : m_base_url(std::move(base_url))
