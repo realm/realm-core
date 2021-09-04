@@ -542,30 +542,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
                 REALM_ASSERT(col_key_dst);
                 DataType col_type = table_src->get_column_type(col_key_src);
-                if (col_type == type_Link) {
-                    ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
-                    TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
-                    REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
-
-                    if (src.is_null(col_key_src)) {
-                        if (!dst.is_null(col_key_dst)) {
-                            dst.set_null(col_key_dst);
-                            updated = true;
-                        }
-                    }
-                    else {
-                        ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
-                        auto target_pk_src = table_target_src->get_primary_key(target_obj_key_src);
-                        auto dst_obj_key = dst.get<ObjKey>(col_key_dst);
-                        if (!dst_obj_key ||
-                            target_pk_src != table_target_dst->get_primary_key(dst.get<ObjKey>(col_key_dst))) {
-                            ObjKey target_obj_key_dst = table_target_dst->get_objkey_from_primary_key(target_pk_src);
-                            dst.set(col_key_dst, target_obj_key_dst);
-                            updated = true;
-                        }
-                    }
-                }
-                else if (col_type == type_LinkList) {
+                if (col_type == type_LinkList) {
                     ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
                     TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
                     REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
@@ -597,6 +574,29 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 else if (col_key_src.is_set()) {
                     if (copy_set(src, col_key_src, dst, col_key_dst)) {
                         updated = true;
+                    }
+                }
+                else if (col_type == type_Link) {
+                    ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
+                    TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
+                    REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
+
+                    if (src.is_null(col_key_src)) {
+                        if (!dst.is_null(col_key_dst)) {
+                            dst.set_null(col_key_dst);
+                            updated = true;
+                        }
+                    }
+                    else {
+                        ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
+                        auto target_pk_src = table_target_src->get_primary_key(target_obj_key_src);
+                        auto dst_obj_key = dst.get<ObjKey>(col_key_dst);
+                        if (!dst_obj_key ||
+                            target_pk_src != table_target_dst->get_primary_key(dst.get<ObjKey>(col_key_dst))) {
+                            ObjKey target_obj_key_dst = table_target_dst->get_objkey_from_primary_key(target_pk_src);
+                            dst.set(col_key_dst, target_obj_key_dst);
+                            updated = true;
+                        }
                     }
                 }
                 else {

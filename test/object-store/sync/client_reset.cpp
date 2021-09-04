@@ -1004,7 +1004,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     // The following can be used to perform the client reset proper, but these tests
     // are only intended to check the transfer_group logic for different types,
     // so to save local test time, we call it directly instead.
-#if TEST_DURATION > 0
+#if 0
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_test_server_client_reset(config, config2, init_sync_manager);
 #else
@@ -1392,141 +1392,203 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     }
 }
 
+namespace cf = realm::collection_fixtures;
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless loss][collections]",
+                   /*cf::ListOfObjects,
+cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
+                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
+{
+    if (!util::EventLoop::has_implementation())
+        return;
 
-#if REALM_ENABLE_AUTH_TESTS
-
-TEST_CASE("app: client reset integration", "[sync][app][client reset]") {
-    std::unique_ptr<app::GenericNetworkTransport> (*factory)() = [] {
-        return std::unique_ptr<app::GenericNetworkTransport>(new IntTestTransport);
-    };
-    std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";
-    REQUIRE(!base_url.empty());
-    const std::string partition = "foo";
-
-    Schema schema = {{"source",
-                      {
-                          {valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
-                          {"source_int", PropertyType::Int},
-                          {"realm_id", PropertyType::String | PropertyType::Nullable},
-                      }},
-                     {"dest",
-                      {
-                          {valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
-                          {"dest_int", PropertyType::Int},
-                          {"realm_id", PropertyType::String | PropertyType::Nullable},
-                      }},
-                     {"object",
-                      {
-                          {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                          {"value", PropertyType::Int},
-                          {"realm_id", PropertyType::String | PropertyType::Nullable},
-                      }}};
-
-    AppCreateConfig app_create_config = default_app_config(base_url);
-    app_create_config.schema = schema;
-    AppSession app_session = create_app(app_create_config);
-
-    auto app_config = app::App::Config{app_session.client_app_id,
-                                       factory,
-                                       base_url,
-                                       util::none,
-                                       util::Optional<std::string>("A Local App Version"),
-                                       util::none,
-                                       "Object Store Platform Tests",
-                                       "Object Store Platform Version Blah",
-                                       "An sdk version"};
-
-    auto base_path = util::make_temp_dir() + app_config.app_id;
-    util::try_remove_dir_recursive(base_path);
-    util::try_make_dir(base_path);
-
-    auto setup_and_get_config = [&base_path, &schema, &partition](std::shared_ptr<app::App> app,
-                                                                  std::string local_path) -> realm::Realm::Config {
-        realm::Realm::Config config;
-        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson(partition));
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cerr << error.message << std::endl;
-            abort();
-        };
-        config.schema_version = 1;
-        config.path = base_path + "/" + local_path;
-        config.schema = schema;
-        return config;
+    const auto partition = random_string(100);
+    const std::string collection_prop_name = "collection";
+    TestType test_type(collection_prop_name, "dest");
+    Schema schema = {
+        {"source",
+         {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
+          {"realm_id", PropertyType::String | PropertyType::Nullable},
+          test_type.property()}},
+        {"dest",
+         {
+             {valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
+             {"realm_id", PropertyType::String | PropertyType::Nullable},
+         }},
+        {"object",
+         {
+             {valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             {"realm_id", PropertyType::String | PropertyType::Nullable},
+         }},
     };
 
-    //    auto get_source_objects = [&](realm::SharedRealm r, std::shared_ptr<SyncSession> session) -> Results {
-    //        wait_for_sync_changes(session);
-    //        return realm::Results(r, r->read_group().get_table("class_source"));
-    //    };
-    //    CppContext c;
-    //    int64_t counter = 0;
-    //    auto create_one_source_object = [&](realm::SharedRealm r) {
-    //        r->begin_transaction();
-    //        auto object = Object::create(c, r, "source",
-    //                                     util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-    //                                                              {"source_int", counter++},
-    //                                                              {"realm_id", std::string(partition)}}),
-    //                                     CreatePolicy::ForceCreate);
-    //
-    //        r->commit_transaction();
-    //    };
-    //
-    //    auto create_one_dest_object = [&](realm::SharedRealm r) -> ObjLink {
-    //        r->begin_transaction();
-    //        auto obj = Object::create(c, r, "dest",
-    //                                  util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
-    //                                                           {"dest_int", counter++},
-    //                                                           {"realm_id", std::string(partition)}}),
-    //                                  CreatePolicy::ForceCreate);
-    //        r->commit_transaction();
-    //        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
-    //    };
-    //
-    //    auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
-    //        std::vector<int64_t> actual;
-    //        for (auto obj : links) {
-    //            actual.push_back(obj.get<Int>("dest_int"));
-    //        }
-    //        std::sort(actual.begin(), actual.end());
-    //        std::sort(expected.begin(), expected.end());
-    //        REQUIRE(actual == expected);
-    //    };
+    TestSyncManager init_sync_manager;
+    SyncTestFile config(init_sync_manager.app(), "default");
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = schema;
+    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
 
+    SyncTestFile config2(init_sync_manager.app(), "default");
 
-    SECTION("manual client reset should trigger the error callback") {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
-        auto app = sync_manager.app();
+    // The following can be used to perform the client reset proper, but these tests
+    // are only intended to check the transfer_group logic for different types,
+    // so to save local test time, we call it directly instead.
+#if 0
+    std::unique_ptr<reset_utils::TestClientReset> test_reset =
+        reset_utils::make_test_server_client_reset(config, config2, init_sync_manager);
+#else
+    std::unique_ptr<reset_utils::TestClientReset> test_reset =
+        reset_utils::make_fake_local_client_reset(config, config2);
+#endif
 
-        create_user_and_log_in(app);
-        auto config = setup_and_get_config(app, "r1.realm");
-        auto config2 = setup_and_get_config(app, "r2.realm");
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        std::atomic<bool> called{false};
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            // ignore "end of input" and other sync errors that might occur when the sync service is killed
-            if (error.is_client_reset_requested()) {
-                called = true;
-            }
-        };
-        {
-            auto r1 = realm::Realm::get_shared_realm(config);
-            auto session1 = app->current_user()->session_for_on_disk_path(r1->config().path);
-            wait_for_download(*r1);
+    CppContext c;
+    auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {
+        auto object = Object::create(
+            c, r, "source",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
+
+        for (auto link : links) {
+            test_type.add_link(object.obj(), link);
         }
+    };
 
-        reset_utils::make_baas_client_reset(config, config2, sync_manager)->run();
+    auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
+        auto obj = Object::create(
+            c, r, "dest",
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            CreatePolicy::ForceCreate);
+        return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
+    };
 
-        auto r1 = realm::Realm::get_shared_realm(config);
-        auto session1 = app->current_user()->session_for_on_disk_path(r1->config().path);
+    auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
+        std::vector<int64_t> actual;
+        for (auto obj : links) {
+            actual.push_back(obj.get<Int>(valid_pk_name));
+        }
+        std::sort(actual.begin(), actual.end());
+        std::sort(expected.begin(), expected.end());
+        REQUIRE(actual == expected);
+    };
 
-        util::EventLoop::main().run_until([&] {
-            return called.load();
+    Results results;
+    Object object;
+    CollectionChangeSet object_changes, results_changes;
+    NotificationToken object_token, results_token;
+    auto setup_listeners = [&](SharedRealm realm) {
+        results =
+            Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "source")).sort({{{"_id", true}}});
+        if (results.size() >= 1) {
+            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "source")->begin();
+            object = Object(realm, obj);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                object_changes = std::move(changes);
+            });
+        }
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            results_changes = std::move(changes);
         });
+    };
+    auto set_links = [&](SharedRealm realm, std::vector<int64_t>& link_pks) {
+        TableRef src_table = get_table(*realm, "source");
+        REQUIRE(src_table->size() == 1);
+        std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
+        for (auto lnk : linked_objects) {
+            int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
+            if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
+                test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
+            }
+        }
+        TableRef dst_table = get_table(*realm, "dest");
+        REQUIRE(dst_table);
+        for (int64_t lnk_pk : link_pks) {
+            if (std::find_if(linked_objects.begin(), linked_objects.end(), [&](auto& lnk) {
+                    return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
+                }) == linked_objects.end()) {
+                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
+                REQUIRE(dst_key);
+                test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
+            }
+        }
+    };
+
+    SECTION("integration testing") {
+        auto reset_collection = [&](std::vector<int64_t> local_pk_links, std::vector<int64_t> remote_pk_links) {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    set_links(local_realm, local_pk_links);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    set_links(remote_realm, remote_pk_links);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    auto linked_objects = test_type.get_links(results.get(0));
+                    require_links_to_match_ids(linked_objects, local_pk_links);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    object_changes = {};
+                    results_changes = {};
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    CHECK(object.is_valid());
+                    auto linked_objects = test_type.get_links(results.get(0));
+                    require_links_to_match_ids(linked_objects, remote_pk_links);
+                    if (local_pk_links == remote_pk_links) {
+                        REQUIRE_INDICES(results_changes.modifications);
+                        REQUIRE_INDICES(object_changes.modifications);
+                    }
+                    else {
+                        REQUIRE_INDICES(results_changes.modifications, 0);
+                        REQUIRE_INDICES(object_changes.modifications, 0);
+                    }
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                })
+                ->run();
+        };
+
+        constexpr int64_t source_pk = 0;
+        constexpr int64_t dest_pk_1 = 1;
+        constexpr int64_t dest_pk_2 = 2;
+        constexpr int64_t dest_pk_3 = 3;
+        test_reset->setup([&](SharedRealm realm) {
+            test_type.reset_test_state();
+            // add a container collection with three valid links
+            ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
+            ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
+            ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
+            create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+        });
+
+        SECTION("remove links") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {});
+        }
+        // FIXME: there's a bug here
+        //        SECTION("no change") {
+        //            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        //        }
+        SECTION("remove middle link") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
+        }
+        SECTION("remove first link") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
+        }
+        SECTION("remove last link") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
+        }
+        SECTION("remove outside links") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
+        }
     }
 }
-
-#endif // REALM_ENABLE_AUTH_TESTS
 
 } // namespace realm
