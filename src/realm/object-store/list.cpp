@@ -388,7 +388,8 @@ List List::thaw(std::shared_ptr<Realm> const& live_realm) const
     const auto live_list = live_realm->import_copy_of(*m_coll_base);
     if (live_list) {
         return List(live_realm, *live_list);
-    } else {
+    }
+    else {
         return {};
     }
 }
