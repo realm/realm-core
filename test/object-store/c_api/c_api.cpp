@@ -2371,6 +2371,7 @@ TEST_CASE("C API") {
             CHECK(checked(realm_object_thaw(frozen_obj1.get(), realm, &thawed_obj1)));
             CHECK(thawed_obj1);
             CHECK(checked(realm_get_value(thawed_obj1, foo_str_key, &value)));
+            realm_release(thawed_obj1);
             CHECK(value.type == RLM_TYPE_STRING);
             CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
 
@@ -2444,6 +2445,7 @@ TEST_CASE("C API") {
             realm_list_t* thawed_list;
             CHECK(checked(realm_list_thaw(frozen_list.get(), realm, &thawed_list)));
             realm_list_size(thawed_list, &count);
+            realm_release(thawed_list);
             CHECK(count == 1);
 
             write([&]() {
