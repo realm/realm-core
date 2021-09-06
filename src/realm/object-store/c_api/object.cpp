@@ -166,14 +166,16 @@ RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, c
     });
 }
 
-RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm, realm_object_t** out_live_object)
+RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm,
+                               realm_object_t** out_live_object)
 {
     return wrap_err([&]() {
         const auto& realm = *live_realm;
         const auto live_object = frozen_object->thaw(realm);
-        if (live_object.is_valid()) {
-            *out_live_object = new realm_object_t(std::move(live_object));
-        } else {
+        if (live_object) {
+            *out_live_object = new realm_object_t(std::move(*live_object));
+        }
+        else {
             *out_live_object = nullptr;
         }
         return true;
@@ -444,9 +446,10 @@ RLM_API bool realm_list_thaw(const realm_list_t* frozen_list, const realm_t* liv
     return wrap_err([&]() {
         const auto& realm = *live_realm;
         const auto& live_list = frozen_list->thaw(realm);
-        if (live_list.is_valid()) {
-            *out_live_list = new realm_list_t{std::move(live_list)};
-        } else {
+        if (live_list) {
+            *out_live_list = new realm_list_t{std::move(*live_list)};
+        }
+        else {
             *out_live_list = nullptr;
         }
         return true;

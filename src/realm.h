@@ -1274,7 +1274,7 @@ RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, c
  * @return True if no exception occured.
  */
 RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm,
-                               realm_object_t** out_frozen_object);
+                               realm_object_t** out_live_object);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);

@@ -382,7 +382,7 @@ List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
     return List(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
 }
 
-List List::thaw(std::shared_ptr<Realm> const& live_realm) const
+util::Optional<List> List::thaw(std::shared_ptr<Realm> const& live_realm) const
 {
     REALM_ASSERT(!live_realm->is_frozen());
     const auto live_list = live_realm->import_copy_of(*m_coll_base);
