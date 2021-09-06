@@ -158,6 +158,8 @@ TEST(Mixed_Table)
     auto obj1 = t.create_object().set(col_data, Mixed("Hello"));
     CHECK_EQUAL(obj0.get_any(col_data), Mixed(5));
     CHECK_EQUAL(obj1.get_any(col_data), Mixed("Hello"));
+    CHECK_EQUAL(obj0.get_any("data"), Mixed(5));
+    CHECK_EQUAL(obj1.get_any("data"), Mixed("Hello"));
 }
 
 

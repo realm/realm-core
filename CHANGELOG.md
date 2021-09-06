@@ -24,6 +24,7 @@
 * ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query. ([#4857](https://github.com/realm/realm-core/pull/4857))
 * A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
 * Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
+* A method Obj::get_any(StringData) has been added.
 
 ### Fixed
 * Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
