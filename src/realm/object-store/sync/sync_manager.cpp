@@ -338,14 +338,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
     else { // LoggedOut => LoggedIn
         auto user = *it;
         REALM_ASSERT(user->state() != SyncUser::State::Removed);
-
-        // It is important that the access token is set before the refresh token
-        // as once each token is set it attempts to revive any pending sessions
-        // (e.g. as user logs out and logs back in they would be using an empty access token with the sync client
-        // if the order of these were flipped).
-        user->update_access_token(std::move(access_token));
-        user->update_refresh_token(std::move(refresh_token));
-        user->set_state(SyncUser::State::LoggedIn);
+        user->update_state_and_tokens(SyncUser::State::LoggedIn, std::move(access_token), std::move(refresh_token));
         return user;
     }
 }
@@ -634,6 +627,12 @@ bool SyncManager::do_has_existing_sessions()
     return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element) {
         return element.second->existing_external_reference();
     });
+}
+
+void SyncManager::wait_for_sessions_to_terminate()
+{
+    auto& client = get_sync_client(); // Throws
+    client.wait_for_session_terminations();
 }
 
 void SyncManager::unregister_session(const std::string& path)

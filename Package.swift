@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.3.1"
+let versionStr = "11.4.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -540,7 +540,7 @@ let headers: [String] = [
     "realm/sort_descriptor.hpp",
     "realm/spec.hpp",
     "realm/status.hpp",
-    "relam/status_with.hpp",
+    "realm/status_with.hpp",
     "realm/string_data.hpp",
     "realm/sync/access_control.hpp",
     "realm/sync/access_token.hpp",
@@ -627,6 +627,7 @@ let headers: [String] = [
     "realm/util/from_chars.hpp",
     "realm/util/functional.hpp",
     "realm/util/function_ref.hpp",
+    "realm/util/future.hpp",
     "realm/util/get_file_size.hpp",
     "realm/util/hex_dump.hpp",
     "realm/util/http.hpp",
