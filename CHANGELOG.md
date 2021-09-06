@@ -1,21 +1,9 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 11.4.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed race between updating user tokens and state in persisted metadata when logging in/out. ([#4875](https://github.com/realm/realm-core/issues/4875))
-* Immediately free shared pointers to scheduler on realm closure ([realm/realm-js#3620](https://github.com/realm/realm-js/issues/3620), [realm/realm-js#2993](https://github.com/realm/realm-js/issues/2993))
+* Fixed issue when opening a synced realm is prevented by assertion "m_state == SyncUser::State::LoggedIn". ([#4875](https://github.com/realm/realm-core/issues/4875))
+* Fixed slow teardown of Realm by immediately freeing shared pointers to scheduler on realm closure ([realm/realm-js#3620](https://github.com/realm/realm-js/issues/3620), [realm/realm-js#2993](https://github.com/realm/realm-js/issues/2993))
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 11.4.0 Release notes
