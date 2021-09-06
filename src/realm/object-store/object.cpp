@@ -39,12 +39,14 @@ Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
     return Object(frozen_realm, frozen_realm->import_copy_of(m_obj));
 }
 
-util::Optional<Object> Object::thaw(std::shared_ptr<Realm> live_realm) const {
+util::Optional<Object> Object::thaw(std::shared_ptr<Realm> live_realm) const
+{
     REALM_ASSERT(!live_realm->is_frozen());
-    const auto &thawed_object = live_realm->import_copy_of(m_obj);
+    const auto& thawed_object = live_realm->import_copy_of(m_obj);
     if (thawed_object.is_valid()) {
         return Object(live_realm, thawed_object);
-    } else {
+    }
+    else {
         return {};
     }
 }
