@@ -1392,10 +1392,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     }
 }
 
-namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless loss][collections]",
-                   /*cf::ListOfObjects,
-cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
+                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
@@ -1496,22 +1494,39 @@ cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
     auto set_links = [&](SharedRealm realm, std::vector<int64_t>& link_pks) {
         TableRef src_table = get_table(*realm, "source");
         REQUIRE(src_table->size() == 1);
+        TableRef dst_table = get_table(*realm, "dest");
         std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
-        for (auto lnk : linked_objects) {
-            int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
-            if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
-                test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
+        if (is_array(test_type.property().type)) {
+            // order matters for lists, leave it be if they are identical,
+            // otherwise clear and add everything in the correct order
+            bool equal = std::equal(linked_objects.begin(), linked_objects.end(), link_pks.begin(), link_pks.end(),
+                                    [&](const Obj& obj, const int64_t& pk) {
+                                        return obj.get_primary_key().template get<int64_t>() == pk;
+                                    });
+            if (!equal) {
+                test_type.clear_collection(*src_table->begin());
+                for (size_t i = 0; i < link_pks.size(); ++i) {
+                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{link_pks[i]});
+                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
+                }
             }
         }
-        TableRef dst_table = get_table(*realm, "dest");
-        REQUIRE(dst_table);
-        for (int64_t lnk_pk : link_pks) {
-            if (std::find_if(linked_objects.begin(), linked_objects.end(), [&](auto& lnk) {
-                    return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
-                }) == linked_objects.end()) {
-                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
-                REQUIRE(dst_key);
-                test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
+        else {
+            for (auto lnk : linked_objects) {
+                int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
+                if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
+                    test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
+                }
+            }
+            REQUIRE(dst_table);
+            for (int64_t lnk_pk : link_pks) {
+                if (std::find_if(linked_objects.begin(), linked_objects.end(), [lnk_pk](auto& lnk) {
+                        return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
+                    }) == linked_objects.end()) {
+                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
+                    REQUIRE(dst_key);
+                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
+                }
             }
         }
     };
@@ -1540,6 +1555,11 @@ cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
                     CHECK(object.is_valid());
                     auto linked_objects = test_type.get_links(results.get(0));
                     require_links_to_match_ids(linked_objects, remote_pk_links);
+                    if (!is_array(test_type.property().type)) {
+                        // order should not matter except for lists
+                        std::sort(local_pk_links.begin(), local_pk_links.end());
+                        std::sort(remote_pk_links.begin(), remote_pk_links.end());
+                    }
                     if (local_pk_links == remote_pk_links) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
@@ -1569,13 +1589,15 @@ cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
             create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
         });
 
-        SECTION("remove links") {
+        SECTION("both empty") {
+            reset_collection({}, {});
+        }
+        SECTION("remove all") {
             reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {});
         }
-        // FIXME: there's a bug here
-        //        SECTION("no change") {
-        //            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        //        }
+        SECTION("no change") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
         SECTION("remove middle link") {
             reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
         }
@@ -1587,6 +1609,24 @@ cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,*/
         }
         SECTION("remove outside links") {
             reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
+        }
+        SECTION("additive") {
+            reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+        SECTION("add middle") {
+            reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+        SECTION("add first") {
+            reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+        SECTION("add last") {
+            reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+        SECTION("add outside") {
+            reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        }
+        SECTION("reversed order") {
+            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
         }
     }
 }

@@ -53,6 +53,7 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
         auto val = src->get_any(ndx);
         if (dst->get_any(ndx) != val) {
             dst->set_any(ndx, val);
+            updated = true;
         }
         ndx++;
     }
@@ -95,6 +96,14 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 
     size_t dst_ndx = 0;
     for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
+        if (dst_ndx == sorted_dst.size()) {
+            // if we have reached the end of the dst items, all remaining
+            // src items should be added
+            while (src_ndx < sorted_src.size()) {
+                to_insert.push_back(sorted_src[src_ndx++]);
+            }
+            break;
+        }
         size_t ndx_in_src = sorted_src[src_ndx];
         Mixed src_val = src->get_any(ndx_in_src);
         while (dst_ndx < sorted_dst.size()) {
@@ -117,9 +126,6 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
                 ++dst_ndx;
                 continue;
             }
-        }
-        if (dst_ndx >= sorted_dst.size()) {
-            to_insert.push_back(ndx_in_src);
         }
     }
     while (dst_ndx < sorted_dst.size()) {
@@ -148,8 +154,16 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
 
     size_t dst_ndx = 0;
     for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
-        auto src_val = src.get_pair(sorted_src[src_ndx]);
+        if (dst_ndx == sorted_dst.size()) {
+            // if we have reached the end of the dst items, all remaining
+            // src items should be added
+            while (src_ndx < sorted_src.size()) {
+                to_insert.push_back(sorted_src[src_ndx++]);
+            }
+            break;
+        }
 
+        auto src_val = src.get_pair(sorted_src[src_ndx]);
         while (dst_ndx < sorted_dst.size()) {
             auto dst_val = dst.get_pair(sorted_dst[dst_ndx]);
             int cmp = src_val.first.compare(dst_val.first);
@@ -174,10 +188,9 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
                 continue;
             }
         }
-        if (dst_ndx >= sorted_dst.size()) {
-            to_insert.push_back(sorted_src[src_ndx]);
-        }
     }
+    // at this point, we've gone through all src items but still have dst items
+    // oustanding; these should all be deleted because they are not in src
     while (dst_ndx < sorted_dst.size()) {
         to_delete.push_back(sorted_dst[dst_ndx++]);
     }
@@ -242,7 +255,10 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
     for (size_t i = prefix_len; i < len_src - suffix_len; ++i) {
         auto key_src = ll_src.get(i);
         auto key_converted = convert_object_keys(key_src);
-        ll_dst.set(i, key_converted); // FIXME: updated should be set if this differs
+        ObjKey old = ll_dst.set(i, key_converted); // FIXME: updated should be set if this differs
+        if (!updated && old != key_converted) {
+            updated = true;
+        }
     }
     return updated;
 }
