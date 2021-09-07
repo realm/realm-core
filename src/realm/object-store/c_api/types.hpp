@@ -469,6 +469,26 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     }
 };
 
+struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSession> {
+    realm_sync_session(std::shared_ptr<realm::SyncSession> session)
+        : std::shared_ptr<realm::SyncSession>{std::move(session)}
+    {
+    }
+
+    realm_sync_session* clone() const override
+    {
+        return new realm_sync_session{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_session*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
 #endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP

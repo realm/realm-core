@@ -49,10 +49,7 @@ namespace _impl {
 struct SyncClient;
 }
 
-class SyncLoggerFactory {
-public:
-    virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
-};
+using SyncLoggerFactory = std::unique_ptr<util::Logger>(util::Logger::Level);
 
 struct SyncClientTimeouts {
     SyncClientTimeouts();
@@ -76,7 +73,7 @@ struct SyncClientConfig {
     util::Optional<std::vector<char>> custom_encryption_key;
     bool reset_metadata_on_error = false;
 
-    SyncLoggerFactory* logger_factory = nullptr;
+    std::function<SyncLoggerFactory> logger_factory = nullptr;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
@@ -116,7 +113,7 @@ public:
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.
     void set_log_level(util::Logger::Level) noexcept;
-    void set_logger_factory(SyncLoggerFactory&) noexcept;
+    void set_logger_factory(std::function<SyncLoggerFactory>) noexcept;
 
     // Create a new logger of the type which will be used by the sync client
     std::unique_ptr<util::Logger> make_logger() const;

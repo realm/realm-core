@@ -2061,6 +2061,23 @@ RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** n
 RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, void (*)(void* userdata, realm_error_t*),
                                    void* userdata, realm_free_userdata_func_t userdata_free);
 
+// returned pointer must be manually released with 'free()'
+RLM_API const char* realm_user_get_identity(const realm_user_t*);
+
+// returned pointer must be manually released with 'free()'
+RLM_API const char* realm_user_get_local_identity(const realm_user_t*);
+
+// returned pointer must be manually released with 'free()'
+RLM_API const char* realm_user_get_device_id(const realm_user_t*);
+
+// returned pointer must be manually released with 'free()'
+RLM_API const char* realm_user_get_refresh_token(const realm_user_t*);
+
+// returned pointer must be manually released with 'free()'
+RLM_API const char* realm_user_get_access_token(const realm_user_t*);
+
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*);
+
 /* Sync */
 
 typedef enum realm_sync_session_stop_policy {
@@ -2079,11 +2096,11 @@ typedef struct realm_sync_session realm_sync_session_t;
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 
-RLM_API realm_sync_config_t* realm_sync_config_new(realm_user_t*, const char* partition_value);
+RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value);
 RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*, realm_sync_session_stop_policy_e);
-RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, void (*)(void* userdata, realm_error_t),
+RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*,
+                                                 void (*)(void* userdata, const realm_sync_session_t*, realm_error_t),
                                                  void* userdata, realm_free_userdata_func_t);
-RLM_API void realm_sync_config_set_realm_encryption_key(realm_sync_config_t*, char[64]);
 RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool);
 RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*);
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
@@ -2109,9 +2126,11 @@ RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void);
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*);
 RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
                                                         realm_sync_client_metadata_mode_e);
-RLM_API void realm_sync_client_config_set_encryption_key(realm_sync_client_config_t*, const uint8_t*, size_t);
+RLM_API void realm_sync_client_config_set_encryption_key(realm_sync_client_config_t*, const uint8_t[64]);
 RLM_API void realm_sync_client_config_set_reset_metadata_on_error(realm_sync_client_config_t*, bool);
-RLM_API void realm_sync_client_config_set_logger_factory(realm_sync_client_config_t*, realm_logger_factory_func_t);
+RLM_API void realm_sync_client_config_set_logger_factory(realm_sync_client_config_t*, realm_logger_factory_func_t,
+                                                         void* logger_factory_userdata,
+                                                         realm_free_userdata_func_t logger_factory_userdata_free);
 RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e);
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e);
@@ -2121,7 +2140,7 @@ RLM_API void realm_sync_client_config_set_user_agent_application_info(realm_sync
 RLM_API void realm_sync_client_config_set_connect_timeout(realm_sync_client_config_t*, uint64_t);
 RLM_API void realm_sync_client_config_set_connection_linger_time(realm_sync_client_config_t*, uint64_t);
 RLM_API void realm_sync_client_config_set_ping_keepalive_period(realm_sync_client_config_t*, uint64_t);
-RLM_API void realm_sync_client_config_set_pong_keepalive_period(realm_sync_client_config_t*, uint64_t);
+RLM_API void realm_sync_client_config_set_pong_keepalive_timeout(realm_sync_client_config_t*, uint64_t);
 RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*, uint64_t);
 
 

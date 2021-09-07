@@ -72,6 +72,11 @@ static inline AuthProvider from_capi(realm_auth_provider_e provider)
     };
     REALM_TERMINATE("Invalid auth provider method."); // LCOV_EXCL_LINE
 }
+
+static inline realm_error_t to_capi(const AppError& error)
+{
+    return {};
+}
 } // namespace
 } // namespace realm::c_api
 
@@ -233,7 +238,8 @@ RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_crede
         auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                       std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr, nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), nullptr, &c_err);
             }
             else {
                 callback(userdata.get(), new realm_user_t(std::move(user)), nullptr);
@@ -251,7 +257,8 @@ RLM_API bool realm_app_log_out_current_user(realm_app_t* app, void (*callback)(v
         auto cb = [callback,
                    userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), &c_err);
             }
             else {
                 callback(userdata.get(), nullptr);
@@ -270,7 +277,8 @@ RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
         auto cb = [callback,
                    userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), &c_err);
             }
             else {
                 callback(userdata.get(), nullptr);
@@ -288,7 +296,8 @@ RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, void (*call
         auto cb = [callback,
                    userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), &c_err);
             }
             else {
                 callback(userdata.get(), nullptr);
@@ -307,7 +316,8 @@ RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app
         auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                       std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr, nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), nullptr, &c_err);
             }
             else {
                 callback(userdata.get(), new realm_user_t(std::move(user)), nullptr);
@@ -337,7 +347,8 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user,
         auto cb = [callback,
                    userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](util::Optional<AppError> error) {
             if (error) {
-                callback(userdata.get(), nullptr);
+                realm_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), &c_err);
             }
             else {
                 callback(userdata.get(), nullptr);
@@ -346,4 +357,38 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user,
         (*app)->remove_user(*user, std::move(cb));
         return true;
     });
+}
+
+RLM_API const char* realm_user_get_identity(const realm_user_t* user)
+{
+    return strdup((*user)->identity().c_str());
+}
+
+RLM_API const char* realm_user_get_local_identity(const realm_user_t* user)
+{
+    return strdup((*user)->local_identity().c_str());
+}
+
+RLM_API const char* realm_user_get_device_id(const realm_user_t* user)
+{
+    if ((*user)->has_device_id()) {
+        return strdup((*user)->device_id().c_str());
+    }
+
+    return nullptr;
+}
+
+RLM_API const char* realm_user_get_refresh_token(const realm_user_t* user)
+{
+    return strdup((*user)->refresh_token().c_str());
+}
+
+RLM_API const char* realm_user_get_access_token(const realm_user_t* user)
+{
+    return strdup((*user)->access_token().c_str());
+}
+
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user)
+{
+    return to_capi(enum_from_provider_type((*user)->provider_type()));
 }
