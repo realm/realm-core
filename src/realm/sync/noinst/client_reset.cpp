@@ -17,8 +17,57 @@ using namespace sync;
 
 namespace {
 
+struct InterRealmValueConverter {
+    TableRef dst_link_table;
+    TableRef src_table;
+    TableRef dst_table;
+    TableRef opposite_of_src;
+    TableRef opposite_of_dst;
+    const bool primitive_types_only;
+
+    InterRealmValueConverter(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+        : primitive_types_only(!(src_col.get_type() == col_type_TypedLink || src_col.get_type() == col_type_Link ||
+                                 src_col.get_type() == col_type_LinkList || src_col.get_type() == col_type_Mixed))
+    {
+        if (!primitive_types_only) {
+            src_table = src_obj.get_table();
+            dst_table = dst_obj.get_table();
+            REALM_ASSERT(src_table);
+            opposite_of_src = src_table->get_opposite_table(src_col);
+            opposite_of_dst = dst_table->get_opposite_table(dst_col);
+            REALM_ASSERT(bool(opposite_of_src) == bool(opposite_of_dst));
+        }
+    }
+
+    Mixed src_to_dst(Mixed src)
+    {
+        if (primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
+            return src;
+        }
+        else {
+            if (opposite_of_src) {
+                ObjKey src_link_key = src.get<ObjKey>();
+                Mixed src_link_pk = opposite_of_src->get_primary_key(src_link_key);
+                Mixed dst_link_key = opposite_of_dst->get_objkey_from_primary_key(src_link_pk);
+                return dst_link_key;
+            }
+            else {
+                ObjLink src_link = src.get<ObjLink>();
+                TableRef src_link_table = src_table->get_parent_group()->get_table(src_link.get_table_key());
+                REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
+                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+
+                TableRef dst_link_table = dst_table->get_parent_group()->get_table(src_link_table->get_name());
+                REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
+                ObjKey dst_link = dst_link_table->get_objkey_from_primary_key(src_pk);
+                return ObjLink{dst_link_table->get_key(), dst_link};
+            }
+        }
+    }
+};
+
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-bool _copy_list(LstBasePtr src, LstBasePtr dst)
+bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -28,6 +77,9 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
     // src = abcdefghi
     // dst = abcxyhi
     // The common prefix is abc. The common suffix is hi. xy is replaced by defg.
+    LstBasePtr src = src_obj.get_listbase_ptr(src_col);
+    LstBasePtr dst = dst_obj.get_listbase_ptr(dst_col);
+    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
 
     bool updated = false;
     size_t len_src = src->size();
@@ -43,14 +95,14 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
 
     size_t suffix_len_max = len_min - ndx;
     while (suffix_len < suffix_len_max &&
-           src->get_any(len_src - 1 - suffix_len) == dst->get_any(len_dst - 1 - suffix_len)) {
+           convert.src_to_dst(src->get_any(len_src - 1 - suffix_len)) == dst->get_any(len_dst - 1 - suffix_len)) {
         suffix_len++;
     }
 
     len_min -= (ndx + suffix_len);
 
     for (size_t i = 0; i < len_min; i++) {
-        auto val = src->get_any(ndx);
+        auto val = convert.src_to_dst(src->get_any(ndx));
         if (dst->get_any(ndx) != val) {
             dst->set_any(ndx, val);
             updated = true;
@@ -60,7 +112,7 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
 
     // New elements must be inserted in dst.
     while (len_dst < len_src) {
-        dst->insert_any(ndx, src->get_any(ndx));
+        dst->insert_any(ndx, convert.src_to_dst(src->get_any(ndx)));
         len_dst++;
         ndx++;
         updated = true;
@@ -75,17 +127,11 @@ bool _copy_list(LstBasePtr src, LstBasePtr dst)
     return updated;
 }
 
-bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
-{
-    LstBasePtr src = src_obj.get_listbase_ptr(src_col);
-    LstBasePtr dst = dst_obj.get_listbase_ptr(dst_col);
-    return _copy_list(std::move(src), std::move(dst));
-}
-
 bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
     SetBasePtr src = src_obj.get_setbase_ptr(src_col);
     SetBasePtr dst = dst_obj.get_setbase_ptr(dst_col);
+    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
 
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
@@ -109,7 +155,8 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
         while (dst_ndx < sorted_dst.size()) {
             size_t ndx_in_dst = sorted_dst[dst_ndx];
             Mixed dst_val = dst->get_any(ndx_in_dst);
-            int cmp = src_val.compare(dst_val); // FIXME: need to compare pks of objects not ObjKeys
+            Mixed converted_src = convert.src_to_dst(src_val);
+            int cmp = converted_src.compare(dst_val);
             if (cmp == 0) {
                 // equal: advance both src and dst
                 ++dst_ndx;
@@ -137,7 +184,8 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
         dst->erase_any(dst->get_any(*it));
     }
     for (auto ndx : to_insert) {
-        dst->insert_any(src->get_any(ndx));
+        Mixed converted_src = convert.src_to_dst(src->get_any(ndx));
+        dst->insert_any(converted_src);
     }
     return to_delete.size() || to_insert.size();
 }
@@ -146,6 +194,7 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
 {
     Dictionary src = src_obj.get_dictionary(src_col);
     Dictionary dst = dst_obj.get_dictionary(dst_col);
+    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
 
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
@@ -168,8 +217,8 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
             auto dst_val = dst.get_pair(sorted_dst[dst_ndx]);
             int cmp = src_val.first.compare(dst_val.first);
             if (cmp == 0) {
-                // FIXME: need to compare pks of objects not ObjKeys
-                cmp = src_val.second.compare(dst_val.second);
+                Mixed converted_src = convert.src_to_dst(src_val.second);
+                cmp = converted_src.compare(dst_val.second);
             }
             if (cmp == 0) {
                 // equal: advance both src and dst
@@ -201,66 +250,10 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
     }
     for (auto ndx : to_insert) {
         auto pair = src.get_pair(ndx);
-        dst.insert(pair.first, pair.second);
+        Mixed converted_val = convert.src_to_dst(pair.second);
+        dst.insert(pair.first, converted_val);
     }
     return to_delete.size() || to_insert.size();
-}
-
-bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_object_keys)
-{
-    // This function ensures that the link list in ll_dst is equal to the
-    // link list in ll_src with equality defined by the conversion function
-    // convert_object_keys.
-
-    bool updated = false;
-    size_t len_src = ll_src.size();
-    size_t len_dst = ll_dst.size();
-
-    size_t prefix_len, suffix_len;
-
-    for (prefix_len = 0; prefix_len < len_src && prefix_len < len_dst; ++prefix_len) {
-        auto key_src = ll_src.get(prefix_len);
-        auto key_dst = ll_dst.get(prefix_len);
-        auto key_converted = convert_object_keys(key_src);
-        if (key_converted != key_dst)
-            break;
-    }
-
-    for (suffix_len = 0; prefix_len + suffix_len < len_src && prefix_len + suffix_len < len_dst; ++suffix_len) {
-        auto key_src = ll_src.get(len_src - 1 - suffix_len);
-        auto key_dst = ll_dst.get(len_dst - 1 - suffix_len);
-        auto key_converted = convert_object_keys(key_src);
-        if (key_converted != key_dst)
-            break;
-    }
-
-    if (len_src > len_dst) {
-        // New elements must be inserted in ll_dst.
-        for (size_t i = prefix_len; i < prefix_len + (len_src - len_dst); ++i) {
-            auto key_src = ll_src.get(i);
-            auto key_converted = convert_object_keys(key_src);
-            ll_dst.insert(i, key_converted);
-            updated = true;
-        }
-    }
-    else if (len_dst > len_src) {
-        // Elements must be removed from ll_dst.
-        for (size_t i = len_dst - suffix_len; i > len_src - suffix_len; --i)
-            ll_dst.remove(i - 1);
-        updated = true;
-    }
-    REALM_ASSERT(ll_dst.size() == len_src);
-
-    // Copy elements from ll_src to ll_dst.
-    for (size_t i = prefix_len; i < len_src - suffix_len; ++i) {
-        auto key_src = ll_src.get(i);
-        auto key_converted = convert_object_keys(key_src);
-        ObjKey old = ll_dst.set(i, key_converted); // FIXME: updated should be set if this differs
-        if (!updated && old != key_converted) {
-            updated = true;
-        }
-    }
-    return updated;
 }
 
 } // namespace
@@ -545,6 +538,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                      table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
                      pk_col.get_type());
 
+        // FIXME: change the order of these loops so that columns are on the outer
+        // which will allow for even more caching of the InterRealmValueConverter (and benchmark)
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
             auto dst = table_dst->get_object_with_primary_key(src_pk);
@@ -558,26 +553,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
                 REALM_ASSERT(col_key_dst);
                 DataType col_type = table_src->get_column_type(col_key_src);
-                if (col_type == type_LinkList) {
-                    ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
-                    TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
-                    REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
-                    // convert_keys converts the object key in table_target_src
-                    // to the object key in table_target_dst such that the
-                    // primary keys are the same.
-                    auto convert_keys = [&](ObjKey key_src) {
-                        auto src_pk = table_target_src->get_primary_key(key_src);
-                        auto key_dst = table_target_dst->find_primary_key(src_pk);
-                        REALM_ASSERT(key_dst);
-                        return key_dst;
-                    };
-                    auto ll_src = src.get_linklist(col_key_src);
-                    auto ll_dst = dst.get_linklist(col_key_dst);
-                    if (copy_linklist(ll_src, ll_dst, convert_keys)) {
-                        updated = true;
-                    }
-                }
-                else if (col_key_src.is_list()) {
+                if (col_key_src.is_list()) {
                     if (copy_list(src, col_key_src, dst, col_key_dst)) {
                         updated = true;
                     }
@@ -617,7 +593,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 }
                 else {
                     REALM_ASSERT(!col_key_src.is_collection());
-                    auto val_src = src.get_any(col_key_src);
+                    InterRealmValueConverter convert(src, col_key_src, dst, col_key_dst);
+                    auto val_src = convert.src_to_dst(src.get_any(col_key_src));
                     auto val_dst = dst.get_any(col_key_dst);
                     if (val_src != val_dst) {
                         dst.set_any(col_key_dst, val_src);
