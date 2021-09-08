@@ -148,6 +148,22 @@ public:
         return true;
     }
 
+    void run_until(std::function<bool()> predicate) override
+    {
+        uv_idle_t idle;
+        idle.data = &predicate;
+        auto loop = uv_default_loop();
+        uv_idle_init(loop, &idle);
+        uv_idle_start(&idle, [](uv_idle_t* handle) {
+            auto& predicate = *static_cast<std::function<bool()>*>(handle->data);
+            if (predicate()) {
+                uv_stop(handle->loop);
+            }
+        });
+        uv_run(loop, UV_RUN_DEFAULT);
+        uv_idle_stop(&idle);
+    }
+
 private:
     struct Data {
         std::function<void()> callback;

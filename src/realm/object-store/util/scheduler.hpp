@@ -95,6 +95,13 @@ public:
         return false;
     }
 
+    virtual void run_until(std::function<bool()> predicate)
+    {
+        if (!predicate()) {
+            throw std::runtime_error("'run_until' not supported");
+        }
+    }
+
     // virtual int enqueue_write(std::function<void()>& block) = 0;
 
     [[deprecated("Use Scheduler::make_frozen() instead")]] static std::shared_ptr<Scheduler>

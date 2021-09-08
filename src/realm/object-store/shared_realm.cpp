@@ -811,7 +811,16 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
     if (is_in_async_transaction()) {
-        throw InvalidTransactionException("Can't begin transaction while an async transaction is ongoing");
+        bool got_it = false;
+        async_begin_transaction(
+            [&got_it] {
+                got_it = true;
+            },
+            true);
+        this->m_scheduler->run_until([&got_it] {
+            return got_it;
+        });
+        return;
     }
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -841,7 +850,14 @@ void Realm::commit_transaction()
 
     if (m_transaction->is_async()) {
         REALM_ASSERT_RELEASE(!m_is_running_async_writes);
-        throw InvalidTransactionException("Can't commit synchronously while in async transaction");
+        bool done = false;
+        async_commit_transaction([&done] {
+            done = true;
+        });
+        this->m_scheduler->run_until([&done] {
+            return done;
+        });
+        return;
     }
 
     if (auto audit = audit_context()) {
