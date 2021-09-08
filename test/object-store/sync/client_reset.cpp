@@ -26,6 +26,8 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
+#include <realm/sync/noinst/client_reset_operation.hpp>
+
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -263,6 +265,27 @@ TEST_CASE("sync: client reset", "[client reset]") {
         config.cache = false;
         config.automatic_change_notifications = false;
         config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+        const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
+        size_t before_callback_invoctions = 0;
+        size_t after_callback_invocations = 0;
+        config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+            ++before_callback_invoctions;
+            REQUIRE(local);
+            REQUIRE(local->is_frozen());
+            REQUIRE(local->get_table("class_object"));
+
+            REQUIRE(remote);
+            REQUIRE(remote->is_frozen());
+            REQUIRE(remote->get_table("class_object"));
+
+            REQUIRE(util::File::exists(config.path));
+            REQUIRE(util::File::exists(fresh_path));
+        };
+        config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+            ++after_callback_invocations;
+            REQUIRE(local);
+            REQUIRE(local->get_table("class_object"));
+        };
 
         Results results;
         Object object;
@@ -302,6 +325,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->on_post_reset([&](SharedRealm realm) {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
 
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
                     CHECK(results.size() == 1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 6);
                     CHECK(object.obj().get<Int>("value") == 6);
@@ -311,6 +336,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_INDICES(object_changes.modifications, 0);
                     REQUIRE_INDICES(object_changes.insertions);
                     REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
                 })
                 ->run();
 
@@ -348,6 +376,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     })
                     ->on_post_reset([&](SharedRealm) {
                         REQUIRE_NOTHROW(advance_and_notify(*object.get_realm()));
+                        CHECK(before_callback_invoctions == 2);
+                        CHECK(after_callback_invocations == 2);
                         // 4 -> 6
                         CHECK(results.size() == 1);
                         CHECK(results.get<Obj>(0).get<Int>("value") == 6);
@@ -363,74 +393,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
         }
 
-        SECTION("notify callbacks") {
-            bool before_was_called = false;
-            bool after_was_called = false;
-            config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
-                before_was_called = true;
-                REQUIRE(local);
-                REQUIRE(local->is_frozen());
-                auto local_table = local->get_table("class_object");
-                REQUIRE(local_table);
-                REQUIRE(local_table->size() == 1);
-                REQUIRE(local_table->begin()->get<Int>("value") == 4);
-
-                REQUIRE(remote);
-                REQUIRE(remote->is_frozen());
-                auto remote_table = remote->get_table("class_object");
-                REQUIRE(remote_table);
-                REQUIRE(remote_table->size() == 1);
-                REQUIRE(remote_table->begin()->get<Int>("value") == 6);
-
-                REQUIRE(util::File::exists(config.path));
-                REQUIRE(util::File::exists(config.path + ".fresh"));
-            };
-            config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
-                after_was_called = true;
-                REQUIRE(local);
-                auto local_table = local->get_table("class_object");
-                REQUIRE(local_table);
-                REQUIRE(local_table->size() == 1);
-                REQUIRE(local_table->begin()->get<Int>("value") == 6);
-            };
-            test_reset
-                ->on_post_local_changes([&](SharedRealm realm) {
-                    setup_listeners(realm);
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                })
-                ->on_post_reset([&](SharedRealm realm) {
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    REQUIRE(before_was_called);
-                    REQUIRE(after_was_called);
-
-                    CHECK(results.size() == 1);
-                    CHECK(results.get<Obj>(0).get<Int>("value") == 6);
-                    CHECK(object.obj().get<Int>("value") == 6);
-                    REQUIRE_INDICES(results_changes.modifications, 0);
-                    REQUIRE_INDICES(results_changes.insertions);
-                    REQUIRE_INDICES(results_changes.deletions);
-                    REQUIRE_INDICES(object_changes.modifications, 0);
-                    REQUIRE_INDICES(object_changes.insertions);
-                    REQUIRE_INDICES(object_changes.deletions);
-
-                    // make sure that the reset operation has cleaned up after itself
-                    REQUIRE(util::File::exists(config.path));
-                    REQUIRE_FALSE(util::File::exists(config.path + ".fresh"));
-                })
-                ->run();
-        }
-
         SECTION("an interrupted reset can recover on the next session") {
             struct SessionInterruption : public std::runtime_error {
                 using std::runtime_error::runtime_error;
-            };
-            bool before_called = false;
-            bool after_called = false;
-            config.sync_config->notify_before_client_reset = [&](TransactionRef, TransactionRef) {
-                before_called = true;
-            };
-            config.sync_config->notify_after_client_reset = [&](TransactionRef) {
-                after_called = true;
             };
             try {
                 test_reset
@@ -440,8 +405,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     ->run();
             }
             catch (const SessionInterruption&) {
-                REQUIRE_FALSE(before_called);
-                REQUIRE_FALSE(after_called);
+                REQUIRE(before_callback_invoctions == 0);
+                REQUIRE(after_callback_invocations == 0);
                 test_reset.reset();
                 auto realm = Realm::get_shared_realm(config);
                 timed_sleeping_wait_for(
@@ -457,8 +422,25 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     },
                     std::chrono::seconds(20));
             }
-            REQUIRE(before_called);
-            REQUIRE(after_called);
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+
+        SECTION("failing to download a fresh copy results in an error") {
+            std::atomic<bool> called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                REQUIRE_FALSE(error.is_client_reset_requested());
+                called = true;
+            };
+            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
+            util::File f(fresh_path, util::File::Mode::mode_Write);
+            f.write("a non empty file");
+            f.sync();
+            f.close();
+
+            REQUIRE(!called);
+            test_reset->run();
+            REQUIRE(called);
         }
 
         SECTION("delete and insert new") {
@@ -933,6 +915,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
+    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
     config.schema = Schema{
         {"object",
          {
@@ -948,10 +931,6 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
-
-    config.cache = false;
-    config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
 
     Results results;
     Object object;

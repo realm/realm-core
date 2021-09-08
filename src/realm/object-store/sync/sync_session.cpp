@@ -466,8 +466,23 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err)
 {
-    // FIXME: handle err
-    // what should happen if the fresh copy is also reset?
+    // The download can fail for many reasons. For example:
+    // - unable to write the fresh copy to the file system
+    // - during download of the fresh copy, the fresh copy itself is reset
+    if (err) {
+        std::string err_msg = "unknown";
+        try {
+            std::rethrow_exception(err);
+        }
+        catch (const std::exception& materialized_err) {
+            err_msg = materialized_err.what();
+        }
+        const bool is_fatal = true;
+        SyncError synthetic(make_error_code(sync::Client::Error::client_reset_failed),
+                            util::format("A fatal error occured during client reset: '%1'", err_msg), is_fatal);
+        handle_error(synthetic);
+        return;
+    }
 
     // Performing a client resync requires tearing down our current
     // sync session and creating a new one with a forced client
@@ -639,6 +654,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
             case ClientError::http_tunnel_failed:
+            case ClientError::client_reset_failed:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.

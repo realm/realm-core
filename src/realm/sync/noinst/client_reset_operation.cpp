@@ -6,25 +6,6 @@
 
 namespace realm::_impl {
 
-struct ResetPathPair {
-    // takes a fresh or local path and distinguishes the two
-    ResetPathPair(std::string path)
-    {
-        const std::string fresh_suffix = ".fresh";
-        const size_t suffix_len = fresh_suffix.size();
-        if (path.size() > suffix_len && path.substr(path.size() - suffix_len, suffix_len) == fresh_suffix) {
-            fresh_path = path;
-            local_path = path.substr(0, path.size() - suffix_len);
-        }
-        else {
-            fresh_path = path + fresh_suffix;
-            local_path = path;
-        }
-    }
-    std::string local_path;
-    std::string fresh_path;
-};
-
 ClientResetOperation::ClientResetOperation(
     util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
     std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
@@ -39,18 +20,19 @@ ClientResetOperation::ClientResetOperation(
     logger.debug("Create ClientStateDownload, realm_path = %1, seamless_loss = %2", m_db.get_path(), seamless_loss);
 }
 
-std::string ClientResetOperation::get_fresh_path_for(const std::string& realm_path)
+std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
 {
-    ResetPathPair paths(realm_path);
-    REALM_ASSERT_EX(paths.fresh_path != realm_path, realm_path);
-    return paths.fresh_path;
+    const std::string fresh_suffix = ".fresh";
+    const size_t suffix_len = fresh_suffix.size();
+    REALM_ASSERT(path.length());
+    REALM_ASSERT_DEBUG_EX(
+        path.size() < suffix_len || path.substr(path.size() - suffix_len, suffix_len) != fresh_suffix, path);
+    return path + fresh_suffix;
 }
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 {
     if (m_seamless_loss) {
-        ResetPathPair paths(m_db.get_path());
-        REALM_ASSERT_EX(m_db.get_path() == paths.local_path, m_db.get_path(), paths.local_path, paths.fresh_path);
         REALM_ASSERT(m_db_fresh);
     }
 

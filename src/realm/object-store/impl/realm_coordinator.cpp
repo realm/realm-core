@@ -99,21 +99,26 @@ void RealmCoordinator::create_sync_session()
         return;
     m_config.sync_config->get_fresh_realm_for_path = [&](const std::string& path,
                                                          std::function<void(DBRef, std::exception_ptr)> callback) {
-        auto task = get_synchronized_realm_at_path(path);
-        task->start([callback, path](ThreadSafeReference realm_ref, std::exception_ptr err) {
-            if (err) {
-                callback(nullptr, std::move(err));
-            }
-            else {
-                SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-                REALM_ASSERT(realm);
-                DBRef db = Realm::Internal::get_db(*realm);
-                std::shared_ptr<RealmCoordinator> rc = RealmCoordinator::get_coordinator(path);
-                rc->m_sync_session->log_out();
-                rc->m_sync_session->close();
-                callback(std::move(db), nullptr);
-            }
-        });
+        try {
+            auto task = get_synchronized_realm_at_path(path);
+            task->start([callback, path](ThreadSafeReference realm_ref, std::exception_ptr err) {
+                if (err) {
+                    callback(nullptr, std::move(err));
+                }
+                else {
+                    SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+                    REALM_ASSERT(realm);
+                    DBRef db = Realm::Internal::get_db(*realm);
+                    std::shared_ptr<RealmCoordinator> rc = RealmCoordinator::get_coordinator(path);
+                    rc->m_sync_session->log_out();
+                    rc->m_sync_session->close();
+                    callback(std::move(db), nullptr);
+                }
+            });
+        }
+        catch (...) {
+            callback(nullptr, std::current_exception());
+        }
     };
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 

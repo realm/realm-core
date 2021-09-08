@@ -478,7 +478,6 @@ struct BaasClientReset : public TestClientReset {
             m_on_post_local(realm);
         }
         wait_for_upload(*realm);
-        //        wait_for_download(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }
