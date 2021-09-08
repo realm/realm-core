@@ -141,7 +141,8 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
     dst->sort(sorted_dst, ascending);
 
     size_t dst_ndx = 0;
-    for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
+    size_t src_ndx = 0;
+    while (src_ndx < sorted_src.size()) {
         if (dst_ndx == sorted_dst.size()) {
             // if we have reached the end of the dst items, all remaining
             // src items should be added
@@ -160,11 +161,13 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
             if (cmp == 0) {
                 // equal: advance both src and dst
                 ++dst_ndx;
+                ++src_ndx;
                 break;
             }
             else if (cmp < 0) {
                 // src < dst: insert src, advance src only
                 to_insert.push_back(ndx_in_src);
+                ++src_ndx;
                 break;
             }
             else {
@@ -202,7 +205,8 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
     dst.sort_keys(sorted_dst, ascending);
 
     size_t dst_ndx = 0;
-    for (size_t src_ndx = 0; src_ndx < sorted_src.size(); ++src_ndx) {
+    size_t src_ndx = 0;
+    while (src_ndx < sorted_src.size()) {
         if (dst_ndx == sorted_dst.size()) {
             // if we have reached the end of the dst items, all remaining
             // src items should be added
@@ -223,17 +227,17 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
             if (cmp == 0) {
                 // equal: advance both src and dst
                 ++dst_ndx;
+                ++src_ndx;
                 break;
             }
             else if (cmp < 0) {
                 // src < dst: insert src, advance src only
-                to_insert.push_back(sorted_src[src_ndx]);
+                to_insert.push_back(sorted_src[src_ndx++]);
                 break;
             }
             else {
                 // src > dst: delete dst, advance only dst
-                to_delete.push_back(sorted_dst[dst_ndx]);
-                ++dst_ndx;
+                to_delete.push_back(sorted_dst[dst_ndx++]);
                 continue;
             }
         }

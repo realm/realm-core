@@ -156,7 +156,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
         FAIL("Error handler should not have been called");
     };
 
