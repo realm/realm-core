@@ -654,7 +654,7 @@ void Realm::check_pending_write_requests()
 {
     if (!m_async_write_q.empty()) {
         // more writes to run later, so re-request the write mutex:
-        m_coordinator->async_request_write_mutex(m_transaction, [&]() {
+        m_coordinator->async_request_write_mutex(m_transaction, [this]() {
             // callback happens on a different thread so...:
             run_writes_on_proper_thread();
         });
@@ -669,7 +669,7 @@ void Realm::end_current_write()
         check_pending_write_requests();
     }
     else {
-        m_transaction->async_request_sync_to_storage([&]() {
+        m_transaction->async_request_sync_to_storage([this]() {
             run_async_completions_on_proper_thread();
         });
     }
@@ -682,8 +682,18 @@ void Realm::run_writes()
         m_async_write_q.clear();
         return;
     }
-    REALM_ASSERT(m_transaction->holds_write_mutex());
+    if (!m_transaction->holds_write_mutex()) {
+        return;
+    }
+
     REALM_ASSERT(!m_transaction->is_synchronizing());
+
+    if (do_run_writes())
+        end_current_write();
+}
+
+bool Realm::do_run_writes()
+{
     m_is_running_async_writes = true;
     int run_limit = 20; // max number of commits without full sync to disk
     // this is tricky
@@ -719,7 +729,7 @@ void Realm::run_writes()
         if (m_notify_only) {
             m_notify_only = false;
             m_is_running_async_writes = false;
-            return;
+            return false;
         }
 
         // if we've run the full transaction, there is follow up work to do:
@@ -739,7 +749,7 @@ void Realm::run_writes()
     m_async_commit_barrier_requested = false;
     m_is_running_async_writes = false;
 
-    end_current_write();
+    return true;
 }
 
 void Realm::async_begin_transaction(const std::function<void()>& the_write_block, bool notify_only)
@@ -757,7 +767,7 @@ void Realm::async_begin_transaction(const std::function<void()>& the_write_block
         REALM_ASSERT(m_scheduler->can_schedule_writes());
         REALM_ASSERT(m_scheduler->can_schedule_completions());
         if (!m_transaction->is_async()) {
-            m_coordinator->async_request_write_mutex(m_transaction, [&] {
+            m_coordinator->async_request_write_mutex(m_transaction, [this] {
                 // callback happens on a different thread so...:
                 run_writes_on_proper_thread();
             });
@@ -777,6 +787,7 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
     // do in-buffer-cache commit_transaction();
     // m_transaction->commit_and_continue_with_lock_held();
     m_async_commit_q.emplace_back(read_lock, std::move(the_done_block));
+    m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
 
     if (m_is_running_async_writes) {
         // we're called from with the callback loop and it will take care of releasing lock
@@ -785,17 +796,15 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
             m_async_commit_barrier_requested = true;
         }
 
-        m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
     }
     else {
         // we're called from outside the callback loop so we have to take care of
         // releasing any lock and of keeping callbacks coming.
-        m_coordinator->commit_write(*this, false);
         if (allow_grouping) {
             run_writes();
         }
         else {
-            m_transaction->async_request_sync_to_storage([&]() {
+            m_transaction->async_request_sync_to_storage([this]() {
                 run_async_completions_on_proper_thread();
             });
         }
@@ -811,7 +820,42 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
     if (is_in_async_transaction()) {
-        throw InvalidTransactionException("Can't begin transaction while an async transaction is ongoing");
+        std::mutex mtx;
+        std::condition_variable cv;
+
+        // Wait until the write mutex is actually acquired
+        while (!m_transaction->holds_write_mutex()) {
+            std::this_thread::yield();
+        }
+
+        // Run all the async handlers with grouping allowed
+        do_run_writes();
+        if (m_async_commit_q.empty()) {
+            // Nothing to commit to disk - just release write lock
+            m_transaction->async_release_write_lock([&] {
+                std::unique_lock<std::mutex> lck(mtx);
+                cv.notify_one();
+            });
+        }
+        else {
+            // Request that the commits are written to disk
+            m_transaction->async_request_sync_to_storage([&]() {
+                std::unique_lock<std::mutex> lck(mtx);
+                cv.notify_one();
+            });
+        }
+        std::unique_lock<std::mutex> lck(mtx);
+        cv.wait(lck);
+
+        // Now the commit has been written to disk - call the completion handlers
+        m_is_running_async_commit_completions = true;
+        for (auto [read_lock, when_completed] : m_async_commit_q) {
+            m_transaction->release_read_lock(read_lock);
+            when_completed();
+        }
+        m_is_running_async_commit_completions = false;
+
+        m_async_commit_q.clear();
     }
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -841,19 +885,31 @@ void Realm::commit_transaction()
 
     if (m_transaction->is_async()) {
         REALM_ASSERT_RELEASE(!m_is_running_async_writes);
-        throw InvalidTransactionException("Can't commit synchronously while in async transaction");
-    }
+        m_coordinator->commit_write(*this, false);
+        std::mutex mtx;
+        std::condition_variable cv;
+        m_transaction->async_request_sync_to_storage([&]() {
+            std::unique_lock<std::mutex> lck(mtx);
+            cv.notify_all();
+        });
 
-    if (auto audit = audit_context()) {
-        auto prev_version = transaction().get_version_of_current_transaction();
-        m_coordinator->commit_write(*this);
-        audit->record_write(prev_version, transaction().get_version_of_current_transaction());
-        // m_shared_group->unpin_version(prev_version);
+        std::unique_lock<std::mutex> lck(mtx);
+        cv.wait(lck);
     }
     else {
-        m_coordinator->commit_write(*this);
+
+        if (auto audit = audit_context()) {
+            auto prev_version = transaction().get_version_of_current_transaction();
+            m_coordinator->commit_write(*this);
+            audit->record_write(prev_version, transaction().get_version_of_current_transaction());
+            // m_shared_group->unpin_version(prev_version);
+        }
+        else {
+            m_coordinator->commit_write(*this);
+        }
     }
     cache_new_schema();
+    check_pending_write_requests();
 }
 
 void Realm::cancel_transaction()

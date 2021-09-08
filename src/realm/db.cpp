@@ -1718,6 +1718,13 @@ public:
         m_changed.notify_one();
     }
 
+    void end_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_mx_release_cb.emplace(std::move(fn));
+        m_changed.notify_one();
+    }
+
     void sync_to_disk(std::function<void()> fn)
     {
         std::unique_lock lg(m_mutex);
@@ -1733,6 +1740,7 @@ private:
     std::condition_variable m_changed;
     std::deque<std::function<void()>> m_pending_writes;
     util::Optional<std::function<void()>> m_pending_sync;
+    util::Optional<std::function<void()>> m_pending_mx_release_cb;
     bool m_pending_mx_release = false;
     bool m_terminated = true;
     bool m_has_write_mutex = false;
@@ -1760,9 +1768,20 @@ void DB::AsyncCommitHelper::main()
                 m_has_write_mutex = false;
                 continue;
             }
+            else if (m_pending_mx_release_cb) {
+                m_db->do_end_write();
+                std::function<void()> cb = m_pending_mx_release_cb.value();
+                m_pending_mx_release_cb.reset();
+                lg.unlock();
+                cb();
+                lg.lock();
+                m_has_write_mutex = false;
+                continue;
+            }
         }
         else {
             // Waiting for write req
+            // std::this_thread::sleep_for (std::chrono::milliseconds(10)); // Enable for testing purposes
             REALM_ASSERT(!m_pending_sync && !m_pending_mx_release);
             if (!m_pending_writes.empty()) {
                 // acquire write mutex
@@ -1793,6 +1812,11 @@ void DB::async_begin_write(std::function<void()> fn)
 void DB::async_end_write()
 {
     m_commit_helper->end_write();
+}
+
+void DB::async_end_write(std::function<void()> fn)
+{
+    m_commit_helper->end_write(fn);
 }
 
 void DB::async_sync_to_disk(std::function<void()> fn)

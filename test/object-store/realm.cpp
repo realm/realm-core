@@ -876,31 +876,46 @@ TEST_CASE("SharedRealm: async_writes") {
         auto table = realm->read_group().get_table("class_object");
         auto col = table->get_column_key("value");
         table->create_object().set(col, 45);
-        REQUIRE_THROWS_WITH(realm->commit_transaction(),
-                            Catch::Matchers::Contains("Can't commit synchronously while in async transaction"));
+        realm->commit_transaction();
     }
-    SECTION("syncronous transaction") {
+    SECTION("syncronous transaction after async transaction with no commit") {
+        realm->async_begin_transaction([&]() {});
+        realm->begin_transaction();
+        auto table = realm->read_group().get_table("class_object");
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 90);
+        realm->commit_transaction();
+    }
+    SECTION("syncronous transaction mixed with async transactions") {
         realm->async_begin_transaction([&]() {
-            REQUIRE(write_nr == 0);
-            ++write_nr;
             auto table = realm->read_group().get_table("class_object");
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
             realm->async_commit_transaction([&]() {
-                REQUIRE(commit_nr == 0);
-                ++commit_nr;
                 done = true;
             });
         });
-        REQUIRE_THROWS_WITH(
-            realm->begin_transaction(),
-            Catch::Matchers::Contains("Can't begin transaction while an async transaction is ongoing"));
+        realm->async_begin_transaction([&]() {
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->async_commit_transaction([&]() {
+                done = true;
+            });
+        });
+        realm->begin_transaction(); // Will execute first async transaction
+        REQUIRE(done);
+        auto table = realm->read_group().get_table("class_object");
+        REQUIRE(table->size() == 1);
+        auto col = table->get_column_key("value");
+        table->create_object().set(col, 90);
+        realm->commit_transaction(); // Will re-initiate async writes
+
+        done = false;
         util::EventLoop::main().run_until([&] {
             return done;
         });
-        REQUIRE(done);
-        realm->begin_transaction(); // Now is ok
-        realm->cancel_transaction();
+        REQUIRE(table->size() == 3);
     }
     SECTION("object change information") {
         realm->begin_transaction();

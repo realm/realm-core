@@ -566,6 +566,7 @@ private:
 
     void async_begin_write(std::function<void()> fn);
     void async_end_write();
+    void async_end_write(std::function<void()> fn);
     void async_sync_to_disk(std::function<void()> fn);
 
     friend class Transaction;
@@ -688,6 +689,13 @@ public:
         REALM_ASSERT(m_async_stage == AsyncState::HasLock);
         m_async_stage = AsyncState::Idle;
         get_db()->async_end_write();
+    }
+
+    void async_release_write_lock(std::function<void()> fn)
+    {
+        REALM_ASSERT(m_async_stage == AsyncState::HasLock);
+        m_async_stage = AsyncState::Idle;
+        get_db()->async_end_write(fn);
     }
 
     // true if sync to disk has been requested
