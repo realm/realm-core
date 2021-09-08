@@ -2,16 +2,41 @@
 
 ### Enhancements
 * Add a "seamless loss" mode to client reset where local changes are overwritten by the server's state without having to handle the reset manually. ([#4809](https://github.com/realm/realm-core/pull/4809))
-* ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query.
-* A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
-* Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
-
+* None.
+ 
 ### Breaking changes
 * None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 11.4.1 Release notes
+
+### Fixed
+* Fixed issue when opening a synced realm is prevented by assertion "m_state == SyncUser::State::LoggedIn". ([#4875](https://github.com/realm/realm-core/issues/4875))
+* Fixed slow teardown of Realm by immediately freeing shared pointers to scheduler on realm closure ([realm/realm-js#3620](https://github.com/realm/realm-js/issues/3620), [realm/realm-js#2993](https://github.com/realm/realm-js/issues/2993))
+ 
+----------------------------------------------
+
+# 11.4.0 Release notes
+
+### Enhancements
+* ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query. ([#4857](https://github.com/realm/realm-core/pull/4857))
+* A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
+* Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
+* A method Obj::get_any(StringData) has been added.
+
+### Fixed
+* Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
+* If an object with a null primary key was deleted by another sync client, the exception `KeyNotFound: No such object` could be triggered. ([#4885](https://github.com/realm/realm-core/issues/4885) since unresolved links were introduced in v10.0.0)
+* Fix a nonexistent file warning when building with Swift Package Manager (since 11.3.1).
 
 -----------
 

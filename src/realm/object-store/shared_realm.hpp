@@ -187,7 +187,7 @@ public:
         // called with the supplied schema, version and migration function when
         // the Realm is actually opened and not just retrieved from the cache
         util::Optional<Schema> schema;
-        uint64_t schema_version = -1;
+        uint64_t schema_version = uint64_t(-1);
         MigrationFunction migration_function;
 
         DataInitializationFunction initialization_function;
