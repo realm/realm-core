@@ -68,9 +68,6 @@ public:
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-
-    std::shared_ptr<AsyncOpenTask> get_synchronized_realm_at_path(std::string path)
-        REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
     // Creates the underlying sync session if it doesn't already exists.
     // This is also created as part of opening a Realm, so only use this
     // method if the session needs to exist before the Realm does.

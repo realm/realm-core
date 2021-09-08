@@ -100,7 +100,20 @@ void RealmCoordinator::create_sync_session()
     m_config.sync_config->get_fresh_realm_for_path = [&](const std::string& path,
                                                          std::function<void(DBRef, std::exception_ptr)> callback) {
         try {
-            auto task = get_synchronized_realm_at_path(path);
+            // Get a fully downloaded Realm using the current configuration but changing the
+            // on disk path to the one provided. The current sync session is not affected.
+            REALM_ASSERT(!path.empty());
+            REALM_ASSERT(path != m_config.path);
+            REALM_ASSERT(m_config.sync_config);
+            auto copy_config = m_config;
+            copy_config.path = path;
+            // Do not use seamless loss mode on the fresh Realm. Use manual mode so that
+            // any error during the download is propagated back to the original session.
+            // This prevents a cycle if the fresh copy itself experiences a client reset.
+            copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+            std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
+            REALM_ASSERT(rc);
+            auto task = rc->get_synchronized_realm(copy_config);
             task->start([callback, path](ThreadSafeReference realm_ref, std::exception_ptr err) {
                 if (err) {
                     callback(nullptr, std::move(err));
@@ -362,18 +375,6 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     set_config(config);
     create_sync_session();
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
-}
-
-std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm_at_path(std::string path)
-{
-    if (!m_config.sync_config)
-        throw std::logic_error("This method is only available for fully synchronized Realms.");
-    auto copy_config = m_config;
-    copy_config.path = path;
-    copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-    std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
-    REALM_ASSERT(rc);
-    return rc->get_synchronized_realm(copy_config);
 }
 
 void RealmCoordinator::create_session(const Realm::Config& config)
