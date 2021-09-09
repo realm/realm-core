@@ -1969,7 +1969,7 @@ typedef struct realm_http_response {
     size_t body_size;
 } realm_http_response_t;
 
-typedef void (*realm_http_completion_func_t)(void* userdata, const realm_http_response_t);
+typedef void (*realm_http_completion_func_t)(void* userdata, realm_http_response_t *response);
 typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_http_request_t, void* completion_data,
                                           realm_http_completion_func_t completion_callback);
 

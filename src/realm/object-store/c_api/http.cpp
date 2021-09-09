@@ -52,7 +52,7 @@ protected:
     void send_request_to_server(const Request request,
                                 std::function<void(const Response)> completion_block) override final
     {
-        auto* completion_data = new std::function<void(const Response)>(std::move(completion_block));
+        auto* completion_data = new std::function<void(const Response&)>(std::move(completion_block));
 
         std::vector<realm_http_header_t> c_headers;
         for (auto& header : request.headers) {
@@ -66,17 +66,17 @@ protected:
     }
 
 private:
-    static void on_response_completed(void* completion_data, const realm_http_response_t response)
+    static void on_response_completed(void* completion_data, realm_http_response_t *response)
     {
         auto& completion = *reinterpret_cast<std::function<void(const Response)>*>(completion_data);
 
         std::map<std::string, std::string> headers;
-        for (size_t i = 0; i < response.num_headers; i++) {
-            headers.emplace(std::string(response.headers[i].name), std::string(response.headers[i].value));
+        for (size_t i = 0; i < response->num_headers; i++) {
+            headers.emplace(std::string(response->headers[i].name), std::string(response->headers[i].value));
         }
 
-        completion({response.status_code, response.custom_status_code, std::move(headers),
-                    std::string(response.body, response.body_size)});
+        completion({response->status_code, response->custom_status_code, std::move(headers),
+                    std::string(response->body, response->body_size)});
         delete &completion;
     }
 
