@@ -68,7 +68,7 @@ protected:
 private:
     static void on_response_completed(void* completion_data, const realm_http_response_t response)
     {
-        auto& completion = reinterpret_cast<std::function<void(const Response)>&>(completion_data);
+        auto& completion = *reinterpret_cast<std::function<void(const Response)>*>(completion_data);
 
         std::map<std::string, std::string> headers;
         for (size_t i = 0; i < response.num_headers; i++) {
