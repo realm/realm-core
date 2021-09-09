@@ -528,9 +528,6 @@ void SyncSession::handle_error(SyncError error)
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
-            case ClientResyncMode::DiscardLocal:
-                handle_fresh_realm_downloaded(nullptr, nullptr);
-                return;
             case ClientResyncMode::SeamlessLoss: {
                 REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                 std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());

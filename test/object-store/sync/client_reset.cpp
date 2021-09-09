@@ -145,109 +145,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
         });
     }
 
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
         FAIL("Error handler should not have been called");
     };
-
-    SECTION("should discard local changeset when mode is discard") {
-        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
-        make_reset()
-            ->on_post_reset([&](SharedRealm realm) {
-                REQUIRE_THROWS(realm->refresh());
-                CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") ==
-                      4);
-                realm->close();
-                SharedRealm r_after;
-                REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
-                CHECK(
-                    ObjectStore::table_for_object_type(r_after->read_group(), "object")->begin()->get<Int>("value") ==
-                    6);
-            })
-            ->run();
-    }
-
-    SECTION("should honor encryption key for downloaded Realm") {
-        config.encryption_key.resize(64, 'a');
-        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
-        make_reset()
-            ->on_post_reset([&](SharedRealm realm) {
-                realm->close();
-                SharedRealm r_after;
-                REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
-                CHECK(
-                    ObjectStore::table_for_object_type(r_after->read_group(), "object")->begin()->get<Int>("value") ==
-                    6);
-            })
-            ->run();
-    }
-
-    SECTION("add table in discarded transaction") {
-        make_reset()
-            ->setup([&](SharedRealm realm) {
-                auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-                REQUIRE(!table);
-            })
-            ->make_local_changes([&](SharedRealm realm) {
-                realm->update_schema(
-                    {
-                        {"object2",
-                         {
-                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                             {"value2", PropertyType::Int},
-                             {"realm_id", PropertyType::String | PropertyType::Nullable},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                create_object(*realm, "object2", partition);
-            })
-            ->on_post_reset([&](SharedRealm realm) {
-                // test local realm that changes were persisted
-                REQUIRE_THROWS(realm->refresh());
-                auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-                REQUIRE(table);
-                REQUIRE(table->size() == 1);
-                // test reset realm that changes were overwritten
-                realm = Realm::get_shared_realm(config);
-                table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-                REQUIRE(!table);
-            })
-            ->run();
-    }
-
-    SECTION("add column in discarded transaction") {
-        make_reset()
-            ->make_local_changes([](SharedRealm realm) {
-                realm->update_schema(
-                    {
-                        {"object",
-                         {
-                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                             {"value2", PropertyType::Int},
-                             {"realm_id", PropertyType::String | PropertyType::Nullable},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->set("value2", 123);
-            })
-            ->on_post_reset([&](SharedRealm realm) {
-                // test local realm that changes were persisted
-                REQUIRE_THROWS(realm->refresh());
-                auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-                REQUIRE(table->get_column_count() == 4);
-                REQUIRE(table->begin()->get<Int>("value2") == 123);
-                REQUIRE_THROWS(realm->refresh());
-                // test resync'd realm that changes were overwritten
-                realm = Realm::get_shared_realm(config);
-                table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-                REQUIRE(table);
-                REQUIRE(table->get_column_count() == 3);
-                REQUIRE(!bool(table->get_column_key("value2")));
-            })
-            ->run();
-    }
 
     SECTION("seamless loss") {
         config.cache = false;
@@ -429,6 +329,21 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(!called);
             test_reset->run();
             REQUIRE(called);
+        }
+
+        SECTION("should honor encryption key for downloaded Realm") {
+            config.encryption_key.resize(64, 'a');
+
+            make_reset()
+                ->on_post_reset([&](SharedRealm realm) {
+                    realm->close();
+                    SharedRealm r_after;
+                    REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
+                    CHECK(ObjectStore::table_for_object_type(r_after->read_group(), "object")
+                              ->begin()
+                              ->get<Int>("value") == 6);
+                })
+                ->run();
         }
 
         SECTION("delete and insert new") {

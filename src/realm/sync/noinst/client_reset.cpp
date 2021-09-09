@@ -262,18 +262,6 @@ bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
 
 } // namespace
 
-void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
-{
-    logger.debug("remove_all_tables, dst size = %1", tr_dst.size());
-    // Remove the tables to be removed.
-    for (auto table_key : tr_dst.get_table_keys()) {
-        if (tr_dst.table_is_public(table_key)) {
-            TableRef table = tr_dst.get_table(table_key);
-            sync::erase_table(tr_dst, table);
-        }
-    }
-}
-
 void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     logger.debug("copy_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
@@ -690,8 +678,10 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
 {
     logger.info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
-                "client_file_ident.salt = %3,",
-                db_local.get_path(), client_file_ident.ident, client_file_ident.salt);
+                "client_file_ident.salt = %3,"
+                "remote = %4,",
+                db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
+                (db_remote ? db_remote->get_path() : "<none>"));
 
     auto& history_local = dynamic_cast<ClientHistoryImpl&>(*db_local.get_replication());
 
@@ -710,9 +700,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     BinaryData recovered_changeset;
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    // changes made here are reflected in the notifier logs
     if (db_remote) { // seamless_loss mode
-        REALM_ASSERT(db_remote);
         auto& history_remote = dynamic_cast<ClientHistoryImpl&>(*db_remote->get_replication());
         auto wt_remote = db_remote->start_write();
         sync::version_type current_version_remote = wt_remote->get_version();
@@ -740,9 +728,6 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
         //            log.print();
         //        }
 #endif
-    }
-    else { // manual discard mode
-        remove_all_tables(*group_local, logger);
     }
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                recovered_changeset);

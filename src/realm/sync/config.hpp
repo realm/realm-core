@@ -82,12 +82,10 @@ struct SyncError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ClientResyncMode : unsigned char {
-    // Enable automatic client resync without local transaction recovery
-    DiscardLocal = 1,
     // Fire a client reset error
-    Manual = 2,
+    Manual = 1,
     // Discard local changes, without disrupting accessors or closing the Realm
-    SeamlessLoss = 3,
+    SeamlessLoss = 2,
 };
 
 enum class ReconnectMode {
