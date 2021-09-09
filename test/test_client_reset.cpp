@@ -43,9 +43,8 @@ TEST(ClientReset_NoLocalChanges)
         Session session = fixture.make_bound_session(sg, server_path);
 
         WriteTransaction wt{sg};
-        TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
-        table->create_object().set_all(123);
+        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int_pk");
+        table->create_object_with_primary_key(int64_t(123));
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
     }
@@ -73,7 +72,7 @@ TEST(ClientReset_NoLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
-        table->create_object().set_all(456);
+        table->create_object_with_primary_key(int64_t(456));
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
 
@@ -88,7 +87,7 @@ TEST(ClientReset_NoLocalChanges)
         ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
-        auto col = table->get_column_key("int");
+        auto col = table->get_primary_key_column();
         CHECK(table);
         CHECK_EQUAL(table->size(), 2);
         CHECK(table->find_first_int(col, 123));
@@ -119,6 +118,15 @@ TEST(ClientReset_NoLocalChanges)
             bowl.get_stone();
         }
 
+        // get a fresh copy from the server to reset against
+        SHARED_GROUP_TEST_PATH(path_fresh);
+        {
+            Session session_fresh = fixture.make_session(path_fresh);
+            fixture.bind_session(session_fresh, server_path);
+            session_fresh.wait_for_download_complete_or_client_stopped();
+        }
+        DBRef sg_fresh = DB::create(make_client_replication(path_fresh));
+
         // The session that performs client reset.
         // The Realm will be opened by a user while the reset takes place.
         {
@@ -141,9 +149,11 @@ TEST(ClientReset_NoLocalChanges)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                session_config.client_reset_config = client_reset_config;
+                client_reset_config.seamless_loss = true;
+                client_reset_config.fresh_copy = std::move(sg_fresh);
+                session_config.client_reset_config = std::move(client_reset_config);
             }
-            Session session = fixture.make_session(sg, session_config);
+            Session session = fixture.make_session(sg, std::move(session_config));
             session.set_sync_transact_callback(std::move(sync_transact_callback));
             fixture.bind_session(session, server_path);
             session.wait_for_download_complete_or_client_stopped();
@@ -157,7 +167,7 @@ TEST(ClientReset_NoLocalChanges)
         ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
-        auto col = table->get_column_key("int");
+        auto col = table->get_primary_key_column();
         CHECK(table);
         CHECK_EQUAL(table->size(), 1);
         CHECK_EQUAL(table->begin()->get<Int>(col), 123);
@@ -183,9 +193,8 @@ TEST(ClientReset_InitialLocalChanges)
         DBRef sg = DB::create(make_client_replication(path_1));
 
         WriteTransaction wt{sg};
-        TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
-        table->create_object().set_all(123);
+        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int");
+        table->create_object_with_primary_key(int64_t(123));
         session_1.nonsync_transact_notify(wt.commit());
     }
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -195,19 +204,29 @@ TEST(ClientReset_InitialLocalChanges)
         DBRef sg = DB::create(make_client_replication(path_2));
 
         WriteTransaction wt{sg};
-        TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
-        table->create_object().set_all(456);
+        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int");
+        table->create_object_with_primary_key(int64_t(456));
         wt.commit();
     }
+
+    // get a fresh copy from the server to reset against
+    SHARED_GROUP_TEST_PATH(path_fresh);
+    {
+        Session session_fresh = fixture.make_session(path_fresh);
+        fixture.bind_session(session_fresh, server_path);
+        session_fresh.wait_for_download_complete_or_client_stopped();
+    }
+    DBRef sg_fresh = DB::create(make_client_replication(path_fresh));
 
     // Start a client reset. There is no need for a reset, but we can do it.
     Session::Config session_config_2;
     {
         Session::Config::ClientReset client_reset_config;
-        session_config_2.client_reset_config = client_reset_config;
+        client_reset_config.seamless_loss = true;
+        client_reset_config.fresh_copy = std::move(sg_fresh);
+        session_config_2.client_reset_config = std::move(client_reset_config);
     }
-    Session session_2 = fixture.make_session(path_2, session_config_2);
+    Session session_2 = fixture.make_session(path_2, std::move(session_config_2));
     fixture.bind_session(session_2, server_path);
     session_2.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
@@ -239,8 +258,7 @@ TEST(ClientReset_InitialLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
-        auto col = table->get_column_key("int");
-        table->create_object().set(col, 1000);
+        table->create_object_with_primary_key(int64_t(1000));
         session_1.nonsync_transact_notify(wt.commit());
     }
     // Make more changes in path_2.
@@ -249,8 +267,7 @@ TEST(ClientReset_InitialLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
-        auto col = table->get_column_key("int");
-        table->create_object().set(col, 2000);
+        table->create_object_with_primary_key(int64_t(2000));
         session_2.nonsync_transact_notify(wt.commit());
     }
     session_1.wait_for_upload_complete_or_client_stopped();
@@ -372,7 +389,7 @@ TEST(ClientReset_ThreeClients)
     std::string real_path_1, real_path_2;
 
     auto create_schema = [&](Transaction& group) {
-        TableRef table_0 = create_table(group, "class_table_0");
+        TableRef table_0 = create_table_with_primary_key(group, "class_table_0", type_Int, "pk_int");
         table_0->add_column(type_Int, "int");
         table_0->add_column(type_Bool, "bool");
         table_0->add_column(type_Float, "float");
@@ -445,7 +462,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{db_1};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            table_0->create_object().set_all(111, true);
+            table_0->create_object_with_primary_key(int64_t(0)).set_all(111, true);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
@@ -463,7 +480,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{db_2};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            table->create_object().set_all(222, false);
+            table->create_object_with_primary_key(int64_t(1)).set_all(222, false);
             wt.commit();
         }
 
@@ -487,7 +504,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            table_0->create_object().set_all(333);
+            table_0->create_object_with_primary_key(int64_t(3)).set_all(333);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
@@ -506,7 +523,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
-            table_0->create_object().set_all(444);
+            table_0->create_object_with_primary_key(int64_t(4)).set_all(444);
 
             TableRef table_2 = wt.get_table("class_table_2");
             CHECK(table_2);
@@ -541,21 +558,42 @@ TEST(ClientReset_ThreeClients)
             bowl.get_stone();
         }
 
+        // get a fresh copy from the server to reset against
+        SHARED_GROUP_TEST_PATH(path_fresh1);
+        SHARED_GROUP_TEST_PATH(path_fresh2);
+        {
+            Session session4 = fixture.make_session(path_fresh1);
+            fixture.bind_session(session4, server_path);
+            session4.wait_for_download_complete_or_client_stopped();
+        }
+        DBRef sg_fresh1 = DB::create(make_client_replication(path_fresh1));
+
+        {
+            Session session4 = fixture.make_session(path_fresh2);
+            fixture.bind_session(session4, server_path);
+            session4.wait_for_download_complete_or_client_stopped();
+        }
+        DBRef sg_fresh2 = DB::create(make_client_replication(path_fresh2));
+
         // Perform client resets on the two clients.
         {
             Session::Config session_config_1;
             {
                 Session::Config::ClientReset client_reset_config;
-                session_config_1.client_reset_config = client_reset_config;
+                client_reset_config.seamless_loss = true;
+                client_reset_config.fresh_copy = std::move(sg_fresh1);
+                session_config_1.client_reset_config = std::move(client_reset_config);
             }
             Session::Config session_config_2;
             {
                 Session::Config::ClientReset client_reset_config;
-                session_config_2.client_reset_config = client_reset_config;
+                client_reset_config.seamless_loss = true;
+                client_reset_config.fresh_copy = std::move(sg_fresh2);
+                session_config_2.client_reset_config = std::move(client_reset_config);
             }
-            Session session_1 = fixture.make_session(path_1, session_config_1);
+            Session session_1 = fixture.make_session(path_1, std::move(session_config_1));
             fixture.bind_session(session_1, server_path);
-            Session session_2 = fixture.make_session(path_2, session_config_2);
+            Session session_2 = fixture.make_session(path_2, std::move(session_config_2));
             fixture.bind_session(session_2, server_path);
 
             session_1.wait_for_download_complete_or_client_stopped();
@@ -568,7 +606,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            table->create_object().set_all(555);
+            table->create_object_with_primary_key(int64_t(5)).set_all(555);
             wt.commit();
         }
         {
@@ -576,7 +614,7 @@ TEST(ClientReset_ThreeClients)
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
-            table->create_object().set_all(666);
+            table->create_object_with_primary_key(int64_t(6)).set_all(666);
             wt.commit();
         }
 
@@ -621,7 +659,7 @@ TEST(ClientReset_ThreeClients)
     }
 }
 
-TEST(ClientReset_DoNotRecoverSchemaV1)
+TEST(ClientReset_DoNotRecoverSchema)
 {
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
@@ -639,22 +677,40 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
         DBRef sg = DB::create(make_client_replication(path_1));
         WriteTransaction wt{sg};
         std::string table_name = "class_table";
-        TableRef table = create_table(wt, table_name);
-        auto col_key = table->add_column(type_Float, "float");
-        table->create_object().set(col_key, 123.456f);
+        TableRef table = create_table_with_primary_key(wt, table_name, type_Int, "int_pk");
+        table->create_object_with_primary_key(int64_t(123));
         wt.commit();
         Session session = fixture.make_bound_session(sg, server_path_1);
         session.wait_for_upload_complete_or_client_stopped();
     }
+
+    // get a fresh copy from the server to reset against
+    SHARED_GROUP_TEST_PATH(path_fresh1);
+    SHARED_GROUP_TEST_PATH(path_fresh2);
+    {
+        Session session_fresh = fixture.make_session(path_fresh1);
+        fixture.bind_session(session_fresh, server_path_2);
+        session_fresh.wait_for_download_complete_or_client_stopped();
+    }
+    DBRef sg_fresh1 = DB::create(make_client_replication(path_fresh1));
+
+    {
+        Session session_fresh = fixture.make_session(path_fresh2);
+        fixture.bind_session(session_fresh, server_path_2);
+        session_fresh.wait_for_download_complete_or_client_stopped();
+    }
+    DBRef sg_fresh2 = DB::create(make_client_replication(path_fresh2));
 
     // Perform client reset for path_1 against server_path_2.
     {
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            session_config.client_reset_config = client_reset_config;
+            client_reset_config.seamless_loss = true;
+            client_reset_config.fresh_copy = std::move(sg_fresh1);
+            session_config.client_reset_config = std::move(client_reset_config);
         }
-        Session session = fixture.make_session(path_1, session_config);
+        Session session = fixture.make_session(path_1, std::move(session_config));
         fixture.bind_session(session, server_path_2);
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -664,9 +720,11 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            session_config.client_reset_config = client_reset_config;
+            client_reset_config.seamless_loss = true;
+            client_reset_config.fresh_copy = std::move(sg_fresh2);
+            session_config.client_reset_config = std::move(client_reset_config);
         }
-        Session session = fixture.make_session(path_2, session_config);
+        Session session = fixture.make_session(path_2, std::move(session_config));
         fixture.bind_session(session, server_path_2);
         session.wait_for_download_complete_or_client_stopped();
     }
@@ -695,72 +753,6 @@ TEST(ClientReset_DoNotRecoverSchemaV1)
         CHECK_EQUAL(group.size(), 0);
     }
 }
-
-TEST(ClientReset_DoNotRecoverSchema)
-{
-    // Same as above - except that the schema should not be recovered.
-    TEST_DIR(dir);
-    SHARED_GROUP_TEST_PATH(path_1);
-    SHARED_GROUP_TEST_PATH(path_2);
-
-    const std::string server_path_1 = "/data_1";
-    const std::string server_path_2 = "/data_2";
-
-    ClientServerFixture fixture(dir, test_context);
-    fixture.start();
-
-    // Insert data into path_1 and upload it.
-    {
-        DBRef db = DB::create(make_client_replication(path_1));
-        WriteTransaction wt{db};
-        std::string table_name = "class_table";
-        TableRef table = create_table(wt, table_name);
-        auto col_key = table->add_column(type_Float, "float");
-        table->create_object().set(col_key, 123.456f);
-        wt.commit();
-        Session session = fixture.make_bound_session(db, server_path_1);
-        session.wait_for_upload_complete_or_client_stopped();
-    }
-
-    // Perform client reset for path_1 against server_path_2.
-    {
-        Session::Config session_config;
-        {
-            Session::Config::ClientReset client_reset_config;
-            session_config.client_reset_config = client_reset_config;
-        }
-        Session session = fixture.make_session(path_1, session_config);
-        fixture.bind_session(session, server_path_2);
-        session.wait_for_download_complete_or_client_stopped();
-        // Now the tables in the path1 realm should be removed
-    }
-
-    // Perform async open for path_2 against server_path_2.
-    {
-        Session::Config session_config;
-        {
-            Session::Config::ClientReset client_reset_config;
-            session_config.client_reset_config = client_reset_config;
-        }
-        Session session = fixture.make_session(path_2, session_config);
-        fixture.bind_session(session, server_path_2);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    // Verify convergence and content.
-    {
-        DBRef sg_1 = DB::create(make_client_replication(path_1));
-        DBRef sg_2 = DB::create(make_client_replication(path_2));
-
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
-        CHECK(compare_groups(rt_1, rt_2));
-
-        const Group& group = rt_1.get_group();
-        CHECK_EQUAL(group.size(), 0);
-    }
-}
-
 
 TEST(ClientReset_PinnedVersion)
 {
