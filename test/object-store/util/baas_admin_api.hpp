@@ -193,12 +193,6 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
 // Get an App config suitable for integration testing against BaaS
 app::App::Config get_integration_config();
 
-template <typename Transport>
-std::unique_ptr<app::GenericNetworkTransport> factory()
-{
-    return std::unique_ptr<app::GenericNetworkTransport>(new Transport);
-}
-
 } // namespace realm
 
 #endif // REALM_ENABLE_AUTH_TESTS
