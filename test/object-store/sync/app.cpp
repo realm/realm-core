@@ -112,60 +112,10 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
     return *err;
 }
 
-template <typename Transport>
-std::unique_ptr<GenericNetworkTransport> factory()
-{
-    return std::unique_ptr<GenericNetworkTransport>(new Transport);
-}
 } // namespace
 
 
 #if REALM_ENABLE_AUTH_TESTS
-
-namespace {
-
-// This will create a new test app in the baas server at base_url
-// to be used in tests throughout this file.
-AppSession get_runtime_app_session(std::string base_url)
-{
-    static const AppSession cached_app_session = [&] {
-        auto cached_app_session = create_app(default_app_config(base_url));
-        return cached_app_session;
-    }();
-    return cached_app_session;
-}
-
-class SynchronousTestTransport : public GenericNetworkTransport {
-public:
-    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
-    {
-        completion_block(do_http_request(request));
-    }
-};
-
-template <typename Factory>
-App::Config get_config(Factory factory, const AppSession& app_session)
-{
-    return {app_session.client_app_id,
-            factory,
-            app_session.admin_api.base_url(),
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
-// Get an App config suitable for integration testing against BaaS
-App::Config get_integration_config()
-{
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto app_session = get_runtime_app_session(base_url);
-    return get_config(factory<SynchronousTestTransport>, app_session);
-}
-} // namespace
 
 // MARK: - Login with Credentials Tests
 

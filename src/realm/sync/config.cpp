@@ -67,8 +67,8 @@ bool SyncError::is_client_reset_requested() const
             error_code == ProtocolError::invalid_schema_change ||
             error_code == ProtocolError::server_file_deleted ||
             error_code == ProtocolError::user_blacklisted);
+    // clang-format on
 }
-// clang-format on
 
 SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
     : user(std::move(user))

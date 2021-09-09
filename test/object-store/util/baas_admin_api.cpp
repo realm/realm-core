@@ -917,6 +917,24 @@ AppSession create_app(const AppCreateConfig& config)
     return {client_app_id, app_id, session, config};
 }
 
+app::App::Config get_integration_config()
+{
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto app_session = get_runtime_app_session(base_url);
+    return get_config(factory<SynchronousTestTransport>, app_session);
+}
+
+AppSession get_runtime_app_session(std::string base_url)
+{
+    static const AppSession cached_app_session = [&] {
+        auto cached_app_session = create_app(default_app_config(base_url));
+        return cached_app_session;
+    }();
+    return cached_app_session;
+}
+
+
 #ifdef REALM_MONGODB_ENDPOINT
 TEST_CASE("app: baas admin api", "[sync][app]") {
     std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);

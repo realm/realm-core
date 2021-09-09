@@ -27,13 +27,11 @@
 #include <realm/object-store/schema.hpp>
 
 #include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
 #include "util/test_utils.hpp"
 
 #include <realm/util/time.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <fstream>

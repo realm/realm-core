@@ -163,7 +163,7 @@ struct AppSession {
 };
 AppSession create_app(const AppCreateConfig& config);
 
-class IntTestTransport : public app::GenericNetworkTransport {
+class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
     void send_request_to_server(const app::Request request,
                                 std::function<void(const app::Response)> completion_block) override
@@ -171,6 +171,33 @@ public:
         completion_block(do_http_request(request));
     }
 };
+
+// This will create a new test app in the baas server at base_url
+// to be used in tests.
+AppSession get_runtime_app_session(std::string base_url);
+
+template <typename Factory>
+inline app::App::Config get_config(Factory factory, const AppSession& app_session)
+{
+    return {app_session.client_app_id,
+            factory,
+            app_session.admin_api.base_url(),
+            util::none,
+            util::Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"};
+}
+
+// Get an App config suitable for integration testing against BaaS
+app::App::Config get_integration_config();
+
+template <typename Transport>
+std::unique_ptr<app::GenericNetworkTransport> factory()
+{
+    return std::unique_ptr<app::GenericNetworkTransport>(new Transport);
+}
 
 } // namespace realm
 

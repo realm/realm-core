@@ -41,7 +41,6 @@
 #include <iostream>
 
 namespace realm {
-
 struct PartitionPair {
     std::string property_name;
     std::string value;
@@ -67,24 +66,26 @@ TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
 
+    const PartitionPair partition{"realm_id", "foo"};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
         {"object",
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
-             {"realm_id", PropertyType::String | PropertyType::Nullable},
+             partition_prop,
          }},
         {"link target",
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
-             {"realm_id", PropertyType::String | PropertyType::Nullable},
+             partition_prop,
          }},
         {"pk link target",
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
-             {"realm_id", PropertyType::String | PropertyType::Nullable},
+             partition_prop,
          }},
         {"link origin",
          {
@@ -93,29 +94,16 @@ TEST_CASE("sync: client reset", "[client reset]") {
              {"pk link", PropertyType::Object | PropertyType::Nullable, "pk link target"},
              {"list", PropertyType::Object | PropertyType::Array, "link target"},
              {"pk list", PropertyType::Object | PropertyType::Array, "pk link target"},
-             {"realm_id", PropertyType::String | PropertyType::Nullable},
+             partition_prop,
          }},
     };
-    const PartitionPair partition{"realm_id", "foo"};
 #if REALM_ENABLE_AUTH_TESTS
-    std::unique_ptr<app::GenericNetworkTransport> (*factory)() = [] {
-        return std::unique_ptr<app::GenericNetworkTransport>(new IntTestTransport);
-    };
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
-    AppCreateConfig app_create_config = default_app_config(base_url);
-    app_create_config.schema = schema;
-    AppSession app_session = create_app(app_create_config);
-
-    auto app_config = app::App::Config{app_session.client_app_id,
-                                       factory,
-                                       base_url,
-                                       util::none,
-                                       util::Optional<std::string>("A Local App Version"),
-                                       util::none,
-                                       "Object Store Platform Tests",
-                                       "Object Store Platform Version Blah",
-                                       "An sdk version"};
+    auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    AppSession app_session = create_app(server_app_config);
+    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
 
     TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
     auto app = sync_manager.app();

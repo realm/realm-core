@@ -502,10 +502,9 @@ public:
         /// reset exactly as in a DOWNLOAD message.
         ///
         /// Client reset downloads its fresh Realm copy for a Realm
-        /// at path "xyx.realm" to "xyz.realm.fresh". There is state within
-        /// the fresh copy to denote that the download is completed such
-        /// that if the client is stopped during download of the fresh copy,
-        /// if may continue on the next session.
+        /// at path "xyx.realm" to "xyz.realm.fresh". It is assumed that
+        /// this path is available for use and if there are any problems
+        /// the client reset will fail with Client::Error::client_reset_failed.
         ///
         /// The recommended usage of client reset is after a previous session
         /// encountered an error that implies the need for a client reset. It
