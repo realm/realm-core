@@ -1778,24 +1778,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 }
 
 TEST_CASE("app: make distributable client file", "[sync][app]") {
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
-        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-    };
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto app_session = get_runtime_app_session(base_url);
-
-    auto app_id = app_session.client_app_id;
-    auto config = App::Config{app_id,
-                              factory,
-                              base_url,
-                              util::none,
-                              Optional<std::string>("A Local App Version"),
-                              util::none,
-                              "Object Store Platform Tests",
-                              "Object Store Platform Version Blah",
-                              "An sdk version"};
-
+    auto config = get_integration_config();
     auto base_path = util::make_temp_dir();
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
@@ -1816,10 +1799,6 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
 
         realm::Realm::Config realm_config;
         realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cerr << error.message << std::endl;
-        };
         realm_config.schema_version = 1;
         realm_config.path = base_path + "/orig/default.realm";
 
@@ -1874,10 +1853,6 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
 
         realm::Realm::Config realm_config;
         realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cerr << error.message << std::endl;
-        };
         realm_config.schema_version = 1;
         realm_config.path = base_path + "/copy/default.realm";
 
