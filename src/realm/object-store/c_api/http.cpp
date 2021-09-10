@@ -52,7 +52,7 @@ protected:
     void send_request_to_server(const Request request,
                                 std::function<void(const Response)> completion_block) override final
     {
-        auto* completion_data = new std::function<void(const Response&)>(std::move(completion_block));
+        auto* completion_data = new std::function<void(const Response)>(std::move(completion_block));
 
         std::vector<realm_http_header_t> c_headers;
         for (auto& header : request.headers) {
