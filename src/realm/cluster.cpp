@@ -272,6 +272,24 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
     }
 }
 
+inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_value, ObjKey origin_key)
+{
+    ArrayMixed arr(m_alloc);
+    arr.set_parent(this, col_key.get_index().val + s_first_col_index);
+    arr.init_from_parent();
+    arr.insert(ndx, init_value);
+
+    // Insert backlink if needed
+    if (init_value.is_type(type_TypedLink)) {
+        ObjLink link = init_value.get<ObjLink>();
+        Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
+        auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
+
+        ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
+        target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
+    }
+}
+
 inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, ObjKey origin_key)
 {
     ObjLink target_link = init_val.is_null() ? ObjLink{} : init_val.get<ObjLink>();
@@ -350,10 +368,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 do_insert_row<ArrayBinary>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Mixed: {
-                ArrayMixed arr(m_alloc);
-                arr.set_parent(this, col_key.get_index().val + s_first_col_index);
-                arr.init_from_parent();
-                arr.insert(ndx, init_value);
+                do_insert_mixed(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
             }
             case col_type_Timestamp:
