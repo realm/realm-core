@@ -125,21 +125,7 @@ jobWrapper {
 
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker(buildOptions),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
-            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
-            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
-            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
-            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
-            checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
-            checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
+            checkAndroidx86Release  : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
             // FIXME: disabled due to issues with CI
 	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
@@ -150,7 +136,7 @@ jobWrapper {
                 checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
                 checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
                 // FIXME: https://github.com/realm/realm-core/issues/4159
-                //checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
+                checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
                 // FIXME: https://github.com/realm/realm-core/issues/4162
                 //coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
