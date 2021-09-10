@@ -5766,6 +5766,25 @@ TEST(Table_MixedNull)
     list.remove(0);
 }
 
+TEST(Table_InsertWithMixedLink)
+{
+    Group g;
+    TableRef dest = g.add_table_with_primary_key("dest", type_Int, "value");
+    TableRef source = g.add_table_with_primary_key("source", type_Int, "value");
+    ColKey mixed_col = source->add_column(type_Mixed, "mixed");
+
+    Obj dest_obj = dest->create_object_with_primary_key(0);
+
+    Mixed mixed_link = ObjLink{dest->get_key(), dest_obj.get_key()};
+    FieldValues values = {
+        {mixed_col, mixed_link},
+    };
+    source->create_object_with_primary_key(0, std::move(values));
+
+    source->clear();
+    dest->clear();
+}
+
 TEST(Table_SortEncrypted)
 {
     SHARED_GROUP_TEST_PATH(path);
