@@ -18,56 +18,71 @@ using namespace sync;
 namespace {
 
 struct InterRealmValueConverter {
-    TableRef dst_link_table;
-    TableRef src_table;
-    TableRef dst_table;
-    TableRef opposite_of_src;
-    TableRef opposite_of_dst;
-    const bool primitive_types_only;
-
-    InterRealmValueConverter(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
-        : primitive_types_only(!(src_col.get_type() == col_type_TypedLink || src_col.get_type() == col_type_Link ||
-                                 src_col.get_type() == col_type_LinkList || src_col.get_type() == col_type_Mixed))
+    InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col)
+        : m_src_table(src_table)
+        , m_dst_table(dst_table)
+        , m_src_col(src_col)
+        , m_dst_col(dst_col)
+        , m_primitive_types_only(!(src_col.get_type() == col_type_TypedLink || src_col.get_type() == col_type_Link ||
+                                   src_col.get_type() == col_type_LinkList || src_col.get_type() == col_type_Mixed))
     {
-        if (!primitive_types_only) {
-            src_table = src_obj.get_table();
-            dst_table = dst_obj.get_table();
+        if (!m_primitive_types_only) {
             REALM_ASSERT(src_table);
-            opposite_of_src = src_table->get_opposite_table(src_col);
-            opposite_of_dst = dst_table->get_opposite_table(dst_col);
-            REALM_ASSERT(bool(opposite_of_src) == bool(opposite_of_dst));
+            m_opposite_of_src = src_table->get_opposite_table(src_col);
+            m_opposite_of_dst = dst_table->get_opposite_table(dst_col);
+            REALM_ASSERT(bool(m_opposite_of_src) == bool(m_opposite_of_dst));
         }
     }
 
     Mixed src_to_dst(Mixed src)
     {
-        if (primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
+        if (m_primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
             return src;
         }
         else {
-            if (opposite_of_src) {
+            if (m_opposite_of_src) {
                 ObjKey src_link_key = src.get<ObjKey>();
-                Mixed src_link_pk = opposite_of_src->get_primary_key(src_link_key);
-                Mixed dst_link_key = opposite_of_dst->get_objkey_from_primary_key(src_link_pk);
+                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+                Mixed dst_link_key = m_opposite_of_dst->get_objkey_from_primary_key(src_link_pk);
                 return dst_link_key;
             }
             else {
                 ObjLink src_link = src.get<ObjLink>();
-                TableRef src_link_table = src_table->get_parent_group()->get_table(src_link.get_table_key());
+                TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
                 REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
                 Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
 
-                TableRef dst_link_table = dst_table->get_parent_group()->get_table(src_link_table->get_name());
+                TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
                 REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
                 ObjKey dst_link = dst_link_table->get_objkey_from_primary_key(src_pk);
                 return ObjLink{dst_link_table->get_key(), dst_link};
             }
         }
     }
+
+    inline ColKey source_col() const
+    {
+        return m_src_col;
+    }
+
+    inline ColKey dest_col() const
+    {
+        return m_dst_col;
+    }
+
+private:
+    TableRef m_dst_link_table;
+    ConstTableRef m_src_table;
+    ConstTableRef m_dst_table;
+    ColKey m_src_col;
+    ColKey m_dst_col;
+    TableRef m_opposite_of_src;
+    TableRef m_opposite_of_dst;
+    const bool m_primitive_types_only;
 };
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+bool copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -77,9 +92,8 @@ bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
     // src = abcdefghi
     // dst = abcxyhi
     // The common prefix is abc. The common suffix is hi. xy is replaced by defg.
-    LstBasePtr src = src_obj.get_listbase_ptr(src_col);
-    LstBasePtr dst = dst_obj.get_listbase_ptr(dst_col);
-    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
+    LstBasePtr src = src_obj.get_listbase_ptr(convert.source_col());
+    LstBasePtr dst = dst_obj.get_listbase_ptr(convert.dest_col());
 
     bool updated = false;
     size_t len_src = src->size();
@@ -127,11 +141,10 @@ bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
     return updated;
 }
 
-bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+bool copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
 {
-    SetBasePtr src = src_obj.get_setbase_ptr(src_col);
-    SetBasePtr dst = dst_obj.get_setbase_ptr(dst_col);
-    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
+    SetBasePtr src = src_obj.get_setbase_ptr(convert.source_col());
+    SetBasePtr dst = dst_obj.get_setbase_ptr(convert.dest_col());
 
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
@@ -193,11 +206,10 @@ bool copy_set(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
     return to_delete.size() || to_insert.size();
 }
 
-bool copy_dictionary(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
 {
-    Dictionary src = src_obj.get_dictionary(src_col);
-    Dictionary dst = dst_obj.get_dictionary(dst_col);
-    InterRealmValueConverter convert(src_obj, src_col, dst_obj, dst_col);
+    Dictionary src = src_obj.get_dictionary(convert.source_col());
+    Dictionary dst = dst_obj.get_dictionary(convert.dest_col());
 
     std::vector<size_t> sorted_src, sorted_dst, to_insert, to_delete;
     constexpr bool ascending = true;
@@ -472,7 +484,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         auto table_dst = group_dst.get_table(table_name);
 
         auto pk_col = table_dst->get_primary_key_column();
-        REALM_ASSERT(pk_col); // sync realms always have a pk
+        REALM_ASSERT_DEBUG(pk_col); // sync realms always have a pk
         std::vector<std::pair<Mixed, ObjKey>> objects_to_remove;
         for (auto obj : *table_dst) {
             auto pk = obj.get_any(pk_col);
@@ -530,66 +542,44 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                      table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
                      pk_col.get_type());
 
-        // FIXME: change the order of these loops so that columns are on the outer
-        // which will allow for even more caching of the InterRealmValueConverter (and benchmark)
+        std::vector<InterRealmValueConverter> columns_cache;
+
+        for (ColKey col_key_src : table_src->get_column_keys()) {
+            if (col_key_src == pk_col)
+                continue;
+            StringData col_name = table_src->get_column_name(col_key_src);
+            ColKey col_key_dst = table_dst->get_column_key(col_name);
+            REALM_ASSERT(col_key_dst);
+            columns_cache.emplace_back(InterRealmValueConverter(table_src, col_key_src, table_dst, col_key_dst));
+        }
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
             auto dst = table_dst->get_object_with_primary_key(src_pk);
             REALM_ASSERT(dst);
             bool updated = false;
 
-            for (ColKey col_key_src : table_src->get_column_keys()) {
-                if (col_key_src == pk_col)
-                    continue;
-                StringData col_name = table_src->get_column_name(col_key_src);
-                ColKey col_key_dst = table_dst->get_column_key(col_name);
-                REALM_ASSERT(col_key_dst);
-                DataType col_type = table_src->get_column_type(col_key_src);
-                if (col_key_src.is_list()) {
-                    if (copy_list(src, col_key_src, dst, col_key_dst)) {
+            for (auto& cache : columns_cache) {
+                if (cache.source_col().is_list()) {
+                    if (copy_list(src, dst, cache)) {
                         updated = true;
                     }
                 }
-                else if (col_key_src.is_dictionary()) {
-                    if (copy_dictionary(src, col_key_src, dst, col_key_dst)) {
+                else if (cache.source_col().is_dictionary()) {
+                    if (copy_dictionary(src, dst, cache)) {
                         updated = true;
                     }
                 }
-                else if (col_key_src.is_set()) {
-                    if (copy_set(src, col_key_src, dst, col_key_dst)) {
+                else if (cache.source_col().is_set()) {
+                    if (copy_set(src, dst, cache)) {
                         updated = true;
-                    }
-                }
-                else if (col_type == type_Link) {
-                    ConstTableRef table_target_src = table_src->get_link_target(col_key_src);
-                    TableRef table_target_dst = table_dst->get_link_target(col_key_dst);
-                    REALM_ASSERT(table_target_src->get_name() == table_target_dst->get_name());
-
-                    if (src.is_null(col_key_src)) {
-                        if (!dst.is_null(col_key_dst)) {
-                            dst.set_null(col_key_dst);
-                            updated = true;
-                        }
-                    }
-                    else {
-                        ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
-                        auto target_pk_src = table_target_src->get_primary_key(target_obj_key_src);
-                        auto dst_obj_key = dst.get<ObjKey>(col_key_dst);
-                        if (!dst_obj_key ||
-                            target_pk_src != table_target_dst->get_primary_key(dst.get<ObjKey>(col_key_dst))) {
-                            ObjKey target_obj_key_dst = table_target_dst->get_objkey_from_primary_key(target_pk_src);
-                            dst.set(col_key_dst, target_obj_key_dst);
-                            updated = true;
-                        }
                     }
                 }
                 else {
-                    REALM_ASSERT(!col_key_src.is_collection());
-                    InterRealmValueConverter convert(src, col_key_src, dst, col_key_dst);
-                    auto val_src = convert.src_to_dst(src.get_any(col_key_src));
-                    auto val_dst = dst.get_any(col_key_dst);
+                    REALM_ASSERT(!cache.source_col().is_collection());
+                    auto val_src = cache.src_to_dst(src.get_any(cache.source_col()));
+                    auto val_dst = dst.get_any(cache.dest_col());
                     if (val_src != val_dst) {
-                        dst.set_any(col_key_dst, val_src);
+                        dst.set_any(cache.dest_col(), val_src);
                         updated = true;
                     }
                 }
