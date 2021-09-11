@@ -386,6 +386,38 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     }
     logger.debug("The number of tables is %1", num_tables);
 
+    // Check that the primary key columns align.
+    // The types of destructive changes that this loop checks for should
+    // be handled by the server already, so this is only preventative.
+    for (auto table_key : group_src.get_table_keys()) {
+        if (!group_src.table_is_public(table_key))
+            continue;
+        ConstTableRef table_src = group_src.get_table(table_key);
+        StringData table_name = table_src->get_name();
+        TableRef table_dst = group_dst.get_table(table_name);
+        ColKey src_pk_col = table_src->get_primary_key_column();
+        ColKey dst_pk_col = table_dst->get_primary_key_column();
+        // the following code relies on both tables having a pk
+        // which is true of a sync'd Realm
+        if (!src_pk_col || !dst_pk_col) {
+            throw ClientResetFailed(util::format("Client reset requires a primary key column in %1 table '%2'",
+                                                 (src_pk_col ? "dest" : "source"), table_name));
+        }
+        if (src_pk_col.get_type() != dst_pk_col.get_type()) {
+            throw ClientResetFailed(
+                util::format("Client reset found incompatible primary key types from %1 to %2 on '%3'",
+                             src_pk_col.get_type(), dst_pk_col.get_type(), table_name));
+        }
+        if (src_pk_col.is_nullable() != dst_pk_col.is_nullable()) {
+            throw ClientResetFailed(
+                util::format("Client reset found incompatible primary key nullability on '%1'", table_name));
+        }
+        if (table_src->get_column_name(src_pk_col) != table_dst->get_column_name(dst_pk_col)) {
+            // if both pk types are aligned, we can rename it
+            table_dst->rename_column(dst_pk_col, table_src->get_column_name(src_pk_col));
+        }
+    }
+
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
         if (!group_src.table_is_public(table_key))
@@ -439,42 +471,67 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             StringData col_name = table_src->get_column_name(col_key);
             ColKey col_key_dst = table_dst->get_column_key(col_name);
             if (!col_key_dst) {
-                DataType type = table_src->get_column_type(col_key);
-                bool nullable = table_src->is_nullable(col_key);
+                DataType col_type = table_src->get_column_type(col_key);
+                bool nullable = col_key.is_nullable();
                 bool has_search_index = table_src->has_search_index(col_key);
                 logger.trace("Create column, table = %1, column name = %2, "
                              " type = %3, nullable = %4, has_search_index = %5",
-                             table_name, col_name, type, nullable, has_search_index);
+                             table_name, col_name, col_key.get_type(), nullable, has_search_index);
                 ColKey col_key_dst;
-                if (Table::is_link_type(ColumnType(type))) {
+                if (Table::is_link_type(col_key.get_type())) {
                     ConstTableRef target_src = table_src->get_link_target(col_key);
                     TableRef target_dst = group_dst.get_table(target_src->get_name());
-                    if (type == type_LinkList) {
+                    if (col_key.is_list()) {
                         col_key_dst = table_dst->add_column_list(*target_dst, col_name);
                     }
+                    else if (col_key.is_set()) {
+                        col_key_dst = table_dst->add_column_set(*target_dst, col_name);
+                    }
+                    else if (col_key.is_dictionary()) {
+                        DataType key_type = table_src->get_dictionary_key_type(col_key);
+                        col_key_dst = table_dst->add_column_dictionary(*target_dst, col_name, key_type);
+                    }
                     else {
+                        REALM_ASSERT(!col_key.is_collection());
                         col_key_dst = table_dst->add_column(*target_dst, col_name);
                     }
                 }
-                else if (col_key.get_attrs().test(col_attr_List)) {
-                    col_key_dst = table_dst->add_column_list(type, col_name, nullable);
+                else if (col_key.is_list()) {
+                    col_key_dst = table_dst->add_column_list(col_type, col_name, nullable);
+                }
+                else if (col_key.is_set()) {
+                    col_key_dst = table_dst->add_column_set(col_type, col_name, nullable);
+                }
+                else if (col_key.is_dictionary()) {
+                    DataType key_type = table_src->get_dictionary_key_type(col_key);
+                    col_key_dst = table_dst->add_column_dictionary(col_type, col_name, nullable, key_type);
                 }
                 else {
-                    col_key_dst = table_dst->add_column(type, col_name, nullable);
+                    REALM_ASSERT(!col_key.is_collection());
+                    col_key_dst = table_dst->add_column(col_type, col_name, nullable);
                 }
 
                 if (has_search_index)
                     table_dst->add_search_index(col_key_dst);
             }
+            else {
+                // column preexists in dest, make sure the types match
+                if (col_key.get_type() != col_key_dst.get_type() ||
+                    col_key.is_nullable() != col_key_dst.is_nullable() ||
+                    col_key.is_list() != col_key_dst.is_list() ||
+                    col_key.is_dictionary() != col_key_dst.is_dictionary() ||
+                    col_key.is_set() != col_key_dst.is_set()) {
+                    throw ClientResetFailed(
+                        util::format("Incompatable column type change detected during client reset for '%1.%2'",
+                                     table_name, col_name));
+                }
+            }
         }
     }
-    // FIXME: make sure that the pk columns are the same?
 
     // Now the schemas are identical.
 
     // Remove objects in dst that are absent in src.
-    // We will also have to remove all objects created locally as they should have
-    // new keys because the client file id is changed.
     for (auto table_key : group_src.get_table_keys()) {
         if (!group_src.table_is_public(table_key))
             continue;
@@ -506,11 +563,6 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         StringData table_name = table_src->get_name();
         logger.debug("Adding objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
-
-        // the following code relies on both tables having a pk
-        // which is true of a sync'd Realm
-        REALM_ASSERT(table_src->get_primary_key_column());
-        REALM_ASSERT(table_dst->get_primary_key_column());
 
         for (auto& obj : *table_src) {
             auto src_pk = obj.get_primary_key();

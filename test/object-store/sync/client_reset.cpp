@@ -603,6 +603,38 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
+        SECTION("primary key type cannot be changed") {
+            test_reset
+                ->make_local_changes([](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {"new table",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                })
+                ->make_remote_changes([](SharedRealm remote) {
+                    remote->update_schema(
+                        {
+                            {"new table",
+                             {
+                                 {"_id", PropertyType::String, Property::IsPrimary{true}},
+                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                })
+                ->on_post_reset([](SharedRealm realm) {
+                    REQUIRE_THROWS_WITH(realm->refresh(),
+                                        Catch::Matchers::Contains(
+                                            "Property 'new table._id' has been changed from 'int' to 'string'."));
+                })
+                ->run();
+        }
+
         SECTION("list operations") {
             ObjKey k0, k1, k2;
             test_reset->setup([&](SharedRealm realm) {

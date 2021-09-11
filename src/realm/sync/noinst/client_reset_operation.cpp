@@ -37,8 +37,9 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
     }
 
     m_salted_file_ident = salted_file_ident;
-    // only do the reset if the file exists
-    // if there is no existing file, there is nothing to reset
+    // only do the reset if there is data to reset
+    // if there is nothing in this Realm, then there is nothing to reset and
+    // sync should be able to continue as normal
     bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
         logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2", m_db.get_path(),
@@ -49,14 +50,14 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
             local_version_ids = client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_notify_before,
                                                                         m_notify_after, m_salted_file_ident, logger);
         }
-        catch (util::File::AccessError& e) {
-            logger.error("In ClientResetOperation::finalize, the client reset failed due to a FileAccessError, "
+        catch (const client_reset::ClientResetFailed& e) {
+            logger.error("In ClientResetOperation::finalize, the client reset failed, "
                          "realm path = %1, msg = %2",
                          m_db.get_path(), e.what());
             return false;
         }
-        catch (client_reset::ClientResetFailed& e) {
-            logger.error("In ClientResetOperation::finalize, the client reset failed, "
+        catch (const std::exception& e) {
+            logger.error("In ClientResetOperation::finalize, the client reset failed due to an unexpected exception "
                          "realm path = %1, msg = %2",
                          m_db.get_path(), e.what());
             return false;
