@@ -2372,7 +2372,9 @@ TEST_CASE("C API") {
             write([&]() {
                 CHECK(checked(realm_object_delete(obj1.get())));
             });
-            auto deleted_obj1 = cptr_checked(realm_object_resolve_in(frozen_obj1.get(), realm));
+            auto a = frozen_obj1.get();
+            auto b = realm_object_resolve_in(a, realm);
+            auto deleted_obj1 = cptr_checked(b);
             CHECK(!realm_object_is_valid(deleted_obj1.get()));
         }
 
@@ -2422,7 +2424,7 @@ TEST_CASE("C API") {
             CHECK(count == 0);
 
             auto frozen_realm = cptr_checked(realm_freeze(realm));
-            auto frozen_list = cptr_checked(realm_list_freeze(list.get(), frozen_realm.get()));
+            auto frozen_list = cptr_checked(realm_list_resolve_in(list.get(), frozen_realm.get()));
             realm_list_size(frozen_list.get(), &count);
             CHECK(count == 0);
 
@@ -2435,17 +2437,15 @@ TEST_CASE("C API") {
             realm_list_size(list.get(), &count);
             CHECK(count == 1);
 
-            realm_list_t* thawed_list;
-            CHECK(checked(realm_list_thaw(frozen_list.get(), realm, &thawed_list)));
-            realm_list_size(thawed_list, &count);
-            realm_release(thawed_list);
+            auto thawed_list = cptr_checked(realm_list_resolve_in(frozen_list.get(), realm));
+            realm_list_size(thawed_list.get(), &count);
             CHECK(count == 1);
 
             write([&]() {
                 CHECK(checked(realm_object_delete(obj1.get())));
             });
-            CHECK(checked(realm_list_thaw(frozen_list.get(), realm, &thawed_list)));
-            CHECK(thawed_list == NULL);
+            thawed_list = cptr_checked(realm_list_resolve_in(frozen_list.get(), realm));
+            CHECK(!realm_list_is_valid(thawed_list.get()));
         }
     }
 

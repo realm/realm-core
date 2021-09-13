@@ -1405,28 +1405,22 @@ RLM_API realm_list_t* _realm_list_from_native_copy(const void* plist, size_t n);
 RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
 
 /**
- * Map the list into a frozen Realm instance.
+ * Resolve the list in the context of a given Realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ * If the list cannot be resolved in the given Realm an invalid list is returned.
+ * Other errors will return a nullptr.
  *
- * @return A frozen copy of the live list.
+ * @return A resolved copy of the live list.
  */
-RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const realm_t* frozen_realm);
+RLM_API realm_list_t* realm_list_resolve_in(const realm_list_t* list, const realm_t* target_realm);
 
 /**
- * Map the list into a live Realm instance.
+ * Check if a list is valid.
  *
- * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
- *
- * Note: Will assert that live_realm is not frozen.
- *
- * @param live_realm The live realm used to resolved the live list.
- * @param out_live_list Where the list pointer should be stored. The list pointer will be NULL if
- *                      the frozen_list has been invalidated.
- * @return A live copy of the frozen list.
+ * @return True if the list is valid.
  */
-RLM_API bool realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm,
-                             realm_list_t** out_live_list);
+RLM_API bool realm_list_is_valid(const realm_list_t*);
 
 /**
  * Get the size of a list, in number of elements.
