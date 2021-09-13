@@ -952,14 +952,6 @@ RLM_API bool realm_refresh(realm_t*);
 RLM_API realm_t* realm_freeze(const realm_t*);
 
 /**
- * Produce a live Realm from a frozen one. This is equivalent to
- * opening a new Realm instance.
- *
- * @return A non-NULL realm instance representing the live state.
- */
-RLM_API realm_t* realm_thaw(const realm_t*);
-
-/**
  * Vacuum the free space from the realm file, reducing its file size.
  *
  * @return True if compaction was successful and no exceptions were thrown.
@@ -1252,29 +1244,16 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_cla
 RLM_API bool realm_object_delete(realm_object_t*);
 
 /**
- * Freeze the Realm object in the provided Realm.
+ * Resolve the Realm object in the provided Realm.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ * NOTE: Use the function `realm_object_is_valid()` to check if the object exists.
  *
- * @return A frozen copy of the live object.
+ * @return A resolved copy of the object. If the object does not exist in the target realm, an
+ * invalid object is returned. Other failures result in NULL.
  */
-RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm);
+RLM_API realm_object_t* realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm);
 
-/**
- * Turn a frozen Realm Object into a live one that is evaluated against a given version of a Live Realm.
- *
- * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
- *
- * Note: Will assert that live_realm is not frozen.
- *
- * @param live_realm The live realm used to resolved the live object.
- * @param out_live_object Where the obejct pointer should be stored. The object pointer will be NULL if
- *                        the frozen_object has been invalidated.
- *
- * @return True if no exception occured.
- */
-RLM_API bool realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm,
-                               realm_object_t** out_live_object);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);

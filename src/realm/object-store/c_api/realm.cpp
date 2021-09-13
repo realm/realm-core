@@ -137,14 +137,6 @@ RLM_API realm_t* realm_freeze(const realm_t* live_realm)
     });
 }
 
-RLM_API realm_t* realm_thaw(const realm_t* frozen_realm)
-{
-    return wrap_err([&]() {
-        auto& p = **frozen_realm;
-        return new realm_t{p.thaw()};
-    });
-}
-
 RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
 {
     return wrap_err([&]() {

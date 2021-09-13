@@ -2333,10 +2333,6 @@ TEST_CASE("C API") {
             auto frozen_realm = cptr_checked(realm_freeze(realm));
             CHECK(!realm_is_frozen(realm));
             CHECK(realm_is_frozen(frozen_realm.get()));
-
-            auto thawed_realm = cptr_checked(realm_thaw(frozen_realm.get()));
-            CHECK(realm_is_frozen(frozen_realm.get()));
-            CHECK(!realm_is_frozen(thawed_realm.get()));
         }
 
         SECTION("objects") {
@@ -2352,7 +2348,7 @@ TEST_CASE("C API") {
             CHECK(strncmp(value.string.data, "", value.string.size) == 0);
 
             auto frozen_realm = cptr_checked(realm_freeze(realm));
-            auto frozen_obj1 = cptr_checked(realm_object_freeze(obj1.get(), frozen_realm.get()));
+            auto frozen_obj1 = cptr_checked(realm_object_resolve_in(obj1.get(), frozen_realm.get()));
             CHECK(frozen_obj1);
 
             write([&]() {
@@ -2367,20 +2363,17 @@ TEST_CASE("C API") {
             CHECK(value.type == RLM_TYPE_STRING);
             CHECK(strncmp(value.string.data, "", value.string.size) == 0);
 
-            realm_object_t* thawed_obj1;
-            CHECK(checked(realm_object_thaw(frozen_obj1.get(), realm, &thawed_obj1)));
+            auto thawed_obj1 = cptr_checked(realm_object_resolve_in(obj1.get(), realm));
             CHECK(thawed_obj1);
-            CHECK(checked(realm_get_value(thawed_obj1, foo_str_key, &value)));
-            realm_release(thawed_obj1);
+            CHECK(checked(realm_get_value(thawed_obj1.get(), foo_str_key, &value)));
             CHECK(value.type == RLM_TYPE_STRING);
             CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
 
             write([&]() {
                 CHECK(checked(realm_object_delete(obj1.get())));
             });
-            realm_object_t* deleted_obj1;
-            CHECK(checked(realm_object_thaw(frozen_obj1.get(), realm, &deleted_obj1)));
-            CHECK(deleted_obj1 == NULL);
+            auto deleted_obj1 = cptr_checked(realm_object_resolve_in(frozen_obj1.get(), realm));
+            CHECK(!realm_object_is_valid(deleted_obj1.get()));
         }
 
         SECTION("results") {

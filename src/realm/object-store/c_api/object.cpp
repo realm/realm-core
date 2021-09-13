@@ -157,12 +157,20 @@ RLM_API const void* _realm_object_get_native_ptr(realm_object_t* obj)
     return static_cast<const Object*>(obj);
 }
 
-RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm)
+RLM_API realm_object_t* realm_object_resolve_in(const realm_object_t* live_object, const realm_t* frozen_realm)
 {
     return wrap_err([&]() {
-        const auto& realm = *frozen_realm;
-        auto frozen_object = live_object->freeze(realm);
-        return new realm_object_t{std::move(frozen_object)};
+        try {
+            const auto& realm = *frozen_realm;
+            auto frozen_object = live_object->freeze(realm);
+            return new realm_object_t{std::move(frozen_object)};
+        }
+        catch (NoSuchTable&) {
+            return new realm_object_t{Object{}};
+        }
+        catch (KeyNotFound&) {
+            return new realm_object_t{Object{}};
+        }
     });
 }
 
