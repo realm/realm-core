@@ -110,12 +110,6 @@ public:
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
     Object freeze(std::shared_ptr<Realm> frozen_realm) const;
 
-    // Returns an optional containing a live copy of this object resolved in the live_realm
-    // or an optional without a value if the object itself has been invalidated.
-    // Equivalent to producing a thread-safe reference and resolving it in the live realm.
-    // Will assert that live_realm is not frozen.
-    util::Optional<Object> thaw(std::shared_ptr<Realm> live_realm) const;
-
     // Returns whether or not this Object is frozen.
     bool is_frozen() const noexcept;
 

@@ -388,18 +388,6 @@ List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
     }
 }
 
-util::Optional<List> List::thaw(std::shared_ptr<Realm> const& live_realm) const
-{
-    REALM_ASSERT(!live_realm->is_frozen());
-    const auto live_list = live_realm->import_copy_of(*m_coll_base);
-    if (live_list) {
-        return List(live_realm, *live_list);
-    }
-    else {
-        return {};
-    }
-}
-
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \
     template T List::get<T>(size_t) const;                                                                           \
     template size_t List::find<T>(T const&) const;                                                                   \

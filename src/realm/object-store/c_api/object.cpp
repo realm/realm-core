@@ -431,9 +431,11 @@ RLM_API realm_list_t* realm_list_resolve_in(const realm_list_t* from_list, const
             const auto& realm = *target_realm;
             auto frozen_list = from_list->freeze(realm);
             return new realm_list_t{std::move(frozen_list)};
-        } catch (NoSuchTable&) {
+        }
+        catch (NoSuchTable&) {
             return new realm_list_t{List{}};
-        } catch (KeyNotFound&) {
+        }
+        catch (KeyNotFound&) {
             return new realm_list_t{List{}};
         }
     });
@@ -441,7 +443,8 @@ RLM_API realm_list_t* realm_list_resolve_in(const realm_list_t* from_list, const
 
 RLM_API bool realm_list_is_valid(const realm_list_t* list)
 {
-    if (!list) return false;
+    if (!list)
+        return false;
     return list->is_valid();
 }
 

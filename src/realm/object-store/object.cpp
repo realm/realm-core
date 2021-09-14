@@ -39,18 +39,6 @@ Object Object::freeze(std::shared_ptr<Realm> frozen_realm) const
     return Object(frozen_realm, frozen_realm->import_copy_of(m_obj));
 }
 
-util::Optional<Object> Object::thaw(std::shared_ptr<Realm> live_realm) const
-{
-    REALM_ASSERT(!live_realm->is_frozen());
-    const auto& thawed_object = live_realm->import_copy_of(m_obj);
-    if (thawed_object.is_valid()) {
-        return Object(live_realm, thawed_object);
-    }
-    else {
-        return {};
-    }
-}
-
 bool Object::is_frozen() const noexcept
 {
     return m_realm->is_frozen();
@@ -106,7 +94,9 @@ Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
 
 Object::Object(SharedRealm r, Obj const& o)
     : m_realm(std::move(r))
-    , m_object_schema(o.is_valid() ? &*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())) : nullptr)
+    , m_object_schema(
+          o.is_valid() ? &*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name()))
+                       : nullptr)
     , m_obj(o)
 {
     REALM_ASSERT(!m_obj.get_table() ||
