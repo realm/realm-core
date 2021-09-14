@@ -384,34 +384,70 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user,
 
 RLM_API const char* realm_user_get_identity(const realm_user_t* user)
 {
-    return strdup((*user)->identity().c_str());
+    return (*user)->identity().c_str();
+}
+
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+                                           size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        if (out_identities) {
+            const auto& identities = (*user)->identities();
+            size_t i = 0;
+            for (; i < max; i++) {
+                out_identities[i] = {identities[i].id.c_str(),
+                                     to_capi(enum_from_provider_type(identities[i].provider_type))};
+            }
+            if (out_n) {
+                *out_n = i;
+            }
+        }
+        else {
+            if (out_n) {
+                *out_n = (*user)->identities().size();
+            }
+        }
+        return true;
+    });
 }
 
 RLM_API const char* realm_user_get_local_identity(const realm_user_t* user)
 {
-    return strdup((*user)->local_identity().c_str());
+    return (*user)->local_identity().c_str();
 }
 
 RLM_API const char* realm_user_get_device_id(const realm_user_t* user)
 {
     if ((*user)->has_device_id()) {
-        return strdup((*user)->device_id().c_str());
+        return duplicate_string((*user)->device_id());
     }
 
     return nullptr;
 }
 
-RLM_API const char* realm_user_get_refresh_token(const realm_user_t* user)
-{
-    return strdup((*user)->refresh_token().c_str());
-}
-
-RLM_API const char* realm_user_get_access_token(const realm_user_t* user)
-{
-    return strdup((*user)->access_token().c_str());
-}
-
 RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user)
 {
     return to_capi(enum_from_provider_type((*user)->provider_type()));
+}
+
+RLM_API bool realm_user_log_out(realm_user_t* user)
+{
+    return wrap_err([&]() {
+        (*user)->log_out();
+        return true;
+    });
+}
+
+RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
+{
+    return (*user)->is_logged_in();
+}
+
+RLM_API const char* realm_user_get_profile_data(const realm_user_t* user)
+{
+    return wrap_err([&]() {
+        std::string data = bson::Bson((*user)->user_profile().data()).to_string();
+
+        return duplicate_string(data);
+    });
 }

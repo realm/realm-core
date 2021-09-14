@@ -100,6 +100,14 @@ inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
     return val;
 }
 
+inline char* duplicate_string(const std::string& string)
+{
+    char* ret = reinterpret_cast<char*>(malloc(string.size() + 1));
+    string.copy(ret, string.size());
+    ret[string.size()] = '\0';
+    return ret;
+}
+
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)

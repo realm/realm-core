@@ -252,7 +252,7 @@ void SyncUser::update_access_token(std::string&& token)
     emit_change_to_subscribers(*this);
 }
 
-std::vector<SyncUserIdentity> SyncUser::identities() const
+const std::vector<SyncUserIdentity>& SyncUser::identities() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_user_identities;
@@ -372,7 +372,7 @@ void SyncUser::set_state(SyncUser::State state)
     });
 }
 
-SyncUserProfile SyncUser::user_profile() const
+const SyncUserProfile& SyncUser::user_profile() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_user_profile;

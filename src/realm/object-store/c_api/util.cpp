@@ -19,6 +19,13 @@ inline const T* cast_ptr(const void* ptr)
     return static_cast<const T*>(rptr);
 }
 
+RLM_API void realm_free(void* ptr)
+{
+    if (!ptr)
+        return;
+    free(ptr);
+}
+
 RLM_API void realm_release(void* ptr)
 {
     if (!ptr)

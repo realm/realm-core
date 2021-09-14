@@ -442,6 +442,17 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*)()) noexcept;
 RLM_API bool realm_clear_last_error(void);
 
 /**
+ * Free memory allocated by the module this library was linked into.
+ *
+ * This is needed for raw memory buffers such as string copies or arrays
+ * returned from a library function. Realm C Wrapper objects on the other hand
+ * should always be freed with realm_release() only.
+ *
+ * @param ptr A pointer to a memory buffer owned by the caller.
+ */
+RLM_API void realm_free(void* ptr);
+
+/**
  * Free any Realm C Wrapper object.
  *
  * Note: Any pointer returned from a library function is owned by the caller.
@@ -2135,7 +2146,7 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*);
  * Get an existing @a realm_app_t* instance with the same app id, or create it with the
  * configuration if it doesn't exist.
  *
- * @return A non-null pointer if no error occured.
+ * @return A non-null pointer if no error occurred.
  */
 RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
 
@@ -2145,7 +2156,7 @@ RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_c
  * @param app_id The app id to look for.
  * @param out_app A pointer to a @a realm_app_t* variable that will be populated
  *                with the app instance, or NULL if an app wasn't found.
- * @return true if no error occured.
+ * @return true if no error occurred.
  */
 RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app);
 
@@ -2195,22 +2206,58 @@ RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** n
 RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, void (*)(void* userdata, realm_error_t*),
                                    void* userdata, realm_free_userdata_func_t userdata_free);
 
-// returned pointer must be manually released with 'free()'
 RLM_API const char* realm_user_get_identity(const realm_user_t*);
 
-// returned pointer must be manually released with 'free()'
+typedef struct {
+    const char* id;
+    realm_auth_provider_e provider_type;
+} realm_user_identity_t;
+
+/**
+ * Get the list of identities of this @a user.
+ *
+ * @param out_identities A pointer to an array of `realm_user_identity_t`, which
+ *                       will be populated with the list of identities of this user.
+ *                       May be NULL, in which case this function can be used to
+ *                       discover the number of identities of this user.
+ * @param max The maximum number of entries to write to `out_identities`.
+ * @param out_n The actual number of properties written to `out_identities`.
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+                                           size_t max, size_t* out_n);
+
 RLM_API const char* realm_user_get_local_identity(const realm_user_t*);
 
-// returned pointer must be manually released with 'free()'
-RLM_API const char* realm_user_get_device_id(const realm_user_t*);
-
-// returned pointer must be manually released with 'free()'
-RLM_API const char* realm_user_get_refresh_token(const realm_user_t*);
-
-// returned pointer must be manually released with 'free()'
-RLM_API const char* realm_user_get_access_token(const realm_user_t*);
+// returned pointer must be manually released with realm_free()
+RLM_API char* realm_user_get_device_id(const realm_user_t*);
 
 RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*);
+
+/**
+ * Log out the user and mark it as logged out.
+ *
+ * Any active sync sessions associated with this user will be stopped.
+ *
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_user_log_out(realm_user_t*);
+
+/**
+ * Check if the user is logged in.
+ *
+ * @return true if the user is in the logged in state.
+ */
+RLM_API bool realm_user_is_logged_in(const realm_user_t*);
+
+/**
+ * Get the user profile associated with this user.
+ *
+ * Returned value must be manually released with realm_free().
+ *
+ * @return A serialized BSON document, or null if an error occurred.
+ */
+RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
 /* Sync */
 

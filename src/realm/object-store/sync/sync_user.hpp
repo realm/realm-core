@@ -156,7 +156,7 @@ struct SyncUserProfile {
         return m_data;
     }
 
-    SyncUserProfile(bson::BsonDocument&& data)
+    SyncUserProfile(bson::BsonDocument data)
         : m_data(std::move(data))
     {
     }
@@ -252,7 +252,7 @@ public:
 
     std::string refresh_token() const;
 
-    RealmJWT refresh_jwt() const
+    const RealmJWT& refresh_jwt() const
     {
         return m_refresh_token;
     }
@@ -261,9 +261,9 @@ public:
 
     bool has_device_id() const;
 
-    SyncUserProfile user_profile() const;
+    const SyncUserProfile& user_profile() const;
 
-    std::vector<SyncUserIdentity> identities() const;
+    const std::vector<SyncUserIdentity>& identities() const;
 
     // Custom user data embedded in the access token.
     util::Optional<bson::BsonDocument> custom_data() const;
@@ -275,12 +275,6 @@ public:
     {
         return m_binding_context.load();
     }
-
-    // Register a session to this user.
-    // A registered session will be bound at the earliest opportunity: either
-    // immediately, or upon the user becoming Active.
-    // Note that this is called by the SyncManager, and should not be directly called.
-    void register_session(std::shared_ptr<SyncSession>);
 
     /// Refreshes the custom data for this user
     void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
@@ -301,6 +295,12 @@ public:
 protected:
     friend class SyncManager;
     void detach_from_sync_manager();
+
+    // Register a session to this user.
+    // A registered session will be bound at the earliest opportunity: either
+    // immediately, or upon the user becoming Active.
+    // Note that this is called by the SyncManager, and should not be directly called.
+    void register_session(std::shared_ptr<SyncSession>);
 
 private:
     static SyncUserContextFactory s_binding_context_factory;
