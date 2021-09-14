@@ -891,8 +891,8 @@ TEST_CASE("SharedRealm: async_writes") {
             auto table = realm->read_group().get_table("class_object");
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
+            done = true;
             realm->async_commit_transaction([&]() {
-                done = true;
             });
         });
         realm->async_begin_transaction([&]() {
@@ -903,8 +903,10 @@ TEST_CASE("SharedRealm: async_writes") {
                 done = true;
             });
         });
-        realm->begin_transaction(); // Will execute first async transaction
-        REQUIRE(done);
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        realm->begin_transaction(); // Here syncing of first async tr has not completed
         auto table = realm->read_group().get_table("class_object");
         REQUIRE(table->size() == 1);
         auto col = table->get_column_key("value");

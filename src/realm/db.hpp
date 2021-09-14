@@ -22,6 +22,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <condition_variable>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #include <realm/util/interprocess_condvar.hpp>
@@ -691,13 +692,6 @@ public:
         get_db()->async_end_write();
     }
 
-    void async_release_write_lock(std::function<void()> fn)
-    {
-        REALM_ASSERT(m_async_stage == AsyncState::HasLock);
-        m_async_stage = AsyncState::Idle;
-        get_db()->async_end_write(fn);
-    }
-
     // true if sync to disk has been requested
     bool is_synchronizing() const noexcept
     {
@@ -714,6 +708,42 @@ public:
     void release_read_lock(DB::ReadLockInfo& read_lock)
     {
         get_db()->release_read_lock(read_lock);
+    }
+
+    void wait_for_write_lock()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Requesting) {
+            waiting_for_write_lock = true;
+            cv.wait(lck);
+            waiting_for_write_lock = false;
+        }
+    }
+
+    // Request that write lock is released on helper thread and wait for it to happen
+    void release_write_lock()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == AsyncState::HasLock) {
+            get_db()->async_end_write([this]() {
+                std::unique_lock<std::mutex> lck(mtx);
+                m_async_stage = AsyncState::Idle;
+                cv.notify_one();
+            });
+            cv.wait(lck);
+        }
+    }
+
+    bool wait_for_sync()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Syncing) {
+            waiting_for_sync = true;
+            cv.wait(lck);
+            waiting_for_sync = false;
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -741,8 +771,12 @@ private:
     mutable _impl::History* m_history = nullptr;
 
     DB::ReadLockInfo m_read_lock;
+    std::mutex mtx;
+    std::condition_variable cv;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
     AsyncState m_async_stage = AsyncState::Idle;
+    bool waiting_for_write_lock = false;
+    bool waiting_for_sync = false;
 
     friend class DB;
     friend class DisableReplication;

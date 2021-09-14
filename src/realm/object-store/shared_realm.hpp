@@ -555,7 +555,6 @@ private:
     void run_async_completions_on_proper_thread();
     void check_pending_write_requests();
     void end_current_write();
-    bool do_run_writes();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

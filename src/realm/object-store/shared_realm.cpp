@@ -688,12 +688,6 @@ void Realm::run_writes()
 
     REALM_ASSERT(!m_transaction->is_synchronizing());
 
-    if (do_run_writes())
-        end_current_write();
-}
-
-bool Realm::do_run_writes()
-{
     m_is_running_async_writes = true;
     int run_limit = 20; // max number of commits without full sync to disk
     // this is tricky
@@ -729,7 +723,7 @@ bool Realm::do_run_writes()
         if (m_notify_only) {
             m_notify_only = false;
             m_is_running_async_writes = false;
-            return false;
+            return;
         }
 
         // if we've run the full transaction, there is follow up work to do:
@@ -749,7 +743,7 @@ bool Realm::do_run_writes()
     m_async_commit_barrier_requested = false;
     m_is_running_async_writes = false;
 
-    return true;
+    end_current_write();
 }
 
 void Realm::async_begin_transaction(const std::function<void()>& the_write_block, bool notify_only)
@@ -820,42 +814,26 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
     if (is_in_async_transaction()) {
-        std::mutex mtx;
-        std::condition_variable cv;
-
         // Wait until the write mutex is actually acquired
-        while (!m_transaction->holds_write_mutex()) {
-            std::this_thread::yield();
-        }
+        m_transaction->wait_for_write_lock();
 
-        // Run all the async handlers with grouping allowed
-        do_run_writes();
-        if (m_async_commit_q.empty()) {
-            // Nothing to commit to disk - just release write lock
-            m_transaction->async_release_write_lock([&] {
-                std::unique_lock<std::mutex> lck(mtx);
-                cv.notify_one();
-            });
+        // Wait for potential syncing to finish
+        if (m_transaction->wait_for_sync()) {
+            // We have hijacked the callback which would have called the
+            // completion handlers. So we just call them here
+            m_is_running_async_commit_completions = true;
+            for (auto [read_lock, when_completed] : m_async_commit_q) {
+                m_transaction->release_read_lock(read_lock);
+                when_completed();
+            }
+            m_is_running_async_commit_completions = false;
+
+            m_async_commit_q.clear();
         }
         else {
-            // Request that the commits are written to disk
-            m_transaction->async_request_sync_to_storage([&]() {
-                std::unique_lock<std::mutex> lck(mtx);
-                cv.notify_one();
-            });
+            // Or just release write lock again
+            m_transaction->release_write_lock();
         }
-        std::unique_lock<std::mutex> lck(mtx);
-        cv.wait(lck);
-
-        // Now the commit has been written to disk - call the completion handlers
-        m_is_running_async_commit_completions = true;
-        for (auto [read_lock, when_completed] : m_async_commit_q) {
-            m_transaction->release_read_lock(read_lock);
-            when_completed();
-        }
-        m_is_running_async_commit_completions = false;
-
-        m_async_commit_q.clear();
     }
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`

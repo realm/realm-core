@@ -1752,6 +1752,9 @@ void DB::AsyncCommitHelper::main()
 {
     std::unique_lock lg(m_mutex);
     while (!m_terminated) {
+#if 0 // Enable for testing purposes
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
         if (m_has_write_mutex) {
             if (m_pending_sync) {
                 std::function<void()> cb = m_pending_sync.value();
@@ -1781,7 +1784,6 @@ void DB::AsyncCommitHelper::main()
         }
         else {
             // Waiting for write req
-            // std::this_thread::sleep_for (std::chrono::milliseconds(10)); // Enable for testing purposes
             REALM_ASSERT(!m_pending_sync && !m_pending_mx_release);
             if (!m_pending_writes.empty()) {
                 // acquire write mutex
@@ -2902,8 +2904,14 @@ void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, when_acquired]() {
         if (auto tr = weak_tr.lock()) {
+            std::unique_lock<std::mutex> lck(tr->mtx);
             tr->m_async_stage = Transaction::AsyncState::HasLock;
-            when_acquired();
+            if (tr->waiting_for_write_lock) {
+                tr->cv.notify_one();
+            }
+            else {
+                when_acquired();
+            }
         }
     });
 }
@@ -3075,7 +3083,14 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         // is allowed to re-request it.
         db->release_read_lock(read_lock);
         db->do_end_write();
-        when_synchronized();
+
+        std::unique_lock<std::mutex> lck(mtx);
+        if (waiting_for_sync) {
+            cv.notify_one();
+        }
+        else {
+            when_synchronized();
+        }
         m_async_stage = AsyncState::Idle;
     });
 }
