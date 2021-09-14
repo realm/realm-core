@@ -189,45 +189,68 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const 
     config->sdk_version = std::string(sdk_version);
 }
 
-RLM_API realm_app_t* realm_app_new(const realm_app_config_t* app_config,
+RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
                                    const realm_sync_client_config_t* sync_client_config)
 {
-    return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
+    return wrap_err([&]() {
+        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
+    });
 }
 
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id)
+RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app)
 {
-    return new realm_app_t(App::get_cached_app(app_id));
+    return wrap_err([&]() {
+        if (auto app = App::get_cached_app(app_id)) {
+            if (out_app) {
+                *out_app = new realm_app_t(app);
+            }
+        };
+
+        return true;
+    });
 }
 
-RLM_API const char* realm_app_get_app_id(realm_app_t* app)
+RLM_API void realm_clear_cached_apps(void)
+{
+    App::clear_cached_apps();
+}
+
+RLM_API const char* realm_app_get_app_id(const realm_app_t* app)
 {
     return (*app)->config().app_id.c_str();
 }
 
-RLM_API realm_user_t* realm_app_get_current_user(realm_app_t* app)
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app)
 {
-    return new realm_user_t((*app)->current_user());
+    return wrap_err([&]() -> realm_user_t* {
+        if (auto user = (*app)->current_user()) {
+            return new realm_user_t(user);
+        }
+
+        return nullptr;
+    });
 }
 
-RLM_API bool realm_app_get_all_users(realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n)
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n)
 {
-    if (out_users) {
-        std::vector<std::shared_ptr<SyncUser>> users = (*app)->all_users();
-        size_t i = 0;
-        for (; i < max; i++) {
-            out_users[i] = new realm_user_t(users[i]);
+    return wrap_err([&]() {
+        if (out_users) {
+            std::vector<std::shared_ptr<SyncUser>> users = (*app)->all_users();
+            size_t i = 0;
+            for (; i < max; i++) {
+                out_users[i] = new realm_user_t(users[i]);
+            }
+            if (out_n) {
+                *out_n = i;
+            }
         }
-        if (out_n) {
-            *out_n = i;
+        else {
+            if (out_n) {
+                *out_n = (*app)->all_users().size();
+            }
         }
-    }
-    else {
-        if (out_n) {
-            *out_n = (*app)->all_users().size();
-        }
-    }
-    return true;
+        return true;
+    });
 }
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_credentials_t* credentials,

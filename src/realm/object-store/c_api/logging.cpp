@@ -55,8 +55,8 @@ private:
 
 using namespace realm::c_api;
 
-RLM_API realm_logger_t* realm_logger_new(void* userdata, realm_logger_log_func_t log_func,
-                                         realm_logger_get_threshold_func_t threshold_func,
+RLM_API realm_logger_t* realm_logger_new(realm_logger_log_func_t log_func,
+                                         realm_logger_get_threshold_func_t threshold_func, void* userdata,
                                          realm_free_userdata_func_t free_func)
 {
     realm_logger_t* logger = new realm_logger_t;

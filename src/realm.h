@@ -1915,25 +1915,48 @@ typedef enum realm_log_level {
     RLM_LOG_LEVEL_FATAL,
     RLM_LOG_LEVEL_OFF,
 } realm_log_level_e;
-typedef void (*realm_logger_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
-typedef realm_log_level_e (*realm_logger_get_threshold_func_t)(void* userdata);
-typedef realm_logger_t* (*realm_logger_factory_func_t)(void* userdata, realm_log_level_e level);
+
 /**
- * Define a new logger instance.
+ * Callback function for a logger sink.
  *
- * @param log_func A function pointer that will be invoked whenever
- *                 `realm_logger_log()` is called. The function does not need to
- *                 be thread-safe in itself, but may be invoked (under lock)
- *                 from multiple threads.
- * @param threshold_func Get the current log level threshold for the logger. The
- *                       function does not need to be thread-safe.
- * @param free_func How to release @a userdata when the logger object is
- *                  destroyed.
- * @return A non-null pointer if no error occurred.
+ * Will be invoked whenever Core wants to emit a log message.
+ * The function does not need to be thread-safe in itself,
+ * but may be invoked (under lock) from multiple threads.
+ *
+ * @param userdata The userdata pointer passed to realm_logger_new().
+ * @param level The log level to use.
+ * @param message The message to log.
  */
-RLM_API realm_logger_t* realm_logger_new(void* userdata, realm_logger_log_func_t log_func,
-                                         realm_logger_get_threshold_func_t threshold_func,
-                                         realm_free_userdata_func_t free_func);
+typedef void (*realm_logger_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+
+/**
+ * Callback function for a logger sink.
+ *
+ * The function does not need to be thread-safe.
+ *
+ * @param userdata The userdata pointer passed to realm_logger_new().
+ * @return The current log level threshold of a logger.
+ */
+typedef realm_log_level_e (*realm_logger_get_threshold_func_t)(void* userdata);
+
+/**
+ * Callback function implementing a logger sink factory.
+ *
+ * Used by Core whenever it needs to instantiate a logger.
+ * Core will take care to realm_release() the return value.
+ *
+ * @param userdata The userdata pointer associated with this factory.
+ * @param level The desired log level threshold.
+ * @return A new logger instance.
+ */
+typedef realm_logger_t* (*realm_logger_factory_func_t)(void* userdata, realm_log_level_e level);
+
+
+/**
+ * Create a new logger instance with these callbacks implementing its functionality.
+ */
+RLM_API realm_logger_t* realm_logger_new(realm_logger_log_func_t, realm_logger_get_threshold_func_t, void* userdata,
+                                         realm_free_userdata_func_t);
 
 /* HTTP transport */
 typedef enum realm_http_method {
@@ -1969,12 +1992,41 @@ typedef struct realm_http_response {
     size_t body_size;
 } realm_http_response_t;
 
-typedef void (*realm_http_completion_func_t)(void* userdata, realm_http_response_t *response);
-typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_http_request_t, void* completion_data,
-                                          realm_http_completion_func_t completion_callback);
+/**
+ * Callback function provided by Core to complete a HTTP request with a given response.
+ *
+ * @param completion_data Internal state pointer passed by Core when invoking realm_http_request_func_t
+ *                        to start the request.
+ * @param response The server response to the HTTP request initiated by Core.
+ */
+typedef void (*realm_http_completion_func_t)(void* completion_data, const realm_http_response_t* response);
+/**
+ * Callback function used by Core to make a HTTP request.
+ *
+ * @param transport_userdata The userdata pointer passed to realm_http_transport_new().
+ * @param request The request to send.
+ * @param completion_data Internal state pointer of Core, needed by @a completion_callback.
+ * @param completion_callback Callback function provided by Core that completes the request with a response.
+ */
+typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_http_request_t request,
+                                          void* completion_data, realm_http_completion_func_t completion_callback);
 
 typedef struct realm_http_transport realm_http_transport_t;
+
+/**
+ * Callback function implementing a HTTP transport factory.
+ *
+ * Used by Core whenever in needs to instantiate a transport object.
+ * Core will take care to realm_release() the return value.
+ *
+ * @param userdata The userdata pointer associated with this factory.
+ * @return A new transport instance.
+ */
 typedef realm_http_transport_t* (*realm_http_transport_factory_func_t)(void* userdata);
+
+/**
+ * Create a new HTTP transport with these callbacks implementing its functionality.
+ */
 RLM_API realm_http_transport_t* realm_http_transport_new(void* userdata, realm_free_userdata_func_t,
                                                          realm_http_request_func_t);
 
@@ -1995,23 +2047,82 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_SERVER_API_KEY,
 } realm_auth_provider_e;
 
+/**
+ * Create anonymous app credentials.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void);
+
+/**
+ * Create Facebook app credentials.
+ *
+ * @param access_token Facebook access token.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token);
+
+/**
+ * Create Google app credentials.
+ *
+ * @param id_token Google id token.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token);
+
+/**
+ * Create Apple app credentials.
+ *
+ * @param id_token Apple id token
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token);
+
+/**
+ * Create custom app credentials.
+ *
+ * @param token Custom token.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_custom(const char* token);
+
+/**
+ * Create username and password app credentials.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_username_password(const char* username,
                                                                              const char* password);
+
+/**
+ * Create Realm Function app credentials.
+ *
+ * @param serialized_bson_payload The serialized BSON payload to invoke the function with.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_bson_payload);
+
+/**
+ * Create User API Key app credentials.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key);
+
+/**
+ * Create Server API Key app credentials.
+ */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key);
 
+/**
+ * Get the provider type of a credentials object.
+ */
 RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*);
 
+/**
+ * Create a new app configuration.
+ *
+ * @param app_id The MongoDB Realm app id.
+ * @param http_transport_factory The HTTP transport factory used to make network calls.
+ * @param transport_factory_userdata The userdata pointer associated with @a http_transport_factory.
+ * @param transport_factory_userdata_free The cleanup function for @a transport_factory_userdata once it's no longer
+ * needed.
+ */
 RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
                                                  realm_http_transport_factory_func_t http_transport_factory,
                                                  void* transport_factory_userdata,
                                                  realm_free_userdata_func_t transport_factory_userdata_free);
+
+
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*);
 RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*);
 RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*);
@@ -2020,11 +2131,34 @@ RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*);
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*);
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*);
 
-RLM_API realm_app_t* realm_app_new(const realm_app_config_t*, const realm_sync_client_config_t*);
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id);
+/**
+ * Get an existing @a realm_app_t* instance with the same app id, or create it with the
+ * configuration if it doesn't exist.
+ *
+ * @return A non-null pointer if no error occured.
+ */
+RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
 
-RLM_API const char* realm_app_get_app_id(realm_app_t*);
-RLM_API realm_user_t* realm_app_get_current_user(realm_app_t*);
+/**
+ * Get an existing @a realm_app_t* instance from the cache.
+ *
+ * @param app_id The app id to look for.
+ * @param out_app A pointer to a @a realm_app_t* variable that will be populated
+ *                with the app instance, or NULL if an app wasn't found.
+ * @return true if no error occured.
+ */
+RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app);
+
+/**
+ * Clear all the cached @a realm_app_t* instances in the process.
+ *
+ * @a realm_app_t* instances will need to be disposed with realm_release()
+ * for them to be fully destroyed after the cache is cleared.
+ */
+RLM_API void realm_clear_cached_apps(void);
+
+RLM_API const char* realm_app_get_app_id(const realm_app_t*);
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*);
 
 /**
  * Get the list of active users in this @a app.
@@ -2037,7 +2171,7 @@ RLM_API realm_user_t* realm_app_get_current_user(realm_app_t*);
  * @param out_n The actual number of properties written to `out_users`.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_app_get_all_users(realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n);
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n);
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                void (*)(void* userdata, realm_user_t*, realm_error_t*),

@@ -66,7 +66,7 @@ protected:
     }
 
 private:
-    static void on_response_completed(void* completion_data, realm_http_response_t *response)
+    static void on_response_completed(void* completion_data, const realm_http_response_t* response)
     {
         auto& completion = *reinterpret_cast<std::function<void(const Response)>*>(completion_data);
 
