@@ -2395,7 +2395,7 @@ TEST_CASE("C API") {
             CHECK(count == 1);
 
             auto frozen_realm = cptr_checked(realm_freeze(realm));
-            auto frozen_results = cptr_checked(realm_results_freeze(results.get(), frozen_realm.get()));
+            auto frozen_results = cptr_checked(realm_results_resolve_in(results.get(), frozen_realm.get()));
             write([&]() {
                 auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
                 CHECK(obj1);
@@ -2405,7 +2405,7 @@ TEST_CASE("C API") {
             realm_results_count(results.get(), &count);
             CHECK(count == 2);
 
-            auto thawed_results = cptr_checked(realm_results_thaw(frozen_results.get(), realm));
+            auto thawed_results = cptr_checked(realm_results_resolve_in(frozen_results.get(), realm));
             realm_results_count(thawed_results.get(), &count);
             CHECK(count == 2);
         }

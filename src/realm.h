@@ -1811,24 +1811,13 @@ RLM_API bool realm_results_delete_all(realm_results_t*);
 RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
 
 /**
- * Map the results into a frozen realm instance.
- *
- * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
- *
- * @return A frozen copy of the Results.
- */
-RLM_API realm_results_t* realm_results_freeze(realm_results_t*, const realm_t* frozen_realm);
-
-/**
  * Map the Results into a live Realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
  *
- * Note: Will assert that live_realm is not frozen.
- *
  * @return A live copy of the Results.
  */
-RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm);
+RLM_API realm_results_t* realm_results_resolve_in(realm_results_t* from_results, const realm_t* target_realm);
 
 /**
  * Compute the minimum value of a property in the results.
