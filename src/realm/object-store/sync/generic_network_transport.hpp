@@ -232,7 +232,6 @@ struct Response {
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    using NetworkTransportFactory = std::function<std::unique_ptr<GenericNetworkTransport>()>;
     virtual void send_request_to_server(const Request request,
                                         std::function<void(const Response)> completionBlock) = 0;
     virtual ~GenericNetworkTransport() = default;
