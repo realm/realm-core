@@ -119,7 +119,7 @@ App::App(const Config& config)
     , m_auth_route(m_app_route + auth_path)
     , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
-    REALM_ASSERT(m_config.transport_generator);
+    REALM_ASSERT(m_config.transport);
 
     if (m_config.platform.empty()) {
         throw std::runtime_error("You must specify the Platform in App::Config");
@@ -814,7 +814,7 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
 
-    m_config.transport_generator()->send_request_to_server(req, [this, completion_block](const Response& response) {
+    m_config.transport->send_request_to_server(req, [this, completion_block](const Response& response) {
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
@@ -869,11 +869,11 @@ void App::do_request(Request request, std::function<void(Response)> completion_b
                 request.url.replace(0, m_base_url.size(), app_metadata->hostname);
             }
 
-            m_config.transport_generator()->send_request_to_server(request, completion_block);
+            m_config.transport->send_request_to_server(request, completion_block);
         });
     }
     else {
-        m_config.transport_generator()->send_request_to_server(request, completion_block);
+        m_config.transport->send_request_to_server(request, completion_block);
     }
 }
 
@@ -902,7 +902,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
             // assign the new access_token to the auth header
             Request newRequest = request;
             newRequest.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            m_config.transport_generator()->send_request_to_server(newRequest, completion_block);
+            m_config.transport->send_request_to_server(newRequest, completion_block);
         }
         else {
             // pass the error back up the chain
