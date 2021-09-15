@@ -1737,11 +1737,11 @@ return yy::parser::make_SORT(yytext);
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-return yy::parser::make_DISTINCT();
+return yy::parser::make_DISTINCT(yytext);
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-return yy::parser::make_LIMIT();
+return yy::parser::make_LIMIT(yytext);
 	YY_BREAK
 case 27:
 YY_RULE_SETUP

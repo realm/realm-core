@@ -54,8 +54,8 @@ blank   [ \t\r]
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 
 (?i:falsepredicate)         return yy::parser::make_FALSEPREDICATE (); 
 (?i:sort)                   return yy::parser::make_SORT(yytext);
-(?i:distinct)               return yy::parser::make_DISTINCT();
-(?i:limit)                  return yy::parser::make_LIMIT();
+(?i:distinct)               return yy::parser::make_DISTINCT(yytext);
+(?i:limit)                  return yy::parser::make_LIMIT(yytext);
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING();
 (?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING();
 (?i:subquery)               return yy::parser::make_SUBQUERY();
