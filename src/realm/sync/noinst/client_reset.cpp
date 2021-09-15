@@ -643,80 +643,9 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     }
 }
 
-
-void client_reset::recover_schema(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
-{
-    // First the missing tables are created. Columns must be created later due
-    // to links.
-    for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
-            continue;
-        ConstTableRef table_src = group_src.get_table(table_key);
-        StringData table_name = table_src->get_name();
-        TableRef table_dst = group_dst.get_table(table_name);
-        if (table_dst) {
-            // Disagreement of table type is ignored.
-            // That problem is rare and cannot be resolved here.
-            continue;
-        }
-        // Create the table.
-        logger.trace("Recover the table %1", table_name);
-        if (auto pk_col = table_src->get_primary_key_column()) {
-            DataType pk_type = DataType(pk_col.get_type());
-            StringData pk_col_name = table_src->get_column_name(pk_col);
-            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col.is_nullable());
-        }
-        else {
-            sync::create_table(group_dst, table_name);
-        }
-    }
-
-    // Create the missing columns.
-    for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
-            continue;
-        ConstTableRef table_src = group_src.get_table(table_key);
-        StringData table_name = table_src->get_name();
-        TableRef table_dst = group_dst.get_table(table_name);
-        REALM_ASSERT(table_dst);
-        for (ColKey col_key : table_src->get_column_keys()) {
-            StringData col_name = table_src->get_column_name(col_key);
-            ColKey col_key_dst = table_dst->get_column_key(col_name);
-            if (!col_key_dst) {
-                DataType type = table_src->get_column_type(col_key);
-                bool nullable = table_src->is_nullable(col_key);
-                logger.trace("Recover column, table = %1, column name = %2, "
-                             " type = %3, nullable = %4",
-                             table_name, col_name, type, nullable);
-                if (col_key.is_list()) {
-                    if (type == type_LinkList) {
-                        ConstTableRef target_src = table_src->get_link_target(col_key);
-                        TableRef target_dst = group_dst.get_table(target_src->get_name());
-                        table_dst->add_column_list(*target_dst, col_name);
-                    }
-                    else {
-                        table_dst->add_column_list(type, col_name, nullable);
-                    }
-                }
-                else {
-                    if (type == type_Link) {
-                        ConstTableRef target_src = table_src->get_link_target(col_key);
-                        TableRef target_dst = group_dst.get_table(target_src->get_name());
-                        table_dst->add_column(*target_dst, col_name);
-                    }
-                    else {
-                        table_dst->add_column(type, col_name, nullable);
-                    }
-                }
-            }
-        }
-    }
-}
-
-client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
-    DB& db_local, DBRef db_remote, std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-    std::function<void(TransactionRef local)> notify_after, sync::SaltedFileIdent client_file_ident,
-    util::Logger& logger)
+client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_local, DBRef db_remote,
+                                                                      sync::SaltedFileIdent client_file_ident,
+                                                                      util::Logger& logger)
 {
     logger.info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
@@ -725,25 +654,17 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
                 (db_remote ? db_remote->get_path() : "<none>"));
 
-    auto& history_local = dynamic_cast<ClientHistoryImpl&>(*db_local.get_replication());
+    auto& history_local = static_cast<ClientHistoryImpl&>(*db_local.get_replication());
 
-    if (notify_before) {
-        TransactionRef local_frozen, remote_frozen;
-        local_frozen = db_local.start_frozen();
-        if (db_remote) {
-            remote_frozen = db_remote->start_frozen();
-        }
-        notify_before(local_frozen, remote_frozen);
-    }
-    auto group_local = db_local.start_write();
-    VersionID old_version_local = group_local->get_version_of_current_transaction();
+    auto wt_local = db_local.start_write();
+    VersionID old_version_local = wt_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
-    group_local->get_history()->ensure_updated(current_version_local);
+    wt_local->get_history()->ensure_updated(current_version_local);
     BinaryData recovered_changeset;
     sync::SaltedVersion fresh_server_version = {0, 0};
 
     if (db_remote) { // seamless_loss mode
-        auto& history_remote = dynamic_cast<ClientHistoryImpl&>(*db_remote->get_replication());
+        auto& history_remote = static_cast<ClientHistoryImpl&>(*db_remote->get_replication());
         auto wt_remote = db_remote->start_write();
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
@@ -755,38 +676,19 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
         history_remote.get_status(remote_version, remote_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
 
-        transfer_group(*wt_remote, *group_local, logger);
-
-#if 0 // the following would only be applicable in recovery mode, in seamless loss we don't modify the remote
-      // Extract the changeset produced in the remote Realm during recovery.
-         sync::ChangesetEncoder& instruction_encoder = history_remote->get_instruction_encoder();
-         const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
-         recovered_changeset = {buffer.data(), buffer.size()};
-        //        {
-        //            // Debug.
-        //            ChunkedBinaryInputStream in{recovered_changeset};
-        //            sync::Changeset log;
-        //            sync::parse_changeset(in, log); // Throws
-        //            log.print();
-        //        }
-#endif
+        transfer_group(*wt_remote, *wt_local, logger);
     }
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                recovered_changeset);
 
     // Finally, the local Realm is committed.
-    group_local->commit_and_continue_as_read();
-    VersionID new_version_local = group_local->get_version_of_current_transaction();
+    wt_local->commit_and_continue_as_read();
+    VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.debug("perform_client_reset_diff is done, old_version.version = %1, "
                  "old_version.index = %2, new_version.version = %3, "
                  "new_version.index = %4",
                  old_version_local.version, old_version_local.index, new_version_local.version,
                  new_version_local.index);
-    if (notify_after) {
-        TransactionRef local_frozen;
-        local_frozen = db_local.start_frozen();
-        notify_after(local_frozen);
-    }
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }

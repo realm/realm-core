@@ -47,8 +47,21 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 
         client_reset::LocalVersionIDs local_version_ids;
         try {
-            local_version_ids = client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_notify_before,
-                                                                        m_notify_after, m_salted_file_ident, logger);
+            if (m_notify_before) {
+                TransactionRef local_frozen, remote_frozen;
+                local_frozen = m_db.start_frozen();
+                if (m_db_fresh) {
+                    remote_frozen = m_db_fresh->start_frozen();
+                }
+                m_notify_before(local_frozen, remote_frozen);
+            }
+
+            local_version_ids =
+                client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, logger);
+
+            if (m_notify_after) {
+                m_notify_after(m_db.start_frozen());
+            }
         }
         catch (const client_reset::ClientResetFailed& e) {
             logger.error("In ClientResetOperation::finalize, the client reset failed, "
@@ -74,7 +87,7 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
                 // this is expected. Releasing the last ref should release the hold on the
                 // lock file and allow us to clean up.
                 long use_count = m_db_fresh.use_count();
-                REALM_ASSERT_DEBUG_EX(m_db_fresh.use_count() == 1, m_db_fresh.use_count(), path_to_clean);
+                REALM_ASSERT_DEBUG_EX(use_count == 1, use_count, path_to_clean);
                 m_db_fresh.reset();
                 // clean up the fresh Realm
                 // we don't mind leaving the fresh lock file around because trying to delete it

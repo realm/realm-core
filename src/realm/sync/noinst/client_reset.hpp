@@ -36,10 +36,6 @@ struct ClientResetFailed : public std::runtime_error {
 // when this function returns.
 void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger);
 
-// recover_schema() transfers all tables and columns that exist in src but not
-// in dst into dst. Nothing is erased in dst.
-void recover_schema(const Transaction& group_src, Transaction& group_dst, util::Logger& logger);
-
 void remove_all_tables(Transaction& tr_dst, util::Logger& logger);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
@@ -58,8 +54,6 @@ struct LocalVersionIDs {
 };
 LocalVersionIDs
 perform_client_reset_diff(DB& db, DBRef db_remote,
-                          std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-                          std::function<void(TransactionRef local)> notify_after,
                           sync::SaltedFileIdent client_file_ident, util::Logger& logger);
 
 } // namespace client_reset

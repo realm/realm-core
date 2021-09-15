@@ -83,9 +83,9 @@ using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ClientResyncMode : unsigned char {
     // Fire a client reset error
-    Manual = 1,
+    Manual,
     // Discard local changes, without disrupting accessors or closing the Realm
-    SeamlessLoss = 2,
+    SeamlessLoss,
 };
 
 enum class ReconnectMode {
