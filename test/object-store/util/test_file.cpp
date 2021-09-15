@@ -36,6 +36,7 @@
 #include <realm/util/file.hpp>
 
 #include <cstdlib>
+#include <iostream>
 
 #ifdef _WIN32
 #include <io.h>
@@ -120,7 +121,10 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
                                                                    app->base_url(), fake_device_id),
                                      name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](auto, auto) {
+    sync_config->error_handler = [](auto, SyncError error) {
+        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
+                                  error.message)
+                  << std::endl;
         abort();
     };
     schema_mode = SchemaMode::AdditiveExplicit;
@@ -133,7 +137,10 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, std::string pa
 
     sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson(partition));
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError /*error*/) {
+    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
+                                  error.message)
+                  << std::endl;
         abort();
     };
     schema_version = 1;
