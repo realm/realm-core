@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
 #include "util/baas_admin_api.hpp"
@@ -1774,6 +1775,101 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             CHECK(array_list.get<int64_t>(0) == int64_t(7));
             CHECK(array_list.get<int64_t>(1) == int64_t(8));
         }
+    }
+}
+
+TEST_CASE("app: make distributable client file", "[sync][app]") {
+    auto config = get_integration_config();
+    auto base_path = util::make_temp_dir();
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
+    util::try_make_dir(base_path + "/orig");
+    util::try_make_dir(base_path + "/copy");
+
+    // Create realm file without client file id
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(!error);
+                                         REQUIRE(user);
+                                     });
+
+        ThreadSafeReference realm_ref;
+
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/orig/default.realm";
+
+        std::mutex mutex;
+        auto task = realm::Realm::get_synchronized_realm(realm_config);
+        task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
+            std::lock_guard<std::mutex> lock(mutex);
+            REQUIRE(!error);
+            realm_ref = std::move(ref);
+        });
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> lock(mutex);
+            return bool(realm_ref);
+        });
+        SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+
+        // Write some data
+        realm->begin_transaction();
+        CppContext c;
+        Object::create(c, realm, "Person",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"age", INT64_C(64)},
+                                                {"firstName", std::string("Paul")},
+                                                {"lastName", std::string("McCartney")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        realm->write_copy(base_path + "/copy/default.realm", BinaryData());
+
+        // Write some additional data
+        realm->begin_transaction();
+        Object::create(c, realm, "Dog",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"breed", std::string("stabyhoun")},
+                                                {"name", std::string("albert")},
+                                                {"realm_id", std::string("foo")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    }
+    // Starting a new session based on the copy
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(!error);
+                                         REQUIRE(user);
+                                     });
+
+        ThreadSafeReference realm_ref;
+
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/copy/default.realm";
+
+        SharedRealm realm = realm::Realm::get_shared_realm(realm_config);
+        wait_for_download(*realm);
+
+        // Check that we can continue committing to this realm
+        realm->begin_transaction();
+        CppContext c;
+        Object::create(c, realm, "Dog",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"breed", std::string("bulldog")},
+                                                {"name", std::string("fido")},
+                                                {"realm_id", std::string("foo")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
     }
 }
 

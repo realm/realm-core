@@ -566,7 +566,13 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
                 std::lock_guard<std::mutex> lock(mutex);
                 return bool(realm_ref);
             });
+            // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            realm->begin_transaction();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
             client_file_id = realm->read_group().get_sync_file_id();
             realm->write_copy(config3.path, BinaryData());
         }
@@ -582,7 +588,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         wait_for_download(*realm);
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(realm->read_group().get_table("class_object")->size() == 2);
+        REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
@@ -593,7 +599,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(origin->read_group().get_table("class_object")->size() == 3);
+        REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {

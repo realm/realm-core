@@ -24,14 +24,14 @@ target_link_libraries(RealmTrawler Storage)
 
 add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp )
 set_target_properties(RealmBrowser PROPERTIES
-    OUTPUT_NAME "realm-browser-6"
+    OUTPUT_NAME "realm-browser-10"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(RealmBrowser Storage)
 
 add_executable(Realm2JSON realm2json.cpp )
 set_target_properties(Realm2JSON PROPERTIES
-    OUTPUT_NAME "realm2json-6"
+    OUTPUT_NAME "realm2json-10"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
 )
 target_link_libraries(Realm2JSON Storage)
