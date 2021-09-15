@@ -54,10 +54,7 @@ void timed_sleeping_wait_for(std::function<bool()> condition,
 void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
 
 template <typename Transport>
-std::unique_ptr<app::GenericNetworkTransport> factory()
-{
-    return std::unique_ptr<app::GenericNetworkTransport>(new Transport);
-}
+const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 
 #if REALM_ENABLE_AUTH_TESTS
 

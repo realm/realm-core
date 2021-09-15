@@ -257,10 +257,8 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     , m_app_session(config.app_session)
 {
     app::App::Config app_config = config.app_config;
-    if (!app_config.transport_generator) {
-        app_config.transport_generator = [this] {
-            return transport_generator();
-        };
+    if (!app_config.transport) {
+        app_config.transport = transport;
     }
 
     if (app_config.platform.empty()) {

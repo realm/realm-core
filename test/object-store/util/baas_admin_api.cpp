@@ -922,7 +922,7 @@ app::App::Config get_integration_config()
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
     auto app_session = get_runtime_app_session(base_url);
-    return get_config(factory<SynchronousTestTransport>, app_session);
+    return get_config(instance_of<SynchronousTestTransport>, app_session);
 }
 
 AppSession get_runtime_app_session(std::string base_url)

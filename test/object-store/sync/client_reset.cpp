@@ -103,7 +103,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
     AppSession app_session = create_app(server_app_config);
-    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
 
     TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
     auto app = sync_manager.app();
