@@ -531,10 +531,10 @@ void SyncSession::handle_error(SyncError error)
             case ClientResyncMode::SeamlessLoss: {
                 REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                 std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
-                using namespace std::placeholders; // for _1, _2
-                m_config.get_fresh_realm_for_path(
-                    fresh_path,
-                    std::bind(std::mem_fn(&SyncSession::handle_fresh_realm_downloaded), shared_from_this(), _1, _2));
+                auto self_ref = shared_from_this();
+                m_config.get_fresh_realm_for_path(fresh_path, [self_ref](DBRef db, std::exception_ptr err) {
+                    self_ref->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                });
                 return;
             }
         }
