@@ -1733,7 +1733,7 @@ return yy::parser::make_FALSEPREDICATE ();
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-return yy::parser::make_SORT();
+return yy::parser::make_SORT(yytext);
 	YY_BREAK
 case 25:
 YY_RULE_SETUP

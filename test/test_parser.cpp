@@ -148,6 +148,7 @@ static std::vector<std::string> valid_queries = {
     "0 =< 0",
     "0<=0",
     "a BETWEEN {4, 5}",
+    "sort > 0",
     "0 contains 0",
     "a CONTAINS[c] b",
     "a contains [c] b",
@@ -191,6 +192,7 @@ static std::vector<std::string> valid_queries = {
 
     // sort/distinct
     "a=b SORT(p ASCENDING)",
+    "TRUEPREDICATE SORT(sort ASCENDING)",
     "a=b SORT(p asc)",
     "a=b SORT(p Descending)",
     "a=b sort (p.q desc)",

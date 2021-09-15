@@ -53,7 +53,7 @@ blank   [ \t\r]
 (?i:between)                return yy::parser::make_BETWEEN(yytext);
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 
 (?i:falsepredicate)         return yy::parser::make_FALSEPREDICATE (); 
-(?i:sort)                   return yy::parser::make_SORT();
+(?i:sort)                   return yy::parser::make_SORT(yytext);
 (?i:distinct)               return yy::parser::make_DISTINCT();
 (?i:limit)                  return yy::parser::make_LIMIT();
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING();
