@@ -233,14 +233,14 @@ bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
             auto dst_val = dst.get_pair(sorted_dst[dst_ndx]);
             int cmp = src_val.first.compare(dst_val.first);
             if (cmp == 0) {
-                // Check if value differ
+                // Check if the values differ
                 Mixed converted_src = convert.src_to_dst(src_val.second);
                 cmp = converted_src.compare(dst_val.second);
                 if (cmp) {
-                    // it does - modify destination
+                    // values are different - modify destination, advance both
                     to_insert.push_back(sorted_src[src_ndx]);
                 }
-                // keys equal: advance both src and dst
+                // keys and values equal: advance both src and dst
                 ++dst_ndx;
                 ++src_ndx;
                 break;

@@ -1190,17 +1190,17 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
         }
         SECTION("modify complex") {
             std::vector<std::pair<std::string, Mixed>> local;
-            local.emplace_back("adam", Mixed(1));
-            local.emplace_back("bernie", Mixed(2));
-            local.emplace_back("david", Mixed(4));
-            local.emplace_back("eric", Mixed(4));
-            local.emplace_back("frank", Mixed(4));
+            local.emplace_back("adam", Mixed(values[0]));
+            local.emplace_back("bernie", Mixed(values[0]));
+            local.emplace_back("david", Mixed(values[0]));
+            local.emplace_back("eric", Mixed(values[0]));
+            local.emplace_back("frank", Mixed(values[1]));
             std::vector<std::pair<std::string, Mixed>> remote;
-            remote.emplace_back("adam", Mixed(1));
-            remote.emplace_back("bernie", Mixed(7));
-            remote.emplace_back("carl", Mixed(3));
-            remote.emplace_back("david", Mixed(-2));
-            remote.emplace_back("frank", Mixed(8));
+            remote.emplace_back("adam", Mixed(values[0]));
+            remote.emplace_back("bernie", Mixed(values[1]));
+            remote.emplace_back("carl", Mixed(values[0]));
+            remote.emplace_back("david", Mixed(values[1]));
+            remote.emplace_back("frank", Mixed(values[0]));
             reset_dictionary(local, remote);
         }
         SECTION("empty remote") {
