@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2021 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include <realm/db.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
@@ -6,18 +24,16 @@
 
 namespace realm::_impl {
 
-ClientResetOperation::ClientResetOperation(
-    util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
-    std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-    std::function<void(TransactionRef local)> notify_after)
-    : logger{logger}
+ClientResetOperation::ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
+                                           CallbackBeforeType notify_before, CallbackAfterType notify_after)
+    : m_logger{logger}
     , m_db{db}
     , m_db_fresh(std::move(db_fresh))
     , m_seamless_loss(seamless_loss)
-    , m_notify_before(notify_before)
-    , m_notify_after(notify_after)
+    , m_notify_before(std::move(notify_before))
+    , m_notify_after(std::move(notify_after))
 {
-    logger.debug("Create ClientStateDownload, realm_path = %1, seamless_loss = %2", m_db.get_path(), seamless_loss);
+    logger.debug("Create ClientResetOperation, realm_path = %1, seamless_loss = %2", m_db.get_path(), seamless_loss);
 }
 
 std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
@@ -42,8 +58,8 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
     // sync should be able to continue as normal
     bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
-        logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2", m_db.get_path(),
-                     local_realm_exists);
+        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2", m_db.get_path(),
+                       local_realm_exists);
 
         client_reset::LocalVersionIDs local_version_ids;
         try {
@@ -57,22 +73,23 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
             }
 
             local_version_ids =
-                client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, logger);
+                client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger);
 
             if (m_notify_after) {
                 m_notify_after(m_db.start_frozen());
             }
         }
         catch (const client_reset::ClientResetFailed& e) {
-            logger.error("In ClientResetOperation::finalize, the client reset failed, "
-                         "realm path = %1, msg = %2",
-                         m_db.get_path(), e.what());
+            m_logger.error("In ClientResetOperation::finalize, the client reset failed, "
+                           "realm path = %1, msg = %2",
+                           m_db.get_path(), e.what());
             return false;
         }
         catch (const std::exception& e) {
-            logger.error("In ClientResetOperation::finalize, the client reset failed due to an unexpected exception "
-                         "realm path = %1, msg = %2",
-                         m_db.get_path(), e.what());
+            m_logger.error(
+                "In ClientResetOperation::finalize, the client reset failed due to an unexpected exception "
+                "realm path = %1, msg = %2",
+                m_db.get_path(), e.what());
             return false;
         }
 
@@ -97,15 +114,15 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
                     DB::delete_files(path, nullptr, delete_lockfile);
                 });
                 if (!did_lock) {
-                    logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
-                                "There were %2 refs remaining.",
-                                path_to_clean, use_count);
+                    m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
+                                  "There were %2 refs remaining.",
+                                  path_to_clean, use_count);
                 }
             }
             catch (const std::exception& err) {
-                logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
-                            "an exception: '%2'",
-                            path_to_clean, err.what());
+                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+                              "an exception: '%2'",
+                              path_to_clean, err.what());
                 // ignored, this is just a best effort
             }
         }

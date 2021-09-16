@@ -10,6 +10,7 @@
 #include <string>
 
 #include <realm/util/buffer.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
@@ -538,8 +539,8 @@ public:
         struct ClientReset {
             bool seamless_loss = false;
             DBRef fresh_copy;
-            std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
-            std::function<void(TransactionRef local)> notify_after_client_reset;
+            util::UniqueFunction<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+            util::UniqueFunction<void(TransactionRef local)> notify_after_client_reset;
         };
         util::Optional<ClientReset> client_reset_config;
 

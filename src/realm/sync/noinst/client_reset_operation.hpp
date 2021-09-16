@@ -1,10 +1,27 @@
+/*************************************************************************
+ *
+ * Copyright 2021 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #ifndef REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 #define REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 
-#include <realm/binary_data.hpp>
+#include <realm/db.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/sync/protocol.hpp>
 
 namespace realm::_impl {
@@ -13,11 +30,11 @@ namespace realm::_impl {
 // state Realm download.
 class ClientResetOperation {
 public:
-    util::Logger& logger;
+    using CallbackBeforeType = util::UniqueFunction<void(TransactionRef, TransactionRef)>;
+    using CallbackAfterType = util::UniqueFunction<void(TransactionRef)>;
 
     ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
-                         std::function<void(TransactionRef local, TransactionRef remote)> notify_before,
-                         std::function<void(TransactionRef local)> notify_after);
+                         CallbackBeforeType notify_before, CallbackAfterType notify_after);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
@@ -30,14 +47,15 @@ public:
     realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
+    util::Logger& m_logger;
     DB& m_db;
     DBRef m_db_fresh;
     bool m_seamless_loss;
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;
-    std::function<void(TransactionRef local, TransactionRef remote)> m_notify_before;
-    std::function<void(TransactionRef local)> m_notify_after;
+    CallbackBeforeType m_notify_before;
+    CallbackAfterType m_notify_after;
 };
 
 // Implementation
