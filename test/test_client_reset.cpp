@@ -303,11 +303,8 @@ TEST(ClientReset_LocalChangesWhenOffline)
     {
         // We force an async open. This will have the effect that the state file will be empty
         Session::Config session_config_1;
-        {
-            Session::Config::ClientReset client_reset_config;
-            session_config_1.client_reset_config = client_reset_config;
-        }
-        Session session_1 = fixture.make_session(sg, session_config_1);
+        session_config_1.client_reset_config = Session::Config::ClientReset{};
+        Session session_1 = fixture.make_session(sg, std::move(session_config_1));
         fixture.bind_session(session_1, server_path);
         session_1.wait_for_download_complete_or_client_stopped();
 
@@ -344,11 +341,8 @@ TEST(ClientReset_LocalChangesWhenOffline)
     }
 
     Session::Config session_config_3;
-    {
-        Session::Config::ClientReset client_reset_config;
-        session_config_3.client_reset_config = client_reset_config;
-    }
-    Session session_3 = fixture.make_session(sg, session_config_3);
+    session_config_3.client_reset_config = Session::Config::ClientReset{};
+    Session session_3 = fixture.make_session(sg, std::move(session_config_3));
     fixture.bind_session(session_3, server_path);
     session_3.wait_for_upload_complete_or_client_stopped();
     session_3.wait_for_download_complete_or_client_stopped();
@@ -634,11 +628,8 @@ TEST(ClientReset_ThreeClients)
         // A third client makes async open
         {
             Session::Config session_config;
-            {
-                Session::Config::ClientReset client_reset_config;
-                session_config.client_reset_config = client_reset_config;
-            }
-            Session session = fixture.make_session(path_3, session_config);
+            session_config.client_reset_config = Session::Config::ClientReset{};
+            Session session = fixture.make_session(path_3, std::move(session_config));
             fixture.bind_session(session, server_path);
             session.wait_for_download_complete_or_client_stopped();
         }
@@ -793,11 +784,8 @@ TEST(ClientReset_PinnedVersion)
     // Trigger a client reset by syncing with a different server URL
     {
         Session::Config session_config;
-        {
-            Session::Config::ClientReset client_reset_config;
-            session_config.client_reset_config = client_reset_config;
-        }
-        Session session = fixture.make_bound_session(sg, server_path_2, session_config);
+        session_config.client_reset_config = Session::Config::ClientReset{};
+        Session session = fixture.make_bound_session(sg, server_path_2, std::move(session_config));
         session.wait_for_download_complete_or_client_stopped();
     }
 }

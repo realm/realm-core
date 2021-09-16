@@ -1855,7 +1855,7 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, DBRef db, Config config)
+Session::Session(Client& client, DBRef db, Config&& config)
     : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
 {
 }

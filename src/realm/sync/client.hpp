@@ -570,7 +570,7 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, Config = {});
+    Session(Client&, std::shared_ptr<DB>, Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
