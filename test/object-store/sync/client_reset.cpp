@@ -1188,6 +1188,21 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
         SECTION("modify opposite") {
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
         }
+        SECTION("modify complex") {
+            std::vector<std::pair<std::string, Mixed>> local;
+            local.emplace_back("adam", Mixed(1));
+            local.emplace_back("bernie", Mixed(2));
+            local.emplace_back("david", Mixed(4));
+            local.emplace_back("eric", Mixed(4));
+            local.emplace_back("frank", Mixed(4));
+            std::vector<std::pair<std::string, Mixed>> remote;
+            remote.emplace_back("adam", Mixed(1));
+            remote.emplace_back("bernie", Mixed(7));
+            remote.emplace_back("carl", Mixed(3));
+            remote.emplace_back("david", Mixed(-2));
+            remote.emplace_back("frank", Mixed(8));
+            reset_dictionary(local, remote);
+        }
         SECTION("empty remote") {
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {});
         }
