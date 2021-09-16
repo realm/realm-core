@@ -19,6 +19,7 @@
 #ifndef REALM_SYNC_CONFIG_HPP
 #define REALM_SYNC_CONFIG_HPP
 
+#include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/network.hpp>
@@ -27,19 +28,13 @@
 #include <memory>
 #include <string>
 #include <map>
-#include <array>
 #include <system_error>
 #include <unordered_map>
 
 namespace realm {
 
-class Transaction;
-using TransactionRef = std::shared_ptr<Transaction>;
-class Group;
 class SyncUser;
 class SyncSession;
-class DB;
-using DBRef = std::shared_ptr<DB>;
 
 namespace bson {
 class Bson;
