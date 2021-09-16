@@ -687,9 +687,10 @@ public:
     // release the write lock without any sync to disk
     void async_release_write_lock()
     {
-        REALM_ASSERT(m_async_stage == AsyncState::HasLock);
-        m_async_stage = AsyncState::Idle;
-        get_db()->async_end_write();
+        if (m_async_stage == AsyncState::HasLock) {
+            m_async_stage = AsyncState::Idle;
+            get_db()->async_end_write();
+        }
     }
 
     // true if sync to disk has been requested

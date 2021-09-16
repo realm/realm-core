@@ -864,19 +864,27 @@ TEST_CASE("SharedRealm: async_writes") {
         });
     }
     SECTION("syncronous commit") {
-        realm->async_begin_transaction(
-            [&]() {
-                done = true;
-            },
-            true);
+        realm->async_begin_transaction([&]() {
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->async_commit_transaction(
+                [&]() {
+                    done = true;
+                },
+                true);
+        });
+        realm->async_begin_transaction([&]() {
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->commit_transaction();
+        });
         util::EventLoop::main().run_until([&] {
             return done;
         });
-
         auto table = realm->read_group().get_table("class_object");
-        auto col = table->get_column_key("value");
-        table->create_object().set(col, 45);
-        realm->commit_transaction();
+        REQUIRE(table->size() == 2);
     }
     SECTION("syncronous transaction after async transaction with no commit") {
         realm->async_begin_transaction([&]() {});
@@ -892,8 +900,7 @@ TEST_CASE("SharedRealm: async_writes") {
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
             done = true;
-            realm->async_commit_transaction([&]() {
-            });
+            realm->async_commit_transaction([&]() {});
         });
         realm->async_begin_transaction([&]() {
             auto table = realm->read_group().get_table("class_object");

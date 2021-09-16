@@ -637,7 +637,7 @@ void Realm::run_async_completions_on_proper_thread()
     m_scheduler->schedule_completions();
 }
 
-void Realm::run_async_completions()
+void Realm::call_completion_callbacks()
 {
     m_is_running_async_commit_completions = true;
     for (auto [read_lock, when_completed] : m_async_commit_q) {
@@ -647,6 +647,11 @@ void Realm::run_async_completions()
     m_is_running_async_commit_completions = false;
 
     m_async_commit_q.clear();
+}
+
+void Realm::run_async_completions()
+{
+    call_completion_callbacks();
     check_pending_write_requests();
 }
 
@@ -682,10 +687,6 @@ void Realm::run_writes()
         m_async_write_q.clear();
         return;
     }
-    if (!m_transaction->holds_write_mutex()) {
-        return;
-    }
-
     REALM_ASSERT(!m_transaction->is_synchronizing());
 
     m_is_running_async_writes = true;
@@ -694,6 +695,12 @@ void Realm::run_writes()
     //  - each pending call may itself add other async writes
     //  - the 'run' will terminate as soon as a commit without grouping is requested
     while (!m_async_write_q.empty() && !m_async_commit_barrier_requested) {
+
+        // We might have made a sync commit and thereby given up the write lock
+        if (!m_transaction->holds_write_mutex()) {
+            return;
+        }
+
         // It is safe to use a reference here. Elements are not invalidated by new insertions
         auto& write_desc = m_async_write_q.front();
 
@@ -862,17 +869,10 @@ void Realm::commit_transaction()
     }
 
     if (m_transaction->is_async()) {
-        REALM_ASSERT_RELEASE(!m_is_running_async_writes);
         m_coordinator->commit_write(*this, false);
-        std::mutex mtx;
-        std::condition_variable cv;
-        m_transaction->async_request_sync_to_storage([&]() {
-            std::unique_lock<std::mutex> lck(mtx);
-            cv.notify_all();
-        });
-
-        std::unique_lock<std::mutex> lck(mtx);
-        cv.wait(lck);
+        m_transaction->async_request_sync_to_storage([&] {});
+        m_transaction->wait_for_sync();
+        call_completion_callbacks();
     }
     else {
 
@@ -885,9 +885,9 @@ void Realm::commit_transaction()
         else {
             m_coordinator->commit_write(*this);
         }
+        check_pending_write_requests();
     }
     cache_new_schema();
-    check_pending_write_requests();
 }
 
 void Realm::cancel_transaction()

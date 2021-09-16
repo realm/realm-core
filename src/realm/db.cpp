@@ -3085,12 +3085,12 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         db->do_end_write();
 
         std::unique_lock<std::mutex> lck(mtx);
+        m_async_stage = AsyncState::Idle;
         if (waiting_for_sync) {
             cv.notify_one();
         }
         else {
             when_synchronized();
         }
-        m_async_stage = AsyncState::Idle;
     });
 }
