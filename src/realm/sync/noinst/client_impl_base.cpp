@@ -1833,11 +1833,14 @@ void Session::activate()
     logger.debug("Activating"); // Throws
 
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        // The reason we need a mutable reference is because we don't want the session to keep
-        // a strong reference to the client_reset_config->fresh_copy DB. If it did, then the
-        // fresh DB would stay alive for the duration of this sync session and we want to clean
-        // it up once the reset is finished. Additionally, it will get set to a new copy on every
-        // reset so the below code is able to std::move it below.
+        // The reason we need a mutable reference from get_client_reset_config() is because we
+        // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
+        // DB. If it did, then the fresh DB would stay alive for the duration of this sync session
+        // and we want to clean it up once the reset is finished. Additionally, the fresh copy will
+        // be set to a new copy on every reset so there is no reason to keep a reference to it.
+        // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
+        // If the client reset config were a `const &` then this std::move would create another strong
+        // reference which we don't want to happen.
         util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
