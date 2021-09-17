@@ -485,56 +485,52 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// The presence of the ClientReset config indicates an ongoing or
-        /// requested client reset operation. If client_reset is util::none or
-        /// if the local Realm does not exist, an ordinary sync session will
-        /// take place.
+        /// The presence of the ClientReset config indicates an ongoing or requested client
+        /// reset operation. If client_reset is util::none or if the local Realm does not
+        /// exist, an ordinary sync session will take place.
         ///
-        /// A session will perform client reset by downloading a fresh copy of
-        /// the Realm from the server at a different file path location. After
-        /// download, the fresh Realm will be integrated into the local
-        /// Realm in a write transaction. The application is free to use the
-        /// local realm during the entire client reset. Like a DOWNLOAD
-        /// message, the application will not be able to perform a write
-        /// transaction at the same time as the sync client
-        /// performs its own write transaction. Client reset is not more
-        /// disturbing for the application than any DOWNLOAD message. The
-        /// application can listen to change notifications from the client
-        /// reset exactly as in a DOWNLOAD message.
+        /// A session will perform client reset by downloading a fresh copy of the Realm
+        /// from the server at a different file path location. After download, the fresh
+        /// Realm will be integrated into the local Realm in a write transaction. The
+        /// application is free to read or write to the local realm during the entire client
+        /// reset. Like a DOWNLOAD message, the application will not be able to perform a
+        /// write transaction at the same time as the sync client performs its own write
+        /// transaction. Client reset is not more disturbing for the application than any
+        /// DOWNLOAD message. The application can listen to change notifications from the
+        /// client reset exactly as in a DOWNLOAD message. If the application writes to the
+        /// local realm during client reset but before the client reset operation has
+        /// obtained a write lock, the changes made by the application may be lost or
+        /// overwritten depending on the recovery mode selected.
         ///
-        /// Client reset downloads its fresh Realm copy for a Realm
-        /// at path "xyx.realm" to "xyz.realm.fresh". It is assumed that
-        /// this path is available for use and if there are any problems
-        /// the client reset will fail with Client::Error::client_reset_failed.
+        /// Client reset downloads its fresh Realm copy for a Realm at path "xyx.realm" to
+        /// "xyz.realm.fresh". It is assumed that this path is available for use and if
+        /// there are any problems the client reset will fail with
+        /// Client::Error::client_reset_failed.
         ///
-        /// The recommended usage of client reset is after a previous session
-        /// encountered an error that implies the need for a client reset. It
-        /// is not recommended to persist the need for a client reset. The
-        /// application should just attempt to synchronize in the usual fashion
-        /// and only after hitting an error, start a new session with a client
-        /// reset. In other words, if the application crashes during a client reset,
-        /// the application should attempt to perform ordinary synchronization
-        /// after restart and switch to client reset if needed.
+        /// The recommended usage of client reset is after a previous session encountered an
+        /// error that implies the need for a client reset. It is not recommended to persist
+        /// the need for a client reset. The application should just attempt to synchronize
+        /// in the usual fashion and only after hitting an error, start a new session with a
+        /// client reset. In other words, if the application crashes during a client reset,
+        /// the application should attempt to perform ordinary synchronization after restart
+        /// and switch to client reset if needed.
         ///
-        /// Error codes that imply the need for a client reset are the session
-        /// level error codes described by SyncError::is_client_reset_requested()
+        /// Error codes that imply the need for a client reset are the session level error
+        /// codes described by SyncError::is_client_reset_requested()
         ///
-        /// However, other errors such as bad changeset (UPLOAD) could also be resolved
-        /// with a client reset. Client reset can even be used without any prior error
-        /// if so desired.
+        /// However, other errors such as bad changeset (UPLOAD) could also be resolved with
+        /// a client reset. Client reset can even be used without any prior error if so
+        /// desired.
         ///
-        /// After completion of a client reset, the sync client will continue
-        /// synchronizing with the server in the usual fashion.
+        /// After completion of a client reset, the sync client will continue synchronizing
+        /// with the server in the usual fashion.
         ///
-        /// The progress of client reset can be tracked with the
-        /// standard progress handler.
+        /// The progress of client reset can be tracked with the standard progress handler.
         ///
-        /// Client reset is done when the progress handler
-        /// arguments satisfy "progress_version > 0". However, if the
-        /// application wants to ensure that it has all data present on the
-        /// server, it should wait for download completion using either
-        /// void async_wait_for_download_completion(WaitOperCompletionHandler)
-        /// or
+        /// Client reset is done when the progress handler arguments satisfy
+        /// "progress_version > 0". However, if the application wants to ensure that it has
+        /// all data present on the server, it should wait for download completion using
+        /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
         /// bool wait_for_download_complete_or_client_stopped().
         struct ClientReset {
             bool seamless_loss = false;

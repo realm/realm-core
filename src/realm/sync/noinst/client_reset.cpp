@@ -533,7 +533,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         for (auto& obj : *table_src) {
             auto src_pk = obj.get_primary_key();
             auto key_dst = table_dst->find_primary_key(src_pk);
-            if (!key_dst || !table_dst->is_valid(key_dst)) {
+            if (!key_dst) {
                 logger.debug("  adding '%1'", src_pk);
                 table_dst->create_object_with_primary_key(src_pk);
             }
@@ -553,7 +553,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
         auto pk_col = table_src->get_primary_key_column();
-        REALM_ASSERT(table_src->get_primary_key_column());
+        REALM_ASSERT(pk_col);
         logger.debug("Updating values for table '%1', number of rows = %2, "
                      "number of columns = %3, primary_key_col = %4, "
                      "primary_key_type = %5",
