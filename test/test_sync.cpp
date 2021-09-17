@@ -3569,7 +3569,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a1.signed_user_token = g_signed_test_user_token;
 
-    Session session_a1{client, db_a1, session_config_a1};
+    Session session_a1{client, db_a1, std::move(session_config_a1)};
     session_a1.bind();
 
     Session::Config session_config_a2;
@@ -3590,7 +3590,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a2.signed_user_token = g_signed_test_user_token;
 
-    Session session_a2{client, db_a2, session_config_a2};
+    Session session_a2{client, db_a2, std::move(session_config_a2)};
     session_a2.bind();
 
     Session::Config session_config_b1;
@@ -3611,7 +3611,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_b1.signed_user_token = g_signed_test_user_token;
 
-    Session session_b1{client, db_b1, session_config_b1};
+    Session session_b1{client, db_b1, std::move(session_config_b1)};
     session_b1.bind();
 
     session_a1.wait_for_download_complete_or_client_stopped();
