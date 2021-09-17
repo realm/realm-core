@@ -79,57 +79,53 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
                 m_notify_after(m_db.start_frozen());
             }
         }
-        catch (const client_reset::ClientResetFailed& e) {
-            m_logger.error("In ClientResetOperation::finalize, the client reset failed, "
-                           "realm path = %1, msg = %2",
-                           m_db.get_path(), e.what());
-            return false;
-        }
         catch (const std::exception& e) {
-            m_logger.error(
-                "In ClientResetOperation::finalize, the client reset failed due to an unexpected exception "
-                "realm path = %1, msg = %2",
-                m_db.get_path(), e.what());
-            return false;
+            clean_up_state();
+            throw e;
         }
 
         m_client_reset_old_version = local_version_ids.old_version;
         m_client_reset_new_version = local_version_ids.new_version;
 
-        if (m_db_fresh) {
-            std::string path_to_clean = m_db_fresh->get_path();
-            try {
-                // In order to obtain the lock and delete the realm, we first have to close
-                // the Realm. This requires that we are the only remaining ref holder, and
-                // this is expected. Releasing the last ref should release the hold on the
-                // lock file and allow us to clean up.
-                long use_count = m_db_fresh.use_count();
-                REALM_ASSERT_DEBUG_EX(use_count == 1, use_count, path_to_clean);
-                m_db_fresh.reset();
-                // clean up the fresh Realm
-                // we don't mind leaving the fresh lock file around because trying to delete it
-                // here could cause a race if there are multiple resets ongoing
-                bool did_lock = DB::call_with_lock(path_to_clean, [&](const std::string& path) {
-                    constexpr bool delete_lockfile = false;
-                    DB::delete_files(path, nullptr, delete_lockfile);
-                });
-                if (!did_lock) {
-                    m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
-                                  "There were %2 refs remaining.",
-                                  path_to_clean, use_count);
-                }
-            }
-            catch (const std::exception& err) {
-                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
-                              "an exception: '%2'",
-                              path_to_clean, err.what());
-                // ignored, this is just a best effort
-            }
-        }
+        clean_up_state();
 
         return true;
     }
     return false;
+}
+
+void ClientResetOperation::clean_up_state()
+{
+    if (m_db_fresh) {
+        std::string path_to_clean = m_db_fresh->get_path();
+        try {
+            // In order to obtain the lock and delete the realm, we first have to close
+            // the Realm. This requires that we are the only remaining ref holder, and
+            // this is expected. Releasing the last ref should release the hold on the
+            // lock file and allow us to clean up.
+            long use_count = m_db_fresh.use_count();
+            REALM_ASSERT_DEBUG_EX(use_count == 1, use_count, path_to_clean);
+            m_db_fresh.reset();
+            // clean up the fresh Realm
+            // we don't mind leaving the fresh lock file around because trying to delete it
+            // here could cause a race if there are multiple resets ongoing
+            bool did_lock = DB::call_with_lock(path_to_clean, [&](const std::string& path) {
+                constexpr bool delete_lockfile = false;
+                DB::delete_files(path, nullptr, delete_lockfile);
+            });
+            if (!did_lock) {
+                m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up. "
+                              "There were %2 refs remaining.",
+                              path_to_clean, use_count);
+            }
+        }
+        catch (const std::exception& err) {
+            m_logger.warn("In ClientResetOperation::finalize, the fresh copy '%1' could not be cleaned up due to "
+                          "an exception: '%2'",
+                          path_to_clean, err.what());
+            // ignored, this is just a best effort
+        }
+    }
 }
 
 } // namespace realm::_impl

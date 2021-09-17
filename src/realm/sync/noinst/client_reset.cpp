@@ -281,10 +281,6 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 {
     logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
 
-    auto throw_client_reset_failure = [&logger](std::string message) {
-        logger.error("Client reset failure: '%1'", message);
-        throw ClientResetFailed(message);
-    };
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
     for (auto table_key : group_dst.get_table_keys()) {
@@ -305,15 +301,15 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         bool has_pk_src = bool(pk_col_src);
         bool has_pk_dst = bool(pk_col_dst);
         if (has_pk_src != has_pk_dst) {
-            throw_client_reset_failure(util::format("Client reset requires a primary key column in %1 table '%2'",
-                                                    (has_pk_src ? "dest" : "source"), table_name));
+            throw ClientResetFailed(util::format("Client reset requires a primary key column in %1 table '%2'",
+                                                 (has_pk_src ? "dest" : "source"), table_name));
         }
         if (!has_pk_src)
             continue;
 
         // Now the tables both have primary keys. Check type.
         if (pk_col_src.get_type() != pk_col_dst.get_type()) {
-            throw_client_reset_failure(
+            throw ClientResetFailed(
                 util::format("Client reset found incompatible primary key types (%1 vs %2) on '%3'",
                              pk_col_src.get_type(), pk_col_dst.get_type(), table_name));
         }
@@ -323,7 +319,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         pk_col_src_attr.reset(ColumnAttr::col_attr_Indexed);
         pk_col_dst_attr.reset(ColumnAttr::col_attr_Indexed);
         if (pk_col_src_attr != pk_col_dst_attr) {
-            throw_client_reset_failure(
+            throw ClientResetFailed(
                 util::format("Client reset found incompatible primary key attributes (%1 vs %2) on '%3'",
                              pk_col_src.value, pk_col_dst.value, table_name));
         }
@@ -331,7 +327,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         StringData pk_col_name_src = table_src->get_column_name(pk_col_src);
         StringData pk_col_name_dst = table_dst->get_column_name(pk_col_dst);
         if (pk_col_name_src != pk_col_name_dst) {
-            throw_client_reset_failure(
+            throw ClientResetFailed(
                 util::format("Client reset requires equal pk column names but '%1' != '%2' on '%3'", pk_col_name_src,
                              pk_col_name_dst, table_name));
         }
@@ -485,7 +481,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             else {
                 // column preexists in dest, make sure the types match
                 if (col_key.get_type() != col_key_dst.get_type()) {
-                    throw_client_reset_failure(util::format(
+                    throw ClientResetFailed(util::format(
                         "Incompatable column type change detected during client reset for '%1.%2' (%3 vs %4)",
                         table_name, col_name, col_key.get_type(), col_key_dst.get_type()));
                 }
@@ -496,7 +492,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 // make sure the attributes such as collection type, nullability etc. match
                 // but index equality doesn't matter here.
                 if (src_col_attrs != dst_col_attrs) {
-                    throw_client_reset_failure(util::format(
+                    throw ClientResetFailed(util::format(
                         "Incompatable column attribute change detected during client reset for '%1.%2' (%3 vs %4)",
                         table_name, col_name, col_key.value, col_key_dst.value));
                 }

@@ -1042,7 +1042,7 @@ enum class Client::Error {
     bad_state_message           = 127, ///< Bad values in state message (STATE)
     missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
     http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    client_reset_failed         = 132, ///< A fatal error was encountered which prevents completion of a client reset
+    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
     // clang-format on
 };
 

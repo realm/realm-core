@@ -317,7 +317,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("failing to download a fresh copy results in an error") {
             std::atomic<bool> called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE_FALSE(error.is_client_reset_requested());
+                REQUIRE(error.is_client_reset_requested());
                 called = true;
             };
             std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
@@ -570,6 +570,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("incompatible schema changes in remote and local transactions") {
+            std::atomic<bool> error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                REQUIRE(error.is_client_reset_requested());
+                error_handler_called = true;
+            };
             test_reset
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
@@ -596,14 +601,19 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([](SharedRealm realm) {
-                    REQUIRE_THROWS_WITH(
-                        realm->refresh(),
-                        Catch::Matchers::Contains("Property 'object.value2' has been changed from 'float' to 'int'"));
+                    REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+            REQUIRE(error_handler_called);
         }
 
         SECTION("primary key type cannot be changed") {
+            std::atomic<bool> error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                REQUIRE(error.is_client_reset_requested());
+                error_handler_called = true;
+            };
+
             test_reset
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
@@ -628,11 +638,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([](SharedRealm realm) {
-                    REQUIRE_THROWS_WITH(realm->refresh(),
-                                        Catch::Matchers::Contains(
-                                            "Property 'new table._id' has been changed from 'int' to 'string'."));
+                    REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+            REQUIRE(error_handler_called);
         }
 
         SECTION("list operations") {

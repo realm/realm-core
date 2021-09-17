@@ -2345,7 +2345,15 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     };
     // if a client reset happens, it will take care of setting the file ident
     // and if not, we do it here
-    if (!client_reset_if_needed()) {
+    bool did_client_reset = false;
+    try {
+        did_client_reset = client_reset_if_needed();
+    }
+    catch (const std::exception& e) {
+        logger.error("A fatal error occured during client reset: '%1'", e.what());
+        return make_error_code(sync::Client::Error::auto_client_reset_failure);
+    }
+    if (!did_client_reset) {
         constexpr bool fix_up_object_ids = true;
         history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
     }

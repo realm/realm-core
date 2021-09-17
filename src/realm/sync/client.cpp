@@ -1752,8 +1752,8 @@ const char* get_error_message(Client::Error error_code)
             return "Requested feature missing in negotiated protocol version";
         case Client::Error::http_tunnel_failed:
             return "Failure to establish HTTP tunnel with configured proxy";
-        case Client::Error::client_reset_failed:
-            return "Client reset failed";
+        case Client::Error::auto_client_reset_failure:
+            return "Automatic recovery from client reset failed";
     }
     return nullptr;
 }

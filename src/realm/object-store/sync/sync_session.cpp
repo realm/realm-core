@@ -478,7 +478,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err
             err_msg = materialized_err.what();
         }
         const bool is_fatal = true;
-        SyncError synthetic(make_error_code(sync::Client::Error::client_reset_failed),
+        SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
                             util::format("A fatal error occured during client reset: '%1'", err_msg), is_fatal);
         handle_error(synthetic);
         return;
@@ -523,19 +523,29 @@ void SyncSession::handle_error(SyncError error)
     }
 
     if (error.is_client_reset_requested()) {
-        switch (m_config.client_resync_mode) {
-            case ClientResyncMode::Manual:
-                next_state = NextStateAfterError::inactive;
-                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
-                break;
-            case ClientResyncMode::SeamlessLoss: {
-                REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
-                std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
-                auto self_ref = shared_from_this();
-                m_config.get_fresh_realm_for_path(fresh_path, [self_ref](DBRef db, std::exception_ptr err) {
-                    self_ref->handle_fresh_realm_downloaded(std::move(db), std::move(err));
-                });
-                return;
+        auto user_handles_reset = [&]() {
+            next_state = NextStateAfterError::inactive;
+            update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
+        };
+        if (error.error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+            // At this point, automatic recovery has been attempted but it failed.
+            // Fallback to a manual reset and let the user try to handle it.
+            user_handles_reset();
+        }
+        else {
+            switch (m_config.client_resync_mode) {
+                case ClientResyncMode::Manual:
+                    user_handles_reset();
+                    break;
+                case ClientResyncMode::SeamlessLoss: {
+                    REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
+                    std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
+                    auto self_ref = shared_from_this();
+                    m_config.get_fresh_realm_for_path(fresh_path, [self_ref](DBRef db, std::exception_ptr err) {
+                        self_ref->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                    });
+                    return;
+                }
             }
         }
     }
@@ -651,7 +661,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
             case ClientError::http_tunnel_failed:
-            case ClientError::client_reset_failed:
+            case ClientError::auto_client_reset_failure:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.

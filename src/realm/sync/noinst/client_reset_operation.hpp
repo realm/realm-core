@@ -39,7 +39,7 @@ public:
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
     // will be inserted in the Realm after download.
-    bool finalize(sync::SaltedFileIdent salted_file_ident);
+    bool finalize(sync::SaltedFileIdent salted_file_ident); // throws
 
     static std::string get_fresh_path_for(const std::string& realm_path);
 
@@ -47,6 +47,8 @@ public:
     realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
+    void clean_up_state();
+
     util::Logger& m_logger;
     DB& m_db;
     DBRef m_db_fresh;
