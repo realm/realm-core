@@ -335,33 +335,23 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         logger.debug("Table '%1' will remain", table_name);
     }
 
-    // Remove all columns that link to one of the tables to be removed.
-    for (auto table_key : group_dst.get_table_keys()) {
-        if (!group_dst.table_is_public(table_key))
-            continue;
-        TableRef table_dst = group_dst.get_table(table_key);
-        std::vector<std::string> columns_to_remove;
-        for (ColKey col_key : table_dst->get_column_keys()) {
-            DataType column_type = table_dst->get_column_type(col_key);
-            if (column_type == type_Link || column_type == type_LinkList) {
-                TableRef table_target = table_dst->get_link_target(col_key);
-                StringData table_target_name = table_target->get_name();
-                if (tables_to_remove.find(table_target_name) != tables_to_remove.end()) {
-                    StringData col_name = table_dst->get_column_name(col_key);
-                    columns_to_remove.push_back(col_name);
-                }
-            }
+    // If there have been any tables marked for removal stop.
+    // We consider two possible options for recovery:
+    // 1: Remove the tables. But this will generate destructive schema
+    //    schema changes that the local Realm cannot advance through.
+    //    Since this action will fail down the line anyway, give up now.
+    // 2: Keep the tables locally and ignore them. But the local app schema
+    //    still has these classes and trying to modify anything in them will
+    //    create sync instructions on tables that sync doesn't know about.
+    if (!tables_to_remove.empty()) {
+        std::string names_list;
+        for (const std::string& table_name : tables_to_remove) {
+            names_list += table_name;
+            names_list += ", ";
         }
-        for (const std::string& col_name : columns_to_remove) {
-            logger.debug("Column '%1' in table '%2' is removed", col_name, table_dst->get_name());
-            ColKey col_key = table_dst->get_column_key(col_name);
-            table_dst->remove_column(col_key);
-        }
+        throw ClientResetFailed(
+            util::format("Client reset cannot recover when tables have been removed: {%1}", names_list));
     }
-
-    // Remove the tables to be removed.
-    for (const std::string& table_name : tables_to_remove)
-        sync::erase_table(group_dst, table_name);
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {
@@ -416,10 +406,15 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 continue;
             }
         }
-        for (const std::string& col_name : columns_to_remove) {
-            logger.debug("Column '%1' in table '%2' is removed", col_name, table_name);
-            ColKey col_key = table_dst->get_column_key(col_name);
-            table_dst->remove_column(col_key);
+        if (!columns_to_remove.empty()) {
+            std::string columns_list;
+            for (const std::string& col_name : columns_to_remove) {
+                columns_list += col_name;
+                columns_list += ", ";
+            }
+            throw ClientResetFailed(
+                util::format("Client reset cannot recover when columns have been removed from '%1': {%2}", table_name,
+                             columns_list));
         }
     }
 

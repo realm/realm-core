@@ -475,7 +475,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
-        SECTION("extra local table is removed") {
+        SECTION("extra local table creates a client reset error") {
+            std::atomic<bool> error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                REQUIRE(error.is_client_reset_requested());
+                error_handler_called = true;
+            };
             test_reset
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
@@ -491,13 +496,18 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     create_object(*local, "object2", partition, {2});
                 })
                 ->on_post_reset([](SharedRealm realm) {
-                    REQUIRE_THROWS_CONTAINING(realm->refresh(),
-                                              "Unsupported schema changes were made by another client or process");
+                    REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+            REQUIRE(error_handler_called);
         }
 
-        SECTION("extra local column is removed") {
+        SECTION("extra local column creates a client reset error") {
+            std::atomic<bool> error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                REQUIRE(error.is_client_reset_requested());
+                error_handler_called = true;
+            };
             test_reset
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
@@ -516,10 +526,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
                 ->on_post_reset([](SharedRealm realm) {
-                    REQUIRE_THROWS_CONTAINING(realm->refresh(),
-                                              "Unsupported schema changes were made by another client or process");
+                    REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+            REQUIRE(error_handler_called);
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
