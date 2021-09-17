@@ -106,15 +106,14 @@ TEST(InstructionReplication_AddColumnTwice)
 }
 
 
-// This test is disabled because EraseTable instruction is unsupported by merge algorithm.
-TEST_IF(InstructionReplication_EraseTable, false)
+TEST(InstructionReplication_EraseTable)
 {
     Fixture fixture{test_context};
     {
-        WriteTransaction wt{fixture.sg_1};
-        sync::create_table(wt, "class_foo");
-        wt.get_group().remove_table("class_foo");
-        wt.commit();
+        auto wt = fixture.sg_1->start_write();
+        auto tk = wt->add_table_with_primary_key("class_foo", type_Int, "id")->get_key();
+        wt->remove_table(tk);
+        wt->commit();
     }
     fixture.replay_transactions();
     fixture.check_equal();

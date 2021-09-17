@@ -188,7 +188,7 @@ void client_reset::remove_all_tables(Transaction& tr_dst, util::Logger& logger)
     for (auto table_key : tr_dst.get_table_keys()) {
         TableRef table = tr_dst.get_table(table_key);
         if (table->get_name().begins_with("class_")) {
-            sync::erase_table(tr_dst, table);
+            tr_dst.remove_table(table_key);
         }
     }
 }
@@ -268,7 +268,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
     // Remove the tables to be removed.
     for (const std::string& table_name : tables_to_remove)
-        sync::erase_table(group_dst, table_name);
+        group_dst.remove_table(table_name);
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {

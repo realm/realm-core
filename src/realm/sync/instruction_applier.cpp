@@ -166,7 +166,7 @@ void InstructionApplier::operator()(const Instruction::EraseTable& instr)
     }
 
     log("sync::erase_table(m_group, \"%1\")", table_name);
-    sync::erase_table(m_transaction, table_name);
+    m_transaction.remove_table(table_name);
 }
 
 void InstructionApplier::operator()(const Instruction::CreateObject& instr)

@@ -20,44 +20,11 @@ bool has_object_ids(const Table& t)
     return dynamic_cast<const SyncReplication*>(r);
 }
 
-namespace {
-
-SyncReplication* sync_replication_for_group(Group& g)
-{
-    Replication* r = g.get_replication();
-    return dynamic_cast<SyncReplication*>(r);
-}
-
-} // unnamed namespace
-
 bool is_object_id_stability_achieved(const DB&, const Transaction& transaction)
 {
     return transaction.get_sync_file_id() != 0;
 }
 
-
-void erase_table(Transaction& g, TableRef table)
-{
-    SyncReplication* repl = sync_replication_for_group(g);
-
-    if (repl) {
-        repl->prepare_erase_table(table->get_name());
-    }
-
-    TableKey table_index = table->get_key();
-
-    g.remove_table(table_index);
-}
-
-void erase_table(Transaction& g, StringData name)
-{
-    erase_table(g, g.get_table(name));
-}
-
-ColKey add_array_column(Table& table, DataType element_type, StringData column_name, bool is_nullable)
-{
-    return table.add_column_list(element_type, column_name, is_nullable);
-}
 
 bool table_has_primary_key(const Table& table)
 {
