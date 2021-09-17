@@ -570,7 +570,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     }
 
     validate_key_value(key);
-    ensure_writable(true);
+    ensure_created();
 
     ObjLink new_link;
     if (value.is_type(type_TypedLink)) {
@@ -829,9 +829,9 @@ UpdateStatus Dictionary::update_if_needed() const
     REALM_UNREACHABLE();
 }
 
-UpdateStatus Dictionary::ensure_writable(bool allow_create)
+UpdateStatus Dictionary::ensure_created()
 {
-    auto status = Base::ensure_writable(allow_create);
+    auto status = Base::ensure_created();
     switch (status) {
         case UpdateStatus::Detached:
             break; // Not possible (would have thrown earlier).
@@ -844,8 +844,8 @@ UpdateStatus Dictionary::ensure_writable(bool allow_create)
             [[fallthrough]];
         }
         case UpdateStatus::Updated: {
-            bool attached = init_from_parent(allow_create);
-            REALM_ASSERT(attached || !allow_create);
+            bool attached = init_from_parent(true);
+            REALM_ASSERT(attached);
             return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
         }
     }

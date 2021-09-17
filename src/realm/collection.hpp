@@ -401,30 +401,22 @@ protected:
         return status;
     }
 
-    /// Refresh the associated `Obj` (if needed) and ensure that it is in a
-    /// writable state.
+    /// Refresh the associated `Obj` (if needed) and ensure that the
+    /// collection is created. Must be used in places where you
+    /// modify a potentially detached collection.
     ///
     /// The caller must react to the `UpdateStatus` in the same way as with
     /// `update_if_needed()`, i.e., eventually end up calling
     /// `init_from_parent()` or similar.
     ///
-    /// The parameter `allow_create` is unused by this method, but may be used
-    /// by overriding implementations in derived classes to lazily initialize
-    /// the in-file data structures.
-    ///
     /// Throws if the owning object no longer exists. Note: This means that this
     /// method will never return `UpdateStatus::Detached`.
-    ///
-    /// Throws if we are not in a write transaction.
-    virtual UpdateStatus ensure_writable(bool allow_create)
+    virtual UpdateStatus ensure_created()
     {
-        static_cast<void>(allow_create);
-
-        bool changed = m_obj.update_if_needed();         // Throws if the object does not exist.
-        bool became_writable = m_obj.ensure_writeable(); // Throws if we are not in a write transaction.
+        bool changed = m_obj.update_if_needed(); // Throws if the object does not exist.
         auto content_version = m_obj.get_alloc().get_content_version();
 
-        if (changed || became_writable || content_version != m_content_version) {
+        if (changed || content_version != m_content_version) {
             m_content_version = content_version;
             return UpdateStatus::Updated;
         }
@@ -545,11 +537,6 @@ protected:
     /// (without `update_unresolved()`).
     virtual UpdateStatus do_update_if_needed() const = 0;
 
-    /// Implementations should call `Obj::ensure_writable()` and
-    /// `update_if_needed()` on their inner accessor (without
-    /// `update_unresolved()`).
-    virtual UpdateStatus do_ensure_writable(bool allow_create) = 0;
-
     /// Implementations should return a non-const reference to their internal
     /// `BPlusTree<T>`.
     virtual BPlusTree<ObjKey>* get_mutable_tree() const = 0;
@@ -564,14 +551,6 @@ protected:
         return status;
     }
 
-    /// Ensure that the collection is writable, maintain the unresolved list if
-    /// the collection was updated, and return true if it is not detached.
-    UpdateStatus ensure_writable(bool allow_create)
-    {
-        auto status = do_ensure_writable(allow_create);
-        update_unresolved(status);
-        return status;
-    }
     /// Translate from condensed index to uncondensed.
     size_t virtual2real(size_t ndx) const noexcept
     {

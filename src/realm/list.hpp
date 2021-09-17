@@ -175,9 +175,9 @@ public:
         REALM_UNREACHABLE();
     }
 
-    UpdateStatus ensure_writable(bool allow_create) final
+    UpdateStatus ensure_created() final
     {
-        auto status = Base::ensure_writable(allow_create);
+        auto status = Base::ensure_created();
         switch (status) {
             case UpdateStatus::Detached:
                 break; // Not possible (would have thrown earlier).
@@ -190,8 +190,8 @@ public:
                 [[fallthrough]];
             }
             case UpdateStatus::Updated: {
-                bool attached = init_from_parent(allow_create);
-                REALM_ASSERT(attached || !allow_create);
+                bool attached = init_from_parent(true);
+                REALM_ASSERT(attached);
                 return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
             }
         }
@@ -465,11 +465,6 @@ private:
         return m_list.update_if_needed();
     }
 
-    UpdateStatus do_ensure_writable(bool allow_create) final
-    {
-        return m_list.ensure_writable(allow_create);
-    }
-
     BPlusTree<ObjKey>* get_mutable_tree() const final
     {
         return m_list.m_tree.get();
@@ -628,7 +623,6 @@ template <class T>
 void Lst<T>::clear()
 {
     if (size() > 0) {
-        ensure_writable(false);
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_clear(*this);
         }
@@ -792,7 +786,6 @@ void Lst<T>::move(size_t from, size_t to)
     }
 
     if (from != to) {
-        ensure_writable(false);
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->list_move(*this, from, to);
         }
@@ -823,7 +816,6 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
     }
 
     if (ndx1 != ndx2) {
-        ensure_writable(false);
         if (Replication* repl = this->m_obj.get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
@@ -859,7 +851,7 @@ void Lst<T>::insert(size_t ndx, T value)
     if (ndx > size())
         throw std::out_of_range("Index out of range");
 
-    ensure_writable(true);
+    ensure_created();
 
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_insert(*this, ndx, value);
@@ -877,7 +869,6 @@ T Lst<T>::remove(size_t ndx)
         repl->list_erase(*this, ndx);
     }
 
-    ensure_writable(false);
     do_remove(ndx);
     bump_content_version();
     return old;
@@ -978,25 +969,25 @@ inline ColKey LnkLst::get_col_key() const noexcept
 
 inline void LnkLst::set_null(size_t ndx)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.set_null(virtual2real(ndx));
 }
 
 inline void LnkLst::set_any(size_t ndx, Mixed val)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.set_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::insert_null(size_t ndx)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.insert_null(virtual2real(ndx));
 }
 
 inline void LnkLst::insert_any(size_t ndx, Mixed val)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.insert_any(virtual2real(ndx), val);
 }
 
@@ -1013,33 +1004,36 @@ inline size_t LnkLst::find_any(Mixed value) const
 
 inline void LnkLst::resize(size_t new_size)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.resize(new_size + num_unresolved());
 }
 
 inline void LnkLst::remove(size_t from, size_t to)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.remove(virtual2real(from), virtual2real(to));
     update_unresolved(UpdateStatus::Updated);
 }
 
 inline void LnkLst::move(size_t from, size_t to)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.move(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 {
-    ensure_writable(false);
+    update_if_needed();
     m_list.swap(virtual2real(ndx1), virtual2real(ndx2));
 }
 
 inline ObjKey LnkLst::get(size_t ndx) const
 {
-    update_if_needed();
-    return m_list.get(virtual2real(ndx));
+    const auto current_size = size();
+    if (ndx >= current_size) {
+        throw std::out_of_range("Index out of range");
+    }
+    return m_list.m_tree->get(virtual2real(ndx));
 }
 
 inline size_t LnkLst::find_first(const ObjKey& key) const
@@ -1047,12 +1041,12 @@ inline size_t LnkLst::find_first(const ObjKey& key) const
     if (key.is_unresolved())
         return not_found;
 
-    update_if_needed();
+    size_t found = not_found;
+    if (update_if_needed() != UpdateStatus::Detached) {
+        found = m_list.m_tree->find_first(key);
+    }
 
-    size_t found = m_list.find_first(key);
-    if (found == not_found)
-        return not_found;
-    return real2virtual(found);
+    return (found != not_found) ? real2virtual(found) : not_found;
 }
 
 inline void LnkLst::insert(size_t ndx, ObjKey value)
@@ -1061,7 +1055,7 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    ensure_writable(false);
+    update_if_needed();
     m_list.insert(virtual2real(ndx), value);
     update_unresolved(UpdateStatus::Updated);
 }
@@ -1072,7 +1066,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    ensure_writable(false);
+    update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);
     REALM_ASSERT(!old.is_unresolved());
     return old;
@@ -1080,7 +1074,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 
 inline ObjKey LnkLst::remove(size_t ndx)
 {
-    ensure_writable(false);
+    update_if_needed();
     ObjKey old = m_list.remove(virtual2real(ndx));
     REALM_ASSERT(!old.is_unresolved());
     update_unresolved(UpdateStatus::Updated);

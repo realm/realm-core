@@ -5830,4 +5830,43 @@ TEST(Table_RebuildTable)
     t->set_primary_key_column(id);
 }
 
+TEST(Table_ListOfPrimitivesTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+    TableRef t = tr->add_table("table");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ObjKeys keys;
+    t->create_objects(32, keys);
+    auto list = t->get_object(keys[7]).get_list<Int>(int_col);
+    list.add(7);
+    list.add(25);
+    list.add(42);
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    list.set(0, 5);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 5);
+    tr->promote_to_write();
+    list.swap(0, 1);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 25);
+    tr->promote_to_write();
+    list.move(1, 0);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 5);
+    tr->promote_to_write();
+    list.remove(1);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(1), 42);
+    tr->promote_to_write();
+    list.clear();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.size(), 0);
+}
+
 #endif // TEST_TABLE

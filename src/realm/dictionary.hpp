@@ -198,7 +198,7 @@ private:
     ObjKey handle_collision_in_erase(const Mixed& key, ObjKey k, ClusterNode::State& state);
 
     UpdateStatus update_if_needed() const final;
-    UpdateStatus ensure_writable(bool allow_create) final;
+    UpdateStatus ensure_created() final;
     inline bool update() const
     {
         return update_if_needed() != UpdateStatus::Detached;
@@ -324,10 +324,6 @@ public:
     UpdateStatus do_update_if_needed() const final
     {
         return m_source.update_if_needed();
-    }
-    UpdateStatus do_ensure_writable(bool allow_create) final
-    {
-        return m_source.ensure_writable(allow_create);
     }
     BPlusTree<ObjKey>* get_mutable_tree() const
     {

@@ -174,9 +174,9 @@ public:
         REALM_UNREACHABLE();
     }
 
-    UpdateStatus ensure_writable(bool allow_create) final
+    UpdateStatus ensure_created() final
     {
-        auto status = Base::ensure_writable(allow_create);
+        auto status = Base::ensure_created();
         switch (status) {
             case UpdateStatus::Detached:
                 break; // Not possible (would have thrown earlier).
@@ -189,8 +189,8 @@ public:
                 [[fallthrough]];
             }
             case UpdateStatus::Updated: {
-                bool attached = init_from_parent(allow_create);
-                REALM_ASSERT(attached || !allow_create);
+                bool attached = init_from_parent(true);
+                REALM_ASSERT(attached);
                 return attached ? UpdateStatus::Updated : UpdateStatus::Detached;
             }
         }
@@ -392,13 +392,6 @@ private:
     UpdateStatus do_update_if_needed() const final
     {
         return m_set.update_if_needed();
-    }
-
-    UpdateStatus do_ensure_writable(bool allow_create) final
-    {
-        // Note: Caller (`ObjCollectionBase::ensure_writable()`) takes care of
-        // maintaining the unresolved list.
-        return m_set.ensure_writable(allow_create);
     }
 
     BPlusTree<ObjKey>* get_mutable_tree() const final
@@ -628,7 +621,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    ensure_writable(true);
+    ensure_created();
     auto it = find_impl(value);
 
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
@@ -671,8 +664,6 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
-
-    ensure_writable(false);
 
     if (Replication* repl = m_obj.get_replication()) {
         this->erase_repl(repl, it.index(), value);
@@ -726,7 +717,6 @@ template <class T>
 inline void Set<T>::clear()
 {
     if (size() > 0) {
-        ensure_writable(false);
         if (Replication* repl = this->m_obj.get_replication()) {
             this->clear_repl(repl);
         }
@@ -1030,8 +1020,11 @@ inline bool LnkSet::operator!=(const LnkSet& other) const
 
 inline ObjKey LnkSet::get(size_t ndx) const
 {
-    update_if_needed();
-    return m_set.get(virtual2real(ndx));
+    const auto current_size = size();
+    if (ndx >= current_size) {
+        throw std::out_of_range("Index out of range");
+    }
+    return m_set.m_tree->get(virtual2real(ndx));
 }
 
 inline size_t LnkSet::find(ObjKey value) const
