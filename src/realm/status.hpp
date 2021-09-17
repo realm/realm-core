@@ -30,7 +30,7 @@
 
 namespace realm {
 
-class [[nodiscard]] Status {
+class REALM_NODISCARD Status {
 public:
     /*
      * This is the best way to construct a Status that represents a non-error condition.

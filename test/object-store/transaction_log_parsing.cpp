@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "collection_fixtures.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -1577,177 +1578,11 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
     }
 }
 
-struct ListOfObjects {
-    const Property property = {"array", PropertyType::Array | PropertyType::Object, "table"};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_linklist(col).add(to.get_obj_key());
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_linklist(col).size();
-    }
-    void set_relation_updater(std::function<void()>) {}
-    size_t count_unresolved_links(Obj, ColKey)
-    {
-        return 0;
-    }
-    constexpr static bool allows_storing_nulls = false;
-};
-
-struct ListOfMixedLinks {
-    const Property property = {"array", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_list<Mixed>(col).add(to);
-        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
-        // In practice, this is triggered by the addition of backlink columns to any table.
-        if (m_relation_updater) {
-            m_relation_updater();
-        }
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_list<Mixed>(col).size();
-    }
-    void set_relation_updater(std::function<void()> updater)
-    {
-        m_relation_updater = updater;
-    }
-    size_t count_unresolved_links(Obj obj, ColKey col)
-    {
-        Lst<Mixed> list = obj.get_list<Mixed>(col);
-        size_t num_unresolved = 0;
-        for (auto value : list) {
-            if (value.is_unresolved_link()) {
-                ++num_unresolved;
-            }
-        }
-        return num_unresolved;
-    }
-    std::function<void()> m_relation_updater;
-    constexpr static bool allows_storing_nulls = true;
-};
-
-struct SetOfObjects {
-    const Property property = {"array", PropertyType::Set | PropertyType::Object, "table"};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_linkset(col).insert(to.get_obj_key());
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_linkset(col).size();
-    }
-    void set_relation_updater(std::function<void()>) {}
-    size_t count_unresolved_links(Obj, ColKey)
-    {
-        return 0;
-    }
-    constexpr static bool allows_storing_nulls = false;
-};
-
-struct SetOfMixedLinks {
-    const Property property = {"array", PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_set<Mixed>(col).insert(to);
-        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
-        // In practice, this is triggered by the addition of backlink columns to any table.
-        if (m_relation_updater) {
-            m_relation_updater();
-        }
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_set<Mixed>(col).size();
-    }
-    void set_relation_updater(std::function<void()> updater)
-    {
-        m_relation_updater = updater;
-    }
-    size_t count_unresolved_links(Obj obj, ColKey col)
-    {
-        Set<Mixed> set = obj.get_set<Mixed>(col);
-        size_t num_unresolved = 0;
-        for (auto value : set) {
-            if (value.is_unresolved_link()) {
-                ++num_unresolved;
-            }
-        }
-        return num_unresolved;
-    }
-    std::function<void()> m_relation_updater;
-    constexpr static bool allows_storing_nulls = true;
-};
-
-struct DictionaryOfObjects {
-    const Property property = {"array", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable,
-                               "table"};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to.get_obj_key());
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_dictionary(col).size();
-    }
-    void set_relation_updater(std::function<void()>) {}
-    size_t count_unresolved_links(Obj obj, ColKey col)
-    {
-        Dictionary dict = obj.get_dictionary(col);
-        size_t num_unresolved = 0;
-        for (auto value : dict) {
-            if (value.second.is_unresolved_link()) {
-                ++num_unresolved;
-            }
-        }
-        return num_unresolved;
-    }
-    size_t key_counter = 0;
-    std::function<void()> m_relation_updater;
-    constexpr static bool allows_storing_nulls = true;
-};
-
-struct DictionaryOfMixedLinks {
-    const Property property = {"array", PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable};
-    void add_link(Obj from, ColKey col, ObjLink to)
-    {
-        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to);
-        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
-        // In practice, this is triggered by the addition of backlink columns to any table.
-        if (m_relation_updater) {
-            m_relation_updater();
-        }
-    }
-    size_t size_of_collection(Obj obj, ColKey col)
-    {
-        return obj.get_dictionary(col).size();
-    }
-    void set_relation_updater(std::function<void()> updater)
-    {
-        m_relation_updater = updater;
-    }
-    size_t count_unresolved_links(Obj obj, ColKey col)
-    {
-        Dictionary dict = obj.get_dictionary(col);
-        size_t num_unresolved = 0;
-        for (auto value : dict) {
-            if (value.second.is_unresolved_link()) {
-                ++num_unresolved;
-            }
-        }
-        return num_unresolved;
-    }
-    size_t key_counter = 0;
-    std::function<void()> m_relation_updater;
-    constexpr static bool allows_storing_nulls = true;
-};
-
-TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObjects, ListOfMixedLinks, SetOfObjects,
-                   SetOfMixedLinks, DictionaryOfObjects, DictionaryOfMixedLinks)
+namespace cf = realm::collection_fixtures;
+TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListOfObjects, cf::ListOfMixedLinks,
+                   cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
-    TestType test_type;
+    TestType test_type("array", "table");
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1756,7 +1591,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
          {{"int", PropertyType::Int},
           {"link1", PropertyType::Object | PropertyType::Nullable, "table"},
           {"link2", PropertyType::Object | PropertyType::Nullable, "table"},
-          test_type.property}},
+          test_type.property()}},
     });
     auto table = r->read_group().get_table("class_table");
     TableKey dst_table_key = table->get_key();
@@ -1786,7 +1621,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
     std::vector<_impl::DeepChangeChecker::RelatedTable> related_tables;
     std::pair<TableKey, ColKey> pair_int(table->get_key(), table->get_column_key("int"));
     std::pair<TableKey, ColKey> pair_link(table->get_key(), table->get_column_key("link1"));
-    std::pair<TableKey, ColKey> pair_test_type(table->get_key(), table->get_column_key(test_type.property.name));
+    std::pair<TableKey, ColKey> pair_test_type(table->get_key(), table->get_column_key(test_type.property().name));
     KeyPath key_path_int = {pair_int};
     KeyPath key_path_link = {pair_link};
     KeyPath key_path_test_type = {pair_test_type};
@@ -1805,9 +1640,9 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
     SECTION("changes over collections are tracked") {
         r->begin_transaction();
         for (int i = 0; i < 3; ++i) {
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
         }
         r->commit_transaction();
 
@@ -1844,9 +1679,9 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
         r->begin_transaction();
         size_t obj_ndx_to_invalidate = 6;
         for (int i = 0; i < 3; ++i) {
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i].get_key()});
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[obj_ndx_to_invalidate].get_key()});
-            test_type.add_link(objects[i], cols[3], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[i].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[obj_ndx_to_invalidate].get_key()});
+            test_type.add_link(objects[i], {dst_table_key, objects[i + 1 + (i == 2)].get_key()});
         }
         // Object invalidation can only happen if another sync client has deleted the object
         // we simulate this by calling it directly here. The consequence is that links to this
@@ -1854,14 +1689,14 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
         // that core has built to hide invalidated links inside LnkLst is not leaking at this level.
         objects[obj_ndx_to_invalidate].invalidate();
         if (TestType::allows_storing_nulls) {
-            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) == 3);
-            REQUIRE(test_type.count_unresolved_links(objects[0], cols[3]) == 1);
-            REQUIRE(test_type.count_unresolved_links(objects[1], cols[3]) == 1);
-            REQUIRE(test_type.count_unresolved_links(objects[2], cols[3]) == 1);
+            REQUIRE(test_type.size_of_collection(objects[0]) == 3);
+            REQUIRE(test_type.count_unresolved_links(objects[0]) == 1);
+            REQUIRE(test_type.count_unresolved_links(objects[1]) == 1);
+            REQUIRE(test_type.count_unresolved_links(objects[2]) == 1);
         }
         else {
             // LnkLst actually has 3 entries but hides one
-            REQUIRE(test_type.size_of_collection(objects[0], cols[3]) == 2);
+            REQUIRE(test_type.size_of_collection(objects[0]) == 2);
         }
         r->commit_transaction();
 
@@ -1912,7 +1747,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
 
     SECTION("cycles over collections do not loop forever") {
         r->begin_transaction();
-        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[0].get_key()});
+        test_type.add_link(objects[0], {dst_table_key, objects[0].get_key()});
         r->commit_transaction();
 
         auto info = track_changes([&] {
@@ -1930,9 +1765,9 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
 
     SECTION("changes made in the 3rd elements in the collection") {
         r->begin_transaction();
-        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[1].get_key()});
-        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[2].get_key()});
-        test_type.add_link(objects[0], cols[3], {dst_table_key, objects[3].get_key()});
+        test_type.add_link(objects[0], {dst_table_key, objects[1].get_key()});
+        test_type.add_link(objects[0], {dst_table_key, objects[2].get_key()});
+        test_type.add_link(objects[0], {dst_table_key, objects[3].get_key()});
         objects[1].set(cols[1], objects[0].get_key());
         objects[2].set(cols[1], objects[0].get_key());
         objects[3].set(cols[1], objects[0].get_key());
@@ -1976,7 +1811,7 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", ListOfObj
 
     SECTION("changes made to collections mark the containing row as modified") {
         auto info = track_changes([&] {
-            test_type.add_link(objects[0], cols[3], {dst_table_key, objects[1].get_key()});
+            test_type.add_link(objects[0], {dst_table_key, objects[1].get_key()});
         });
         REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, false)(0));
         REQUIRE(_impl::DeepChangeChecker(info, *table, related_tables, key_path_array_empty, true)(0));
