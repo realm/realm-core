@@ -279,8 +279,12 @@ bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
 
 void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
-    logger.debug("copy_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
+    logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
 
+    auto throw_client_reset_failure = [&logger](std::string message) {
+        logger.error("Client reset failure: '%1'", message);
+        throw ClientResetFailed(message);
+    };
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
     for (auto table_key : group_dst.get_table_keys()) {
@@ -301,25 +305,35 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         bool has_pk_src = bool(pk_col_src);
         bool has_pk_dst = bool(pk_col_dst);
         if (has_pk_src != has_pk_dst) {
-            logger.debug("Table '%1' will be removed", table_name);
-            tables_to_remove.insert(table_name);
-            continue;
+            throw_client_reset_failure(util::format("Client reset requires a primary key column in %1 table '%2'",
+                                                    (has_pk_src ? "dest" : "source"), table_name));
         }
         if (!has_pk_src)
             continue;
 
-        // Now the tables both have primary keys.
-        if (pk_col_src.get_type() != pk_col_dst.get_type() || pk_col_src.is_nullable() != pk_col_dst.is_nullable()) {
-            logger.debug("Table '%1' will be removed", table_name);
-            tables_to_remove.insert(table_name);
-            continue;
+        // Now the tables both have primary keys. Check type.
+        if (pk_col_src.get_type() != pk_col_dst.get_type()) {
+            throw_client_reset_failure(
+                util::format("Client reset found incompatible primary key types (%1 vs %2) on '%3'",
+                             pk_col_src.get_type(), pk_col_dst.get_type(), table_name));
         }
+        // Check collection type, nullability etc. but having an index doesn't matter;
+        ColumnAttrMask pk_col_src_attr = pk_col_src.get_attrs();
+        ColumnAttrMask pk_col_dst_attr = pk_col_dst.get_attrs();
+        pk_col_src_attr.reset(ColumnAttr::col_attr_Indexed);
+        pk_col_dst_attr.reset(ColumnAttr::col_attr_Indexed);
+        if (pk_col_src_attr != pk_col_dst_attr) {
+            throw_client_reset_failure(
+                util::format("Client reset found incompatible primary key attributes (%1 vs %2) on '%3'",
+                             pk_col_src.value, pk_col_dst.value, table_name));
+        }
+        // Check name.
         StringData pk_col_name_src = table_src->get_column_name(pk_col_src);
         StringData pk_col_name_dst = table_dst->get_column_name(pk_col_dst);
         if (pk_col_name_src != pk_col_name_dst) {
-            logger.debug("Table '%1' will be removed", table_name);
-            tables_to_remove.insert(table_name);
-            continue;
+            throw_client_reset_failure(
+                util::format("Client reset requires equal pk column names but '%1' != '%2' on '%3'", pk_col_name_src,
+                             pk_col_name_dst, table_name));
         }
         // The table survives.
         logger.debug("Table '%1' will remain", table_name);
@@ -389,38 +403,6 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     }
     logger.debug("The number of tables is %1", num_tables);
 
-    // Check that the primary key columns align.
-    // The types of destructive changes that this loop checks for should
-    // be handled by the server already, so this is only preventative.
-    for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
-            continue;
-        ConstTableRef table_src = group_src.get_table(table_key);
-        StringData table_name = table_src->get_name();
-        TableRef table_dst = group_dst.get_table(table_name);
-        ColKey src_pk_col = table_src->get_primary_key_column();
-        ColKey dst_pk_col = table_dst->get_primary_key_column();
-        // the following code relies on both tables having a pk
-        // which is true of a sync'd Realm
-        if (!src_pk_col || !dst_pk_col) {
-            throw ClientResetFailed(util::format("Client reset requires a primary key column in %1 table '%2'",
-                                                 (src_pk_col ? "dest" : "source"), table_name));
-        }
-        if (src_pk_col.get_type() != dst_pk_col.get_type()) {
-            throw ClientResetFailed(
-                util::format("Client reset found incompatible primary key types from %1 to %2 on '%3'",
-                             src_pk_col.get_type(), dst_pk_col.get_type(), table_name));
-        }
-        if (src_pk_col.is_nullable() != dst_pk_col.is_nullable()) {
-            throw ClientResetFailed(
-                util::format("Client reset found incompatible primary key nullability on '%1'", table_name));
-        }
-        if (table_src->get_column_name(src_pk_col) != table_dst->get_column_name(dst_pk_col)) {
-            // if both pk types are aligned, we can rename it
-            table_dst->rename_column(dst_pk_col, table_src->get_column_name(src_pk_col));
-        }
-    }
-
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
         if (!group_src.table_is_public(table_key))
@@ -431,28 +413,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         REALM_ASSERT(table_dst);
         std::vector<std::string> columns_to_remove;
         for (ColKey col_key : table_dst->get_column_keys()) {
-            auto col_type = col_key.get_type();
             StringData col_name = table_dst->get_column_name(col_key);
             ColKey col_key_src = table_src->get_column_key(col_name);
             if (!col_key_src) {
                 columns_to_remove.push_back(col_name);
                 continue;
-            }
-            if (col_key_src.get_type() != col_type) {
-                columns_to_remove.push_back(col_name);
-                continue;
-            }
-            if (!(col_key.get_attrs() == col_key.get_attrs())) {
-                columns_to_remove.push_back(col_name);
-                continue;
-            }
-            if (Table::is_link_type(col_type)) {
-                ConstTableRef target_src = table_src->get_link_target(col_key_src);
-                TableRef target_dst = table_dst->get_link_target(col_key);
-                if (target_src->get_name() != target_dst->get_name()) {
-                    columns_to_remove.push_back(col_name);
-                    continue;
-                }
             }
         }
         for (const std::string& col_name : columns_to_remove) {
@@ -519,14 +484,21 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             }
             else {
                 // column preexists in dest, make sure the types match
-                if (col_key.get_type() != col_key_dst.get_type() ||
-                    col_key.is_nullable() != col_key_dst.is_nullable() ||
-                    col_key.is_list() != col_key_dst.is_list() ||
-                    col_key.is_dictionary() != col_key_dst.is_dictionary() ||
-                    col_key.is_set() != col_key_dst.is_set()) {
-                    throw ClientResetFailed(
-                        util::format("Incompatable column type change detected during client reset for '%1.%2'",
-                                     table_name, col_name));
+                if (col_key.get_type() != col_key_dst.get_type()) {
+                    throw_client_reset_failure(util::format(
+                        "Incompatable column type change detected during client reset for '%1.%2' (%3 vs %4)",
+                        table_name, col_name, col_key.get_type(), col_key_dst.get_type()));
+                }
+                ColumnAttrMask src_col_attrs = col_key.get_attrs();
+                ColumnAttrMask dst_col_attrs = col_key_dst.get_attrs();
+                src_col_attrs.reset(ColumnAttr::col_attr_Indexed);
+                dst_col_attrs.reset(ColumnAttr::col_attr_Indexed);
+                // make sure the attributes such as collection type, nullability etc. match
+                // but index equality doesn't matter here.
+                if (src_col_attrs != dst_col_attrs) {
+                    throw_client_reset_failure(util::format(
+                        "Incompatable column attribute change detected during client reset for '%1.%2' (%3 vs %4)",
+                        table_name, col_name, col_key.value, col_key_dst.value));
                 }
             }
         }
