@@ -34,7 +34,7 @@ struct InterRealmValueConverter {
         }
     }
 
-    Mixed src_to_dst(Mixed src)
+    Mixed src_to_dst(Mixed src, bool* did_create = nullptr)
     {
         if (m_primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
             return src;
@@ -43,8 +43,8 @@ struct InterRealmValueConverter {
             if (m_opposite_of_src) {
                 ObjKey src_link_key = src.get<ObjKey>();
                 Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                Mixed dst_link_key = m_opposite_of_dst->get_objkey_from_primary_key(src_link_pk);
-                return dst_link_key;
+                Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_create);
+                return dst_link.get_key();
             }
             else {
                 ObjLink src_link = src.get<ObjLink>();
@@ -54,8 +54,8 @@ struct InterRealmValueConverter {
 
                 TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
                 REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-                ObjKey dst_link = dst_link_table->get_objkey_from_primary_key(src_pk);
-                return ObjLink{dst_link_table->get_key(), dst_link};
+                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_create);
+                return ObjLink{dst_link_table->get_key(), dst_link.get_key()};
             }
         }
     }
@@ -82,7 +82,7 @@ private:
 };
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
-bool copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
+void copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert, bool* update_out)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -108,8 +108,8 @@ bool copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conve
     }
 
     size_t suffix_len_max = len_min - ndx;
-    while (suffix_len < suffix_len_max &&
-           convert.src_to_dst(src->get_any(len_src - 1 - suffix_len)) == dst->get_any(len_dst - 1 - suffix_len)) {
+    while (suffix_len < suffix_len_max && convert.src_to_dst(src->get_any(len_src - 1 - suffix_len), update_out) ==
+                                              dst->get_any(len_dst - 1 - suffix_len)) {
         suffix_len++;
     }
 
@@ -138,10 +138,12 @@ bool copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conve
     }
 
     REALM_ASSERT(dst->size() == len_src);
-    return updated;
+    if (updated && update_out) {
+        *update_out = updated;
+    }
 }
 
-bool copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
+void copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert, bool* update_out)
 {
     SetBasePtr src = src_obj.get_setbase_ptr(convert.source_col());
     SetBasePtr dst = dst_obj.get_setbase_ptr(convert.dest_col());
@@ -169,7 +171,7 @@ bool copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conver
         while (dst_ndx < sorted_dst.size()) {
             size_t ndx_in_dst = sorted_dst[dst_ndx];
             Mixed dst_val = dst->get_any(ndx_in_dst);
-            Mixed converted_src = convert.src_to_dst(src_val);
+            Mixed converted_src = convert.src_to_dst(src_val, update_out);
             int cmp = converted_src.compare(dst_val);
             if (cmp == 0) {
                 // equal: advance both src and dst
@@ -200,13 +202,16 @@ bool copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conver
         dst->erase_any(dst->get_any(*it));
     }
     for (auto ndx : to_insert) {
-        Mixed converted_src = convert.src_to_dst(src->get_any(ndx));
+        Mixed converted_src = convert.src_to_dst(src->get_any(ndx), update_out);
         dst->insert_any(converted_src);
     }
-    return to_delete.size() || to_insert.size();
+
+    if (update_out && (to_delete.size() || to_insert.size())) {
+        *update_out = true;
+    }
 }
 
-bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert)
+void copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert, bool* update_out)
 {
     Dictionary src = src_obj.get_dictionary(convert.source_col());
     Dictionary dst = dst_obj.get_dictionary(convert.dest_col());
@@ -234,7 +239,7 @@ bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
             int cmp = src_val.first.compare(dst_val.first);
             if (cmp == 0) {
                 // Check if the values differ
-                Mixed converted_src = convert.src_to_dst(src_val.second);
+                Mixed converted_src = convert.src_to_dst(src_val.second, update_out);
                 cmp = converted_src.compare(dst_val.second);
                 if (cmp) {
                     // values are different - modify destination, advance both
@@ -269,10 +274,12 @@ bool copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
     }
     for (auto ndx : to_insert) {
         auto pair = src.get_pair(ndx);
-        Mixed converted_val = convert.src_to_dst(pair.second);
+        Mixed converted_val = convert.src_to_dst(pair.second, update_out);
         dst.insert(pair.first, converted_val);
     }
-    return to_delete.size() || to_insert.size();
+    if (update_out && (to_delete.size() || to_insert.size())) {
+        *update_out = true;
+    }
 }
 
 } // namespace
@@ -521,36 +528,15 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         }
     }
 
-    // Add objects that are present in src but absent in dst.
-    for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
-            continue;
-        auto table_src = group_src.get_table(table_key);
-        StringData table_name = table_src->get_name();
-        logger.debug("Adding objects in '%1'", table_name);
-        auto table_dst = group_dst.get_table(table_name);
-
-        for (auto& obj : *table_src) {
-            auto src_pk = obj.get_primary_key();
-            auto key_dst = table_dst->find_primary_key(src_pk);
-            if (!key_dst) {
-                logger.debug("  adding '%1'", src_pk);
-                table_dst->create_object_with_primary_key(src_pk);
-            }
-        }
-    }
-
-    // Now src and dst have identical schemas and objects. The values might
-    // still differ.
-
-    // Diff all the values and update if needed.
+    // Now src and dst have identical schemas and no extraneous objects from dst.
+    // There may be missing object from src and the values of existing objects may
+    // still differ. Diff all the values and create missing objects on the fly.
     for (auto table_key : group_src.get_table_keys()) {
         if (!group_src.table_is_public(table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
         TableRef table_dst = group_dst.get_table(table_name);
-        REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
         auto pk_col = table_src->get_primary_key_column();
         REALM_ASSERT(pk_col);
@@ -572,29 +558,24 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         }
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
-            auto dst = table_dst->get_object_with_primary_key(src_pk);
-            REALM_ASSERT(dst);
             bool updated = false;
+            // get or create the object
+            auto dst = table_dst->create_object_with_primary_key(src_pk, &updated);
+            REALM_ASSERT(dst);
 
             for (auto& cache : columns_cache) {
                 if (cache.source_col().is_list()) {
-                    if (copy_list(src, dst, cache)) {
-                        updated = true;
-                    }
+                    copy_list(src, dst, cache, &updated);
                 }
                 else if (cache.source_col().is_dictionary()) {
-                    if (copy_dictionary(src, dst, cache)) {
-                        updated = true;
-                    }
+                    copy_dictionary(src, dst, cache, &updated);
                 }
                 else if (cache.source_col().is_set()) {
-                    if (copy_set(src, dst, cache)) {
-                        updated = true;
-                    }
+                    copy_set(src, dst, cache, &updated);
                 }
                 else {
                     REALM_ASSERT(!cache.source_col().is_collection());
-                    auto val_src = cache.src_to_dst(src.get_any(cache.source_col()));
+                    auto val_src = cache.src_to_dst(src.get_any(cache.source_col()), &updated);
                     auto val_dst = dst.get_any(cache.dest_col());
                     if (val_src != val_dst) {
                         dst.set_any(cache.dest_col(), val_src);
