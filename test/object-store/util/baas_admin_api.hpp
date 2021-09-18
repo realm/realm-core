@@ -123,6 +123,7 @@ struct AppCreateConfig {
     util::Optional<std::string> custom_function_auth;
     bool enable_api_key_auth = false;
     bool enable_anonymous_auth = false;
+    bool enable_custom_token_auth = false;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);
