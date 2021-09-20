@@ -144,11 +144,11 @@ public:
     {
         return true;
     }
-    bool erase_group_level_table(TableKey)
+    bool erase_class(TableKey)
     {
         return true;
     }
-    bool rename_group_level_table(TableKey)
+    bool rename_class(TableKey)
     {
         return true;
     }
@@ -253,8 +253,8 @@ public:
     // No selection needed:
     bool select_table(TableKey key);
     bool insert_group_level_table(TableKey table_key);
-    bool erase_group_level_table(TableKey table_key);
-    bool rename_group_level_table(TableKey table_key);
+    bool erase_class(TableKey table_key);
+    bool rename_class(TableKey table_key);
 
     /// Must have table selected.
     bool create_object(ObjKey key)
@@ -375,8 +375,9 @@ public:
     virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
                                             bool nullable);
-    virtual void erase_group_level_table(TableKey table_key, size_t num_tables);
-    virtual void rename_group_level_table(TableKey table_key, StringData new_name);
+    virtual void prepare_erase_class(TableKey table_key);
+    virtual void erase_class(TableKey table_key, size_t num_tables);
+    virtual void rename_class(TableKey table_key, StringData new_name);
     virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
@@ -770,28 +771,30 @@ inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key)
     return true;
 }
 
-inline bool TransactLogEncoder::erase_group_level_table(TableKey table_key)
+inline bool TransactLogEncoder::erase_class(TableKey table_key)
 {
     append_simple_instr(instr_EraseGroupLevelTable, table_key); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::erase_group_level_table(TableKey table_key, size_t)
+inline void TransactLogConvenientEncoder::prepare_erase_class(TableKey) {}
+
+inline void TransactLogConvenientEncoder::erase_class(TableKey table_key, size_t)
 {
     unselect_all();
-    m_encoder.erase_group_level_table(table_key); // Throws
+    m_encoder.erase_class(table_key); // Throws
 }
 
-inline bool TransactLogEncoder::rename_group_level_table(TableKey table_key)
+inline bool TransactLogEncoder::rename_class(TableKey table_key)
 {
     append_simple_instr(instr_RenameGroupLevelTable, table_key); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_group_level_table(TableKey table_key, StringData)
+inline void TransactLogConvenientEncoder::rename_class(TableKey table_key, StringData)
 {
     unselect_all();
-    m_encoder.rename_group_level_table(table_key); // Throws
+    m_encoder.rename_class(table_key); // Throws
 }
 
 inline bool TransactLogEncoder::insert_column(ColKey col_key)
@@ -1160,13 +1163,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_EraseGroupLevelTable: {
             TableKey table_key = TableKey(read_int<uint32_t>()); // Throws
-            if (!handler.erase_group_level_table(table_key))     // Throws
+            if (!handler.erase_class(table_key))                 // Throws
                 parser_error();
             return;
         }
         case instr_RenameGroupLevelTable: {
             TableKey table_key = TableKey(read_int<uint32_t>()); // Throws
-            if (!handler.rename_group_level_table(table_key))    // Throws
+            if (!handler.rename_class(table_key))                // Throws
                 parser_error();
             return;
         }
@@ -1295,12 +1298,12 @@ public:
     bool insert_group_level_table(TableKey table_key)
     {
         sync_table();
-        m_encoder.erase_group_level_table(table_key);
+        m_encoder.erase_class(table_key);
         append_instruction();
         return true;
     }
 
-    bool erase_group_level_table(TableKey table_key)
+    bool erase_class(TableKey table_key)
     {
         sync_table();
         m_encoder.insert_group_level_table(table_key);
@@ -1308,7 +1311,7 @@ public:
         return true;
     }
 
-    bool rename_group_level_table(TableKey)
+    bool rename_class(TableKey)
     {
         sync_table();
         return true;

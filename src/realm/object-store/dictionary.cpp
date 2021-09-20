@@ -89,15 +89,6 @@ public:
     // -------------------------------------------------------------------------
     // Things not applicable to the adapter
 
-    bool init_from_parent() const override
-    {
-        REALM_TERMINATE("not implemented");
-    }
-    bool update_if_needed() const override
-    {
-        REALM_TERMINATE("not implemented");
-    }
-
     // We currently only support string keys which means these aren't reachable
     // as Results will handle the type-checks
     util::Optional<Mixed> min(size_t* = nullptr) const override

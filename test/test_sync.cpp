@@ -6755,7 +6755,7 @@ TEST(Sync_CreateDeleteCreateTableWithPrimaryKey)
 
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
         TableRef table = sync::create_table_with_primary_key(wt, "class_t", type_Int, "pk");
-        sync::erase_table(wt, std::move(table));
+        wt.get_group().remove_table(table->get_key());
         table = sync::create_table_with_primary_key(wt, "class_t", type_String, "pk");
     });
     session.wait_for_upload_complete_or_client_stopped();

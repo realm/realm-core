@@ -42,26 +42,6 @@ public:
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    //@{
-    /// Generate instructions for Object Store tables. These must be called
-    /// prior to calling the equivalent functions in Core's API. When creating a
-    /// class-like table, `add_class()` must be called prior to
-    /// `Group::insert_group_level_table()`. Similarly, `create_object()` or
-    /// `create_object_with_primary_key()` must be called prior to
-    /// `Table::insert_empty_row()` and/or `Table::set_int_unique()` or
-    /// `Table::set_string_unique()` or `Table::set_null_unique()`.
-    ///
-    /// If a class-like table is added, or an object-like row is inserted,
-    /// without calling these methods first, an exception will be thrown.
-    ///
-    /// A "class-like table" is defined as a table whose name begins with
-    /// "class_" (this is the convention used by Object Store). Non-class-like
-    /// tables can be created and modified using Core's API without calling
-    /// these functions, because they do not result in instructions being
-    /// emitted.
-    void prepare_erase_table(StringData table_name);
-    //@}
-
     // TrivialReplication interface:
     void initialize(DB&) override;
 
@@ -71,8 +51,9 @@ public:
                                     bool nullable) override;
     void create_object(const Table*, GlobalKey) override;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) override;
-    void erase_group_level_table(TableKey table_key, size_t num_tables) override;
-    void rename_group_level_table(TableKey table_key, StringData new_name) override;
+    void prepare_erase_class(TableKey tk) override;
+    void erase_class(TableKey table_key, size_t num_tables) override;
+    void rename_class(TableKey table_key, StringData new_name) override;
     void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) override;
     void erase_column(const Table*, ColKey col_key) override;
     void rename_column(const Table*, ColKey col_key, StringData name) override;
@@ -127,8 +108,7 @@ private:
     DB* m_db = nullptr;
     Transaction* m_transaction;
 
-    // Consistency checks:
-    std::string m_table_being_erased;
+    TableKey m_table_being_erased;
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 

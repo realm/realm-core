@@ -1820,11 +1820,11 @@ public:
     {
         return false;
     }
-    bool erase_group_level_table(TableKey)
+    bool erase_class(TableKey)
     {
         return false;
     }
-    bool rename_group_level_table(TableKey)
+    bool rename_class(TableKey)
     {
         return false;
     }
