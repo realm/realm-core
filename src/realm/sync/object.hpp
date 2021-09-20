@@ -109,25 +109,6 @@ inline TableRef create_table_with_primary_key(Transaction& wt, StringData name, 
     return wt.add_table_with_primary_key(name, pk_type, pk_column_name, nullable);
 }
 
-
-//@{
-/// Erase table and update metadata.
-///
-/// It is an error to erase tables via the Group API, because it does not
-/// correctly update metadata tables (such as the `pk` table).
-void erase_table(Transaction&, StringData name);
-void erase_table(Transaction&, TableRef);
-//@}
-
-/// Create an array column with the specified element type.
-///
-/// The result will be a column of type type_Table with one subcolumn named
-/// "!ARRAY_VALUE" of the specified element type and nullability.
-///
-/// Return the column index of the inserted array column.
-ColKey add_array_column(Table&, DataType element_type, StringData column_name, bool is_nullable = false);
-
-
 /// Determine whether it is safe to call `object_id_for_row()` on tables without
 /// primary keys. If the table has a primary key, always returns true.
 bool has_globally_stable_object_ids(const Table&);
