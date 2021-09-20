@@ -1246,13 +1246,14 @@ RLM_API bool realm_object_delete(realm_object_t*);
 /**
  * Resolve the Realm object in the provided Realm.
  *
- * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
- * NOTE: Use the function `realm_object_is_valid()` to check if the object exists.
+ * This is equivalent to producing a thread-safe reference and resolving it in the target realm.
  *
- * @return A resolved copy of the object. If the object does not exist in the target realm, an
- * invalid object is returned. Other failures result in NULL.
+ * If the object can be resolved in the target realm, '*resolved' points to the new object
+ * If the object cannot be resolved in the target realm, '*resolved' will be null.
+ * @return True if no exception occurred (except exceptions that may normally occur if resolution fails)
  */
-RLM_API realm_object_t* realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm);
+RLM_API bool realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm,
+                                     realm_object_t** resolved);
 
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
@@ -1408,12 +1409,13 @@ RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
  * Resolve the list in the context of a given Realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
- * If the list cannot be resolved in the given Realm an invalid list is returned.
- * Other errors will return a nullptr.
  *
- * @return A resolved copy of the live list.
+ * If resolution is possible, a valid resolved object is produced at '*resolved*'.
+ * If resolution is not possible, but no error occurs, '*resolved' is set to NULL
+ *
+ * @return true if no error occurred.
  */
-RLM_API realm_list_t* realm_list_resolve_in(const realm_list_t* list, const realm_t* target_realm);
+RLM_API bool realm_list_resolve_in(const realm_list_t* list, const realm_t* target_realm, realm_list_t** resolved);
 
 /**
  * Check if a list is valid.

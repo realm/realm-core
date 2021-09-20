@@ -157,19 +157,31 @@ RLM_API const void* _realm_object_get_native_ptr(realm_object_t* obj)
     return static_cast<const Object*>(obj);
 }
 
-RLM_API realm_object_t* realm_object_resolve_in(const realm_object_t* from_object, const realm_t* target_realm)
+RLM_API bool realm_object_resolve_in(const realm_object_t* from_object, const realm_t* target_realm,
+                                     realm_object_t** resolved)
 {
     return wrap_err([&]() {
         try {
             const auto& realm = *target_realm;
-            auto frozen_object = from_object->freeze(realm);
-            return new realm_object_t{std::move(frozen_object)};
+            auto new_obj = from_object->freeze(realm);
+            // clients of the C-API adhere to a different error handling strategy than Core.
+            // Core represents lack of resolution as a new object which is invalid.
+            // But clients of the C-API instead wants NO object to be produced.
+            if (new_obj.is_valid()) {
+                *resolved = new realm_object_t{std::move(new_obj)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
         }
         catch (NoSuchTable&) {
-            return new realm_object_t{Object{}};
+            *resolved = nullptr;
+            return true;
         }
         catch (KeyNotFound&) {
-            return new realm_object_t{Object{}};
+            *resolved = nullptr;
+            return true;
         }
     });
 }
@@ -424,19 +436,28 @@ RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm
     });
 }
 
-RLM_API realm_list_t* realm_list_resolve_in(const realm_list_t* from_list, const realm_t* target_realm)
+RLM_API bool realm_list_resolve_in(const realm_list_t* from_list, const realm_t* target_realm,
+                                   realm_list_t** resolved)
 {
     return wrap_err([&]() {
         try {
             const auto& realm = *target_realm;
             auto frozen_list = from_list->freeze(realm);
-            return new realm_list_t{std::move(frozen_list)};
+            if (frozen_list.is_valid()) {
+                *resolved = new realm_list_t{std::move(frozen_list)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
         }
         catch (NoSuchTable&) {
-            return new realm_list_t{List{}};
+            *resolved = nullptr;
+            return true;
         }
         catch (KeyNotFound&) {
-            return new realm_list_t{List{}};
+            *resolved = nullptr;
+            return true;
         }
     });
 }
