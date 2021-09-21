@@ -949,7 +949,7 @@ RLM_API bool realm_refresh(realm_t*);
  *
  * @return A non-NULL realm instance representing the frozen state.
  */
-RLM_API realm_t* realm_freeze(realm_t*);
+RLM_API realm_t* realm_freeze(const realm_t*);
 
 /**
  * Vacuum the free space from the realm file, reducing its file size.
@@ -1243,6 +1243,19 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_cla
  */
 RLM_API bool realm_object_delete(realm_object_t*);
 
+/**
+ * Resolve the Realm object in the provided Realm.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the target realm.
+ *
+ * If the object can be resolved in the target realm, '*resolved' points to the new object
+ * If the object cannot be resolved in the target realm, '*resolved' will be null.
+ * @return True if no exception occurred (except exceptions that may normally occur if resolution fails)
+ */
+RLM_API bool realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm,
+                                     realm_object_t** resolved);
+
+
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
 RLM_API const void* _realm_object_get_native_ptr(realm_object_t*);
@@ -1391,6 +1404,25 @@ RLM_API realm_list_t* _realm_list_from_native_copy(const void* plist, size_t n);
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
+
+/**
+ * Resolve the list in the context of a given Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * If resolution is possible, a valid resolved object is produced at '*resolved*'.
+ * If resolution is not possible, but no error occurs, '*resolved' is set to NULL
+ *
+ * @return true if no error occurred.
+ */
+RLM_API bool realm_list_resolve_in(const realm_list_t* list, const realm_t* target_realm, realm_list_t** resolved);
+
+/**
+ * Check if a list is valid.
+ *
+ * @return True if the list is valid.
+ */
+RLM_API bool realm_list_is_valid(const realm_list_t*);
 
 /**
  * Get the size of a list, in number of elements.
@@ -1781,9 +1813,13 @@ RLM_API bool realm_results_delete_all(realm_results_t*);
 RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
 
 /**
- * Map the results into a frozen realm instance.
+ * Map the Results into a live Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
+ *
+ * @return A live copy of the Results.
  */
-RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const realm_t* frozen_realm);
+RLM_API realm_results_t* realm_results_resolve_in(realm_results_t* from_results, const realm_t* target_realm);
 
 /**
  * Compute the minimum value of a property in the results.

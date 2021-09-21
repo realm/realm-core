@@ -2328,6 +2328,133 @@ TEST_CASE("C API") {
         }
     }
 
+    SECTION("freeze and thaw") {
+        SECTION("realm") {
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            CHECK(!realm_is_frozen(realm));
+            CHECK(realm_is_frozen(frozen_realm.get()));
+        }
+
+        SECTION("objects") {
+            CPtr<realm_object_t> obj1;
+            realm_value_t value;
+
+            write([&]() {
+                obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+            CHECK(checked(realm_get_value(obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "", value.string.size) == 0);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            realm_object_t* frozen_obj1;
+            CHECK(realm_object_resolve_in(obj1.get(), frozen_realm.get(), &frozen_obj1));
+
+            write([&]() {
+                CHECK(checked(realm_set_value(obj1.get(), foo_str_key, rlm_str_val("Hello, World!"), false)));
+            });
+
+            CHECK(checked(realm_get_value(obj1.get(), foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
+
+            CHECK(checked(realm_get_value(frozen_obj1, foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "", value.string.size) == 0);
+            realm_object_t* thawed_obj1;
+            CHECK(realm_object_resolve_in(obj1.get(), realm, &thawed_obj1));
+            CHECK(thawed_obj1);
+            CHECK(checked(realm_get_value(thawed_obj1, foo_str_key, &value)));
+            CHECK(value.type == RLM_TYPE_STRING);
+            CHECK(strncmp(value.string.data, "Hello, World!", value.string.size) == 0);
+
+            write([&]() {
+                CHECK(checked(realm_object_delete(obj1.get())));
+            });
+            realm_object_t* deleted_obj;
+            auto b = realm_object_resolve_in(frozen_obj1, realm, &deleted_obj);
+            CHECK(b);
+            CHECK(deleted_obj == nullptr);
+            realm_release(frozen_obj1);
+            realm_release(thawed_obj1);
+        }
+
+        SECTION("results") {
+            auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
+            realm_results_delete_all(results.get());
+
+            write([&]() {
+                // Ensure that we start from a known initial state
+                CHECK(realm_results_delete_all(results.get()));
+
+                auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+
+            size_t count;
+            realm_results_count(results.get(), &count);
+            CHECK(count == 1);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            auto frozen_results = cptr_checked(realm_results_resolve_in(results.get(), frozen_realm.get()));
+            write([&]() {
+                auto obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+            realm_results_count(frozen_results.get(), &count);
+            CHECK(count == 1);
+            realm_results_count(results.get(), &count);
+            CHECK(count == 2);
+
+            auto thawed_results = cptr_checked(realm_results_resolve_in(frozen_results.get(), realm));
+            realm_results_count(thawed_results.get(), &count);
+            CHECK(count == 2);
+        }
+
+        SECTION("lists") {
+            CPtr<realm_object_t> obj1;
+            size_t count;
+
+            write([&]() {
+                obj1 = cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(1)));
+                CHECK(obj1);
+            });
+
+            auto list = cptr_checked(realm_get_list(obj1.get(), bar_strings_property.key));
+            realm_list_size(list.get(), &count);
+            CHECK(count == 0);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            realm_list_t* frozen_list;
+            CHECK(realm_list_resolve_in(list.get(), frozen_realm.get(), &frozen_list));
+            realm_list_size(frozen_list, &count);
+            CHECK(count == 0);
+
+            write([&]() {
+                checked(realm_list_insert(list.get(), 0, rlm_str_val("Hello")));
+            });
+
+            realm_list_size(frozen_list, &count);
+            CHECK(count == 0);
+            realm_list_size(list.get(), &count);
+            CHECK(count == 1);
+
+            realm_list_t* thawed_list;
+            CHECK(realm_list_resolve_in(frozen_list, realm, &thawed_list));
+            realm_list_size(thawed_list, &count);
+            CHECK(count == 1);
+
+            write([&]() {
+                CHECK(checked(realm_object_delete(obj1.get())));
+            });
+            realm_release(thawed_list);
+            CHECK(realm_list_resolve_in(frozen_list, realm, &thawed_list));
+            CHECK(thawed_list == nullptr);
+            realm_release(frozen_list);
+        }
+    }
+
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
     realm_release(realm);
