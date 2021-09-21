@@ -1,4 +1,4 @@
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include <realm/db.hpp>
@@ -17,12 +17,29 @@ using namespace sync;
 
 namespace {
 
+struct EmbeddedObjectConverter {
+    void track_if_needed(Obj e_src, Obj e_dst);
+    void process_pending();
+
+private:
+    struct EmbeddedToCheck {
+        Obj embedded_in_src;
+        Obj embedded_in_dst;
+    };
+
+    std::vector<std::pair<TableKey, std::unordered_set<ObjKey>>> embedded_verified;
+    std::vector<EmbeddedToCheck> embedded_pending;
+};
+
 struct InterRealmValueConverter {
-    InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col)
+    InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col,
+                             EmbeddedObjectConverter& ec)
         : m_src_table(src_table)
         , m_dst_table(dst_table)
         , m_src_col(src_col)
         , m_dst_col(dst_col)
+        , m_embedded_converter(ec)
+        , m_is_embedded_link(false)
         , m_primitive_types_only(!(src_col.get_type() == col_type_TypedLink || src_col.get_type() == col_type_Link ||
                                    src_col.get_type() == col_type_LinkList || src_col.get_type() == col_type_Mixed))
     {
@@ -31,33 +48,110 @@ struct InterRealmValueConverter {
             m_opposite_of_src = src_table->get_opposite_table(src_col);
             m_opposite_of_dst = dst_table->get_opposite_table(dst_col);
             REALM_ASSERT(bool(m_opposite_of_src) == bool(m_opposite_of_dst));
+            if (m_opposite_of_src) {
+                m_is_embedded_link = m_opposite_of_src->is_embedded();
+            }
         }
     }
 
-    Mixed src_to_dst(Mixed src, bool* did_create = nullptr)
+    void track_new_embedded(Obj src, Obj dst)
     {
+        m_embedded_converter.track_if_needed(src, dst);
+    }
+
+    struct ConversionResult {
+        Mixed converted_value;
+        bool requires_new_embedded_object = false;
+        Obj src_embedded_to_check;
+    };
+
+    // convert `src` to the destination Realm and compare that value with `dst`
+    // If `converted_src_out` is provided, it will be set to the converted src value
+    int cmp_src_to_dst(Mixed src, Mixed dst, ConversionResult* converted_src_out = nullptr,
+                       bool* did_update_out = nullptr)
+    {
+        bool cmp = 0;
+        Mixed converted_src;
         if (m_primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
-            return src;
+            converted_src = src;
+            cmp = src.compare(dst);
         }
         else {
             if (m_opposite_of_src) {
                 ObjKey src_link_key = src.get<ObjKey>();
-                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_create);
-                return dst_link.get_key();
+                if (m_is_embedded_link) {
+                    Obj src_embedded = m_opposite_of_src->get_object(src_link_key);
+                    REALM_ASSERT_DEBUG(src_embedded);
+                    if (dst.is_type(type_Link, type_TypedLink)) {
+                        cmp = 0; // no need to set this link, there is already an embedded object here
+                        Obj dst_embedded = m_opposite_of_dst->get_object(dst.get<ObjKey>());
+                        REALM_ASSERT_DEBUG(dst_embedded);
+                        converted_src = dst_embedded.get_key();
+                        m_embedded_converter.track_if_needed(src_embedded, dst_embedded);
+                    }
+                    else {
+                        cmp = src.compare(dst);
+                        if (converted_src_out) {
+                            converted_src_out->requires_new_embedded_object = true;
+                            converted_src_out->src_embedded_to_check = src_embedded;
+                        }
+                    }
+                }
+                else {
+                    Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+                    Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+                    converted_src = dst_link.get_key();
+                    if (dst.is_type(type_TypedLink)) {
+                        cmp = converted_src.compare(dst.get<ObjKey>());
+                    }
+                    else {
+                        cmp = converted_src.compare(dst);
+                    }
+                }
             }
             else {
                 ObjLink src_link = src.get<ObjLink>();
                 TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
                 REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
-                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-
                 TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
                 REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_create);
-                return ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+
+                if (src_link_table->is_embedded()) {
+                    Obj src_embedded = src_link_table->get_object(src_link.get_obj_key());
+                    REALM_ASSERT_DEBUG(src_embedded);
+                    if (dst.is_type(type_TypedLink) &&
+                        dst.get<ObjLink>().get_table_key() == dst_link_table->get_key()) {
+                        // dst link already points to an embedded object in this table, keep it
+                        cmp = 0; // no need to set a new link
+                        Obj dst_embedded = dst_link_table->get_object(dst.get<ObjLink>().get_obj_key());
+                        REALM_ASSERT_DEBUG(dst_embedded);
+                        converted_src = ObjLink{dst_link_table->get_key(), dst_embedded.get_key()};
+                        m_embedded_converter.track_if_needed(src_embedded, dst_embedded);
+                    }
+                    else {
+                        cmp = src.compare(dst);
+                        // dst is different, create an embedded object to link to it
+                        if (converted_src_out) {
+                            converted_src_out->requires_new_embedded_object = true;
+                            converted_src_out->src_embedded_to_check = src_embedded;
+                        }
+                    }
+                }
+                else { // regular table, convert by pk
+                    Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+                    Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+                    converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                    cmp = converted_src.compare(dst);
+                }
             }
         }
+        if (converted_src_out) {
+            converted_src_out->converted_value = converted_src;
+        }
+        if (did_update_out && cmp) {
+            *did_update_out = true;
+        }
+        return cmp;
     }
 
     inline ColKey source_col() const
@@ -78,6 +172,8 @@ private:
     ColKey m_dst_col;
     TableRef m_opposite_of_src;
     TableRef m_opposite_of_dst;
+    EmbeddedObjectConverter& m_embedded_converter;
+    bool m_is_embedded_link;
     const bool m_primitive_types_only;
 };
 
@@ -103,22 +199,32 @@ void copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conve
     size_t ndx = 0;
     size_t suffix_len = 0;
 
-    while (ndx < len_min && src->get_any(ndx) == dst->get_any(ndx)) {
+    while (ndx < len_min && convert.cmp_src_to_dst(src->get_any(ndx), dst->get_any(ndx), nullptr, update_out) == 0) {
         ndx++;
     }
 
     size_t suffix_len_max = len_min - ndx;
-    while (suffix_len < suffix_len_max && convert.src_to_dst(src->get_any(len_src - 1 - suffix_len), update_out) ==
-                                              dst->get_any(len_dst - 1 - suffix_len)) {
+
+    while (suffix_len < suffix_len_max &&
+           convert.cmp_src_to_dst(src->get_any(len_src - 1 - suffix_len), dst->get_any(len_dst - 1 - suffix_len),
+                                  nullptr, update_out) == 0) {
         suffix_len++;
     }
 
     len_min -= (ndx + suffix_len);
 
     for (size_t i = 0; i < len_min; i++) {
-        auto val = convert.src_to_dst(src->get_any(ndx));
-        if (dst->get_any(ndx) != val) {
-            dst->set_any(ndx, val);
+        InterRealmValueConverter::ConversionResult converted_src;
+        if (convert.cmp_src_to_dst(src->get_any(ndx), dst->get_any(ndx), &converted_src, update_out)) {
+            if (converted_src.requires_new_embedded_object) {
+                auto lnklist = dynamic_cast<LnkLst*>(dst.get());
+                REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
+                Obj embedded = lnklist->create_and_set_linked_object(ndx);
+                convert.track_new_embedded(converted_src.src_embedded_to_check, embedded);
+            }
+            else {
+                dst->set_any(ndx, converted_src.converted_value);
+            }
             updated = true;
         }
         ndx++;
@@ -126,7 +232,17 @@ void copy_list(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conve
 
     // New elements must be inserted in dst.
     while (len_dst < len_src) {
-        dst->insert_any(ndx, convert.src_to_dst(src->get_any(ndx)));
+        InterRealmValueConverter::ConversionResult converted_src;
+        convert.cmp_src_to_dst(src->get_any(ndx), Mixed{}, &converted_src, update_out);
+        if (converted_src.requires_new_embedded_object) {
+            auto lnklist = dynamic_cast<LnkLst*>(dst.get());
+            REALM_ASSERT(lnklist); // this is the only type of list that supports embedded objects
+            Obj embedded = lnklist->create_and_insert_linked_object(ndx);
+            convert.track_new_embedded(converted_src.src_embedded_to_check, embedded);
+        }
+        else {
+            dst->insert_any(ndx, converted_src.converted_value);
+        }
         len_dst++;
         ndx++;
         updated = true;
@@ -170,9 +286,8 @@ void copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conver
         Mixed src_val = src->get_any(ndx_in_src);
         while (dst_ndx < sorted_dst.size()) {
             size_t ndx_in_dst = sorted_dst[dst_ndx];
-            Mixed dst_val = dst->get_any(ndx_in_dst);
-            Mixed converted_src = convert.src_to_dst(src_val, update_out);
-            int cmp = converted_src.compare(dst_val);
+
+            int cmp = convert.cmp_src_to_dst(src_val, dst->get_any(ndx_in_dst), nullptr, update_out);
             if (cmp == 0) {
                 // equal: advance both src and dst
                 ++dst_ndx;
@@ -202,8 +317,11 @@ void copy_set(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conver
         dst->erase_any(dst->get_any(*it));
     }
     for (auto ndx : to_insert) {
-        Mixed converted_src = convert.src_to_dst(src->get_any(ndx), update_out);
-        dst->insert_any(converted_src);
+        InterRealmValueConverter::ConversionResult converted_src;
+        convert.cmp_src_to_dst(src->get_any(ndx), Mixed{}, &converted_src, update_out);
+        // we do not support a set of embedded objects
+        REALM_ASSERT(!converted_src.requires_new_embedded_object);
+        dst->insert_any(converted_src.converted_value);
     }
 
     if (update_out && (to_delete.size() || to_insert.size())) {
@@ -239,9 +357,7 @@ void copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
             int cmp = src_val.first.compare(dst_val.first);
             if (cmp == 0) {
                 // Check if the values differ
-                Mixed converted_src = convert.src_to_dst(src_val.second, update_out);
-                cmp = converted_src.compare(dst_val.second);
-                if (cmp) {
+                if (convert.cmp_src_to_dst(src_val.second, dst_val.second, nullptr, update_out)) {
                     // values are different - modify destination, advance both
                     to_insert.push_back(sorted_src[src_ndx]);
                 }
@@ -274,13 +390,129 @@ void copy_dictionary(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter&
     }
     for (auto ndx : to_insert) {
         auto pair = src.get_pair(ndx);
-        Mixed converted_val = convert.src_to_dst(pair.second, update_out);
-        dst.insert(pair.first, converted_val);
+        InterRealmValueConverter::ConversionResult converted_val;
+        convert.cmp_src_to_dst(pair.second, Mixed{}, &converted_val, update_out);
+        if (converted_val.requires_new_embedded_object) {
+            Obj new_embedded = dst.create_and_insert_linked_object(pair.first);
+            convert.track_new_embedded(converted_val.src_embedded_to_check, new_embedded);
+        }
+        else {
+            dst.insert(pair.first, converted_val.converted_value);
+        }
     }
     if (update_out && (to_delete.size() || to_insert.size())) {
         *update_out = true;
     }
 }
+
+void copy_value(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& convert, bool* update_out)
+{
+    if (convert.source_col().is_list()) {
+        copy_list(src_obj, dst_obj, convert, update_out);
+    }
+    else if (convert.source_col().is_dictionary()) {
+        copy_dictionary(src_obj, dst_obj, convert, update_out);
+    }
+    else if (convert.source_col().is_set()) {
+        copy_set(src_obj, dst_obj, convert, update_out);
+    }
+    else {
+        REALM_ASSERT(!convert.source_col().is_collection());
+        InterRealmValueConverter::ConversionResult converted_src;
+        if (convert.cmp_src_to_dst(src_obj.get_any(convert.source_col()), dst_obj.get_any(convert.dest_col()),
+                                   &converted_src, update_out)) {
+            if (converted_src.requires_new_embedded_object) {
+                Obj new_embedded = dst_obj.create_and_set_linked_object(convert.dest_col());
+                convert.track_new_embedded(converted_src.src_embedded_to_check, new_embedded);
+            }
+            else {
+                dst_obj.set_any(convert.dest_col(), converted_src.converted_value);
+            }
+        }
+    }
+}
+
+struct InterRealmObjectConverter {
+    InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst, EmbeddedObjectConverter& embedded_tracker)
+        : m_embedded_tracker(embedded_tracker)
+    {
+        populate_columns_from_table(table_src, table_dst);
+    }
+
+    void copy(const Obj& src, Obj& dst, bool* update_out)
+    {
+        for (auto& column : m_columns_cache) {
+            copy_value(src, dst, column, update_out);
+        }
+    }
+
+private:
+    void populate_columns_from_table(ConstTableRef table_src, ConstTableRef table_dst)
+    {
+        m_columns_cache.clear();
+        m_columns_cache.reserve(table_src->get_column_count());
+        ColKey pk_col = table_src->get_primary_key_column();
+        for (ColKey col_key_src : table_src->get_column_keys()) {
+            if (col_key_src == pk_col)
+                continue;
+            StringData col_name = table_src->get_column_name(col_key_src);
+            ColKey col_key_dst = table_dst->get_column_key(col_name);
+            REALM_ASSERT(col_key_dst);
+            m_columns_cache.emplace_back(
+                InterRealmValueConverter(table_src, col_key_src, table_dst, col_key_dst, m_embedded_tracker));
+        }
+    }
+
+    EmbeddedObjectConverter& m_embedded_tracker;
+    std::vector<InterRealmValueConverter> m_columns_cache;
+};
+
+void EmbeddedObjectConverter::track_if_needed(Obj e_src, Obj e_dst)
+{
+    auto get_tracked_objects_for_dst_table = [this](TableKey dst_table_key) {
+        auto it = std::find_if(embedded_verified.begin(), embedded_verified.end(),
+                               [&dst_table_key](const auto& pair) -> bool {
+                                   return pair.first == dst_table_key;
+                               });
+
+        if (it != embedded_verified.end()) {
+            return it;
+        }
+        embedded_verified.push_back({dst_table_key, {}});
+        return embedded_verified.end() - 1;
+    };
+
+    auto it = get_tracked_objects_for_dst_table(e_dst.get_table()->get_key());
+    if (it->second.find(e_dst.get_key()) == it->second.end()) {
+        embedded_pending.push_back({e_src, e_dst});
+    }
+}
+
+void EmbeddedObjectConverter::process_pending()
+{
+    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters;
+    auto get_converter = [this, &converters](ConstTableRef src_table,
+                                             TableRef dst_table) -> InterRealmObjectConverter& {
+        TableKey dst_table_key = dst_table->get_key();
+        auto it = std::find_if(converters.begin(), converters.end(), [&dst_table_key](auto& val) {
+            return val.first == dst_table_key;
+        });
+        if (it == converters.end()) {
+            converters.push_back({dst_table_key, InterRealmObjectConverter{src_table, dst_table, *this}});
+            it = converters.end() - 1;
+        }
+        return it->second;
+    };
+
+    while (!embedded_pending.empty()) {
+        EmbeddedToCheck pending = embedded_pending.back();
+        embedded_pending.pop_back();
+        InterRealmObjectConverter& converter =
+            get_converter(pending.embedded_in_src.get_table(), pending.embedded_in_dst.get_table());
+        converter.copy(pending.embedded_in_src, pending.embedded_in_dst, nullptr);
+    }
+}
+
 
 } // namespace
 
@@ -509,6 +741,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         if (!group_src.table_is_public(table_key))
             continue;
         auto table_src = group_src.get_table(table_key);
+        // There are no primary keys in embedded tables but this is ok, because
+        // embedded objects are tied to the lifetime of top level objects.
+        if (table_src->is_embedded())
+            continue;
         StringData table_name = table_src->get_name();
         logger.debug("Removing objects in '%1'", table_name);
         auto table_dst = group_dst.get_table(table_name);
@@ -528,6 +764,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         }
     }
 
+    EmbeddedObjectConverter embedded_tracker;
+
     // Now src and dst have identical schemas and no extraneous objects from dst.
     // There may be missing object from src and the values of existing objects may
     // still differ. Diff all the values and create missing objects on the fly.
@@ -535,6 +773,10 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         if (!group_src.table_is_public(table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
+        // Embedded objects don't have a primary key, so they are handled
+        // as a special case when they are encountered as a link value.
+        if (table_src->is_embedded())
+            continue;
         StringData table_name = table_src->get_name();
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
@@ -546,16 +788,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                      table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
                      pk_col.get_type());
 
-        std::vector<InterRealmValueConverter> columns_cache;
+        InterRealmObjectConverter converter(table_src, table_dst, embedded_tracker);
 
-        for (ColKey col_key_src : table_src->get_column_keys()) {
-            if (col_key_src == pk_col)
-                continue;
-            StringData col_name = table_src->get_column_name(col_key_src);
-            ColKey col_key_dst = table_dst->get_column_key(col_name);
-            REALM_ASSERT(col_key_dst);
-            columns_cache.emplace_back(InterRealmValueConverter(table_src, col_key_src, table_dst, col_key_dst));
-        }
         for (const Obj& src : *table_src) {
             auto src_pk = src.get_primary_key();
             bool updated = false;
@@ -563,30 +797,12 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             auto dst = table_dst->create_object_with_primary_key(src_pk, &updated);
             REALM_ASSERT(dst);
 
-            for (auto& cache : columns_cache) {
-                if (cache.source_col().is_list()) {
-                    copy_list(src, dst, cache, &updated);
-                }
-                else if (cache.source_col().is_dictionary()) {
-                    copy_dictionary(src, dst, cache, &updated);
-                }
-                else if (cache.source_col().is_set()) {
-                    copy_set(src, dst, cache, &updated);
-                }
-                else {
-                    REALM_ASSERT(!cache.source_col().is_collection());
-                    auto val_src = cache.src_to_dst(src.get_any(cache.source_col()), &updated);
-                    auto val_dst = dst.get_any(cache.dest_col());
-                    if (val_src != val_dst) {
-                        dst.set_any(cache.dest_col(), val_src);
-                        updated = true;
-                    }
-                }
-            }
+            converter.copy(src, dst, &updated);
             if (updated) {
                 logger.debug("  updating %1", src_pk);
             }
         }
+        embedded_tracker.process_pending();
     }
 }
 

@@ -49,6 +49,13 @@ static inline std::string random_string(std::string::size_type length)
         s += chrs[pick(rg)];
     return s;
 }
+
+static inline int64_t random_int()
+{
+    thread_local std::mt19937_64 rng(std::random_device{}());
+    return rng();
+}
+
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path)                                                                               \
