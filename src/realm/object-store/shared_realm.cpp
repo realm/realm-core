@@ -848,7 +848,7 @@ void Realm::commit_transaction()
         auto prev_version = transaction().get_version_of_current_transaction();
         m_coordinator->commit_write(*this);
         audit->record_write(prev_version, transaction().get_version_of_current_transaction());
-        // m_shared_group->unpin_version(prev_version);
+        // m_db->unpin_version(prev_version);
     }
     else {
         m_coordinator->commit_write(*this);
@@ -1107,6 +1107,8 @@ void Realm::close()
     m_transaction = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
+    m_scheduler = nullptr;
+    m_config = {};
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)

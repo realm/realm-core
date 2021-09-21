@@ -596,9 +596,6 @@ TEST_CASE("sync_manager: metadata") {
 
     app::App::Config app_config;
     app_config.app_id = "foo_app_id";
-    app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
-        REALM_ASSERT_RELEASE(false);
-    };
     app_config.base_url = base_path;
     app_config.platform = "OS Test Platform";
     app_config.platform_version = "OS Test Platform Version";

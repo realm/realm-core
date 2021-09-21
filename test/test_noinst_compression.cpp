@@ -217,8 +217,7 @@ void make_data_in_realm(const std::string& realm_path, size_t data_size,
                         util::Optional<std::array<char, 64>> encryption_key = none)
 {
     DBOptions options{encryption_key ? encryption_key->data() : nullptr};
-    std::unique_ptr<ClientReplication> history = make_client_replication(realm_path);
-    DBRef sg = DB::create(*history, options);
+    DBRef sg = DB::create(make_client_replication(realm_path), options);
 
     WriteTransaction wt{sg};
     TableRef tr = sync::create_table(wt, "class_table");
@@ -505,13 +504,10 @@ TEST(Compression_RealmBlocksLarge)
     CHECK(files_compare_equal(src_path, unencrypted_path));
     CHECK(!files_compare_equal(src_path, encrypted_path));
     {
-        std::unique_ptr<ClientReplication> history_src = make_client_replication(src_path);
-        DBRef sg_src = DB::create(*history_src);
-        std::unique_ptr<ClientReplication> history_unencrypted = make_client_replication(unencrypted_path);
-        DBRef sg_unencrypted = DB::create(*history_unencrypted);
-        std::unique_ptr<ClientReplication> history_encrypted = make_client_replication(encrypted_path);
+        DBRef sg_src = DB::create(make_client_replication(src_path));
+        DBRef sg_unencrypted = DB::create(make_client_replication(unencrypted_path));
         DBOptions options{encryption_key ? encryption_key->data() : nullptr};
-        DBRef sg_encrypted = DB::create(*history_encrypted, options);
+        DBRef sg_encrypted = DB::create(make_client_replication(encrypted_path), options);
         ReadTransaction rt_src{sg_src};
         ReadTransaction rt_unencrypted{sg_unencrypted};
         ReadTransaction rt_encrypted{sg_encrypted};
@@ -573,13 +569,10 @@ TEST(Compression_RealmBlocksUnencryptedSplit)
     CHECK(files_compare_equal(src_path, unencrypted_path));
     CHECK(!files_compare_equal(src_path, encrypted_path));
     {
-        std::unique_ptr<ClientReplication> history_src = make_client_replication(src_path);
-        DBRef sg_src = DB::create(*history_src);
-        std::unique_ptr<ClientReplication> history_unencrypted = make_client_replication(unencrypted_path);
-        DBRef sg_unencrypted = DB::create(*history_unencrypted);
-        std::unique_ptr<ClientReplication> history_encrypted = make_client_replication(encrypted_path);
+        DBRef sg_src = DB::create(make_client_replication(src_path));
+        DBRef sg_unencrypted = DB::create(make_client_replication(unencrypted_path));
         DBOptions options{encryption_key ? encryption_key->data() : nullptr};
-        DBRef sg_encrypted = DB::create(*history_encrypted, options);
+        DBRef sg_encrypted = DB::create(make_client_replication(encrypted_path), options);
         ReadTransaction rt_src{sg_src};
         ReadTransaction rt_unencrypted{sg_unencrypted};
         ReadTransaction rt_encrypted{sg_encrypted};
@@ -694,15 +687,10 @@ TEST(Compression_ExtractBlocksEncrypted)
     CHECK(!files_compare_equal(path_2, path_3));
     {
         DBOptions options_1{encryption_key_1.data()};
-        std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-        DBRef sg_1 = DB::create(*history_1, options_1);
-
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
-
+        DBRef sg_1 = DB::create(make_client_replication(path_1), options_1);
+        DBRef sg_2 = DB::create(make_client_replication(path_2));
         DBOptions options_3{encryption_key_3.data()};
-        std::unique_ptr<ClientReplication> history_3 = make_client_replication(path_3);
-        DBRef sg_3 = DB::create(*history_3, options_3);
+        DBRef sg_3 = DB::create(make_client_replication(path_3), options_3);
 
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};

@@ -2863,13 +2863,14 @@ TEST(Table_list_basic)
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
 
-        size_t return_cnt = 0;
+        size_t return_cnt = 0, return_ndx = 0;
         list.sum(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
-        list.max(&return_cnt);
-        CHECK_EQUAL(return_cnt, 0);
-        list.min(&return_cnt);
-        CHECK_EQUAL(return_cnt, 0);
+        list.max(&return_ndx);
+        CHECK_EQUAL(return_ndx, not_found);
+        return_ndx = 0;
+        list.min(&return_ndx);
+        CHECK_EQUAL(return_ndx, not_found);
         list.avg(&return_cnt);
         CHECK_EQUAL(return_cnt, 0);
 
@@ -5278,7 +5279,9 @@ TEST(Table_ChangePKNullability)
     table->create_object_with_primary_key("");
     table->create_object_with_primary_key({});
 
-    CHECK_LOGIC_ERROR(table->set_nullability(pk_col, false, true), LogicError::column_not_nullable);
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(table->set_nullability(pk_col, false, true), message);
+    CHECK_EQUAL(message, "Objects in 'foo' has null value(s) in property 'id'");
 
     table->get_object_with_primary_key({}).remove();
     table->set_nullability(pk_col, false, true);
@@ -5764,6 +5767,25 @@ TEST(Table_MixedNull)
     list.remove(0);
 }
 
+TEST(Table_InsertWithMixedLink)
+{
+    Group g;
+    TableRef dest = g.add_table_with_primary_key("dest", type_Int, "value");
+    TableRef source = g.add_table_with_primary_key("source", type_Int, "value");
+    ColKey mixed_col = source->add_column(type_Mixed, "mixed");
+
+    Obj dest_obj = dest->create_object_with_primary_key(0);
+
+    Mixed mixed_link = ObjLink{dest->get_key(), dest_obj.get_key()};
+    FieldValues values = {
+        {mixed_col, mixed_link},
+    };
+    source->create_object_with_primary_key(0, std::move(values));
+
+    source->clear();
+    dest->clear();
+}
+
 TEST(Table_SortEncrypted)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5806,6 +5828,45 @@ TEST(Table_RebuildTable)
         t->create_object().set(id, i);
     }
     t->set_primary_key_column(id);
+}
+
+TEST(Table_ListOfPrimitivesTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+    TableRef t = tr->add_table("table");
+    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ObjKeys keys;
+    t->create_objects(32, keys);
+    auto list = t->get_object(keys[7]).get_list<Int>(int_col);
+    list.add(7);
+    list.add(25);
+    list.add(42);
+    tr->commit_and_continue_as_read();
+
+    tr->promote_to_write();
+    list.set(0, 5);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 5);
+    tr->promote_to_write();
+    list.swap(0, 1);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 25);
+    tr->promote_to_write();
+    list.move(1, 0);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(0), 5);
+    tr->promote_to_write();
+    list.remove(1);
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.get(1), 42);
+    tr->promote_to_write();
+    list.clear();
+    tr->commit_and_continue_as_read();
+    CHECK_EQUAL(list.size(), 0);
 }
 
 #endif // TEST_TABLE

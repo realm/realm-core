@@ -109,10 +109,6 @@ int main(int argc, char* argv[])
     }
     class HistoryContext : public _impl::ServerHistory::Context {
     public:
-        bool owner_is_sync_server() const noexcept override final
-        {
-            return false;
-        }
         std::mt19937_64& server_history_get_random() noexcept override final
         {
             return m_random;

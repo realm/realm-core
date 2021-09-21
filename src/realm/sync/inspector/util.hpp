@@ -26,7 +26,6 @@ class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     ServerHistoryContext();
 
-    bool owner_is_sync_server() const noexcept override;
     std::mt19937_64& server_history_get_random() noexcept override;
 
     sync::Transformer& get_transformer() override;

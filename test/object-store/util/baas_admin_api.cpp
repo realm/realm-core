@@ -131,7 +131,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
 
         if (target_obj->is_embedded) {
             m_current_path.push_back(prop.name);
-            if (is_array(prop.type)) {
+            if (is_collection(prop.type)) {
                 m_current_path.push_back("[]");
             }
 
@@ -150,7 +150,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
                 {"ref",
                  util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
                 {"foreign_key", target_obj->primary_key_property()->name},
-                {"is_list", is_array(prop.type)},
+                {"is_list", is_collection(prop.type)},
             };
             type_output.emplace("bsonType", property_type_to_bson_type_str(target_obj->primary_key_property()->type));
         }

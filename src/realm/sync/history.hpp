@@ -215,8 +215,6 @@ protected:
 
 class ClientReplication : public ClientReplicationBase {
 public:
-    class Config;
-
     /// Get the persisted upload/download progress in bytes.
     virtual void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes,
                                            std::uint_fast64_t& downloadable_bytes, std::uint_fast64_t& uploaded_bytes,
@@ -246,27 +244,12 @@ protected:
 };
 
 
-class ClientReplication::Config {
-public:
-    Config() {}
-
-    /// Must be set to true if, and only if the created history object
-    /// represents (is owned by) the sync agent of the specified Realm file. At
-    /// most one such instance is allowed to participate in a Realm file access
-    /// session at any point in time. Ordinarily the sync agent is encapsulated
-    /// by the sync::Client class, and the history instance representing the
-    /// agent is created transparently by sync::Client (one history instance per
-    /// sync::Session object).
-    bool owner_is_sync_agent = false;
-};
-
 /// \brief Create a "sync history" implementation of the realm::Replication
 /// interface.
 ///
 /// The intended role for such an object is as a plugin for new
 /// realm::DB objects.
-std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path,
-                                                           ClientReplication::Config = {});
+std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path);
 
 
 // Implementation

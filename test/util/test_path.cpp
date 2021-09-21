@@ -125,11 +125,25 @@ TestPathGuard::~TestPathGuard() noexcept
     if (keep_files)
         return;
     try {
-        File::try_remove(m_path);
+        if (!m_path.empty())
+            File::try_remove(m_path);
     }
     catch (...) {
         // Exception deliberately ignored
     }
+}
+
+TestPathGuard::TestPathGuard(TestPathGuard&& other) noexcept
+    : m_path(std::move(other.m_path))
+{
+    other.m_path.clear();
+}
+
+TestPathGuard& TestPathGuard::operator=(TestPathGuard&& other) noexcept
+{
+    m_path = std::move(other.m_path);
+    other.m_path.clear();
+    return *this;
 }
 
 
@@ -191,7 +205,7 @@ DBTestPathGuard::DBTestPathGuard(const std::string& path)
 
 DBTestPathGuard::~DBTestPathGuard() noexcept
 {
-    if (!keep_files)
+    if (!keep_files && !m_path.empty())
         cleanup();
 }
 

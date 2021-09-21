@@ -442,6 +442,22 @@ Query EqualityNode::visit(ParserDriver* drv)
     return {};
 }
 
+Query BetweenNode::visit(ParserDriver* drv)
+{
+    if (limits->elements.size() != 2) {
+        throw InvalidQueryError("Operator 'BETWEEN' requires list with 2 elements.");
+    }
+
+    ValueNode min(limits->elements.at(0));
+    ValueNode max(limits->elements.at(1));
+    RelationalNode cmp1(prop, CompareNode::GREATER, &min);
+    RelationalNode cmp2(prop, CompareNode::LESS, &max);
+    AndNode and_node(&cmp1);
+    and_node.atom_preds.emplace_back(&cmp2);
+
+    return and_node.visit(drv);
+}
+
 Query RelationalNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);

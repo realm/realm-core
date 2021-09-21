@@ -72,7 +72,7 @@ public:
     const std::string virt_path;
 
     Slot(ServerFileAccessCache&, std::string realm_path, std::string virt_path, ServerHistory::CompactionControl&,
-         bool disable_sync_to_disk) noexcept;
+         bool claim_sync_agent, bool disable_sync_to_disk) noexcept;
 
     Slot(Slot&&) = default;
 
@@ -105,6 +105,7 @@ private:
     ServerFileAccessCache& m_cache;
     ServerHistory::CompactionControl& m_compaction_control;
     const bool m_disable_sync_to_disk;
+    const bool m_claim_sync_agent;
 
     Slot* m_prev_open_file = nullptr;
     Slot* m_next_open_file = nullptr;
@@ -188,12 +189,14 @@ inline void ServerFileAccessCache::insert(Slot& slot) noexcept
 }
 
 inline ServerFileAccessCache::Slot::Slot(ServerFileAccessCache& cache, std::string rp, std::string vp,
-                                         ServerHistory::CompactionControl& cc, bool dstd) noexcept
+                                         ServerHistory::CompactionControl& cc, bool claim_sync_agent,
+                                         bool dstd) noexcept
     : realm_path{std::move(rp)}
     , virt_path{std::move(vp)}
     , m_cache{cache}
     , m_compaction_control{cc}
     , m_disable_sync_to_disk{dstd}
+    , m_claim_sync_agent{claim_sync_agent}
 {
 }
 
@@ -253,10 +256,12 @@ inline void ServerFileAccessCache::Slot::do_close() noexcept
 }
 
 inline ServerFileAccessCache::File::File(const Slot& slot)
-    : history{slot.realm_path, slot.m_cache.m_history_context, slot.m_compaction_control}
-    ,                                                                   // Throws
-    shared_group{DB::create(history, slot.make_shared_group_options())} // Throws
+    : history{slot.realm_path, slot.m_cache.m_history_context, slot.m_compaction_control} // Throws
+    , shared_group{DB::create(history, slot.make_shared_group_options())}                 // Throws
 {
+    if (slot.m_claim_sync_agent) {
+        shared_group->claim_sync_agent();
+    }
 }
 
 } // namespace _impl

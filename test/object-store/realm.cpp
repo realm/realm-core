@@ -603,7 +603,13 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
                 std::lock_guard<std::mutex> lock(mutex);
                 return bool(realm_ref);
             });
+            // Write some data
             SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            realm->begin_transaction();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
             client_file_id = realm->read_group().get_sync_file_id();
             realm->write_copy(config3.path, BinaryData());
         }
@@ -619,7 +625,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         wait_for_download(*realm);
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
-        REQUIRE(realm->read_group().get_table("class_object")->size() == 2);
+        REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
@@ -630,7 +636,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Check that this change is now in the original realm
         wait_for_download(*origin);
         origin->refresh();
-        REQUIRE(origin->read_group().get_table("class_object")->size() == 3);
+        REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
     }
 
     SECTION("downloads Realms which exist on the server") {
@@ -716,19 +722,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
     auto invalid_token = "." + encoded_body + ".";
 
-    // Capture the token refresh callback so that we can invoke it later with
-    // the desired result
-    static std::function<void(app::Response)> refresh_completion;
-    init_sync_manager.transport_generator = [] {
-        struct transport : app::GenericNetworkTransport {
-            void send_request_to_server(app::Request, std::function<void(app::Response)> completion_block)
-            {
-                refresh_completion = completion_block;
-            }
-        };
-        return std::unique_ptr<app::GenericNetworkTransport>(new transport);
-    };
-
     // Token refreshing requires that we have app metadata and we can't fetch
     // it normally, so just stick some fake values in
     init_sync_manager.app()->sync_manager()->perform_metadata_update([&](const SyncMetadataManager& manager) {
@@ -750,11 +743,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         });
 
         auto body = nlohmann::json({{"access_token", valid_token}}).dump();
-        refresh_completion(app::Response{200, 0, {}, body});
+        init_sync_manager.network_callback(app::Response{200, 0, {}, body});
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
-        refresh_completion = nullptr;
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
@@ -776,11 +768,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(!ref);
             called = true;
         });
-        refresh_completion(app::Response{403});
+        init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
-        refresh_completion = nullptr;
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
         REQUIRE(got_error);
@@ -1355,7 +1346,9 @@ TEST_CASE("Realm::delete_files()") {
 
     SECTION("Calling delete on a folder that does not exist.") {
         auto fake_path = "/tmp/doesNotExist/realm.424242";
-        Realm::delete_files(fake_path);
+        bool did_delete = false;
+        Realm::delete_files(fake_path, &did_delete);
+        REQUIRE_FALSE(did_delete);
     }
 
     SECTION("passing did_delete is optional") {

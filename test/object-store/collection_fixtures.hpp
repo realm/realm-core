@@ -27,7 +27,9 @@
 
 #include <realm/db.hpp>
 #include <realm/util/any.hpp>
+#include <realm/util/functional.hpp>
 
+#include <string>
 #include <type_traits>
 
 namespace realm::collection_fixtures {
@@ -424,6 +426,419 @@ struct UnboxedOptional : BaseT {
         return ret;
     }
 };
+
+template <typename T>
+std::vector<Obj> get_linked_objects(T collection)
+{
+    std::vector<Obj> links;
+    auto group = collection.get_obj().get_table()->get_parent_group();
+    REALM_ASSERT(group);
+
+    for (size_t i = 0; i < collection.size(); ++i) {
+        Mixed value = collection.get_any(i);
+        if (value.is_type(type_TypedLink)) {
+            ObjLink lnk = value.get_link();
+            if (lnk && !lnk.is_unresolved()) {
+                auto dst_table = group->get_table(lnk.get_table_key());
+                REALM_ASSERT(dst_table);
+                links.push_back(dst_table->get_object(lnk.get_obj_key()));
+            }
+        }
+        else if (value.is_type(type_Link)) {
+            ObjKey lnk = value.get<ObjKey>();
+            if (lnk && !lnk.is_unresolved()) {
+                auto dst_table = collection.get_obj().get_table()->get_opposite_table(collection.get_col_key());
+                REALM_ASSERT(dst_table);
+                links.push_back(dst_table->get_object(lnk));
+            }
+        }
+        // null values and any other non-link value are ignored
+    }
+    return links;
+}
+
+struct LinkedCollectionBase {
+    LinkedCollectionBase(const std::string& property_name, const std::string& dest_name)
+        : m_prop_name(property_name)
+        , m_dest_name(dest_name)
+    {
+    }
+
+    void set_relation_updater(std::function<void()> updater)
+    {
+        m_relation_updater = std::move(updater);
+    }
+
+    ColKey get_link_col_key(TableRef source_table)
+    {
+        REALM_ASSERT(source_table);
+        ColKey collection_col_key = source_table->get_column_key(m_prop_name);
+        REALM_ASSERT(collection_col_key);
+        return collection_col_key;
+    }
+    virtual bool will_erase_removed_object_links()
+    {
+        return true; // only dictionaries are false
+    }
+
+    std::string m_prop_name;
+    std::string m_dest_name;
+    util::UniqueFunction<void()> m_relation_updater;
+};
+
+struct ListOfObjects : public LinkedCollectionBase {
+    ListOfObjects(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Array | PropertyType::Object, m_dest_name};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_linklist(col).add(to.get_obj_key());
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        std::vector<Obj> links;
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_linklist(col);
+        for (size_t i = 0; i < coll.size(); ++i) {
+            links.push_back(coll.get_object(i));
+        }
+        return links;
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_linklist(col);
+        size_t ndx = coll.find_first(to.get_obj_key());
+        if (ndx != realm::not_found) {
+            coll.remove(ndx);
+            return true;
+        }
+        return false;
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_linklist(col).size();
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        obj.get_linklist(col).clear();
+    }
+    size_t count_unresolved_links(Obj)
+    {
+        return 0;
+    }
+    constexpr static bool allows_storing_nulls = false;
+};
+
+struct ListOfMixedLinks : public LinkedCollectionBase {
+    ListOfMixedLinks(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_list<Mixed>(col).add(to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_list<Mixed>(col).size();
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_list<Mixed>(col);
+        return get_linked_objects(coll);
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_list<Mixed>(col);
+        size_t ndx = coll.find_first(Mixed{to});
+        if (ndx != realm::not_found) {
+            coll.remove(ndx);
+            return true;
+        }
+        return false;
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        obj.get_list<Mixed>(col).clear();
+    }
+    size_t count_unresolved_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Lst<Mixed> list = obj.get_list<Mixed>(col);
+        size_t num_unresolved = 0;
+        for (auto value : list) {
+            if (value.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct SetOfObjects : public LinkedCollectionBase {
+    SetOfObjects(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Set | PropertyType::Object, m_dest_name};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_linkset(col).insert(to.get_obj_key());
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        std::vector<Obj> links;
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_linkset(col);
+        for (size_t i = 0; i < coll.size(); ++i) {
+            links.push_back(coll.get_object(i));
+        }
+        return links;
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_linkset(col);
+        auto pair = coll.erase(to.get_obj_key());
+        return pair.second;
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_linkset(col).size();
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        obj.get_linkset(col).clear();
+    }
+    size_t count_unresolved_links(Obj)
+    {
+        return 0;
+    }
+    constexpr static bool allows_storing_nulls = false;
+};
+
+struct SetOfMixedLinks : public LinkedCollectionBase {
+    SetOfMixedLinks(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_set<Mixed>(col).insert(to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_set<Mixed>(col);
+        return get_linked_objects(coll);
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_set<Mixed>(col);
+        auto pair = coll.erase(Mixed{to});
+        return pair.second;
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        obj.get_set<Mixed>(col).clear();
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_set<Mixed>(col).size();
+    }
+    size_t count_unresolved_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Set<Mixed> set = obj.get_set<Mixed>(col);
+        size_t num_unresolved = 0;
+        for (auto value : set) {
+            if (value.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct DictionaryOfObjects : public LinkedCollectionBase {
+    DictionaryOfObjects(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, m_dest_name};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey link_col = get_link_col_key(from.get_table());
+        from.get_dictionary(link_col).insert(util::format("key_%1", key_counter++), to.get_obj_key());
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_dictionary(col);
+        return get_linked_objects(coll);
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_dictionary(col).size();
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_dictionary(col);
+        for (auto it = coll.begin(); it != coll.end(); ++it) {
+            if ((*it).second == to) {
+                coll.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Dictionary dict = obj.get_dictionary(col);
+        dict.clear();
+    }
+    size_t count_unresolved_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Dictionary dict = obj.get_dictionary(col);
+        size_t num_unresolved = 0;
+        for (auto value : dict) {
+            if (value.second.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    bool will_erase_removed_object_links() override
+    {
+        return false;
+    }
+    size_t key_counter = 0;
+    constexpr static bool allows_storing_nulls = true;
+};
+
+struct DictionaryOfMixedLinks : public LinkedCollectionBase {
+    DictionaryOfMixedLinks(const std::string& property_name, const std::string& dest_name)
+        : LinkedCollectionBase(property_name, dest_name)
+    {
+    }
+    Property property()
+    {
+        return {m_prop_name, PropertyType::Dictionary | PropertyType::Mixed | PropertyType::Nullable};
+    }
+    void add_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        from.get_dictionary(col).insert(util::format("key_%1", key_counter++), to);
+        // When adding dynamic links through a mixed value, the relationship map needs to be dynamically updated.
+        // In practice, this is triggered by the addition of backlink columns to any table.
+        if (m_relation_updater) {
+            m_relation_updater();
+        }
+    }
+    std::vector<Obj> get_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        auto coll = obj.get_dictionary(col);
+        return get_linked_objects(coll);
+    }
+    bool remove_link(Obj from, ObjLink to)
+    {
+        ColKey col = get_link_col_key(from.get_table());
+        auto coll = from.get_dictionary(col);
+        for (auto it = coll.begin(); it != coll.end(); ++it) {
+            if ((*it).second == to) {
+                coll.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+    size_t size_of_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        return obj.get_dictionary(col).size();
+    }
+    void clear_collection(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Dictionary dict = obj.get_dictionary(col);
+        dict.clear();
+    }
+    size_t count_unresolved_links(Obj obj)
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        Dictionary dict = obj.get_dictionary(col);
+        size_t num_unresolved = 0;
+        for (auto value : dict) {
+            if (value.second.is_unresolved_link()) {
+                ++num_unresolved;
+            }
+        }
+        return num_unresolved;
+    }
+    bool will_erase_removed_object_links() override
+    {
+        return false;
+    }
+    size_t key_counter = 0;
+    constexpr static bool allows_storing_nulls = true;
+};
+
 
 } // namespace realm::collection_fixtures
 

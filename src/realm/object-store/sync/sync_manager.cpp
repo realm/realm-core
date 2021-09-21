@@ -338,14 +338,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
     else { // LoggedOut => LoggedIn
         auto user = *it;
         REALM_ASSERT(user->state() != SyncUser::State::Removed);
-
-        // It is important that the access token is set before the refresh token
-        // as once each token is set it attempts to revive any pending sessions
-        // (e.g. as user logs out and logs back in they would be using an empty access token with the sync client
-        // if the order of these were flipped).
-        user->update_access_token(std::move(access_token));
-        user->update_refresh_token(std::move(refresh_token));
-        user->set_state(SyncUser::State::LoggedIn);
+        user->update_state_and_tokens(SyncUser::State::LoggedIn, std::move(access_token), std::move(refresh_token));
         return user;
     }
 }
@@ -600,9 +593,10 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
+std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const SyncConfig& sync_config)
 {
     auto& client = get_sync_client(); // Throws
+    auto path = db->get_path();
 
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
@@ -610,7 +604,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, this);
+    auto shared_session = SyncSession::create(client, std::move(db), sync_config, this);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
@@ -621,7 +615,6 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
 
     return external_reference;
 }
-
 
 bool SyncManager::has_existing_sessions()
 {
@@ -634,6 +627,12 @@ bool SyncManager::do_has_existing_sessions()
     return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element) {
         return element.second->existing_external_reference();
     });
+}
+
+void SyncManager::wait_for_sessions_to_terminate()
+{
+    auto& client = get_sync_client(); // Throws
+    client.wait_for_session_terminations();
 }
 
 void SyncManager::unregister_session(const std::string& path)

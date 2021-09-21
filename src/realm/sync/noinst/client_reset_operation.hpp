@@ -16,8 +16,7 @@ class ClientResetOperation {
 public:
     util::Logger& logger;
 
-    ClientResetOperation(util::Logger& logger, const std::string& realm_path, const std::string& metadata_dir,
-                         util::Optional<std::array<char, 64>> encryption_key);
+    ClientResetOperation(util::Logger& logger, DB& db, const std::string& metadata_dir);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
@@ -31,11 +30,8 @@ public:
     realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
-    const std::string m_realm_path;
-    util::Optional<std::array<char, 64>> m_encryption_key;
-#if REALM_ENABLE_ENCRYPTION
-    std::unique_ptr<util::AESCryptor> m_aes_cryptor;
-#endif
+    DB& m_db;
+    const std::string m_metadata_dir;
 
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
     sync::SaltedVersion m_server_version = {0, 0};

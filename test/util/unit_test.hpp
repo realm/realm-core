@@ -408,6 +408,7 @@ public:
 
 protected:
     bool m_report_progress;
+    std::vector<std::string> m_error_messages;
 };
 
 

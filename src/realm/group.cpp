@@ -413,15 +413,13 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // forget it.
     REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
 
+    // DB::do_open() must ensure that only supported version are allowed.
+    // It does that by asking backup if the current file format version is
+    // included in the accepted versions, so be sure to align the list of
+    // versions with the logic below
+
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
-
-    // DB::do_open() must ensure this. Be sure to revisit the
-    // following upgrade logic when DB::do_open() is changed (or
-    // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 21,
-                    current_file_format_version);
-
 
     // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
@@ -1053,14 +1051,19 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // replication instructions for each column removal with sufficient
     // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
+    Replication* repl = *get_repl();
+    if (repl) {
+        // This will prevent sync instructions for column removals to be generated
+        repl->prepare_erase_class(key);
+    }
     for (size_t i = n; i > 0; --i) {
         ColKey col_key = table->spec_ndx2colkey(i - 1);
         table->remove_column(col_key);
     }
 
     size_t prior_num_tables = m_tables.size();
-    if (Replication* repl = *get_repl())
-        repl->erase_group_level_table(key, prior_num_tables); // Throws
+    if (repl)
+        repl->erase_class(key, prior_num_tables); // Throws
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
@@ -1104,7 +1107,7 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
     size_t table_ndx = key2ndx_checked(key);
     m_table_names.set(table_ndx, new_name);
     if (Replication* repl = *get_repl())
-        repl->rename_group_level_table(key, new_name); // Throws
+        repl->rename_class(key, new_name); // Throws
 }
 
 Obj Group::get_object(ObjLink link)
@@ -1580,13 +1583,13 @@ public:
         return true;
     }
 
-    bool erase_group_level_table(TableKey) noexcept
+    bool erase_class(TableKey) noexcept
     {
         m_schema_changed = true;
         return true;
     }
 
-    bool rename_group_level_table(TableKey) noexcept
+    bool rename_class(TableKey) noexcept
     {
         m_schema_changed = true;
         return true;
@@ -1789,12 +1792,12 @@ void Group::advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream& in,
     // database.
     //
     // Initially, when this function is invoked, we cannot assume any
-    // correspondance between the accessor state and the underlying node
+    // correspondence between the accessor state and the underlying node
     // structure. We can assume that the hierarchy is in a state of minimal
     // consistency, and that it can be brought to a state of structural
-    // correspondace using information in the transaction logs. When structural
-    // correspondace is achieved, we can reliably refresh the accessor hierarchy
-    // (Table::refresh_accessor_tree()) to bring it back to a fully concsistent
+    // correspondence using information in the transaction logs. When structural
+    // correspondence is achieved, we can reliably refresh the accessor hierarchy
+    // (Table::refresh_accessor_tree()) to bring it back to a fully consistent
     // state. See AccessorConsistencyLevels.
     //
     // Much of the information in the transaction logs is not used in this

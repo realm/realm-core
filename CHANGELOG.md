@@ -4,8 +4,65 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
+* Using "sort", "distinct", or "limit" as field name in query expression would cause an "Invalid predicate" error ([#7545](https://github.com/realm/realm-java/issues/7545) since v10.1.2)
+
+### Breaking changes
+* `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
+
+-----------
+
+### Internals
 * None.
+
+----------------------------------------------
+
+# 11.4.1 Release notes
+
+### Fixed
+* Fixed issue when opening a synced realm is prevented by assertion "m_state == SyncUser::State::LoggedIn". ([#4875](https://github.com/realm/realm-core/issues/4875))
+* Fixed slow teardown of Realm by immediately freeing shared pointers to scheduler on realm closure ([realm/realm-js#3620](https://github.com/realm/realm-js/issues/3620), [realm/realm-js#2993](https://github.com/realm/realm-js/issues/2993))
+ 
+----------------------------------------------
+
+# 11.4.0 Release notes
+
+### Enhancements
+* ThreadSafeReference no longer pins the source transaction version for anything other than a Results backed by a Query. ([#4857](https://github.com/realm/realm-core/pull/4857))
+* A ThreadSafeReference to a Results backed by a collection can now be created inside a write transaction as long as the collection was not created in the current write transaction.
+* Synchronized Realms are no longer opened twice, cutting the address space and file descriptors used in half. ([#4839](https://github.com/realm/realm-core/pull/4839))
+* A method Obj::get_any(StringData) has been added.
+
+### Fixed
+* Failing to refresh the access token due to a 401/403 error will now correctly emit a sync error with `ProtocolError::bad_authentication` rather than `ProtocolError::permission_denied`. ([#4881](https://github.com/realm/realm-core/pull/4881), since 11.0.4)
+* If an object with a null primary key was deleted by another sync client, the exception `KeyNotFound: No such object` could be triggered. ([#4885](https://github.com/realm/realm-core/issues/4885) since unresolved links were introduced in v10.0.0)
+* Fix a nonexistent file warning when building with Swift Package Manager (since 11.3.1).
+
+-----------
+
+### Internals
+* SyncConfig no longer has an encryption_key field, and the key from the parent Realm::Config is used instead.
+
+----------------------------------------------
+
+# 11.3.1 Release notes
+
+### Fixed
+* Fixed "Invalid data type" assertion failure in the sync client when applying an AddColumn instruction for a Mixed column when that column already exists locally. ([#4873](https://github.com/realm/realm-core/issues/4873), since v11.0.0)
+* Fixed a crash when accessing the lock file during deletion of a Realm on Windows if the folder does not exist. ([#4855](https://github.com/realm/realm-core/pull/4855))
+ 
+----------------------------------------------
+
+# 11.3.0 Release notes
+
+### Enhancements
+* InstructionApplier exceptions now contain information about what object/changeset was being applied when the exception was thrown. ([#4836](https://github.com/realm/realm-core/issues/4836))
+* Added ServiceErrorCode for wrong username/password.  ([#4581](https://github.com/realm/realm-core/issues/4581))
+* Query parser now accepts "BETWEEN" operator. Can be used like "Age BETWEEN {20, 60}" which means "'Age' must be in the open interval ]20;60[". ([#4268](https://github.com/realm/realm-core/issues/4268))
+
+### Fixed
+* Fixes prior_size history corruption when replacing an embedded object in a list ([#4845](https://github.com/realm/realm-core/issues/4845))
+* Updated the Catch2 URL to include '.git' extension ([#4608](https://github.com/realm/realm-core/issues/4608))
  
 ### Breaking changes
 * None.
@@ -13,7 +70,8 @@
 -----------
 
 ### Internals
-* None.
+* Added Status/StatusWith types for representing errors/exceptions as values ([#4859](https://github.com/realm/realm-core/issues/4859))
+* ApplyToState tool now exits with a non-zero exit code if download message application fails.
 
 ----------------------------------------------
 

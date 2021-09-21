@@ -36,6 +36,7 @@ struct TestSyncManager;
 
 namespace realm {
 
+class DB;
 struct SyncConfig;
 class SyncSession;
 class SyncUser;
@@ -141,7 +142,7 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
-    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
+    std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -149,6 +150,12 @@ public:
     // This will return true as long as there is an external reference to a session object, no matter
     // the state of that session.
     bool has_existing_sessions();
+
+    // Blocking call that only return once all sessions have been terminated.
+    // Due to the async nature of the SyncClient, even with `SyncSessionStopPolicy::Immediate`, a
+    // session is not guaranteed to stop immediately when a Realm is closed. Using this method
+    // makes it possible to guarantee that all sessions have, in fact, been closed.
+    void wait_for_sessions_to_terminate();
 
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;

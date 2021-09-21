@@ -115,12 +115,14 @@ public:
     {
         return m_path;
     }
-    const char* c_str() const
+    const char* c_str() const noexcept
     {
         return m_path.c_str();
     }
     TestPathGuard(const TestPathGuard&) = delete;
     TestPathGuard& operator=(const TestPathGuard&) = delete;
+    TestPathGuard(TestPathGuard&&) noexcept;
+    TestPathGuard& operator=(TestPathGuard&&) noexcept;
 
 protected:
     std::string m_path;
@@ -155,6 +157,8 @@ public:
         return m_path + ".lock"; // ".management/access_control";
     }
     ~DBTestPathGuard() noexcept;
+    DBTestPathGuard(DBTestPathGuard&&) = default;
+    DBTestPathGuard& operator=(DBTestPathGuard&&) = default;
 
 private:
     void cleanup() const noexcept;

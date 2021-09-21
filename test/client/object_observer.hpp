@@ -40,7 +40,7 @@ public:
     {
     }
 
-    bool erase_group_level_table(TableKey table_key)
+    bool erase_class(TableKey table_key)
     {
         m_new_objects.erase(table_key);
         return true;

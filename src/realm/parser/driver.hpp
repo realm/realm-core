@@ -120,6 +120,21 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
 };
 
+class ListNode : public ParserNode {
+public:
+    std::vector<ConstantNode*> elements;
+
+    ListNode(ConstantNode* elem)
+    {
+        elements.emplace_back(elem);
+    }
+
+    void add_element(ConstantNode* elem)
+    {
+        elements.emplace_back(elem);
+    }
+};
+
 class PropertyNode : public ParserNode {
 public:
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
@@ -165,6 +180,19 @@ public:
     {
         values.emplace_back(left);
         values.emplace_back(right);
+    }
+    Query visit(ParserDriver*) override;
+};
+
+class BetweenNode : public CompareNode {
+public:
+    ValueNode* prop;
+    ListNode* limits;
+
+    BetweenNode(ValueNode* left, ListNode* right)
+        : prop(left)
+        , limits(right)
+    {
     }
     Query visit(ParserDriver*) override;
 };

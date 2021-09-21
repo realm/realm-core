@@ -88,6 +88,34 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(second->state() == SyncUser::State::LoggedIn);
     }
 }
+TEST_CASE("sync_user: update state and tokens", "[sync]") {
+    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path), {});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
+    const std::string identity = "sync_test_identity";
+    const std::string refresh_token = ENCODE_FAKE_JWT("fake-refresh-token-1");
+    const std::string access_token = ENCODE_FAKE_JWT("fake-access-token-1");
+    const std::string server_url = "https://realm.example.org";
+    const std::string second_refresh_token = ENCODE_FAKE_JWT("fake-refresh-token-4");
+    const std::string second_access_token = ENCODE_FAKE_JWT("fake-access-token-4");
+
+    auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+    REQUIRE(user->is_logged_in());
+    REQUIRE(user->refresh_token() == refresh_token);
+
+    user->update_state_and_tokens(SyncUser::State::LoggedIn, second_access_token, second_refresh_token);
+    REQUIRE(user->is_logged_in());
+    REQUIRE(user->refresh_token() == second_refresh_token);
+
+    user->update_state_and_tokens(SyncUser::State::LoggedOut, "", "");
+    REQUIRE(!user->is_logged_in());
+    REQUIRE(user->refresh_token().empty());
+
+    user->update_state_and_tokens(SyncUser::State::LoggedIn, access_token, refresh_token);
+    REQUIRE(user->is_logged_in());
+    REQUIRE(user->refresh_token() == refresh_token);
+
+    sync_manager->remove_user(identity);
+}
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
     TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoMetadata));

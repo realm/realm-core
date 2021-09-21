@@ -181,7 +181,7 @@ To run the [app] tests against the local image, you need to configure a build wi
 ```
 mkdir build.sync.ninja
 cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090
-cmake --build build.sync.ninja --target tests
+cmake --build build.sync.ninja --target realm-object-store-tests
 ./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
 ```
 ### Developing inside a container

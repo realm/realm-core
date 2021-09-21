@@ -24,6 +24,7 @@ set(REALM_SOURCES
     cluster.cpp
     collection.cpp
     cluster_tree.cpp
+    error_codes.cpp
     table_cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
@@ -56,6 +57,7 @@ set(REALM_SOURCES
     object_id.cpp
     table_view.cpp
     sort_descriptor.cpp
+    status.cpp
     unicode.cpp
     utilities.cpp
     uuid.cpp
@@ -148,6 +150,7 @@ set(REALM_INSTALL_HEADERS
     dictionary.hpp
     dictionary_cluster_tree.hpp
     disable_sync_to_disk.hpp
+    error_codes.hpp
     exceptions.hpp
     global_key.hpp
     group.hpp
@@ -175,6 +178,7 @@ set(REALM_INSTALL_HEADERS
     set.hpp
     sort_descriptor.hpp
     spec.hpp
+    status.hpp
     string_data.hpp
     table.hpp
     table_cluster_tree.hpp

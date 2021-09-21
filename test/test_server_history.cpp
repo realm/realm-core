@@ -40,36 +40,15 @@ namespace {
 
 class HistoryContext : public _impl::ServerHistory::Context {
 public:
-    HistoryContext(bool owner_is_sync_server = false)
-        : m_owner_is_sync_server{owner_is_sync_server}
-    {
-    }
-    bool owner_is_sync_server() const noexcept override final
-    {
-        return m_owner_is_sync_server;
-    }
+    HistoryContext() = default;
     std::mt19937_64& server_history_get_random() noexcept override final
     {
         return m_random;
     }
 
 private:
-    const bool m_owner_is_sync_server;
     std::mt19937_64 m_random;
 };
-
-
-TEST(ServerHistory_MaxOneOwnedByServer)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    bool owner_is_sync_server = true;
-    HistoryContext context{owner_is_sync_server};
-    ServerHistory::DummyCompactionControl compaction_control;
-    ServerHistory history_1{path, context, compaction_control};
-    ServerHistory history_2{path, context, compaction_control};
-    DBRef sg = DB::create(history_1);
-    CHECK_THROW(DB::create(history_2), MultipleSyncAgents);
-}
 
 
 TEST(ServerHistory_Verify)

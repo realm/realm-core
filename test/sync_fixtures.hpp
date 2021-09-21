@@ -419,7 +419,6 @@ public:
         milliseconds_type server_connection_reaper_timeout = 100000000;
         milliseconds_type server_connection_reaper_interval = 100000000;
 
-        long client_max_open_files = 64;
         long server_max_open_files = 64;
 
         bool enable_server_ssl = false;
@@ -541,7 +540,6 @@ public:
         for (int i = 0; i < num_clients; ++i) {
             Client::Config config_2;
             config_2.user_agent_application_info = "TestFixture/" REALM_VERSION_STRING;
-            config_2.max_open_files = config.client_max_open_files;
             config_2.logger = &*m_client_loggers[i];
             config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
@@ -644,13 +642,13 @@ public:
         return *m_servers[server_index];
     }
 
-    Session make_session(int client_index, std::string path, Session::Config config = {})
+    Session make_session(int client_index, DBRef db, Session::Config config = {})
     {
         //  *ClientServerFixture uses the service identifier "/realm-sync" to distinguish Sync
         //  connections, while the MongoDB/Stitch-based Sync server does not.
         config.service_identifier = "/realm-sync";
 
-        Session session{*m_clients[client_index], std::move(path), std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
@@ -684,17 +682,17 @@ public:
                      protocol);
     }
 
-    Session make_bound_session(int client_index, std::string path, int server_index, std::string server_path,
+    Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
                                Session::Config config = {})
     {
-        return make_bound_session(client_index, std::move(path), server_index, std::move(server_path),
+        return make_bound_session(client_index, std::move(db), server_index, std::move(server_path),
                                   g_signed_test_user_token, std::move(config));
     }
 
-    Session make_bound_session(int client_index, std::string path, int server_index, std::string server_path,
+    Session make_bound_session(int client_index, DBRef db, int server_index, std::string server_path,
                                std::string signed_user_token, Session::Config config = {})
     {
-        Session session = make_session(client_index, std::move(path), std::move(config));
+        Session session = make_session(client_index, std::move(db), std::move(config));
         bind_session(session, server_index, std::move(server_path), std::move(signed_user_token),
                      config.protocol_envelope);
         return session;
@@ -904,9 +902,14 @@ public:
         return MultiClientServerFixture::get_server(0);
     }
 
-    Session make_session(std::string path, Session::Config config = {})
+    Session make_session(DBRef db, Session::Config config = {})
     {
-        return MultiClientServerFixture::make_session(0, std::move(path), std::move(config));
+        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
+    }
+    Session make_session(std::string const& path, Session::Config config = {})
+    {
+        auto db = DB::create(make_client_replication(path));
+        return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
     }
 
     void bind_session(Session& session, std::string server_path,
@@ -917,16 +920,16 @@ public:
                                                protocol);
     }
 
-    Session make_bound_session(std::string path, std::string server_path, Session::Config config = {})
+    Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config config = {})
     {
-        return MultiClientServerFixture::make_bound_session(0, std::move(path), 0, std::move(server_path),
+        return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(config));
     }
 
-    Session make_bound_session(std::string path, std::string server_path, std::string signed_user_token,
+    Session make_bound_session(DBRef db, std::string server_path, std::string signed_user_token,
                                Session::Config config = {})
     {
-        return MultiClientServerFixture::make_bound_session(0, std::move(path), 0, std::move(server_path),
+        return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(signed_user_token), std::move(config));
     }
 
@@ -1012,8 +1015,7 @@ private:
     };
 
     const std::shared_ptr<SelfRef> m_self_ref;
-    _impl::ClientHistoryImpl m_history;
-    DBRef m_shared_group;
+    DBRef m_db;
     sync::Session m_session;
 
     void setup_error_handler(std::function<ErrorHandler>);
@@ -1022,10 +1024,9 @@ private:
 
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                                 // Throws
-    , m_history{real_path}                                                        // Throws
-    , m_shared_group{DB::create(m_history)}                                       // Throws
-    , m_session{client_server_fixture.make_session(real_path, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}                            // Throws
+    , m_db{DB::create(make_client_replication(real_path))}                   // Throws
+    , m_session{client_server_fixture.make_session(m_db, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
@@ -1035,10 +1036,9 @@ inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, co
 
 inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
                                   const std::string& real_path, const std::string& virt_path, Config config)
-    : m_self_ref{std::make_shared<SelfRef>(this)}                                               // Throws
-    , m_history{real_path}                                                                      // Throws
-    , m_shared_group{DB::create(m_history)}                                                     // Throws
-    , m_session{client_server_fixture.make_session(client_index, real_path, std::move(config))} // Throws
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                          // Throws
+    , m_db{DB::create(make_client_replication(real_path))}                                 // Throws
+    , m_session{client_server_fixture.make_session(client_index, m_db, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
@@ -1072,7 +1072,7 @@ inline void RealmFixture::nonempty_transact()
 
 inline bool RealmFixture::transact(TransactFunc transact_func)
 {
-    auto tr = m_shared_group->start_write(); // Throws
+    auto tr = m_db->start_write();           // Throws
     if (!transact_func(*tr))                 // Throws
         return false;
     version_type new_version = tr->commit();        // Throws
@@ -1110,7 +1110,8 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
     version_type current_client_version = 0;    // Dummy
     SaltedFileIdent client_file_ident = {0, 0}; // Dummy
     SyncProgress progress;
-    m_history.get_status(current_client_version, client_file_ident, progress);
+    auto& history = static_cast<_impl::ClientHistoryImpl&>(*m_db->get_replication());
+    history.get_status(current_client_version, client_file_ident, progress);
     return progress.download.server_version;
 }
 

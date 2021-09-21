@@ -84,6 +84,7 @@ private:
     TableRef m_last_table;
     ColKey m_last_field;
     util::Optional<Instruction::PrimaryKey> m_last_object_key;
+    util::Optional<Instruction::Path> m_current_path;
     util::Optional<Obj> m_last_object;
     std::unique_ptr<LstBase> m_last_list;
 
@@ -119,6 +120,10 @@ private:
 
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);
+
+    REALM_NORETURN void bad_transaction_log(const std::string& msg) const;
+    template <class... Params>
+    REALM_NORETURN void bad_transaction_log(const char* msg, Params&&... params) const;
 };
 
 
@@ -144,6 +149,7 @@ inline void InstructionApplier::end_apply() noexcept
     m_last_table = TableRef{};
     m_last_field = ColKey{};
     m_last_object.reset();
+    m_last_object_key.reset();
     m_last_list.reset();
 }
 

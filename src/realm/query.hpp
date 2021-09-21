@@ -302,6 +302,13 @@ public:
         return !m_view;
     }
 
+    // Get the ObjKey of the object which owns the restricting view, or null
+    // if that is not applicable
+    ObjKey view_owner_obj_key() const noexcept
+    {
+        return m_view ? m_view->get_owning_obj().get_key() : ObjKey{};
+    }
+
     // Calls sync_if_needed on the restricting view, if present.
     // Returns the current version of the table(s) this query depends on,
     // or empty vector if the query is not associated with a table.

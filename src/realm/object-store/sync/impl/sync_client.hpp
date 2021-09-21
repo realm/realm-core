@@ -109,9 +109,9 @@ struct SyncClient {
             m_thread.join();
     }
 
-    std::unique_ptr<sync::Session> make_session(std::string path, sync::Session::Config config)
+    std::unique_ptr<sync::Session> make_session(std::shared_ptr<DB> db, sync::Session::Config config)
     {
-        return std::make_unique<sync::Session>(m_client, std::move(path), std::move(config));
+        return std::make_unique<sync::Session>(m_client, std::move(db), std::move(config));
     }
 
     bool decompose_server_url(const std::string& url, sync::ProtocolEnvelope& protocol, std::string& address,

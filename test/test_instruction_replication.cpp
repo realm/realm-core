@@ -37,7 +37,6 @@ struct Fixture {
 
     void replay_transactions()
     {
-
         Changeset result;
         const auto& buffer = history_1->get_instruction_encoder().buffer();
         _impl::SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
@@ -76,15 +75,45 @@ TEST(InstructionReplication_AddTable)
     }
 }
 
-// This test is disabled because EraseTable instruction is unsupported by merge algorithm.
-TEST_IF(InstructionReplication_EraseTable, false)
+TEST(InstructionReplication_AddColumnTwice)
 {
+    std::vector<DataType> basic_types = {
+        type_Int,   type_Bool,   type_String,  type_Binary,   type_Mixed, type_Timestamp,
+        type_Float, type_Double, type_Decimal, type_ObjectId, type_UUID,
+    };
+
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        sync::create_table(wt, "class_foo");
-        wt.get_group().remove_table("class_foo");
+        TableRef foo = sync::create_table(wt, "class_types");
+        for (auto type : basic_types) {
+            foo->add_column(type, util::format("simple_%1", type));
+            foo->add_column_list(type, util::format("list_of_%1", type));
+            foo->add_column_dictionary(type, util::format("dictionary_of_%1", type));
+            foo->add_column_set(type, util::format("set_of_%1", type));
+        }
+        foo->add_column(*foo, "link");
+        foo->add_column(*foo, "linklist");
+        foo->add_column_dictionary(*foo, "dictionary_of_links");
+        foo->add_column_set(*foo, "set_of_links");
         wt.commit();
+    }
+    fixture.replay_transactions();
+    fixture.check_equal();
+    // creating same table/columns twice have no effect or error as long as they are the same type
+    fixture.replay_transactions();
+    fixture.check_equal();
+}
+
+
+TEST(InstructionReplication_EraseTable)
+{
+    Fixture fixture{test_context};
+    {
+        auto wt = fixture.sg_1->start_write();
+        auto tk = wt->add_table_with_primary_key("class_foo", type_Int, "id")->get_key();
+        wt->remove_table(tk);
+        wt->commit();
     }
     fixture.replay_transactions();
     fixture.check_equal();

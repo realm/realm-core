@@ -147,6 +147,10 @@ static std::vector<std::string> valid_queries = {
     "0 <= 0",
     "0 =< 0",
     "0<=0",
+    "a BETWEEN {4, 5}",
+    "sort > 0",
+    "distinct > 0",
+    "limit > 0",
     "0 contains 0",
     "a CONTAINS[c] b",
     "a contains [c] b",
@@ -190,6 +194,16 @@ static std::vector<std::string> valid_queries = {
 
     // sort/distinct
     "a=b SORT(p ASCENDING)",
+    "TRUEPREDICATE SORT(sort ASCENDING)",
+    "TRUEPREDICATE SORT(distinct ASCENDING)",
+    "TRUEPREDICATE SORT(limit ASC)",
+    "TRUEPREDICATE SORT(sort ASC, distinct ASC, limit ASC)",
+    "TRUEPREDICATE DISTINCT(disstinct)",
+    "TRUEPREDICATE DISTINCT(sort)",
+    "TRUEPREDICATE DISTINCT(limit)",
+    "TRUEPREDICATE DISTINCT(sort, distinct, limit)",
+    "TRUEPREDICATE SORT(sort ASC, distinct ASC, limit ASC) DISTINCT(sort, distinct, limit) LIMIT(1)",
+    "TRUEPREDICATE LIMIT(1)",
     "a=b SORT(p asc)",
     "a=b SORT(p Descending)",
     "a=b sort (p.q desc)",
@@ -271,6 +285,8 @@ static std::vector<std::string> invalid_queries = {
 
     // operators
     "0===>0",
+    "a between {}",
+    "a between {1 2}",
     "0 contains1",
     "a contains_something",
     "endswith 0",
@@ -548,6 +564,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age = 1 || age == 3", 2);
     verify_query(test_context, t, "fees = 1.2 || fees = 2.23", 1);
     verify_query(test_context, t, "fees = 2 || fees = 3", 1);
+    verify_query(test_context, t, "fees BETWEEN {2, 3}", 3);
+    verify_query(test_context, t, "fees BETWEEN {2.20, 2.25}", 2);
     verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
 
@@ -3853,11 +3871,9 @@ TEST(Parser_Between)
     verify_query(test_context, table, "between > 0", 2);
     verify_query(test_context, table, "between <= 3", 3);
 
-    // operator between is not supported yet, but we at least use a friendly error message.
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
-    CHECK(message.find("The 'between' operator is not supported yet, please rewrite the "
-                       "expression using '>' and '<'.") != std::string::npos);
+    verify_query(test_context, table, "age between {20, 25}", 1);
+    CHECK_THROW_ANY(verify_query(test_context, table, "age between {20}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "age between {20, 25, 34}", 1));
 }
 
 TEST(Parser_ChainedStringEqualQueries)
