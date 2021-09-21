@@ -2377,11 +2377,11 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: log in with jwt", "[sync][app]") {
+TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
     auto app_config = get_integration_config();
     auto jwt = create_jwt(app_config.app_id);
 
-    SECTION("custom user data happy path") {
+    SECTION("jwt happy path") {
         TestSyncManager sync_manager(app_config);
         auto app = sync_manager.app();
 
@@ -2405,7 +2405,7 @@ TEST_CASE("app: log in with jwt", "[sync][app]") {
         auto metadata = user->user_profile();
         auto custom_data = *user->custom_data();
         CHECK(custom_data["name"] == "Not Foo Bar");
-        CHECK(metadata.name() == "Foo Bar");
+        CHECK(metadata["name"] == "Foo Bar");
     }
 }
 
