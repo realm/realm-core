@@ -33,6 +33,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <condition_variable>
 
 namespace realm {
 
@@ -423,14 +424,15 @@ protected:
 
 private:
     class AsyncCommitHelper;
+    struct SharedInfo;
+    struct ReadCount;
+
     // Member variables
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
     Replication* m_replication = nullptr;
-    struct SharedInfo;
-    struct ReadCount;
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
@@ -575,6 +577,7 @@ private:
 
     void async_begin_write(std::function<void()> fn);
     void async_end_write();
+    void async_end_write(std::function<void()> fn);
     void async_sync_to_disk(std::function<void()> fn);
 
     friend class Transaction;
@@ -690,13 +693,14 @@ public:
     }
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
-    void async_request_sync_to_storage(std::function<void()> when_synchronized);
+    void async_request_sync_to_storage(std::function<void()> when_synchronized = nullptr);
     // release the write lock without any sync to disk
     void async_release_write_lock()
     {
-        REALM_ASSERT(m_async_stage == AsyncState::HasLock);
-        m_async_stage = AsyncState::Idle;
-        get_db()->async_end_write();
+        if (m_async_stage == AsyncState::HasLock) {
+            m_async_stage = AsyncState::Idle;
+            get_db()->async_end_write();
+        }
     }
 
     // true if sync to disk has been requested
@@ -715,6 +719,42 @@ public:
     void release_read_lock(DB::ReadLockInfo& read_lock)
     {
         get_db()->release_read_lock(read_lock);
+    }
+
+    void wait_for_write_lock()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Requesting) {
+            waiting_for_write_lock = true;
+            cv.wait(lck);
+            waiting_for_write_lock = false;
+        }
+    }
+
+    // Request that write lock is released on helper thread and wait for it to happen
+    void release_write_lock()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == AsyncState::HasLock) {
+            get_db()->async_end_write([this]() {
+                std::unique_lock<std::mutex> lck(mtx);
+                m_async_stage = AsyncState::Idle;
+                cv.notify_one();
+            });
+            cv.wait(lck);
+        }
+    }
+
+    bool wait_for_sync()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Syncing) {
+            waiting_for_sync = true;
+            cv.wait(lck);
+            waiting_for_sync = false;
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -742,8 +782,12 @@ private:
     mutable _impl::History* m_history = nullptr;
 
     DB::ReadLockInfo m_read_lock;
+    std::mutex mtx;
+    std::condition_variable cv;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
     AsyncState m_async_stage = AsyncState::Idle;
+    bool waiting_for_write_lock = false;
+    bool waiting_for_sync = false;
 
     friend class DB;
     friend class DisableReplication;

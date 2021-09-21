@@ -1705,6 +1705,13 @@ public:
         m_changed.notify_one();
     }
 
+    void end_write(std::function<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_mx_release_cb.emplace(std::move(fn));
+        m_changed.notify_one();
+    }
+
     void sync_to_disk(std::function<void()> fn)
     {
         std::unique_lock lg(m_mutex);
@@ -1720,6 +1727,7 @@ private:
     std::condition_variable m_changed;
     std::deque<std::function<void()>> m_pending_writes;
     util::Optional<std::function<void()>> m_pending_sync;
+    util::Optional<std::function<void()>> m_pending_mx_release_cb;
     bool m_pending_mx_release = false;
     bool m_terminated = true;
     bool m_has_write_mutex = false;
@@ -1731,6 +1739,9 @@ void DB::AsyncCommitHelper::main()
 {
     std::unique_lock lg(m_mutex);
     while (!m_terminated) {
+#if 0 // Enable for testing purposes
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
         if (m_has_write_mutex) {
             if (m_pending_sync) {
                 std::function<void()> cb = m_pending_sync.value();
@@ -1744,6 +1755,16 @@ void DB::AsyncCommitHelper::main()
             else if (m_pending_mx_release) {
                 m_db->do_end_write();
                 m_pending_mx_release = false;
+                m_has_write_mutex = false;
+                continue;
+            }
+            else if (m_pending_mx_release_cb) {
+                m_db->do_end_write();
+                std::function<void()> cb = m_pending_mx_release_cb.value();
+                m_pending_mx_release_cb.reset();
+                lg.unlock();
+                cb();
+                lg.lock();
                 m_has_write_mutex = false;
                 continue;
             }
@@ -1780,6 +1801,11 @@ void DB::async_begin_write(std::function<void()> fn)
 void DB::async_end_write()
 {
     m_commit_helper->end_write();
+}
+
+void DB::async_end_write(std::function<void()> fn)
+{
+    m_commit_helper->end_write(fn);
 }
 
 void DB::async_sync_to_disk(std::function<void()> fn)
@@ -2812,7 +2838,6 @@ DB::VersionID Transaction::get_version_of_current_transaction()
     return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
 }
 
-
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (m_fake_read_lock_if_immutable) {
@@ -2861,12 +2886,18 @@ TransactionRef DB::start_write(bool nonblocking)
 void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired)
 {
     tr->m_async_stage = Transaction::AsyncState::Requesting;
-    // TODO make async
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, when_acquired]() {
         if (auto tr = weak_tr.lock()) {
+            std::unique_lock<std::mutex> lck(tr->mtx);
             tr->m_async_stage = Transaction::AsyncState::HasLock;
-            when_acquired();
+            if (tr->waiting_for_write_lock) {
+                tr->cv.notify_one();
+            }
+            else if (when_acquired) {
+                when_acquired();
+            }
+            tr.reset(); // Release pointer while lock is held
         }
     });
 }
@@ -3070,7 +3101,14 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         // is allowed to re-request it.
         db->release_read_lock(read_lock);
         db->do_end_write();
-        when_synchronized();
+
+        std::unique_lock<std::mutex> lck(mtx);
         m_async_stage = AsyncState::Idle;
+        if (waiting_for_sync) {
+            cv.notify_one();
+        }
+        else if (when_synchronized) {
+            when_synchronized();
+        }
     });
 }
