@@ -487,11 +487,6 @@ size_t Mixed::hash() const
         case type_ObjectId:
             hash = get<ObjectId>().hash();
             break;
-        case type_Decimal: {
-            std::hash<realm::Decimal128> h;
-            hash = h(decimal_val);
-            break;
-        }
         case type_UUID: {
             hash = get<UUID>().hash();
             break;
@@ -501,6 +496,7 @@ size_t Mixed::hash() const
             hash = murmur2_or_cityhash(unsigned_data, 12);
             break;
         }
+        case type_Decimal:
         case type_Mixed:
         case type_Link:
         case type_LinkList:
