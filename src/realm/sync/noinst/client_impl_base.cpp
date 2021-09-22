@@ -1937,7 +1937,7 @@ void Session::send_message()
     REALM_ASSERT(m_active_or_deactivating);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (REALM_UNLIKELY(m_deactivation_initiated) || REALM_UNLIKELY(m_error_message_received)) {
+    if (m_deactivation_initiated || m_error_message_received) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
@@ -1957,30 +1957,27 @@ void Session::send_message()
     // not been initiated
     REALM_ASSERT(!m_unbind_message_sent);
 
-    if (REALM_UNLIKELY(!m_bind_message_sent))
+    if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (REALM_UNLIKELY(!m_access_token_sent))
+    if (!m_access_token_sent)
         return send_refresh_message(); // Throws
 
-    if (REALM_UNLIKELY(!m_ident_message_sent)) {
+    if (!m_ident_message_sent) {
         if (have_client_file_ident())
             send_ident_message(); // Throws
         return;
     }
 
-    bool send_alloc = (m_num_outstanding_subtier_allocations > 0 && !m_alloc_message_sent);
-    if (REALM_UNLIKELY(send_alloc))
+    if (!m_alloc_message_sent && m_num_outstanding_subtier_allocations > 0)
         return send_alloc_message(); // Throws
 
-    bool send_mark = (m_target_download_mark > m_last_download_mark_sent);
-    if (REALM_UNLIKELY(send_mark))
+    if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-    bool need_upload = (m_upload_target_version > m_upload_progress.client_version);
-    if (REALM_UNLIKELY(need_upload) && REALM_LIKELY(m_allow_upload))
+    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version))
         send_upload_message(); // Throws
     return;
 }
