@@ -958,8 +958,6 @@ TEST_CASE("SharedRealm: async_writes") {
         util::EventLoop::main().run_until([&] {
             return done;
         });
-        // First async transaction committed but not persisted
-        CHECK(!persisted);
         realm->begin_transaction();
         CHECK(persisted);
         persisted = false;

@@ -695,7 +695,7 @@ void Realm::run_writes()
     // this is tricky
     //  - each pending call may itself add other async writes
     //  - the 'run' will terminate as soon as a commit without grouping is requested
-    while (!m_async_write_q.empty() && !m_async_commit_barrier_requested) {
+    while (!m_async_write_q.empty()) {
 
         // We might have made a sync commit and thereby given up the write lock
         if (!m_transaction->holds_write_mutex()) {
@@ -716,6 +716,7 @@ void Realm::run_writes()
 
         // prevent any calls to commit/cancel during a simple notification
         m_notify_only = write_desc.notify_only;
+        m_async_commit_barrier_requested = false;
         auto prev_version = m_transaction->get_version();
         try {
             write_desc.writer();
@@ -738,8 +739,8 @@ void Realm::run_writes()
         if (new_version > prev_version) {
             // A commit was done during callback
             --run_limit;
-            if (!run_limit)
-                m_async_commit_barrier_requested = true;
+            if (run_limit <= 0)
+                break;
         }
         else {
             if (m_transaction->get_transact_stage() == DB::transact_Writing) {
@@ -747,8 +748,9 @@ void Realm::run_writes()
                 transaction::cancel(transaction(), m_binding_context.get());
             }
         }
+        if (m_async_commit_barrier_requested)
+            break;
     }
-    m_async_commit_barrier_requested = false;
     m_is_running_async_writes = false;
 
     end_current_write();
