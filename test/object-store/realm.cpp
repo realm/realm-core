@@ -845,6 +845,23 @@ TEST_CASE("SharedRealm: async_writes") {
             REQUIRE(!done);
         }
     }
+    SECTION("realm closed when sync in progress") {
+        bool persisted = false;
+        realm->async_begin_transaction([&] {
+            auto table = realm->read_group().get_table("class_object");
+            auto col = table->get_column_key("value");
+            table->create_object().set(col, 45);
+            realm->async_commit_transaction([&]() {
+                persisted = true;
+            });
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        realm->close();
+        REQUIRE(persisted);
+    }
     SECTION("notify only with no further actions") {
         realm->async_begin_transaction(
             [&] {

@@ -89,14 +89,9 @@ Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_
 Realm::~Realm()
 {
     if (m_transaction) {
-        // We should busy wait for the data to be written
-        while (m_transaction->is_synchronizing())
-            std::this_thread::yield();
-
-        // Make sure we don't hold any read_locks
-        for (auto it : m_async_commit_q) {
-            m_transaction->release_read_lock(it.first);
-        }
+        // Wait for potential syncing to finish
+        m_transaction->wait_for_sync();
+        call_completion_callbacks();
     }
 
     if (m_coordinator) {
@@ -660,10 +655,12 @@ void Realm::check_pending_write_requests()
 {
     if (!m_async_write_q.empty()) {
         // more writes to run later, so re-request the write mutex:
-        m_coordinator->async_request_write_mutex(m_transaction, [this]() {
-            // callback happens on a different thread so...:
-            run_writes_on_proper_thread();
-        });
+        if (!m_transaction->is_async()) {
+            m_coordinator->async_request_write_mutex(m_transaction, [this]() {
+                // callback happens on a different thread so...:
+                run_writes_on_proper_thread();
+            });
+        }
     }
 }
 
@@ -1131,7 +1128,11 @@ void Realm::close()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
+
     if (!m_config.immutable() && m_transaction) {
+        // Wait for potential syncing to finish
+        m_transaction->wait_for_sync();
+        call_completion_callbacks();
         transaction().close();
     }
 

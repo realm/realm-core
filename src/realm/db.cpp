@@ -2885,23 +2885,22 @@ TransactionRef DB::start_write(bool nonblocking)
 
 void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired)
 {
-    if (tr->m_async_stage == Transaction::AsyncState::Idle) {
-        tr->m_async_stage = Transaction::AsyncState::Requesting;
-        std::weak_ptr<Transaction> weak_tr = tr;
-        async_begin_write([weak_tr, when_acquired]() {
-            if (auto tr = weak_tr.lock()) {
-                std::unique_lock<std::mutex> lck(tr->mtx);
-                tr->m_async_stage = Transaction::AsyncState::HasLock;
-                if (tr->waiting_for_write_lock) {
-                    tr->cv.notify_one();
-                }
-                else if (when_acquired) {
-                    when_acquired();
-                }
-                tr.reset(); // Release pointer while lock is held
+    REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
+    tr->m_async_stage = Transaction::AsyncState::Requesting;
+    std::weak_ptr<Transaction> weak_tr = tr;
+    async_begin_write([weak_tr, when_acquired]() {
+        if (auto tr = weak_tr.lock()) {
+            std::unique_lock<std::mutex> lck(tr->mtx);
+            tr->m_async_stage = Transaction::AsyncState::HasLock;
+            if (tr->waiting_for_write_lock) {
+                tr->cv.notify_one();
             }
-        });
-    }
+            else if (when_acquired) {
+                when_acquired();
+            }
+            tr.reset(); // Release pointer while lock is held
+        }
+    });
 }
 
 Obj Transaction::import_copy_of(const Obj& original)
