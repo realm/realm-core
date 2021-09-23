@@ -295,12 +295,19 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
+        realm_lock.unlock_unchecked();
+        std::unique_ptr<ExternalCommitHelper> notifier;
         try {
-            m_notifier = std::make_unique<ExternalCommitHelper>(*this);
+            // Creating the ExternalCommitHelper while the mutex is locked
+            // could potentially lead to a deadlock
+            notifier = std::make_unique<ExternalCommitHelper>(*this);
         }
         catch (std::system_error const& ex) {
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
+        realm_lock.lock_unchecked();
+        if (!m_notifier)
+            m_notifier = std::move(notifier);
     }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 

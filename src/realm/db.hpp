@@ -652,8 +652,9 @@ public:
     {
         return m_transact_stage == DB::transact_Frozen;
     }
-    bool is_async() const noexcept
+    bool is_async() noexcept
     {
+        std::unique_lock<std::mutex> lck(mtx);
         return m_async_stage != AsyncState::Idle;
     }
     TransactionRef duplicate();
@@ -697,6 +698,7 @@ public:
     // release the write lock without any sync to disk
     void async_release_write_lock()
     {
+        std::unique_lock<std::mutex> lck(mtx);
         if (m_async_stage == AsyncState::HasLock) {
             m_async_stage = AsyncState::Idle;
             get_db()->async_end_write();
@@ -704,8 +706,9 @@ public:
     }
 
     // true if sync to disk has been requested
-    bool is_synchronizing() const noexcept
+    bool is_synchronizing() noexcept
     {
+        std::unique_lock<std::mutex> lck(mtx);
         return m_async_stage == AsyncState::Syncing;
     }
 

@@ -953,7 +953,7 @@ TEST_CASE("SharedRealm: async_writes") {
         });
         REQUIRE(table->size() == 3);
     }
-    SECTION("asynchronous transaction mixed with sync transactions that is cancelled") {
+    SECTION("asynchronous transaction mixed with sync transaction that is cancelled") {
         bool persisted = false;
         realm->async_begin_transaction([&]() {
             auto table = realm->read_group().get_table("class_object");
