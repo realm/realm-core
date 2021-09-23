@@ -484,26 +484,30 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err
         return;
     }
 
-    // Performing a client resync requires tearing down our current
-    // sync session and creating a new one with a forced client
-    // reset. This will result in session completion handlers firing
+    // Performing a client reset requires tearing down our current
+    // sync session and creating a new one with the relevant client reset config. This
+    // will result in session completion handlers firing
     // when the old session is torn down, which we don't want as this
     // is supposed to be transparent to the user.
     //
     // To avoid this, we need to move the completion handlers aside temporarily so
-    // that moving to the inactive state doesn't clear them - they will be re-registered
-    // when the session becomes active again.
+    // that moving to the inactive state doesn't clear them - they will be
+    // re-registered when the session becomes active again.
     {
         std::unique_lock<std::mutex> lock(m_state_mutex);
         m_force_client_reset = true;
         m_client_reset_fresh_copy = std::move(db);
-        CompletionCallbacks callbacks;
-        std::swap(m_completion_callbacks, callbacks);
-        // always swap back, even if advance_state throws
-        auto guard = util::make_scope_exit([&]() noexcept {
-            std::swap(callbacks, m_completion_callbacks);
-        });
-        advance_state(lock, State::inactive);
+        // It is possible that during the download, this sync session has already
+        // moved to the inactive state naturally and in that case just revive it.
+        if (m_state != &State::inactive) {
+            CompletionCallbacks callbacks;
+            std::swap(m_completion_callbacks, callbacks);
+            // always swap back, even if advance_state throws
+            auto guard = util::make_scope_exit([&]() noexcept {
+                std::swap(callbacks, m_completion_callbacks);
+            });
+            advance_state(lock, State::inactive);
+        }
     }
     revive_if_needed();
 }
