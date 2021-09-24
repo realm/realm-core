@@ -145,7 +145,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         });
     }
 
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+        CAPTURE(err.message);
         FAIL("Error handler should not have been called");
     };
 

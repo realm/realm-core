@@ -295,6 +295,7 @@ struct TestServerClientReset : public TestClientReset {
         // the server performs log compaction
         {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
+            auto session2 = sync_manager->get_existing_session(realm2->config().path);
 
             for (int i = 0; i < 2; ++i) {
                 wait_for_download(*realm2);
@@ -313,6 +314,7 @@ struct TestServerClientReset : public TestClientReset {
             }
             realm2->commit_transaction();
             wait_for_upload(*realm2);
+            session2->log_out();
             server.advance_clock(10s);
             realm2->close();
         }
