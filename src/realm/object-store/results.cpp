@@ -1255,22 +1255,20 @@ REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
     switch (m_mode) {
         case Mode::Table:
-            return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
+            return Results(realm, realm->import_copy_of(m_table));
         case Mode::Collection:
-            return Results(frozen_realm, frozen_realm->import_copy_of(*m_collection), m_descriptor_ordering);
+            return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::Query:
-            return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy),
-                           m_descriptor_ordering);
+            return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(frozen_realm, *frozen_realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
-                            m_descriptor_ordering);
+            Results results(realm, *realm->import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
             return results;
@@ -1278,6 +1276,11 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
+}
+
+Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+{
+    return import_copy_into_realm(frozen_realm);
 }
 
 bool Results::is_frozen() const
