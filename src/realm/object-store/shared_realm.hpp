@@ -545,7 +545,10 @@ private:
         bool notify_only;
     };
     std::deque<async_write_desc> m_async_write_q;
-    using async_commit_desc = std::pair<DB::ReadLockInfo, std::function<void()>>;
+    struct async_commit_desc {
+        DB::VersionID version;
+        std::function<void()> callback;
+    };
     std::vector<async_commit_desc> m_async_commit_q;
     bool m_is_running_async_writes = false;
     bool m_notify_only = false;

@@ -2285,6 +2285,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
@@ -2344,7 +2345,18 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    db->release_read_lock(m_read_lock);
+
+    if (commit_to_disk || m_oldest_version_not_persisted) {
+        db->release_read_lock(m_read_lock);
+    }
+    else {
+        m_oldest_version_not_persisted = m_read_lock;
+    }
+
+    if (commit_to_disk && m_oldest_version_not_persisted) {
+        db->release_read_lock(*m_oldest_version_not_persisted);
+        m_oldest_version_not_persisted.reset();
+    }
     m_read_lock = new_read_lock;
 
     if (m_async_stage == AsyncState::Idle) {
@@ -2522,6 +2534,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
             r.filesize = new_file_size;
             r.version = new_version;
             r_info->readers.use_next();
+
             // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
             REALM_ASSERT(new_top_ref < new_file_size);
         }
@@ -2679,7 +2692,11 @@ void Transaction::end_read()
 void Transaction::do_end_read() noexcept
 {
     detach();
+
     db->release_read_lock(m_read_lock);
+    if (m_oldest_version_not_persisted)
+        db->release_read_lock(*m_oldest_version_not_persisted);
+
     m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
@@ -3105,6 +3122,10 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         // we must release the write mutex before the callback, because the callback
         // is allowed to re-request it.
         db->release_read_lock(read_lock);
+        if (m_oldest_version_not_persisted) {
+            db->release_read_lock(*m_oldest_version_not_persisted);
+            m_oldest_version_not_persisted.reset();
+        }
         db->do_end_write();
 
         std::unique_lock<std::mutex> lck(mtx);
