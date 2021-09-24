@@ -1350,11 +1350,12 @@ void Query::handle_pending_not()
     auto& current_group = m_groups.back();
     if (m_groups.size() > 1 && current_group.m_pending_not) {
         // we are inside group(s) implicitly created to handle a not, so reparent its
-        // nodes into a NotNode.
-        auto not_node = std::unique_ptr<ParentNode>(new NotNode(std::move(current_group.m_root_node)));
+        // nodes into a NotNode (if not empty).
         current_group.m_pending_not = false;
+        if (auto not_root_node = std::move(current_group.m_root_node)) {
+            add_node(std::make_unique<NotNode>(std::move(not_root_node)));
+        }
 
-        add_node(std::move(not_node));
         end_group();
     }
 }
@@ -1364,7 +1365,7 @@ Query& Query::Or()
     auto& current_group = m_groups.back();
     if (current_group.m_state != QueryGroup::State::OrConditionChildren) {
         // Reparent the current group's nodes within an OrNode.
-        add_node(std::unique_ptr<ParentNode>(new OrNode(std::move(current_group.m_root_node))));
+        add_node(std::make_unique<OrNode>(std::move(current_group.m_root_node)));
     }
     current_group.m_state = QueryGroup::State::OrCondition;
 
