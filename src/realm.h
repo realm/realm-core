@@ -966,14 +966,6 @@ RLM_API bool realm_refresh(realm_t*);
 RLM_API realm_t* realm_freeze(const realm_t*);
 
 /**
- * Produce a live Realm from a frozen one. This is equivalent to
- * opening a new Realm instance.
- *
- * @return A non-NULL realm instance representing the live state.
- */
-RLM_API realm_t* realm_thaw(const realm_t*);
-
-/**
  * Vacuum the free space from the realm file, reducing its file size.
  *
  * @return True if compaction was successful and no exceptions were thrown.
@@ -1266,24 +1258,16 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_cla
 RLM_API bool realm_object_delete(realm_object_t*);
 
 /**
- * Freeze the Realm object in the provided Realm.
+ * Resolve the Realm object in the provided Realm.
  *
- * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ * This is equivalent to producing a thread-safe reference and resolving it in the target realm.
  *
- * @return A frozen copy of the live object.
+ * If the object can be resolved in the target realm, '*resolved' points to the new object
+ * If the object cannot be resolved in the target realm, '*resolved' will be null.
+ * @return True if no exception occurred (except exceptions that may normally occur if resolution fails)
  */
-RLM_API realm_object_t* realm_object_freeze(const realm_object_t* live_object, const realm_t* frozen_realm);
-
-/**
- * Turn a frozen Realm Object into a live one that is evaluated against a given version of a Live Realm.
- *
- * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
- *
- * Note: Will assert that live_realm is not frozen.
- *
- * @return A live copy of the frozen object.
- */
-RLM_API realm_object_t* realm_object_thaw(const realm_object_t* frozen_object, const realm_t* live_realm);
+RLM_API bool realm_object_resolve_in(const realm_object_t* live_object, const realm_t* target_realm,
+                                     realm_object_t** resolved);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
@@ -1435,24 +1419,23 @@ RLM_API realm_list_t* _realm_list_from_native_copy(const void* plist, size_t n);
 RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
 
 /**
- * Map the list into a frozen Realm instance.
+ * Resolve the list in the context of a given Realm instance.
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
  *
- * @return A frozen copy of the live list.
+ * If resolution is possible, a valid resolved object is produced at '*resolved*'.
+ * If resolution is not possible, but no error occurs, '*resolved' is set to NULL
+ *
+ * @return true if no error occurred.
  */
-RLM_API realm_list_t* realm_list_freeze(const realm_list_t* live_list, const realm_t* frozen_realm);
+RLM_API bool realm_list_resolve_in(const realm_list_t* list, const realm_t* target_realm, realm_list_t** resolved);
 
 /**
- * Map the list into a live Realm instance.
+ * Check if a list is valid.
  *
- * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
- *
- * Note: Will assert that live_realm is not frozen.
- *
- * @return A live copy of the frozen list.
+ * @return True if the list is valid.
  */
-RLM_API realm_list_t* realm_list_thaw(const realm_list_t* frozen_list, const realm_t* live_realm);
+RLM_API bool realm_list_is_valid(const realm_list_t*);
 
 /**
  * Get the size of a list, in number of elements.
@@ -1856,11 +1839,9 @@ RLM_API realm_results_t* realm_results_freeze(realm_results_t*, const realm_t* f
  *
  * This is equivalent to producing a thread-safe reference and resolving it in the live realm.
  *
- * Note: Will assert that live_realm is not frozen.
- *
  * @return A live copy of the Results.
  */
-RLM_API realm_results_t* realm_results_thaw(realm_results_t* frozen_results, const realm_t* live_realm);
+RLM_API realm_results_t* realm_results_resolve_in(realm_results_t* from_results, const realm_t* target_realm);
 
 /**
  * Compute the minimum value of a property in the results.
@@ -2025,17 +2006,6 @@ typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_
 typedef struct realm_http_transport realm_http_transport_t;
 
 /**
- * Callback function implementing a HTTP transport factory.
- *
- * Used by Core whenever in needs to instantiate a transport object.
- * Core will take care to realm_release() the return value.
- *
- * @param userdata The userdata pointer associated with this factory.
- * @return A new transport instance.
- */
-typedef realm_http_transport_t* (*realm_http_transport_factory_func_t)(void* userdata);
-
-/**
  * Create a new HTTP transport with these callbacks implementing its functionality.
  */
 RLM_API realm_http_transport_t* realm_http_transport_new(void* userdata, realm_free_userdata_func_t,
@@ -2123,16 +2093,10 @@ RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_cred
  * Create a new app configuration.
  *
  * @param app_id The MongoDB Realm app id.
- * @param http_transport_factory The HTTP transport factory used to make network calls.
- * @param transport_factory_userdata The userdata pointer associated with @a http_transport_factory.
- * @param transport_factory_userdata_free The cleanup function for @a transport_factory_userdata once it's no longer
+ * @param http_transport The HTTP transport used to make network calls.
  * needed.
  */
-RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
-                                                 realm_http_transport_factory_func_t http_transport_factory,
-                                                 void* transport_factory_userdata,
-                                                 realm_free_userdata_func_t transport_factory_userdata_free);
-
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport);
 
 RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*);
 RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*);

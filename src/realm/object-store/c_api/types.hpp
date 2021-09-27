@@ -406,8 +406,24 @@ struct realm_logger : realm::c_api::WrapC {
     std::unique_ptr<realm::util::Logger> logger;
 };
 
-struct realm_http_transport : realm::c_api::WrapC {
-    std::unique_ptr<realm::app::GenericNetworkTransport> transport;
+struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
+    realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
+        : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))
+    {
+    }
+
+    realm_http_transport* clone() const override
+    {
+        return new realm_http_transport{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_http_transport*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
 };
 
 struct realm_app_config : realm::c_api::WrapC, realm::app::App::Config {

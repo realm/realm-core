@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
 #include "util/baas_admin_api.hpp"
@@ -112,10 +113,7 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
 }
 
 template <typename Transport>
-std::unique_ptr<GenericNetworkTransport> factory()
-{
-    return std::unique_ptr<GenericNetworkTransport>(new Transport);
-}
+const std::shared_ptr<GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 } // namespace
 
 
@@ -216,7 +214,7 @@ App::Config get_integration_config()
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
     auto app_session = get_runtime_app_session(base_url);
-    return get_config(factory<SynchronousTestTransport>, app_session);
+    return get_config(instance_of<SynchronousTestTransport>, app_session);
 }
 } // namespace
 
@@ -1560,7 +1558,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
     auto app_session = create_app(server_app_config);
-    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     auto partition = random_string(100);
 
     auto email = std::string("realm_tests_do_autoverify-test@example.com");
@@ -1653,7 +1651,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
     auto app_session = create_app(server_app_config);
-    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     auto partition = random_string(100);
 
     auto array_of_objs_id = ObjectId::gen();
@@ -1774,6 +1772,101 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             CHECK(array_list.get<int64_t>(0) == int64_t(7));
             CHECK(array_list.get<int64_t>(1) == int64_t(8));
         }
+    }
+}
+
+TEST_CASE("app: make distributable client file", "[sync][app]") {
+    auto config = get_integration_config();
+    auto base_path = util::make_temp_dir();
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
+    util::try_make_dir(base_path + "/orig");
+    util::try_make_dir(base_path + "/copy");
+
+    // Create realm file without client file id
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(!error);
+                                         REQUIRE(user);
+                                     });
+
+        ThreadSafeReference realm_ref;
+
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/orig/default.realm";
+
+        std::mutex mutex;
+        auto task = realm::Realm::get_synchronized_realm(realm_config);
+        task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
+            std::lock_guard<std::mutex> lock(mutex);
+            REQUIRE(!error);
+            realm_ref = std::move(ref);
+        });
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> lock(mutex);
+            return bool(realm_ref);
+        });
+        SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+
+        // Write some data
+        realm->begin_transaction();
+        CppContext c;
+        Object::create(c, realm, "Person",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"age", INT64_C(64)},
+                                                {"firstName", std::string("Paul")},
+                                                {"lastName", std::string("McCartney")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
+
+        realm->write_copy(base_path + "/copy/default.realm", BinaryData());
+
+        // Write some additional data
+        realm->begin_transaction();
+        Object::create(c, realm, "Dog",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"breed", std::string("stabyhoun")},
+                                                {"name", std::string("albert")},
+                                                {"realm_id", std::string("foo")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    }
+    // Starting a new session based on the copy
+    {
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                         REQUIRE(!error);
+                                         REQUIRE(user);
+                                     });
+
+        ThreadSafeReference realm_ref;
+
+        realm::Realm::Config realm_config;
+        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+        realm_config.schema_version = 1;
+        realm_config.path = base_path + "/copy/default.realm";
+
+        SharedRealm realm = realm::Realm::get_shared_realm(realm_config);
+        wait_for_download(*realm);
+
+        // Check that we can continue committing to this realm
+        realm->begin_transaction();
+        CppContext c;
+        Object::create(c, realm, "Dog",
+                       util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                                {"breed", std::string("bulldog")},
+                                                {"name", std::string("fido")},
+                                                {"realm_id", std::string("foo")}}));
+        realm->commit_transaction();
+        wait_for_upload(*realm);
     }
 }
 
@@ -1910,13 +2003,26 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         {
             std::function<void()> hook;
-            std::function<std::unique_ptr<GenericNetworkTransport>()> hooked_factory = [&hook] {
-                if (hook) {
-                    hook();
+            class MyTestTransport : public SynchronousTestTransport {
+            public:
+                MyTestTransport(std::function<void()>* hook)
+                    : hook(hook)
+                {
                 }
-                return std::unique_ptr<GenericNetworkTransport>(new SynchronousTestTransport);
+
+                void send_request_to_server(const Request request,
+                                            std::function<void(const Response)> completion_block) override
+                {
+                    if (*hook) {
+                        (*hook)();
+                    }
+                    SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
+                }
+
+            private:
+                std::function<void()>* hook;
             };
-            app_config.transport_generator = hooked_factory;
+            app_config.transport = std::make_shared<MyTestTransport>(&hook);
 
             TestSyncManager sync_manager(app_config, {});
             auto app = sync_manager.app();
@@ -2233,7 +2339,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
                       }}};
     auto server_app_config = minimal_app_config(base_url, "collections_of_links", schema);
     auto app_session = create_app(server_app_config);
-    auto app_config = get_config(factory<SynchronousTestTransport>, app_session);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     TestSyncManager sync_manager(app_config);
     auto app = sync_manager.app();
 
@@ -2389,11 +2495,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
     };
 
     SECTION("custom code and message is sent back") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
-            return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
-        };
-
-        TestSyncManager tsm(get_config(factory), {});
+        TestSyncManager tsm(get_config(std::make_shared<CustomErrorTransport>(1001, "Boom!")), {});
         auto app = tsm.app();
         auto error = failed_log_in(app);
         CHECK(error.is_custom_error());
@@ -2615,7 +2717,7 @@ public:
 
 App::Config get_config()
 {
-    return get_config(factory<UnitTestTransport>);
+    return get_config(instance_of<UnitTestTransport>);
 }
 
 static const std::string good_access_token =
@@ -2781,7 +2883,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             }
         };
 
-        TestSyncManager tsm(get_config(factory<transport>), {});
+        TestSyncManager tsm(get_config(instance_of<transport>), {});
         auto app = tsm.app();
 
         auto error = failed_log_in(app);
@@ -2973,17 +3075,17 @@ TEST_CASE("app: user_semantics", "[app]") {
 }
 
 struct ErrorCheckingTransport : public GenericNetworkTransport {
-    ErrorCheckingTransport(Response r)
+    ErrorCheckingTransport(Response* r)
         : m_response(r)
     {
     }
     void send_request_to_server(const Request, std::function<void(const Response)> completion_block) override
     {
-        completion_block(m_response);
+        completion_block(*m_response);
     }
 
 private:
-    Response m_response;
+    Response* m_response;
 };
 
 TEST_CASE("app: response error handling", "[sync][app]") {
@@ -2995,11 +3097,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 
     Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
 
-    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
-        return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
-    };
-
-    TestSyncManager tsm(get_config(transport_generator), {});
+    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)), {});
     auto app = tsm.app();
 
     SECTION("http 404") {
@@ -3348,7 +3446,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             }
         };
 
-        TestSyncManager sync_manager(get_config(factory<transport>));
+        TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
         setup_user(app);
 
@@ -3378,7 +3476,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             }
         };
 
-        TestSyncManager sync_manager(get_config(factory<transport>));
+        TestSyncManager sync_manager(get_config(instance_of<transport>));
         auto app = sync_manager.app();
         setup_user(app);
 
@@ -3456,7 +3554,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 }
             };
 
-            TestSyncManager sync_manager(get_config(factory<transport>));
+            TestSyncManager sync_manager(get_config(instance_of<transport>));
             auto app = sync_manager.app();
             setup_user(app);
             REQUIRE(log_in(app));
@@ -3570,81 +3668,77 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
         TestState state = TestState::unknown;
     } state;
-    std::function<std::unique_ptr<GenericNetworkTransport>()> generic_factory = [&] {
-        struct transport : public GenericNetworkTransport {
-            transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
-                : mock_transport_worker(worker)
-                , state(state)
-            {
+    struct transport : public GenericNetworkTransport {
+        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+            : mock_transport_worker(worker)
+            , state(state)
+        {
+        }
+
+        void send_request_to_server(const Request request,
+                                    std::function<void(const Response)> completion_block) override
+
+        {
+            std::cerr << request.url << std::endl;
+            if (request.url.find("/login") != std::string::npos) {
+                CHECK(state.get() == TestState::location);
+                state.advance_to(TestState::login);
+                mock_transport_worker.add_work_item(
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
+                    std::move(completion_block));
             }
-
-            void send_request_to_server(const Request request,
-                                        std::function<void(const Response)> completion_block) override
-
-            {
-                std::cerr << request.url << std::endl;
-                if (request.url.find("/login") != std::string::npos) {
-                    CHECK(state.get() == TestState::location);
-                    state.advance_to(TestState::login);
-                    mock_transport_worker.add_work_item(
-                        Response{200, 0, {}, user_json(encode_fake_jwt("access token 1")).dump()},
-                        std::move(completion_block));
+            else if (request.url.find("/profile") != std::string::npos) {
+                // simulated bad token request
+                auto cur_state = state.get();
+                CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
+                if (cur_state == TestState::refresh_1) {
+                    state.advance_to(TestState::profile_2);
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                        std::move(completion_block));
                 }
-                else if (request.url.find("/profile") != std::string::npos) {
-                    // simulated bad token request
-                    auto cur_state = state.get();
-                    CHECK((cur_state == TestState::refresh_1 || cur_state == TestState::login));
-                    if (cur_state == TestState::refresh_1) {
-                        state.advance_to(TestState::profile_2);
-                        mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
-                                                            std::move(completion_block));
-                    }
-                    else if (cur_state == TestState::login) {
-                        state.advance_to(TestState::profile_1);
-                        mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
-                    }
-                }
-                else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
-                    if (state.get() == TestState::profile_1) {
-                        state.advance_to(TestState::refresh_1);
-                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
-                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                            std::move(completion_block));
-                    }
-                    else if (state.get() == TestState::profile_2) {
-                        state.advance_to(TestState::refresh_2);
-                        mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
-                                                            std::move(completion_block));
-                    }
-                    else {
-                        CHECK(state.get() == TestState::refresh_2);
-                        state.advance_to(TestState::refresh_3);
-                        nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
-                        mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
-                                                            std::move(completion_block));
-                    }
-                }
-                else if (request.url.find("/location") != std::string::npos) {
-                    CHECK(request.method == HttpMethod::get);
-                    CHECK(state.get() == TestState::unknown);
-                    state.advance_to(TestState::location);
-                    mock_transport_worker.add_work_item(
-                        Response{200,
-                                 0,
-                                 {},
-                                 "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                 "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
-                        std::move(completion_block));
+                else if (cur_state == TestState::login) {
+                    state.advance_to(TestState::profile_1);
+                    mock_transport_worker.add_work_item(Response{401, 0, {}}, std::move(completion_block));
                 }
             }
+            else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                if (state.get() == TestState::profile_1) {
+                    state.advance_to(TestState::refresh_1);
+                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 1")}};
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                        std::move(completion_block));
+                }
+                else if (state.get() == TestState::profile_2) {
+                    state.advance_to(TestState::refresh_2);
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, "{\"error\":\"too bad, buddy!\"}"},
+                                                        std::move(completion_block));
+                }
+                else {
+                    CHECK(state.get() == TestState::refresh_2);
+                    state.advance_to(TestState::refresh_3);
+                    nlohmann::json json{{"access_token", encode_fake_jwt("access token 2")}};
+                    mock_transport_worker.add_work_item(Response{200, 0, {}, json.dump()},
+                                                        std::move(completion_block));
+                }
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                CHECK(state.get() == TestState::unknown);
+                state.advance_to(TestState::location);
+                mock_transport_worker.add_work_item(
+                    Response{200,
+                             0,
+                             {},
+                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    std::move(completion_block));
+            }
+        }
 
-            AsyncMockNetworkTransport& mock_transport_worker;
-            TestStateBundle& state;
-        };
-        return std::make_unique<transport>(mock_transport_worker, state);
+        AsyncMockNetworkTransport& mock_transport_worker;
+        TestStateBundle& state;
     };
-
-    TestSyncManager sync_manager(get_config(generic_factory));
+    TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
     auto app = sync_manager.app();
 
     {
@@ -3719,7 +3813,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         }
     };
 
-    TestSyncManager::Config config = get_config(factory<transport>);
+    TestSyncManager::Config config = get_config(instance_of<transport>);
     config.base_path = util::make_temp_dir();
     config.should_teardown_test_directory = false;
 

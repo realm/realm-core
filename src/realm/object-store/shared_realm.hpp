@@ -187,7 +187,7 @@ public:
         // called with the supplied schema, version and migration function when
         // the Realm is actually opened and not just retrieved from the cache
         util::Optional<Schema> schema;
-        uint64_t schema_version = -1;
+        uint64_t schema_version = uint64_t(-1);
         MigrationFunction migration_function;
 
         DataInitializationFunction initialization_function;
@@ -307,6 +307,12 @@ public:
     bool is_in_transaction() const noexcept;
 
     // Returns a frozen copy for the current version of this Realm
+    // If called from within a write transaction, the returned Realm will
+    // reflect the state at the beginning of the write transaction. Any
+    // accumulated state changes will not be part of it. To obtain a frozen
+    // transaction reflecting a current write transaction, you need to first
+    // commit the write and then freeze.
+    // possible better name: freeze_at_transaction_start ?
     SharedRealm freeze();
 
     // Returns a Live copy of the current frozen version of this Realm.

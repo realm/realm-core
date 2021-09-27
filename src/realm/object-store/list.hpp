@@ -85,11 +85,6 @@ public:
     // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
     List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
 
-    // Returns a live copy of this List.
-    // Equivalent to producing a thread-safe reference and resolving it in the live realm.
-    // Will assert that the live_realm is not frozen.
-    List thaw(std::shared_ptr<Realm> const& live_realm) const;
-
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
     // sum() returns 0,

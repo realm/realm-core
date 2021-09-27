@@ -135,22 +135,11 @@ RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_cred
     return to_capi(credentials->provider());
 }
 
-RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
-                                                 realm_http_transport_factory_func_t http_transport_factory,
-                                                 void* transport_factory_userdata,
-                                                 realm_free_userdata_func_t transport_factory_userdata_free)
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport)
 {
     auto* config = new realm_app_config_t;
     config->app_id = app_id;
-    config->transport_generator =
-        [http_transport_factory,
-         userdata = SharedUserdata{transport_factory_userdata, FreeUserdata(transport_factory_userdata_free)}]() {
-            realm_http_transport_t* transport = http_transport_factory(userdata.get());
-            auto scope_exit = util::make_scope_exit([transport]() noexcept {
-                realm_release(transport);
-            });
-            return std::move(transport->transport);
-        };
+    config->transport = *http_transport;
     return config;
 }
 
@@ -416,7 +405,7 @@ RLM_API const char* realm_user_get_local_identity(const realm_user_t* user)
     return (*user)->local_identity().c_str();
 }
 
-RLM_API const char* realm_user_get_device_id(const realm_user_t* user)
+RLM_API char* realm_user_get_device_id(const realm_user_t* user)
 {
     if ((*user)->has_device_id()) {
         return duplicate_string((*user)->device_id());
@@ -443,7 +432,7 @@ RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
     return (*user)->is_logged_in();
 }
 
-RLM_API const char* realm_user_get_profile_data(const realm_user_t* user)
+RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
 {
     return wrap_err([&]() {
         std::string data = bson::Bson((*user)->user_profile().data()).to_string();

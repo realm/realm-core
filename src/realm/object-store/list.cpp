@@ -379,13 +379,13 @@ bool List::operator==(List const& rgt) const noexcept
 
 List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
 {
-    return List(frozen_realm, *frozen_realm->import_copy_of(*m_coll_base));
-}
-
-List List::thaw(std::shared_ptr<Realm> const& live_realm) const
-{
-    REALM_ASSERT(!live_realm->is_frozen());
-    return List(live_realm, *live_realm->import_copy_of(*m_coll_base));
+    auto frozen_list(frozen_realm->import_copy_of(*m_coll_base));
+    if (frozen_list) {
+        return List(frozen_realm, std::move(frozen_list));
+    }
+    else {
+        return List{};
+    }
 }
 
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \

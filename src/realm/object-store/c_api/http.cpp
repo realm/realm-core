@@ -89,7 +89,7 @@ private:
 RLM_API realm_http_transport_t* realm_http_transport_new(void* userdata, realm_free_userdata_func_t free,
                                                          realm_http_request_func_t request_executor)
 {
-    realm_http_transport_t* transport = new realm_http_transport_t;
-    transport->transport.reset(new realm::c_api::CNetworkTransport({userdata, free}, request_executor));
-    return transport;
+    auto transport = std::make_shared<realm::c_api::CNetworkTransport>(realm::c_api::UserdataPtr{userdata, free},
+                                                                       request_executor);
+    return new realm_http_transport_t(std::move(transport));
 }

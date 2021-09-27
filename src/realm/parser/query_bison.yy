@@ -57,9 +57,6 @@ using namespace realm::query_parser;
   END  0  "end of file"
   TRUEPREDICATE "truepredicate"
   FALSEPREDICATE "falsepredicate"
-  SORT "sort"
-  DISTINCT "distinct"
-  LIMIT "limit"
   ASCENDING "ascending"
   DESCENDING "descending"
   SUBQUERY "subquery"
@@ -106,6 +103,9 @@ using namespace realm::query_parser;
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
+%token <std::string> SORT "sort"
+%token <std::string> DISTINCT "distinct"
+%token <std::string> LIMIT "limit"
 %token <std::string> SIZE "@size"
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
@@ -292,6 +292,9 @@ id
     | LIKE                      { $$ = $1; }
     | BETWEEN                   { $$ = $1; }
     | KEY_VAL                   { $$ = $1; }
+    | SORT                      { $$ = $1; }
+    | DISTINCT                  { $$ = $1; }
+    | LIMIT                     { $$ = $1; }
 %%
 
 void

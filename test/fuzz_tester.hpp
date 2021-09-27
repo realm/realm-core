@@ -239,7 +239,7 @@ private:
                          "group, \""
                       << table->get_name() << "\");\n";
         }
-        sync::erase_table(*client.group, table->get_name());
+        client.group->remove_table(table->get_name());
     }
 
     void clear_group(Peer& client)

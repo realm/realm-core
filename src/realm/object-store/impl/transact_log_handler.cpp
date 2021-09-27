@@ -222,11 +222,11 @@ public:
     }
 
     // Removing or renaming things while a Realm is open is never supported
-    bool erase_group_level_table(TableKey)
+    bool erase_class(TableKey)
     {
         schema_error();
     }
-    bool rename_group_level_table(TableKey)
+    bool rename_class(TableKey)
     {
         schema_error();
     }

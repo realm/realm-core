@@ -85,6 +85,9 @@ public:
     std::vector<realm::SyncUserIdentity> identities() const;
     void set_identities(std::vector<SyncUserIdentity>);
 
+    void set_state_and_tokens(SyncUser::State state, const std::string& access_token,
+                              const std::string& refresh_token);
+
     std::string refresh_token() const;
     void set_refresh_token(const std::string& token);
 

@@ -5700,4 +5700,16 @@ TEST(Query_IntPerformance)
     std::cout << "    time sum: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep" << std::endl;
 }
 
+TEST(Query_NotWithEmptyGroup)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col = table->add_column(type_String, "type");
+    table->create_object().set(col, "hello");
+    auto q = table->where().equal(col, "hello").Or().Not().group().end_group();
+    CHECK_EQUAL(q.count(), 1);
+    q = table->where().Not().group().end_group().Or().equal(col, "hello");
+    CHECK_EQUAL(q.count(), 1);
+}
+
 #endif // TEST_QUERY
