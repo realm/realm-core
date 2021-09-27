@@ -2852,11 +2852,6 @@ Transaction::~Transaction()
 }
 
 
-DB::VersionID Transaction::get_version_of_current_transaction()
-{
-    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-}
-
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (m_fake_read_lock_if_immutable) {
