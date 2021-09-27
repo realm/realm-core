@@ -40,6 +40,43 @@
 
 #include <iostream>
 
+struct ThreadSafeSyncError {
+    void operator=(const realm::SyncError& e)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_error = e;
+    }
+    operator bool() const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return bool(m_error);
+    }
+    realm::util::Optional<realm::SyncError> value() const
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_error;
+    }
+
+private:
+    mutable std::mutex m_mutex;
+    realm::util::Optional<realm::SyncError> m_error;
+};
+
+namespace Catch {
+template <>
+struct StringMaker<ThreadSafeSyncError> {
+    static std::string convert(const ThreadSafeSyncError& err)
+    {
+        auto value = err.value();
+        if (!value) {
+            return "No SyncError";
+        }
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->error_code,
+                                   value->is_fatal, value->message);
+    }
+};
+} // namespace Catch
+
 namespace realm {
 struct PartitionPair {
     std::string property_name;
@@ -125,28 +162,43 @@ TEST_CASE("sync: client reset", "[client reset]") {
     SyncTestFile config = get_valid_config();
     config.schema = schema;
     SyncTestFile config2 = get_valid_config();
+    config2.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+        CAPTURE(err.message);
+        CAPTURE(config2.path);
+        // There is a race in the test code of the sync test server where somehow the
+        // remote Realm is also reset sometimes. We ignore it as it shouldn't affect the result.
+    };
     auto make_reset = [&]() -> std::unique_ptr<reset_utils::TestClientReset> {
         return reset_utils::make_test_server_client_reset(config, config2, sync_manager);
     };
 #endif
 
+    // this is just for ease of debugging
+    config.path = config.path + ".local";
+    config2.path = config2.path + ".remote";
+
     SECTION("should trigger error callback when mode is manual") {
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        std::atomic<bool> called{false};
+        ThreadSafeSyncError err;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.is_client_reset_requested());
-            called = true;
+            err = error;
         };
 
-        make_reset()->run();
+        make_reset()
+            ->on_post_reset([&](SharedRealm) {
+                util::EventLoop::main().run_until([&] {
+                    return bool(err);
+                });
+            })
+            ->run();
 
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
+        REQUIRE(err);
+        REQUIRE(err.value()->is_client_reset_requested());
     }
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         CAPTURE(err.message);
+        CAPTURE(config.path);
         FAIL("Error handler should not have been called");
     };
 
@@ -288,7 +340,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
             };
             try {
                 test_reset
-                    ->on_post_local_changes([&](SharedRealm) {
+                    ->on_post_local_changes([&](SharedRealm local) {
+                        local->begin_transaction();
                         throw SessionInterruption("fake interruption during reset");
                     })
                     ->run();
@@ -316,10 +369,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("failing to download a fresh copy results in an error") {
-            std::atomic<bool> called{false};
+            ThreadSafeSyncError err;
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE(error.is_client_reset_requested());
-                called = true;
+                err = error;
             };
             std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
             util::File f(fresh_path, util::File::Mode::mode_Write);
@@ -327,9 +379,16 @@ TEST_CASE("sync: client reset", "[client reset]") {
             f.sync();
             f.close();
 
-            REQUIRE(!called);
-            test_reset->run();
-            REQUIRE(called);
+            REQUIRE(!err);
+            make_reset()
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
+                })
+                ->run();
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
         }
 
         SECTION("should honor encryption key for downloaded Realm") {
@@ -477,12 +536,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("extra local table creates a client reset error") {
-            std::atomic<bool> error_handler_called{false};
+            ThreadSafeSyncError err;
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE(error.is_client_reset_requested());
-                error_handler_called = true;
+                err = error;
             };
-            test_reset
+            make_reset()
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -496,20 +554,23 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     create_object(*local, "object2", partition, {1});
                     create_object(*local, "object2", partition, {2});
                 })
-                ->on_post_reset([](SharedRealm realm) {
+                ->on_post_reset([&](SharedRealm realm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
-            REQUIRE(error_handler_called);
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
         }
 
         SECTION("extra local column creates a client reset error") {
-            std::atomic<bool> error_handler_called{false};
+            ThreadSafeSyncError err;
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE(error.is_client_reset_requested());
-                error_handler_called = true;
+                err = error;
             };
-            test_reset
+            make_reset()
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -526,11 +587,15 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
                     table->begin()->set(table->get_column_key("value2"), 123);
                 })
-                ->on_post_reset([](SharedRealm realm) {
+                ->on_post_reset([&](SharedRealm realm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
-            REQUIRE(error_handler_called);
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
@@ -581,12 +646,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("incompatible schema changes in remote and local transactions") {
-            std::atomic<bool> error_handler_called{false};
+            ThreadSafeSyncError err;
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE(error.is_client_reset_requested());
-                error_handler_called = true;
+                err = error;
             };
-            test_reset
+            make_reset()
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -611,21 +675,24 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([](SharedRealm realm) {
+                ->on_post_reset([&](SharedRealm realm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
-            REQUIRE(error_handler_called);
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
         }
 
         SECTION("primary key type cannot be changed") {
-            std::atomic<bool> error_handler_called{false};
+            ThreadSafeSyncError err;
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                REQUIRE(error.is_client_reset_requested());
-                error_handler_called = true;
+                err = error;
             };
 
-            test_reset
+            make_reset()
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -648,11 +715,15 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         },
                         0, nullptr, nullptr, true);
                 })
-                ->on_post_reset([](SharedRealm realm) {
+                ->on_post_reset([&](SharedRealm realm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
-            REQUIRE(error_handler_called);
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
         }
 
         SECTION("list operations") {

@@ -466,10 +466,15 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err)
 {
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    if (m_state != &State::active) {
+        return;
+    }
     // The download can fail for many reasons. For example:
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
     if (err) {
+        lock.unlock();
         std::string err_msg = "unknown";
         try {
             std::rethrow_exception(err);
@@ -494,20 +499,15 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        std::unique_lock<std::mutex> lock(m_state_mutex);
         m_force_client_reset = true;
         m_client_reset_fresh_copy = std::move(db);
-        // It is possible that during the download, this sync session has already
-        // moved to the inactive state naturally and in that case just revive it.
-        if (m_state != &State::inactive) {
-            CompletionCallbacks callbacks;
-            std::swap(m_completion_callbacks, callbacks);
-            // always swap back, even if advance_state throws
-            auto guard = util::make_scope_exit([&]() noexcept {
-                std::swap(callbacks, m_completion_callbacks);
-            });
-            advance_state(lock, State::inactive);
-        }
+        CompletionCallbacks callbacks;
+        std::swap(m_completion_callbacks, callbacks);
+        // always swap back, even if advance_state throws
+        auto guard = util::make_scope_exit([&]() noexcept {
+            std::swap(callbacks, m_completion_callbacks);
+        });
+        advance_state(lock, State::inactive); // unlocks the lock
     }
     revive_if_needed();
 }
@@ -544,9 +544,13 @@ void SyncSession::handle_error(SyncError error)
                 case ClientResyncMode::SeamlessLoss: {
                     REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                     std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
-                    auto self_ref = shared_from_this();
-                    m_config.get_fresh_realm_for_path(fresh_path, [self_ref](DBRef db, std::exception_ptr err) {
-                        self_ref->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                    auto weak_self_ref = weak_from_this();
+                    m_config.get_fresh_realm_for_path(fresh_path, [weak_self_ref](DBRef db, std::exception_ptr err) {
+                        // the original session may have been closed during download of the reset realm
+                        // and in that case do nothing
+                        if (auto strong = weak_self_ref.lock()) {
+                            strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                        }
                     });
                     return;
                 }
@@ -687,35 +691,37 @@ void SyncSession::handle_error(SyncError error)
         error.is_unrecognized_by_client = true;
     }
 
-    // Dont't bother invoking m_config.error_handler if the sync is inactive.
-    // It does not make sense to call the handler when the session is closed.
-    if (m_state == &State::inactive) {
-        return;
-    }
-
-    switch (next_state) {
-        case NextStateAfterError::none:
-            if (m_config.cancel_waits_on_nonfatal_error) {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                cancel_pending_waits(lock, error.error_code);
-            }
-            break;
-        case NextStateAfterError::inactive: {
-            if (error.is_client_reset_requested()) {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                cancel_pending_waits(lock, error.error_code);
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                advance_state(lock, State::inactive);
-            }
-            break;
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        // Dont't bother invoking m_config.error_handler if the sync is inactive.
+        // It does not make sense to call the handler when the session is closed.
+        if (m_state == &State::inactive) {
+            return;
         }
-        case NextStateAfterError::error: {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            cancel_pending_waits(lock, error.error_code);
-            break;
+
+        switch (next_state) {
+            case NextStateAfterError::none:
+                if (m_config.cancel_waits_on_nonfatal_error) {
+                    cancel_pending_waits(lock, error.error_code); // unlocks the mutex
+                }
+                break;
+            case NextStateAfterError::inactive: {
+                if (error.is_client_reset_requested()) {
+                    cancel_pending_waits(lock, error.error_code); // unlocks the mutex
+                }
+                // reacquire the lock if the above cancel_pending_waits released it
+                if (!lock.owns_lock()) {
+                    lock.lock();
+                }
+                if (m_state != &State::inactive) { // check this again now that we have the lock
+                    advance_state(lock, State::inactive);
+                }
+                break;
+            }
+            case NextStateAfterError::error: {
+                cancel_pending_waits(lock, error.error_code);
+                break;
+            }
         }
     }
     if (m_config.error_handler) {

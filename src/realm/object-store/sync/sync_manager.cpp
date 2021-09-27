@@ -639,7 +639,12 @@ void SyncManager::unregister_session(const std::string& path)
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
     auto it = m_sessions.find(path);
-    REALM_ASSERT(it != m_sessions.end());
+    if (it == m_sessions.end()) {
+        // There was a race to unregister and there's nothing left to do here
+        // this can happen if the sync session is closing down at the same time
+        // that a local Realm reference is being cleaned up.
+        return;
+    }
 
     // If the session has an active external reference, leave it be. This will happen if the session
     // moves to an inactive state while still externally reference, for instance, as a result of
