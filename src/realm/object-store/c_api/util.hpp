@@ -16,7 +16,19 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
     catch (...) {
         set_last_exception(std::current_exception());
         return {};
-    };
+    }
+}
+
+template <class F>
+inline auto wrap_err(F&& f, const decltype(std::declval<F>()())& e)
+{
+    try {
+        return f();
+    }
+    catch (...) {
+        set_last_exception(std::current_exception());
+        return e;
+    }
 }
 
 inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, TableKey table_key)

@@ -2267,6 +2267,24 @@ typedef enum realm_sync_client_reconnect_mode {
     RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING
 } realm_sync_client_reconnect_mode_e;
 
+typedef enum realm_sync_session_state {
+    RLM_SYNC_SESSION_STATE_ACTIVE,
+    RLM_SYNC_SESSION_STATE_DYING,
+    RLM_SYNC_SESSION_STATE_INACTIVE,
+    RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN
+} realm_sync_session_state_e;
+
+typedef enum realm_sync_connection_state {
+    RLM_SYNC_CONNECTION_STATE_DISCONNECTED,
+    RLM_SYNC_CONNECTION_STATE_CONNECTING,
+    RLM_SYNC_CONNECTION_STATE_CONNECTED
+} realm_sync_connection_state_e;
+
+typedef enum realm_sync_progress_direction {
+    RLM_SYNC_PROGRESS_DIRECTION_UPLOAD,
+    RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD
+} realm_sync_progress_direction_e;
+
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void);
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*);
 RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
@@ -2288,5 +2306,104 @@ RLM_API void realm_sync_client_config_set_ping_keepalive_period(realm_sync_clien
 RLM_API void realm_sync_client_config_set_pong_keepalive_timeout(realm_sync_client_config_t*, uint64_t);
 RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*, uint64_t);
 
+/**
+ * Get the sync session for a specific realm.
+ *
+ * This function will not fail if the realm wasn't open with a sync configuration in place,
+ * but just return NULL;
+ *
+ * @return A non-null pointer if a session exists.
+ */
+RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t*);
+
+RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t*);
+
+RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t*);
+
+RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t*);
+
+RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t*);
+
+/**
+ * Get the filesystem path of the realm file backing this session.
+ *
+ * @return File path.
+ */
+RLM_API const char* realm_sync_session_get_file_path(const realm_sync_session_t*);
+
+/**
+ * Ask the session to pause synchronization.
+ *
+ * No-op if the session is already inactive.
+ *
+ * @return true if no exceptions occurred.
+ */
+RLM_API bool realm_sync_session_pause(realm_sync_session_t*);
+
+/**
+ * Ask the session to resume synchronization.
+ *
+ * No-op if the session is already active.
+ *
+ * @return true if no exceptions occurred.
+ */
+RLM_API bool realm_sync_session_resume(realm_sync_session_t*);
+
+/**
+ * Register a callback that will be invoked every time the session's connection state changes.
+ *
+ * @return A token value that can be used to unregiser the callback, or -1 if an error occurred.
+ */
+RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
+    realm_sync_session_t*,
+    void (*)(void* userdata, realm_sync_connection_state_e old_state, realm_sync_connection_state_e new_state),
+    void* userdata, realm_free_userdata_func_t userdata_free);
+
+/**
+ * Unregisters a connection state change callback for the specified token.
+ *
+ * @return true if no exceptions occurred.
+ */
+RLM_API bool realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t*, uint64_t token);
+
+/**
+ * Register a callback that will be invoked every time the session reports progress.
+ *
+ * @param is_streaming If true, then the notifier will be called forever, and will
+ *                     always contain the most up-to-date number of downloadable or uploadable bytes.
+ *                     Otherwise, the number of downloaded or uploaded bytes will always be reported
+ *                     relative to the number of downloadable or uploadable bytes at the point in time
+ *                     when the notifier was registered.
+ * @return A token value that can be used to unregiser the notifier, or -1 if an error occurred.
+ */
+RLM_API uint64_t realm_sync_session_register_progress_notifier(
+    realm_sync_session_t*, void (*)(void* userdata, uint64_t transferred_bytes, uint64_t transferrable_bytes),
+    realm_sync_progress_direction_e, bool is_streaming, void* userdata, realm_free_userdata_func_t userdata_free);
+
+/**
+ * Unregisters a progress notifier for the specified token.
+ *
+ * @return true if no exceptions occurred.
+ */
+RLM_API bool realm_sync_session_unregister_progress_notifier(realm_sync_session_t*, uint64_t token);
+
+/**
+ * Register a callback that will be invoked when all pending downloads have completed.
+ *
+ * @return true if no exceptions occurred
+ */
+RLM_API bool realm_sync_session_wait_for_download_completion(realm_sync_session_t*,
+                                                             void (*)(void* userdata, const realm_error_t*),
+                                                             void* userdata,
+                                                             realm_free_userdata_func_t userdata_free);
+
+/**
+ * Register a callback that will be invoked when all pending uploads have completed.
+ *
+ * @return true if no exceptions occurred
+ */
+RLM_API bool realm_sync_session_wait_for_upload_completion(realm_sync_session_t*,
+                                                           void (*)(void* userdata, const realm_error_t*),
+                                                           void* userdata, realm_free_userdata_func_t userdata_free);
 
 #endif // REALM_H
