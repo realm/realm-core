@@ -48,7 +48,7 @@ class BacklinkColumn;
 template <class>
 class BacklinkCount;
 class BinaryColumy;
-class ConstTableView;
+class TableView;
 class Group;
 class SortDescriptor;
 class StringIndex;
@@ -409,27 +409,26 @@ public:
     ObjKey find_first_uuid(ColKey col_key, UUID value) const;
 
     //    TableView find_all_link(Key target_key);
-    //    ConstTableView find_all_link(Key target_key) const;
     TableView find_all_int(ColKey col_key, int64_t value);
-    ConstTableView find_all_int(ColKey col_key, int64_t value) const;
+    TableView find_all_int(ColKey col_key, int64_t value) const;
     TableView find_all_bool(ColKey col_key, bool value);
-    ConstTableView find_all_bool(ColKey col_key, bool value) const;
+    TableView find_all_bool(ColKey col_key, bool value) const;
     TableView find_all_float(ColKey col_key, float value);
-    ConstTableView find_all_float(ColKey col_key, float value) const;
+    TableView find_all_float(ColKey col_key, float value) const;
     TableView find_all_double(ColKey col_key, double value);
-    ConstTableView find_all_double(ColKey col_key, double value) const;
+    TableView find_all_double(ColKey col_key, double value) const;
     TableView find_all_string(ColKey col_key, StringData value);
-    ConstTableView find_all_string(ColKey col_key, StringData value) const;
+    TableView find_all_string(ColKey col_key, StringData value) const;
     TableView find_all_binary(ColKey col_key, BinaryData value);
-    ConstTableView find_all_binary(ColKey col_key, BinaryData value) const;
+    TableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
-    ConstTableView find_all_null(ColKey col_key) const;
+    TableView find_all_null(ColKey col_key) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
-    ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
+    TableView get_sorted_view(ColKey col_key, bool ascending = true) const;
 
     TableView get_sorted_view(SortDescriptor order);
-    ConstTableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(SortDescriptor order) const;
 
     // Report the current content version. This is a 64-bit value which is bumped whenever
     // the content in the table changes.
@@ -523,12 +522,12 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(ConstTableView* tv = nullptr)
+    Query where(TableView* tv = nullptr)
     {
         return Query(m_own_ref, tv);
     }
 
-    Query where(ConstTableView* tv = nullptr) const
+    Query where(TableView* tv = nullptr) const
     {
         return Query(m_own_ref, tv);
     }
@@ -833,7 +832,7 @@ private:
     template <class>
     friend class SimpleQuerySupport;
     friend class LangBindHelper;
-    friend class ConstTableView;
+    friend class TableView;
     template <class T>
     friend class Columns;
     friend class Columns<StringData>;

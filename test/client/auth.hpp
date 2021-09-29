@@ -26,7 +26,6 @@
 #include <deque>
 #include <random>
 
-#include <realm/util/string_view.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/optional.hpp>

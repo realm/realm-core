@@ -161,7 +161,7 @@ void all_client_files(std::set<LogicalClientType>& types)
 }
 
 
-bool parse_client_types(util::StringView string, std::set<LogicalClientType>& types)
+bool parse_client_types(std::string_view string, std::set<LogicalClientType>& types)
 {
     std::set<LogicalClientType> types_2;
     for (char ch : string) {

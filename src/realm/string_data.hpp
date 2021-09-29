@@ -162,6 +162,10 @@ public:
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
     explicit operator bool() const noexcept;
+    explicit operator std::string_view() const noexcept
+    {
+        return std::string_view(m_data);
+    }
 
     /// If the StringData is NULL, the hash is 0. Otherwise, the function
     /// `murmur2_or_cityhash()` is called on the data.

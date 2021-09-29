@@ -2793,11 +2793,6 @@ std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPol
     return tv.clone_for_handover(this, policy);
 }
 
-std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, PayloadPolicy policy)
-{
-    return tv.clone_for_handover(this, policy);
-}
-
 inline DB::DB(const DBOptions& options)
     : m_key(options.encryption_key)
     , m_upgrade_callback(std::move(options.upgrade_callback))

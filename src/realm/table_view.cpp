@@ -25,7 +25,7 @@
 
 using namespace realm;
 
-void ConstTableView::KeyValues::copy_from(const KeyValues& rhs)
+void TableView::KeyValues::copy_from(const KeyValues& rhs)
 {
     Allocator& rhs_alloc = rhs.get_alloc();
 
@@ -41,7 +41,7 @@ void ConstTableView::KeyValues::copy_from(const KeyValues& rhs)
     }
 }
 
-void ConstTableView::KeyValues::move_from(KeyValues& rhs)
+void TableView::KeyValues::move_from(KeyValues& rhs)
 {
     // Destroy current tree
     destroy();
@@ -53,7 +53,7 @@ void ConstTableView::KeyValues::move_from(KeyValues& rhs)
     rhs.m_size = 0;
 }
 
-ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPolicy mode)
+TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy mode)
     : m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
 {
@@ -74,8 +74,7 @@ ConstTableView::ConstTableView(ConstTableView& src, Transaction* tr, PayloadPoli
     else
         m_last_seen_versions.clear();
     m_table = tr->import_copy_of(src.m_table);
-    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
-    m_linkset_source = tr->import_copy_of(src.m_linkset_source);
+    m_collection_source = tr->import_copy_of(src.m_collection_source);
     if (src.m_source_column_key) {
         m_linked_table = tr->import_copy_of(src.m_linked_table);
     }
@@ -125,7 +124,7 @@ struct Aggregator<T, act_Max> {
 };
 
 template <Action action, typename T, typename R>
-R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
+R TableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
     size_t non_nulls = 0;
 
@@ -189,7 +188,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 }
 
 template <typename T>
-size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
+size_t TableView::aggregate_count(ColKey column_key, T count_target) const
 {
     REALM_ASSERT(m_table->valid_column(column_key));
 
@@ -224,7 +223,7 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
 // Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume
 // numeric types that support arithmetic (+, /, etc).
 template <class C>
-Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
+Timestamp TableView::minmax_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     Timestamp best_value;
     ObjKey best_key;
@@ -246,7 +245,7 @@ Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key
 }
 
 // sum
-int64_t ConstTableView::sum_int(ColKey column_key) const
+int64_t TableView::sum_int(ColKey column_key) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_key, 0);
@@ -254,126 +253,126 @@ int64_t ConstTableView::sum_int(ColKey column_key) const
         return aggregate<act_Sum, int64_t, int64_t>(column_key, 0);
     }
 }
-double ConstTableView::sum_float(ColKey column_key) const
+double TableView::sum_float(ColKey column_key) const
 {
     return aggregate<act_Sum, float, double>(column_key);
 }
-double ConstTableView::sum_double(ColKey column_key) const
+double TableView::sum_double(ColKey column_key) const
 {
     return aggregate<act_Sum, double, double>(column_key);
 }
 
-Decimal128 ConstTableView::sum_decimal(ColKey column_key) const
+Decimal128 TableView::sum_decimal(ColKey column_key) const
 {
     return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
 }
 
-Decimal128 ConstTableView::sum_mixed(ColKey column_key) const
+Decimal128 TableView::sum_mixed(ColKey column_key) const
 {
     return aggregate<act_Sum, Mixed, Decimal128>(column_key);
 }
 
 // Maximum
-int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
+int64_t TableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float ConstTableView::maximum_float(ColKey column_key, ObjKey* return_key) const
+float TableView::maximum_float(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, float, float>(column_key, nullptr, return_key);
 }
-double ConstTableView::maximum_double(ColKey column_key, ObjKey* return_key) const
+double TableView::maximum_double(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, double, double>(column_key, nullptr, return_key);
 }
-Timestamp ConstTableView::maximum_timestamp(ColKey column_key, ObjKey* return_key) const
+Timestamp TableView::maximum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     return minmax_timestamp<realm::Greater>(column_key, return_key);
 }
-Decimal128 ConstTableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
+Decimal128 TableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_key);
 }
-Mixed ConstTableView::maximum_mixed(ColKey column_key, ObjKey* return_key) const
+Mixed TableView::maximum_mixed(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Max, Mixed, Mixed>(column_key, nullptr, return_key);
 }
 
 // Minimum
-int64_t ConstTableView::minimum_int(ColKey column_key, ObjKey* return_key) const
+int64_t TableView::minimum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_key);
 }
-float ConstTableView::minimum_float(ColKey column_key, ObjKey* return_key) const
+float TableView::minimum_float(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, float, float>(column_key, nullptr, return_key);
 }
-double ConstTableView::minimum_double(ColKey column_key, ObjKey* return_key) const
+double TableView::minimum_double(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, double, double>(column_key, nullptr, return_key);
 }
-Timestamp ConstTableView::minimum_timestamp(ColKey column_key, ObjKey* return_key) const
+Timestamp TableView::minimum_timestamp(ColKey column_key, ObjKey* return_key) const
 {
     return minmax_timestamp<realm::Less>(column_key, return_key);
 }
-Decimal128 ConstTableView::minimum_decimal(ColKey column_key, ObjKey* return_key) const
+Decimal128 TableView::minimum_decimal(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_key);
 }
-Mixed ConstTableView::minimum_mixed(ColKey column_key, ObjKey* return_key) const
+Mixed TableView::minimum_mixed(ColKey column_key, ObjKey* return_key) const
 {
     return aggregate<act_Min, Mixed, Mixed>(column_key, nullptr, return_key);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
-double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
+double TableView::average_int(ColKey column_key, size_t* value_count) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate<act_Average, util::Optional<int64_t>, double>(column_key, value_count);
     else
         return aggregate<act_Average, int64_t, double>(column_key, value_count);
 }
-double ConstTableView::average_float(ColKey column_key, size_t* value_count) const
+double TableView::average_float(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, float, double>(column_key, value_count);
 }
-double ConstTableView::average_double(ColKey column_key, size_t* value_count) const
+double TableView::average_double(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, double, double>(column_key, value_count);
 }
-Decimal128 ConstTableView::average_decimal(ColKey column_key, size_t* value_count) const
+Decimal128 TableView::average_decimal(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, Decimal128, Decimal128>(column_key, value_count);
 }
-Decimal128 ConstTableView::average_mixed(ColKey column_key, size_t* value_count) const
+Decimal128 TableView::average_mixed(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, Mixed, Decimal128>(column_key, value_count);
 }
 
 // Count
-size_t ConstTableView::count_int(ColKey column_key, int64_t target) const
+size_t TableView::count_int(ColKey column_key, int64_t target) const
 {
     if (m_table->is_nullable(column_key))
         return aggregate_count<util::Optional<int64_t>>(column_key, target);
     else
         return aggregate_count<int64_t>(column_key, target);
 }
-size_t ConstTableView::count_float(ColKey column_key, float target) const
+size_t TableView::count_float(ColKey column_key, float target) const
 {
     return aggregate_count<float>(column_key, target);
 }
-size_t ConstTableView::count_double(ColKey column_key, double target) const
+size_t TableView::count_double(ColKey column_key, double target) const
 {
     return aggregate_count<double>(column_key, target);
 }
 
-size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) const
+size_t TableView::count_timestamp(ColKey column_key, Timestamp target) const
 {
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
@@ -393,18 +392,18 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     return count;
 }
 
-size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
+size_t TableView::count_decimal(ColKey column_key, Decimal128 target) const
 {
     return aggregate_count<Decimal128>(column_key, target);
 }
 
-size_t ConstTableView::count_mixed(ColKey column_key, Mixed target) const
+size_t TableView::count_mixed(ColKey column_key, Mixed target) const
 {
     return aggregate_count<Mixed>(column_key, target);
 }
 
 
-void ConstTableView::to_json(std::ostream& out, size_t link_depth) const
+void TableView::to_json(std::ostream& out, size_t link_depth) const
 {
     // Represent table as list of objects
     out << "[";
@@ -426,13 +425,10 @@ void ConstTableView::to_json(std::ostream& out, size_t link_depth) const
     out << "]";
 }
 
-bool ConstTableView::depends_on_deleted_object() const
+bool TableView::depends_on_deleted_object() const
 {
-    if (m_linklist_source && !m_linklist_source->is_attached()) {
-        return true;
-    }
-    if (m_linkset_source && !m_linkset_source->is_attached()) {
-        return true;
+    if (m_collection_source) {
+        return !m_collection_source->get_owning_obj().is_valid();
     }
 
     if (m_source_column_key && !(m_linked_table && m_linked_table->is_valid(m_linked_obj_key))) {
@@ -444,23 +440,9 @@ bool ConstTableView::depends_on_deleted_object() const
     return false;
 }
 
-void ConstTableView::get_dependencies(TableVersions& ret) const
+void TableView::get_dependencies(TableVersions& ret) const
 {
-    if (m_linklist_source) {
-        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linklist_source->is_attached()) {
-            Table& table = *m_linklist_source->get_target_table();
-            ret.emplace_back(table.get_key(), table.get_content_version());
-        }
-    }
-    else if (m_linkset_source) {
-        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linkset_source->is_attached()) {
-            Table& table = *m_linkset_source->get_target_table();
-            ret.emplace_back(table.get_key(), table.get_content_version());
-        }
-    }
-    else if (m_source_column_key) {
+    if (m_source_column_key) {
         // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
         if (m_linked_table) {
             ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
@@ -470,7 +452,7 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
         m_query.get_outside_versions(ret);
     }
     else {
-        // This TableView was created by Table::get_distinct_view()
+        // This TableView was created by Table::get_distinct_view() or get_sorted_view() on collections
         ret.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
 
@@ -480,20 +462,20 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
     }
 }
 
-bool ConstTableView::is_in_sync() const
+bool TableView::is_in_sync() const
 {
     return !m_table ? false : m_last_seen_versions == get_dependency_versions();
 }
 
-void ConstTableView::sync_if_needed() const
+void TableView::sync_if_needed() const
 {
     if (!is_in_sync()) {
         // FIXME: Is this a reasonable handling of constness?
-        const_cast<ConstTableView*>(this)->do_sync();
+        const_cast<TableView*>(this)->do_sync();
     }
 }
 
-void ConstTableView::update_query(const Query& q)
+void TableView::update_query(const Query& q)
 {
     REALM_ASSERT(m_query.m_table);
     REALM_ASSERT(m_query.m_table == q.m_table);
@@ -501,32 +483,6 @@ void ConstTableView::update_query(const Query& q)
     m_query = q;
     do_sync();
 }
-
-void TableView::remove(size_t row_ndx)
-{
-    m_table.check();
-    REALM_ASSERT(row_ndx < m_key_values.size());
-
-    // If distinct is applied then removing an object may leave us out of sync
-    // if there's another object with the same value in the distinct column
-    // as the removed object
-    bool sync_to_keep =
-        m_last_seen_versions == get_dependency_versions() && !m_descriptor_ordering.will_apply_distinct();
-
-    ObjKey key = get_key(row_ndx);
-
-    // Update refs
-    m_key_values.erase(row_ndx);
-
-    // Delete row in origin table
-    get_parent()->remove_object(key);
-
-    // It is important to not accidentally bring us in sync, if we were
-    // not in sync to start with:
-    if (sync_to_keep)
-        m_last_seen_versions = get_dependency_versions();
-}
-
 
 void TableView::clear()
 {
@@ -548,14 +504,14 @@ void TableView::clear()
         m_last_seen_versions = get_dependency_versions();
 }
 
-void ConstTableView::distinct(ColKey column)
+void TableView::distinct(ColKey column)
 {
     distinct(DistinctDescriptor({{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void ConstTableView::distinct(DistinctDescriptor columns)
+void TableView::distinct(DistinctDescriptor columns)
 {
     m_descriptor_ordering.append_distinct(std::move(columns));
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
@@ -563,13 +519,13 @@ void ConstTableView::distinct(DistinctDescriptor columns)
     do_sync();
 }
 
-void ConstTableView::limit(LimitDescriptor lim)
+void TableView::limit(LimitDescriptor lim)
 {
     m_descriptor_ordering.append_limit(std::move(lim));
     do_sync();
 }
 
-void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
+void TableView::apply_descriptor_ordering(const DescriptorOrdering& new_ordering)
 {
     m_descriptor_ordering = new_ordering;
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
@@ -577,19 +533,19 @@ void ConstTableView::apply_descriptor_ordering(const DescriptorOrdering& new_ord
     do_sync();
 }
 
-std::string ConstTableView::get_descriptor_ordering_description() const
+std::string TableView::get_descriptor_ordering_description() const
 {
     return m_descriptor_ordering.get_description(m_table);
 }
 
 // Sort according to one column
-void ConstTableView::sort(ColKey column, bool ascending)
+void TableView::sort(ColKey column, bool ascending)
 {
     sort(SortDescriptor({{column}}, {ascending}));
 }
 
 // Sort according to multiple columns, user specified order on each column
-void ConstTableView::sort(SortDescriptor order)
+void TableView::sort(SortDescriptor order)
 {
     m_descriptor_ordering.append_sort(std::move(order), SortDescriptor::MergeMode::prepend);
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
@@ -598,7 +554,7 @@ void ConstTableView::sort(SortDescriptor order)
 }
 
 
-void ConstTableView::do_sync()
+void TableView::do_sync()
 {
     util::CriticalSection cs(m_race_detector);
     // This TableView can be "born" from 4 different sources:
@@ -609,17 +565,12 @@ void ConstTableView::do_sync()
     // Here we sync with the respective source.
     m_last_seen_versions.clear();
 
-    if (m_linklist_source) {
+    if (m_collection_source) {
         m_key_values.clear();
-        std::for_each(m_linklist_source->begin(), m_linklist_source->end(), [this](ObjKey key) {
-            m_key_values.add(key);
-        });
-    }
-    else if (m_linkset_source) {
-        m_key_values.clear();
-        std::for_each(m_linkset_source->begin(), m_linkset_source->end(), [this](ObjKey key) {
-            m_key_values.add(key);
-        });
+        auto sz = m_collection_source->size();
+        for (size_t i = 0; i < sz; i++) {
+            m_key_values.add(m_collection_source->get_key(i));
+        }
     }
     else if (m_source_column_key) {
         m_key_values.clear();
@@ -648,7 +599,7 @@ void ConstTableView::do_sync()
 
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
-        m_query.find_all(*const_cast<ConstTableView*>(this), m_start, m_end, m_limit);
+        m_query.find_all(*const_cast<TableView*>(this), m_start, m_end, m_limit);
     }
 
     do_sort(m_descriptor_ordering);
@@ -656,7 +607,7 @@ void ConstTableView::do_sync()
     m_last_seen_versions = get_dependency_versions();
 }
 
-void ConstTableView::do_sort(const DescriptorOrdering& ordering)
+void TableView::do_sort(const DescriptorOrdering& ordering)
 {
     if (ordering.is_empty())
         return;
@@ -704,15 +655,12 @@ void ConstTableView::do_sort(const DescriptorOrdering& ordering)
         m_key_values.add(null_key);
 }
 
-bool ConstTableView::is_in_table_order() const
+bool TableView::is_in_table_order() const
 {
     if (!m_table) {
         return false;
     }
-    else if (m_linklist_source) {
-        return false;
-    }
-    else if (m_linkset_source) {
+    else if (m_collection_source) {
         return false;
     }
     else if (m_source_column_key) {

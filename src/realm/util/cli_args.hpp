@@ -2,8 +2,8 @@
 #define REALM_UTIL_CLI_ARGS_HPP
 
 #include <vector>
-
-#include "realm/util/string_view.hpp"
+#include <string_view>
+#include <stdexcept>
 
 namespace realm::util {
 
@@ -13,8 +13,8 @@ public:
     void add_argument(CliFlag* flag);
 
     struct ParseResult {
-        StringView program_name;
-        std::vector<StringView> unmatched_arguments;
+        std::string_view program_name;
+        std::vector<std::string_view> unmatched_arguments;
     };
 
     ParseResult parse(int argc, const char** argv);
@@ -27,7 +27,7 @@ class CliFlag {
 public:
     virtual ~CliFlag() = default;
 
-    explicit CliFlag(CliArgumentParser& parser, StringView name, char short_name = '\0')
+    explicit CliFlag(CliArgumentParser& parser, std::string_view name, char short_name = '\0')
         : m_name(name)
         , m_short_name(short_name)
     {
@@ -39,7 +39,7 @@ public:
         return m_found;
     }
 
-    StringView name() const noexcept
+    std::string_view name() const noexcept
     {
         return m_name;
     }
@@ -51,7 +51,7 @@ public:
 protected:
     friend class CliArgumentParser;
 
-    virtual void assign(StringView)
+    virtual void assign(std::string_view)
     {
         m_found = true;
     }
@@ -63,7 +63,7 @@ protected:
 
 private:
     bool m_found = false;
-    StringView m_name;
+    std::string_view m_name;
     char m_short_name = '\0';
 };
 
@@ -71,7 +71,7 @@ class CliArgument : public CliFlag {
 public:
     using CliFlag::CliFlag;
 
-    StringView value() const noexcept
+    std::string_view value() const noexcept
     {
         return m_value;
     }
@@ -82,7 +82,7 @@ public:
 protected:
     friend class CliArgumentParser;
 
-    void assign(StringView value) override
+    void assign(std::string_view value) override
     {
         CliFlag::assign(value);
         m_value = value;
@@ -94,7 +94,7 @@ protected:
     }
 
 private:
-    StringView m_value;
+    std::string_view m_value;
 };
 
 class CliParseException : public std::runtime_error {

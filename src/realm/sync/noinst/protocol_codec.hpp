@@ -8,7 +8,6 @@
 #include <string>
 
 #include <realm/util/optional.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/from_chars.hpp>

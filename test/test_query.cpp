@@ -5291,7 +5291,8 @@ TEST(Query_Sort_And_Requery)
     CHECK_EQUAL(9, tv3[3].get<Int>(col_int));
 
     // Test that remove() maintains order
-    tv3.remove(0);
+    tv3.get(0).remove();
+    tv3.sync_if_needed();
     // q5 and q3 should behave the same.
     Query q5 = table.where(&tv2).not_equal(col_str, "X");
     TableView tv5 = q5.find_all();

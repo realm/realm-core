@@ -224,7 +224,7 @@ public:
         n_write_errors++;
     }
 
-    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const util::StringView*) override
+    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const std::string_view*) override
     {
         n_protocol_errors++;
     }

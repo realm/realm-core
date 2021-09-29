@@ -12,7 +12,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/network.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/string_data.hpp>
 
 namespace realm {
@@ -130,11 +129,11 @@ public:
     template <class A, class B>
     bool operator()(const A& a, const B& b) const noexcept
     {
-        return comp(StringView(a), StringView(b));
+        return comp(std::string_view(a), std::string_view(b));
     }
 
 private:
-    bool comp(StringView a, StringView b) const noexcept
+    bool comp(std::string_view a, std::string_view b) const noexcept
     {
         auto cmp = [](char lhs, char rhs) {
             return std::tolower(lhs, std::locale::classic()) < std::tolower(rhs, std::locale::classic());
@@ -517,7 +516,7 @@ private:
 };
 
 
-std::string make_http_host(bool is_ssl, StringView address, std::uint_fast16_t port);
+std::string make_http_host(bool is_ssl, std::string_view address, std::uint_fast16_t port);
 
 } // namespace util
 } // namespace realm
