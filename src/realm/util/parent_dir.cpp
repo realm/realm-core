@@ -36,7 +36,7 @@ std::string util::parent_dir(const std::string& path)
     return {};
 #elif HAVE_STD_FILESYSTEM
     namespace fs = std::filesystem;
-    return fs::path(path).parent_path().u8string(); // Throws
+    return fs::path(path).parent_path().string(); // Throws
 #else
     static_cast<void>(path);
     throw util::runtime_error{"Not yet supported"};

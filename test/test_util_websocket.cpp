@@ -134,7 +134,7 @@ public:
         done = false;
         m_read_buffer.resize(size);
 
-        auto handler = [=](std::error_code, size_t) {
+        auto handler = [this](std::error_code, size_t) {
             done = true;
             result = std::string{m_read_buffer.begin(), m_read_buffer.end()};
         };
@@ -147,7 +147,7 @@ public:
         done = false;
         m_read_buffer.resize(size);
 
-        auto handler = [=](std::error_code ec, size_t actual_size) {
+        auto handler = [this](std::error_code ec, size_t actual_size) {
             if (!ec) {
                 done = true;
                 result = std::string{m_read_buffer.begin(), m_read_buffer.begin() + actual_size};

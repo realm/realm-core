@@ -46,9 +46,9 @@ protected:
 };
 
 template <class T>
-class Set final : public CollectionBaseImpl<SetBase> {
+class Set final : public CollectionBaseImpl<SetBase, Set<T>> {
 public:
-    using Base = CollectionBaseImpl<SetBase>;
+    using Base = CollectionBaseImpl<SetBase, Set>;
     using value_type = T;
     using iterator = CollectionIterator<Set<T>>;
 
@@ -509,7 +509,7 @@ inline Set<T>::Set(const Set& other)
 {
     // Reset the content version so we can rely on init_from_parent() being
     // called lazily when the accessor is used.
-    reset_content_version();
+    Base::reset_content_version();
 }
 
 template <class T>
@@ -531,7 +531,7 @@ inline Set<T>& Set<T>::operator=(const Set& other)
         // Just reset the pointer and rely on init_from_parent() being called
         // when the accessor is actually used.
         m_tree.reset();
-        reset_content_version();
+        Base::reset_content_version();
     }
 
     return *this;

@@ -3283,7 +3283,7 @@ TEST_CASE("notifications: results") {
     }
 
     SECTION("notifier query rerunning") {
-        results = Results(r, 0 <= table->column<Link>(col_link));
+        results = Results(r, table->column<Link>(col_link) != null());
         _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> notifier =
             std::make_shared<_impl::ResultsNotifier>(results);
         _impl::RealmCoordinator::register_notifier(notifier);

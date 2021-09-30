@@ -58,9 +58,9 @@ public:
     }
 
     template <typename Other>
-    bool operator==(Other const& it) const noexcept;
+    bool operator==(ChunkedRangeVectorIterator<Other> const& it) const noexcept;
     template <typename Other>
-    bool operator!=(Other const& it) const noexcept;
+    bool operator!=(ChunkedRangeVectorIterator<Other> const& it) const noexcept;
 
     ChunkedRangeVectorIterator& operator++() noexcept;
     ChunkedRangeVectorIterator operator++(int) noexcept;
@@ -332,14 +332,16 @@ std::reverse_iterator<Iterator> make_reverse_iterator(Iterator it) noexcept
 namespace _impl {
 template <typename T>
 template <typename OtherIterator>
-inline bool ChunkedRangeVectorIterator<T>::operator==(OtherIterator const& it) const noexcept
+inline bool
+ChunkedRangeVectorIterator<T>::operator==(ChunkedRangeVectorIterator<OtherIterator> const& it) const noexcept
 {
     return m_outer == it.outer() && m_inner == it.operator->();
 }
 
 template <typename T>
 template <typename OtherIterator>
-inline bool ChunkedRangeVectorIterator<T>::operator!=(OtherIterator const& it) const noexcept
+inline bool
+ChunkedRangeVectorIterator<T>::operator!=(ChunkedRangeVectorIterator<OtherIterator> const& it) const noexcept
 {
     return !(*this == it);
 }

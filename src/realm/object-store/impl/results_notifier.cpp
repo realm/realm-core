@@ -313,7 +313,7 @@ void ListResultsNotifier::calculate_changes()
             }
         }
 
-        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [=](size_t index) {
+        m_change = CollectionChangeBuilder::calculate(m_previous_indices, *m_run_indices, [&](size_t index) {
             return m_change.modifications.contains(index);
         });
     }
