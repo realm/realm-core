@@ -85,8 +85,13 @@ TestFile::TestFile()
 TestFile::~TestFile()
 {
     if (!m_persist) {
-        util::File::try_remove(path);
-        util::try_remove_dir_recursive(m_temp_dir);
+        try {
+            util::File::try_remove(path);
+            util::try_remove_dir_recursive(m_temp_dir);
+        }
+        catch (...) {
+            // clean up is best effort, ignored.
+        }
     }
 }
 
