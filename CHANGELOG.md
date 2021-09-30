@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Added methods to freeze and thaw realms, objects, results and lists.
+* Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
 
 ### Fixed
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
