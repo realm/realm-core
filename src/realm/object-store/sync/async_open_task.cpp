@@ -71,10 +71,11 @@ void AsyncOpenTask::cancel()
     }
 }
 
-uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback)
+uint64_t
+AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback> callback)
 {
     if (auto session = m_session.load()) {
-        return session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
+        return session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
     }
     else {
         return 0;

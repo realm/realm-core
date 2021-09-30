@@ -10,6 +10,12 @@
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
+* Several typedefs in `realm/object-store/sync/sync_session.hpp` were renamed:
+  * `realm::SyncSession::SyncSessionStateCallback` -> `realm::SyncSession::StateChangeCallback`
+  * `realm::SyncSession::ConnectionStateCallback` -> `realm::SyncSession::ConnectionStateChangeCallback`
+  * `realm::SyncSessionTransactCallback` -> `realm::SyncSession::TransactionCallback`
+  * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
+  * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
 
 -----------
 
