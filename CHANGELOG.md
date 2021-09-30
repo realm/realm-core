@@ -10,6 +10,7 @@
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
+* `realm::SyncClientConfig::logger_factory` was replaced with `realm::SyncClientConfig::logger`. It should now be an instance of `util::Logger` rather than a factory for making instances. This allows the SDK to share the logger instance across multiple `App` instances.
 
 -----------
 
