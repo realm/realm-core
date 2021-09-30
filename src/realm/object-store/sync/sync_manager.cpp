@@ -263,16 +263,16 @@ void SyncManager::set_log_level(util::Logger::Level level) noexcept
     m_config.log_level = level;
 }
 
-void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
+void SyncManager::set_logger_factory(std::function<SyncLoggerFactory> factory) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_config.logger_factory = &factory;
+    m_config.logger_factory = std::move(factory);
 }
 
 std::unique_ptr<util::Logger> SyncManager::make_logger() const
 {
     if (m_config.logger_factory) {
-        return m_config.logger_factory->make_logger(m_config.log_level); // Throws
+        return m_config.logger_factory(m_config.log_level); // Throws
     }
 
     auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws

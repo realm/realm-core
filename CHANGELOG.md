@@ -17,6 +17,7 @@
   * `realm::SyncSessionTransactCallback` -> `realm::SyncSession::TransactionCallback`
   * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
   * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
+* `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed.
 
 -----------
 
