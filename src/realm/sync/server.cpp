@@ -5366,7 +5366,7 @@ void ServerImpl::listen()
 
 void ServerImpl::initiate_accept()
 {
-    auto handler = [=](std::error_code ec) {
+    auto handler = [this](std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_accept(ec);
     };
@@ -6067,7 +6067,7 @@ void SyncConnection::send_next_message()
 
 void SyncConnection::initiate_write_output_buffer()
 {
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_write_output_buffer();
     };
 
@@ -6080,7 +6080,7 @@ void SyncConnection::initiate_write_output_buffer()
 
 void SyncConnection::initiate_pong_output_buffer()
 {
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_pong_output_buffer();
     };
 
@@ -6142,7 +6142,7 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
                                              session_ident); // Throws
 
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_write_error(); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler));

@@ -52,14 +52,14 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     : m_parent(parent)
     , m_shared_part(create_condvar_sharedmemory_name(parent.get_path()))
 {
-    m_mutex.set_shared_part(InterprocessMutex::SharedPart(),
-                            normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+    auto unneeded = InterprocessMutex::SharedPart();
+    m_mutex.set_shared_part(unneeded, normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
                             "ExternalCommitHelper_ControlMutex");
 
     m_commit_available.set_shared_part(
         m_shared_part->cv, normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
         "ExternalCommitHelper_CommitCondVar",
-        normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().u8string()));
+        normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().string()));
 
     {
         auto lock = std::unique_lock(m_mutex);

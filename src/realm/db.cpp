@@ -714,7 +714,7 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 #if REALM_HAVE_STD_FILESYSTEM
-std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
+std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().string();
 #else
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif

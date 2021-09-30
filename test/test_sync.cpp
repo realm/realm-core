@@ -7188,7 +7188,7 @@ TEST(Sync_Dictionary)
     session_2.wait_for_upload_complete_or_client_stopped();
     session_1.wait_for_download_complete_or_client_stopped();
 
-    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& tr) {
+    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
         auto foos = tr.get_table("class_Foo");
         CHECK_EQUAL(foos->size(), 1);
 
@@ -7284,7 +7284,7 @@ TEST(Sync_Dictionary_Links)
 
     // Test that we can create tombstones for objects in dictionaries.
 
-    write_transaction_notifying_session(db_1, session_1, [=](WriteTransaction& tr) {
+    write_transaction_notifying_session(db_1, session_1, [&](WriteTransaction& tr) {
         auto& g = tr.get_group();
 
         auto bars = g.get_table("class_Bar");

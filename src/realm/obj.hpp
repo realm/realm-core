@@ -323,7 +323,7 @@ private:
     friend class ConstTableView;
     template <class, class>
     friend class Collection;
-    template <class>
+    template <class, class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;

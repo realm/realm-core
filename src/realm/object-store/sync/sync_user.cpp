@@ -238,7 +238,7 @@ void SyncUser::update_refresh_token(std::string&& token)
             }
         }
 
-        m_sync_manager->perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_refresh_token(m_refresh_token.token);
         });
@@ -279,7 +279,7 @@ void SyncUser::update_access_token(std::string&& token)
             }
         }
 
-        m_sync_manager->perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_access_token(m_access_token.token);
         });
@@ -308,7 +308,7 @@ void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
     REALM_ASSERT(m_state == SyncUser::State::LoggedIn);
     m_user_identities = identities;
 
-    m_sync_manager->perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([&](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_identities(identities);
     });
@@ -328,7 +328,7 @@ void SyncUser::log_out()
         m_access_token = RealmJWT{};
         m_refresh_token = RealmJWT{};
 
-        m_sync_manager->perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([&](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_state_and_tokens(State::LoggedOut, "", "");
         });
@@ -350,7 +350,7 @@ void SyncUser::log_out()
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
         invalidate();
-        sync_manager_shared->perform_metadata_update([=](const auto& manager) {
+        sync_manager_shared->perform_metadata_update([&](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
             if (metadata)
                 metadata->remove();
@@ -407,7 +407,7 @@ void SyncUser::set_state(SyncUser::State state)
     m_state = state;
 
     REALM_ASSERT(m_sync_manager);
-    m_sync_manager->perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([&](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_state(state);
     });
@@ -432,7 +432,7 @@ void SyncUser::update_user_profile(const SyncUserProfile& profile)
 
     m_user_profile = profile;
 
-    m_sync_manager->perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([&](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_user_profile(profile);
     });
