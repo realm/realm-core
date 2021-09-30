@@ -82,6 +82,7 @@ struct TestFile : realm::Realm::Config {
 
 private:
     bool m_persist = false;
+    std::string m_temp_dir;
 };
 
 struct InMemoryTestFile : TestFile {

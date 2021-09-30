@@ -2266,13 +2266,12 @@ TEST_CASE("migration: AdditiveDiscovered") {
          }},
     };
 
-    TestFile config;
-    config.cache = false;
-    config.schema = schema;
-
     std::vector<SchemaMode> additive_modes = {SchemaMode::AdditiveDiscovered, SchemaMode::AdditiveExplicit};
 
     for (auto mode : additive_modes) {
+        TestFile config;
+        config.cache = false;
+        config.schema = schema;
         config.schema_mode = mode;
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema(schema);

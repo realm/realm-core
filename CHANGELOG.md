@@ -8,6 +8,7 @@
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
 * Using "sort", "distinct", or "limit" as field name in query expression would cause an "Invalid predicate" error ([#7545](https://github.com/realm/realm-java/issues/7545) since v10.1.2)
 * Crash when quering with 'Not()' followed by empty group. ([#4168](https://github.com/realm/realm-core/issues/4168) since v1.0.0)
+* Change Apple/Linux temp dir created with `util::make_temp_dir()` to default to the environment's TMPDIR if available. Make `TestFile` clean up the directories it creates when finished. ([#4921](https://github.com/realm/realm-core/issues/4921))
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
