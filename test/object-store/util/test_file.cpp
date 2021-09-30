@@ -61,7 +61,11 @@ using namespace realm;
 TestFile::TestFile()
 {
     disable_sync_to_disk();
-    path = util::format("%1/realm.XXXXXX", util::make_temp_dir());
+    m_temp_dir = util::make_temp_dir();
+    if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
+        m_temp_dir = m_temp_dir + "/";
+    }
+    path = util::format("%1realm.XXXXXX", m_temp_dir);
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
@@ -80,12 +84,10 @@ TestFile::TestFile()
 
 TestFile::~TestFile()
 {
-    if (!m_persist)
-#ifdef _WIN32
-        _unlink(path.c_str());
-#else // POSIX
-        unlink(path.c_str());
-#endif
+    if (!m_persist) {
+        util::File::try_remove(path);
+        util::try_remove_dir_recursive(m_temp_dir);
+    }
 }
 
 DBOptions TestFile::options() const
