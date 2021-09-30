@@ -322,7 +322,12 @@ std::string make_temp_dir()
     }
     return std::string(buffer);
 #else
-    std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
+    char* tmp_dir_env = getenv("TMPDIR");
+    std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
+    if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
+        base_dir = base_dir + "/";
+    }
+    std::string tmp = base_dir + std::string("realm_XXXXXX") + std::string("\0", 1);
     std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
     memcpy(buffer.get(), tmp.c_str(), tmp.size());
     if (mkdtemp(buffer.get()) == 0) {

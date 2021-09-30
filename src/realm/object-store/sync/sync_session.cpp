@@ -964,17 +964,17 @@ void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
 void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    add_completion_callback(lock, std::move(callback), _impl::SyncProgressNotifier::NotifierType::upload);
+    add_completion_callback(lock, std::move(callback), ProgressDirection::upload);
 }
 
 void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    add_completion_callback(lock, std::move(callback), _impl::SyncProgressNotifier::NotifierType::download);
+    add_completion_callback(lock, std::move(callback), ProgressDirection::download);
 }
 
-uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
-                                                 NotifierType direction, bool is_streaming)
+uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback> notifier,
+                                                 ProgressDirection direction, bool is_streaming)
 {
     return m_progress_notifier.register_callback(std::move(notifier), direction, is_streaming);
 }
@@ -984,7 +984,7 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
     m_progress_notifier.unregister_callback(token);
 }
 
-uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateCallback> callback)
+uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateChangeCallback> callback)
 {
     return m_connection_change_notifier.add_callback(callback);
 }
@@ -1112,7 +1112,7 @@ void SyncSession::did_drop_external_reference()
     m_state->close(lock, *this);
 }
 
-uint64_t SyncProgressNotifier::register_callback(std::function<SyncProgressNotifierCallback> notifier,
+uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
     std::function<void()> invocation;
@@ -1208,7 +1208,7 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     };
 }
 
-uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<ConnectionStateCallback> callback)
+uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<ConnectionStateChangeCallback> callback)
 {
     std::lock_guard<std::mutex> lock(m_callback_mutex);
     auto token = m_next_token++;

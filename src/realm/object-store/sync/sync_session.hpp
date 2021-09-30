@@ -51,16 +51,13 @@ namespace sync {
 class Session;
 }
 
-using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
-using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
-
 namespace _impl {
 class SyncProgressNotifier {
 public:
     enum class NotifierType { upload, download };
+    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
-    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, NotifierType direction,
-                               bool is_streaming);
+    uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
@@ -82,7 +79,7 @@ private:
     // A PODS encapsulating some information for progress notifier callbacks a binding
     // can register upon this session.
     struct NotifierPackage {
-        std::function<SyncProgressNotifierCallback> notifier;
+        std::function<ProgressNotifierCallback> notifier;
         util::Optional<uint64_t> captured_transferrable;
         uint64_t snapshot_version;
         bool is_streaming;
@@ -124,8 +121,11 @@ public:
         Connected,
     };
 
-    using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
-    using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
+    using StateChangeCallback = void(PublicState old_state, PublicState new_state);
+    using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
+    using TransactionCallback = void(VersionID old_version, VersionID new_version);
+    using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
+    using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
 
     ~SyncSession();
     PublicState state() const;
@@ -143,7 +143,6 @@ public:
     // Works the same way as `wait_for_upload_completion()`.
     void wait_for_download_completion(std::function<void(std::error_code)> callback);
 
-    using NotifierType = _impl::SyncProgressNotifier::NotifierType;
     // Register a notifier that updates the app regarding progress.
     //
     // If `m_current_progress` is populated when this method is called, the notifier
@@ -162,7 +161,8 @@ public:
     //
     // Note that bindings should dispatch the callback onto a separate thread or queue
     // in order to avoid blocking the sync client.
-    uint64_t register_progress_notifier(std::function<SyncProgressNotifierCallback>, NotifierType, bool is_streaming);
+    uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>, ProgressDirection,
+                                        bool is_streaming);
 
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
@@ -170,7 +170,7 @@ public:
 
     // Registers a callback that is invoked when the the underlying sync session changes
     // its connection state
-    uint64_t register_connection_change_callback(std::function<ConnectionStateCallback>);
+    uint64_t register_connection_change_callback(std::function<ConnectionStateChangeCallback>);
 
     // Unregisters a previously registered callback. If the token is invalid,
     // this method does nothing
@@ -248,8 +248,7 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
 
-        static void set_sync_transact_callback(SyncSession& session,
-                                               std::function<SyncSessionTransactCallback> callback)
+        static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback> callback)
         {
             session.set_sync_transact_callback(std::move(callback));
         }
@@ -279,8 +278,7 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
-    using CompletionCallbacks =
-        std::map<int64_t, std::pair<_impl::SyncProgressNotifier::NotifierType, std::function<void(std::error_code)>>>;
+    using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, std::function<void(std::error_code)>>>;
 
     struct State;
     friend struct _impl::sync_session_states::Active;
@@ -290,13 +288,13 @@ private:
 
     class ConnectionChangeNotifier {
     public:
-        uint64_t add_callback(std::function<ConnectionStateCallback> callback);
+        uint64_t add_callback(std::function<ConnectionStateChangeCallback> callback);
         void remove_callback(uint64_t token);
         void invoke_callbacks(ConnectionState old_state, ConnectionState new_state);
 
     private:
         struct Callback {
-            std::function<ConnectionStateCallback> fn;
+            std::function<ConnectionStateChangeCallback> fn;
             uint64_t token;
         };
 
@@ -338,7 +336,7 @@ private:
     std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
-    void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
+    void set_sync_transact_callback(std::function<TransactionCallback>);
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
@@ -352,9 +350,9 @@ private:
     void detach_from_sync_manager();
 
     void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
-                                 _impl::SyncProgressNotifier::NotifierType direction);
+                                 ProgressDirection direction);
 
-    std::function<SyncSessionTransactCallback> m_sync_transact_callback;
+    std::function<TransactionCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;
 

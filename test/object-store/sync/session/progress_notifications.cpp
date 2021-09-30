@@ -25,7 +25,7 @@
 using namespace realm;
 
 TEST_CASE("progress notification", "[sync]") {
-    using NotifierType = SyncSession::NotifierType;
+    using NotifierType = SyncSession::ProgressDirection;
     _impl::SyncProgressNotifier progress;
 
     SECTION("callback is not called prior to first update") {
