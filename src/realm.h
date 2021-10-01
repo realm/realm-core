@@ -1872,4 +1872,40 @@ RLM_API realm_notification_token_t* realm_results_add_notification_callback(real
  */
 RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
 
+/* Logging */
+typedef struct realm_logger realm_logger_t;
+
+typedef enum realm_log_level {
+    RLM_LOG_LEVEL_ALL,
+    RLM_LOG_LEVEL_TRACE,
+    RLM_LOG_LEVEL_DEBUG,
+    RLM_LOG_LEVEL_DETAIL,
+    RLM_LOG_LEVEL_INFO,
+    RLM_LOG_LEVEL_WARNING,
+    RLM_LOG_LEVEL_ERROR,
+    RLM_LOG_LEVEL_FATAL,
+    RLM_LOG_LEVEL_OFF,
+} realm_log_level_e;
+
+typedef void (*realm_logger_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+typedef realm_log_level_e (*realm_logger_get_threshold_func_t)(void* userdata);
+typedef realm_logger_t* (*realm_logger_factory_func_t)(void* userdata, realm_log_level_e level);
+
+/**
+ * Define a new logger instance.
+ *
+ * @param log_func A function pointer that will be invoked whenever
+ *                 `realm_logger_log()` is called. The function does not need to
+ *                 be thread-safe in itself, but may be invoked (under lock)
+ *                 from multiple threads.
+ * @param threshold_func Get the current log level threshold for the logger. The
+ *                       function does not need to be thread-safe.
+ * @param free_func How to release @a userdata when the logger object is
+ *                  destroyed.
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_logger_t* realm_logger_new(realm_logger_log_func_t log_func,
+                                         realm_logger_get_threshold_func_t threshold_func, void* userdata,
+                                         realm_free_userdata_func_t free_func);
+
 #endif // REALM_H

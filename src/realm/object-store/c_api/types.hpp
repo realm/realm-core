@@ -394,5 +394,12 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
     }
 };
 
+#if REALM_ENABLE_SYNC
+
+struct realm_logger : realm::c_api::WrapC, std::unique_ptr<realm::util::Logger> {
+    using std::unique_ptr<realm::util::Logger>::unique_ptr;
+};
+
+#endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP
