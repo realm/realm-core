@@ -49,8 +49,6 @@ namespace _impl {
 struct SyncClient;
 }
 
-using SyncLoggerFactory = std::unique_ptr<util::Logger>(util::Logger::Level);
-
 struct SyncClientTimeouts {
     SyncClientTimeouts();
     // See sync::Client::Config for the meaning of these fields.
@@ -73,7 +71,8 @@ struct SyncClientConfig {
     util::Optional<std::vector<char>> custom_encryption_key;
     bool reset_metadata_on_error = false;
 
-    std::function<SyncLoggerFactory> logger_factory;
+    using LoggerFactory = std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>;
+    LoggerFactory logger_factory;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
@@ -113,7 +112,7 @@ public:
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.
     void set_log_level(util::Logger::Level) noexcept;
-    void set_logger_factory(std::function<SyncLoggerFactory>) noexcept;
+    void set_logger_factory(SyncClientConfig::LoggerFactory) noexcept;
 
     // Sets the application level user agent string.
     // This should have the format specified here:

@@ -263,7 +263,7 @@ void SyncManager::set_log_level(util::Logger::Level level) noexcept
     m_config.log_level = level;
 }
 
-void SyncManager::set_logger_factory(std::function<SyncLoggerFactory> factory) noexcept
+void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_config.logger_factory = std::move(factory);
