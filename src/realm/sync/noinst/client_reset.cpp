@@ -18,7 +18,10 @@ using namespace sync;
 namespace {
 
 struct EmbeddedObjectConverter {
-    void track_if_needed(Obj e_src, Obj e_dst);
+    // If an embedded object is encountered, add it to a list of embedded objects to process.
+    // This relies on the property that embedded objects only have one incoming link
+    // otherwise there could be an infinite loop while discovering embedded objects.
+    void track(Obj e_src, Obj e_dst);
     void process_pending();
 
 private:
@@ -27,7 +30,6 @@ private:
         Obj embedded_in_dst;
     };
 
-    std::vector<std::pair<TableKey, std::unordered_set<ObjKey>>> embedded_verified;
     std::vector<EmbeddedToCheck> embedded_pending;
 };
 
@@ -56,7 +58,7 @@ struct InterRealmValueConverter {
 
     void track_new_embedded(Obj src, Obj dst)
     {
-        m_embedded_converter.track_if_needed(src, dst);
+        m_embedded_converter.track(src, dst);
     }
 
     struct ConversionResult {
@@ -87,7 +89,7 @@ struct InterRealmValueConverter {
                         Obj dst_embedded = m_opposite_of_dst->get_object(dst.get<ObjKey>());
                         REALM_ASSERT_DEBUG(dst_embedded);
                         converted_src = dst_embedded.get_key();
-                        m_embedded_converter.track_if_needed(src_embedded, dst_embedded);
+                        m_embedded_converter.track(src_embedded, dst_embedded);
                     }
                     else {
                         cmp = src.compare(dst);
@@ -115,34 +117,13 @@ struct InterRealmValueConverter {
                 REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
                 TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
                 REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-
-                if (src_link_table->is_embedded()) {
-                    Obj src_embedded = src_link_table->get_object(src_link.get_obj_key());
-                    REALM_ASSERT_DEBUG(src_embedded);
-                    if (dst.is_type(type_TypedLink) &&
-                        dst.get<ObjLink>().get_table_key() == dst_link_table->get_key()) {
-                        // dst link already points to an embedded object in this table, keep it
-                        cmp = 0; // no need to set a new link
-                        Obj dst_embedded = dst_link_table->get_object(dst.get<ObjLink>().get_obj_key());
-                        REALM_ASSERT_DEBUG(dst_embedded);
-                        converted_src = ObjLink{dst_link_table->get_key(), dst_embedded.get_key()};
-                        m_embedded_converter.track_if_needed(src_embedded, dst_embedded);
-                    }
-                    else {
-                        cmp = src.compare(dst);
-                        // dst is different, create an embedded object to link to it
-                        if (converted_src_out) {
-                            converted_src_out->requires_new_embedded_object = true;
-                            converted_src_out->src_embedded_to_check = src_embedded;
-                        }
-                    }
-                }
-                else { // regular table, convert by pk
-                    Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-                    Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-                    converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
-                    cmp = converted_src.compare(dst);
-                }
+                // embedded tables should always be covered by the m_opposite_of_src case above.
+                REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
+                // regular table, convert by pk
+                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                cmp = converted_src.compare(dst);
             }
         }
         if (converted_src_out) {
@@ -467,29 +448,19 @@ private:
     std::vector<InterRealmValueConverter> m_columns_cache;
 };
 
-void EmbeddedObjectConverter::track_if_needed(Obj e_src, Obj e_dst)
+void EmbeddedObjectConverter::track(Obj e_src, Obj e_dst)
 {
-    auto get_tracked_objects_for_dst_table = [this](TableKey dst_table_key) {
-        auto it = std::find_if(embedded_verified.begin(), embedded_verified.end(),
-                               [&dst_table_key](const auto& pair) -> bool {
-                                   return pair.first == dst_table_key;
-                               });
-
-        if (it != embedded_verified.end()) {
-            return it;
-        }
-        embedded_verified.push_back({dst_table_key, {}});
-        return embedded_verified.end() - 1;
-    };
-
-    auto it = get_tracked_objects_for_dst_table(e_dst.get_table()->get_key());
-    if (it->second.find(e_dst.get_key()) == it->second.end()) {
-        embedded_pending.push_back({e_src, e_dst});
-    }
+    embedded_pending.push_back({e_src, e_dst});
 }
 
 void EmbeddedObjectConverter::process_pending()
 {
+    // Conceptually this is a map, but doing a linear search through a vector is known
+    // to be faster for small number of elements. Since the number of tables expected
+    // to be processed here is assumed to be small < 20, use linear search instead of
+    // hashing. N is the depth to which embedded objects are connected and the upper
+    // bound is the total number of tables which is finite, and is usually small.
+
     std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters;
     auto get_converter = [this, &converters](ConstTableRef src_table,
                                              TableRef dst_table) -> InterRealmObjectConverter& {
