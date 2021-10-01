@@ -8,7 +8,6 @@
 #include "realm/sync/changeset_parser.hpp"
 #include "realm/sync/noinst/compression.hpp"
 #include "realm/util/cli_args.hpp"
-#include "realm/util/from_chars.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 #include "realm/util/string_view.hpp"
@@ -16,6 +15,7 @@
 #include <external/mpark/variant.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <iostream>
 #include <string>
 #include <type_traits>
@@ -78,7 +78,7 @@ StringView parse_header_element(StringView sv, char)
 template <typename T, typename = std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>>>
 StringView parse_header_value(StringView sv, T&& cur_arg)
 {
-    auto parse_res = realm::util::from_chars(sv.begin(), sv.end(), cur_arg, 10);
+    auto parse_res = std::from_chars(sv.begin(), sv.end(), cur_arg, 10);
     if (parse_res.ec != std::errc{}) {
         throw MessageParseException("error parsing integer in header line: %1",
                                     std::make_error_code(parse_res.ec).message());
