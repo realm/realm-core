@@ -637,17 +637,7 @@ void SyncManager::wait_for_sessions_to_terminate()
 
 void SyncManager::unregister_session(const std::string& path)
 {
-    // The order here is intentional, the lock must be released before
-    // `existing_session` is released. This prevents a deadlock in the
-    // scenario where a strong reference to the existing session is acquired
-    // here but other references are cleaned up before this method is finished.
-    // In that case, `existing_session` becomes the last strong external reference
-    // and the session will attempt to close when it goes out of scope. If that
-    // happens while we still hold the lock here, `unregister_session` will be
-    // called again and will block on m_session_mutex which is already held.
-    // Releasing the lock before `existing_session` expires prevents this.
-    std::shared_ptr<SyncSession> existing_session;
-    std::lock_guard<std::mutex> lock(m_session_mutex);
+    std::unique_lock<std::mutex> lock(m_session_mutex);
     auto it = m_sessions.find(path);
     if (it == m_sessions.end()) {
         // There was a race to unregister and there's nothing left to do here.
@@ -659,9 +649,18 @@ void SyncManager::unregister_session(const std::string& path)
     // If the session has an active external reference, leave it be. This will happen if the session
     // moves to an inactive state while still externally reference, for instance, as a result of
     // the session's user being logged out.
-    existing_session = it->second->existing_external_reference();
-    if (existing_session)
+    if (auto existing_session = it->second->existing_external_reference()) {
+        // The lock must be released before `existing_session` is released. This prevents a
+        // deadlock in the scenario where a strong reference to the existing session is
+        // acquired here but other references are cleaned up before this method is
+        // finished. In that case, `existing_session` becomes the last strong external
+        // reference and the session will attempt to close when it goes out of scope. If
+        // that happens while we still hold the lock here, `unregister_session` will be
+        // called again and will block on `m_session_mutex` which is already held.
+        // Releasing the lock before `existing_session` expires prevents this.
+        lock.unlock();
         return;
+    }
 
     m_sessions.erase(path);
 }
