@@ -109,31 +109,31 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
 void ResultsNotifier::calculate_changes()
 {
     if (has_run() && have_callbacks()) {
-        ObjKeys next_rows;
-        next_rows.reserve(m_run_tv.size());
+        ObjKeys next_objs;
+        next_objs.reserve(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            next_rows.push_back(m_run_tv.get_key(i));
+            next_objs.push_back(m_run_tv.get_key(i));
 
         auto table_key = m_query->get_table()->get_key();
         if (auto it = m_info->tables.find(table_key); it != m_info->tables.end()) {
             auto& changes = it->second;
-            for (auto& key_val : m_previous_rows) {
+            for (auto& key_val : m_previous_objs) {
                 if (changes.deletions_contains(key_val)) {
                     key_val = ObjKey();
                 }
             }
         }
 
-        m_change = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
+        m_change = CollectionChangeBuilder::calculate(m_previous_objs, next_objs,
                                                       get_modification_checker(*m_info, m_query->get_table()),
                                                       m_target_is_in_table_order);
 
-        m_previous_rows = std::move(next_rows);
+        m_previous_objs = std::move(next_objs);
     }
     else {
-        m_previous_rows.resize(m_run_tv.size());
+        m_previous_objs.resize(m_run_tv.size());
         for (size_t i = 0; i < m_run_tv.size(); ++i)
-            m_previous_rows[i] = m_run_tv.get_key(i);
+            m_previous_objs[i] = m_run_tv.get_key(i);
     }
 }
 
@@ -141,11 +141,11 @@ void ResultsNotifier::run()
 {
     REALM_ASSERT(m_info);
 
-    // Table's been deleted, so report all rows as deleted
+    // Table's been deleted, so report all objects as deleted
     if (!m_query->get_table()) {
         m_change = {};
-        m_change.deletions.set(m_previous_rows.size());
-        m_previous_rows.clear();
+        m_change.deletions.set(m_previous_objs.size());
+        m_previous_objs.clear();
         return;
     }
 
@@ -167,8 +167,8 @@ void ResultsNotifier::run()
             return;
         REALM_ASSERT(m_change.empty());
         auto checker = get_modification_checker(*m_info, m_query->get_table());
-        for (size_t i = 0; i < m_previous_rows.size(); ++i) {
-            if (checker(ObjKey(m_previous_rows[i]))) {
+        for (size_t i = 0; i < m_previous_objs.size(); ++i) {
+            if (checker(m_previous_objs[i])) {
                 m_change.modifications.add(i);
             }
         }
