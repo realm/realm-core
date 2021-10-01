@@ -303,18 +303,13 @@ struct TestServerClientReset : public TestClientReset {
                 auto table = get_table(*realm2, "object");
                 auto col = table->get_column_key("value");
                 table->begin()->set(col, i + 5);
+                if (i == 1 && m_make_remote_changes) {
+                    m_make_remote_changes(realm2);
+                }
                 realm2->commit_transaction();
                 wait_for_upload(*realm2);
                 server.advance_clock(10s);
             }
-
-            realm2->begin_transaction();
-            if (m_make_remote_changes) {
-                m_make_remote_changes(realm2);
-            }
-            realm2->commit_transaction();
-            wait_for_upload(*realm2);
-            session2->log_out();
             server.advance_clock(10s);
             realm2->close();
         }

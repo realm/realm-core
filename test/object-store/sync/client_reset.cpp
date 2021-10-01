@@ -148,10 +148,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         create_user_and_log_in(app);
         return SyncTestFile(app->current_user(), partition.value, schema);
     };
-    SyncTestFile config = get_valid_config();
-    SyncTestFile config2 = get_valid_config();
-    auto make_reset = [&]() -> std::unique_ptr<reset_utils::TestClientReset> {
-        return reset_utils::make_baas_client_reset(config, config2, sync_manager);
+    SyncTestFile local_config = get_valid_config();
+    SyncTestFile remote_config = get_valid_config();
+    auto make_reset = [&](Realm::Config config_local,
+                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+        return reset_utils::make_baas_client_reset(config_local, config_remote, sync_manager);
     };
 
 #else
@@ -159,32 +160,33 @@ TEST_CASE("sync: client reset", "[client reset]") {
     auto get_valid_config = [&]() -> SyncTestFile {
         return SyncTestFile(sync_manager.app(), "default");
     };
-    SyncTestFile config = get_valid_config();
-    config.schema = schema;
-    SyncTestFile config2 = get_valid_config();
-    config2.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+    SyncTestFile local_config = get_valid_config();
+    local_config.schema = schema;
+    SyncTestFile remote_config = get_valid_config();
+    remote_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         CAPTURE(err.message);
-        CAPTURE(config2.path);
+        CAPTURE(remote_config.path);
         // There is a race in the test code of the sync test server where somehow the
         // remote Realm is also reset sometimes. We ignore it as it shouldn't affect the result.
     };
-    auto make_reset = [&]() -> std::unique_ptr<reset_utils::TestClientReset> {
-        return reset_utils::make_test_server_client_reset(config, config2, sync_manager);
+    auto make_reset = [&](Realm::Config config_local,
+                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+        return reset_utils::make_test_server_client_reset(config_local, config_remote, sync_manager);
     };
 #endif
 
     // this is just for ease of debugging
-    config.path = config.path + ".local";
-    config2.path = config2.path + ".remote";
+    local_config.path = local_config.path + ".local";
+    remote_config.path = remote_config.path + ".remote";
 
     SECTION("should trigger error callback when mode is manual") {
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+        local_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         ThreadSafeSyncError err;
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+        local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
             err = error;
         };
 
-        make_reset()
+        make_reset(local_config, remote_config)
             ->on_post_reset([&](SharedRealm) {
                 util::EventLoop::main().run_until([&] {
                     return bool(err);
@@ -196,20 +198,20 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(err.value()->is_client_reset_requested());
     }
 
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+    local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         CAPTURE(err.message);
-        CAPTURE(config.path);
+        CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };
 
     SECTION("seamless loss") {
-        config.cache = false;
-        config.automatic_change_notifications = false;
-        config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
-        const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
+        local_config.cache = false;
+        local_config.automatic_change_notifications = false;
+        local_config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+        const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
-        config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+        local_config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
             ++before_callback_invoctions;
             REQUIRE(local);
             REQUIRE(local->is_frozen());
@@ -219,10 +221,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(remote->is_frozen());
             REQUIRE(remote->get_table("class_object"));
 
-            REQUIRE(util::File::exists(config.path));
+            REQUIRE(util::File::exists(local_config.path));
             REQUIRE(util::File::exists(fresh_path));
         };
-        config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+        local_config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
             ++after_callback_invocations;
             REQUIRE(local);
             REQUIRE(local->get_table("class_object"));
@@ -253,7 +255,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     results_changes = std::move(changes);
                 });
         };
-        std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset();
+        std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
 
         SECTION("modify") {
             test_reset
@@ -278,7 +280,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_INDICES(object_changes.insertions);
                     REQUIRE_INDICES(object_changes.deletions);
                     // make sure that the reset operation has cleaned up after itself
-                    REQUIRE(util::File::exists(config.path));
+                    REQUIRE(util::File::exists(local_config.path));
                     REQUIRE_FALSE(util::File::exists(fresh_path));
                 })
                 ->run();
@@ -286,8 +288,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
             SECTION("a Realm can be reset twice") {
                 // keep the Realm to reset (config) the same, but change out the remote (config2)
                 // to a new path because otherwise it will be reset as well which we don't want
-                config2 = get_valid_config();
-                test_reset = make_reset();
+                SyncTestFile config3 = get_valid_config();
+                test_reset = make_reset(local_config, config3);
                 test_reset
                     ->setup([&](SharedRealm realm) {
                         // after a reset we already start with a value of 6
@@ -340,8 +342,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             };
             try {
                 test_reset
-                    ->on_post_local_changes([&](SharedRealm local) {
-                        local->begin_transaction();
+                    ->on_post_local_changes([&](SharedRealm) {
                         throw SessionInterruption("fake interruption during reset");
                     })
                     ->run();
@@ -350,7 +351,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 REQUIRE(before_callback_invoctions == 0);
                 REQUIRE(after_callback_invocations == 0);
                 test_reset.reset();
-                auto realm = Realm::get_shared_realm(config);
+                auto realm = Realm::get_shared_realm(local_config);
                 timed_sleeping_wait_for(
                     [&]() -> bool {
                         realm->begin_transaction();
@@ -364,23 +365,27 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     },
                     std::chrono::seconds(20));
             }
+            auto session = sync_manager.app()->sync_manager()->get_existing_session(local_config.path);
+            if (session) {
+                session->shutdown_and_wait();
+            }
             REQUIRE(before_callback_invoctions == 1);
             REQUIRE(after_callback_invocations == 1);
         }
 
         SECTION("failing to download a fresh copy results in an error") {
             ThreadSafeSyncError err;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(config.path);
+            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
             util::File f(fresh_path, util::File::Mode::mode_Write);
             f.write("a non empty file");
             f.sync();
             f.close();
 
             REQUIRE(!err);
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm) {
                     util::EventLoop::main().run_until([&] {
                         return bool(err);
@@ -392,13 +397,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("should honor encryption key for downloaded Realm") {
-            config.encryption_key.resize(64, 'a');
+            local_config.encryption_key.resize(64, 'a');
 
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm realm) {
                     realm->close();
                     SharedRealm r_after;
-                    REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
+                    REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(local_config));
                     CHECK(ObjectStore::table_for_object_type(r_after->read_group(), "object")
                               ->begin()
                               ->get<Int>("value") == 6);
@@ -537,10 +542,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
         SECTION("extra local table creates a client reset error") {
             ThreadSafeSyncError err;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
@@ -567,10 +572,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
         SECTION("extra local column creates a client reset error") {
             ThreadSafeSyncError err;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -647,10 +652,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
         SECTION("incompatible schema changes in remote and local transactions") {
             ThreadSafeSyncError err;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
@@ -688,11 +693,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
         SECTION("primary key type cannot be changed") {
             ThreadSafeSyncError err;
-            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
             };
 
-            make_reset()
+            make_reset(local_config, remote_config)
                 ->make_local_changes([](SharedRealm local) {
                     local->update_schema(
                         {
