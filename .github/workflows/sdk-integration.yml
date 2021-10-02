@@ -1,7 +1,7 @@
 name: Test SDKs
 on:
-  pull_request:
-    types: [ labeled ]
+  pull_request: null
+    # types: [ labeled ]
 jobs:
   update-dotnet:
     runs-on: ubuntu-latest
