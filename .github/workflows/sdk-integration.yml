@@ -1,0 +1,21 @@
+name: Test SDKs
+on:
+  pull_request:
+    types: [ labeled ]
+jobs:
+  update-dotnet:
+    runs-on: ubuntu-latest
+    name: Update .NET
+    if: ${{ contains(github.event.pull_request.labels, "public-api") }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout .NET repo
+        uses: actions/checkout@v2
+        with:
+          repository: realm/realm-dotnet
+          path: integration/dotnet
+          submodules: recursive
+      - name: Update submodule
+        run: |
+          cd integration/dotnet/wrappers/realm-core
+          git checkout -track origin/${{ github.event.pull_request.head.ref }}
