@@ -6,7 +6,7 @@ jobs:
   update-dotnet:
     runs-on: ubuntu-latest
     name: Update .NET
-    if: ${{ contains(github.event.pull_request.labels, "public-api") }}
+    if: ${{ contains(github.event.pull_request.labels, 'public-api') }}
     steps:
       - uses: actions/checkout@v2
       - name: Checkout .NET repo
