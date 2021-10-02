@@ -10,8 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-        echo ${{ toJSON(github.event.pull_request) }}
-      - name: Checkout .NET repo
+        echo '${{ toJSON(github.event.pull_request) }}'
+      - name: "Checkout .NET repo"
         uses: actions/checkout@v2
         with:
           repository: realm/realm-dotnet
