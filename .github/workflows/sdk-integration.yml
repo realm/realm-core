@@ -1,6 +1,6 @@
 name: Test SDKs
 on:
-  pull_request: null
+  pull_request:
     types: [ opened, labeled, synchronize ]
 jobs:
   update-dotnet:
