@@ -18,5 +18,6 @@ jobs:
       - name: Update submodule
         run: |
           cd integration/dotnet/wrappers/realm-core
+          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
           git fetch origin ${{ github.event.pull_request.head.ref }}
           git checkout -b ${{ github.event.pull_request.head.ref }} origin/${{ github.event.pull_request.head.ref }}
