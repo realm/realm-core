@@ -21,3 +21,14 @@ jobs:
           git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
           git fetch origin ${{ github.event.pull_request.head.ref }}
           git checkout -b ${{ github.event.pull_request.head.ref }} origin/${{ github.event.pull_request.head.ref }}
+      - name: Create PR
+        uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+        with:
+          branch: ${{ github.event.pull_request.head.ref }}
+          title: ${{ github.event.pull_request.title }}
+          body: Pick up realm-core/#${{ github.event.pull_request.number }}
+          delete-branch: true
+          path: integration/dotnet
+          labels: public-api
+          draft: true
+
