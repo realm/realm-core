@@ -18,6 +18,7 @@ jobs:
       - name: Check if PR already exists
         id: check-existing-pr
         run: |
+          cd integration/dotnet
           branch_exists=$(git ls-remote --heads git@github.com:realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }})
           echo '::set-output name=exists::$branch_exists'
       - name: Checkout existing branch
