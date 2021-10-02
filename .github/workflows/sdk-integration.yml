@@ -21,7 +21,7 @@ jobs:
           cd integration/dotnet
           branch_exists=$(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l)
           echo $branch_exists
-          echo '::set-output name=exists::$branch_exists'
+          echo "::set-output name=exists::$branch_exists"
       - name: Checkout existing branch
         if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
         run: |
