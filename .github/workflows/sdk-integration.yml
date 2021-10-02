@@ -9,8 +9,6 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
     steps:
       - uses: actions/checkout@v2
-      - run: |
-          echo '${{ toJSON(github.event.pull_request) }}'
       - name: "Checkout .NET repo"
         uses: actions/checkout@v2
         with:
@@ -20,5 +18,6 @@ jobs:
       - name: Update submodule
         run: |
           cd integration/dotnet/wrappers/realm-core
+          git remote
           git fetch --all
           git checkout --track origin/${{ github.event.pull_request.head.ref }}
