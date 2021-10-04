@@ -84,6 +84,7 @@ AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::Pr
     if (auto session = m_session.load()) {
         auto token = session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
         m_registered_callbacks.emplace_back(token);
+        return token;
     }
     else {
         return 0;
