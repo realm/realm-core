@@ -6,26 +6,34 @@ name: Test SDKs
     - labeled
     - synchronize
 jobs:
-  update-realm-dotnet:
+  update-sdk-prs:
     runs-on: ubuntu-latest
-    name: Update realm-dotnet
+    name: Update SDK PRs
     if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
+    strategy:
+      matrix:
+        repo:
+          - name: realm-dotnet
+            submodule-path: wrappers/realm-core
+          - name: realm-js
+            submodule-path: vendor/realm-core
+          - name: realm-cocoa
     steps:
     - uses: actions/checkout@v2
       with:
         ref: ${{ github.event.pull_request.head.sha }}
-    - name: Checkout realm-dotnet
+    - name: Checkout ${{ matrix.repo.name }}
       uses: actions/checkout@v2
       with:
-        repository: realm/realm-dotnet
-        path: integration/realm-dotnet
+        repository: realm/${{ matrix.repo.name }}
+        path: integration/${{ matrix.repo.name }}
         submodules: recursive
         token: ${{ secrets.REALM_CI_PAT }}
     - name: Checkout existing branch
       id: checkout-existing
       run: |
-        cd integration/realm-dotnet
-        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l)
+        cd integration/${{ matrix.repo.name }}
+        branch_exists=$(git ls-remote --heads https://github.com/realm/${{ matrix.repo.name }}.git ${{ github.event.pull_request.head.ref }} | wc -l)
         if [ $branch_exists -eq 1 ];then
           git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
           git fetch origin ${{ github.event.pull_request.head.ref }}
@@ -33,136 +41,28 @@ jobs:
           echo "::set-output name=pr-exists::true"
         fi
     - name: Update submodule
+      if: ${{ matrix.repo.submodule-path }}
       run: |
-        cd integration/realm-dotnet/wrappers/realm-core
+        cd integration/${{ matrix.repo.name }}/${{ matrix.repo.submodule-path }}
         git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
         git fetch origin ${{ github.event.pull_request.head.ref }}
         git checkout -t origin/${{ github.event.pull_request.head.ref }}
-    - name: Push to existing branch
-      if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
-      run: |
-        cd integration/realm-dotnet
-        if [ -n "$(git status --porcelain)" ]; then
-          git config --global user.name 'Realm CI bot'
-          git config --global user.email 'realm-ci@users.noreply.github.com'
-          git commit -am "Update Core to ${{ github.event.pull_request.head.sha }}"
-          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/realm-dotnet.git
-        else
-          echo "SDK repo is already up to date with these changes. Nothing to commit/push."
-        fi
-    - name: Create PR
-      uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
-      if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
-      with:
-        token: ${{ secrets.REALM_CI_PAT }}
-        branch: ${{ github.event.pull_request.head.ref }}
-        title: ${{ github.event.pull_request.title }}
-        body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
-        delete-branch: true
-        path: integration/realm-dotnet
-        base: master
-        labels: public-api
-        commit-message: Update Core to ${{ github.event.pull_request.head.sha }}
-        draft: true
-  update-realm-js:
-    runs-on: ubuntu-latest
-    name: Update realm-js
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Checkout realm-js
-      uses: actions/checkout@v2
-      with:
-        repository: realm/realm-js
-        path: integration/realm-js
-        submodules: recursive
-        token: ${{ secrets.REALM_CI_PAT }}
-    - name: Checkout existing branch
-      id: checkout-existing
-      run: |
-        cd integration/realm-js
-        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-js.git ${{ github.event.pull_request.head.ref }} | wc -l)
-        if [ $branch_exists -eq 1 ];then
-          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-          git fetch origin ${{ github.event.pull_request.head.ref }}
-          git checkout -t origin/${{ github.event.pull_request.head.ref }}
-          echo "::set-output name=pr-exists::true"
-        fi
-    - name: Update submodule
-      run: |
-        cd integration/realm-js/vendor/realm-core
-        git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-        git fetch origin ${{ github.event.pull_request.head.ref }}
-        git checkout -t origin/${{ github.event.pull_request.head.ref }}
-    - name: Push to existing branch
-      if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
-      run: |
-        cd integration/realm-js
-        if [ -n "$(git status --porcelain)" ]; then
-          git config --global user.name 'Realm CI bot'
-          git config --global user.email 'realm-ci@users.noreply.github.com'
-          git commit -am "Update Core to ${{ github.event.pull_request.head.sha }}"
-          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/realm-js.git
-        else
-          echo "SDK repo is already up to date with these changes. Nothing to commit/push."
-        fi
-    - name: Create PR
-      uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
-      if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
-      with:
-        token: ${{ secrets.REALM_CI_PAT }}
-        branch: ${{ github.event.pull_request.head.ref }}
-        title: ${{ github.event.pull_request.title }}
-        body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
-        delete-branch: true
-        path: integration/realm-js
-        base: master
-        labels: public-api
-        commit-message: Update Core to ${{ github.event.pull_request.head.sha }}
-        draft: true
-  update-realm-cocoa:
-    runs-on: ubuntu-latest
-    name: Update realm-cocoa
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Checkout realm-cocoa
-      uses: actions/checkout@v2
-      with:
-        repository: realm/realm-cocoa
-        path: integration/realm-cocoa
-        submodules: recursive
-        token: ${{ secrets.REALM_CI_PAT }}
-    - name: Checkout existing branch
-      id: checkout-existing
-      run: |
-        cd integration/realm-cocoa
-        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-cocoa.git ${{ github.event.pull_request.head.ref }} | wc -l)
-        if [ $branch_exists -eq 1 ];then
-          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-          git fetch origin ${{ github.event.pull_request.head.ref }}
-          git checkout -t origin/${{ github.event.pull_request.head.ref }}
-          echo "::set-output name=pr-exists::true"
-        fi
     - name: Update Package.swift
+      if: ${{ !matrix.repo.submodule-path }}
       uses: jacobtomlinson/gha-find-replace@3eaedee5ed6204139f1edb18af1ee349763feac2
       with:
-        include: integration\/realm-cocoa\/Package\.swift
-        find: '\.package\(name: "RealmDatabase", url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
-        replace: '.package(name: "RealmDatabase", url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.head.sha }}"))'
+        include: integration\/${{ matrix.repo.name }}\/Package\.swift
+        find: 'url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
+        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.head.sha }}"))'
     - name: Push to existing branch
       if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
       run: |
-        cd integration/realm-cocoa
+        cd integration/${{ matrix.repo.name }}
         if [ -n "$(git status --porcelain)" ]; then
           git config --global user.name 'Realm CI bot'
           git config --global user.email 'realm-ci@users.noreply.github.com'
           git commit -am "Update Core to ${{ github.event.pull_request.head.sha }}"
-          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/realm-cocoa.git
+          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/${{ matrix.repo.name }}.git
         else
           echo "SDK repo is already up to date with these changes. Nothing to commit/push."
         fi
@@ -175,7 +75,7 @@ jobs:
         title: ${{ github.event.pull_request.title }}
         body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
         delete-branch: true
-        path: integration/realm-cocoa
+        path: integration/${{ matrix.repo.name }}
         base: master
         labels: public-api
         commit-message: Update Core to ${{ github.event.pull_request.head.sha }}
