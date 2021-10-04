@@ -1,0 +1,95 @@
+#@ load("@ytt:template", "template")
+#@ load("@ytt:overlay", "overlay")
+#@ realmciToken = "${{ secrets.REALM_CI_PAT }}"
+
+#@ def checkoutSDK(repo):
+name: #@ "Checkout " + repo
+uses: actions/checkout@v2
+with:
+  repository: #@ "realm/" + repo
+  path: #@ "integration/" + repo
+  submodules: recursive
+#@ end
+
+#@ def checkForExistingPR(repo):
+name: Check if PR already exists
+id: check-existing-pr
+#@yaml/text-templated-strings
+run: |
+  cd integration/(@= repo @)
+  branch_exists=$(git ls-remote --heads https://github.com/realm/(@= repo @).git ${{ github.event.pull_request.head.ref }} | wc -l)
+  echo "::set-output name=exists::$branch_exists"
+#@ end
+
+#@ def checkoutExistingBranch(repo):
+name: Checkout existing branch
+if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
+#@yaml/text-templated-strings
+run: |
+  cd integration/(@= repo @)
+  git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+  git checkout -t origin/${{ github.event.pull_request.head.ref }}"
+#@ end
+
+#@ def updateSubmodule(repo):
+name: Update submodule
+id: update-core
+#@yaml/text-templated-strings
+run: |
+  cd integration/(@= repo @)/wrappers/realm-core
+  git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+  git fetch origin ${{ github.event.pull_request.head.ref }}
+  git checkout -t origin/${{ github.event.pull_request.head.ref }}
+  core_sha=$(git rev-parse HEAD)\necho '::set-output name=core-sha::$core_sha'"""
+#@ end
+
+#@ def pushToExistingBranch(repo):
+name: Push to existing branch
+if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
+#@yaml/text-templated-strings
+run: |
+  cd integration/(@= repo @)
+  git config --global user.name 'Realm CI bot'
+  git config --global user.email 'realm-ci@users.noreply.github.com'
+  git commit -am "Update Core to ${{ steps.update-core.outputs.core-sha }}"
+  git push https://realm-ci:(@= realmciToken @)@github.com/realm/(@= repo @).git
+#@ end
+
+#@ def preparePR(repo):
+name: Create PR
+uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+if: ${{ steps.check-existing-pr.outputs.exists == '0' }}
+with:
+  token: #@ realmciToken
+  branch: ${{ github.event.pull_request.head.ref }}
+  title: ${{ github.event.pull_request.title }}
+  body: Pick up realm-core/#${{ github.event.pull_request.number }}
+  delete-branch: true
+  path: #@ "integration/" + repo
+  labels: public-api
+  draft: true
+#@ end
+
+#@ def sdkIntegrationTest(repo):
+#@yaml/text-templated-strings
+"update-(@= repo @)":
+  runs-on: ubuntu-latest
+  name: #@ "Update " + repo
+  if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
+  steps:
+    - uses: actions/checkout@v2
+    - #@ checkoutSDK(repo)
+#!    - #@ checkForExistingPR(repo)
+#!    - #@ checkoutExistingBranch(repo)
+    - #@ updateSubmodule(repo)
+#!    - #@ pushToExistingBranch(repo)
+    - #@ preparePR(repo)
+#@ end
+
+---
+name: Test SDKs
+"on":
+  pull_request:
+    types: [ opened, labeled, synchronize ]
+jobs:
+  _: #@ template.replace(sdkIntegrationTest("realm-dotnet"))

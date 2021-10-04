@@ -1,58 +1,40 @@
 name: Test SDKs
-on:
+"on":
   pull_request:
-    types: [ opened, labeled, synchronize ]
+    types:
+    - opened
+    - labeled
+    - synchronize
 jobs:
-  update-dotnet:
+  update-realm-dotnet:
     runs-on: ubuntu-latest
-    name: Update .NET
+    name: Update realm-dotnet
     if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
     steps:
-      - uses: actions/checkout@v2
-      - name: "Checkout .NET repo"
-        uses: actions/checkout@v2
-        with:
-          repository: realm/realm-dotnet
-          path: integration/dotnet
-          submodules: recursive
-      - name: Check if PR already exists
-        id: check-existing-pr
-        run: |
-          cd integration/dotnet
-          branch_exists=$(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l)
-          echo "::set-output name=exists::$branch_exists"
-      - name: Checkout existing branch
-        if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
-        run: |
-          cd integration/dotnet
-          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-          git checkout -t origin/${{ github.event.pull_request.head.ref }}
-      - name: Update submodule
-        id: update-core
-        run: |
-          cd integration/dotnet/wrappers/realm-core
-          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-          git fetch origin ${{ github.event.pull_request.head.ref }}
-          git checkout -t origin/${{ github.event.pull_request.head.ref }}
-          core_sha=$(git rev-parse HEAD)
-          echo '::set-output name=core-sha::$core_sha'
-      - name: Push to existing branch
-        if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
-        run: |
-          cd integration/dotnet
-          git config --global user.name 'Realm CI bot'
-          git config --global user.email 'realm-ci@users.noreply.github.com'
-          git commit -am "Update Core to ${{ steps.update-core.outputs.core-sha }}"
-          git push
-      - name: Create PR
-        uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
-        if: ${{ steps.check-existing-pr.outputs.exists == '0' }}
-        with:
-          branch: ${{ github.event.pull_request.head.ref }}
-          title: ${{ github.event.pull_request.title }}
-          body: Pick up realm-core/#${{ github.event.pull_request.number }}
-          delete-branch: true
-          path: integration/dotnet
-          labels: public-api
-          draft: true
-
+    - uses: actions/checkout@v2
+    - name: Checkout realm-dotnet
+      uses: actions/checkout@v2
+      with:
+        repository: realm/realm-dotnet
+        path: integration/realm-dotnet
+        submodules: recursive
+    - name: Update submodule
+      id: update-core
+      run: |
+        cd integration/realm-dotnet/wrappers/realm-core
+        git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+        git fetch origin ${{ github.event.pull_request.head.ref }}
+        git checkout -t origin/${{ github.event.pull_request.head.ref }}
+        core_sha=$(git rev-parse HEAD)\necho '::set-output name=core-sha::$core_sha'"""
+    - name: Create PR
+      uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+      if: ${{ steps.check-existing-pr.outputs.exists == '0' }}
+      with:
+        token: ${{ secrets.REALM_CI_PAT }}
+        branch: ${{ github.event.pull_request.head.ref }}
+        title: ${{ github.event.pull_request.title }}
+        body: Pick up realm-core/#${{ github.event.pull_request.number }}
+        delete-branch: true
+        path: integration/realm-dotnet
+        labels: public-api
+        draft: true
