@@ -1,6 +1,7 @@
 #@ load("@ytt:template", "template")
 #@ load("@ytt:overlay", "overlay")
 #@ realmciToken = "${{ secrets.REALM_CI_PAT }}"
+#@ defaultCommitMessage = "Update Core to ${{ steps.update-core.outputs.core-sha }}"
 
 #@ def checkoutSDK(repo):
 name: #@ "Checkout " + repo
@@ -12,25 +13,19 @@ with:
   token: #@ realmciToken
 #@ end
 
-#@ def checkForExistingPR(repo):
-name: Check if PR already exists
-id: check-existing-pr
-#@yaml/text-templated-strings
-run: |
-  cd integration/(@= repo @)
-  branch_exists=$(git ls-remote --heads https://github.com/realm/(@= repo @).git ${{ github.event.pull_request.head.ref }} | wc -l)
-  echo "::set-output name=exists::$branch_exists"
-#@ end
-
 #@ def checkoutExistingBranch(repo):
 name: Checkout existing branch
-if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
+id: checkout-existing
 #@yaml/text-templated-strings
 run: |
   cd integration/(@= repo @)
-  git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-  git fetch origin ${{ github.event.pull_request.head.ref }}
-  git checkout -t origin/${{ github.event.pull_request.head.ref }}
+  if $(git ls-remote --heads https://github.com/realm/(@= repo @).git ${{ github.event.pull_request.head.ref }} | wc -l) != 0
+  then
+    git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+    git fetch origin ${{ github.event.pull_request.head.ref }}
+    git checkout -t origin/${{ github.event.pull_request.head.ref }}
+    echo "::set-output name=pr-exists::true"
+  fi
 #@ end
 
 #@ def updateSubmodule(repo):
@@ -48,19 +43,20 @@ run: |
 
 #@ def pushToExistingBranch(repo):
 name: Push to existing branch
-if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
+if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
 #@yaml/text-templated-strings
 run: |
   cd integration/(@= repo @)
   git config --global user.name 'Realm CI bot'
   git config --global user.email 'realm-ci@users.noreply.github.com'
-  git commit -am "Update Core to ${{ steps.update-core.outputs.core-sha }}"
+  git commit -am "(@= defaultCommitMessage @)"
   git push https://realm-ci:(@= realmciToken @)@github.com/realm/(@= repo @).git
 #@ end
 
 #@ def preparePR(repo):
 name: Create PR
 uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
 with:
   token: #@ realmciToken
   branch: ${{ github.event.pull_request.head.ref }}
@@ -70,7 +66,7 @@ with:
   path: #@ "integration/" + repo
   base: master
   labels: public-api
-  commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
+  commit-message: #@ defaultCommitMessage
   draft: true
 #@ end
 
@@ -83,10 +79,9 @@ with:
   steps:
     - uses: actions/checkout@v2
     - #@ checkoutSDK(repo)
-    - #@ checkForExistingPR(repo)
     - #@ checkoutExistingBranch(repo)
     - #@ updateSubmodule(repo)
-#!    - #@ pushToExistingBranch(repo)
+    - #@ pushToExistingBranch(repo)
     - #@ preparePR(repo)
 #@ end
 

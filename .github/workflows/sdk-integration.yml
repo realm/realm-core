@@ -19,19 +19,17 @@ jobs:
         path: integration/realm-dotnet
         submodules: recursive
         token: ${{ secrets.REALM_CI_PAT }}
-    - name: Check if PR already exists
-      id: check-existing-pr
-      run: |
-        cd integration/realm-dotnet
-        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l)
-        echo "::set-output name=exists::$branch_exists"
     - name: Checkout existing branch
-      if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
+      id: checkout-existing
       run: |
         cd integration/realm-dotnet
-        git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-        git fetch origin ${{ github.event.pull_request.head.ref }}
-        git checkout -t origin/${{ github.event.pull_request.head.ref }}
+        if $(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l) != 0
+        then
+          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+          git fetch origin ${{ github.event.pull_request.head.ref }}
+          git checkout -t origin/${{ github.event.pull_request.head.ref }}
+          echo "::set-output name=pr-exists::true"
+        fi
     - name: Update submodule
       id: update-core
       run: |
@@ -41,8 +39,17 @@ jobs:
         git checkout -t origin/${{ github.event.pull_request.head.ref }}
         core_sha=$(git rev-parse HEAD)
         echo "::set-output name=core-sha::$core_sha"
+    - name: Push to existing branch
+      if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
+      run: |
+        cd integration/realm-dotnet
+        git config --global user.name 'Realm CI bot'
+        git config --global user.email 'realm-ci@users.noreply.github.com'
+        git commit -am "Update Core to ${{ steps.update-core.outputs.core-sha }}"
+        git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/realm-dotnet.git
     - name: Create PR
       uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+      if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
       with:
         token: ${{ secrets.REALM_CI_PAT }}
         branch: ${{ github.event.pull_request.head.ref }}
