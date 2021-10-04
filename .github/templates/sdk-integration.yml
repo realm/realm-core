@@ -41,7 +41,7 @@ run: |
   git fetch origin ${{ github.event.pull_request.head.ref }}
   git checkout -t origin/${{ github.event.pull_request.head.ref }}
   core_sha=$(git rev-parse HEAD)
-  echo '::set-output name=core-sha::$core_sha'
+  echo "::set-output name=core-sha::$core_sha"
 #@ end
 
 #@ def pushToExistingBranch(repo):
@@ -67,6 +67,7 @@ with:
   body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
   delete-branch: true
   path: #@ "integration/" + repo
+  base: master
   labels: public-api
   commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
   draft: true
@@ -81,8 +82,8 @@ with:
   steps:
     - uses: actions/checkout@v2
     - #@ checkoutSDK(repo)
-#!    - #@ checkForExistingPR(repo)
-#!    - #@ checkoutExistingBranch(repo)
+    - #@ checkForExistingPR(repo)
+    - #@ checkoutExistingBranch(repo)
     - #@ updateSubmodule(repo)
 #!    - #@ pushToExistingBranch(repo)
     - #@ preparePR(repo)
