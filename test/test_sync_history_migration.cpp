@@ -5,7 +5,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "test.hpp"
 #include "util/compare_groups.hpp"

@@ -2,9 +2,9 @@
 #define REALM_SYNC_ACCESS_CONTROL_HPP
 
 #include <realm/string_data.hpp>
-#include <realm/sync/access_token.hpp>
-#include <realm/sync/crypto_server.hpp>
-#include <realm/sync/permissions.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
+#include <realm/sync/noinst/server/crypto_server.hpp>
+#include <realm/sync/noinst/server/permissions.hpp>
 
 namespace realm {
 namespace sync {

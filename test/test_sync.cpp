@@ -19,9 +19,9 @@
 #include <realm/util/random.hpp>
 #include <realm/util/websocket.hpp>
 #include <realm/chunked_binary.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
 #include <realm/version.hpp>
@@ -29,7 +29,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/server.hpp>
+#include <realm/sync/noinst/server/server.hpp>
 #include <realm/list.hpp>
 
 #include "sync_fixtures.hpp"

@@ -4,8 +4,8 @@
 
 #include <realm/db.hpp>
 #include <realm/util/file.hpp>
-#include <realm/sync/noinst/server_history.hpp>
-#include <realm/sync/noinst/server_legacy_migration.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/server/server_legacy_migration.hpp>
 
 using namespace realm;
 
@@ -67,12 +67,12 @@ void migrate_file_safely(const std::string& realm_file, const std::string& temp_
                          const std::string& temp_file_2, const std::string& backup_file)
 {
     std::string lock_file = DB::get_core_file(realm_file, DB::CoreFileType::Lock); // Throws
-    util::File lock{lock_file, util::File::mode_Write}; // Throws
-    lock.lock_exclusive();                              // Throws
+    util::File lock{lock_file, util::File::mode_Write};                            // Throws
+    lock.lock_exclusive();                                                         // Throws
     util::File::UnlockGuard ug{lock};
-    util::File::copy(realm_file, temp_file_1);                                      // Throws
-    util::File::try_remove(temp_file_2);                                            // Throws
-    bool migration_was_needed = try_migrate_file(temp_file_1, temp_file_2);         // Throws
+    util::File::copy(realm_file, temp_file_1);                              // Throws
+    util::File::try_remove(temp_file_2);                                    // Throws
+    bool migration_was_needed = try_migrate_file(temp_file_1, temp_file_2); // Throws
     if (migration_was_needed) {
         // Just-in-time backup of the original Realm file.
         util::File::copy(realm_file, backup_file); // Throws
@@ -130,8 +130,8 @@ void ensure_legacy_migration_1(const std::string& realms_dir, const std::string&
             std::size_t n = 1;
             for (const auto& file : realm_files) {
                 logger.info("Migrating %1 (%2/%3)", file, n, realm_files.size());
-                std::string realm_file = util::File::resolve(file, realms_dir);  // Throws
-                std::string backup_file = util::File::resolve(file, backup_dir); // Throws
+                std::string realm_file = util::File::resolve(file, realms_dir);         // Throws
+                std::string backup_file = util::File::resolve(file, backup_dir);        // Throws
                 migrate_file_safely(realm_file, temp_file_1, temp_file_2, backup_file); // Throws
                 ++n;
             }

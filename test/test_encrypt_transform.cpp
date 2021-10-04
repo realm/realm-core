@@ -1,9 +1,9 @@
 #include "test.hpp"
 
-#include <realm/sync/encrypt/encryption_transformer.hpp>
+#include <realm/sync/noinst/server/encryption_transformer.hpp>
 #include <realm/util/file.hpp>
 #include <realm/db.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "sync_fixtures.hpp"
 

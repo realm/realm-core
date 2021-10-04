@@ -35,7 +35,7 @@
 #include "util/test_file.hpp"
 
 #include <external/json/json.hpp>
-#include <realm/sync/access_token.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
