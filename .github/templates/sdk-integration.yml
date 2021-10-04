@@ -28,7 +28,7 @@ if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
 run: |
   cd integration/(@= repo @)
   git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-  git checkout -t origin/${{ github.event.pull_request.head.ref }}"
+  git checkout -t origin/${{ github.event.pull_request.head.ref }}
 #@ end
 
 #@ def updateSubmodule(repo):
