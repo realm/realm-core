@@ -43,7 +43,6 @@ jobs:
         echo "::set-output name=core-sha::$core_sha"
     - name: Create PR
       uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
-      if: ${{ steps.check-existing-pr.outputs.exists == '0' }}
       with:
         token: ${{ secrets.REALM_CI_PAT }}
         branch: ${{ github.event.pull_request.head.ref }}
