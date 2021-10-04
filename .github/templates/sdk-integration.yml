@@ -47,10 +47,14 @@ if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
 #@yaml/text-templated-strings
 run: |
   cd integration/(@= repo @)
-  git config --global user.name 'Realm CI bot'
-  git config --global user.email 'realm-ci@users.noreply.github.com'
-  git commit -am "(@= defaultCommitMessage @)"
-  git push https://realm-ci:(@= realmciToken @)@github.com/realm/(@= repo @).git
+  if [ -n "$(git status --porcelain)" ]; then
+    git config --global user.name 'Realm CI bot'
+    git config --global user.email 'realm-ci@users.noreply.github.com'
+    git commit -am "(@= defaultCommitMessage @)"
+    git push https://realm-ci:(@= realmciToken @)@github.com/realm/(@= repo @).git
+  else
+    echo "SDK repo is already up to date with these changes. Nothing to commit/push."
+  fi
 #@ end
 
 #@ def preparePR(repo):
