@@ -109,7 +109,5 @@ RLM_API realm_logger_t* realm_logger_new(realm_logger_log_func_t log_func,
                                          realm_logger_get_threshold_func_t threshold_func, void* userdata,
                                          realm_free_userdata_func_t free_func)
 {
-    realm_logger_t* logger = new realm_logger_t;
-    logger->reset(new CLogger(UserdataPtr{userdata, free_func}, log_func, threshold_func));
-    return logger;
+    return new realm_logger_t(new CLogger(UserdataPtr{userdata, free_func}, log_func, threshold_func));
 }
