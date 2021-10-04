@@ -64,10 +64,11 @@ with:
   token: #@ realmciToken
   branch: ${{ github.event.pull_request.head.ref }}
   title: ${{ github.event.pull_request.title }}
-  body: Pick up realm-core/#${{ github.event.pull_request.number }}
+  body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
   delete-branch: true
   path: #@ "integration/" + repo
   labels: public-api
+  commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
   draft: true
 #@ end
 

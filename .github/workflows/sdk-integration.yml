@@ -34,8 +34,9 @@ jobs:
         token: ${{ secrets.REALM_CI_PAT }}
         branch: ${{ github.event.pull_request.head.ref }}
         title: ${{ github.event.pull_request.title }}
-        body: Pick up realm-core/#${{ github.event.pull_request.number }}
+        body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
         delete-branch: true
         path: integration/realm-dotnet
         labels: public-api
+        commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
         draft: true
