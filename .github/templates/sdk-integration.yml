@@ -9,6 +9,7 @@ with:
   repository: #@ "realm/" + repo
   path: #@ "integration/" + repo
   submodules: recursive
+  token: #@ realmciToken
 #@ end
 
 #@ def checkForExistingPR(repo):
@@ -28,6 +29,7 @@ if: ${{ steps.check-existing-pr.outputs.exists == '1' }}
 run: |
   cd integration/(@= repo @)
   git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+  git fetch origin ${{ github.event.pull_request.head.ref }}
   git checkout -t origin/${{ github.event.pull_request.head.ref }}
 #@ end
 

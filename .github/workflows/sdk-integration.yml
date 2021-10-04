@@ -18,6 +18,7 @@ jobs:
         repository: realm/realm-dotnet
         path: integration/realm-dotnet
         submodules: recursive
+        token: ${{ secrets.REALM_CI_PAT }}
     - name: Check if PR already exists
       id: check-existing-pr
       run: |
@@ -29,6 +30,7 @@ jobs:
       run: |
         cd integration/realm-dotnet
         git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+        git fetch origin ${{ github.event.pull_request.head.ref }}
         git checkout -t origin/${{ github.event.pull_request.head.ref }}
     - name: Update submodule
       id: update-core
