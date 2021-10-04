@@ -22,7 +22,6 @@ set(SYNC_SOURCES
     instruction_replication.cpp
     instructions.cpp
     object_id.cpp
-    object.cpp
     protocol.cpp
     transform.cpp
     ../util/network_ssl.cpp

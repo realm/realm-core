@@ -108,7 +108,7 @@ TEST_IF(Sync_HistoryMigration, false)
     auto reference_initialize = [&](const std::string& client_path) {
         DBRef sg = DB::create(sync::make_client_replication(client_path));
         WriteTransaction wt{sg};
-        TableRef table = sync::create_table_with_primary_key(wt, "class_Table", type_String, "label");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_Table", type_String, "label");
         ColKey col_key = table->add_column(type_Int, "value");
         table->create_object_with_primary_key("Banach").set(col_key, 88);
         table->create_object_with_primary_key("Hausdorff").set(col_key, 99);

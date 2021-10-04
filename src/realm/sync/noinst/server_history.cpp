@@ -2832,8 +2832,8 @@ void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transacti
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
         REALM_ASSERT(class_name.size() < Group::max_table_name_length - 6);
-        TableNameBuffer buffer;
-        return group.get_table(class_name_to_table_name(class_name, buffer));
+        Group::TableNameBuffer buffer;
+        return group.get_table(Group::class_name_to_table_name(class_name, buffer));
     };
 
     // Fix up changesets in history. We know that all of these are of our own

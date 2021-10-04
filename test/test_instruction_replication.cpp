@@ -64,7 +64,7 @@ TEST(InstructionReplication_AddTable)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        sync::create_table(wt, "class_foo");
+        wt.add_table("class_foo");
         wt.commit();
     }
     fixture.replay_transactions();
@@ -85,7 +85,7 @@ TEST(InstructionReplication_AddColumnTwice)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_types");
+        TableRef foo = wt.add_table("class_types");
         for (auto type : basic_types) {
             foo->add_column(type, util::format("simple_%1", type));
             foo->add_column_list(type, util::format("list_of_%1", type));
@@ -163,7 +163,7 @@ TEST(InstructionReplication_CreateObject)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
+        TableRef foo = wt.add_table("class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
         foo->create_object().set(col_ndx, 123);
         wt.commit();
@@ -186,7 +186,7 @@ TEST(InstructionReplication_CreateObjectNullStringPK)
     {
         WriteTransaction wt{fixture.sg_1};
         bool nullable = true;
-        TableRef foo = sync::create_table_with_primary_key(wt, "class_foo", type_String, "pk", nullable);
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_String, "pk", nullable);
         Obj obj = foo->create_object_with_primary_key(StringData{});
         ColKey col_ndx = foo->get_column_key("pk");
         CHECK(obj.is_null(col_ndx));
@@ -220,7 +220,7 @@ TEST(InstructionReplication_CreateObjectObjectIdPK)
     ObjKey key3;
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table_with_primary_key(wt, "class_foo", type_ObjectId, "_id", false);
+        TableRef foo = wt.get_group().add_table_with_primary_key("class_foo", type_ObjectId, "_id", false);
         auto col_dec = foo->add_column(type_Decimal, "cost");
         key = foo->create_object_with_primary_key(id).set(col_dec, cost).get_key();
         key2 = foo->create_object_with_primary_key(ObjectId::gen()).set(col_dec, large).get_key();
@@ -251,7 +251,7 @@ TEST(InstructionReplication_CreateEmbedded)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef car = sync::create_table_with_primary_key(wt, "class_Car", type_String, "id", false);
+        TableRef car = wt.get_group().add_table_with_primary_key("class_Car", type_String, "id", false);
         auto wheel = wt.add_embedded_table("class_Wheel");
         auto col_position = wheel->add_column(type_String, "position");
         auto col_wheels = car->add_column_list(*wheel, "wheels");
@@ -377,8 +377,8 @@ TEST(InstructionReplication_SetLink)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
-        TableRef bar = sync::create_table(wt, "class_bar");
+        TableRef foo = wt.add_table("class_foo");
+        TableRef bar = wt.add_table("class_bar");
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_l = bar->add_column(*foo, "l");
 
@@ -416,7 +416,7 @@ TEST(InstructionReplication_AddInteger)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
+        TableRef foo = wt.add_table("class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
         ColKey col_mixed = foo->add_column(type_Mixed, "m");
         auto obj = foo->create_object();
@@ -444,7 +444,7 @@ TEST(InstructionReplication_ListSwap)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
+        TableRef foo = wt.add_table("class_foo");
         ColKey col_list = foo->add_column_list(type_Int, "i");
         auto list = foo->create_object().get_list<Int>(col_list);
         list.add(1);
@@ -478,8 +478,8 @@ TEST(InstructionReplication_LinkLists)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
-        TableRef bar = sync::create_table(wt, "class_bar");
+        TableRef foo = wt.add_table("class_foo");
+        TableRef bar = wt.add_table("class_bar");
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_ll = bar->add_column_list(*foo, "ll");
 
@@ -529,8 +529,8 @@ TEST(InstructionReplication_LinkSets)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = sync::create_table(wt, "class_foo");
-        TableRef bar = sync::create_table(wt, "class_bar");
+        TableRef foo = wt.add_table("class_foo");
+        TableRef bar = wt.add_table("class_bar");
         ColKey foo_i = foo->add_column(type_Int, "int");
         ColKey bar_ls = bar->add_column_set(*foo, "link set");
 
@@ -583,7 +583,7 @@ TEST(InstructionReplication_NullablePrimaryKeys)
     {
         WriteTransaction wt{fixture.sg_1};
         bool nullable = true;
-        TableRef t = sync::create_table_with_primary_key(wt, "class_t", type_Int, "pk", nullable);
+        TableRef t = wt.get_group().add_table_with_primary_key("class_t", type_Int, "pk", nullable);
         ColKey col_ndx = t->add_column(type_Int, "i");
 
         t->create_object_with_primary_key(123).set(col_ndx, 123);

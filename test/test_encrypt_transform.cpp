@@ -3,7 +3,6 @@
 #include <realm/sync/encrypt/encryption_transformer.hpp>
 #include <realm/util/file.hpp>
 #include <realm/db.hpp>
-#include <realm/sync/object.hpp>
 #include <realm/sync/noinst/server_history.hpp>
 
 #include "sync_fixtures.hpp"
@@ -18,7 +17,7 @@ const size_t num_rows = 100;
 void populate(DBRef& sg)
 {
     WriteTransaction wt{sg};
-    TableRef t = create_table(wt, "table");
+    TableRef t = wt.add_table("table");
     t->add_column(type_String, "str_col");
     t->add_column(type_Int, "int_col");
     for (size_t i = 0; i < num_rows; ++i) {
@@ -152,7 +151,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         ObjKey obj_key;
         {
             WriteTransaction wt{reference_sg};
-            TableRef persons = create_table(wt, "class_persons");
+            TableRef persons = wt.add_table("class_persons");
             col_ndx_person_name = persons->add_column(type_String, "name");
             col_ndx_person_age = persons->add_column(type_Int, "age");
             persons->create_object().set_all("Adam", 28);

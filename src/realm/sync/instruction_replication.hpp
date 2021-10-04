@@ -21,7 +21,6 @@
 
 #include <realm/replication.hpp>
 #include <realm/sync/instructions.hpp>
-#include <realm/sync/object.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 
 namespace realm {
