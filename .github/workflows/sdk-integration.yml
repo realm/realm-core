@@ -1,5 +1,5 @@
-name: Test SDKs
-"on":
+name: SDK Integration
+on:
   pull_request:
     types:
     - opened
