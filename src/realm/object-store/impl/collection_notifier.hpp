@@ -187,14 +187,14 @@ protected:
     bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
 
     // Creates and returns a `DeepChangeChecker` or `KeyPathChecker` depending on the given KeyPathArray.
-    std::function<bool(ObjectChangeSet::ObjectKeyType)> get_modification_checker(TransactionChangeInfo const&,
-                                                                                 ConstTableRef)
+    std::function<bool(ObjKey)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef)
         REQUIRES(!m_callback_mutex);
 
     // Creates and returns a `ObjectKeyPathChangeChecker` which behaves slightly different that `DeepChangeChecker`
     // and `KeyPathChecker` which are used for `Collection`s.
-    std::function<std::vector<int64_t>(ObjectChangeSet::ObjectKeyType)>
-    get_object_modification_checker(TransactionChangeInfo const&, ConstTableRef) REQUIRES(!m_callback_mutex);
+    std::function<std::vector<ColKey>(ObjKey)> get_object_modification_checker(TransactionChangeInfo const&,
+                                                                               ConstTableRef)
+        REQUIRES(!m_callback_mutex);
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.
     void recalculate_key_path_array() REQUIRES(m_callback_mutex);

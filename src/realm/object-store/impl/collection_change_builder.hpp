@@ -22,6 +22,7 @@
 #include <realm/object-store/collection_notifications.hpp>
 
 #include <realm/keys.hpp>
+#include <realm/util/function_ref.hpp>
 
 #include <functional>
 #include <unordered_set>
@@ -40,13 +41,14 @@ public:
     CollectionChangeBuilder(IndexSet deletions = {}, IndexSet insertions = {}, IndexSet modification = {},
                             std::vector<Move> moves = {}, bool root_was_deleted = false);
 
+    // Calculate where objects need to be inserted or deleted from old_objs to turn
+    // it into new_objs, and check all matching objects for modifications
+    static CollectionChangeBuilder calculate(const ObjKeys& old_objs, const ObjKeys& new_objs,
+                                             util::FunctionRef<bool(ObjKey)> key_did_change, bool in_table_order);
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
-    static CollectionChangeBuilder calculate(std::vector<int64_t> const& old_rows,
-                                             std::vector<int64_t> const& new_rows,
-                                             std::function<bool(int64_t)> key_did_change, bool in_table_order);
     static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows, std::vector<size_t> const& new_rows,
-                                             std::function<bool(int64_t)> key_did_change);
+                                             util::FunctionRef<bool(size_t)> ndx_did_change);
 
     // generic operations {
     CollectionChangeSet finalize() &&;

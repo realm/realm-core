@@ -146,7 +146,7 @@ public:
         IndexSet indices;
     };
 
-    // Information about an observed row in a table
+    // Information about an observed object in a table
     //
     // Each object which needs detailed change information should have an
     // ObserverState entry in the vector returned from get_observed_rows(), with
@@ -154,9 +154,9 @@ public:
     // The Realm parses the transaction log, and populates the `changes` vector
     // in each ObserverState with information about what changes were made.
     struct ObserverState {
-        // Table and row which is observed
+        // Table and object which is observed
         realm::TableKey table_key;
-        int64_t obj_key;
+        ObjKey obj_key;
 
         // Opaque userdata for the delegate's use
         void* info;
