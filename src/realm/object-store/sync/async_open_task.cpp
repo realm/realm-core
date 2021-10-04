@@ -41,9 +41,13 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     session->wait_for_download_completion([callback, self, this](std::error_code ec) {
         auto session = m_session.exchange(nullptr);
-        if (!session)
-            return; // Swallow all events if the task as been canceled.
 
+        if (!session)
+            return; // Swallow all events if the task has been cancelled.
+
+        for (auto token : m_registered_callbacks) {
+            session->unregister_progress_notifier(token);
+        }
         // Release our references to the coordinator after calling the callback
         auto coordinator = std::move(m_coordinator);
         m_coordinator = nullptr;
@@ -65,6 +69,9 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 void AsyncOpenTask::cancel()
 {
     if (auto session = m_session.exchange(nullptr)) {
+        for (auto token : m_registered_callbacks) {
+            session->unregister_progress_notifier(token);
+        }
         // Does a better way exists for canceling the download?
         session->log_out();
         m_coordinator = nullptr;
@@ -75,7 +82,8 @@ uint64_t
 AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback> callback)
 {
     if (auto session = m_session.load()) {
-        return session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+        auto token = session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+        m_registered_callbacks.emplace_back(token);
     }
     else {
         return 0;

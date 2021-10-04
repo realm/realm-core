@@ -54,6 +54,7 @@ public:
 private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
     util::AtomicSharedPtr<SyncSession> m_session;
+    std::vector<uint64_t> m_registered_callbacks;
 };
 
 } // namespace realm
