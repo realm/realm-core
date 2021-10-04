@@ -1,7 +1,7 @@
 #@ load("@ytt:template", "template")
 #@ load("@ytt:overlay", "overlay")
 #@ realmciToken = "${{ secrets.REALM_CI_PAT }}"
-#@ defaultCommitMessage = "Update Core to ${{ steps.update-core.outputs.core-sha }}"
+#@ defaultCommitMessage = "Update Core to ${{ github.event.pull_request.head.sha }}"
 
 #@ def checkoutSDK(repo):
 name: #@ "Checkout " + repo
@@ -30,15 +30,21 @@ run: |
 
 #@ def updateSubmodule(repo, submodulePath):
 name: Update submodule
-id: update-core
 #@yaml/text-templated-strings
 run: |
   cd integration/(@= repo @)/(@= submodulePath @)
   git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
   git fetch origin ${{ github.event.pull_request.head.ref }}
   git checkout -t origin/${{ github.event.pull_request.head.ref }}
-  core_sha=$(git rev-parse HEAD)
-  echo "::set-output name=core-sha::$core_sha"
+#@ end
+
+#@ def updatePackageSwift(repo):
+name: Update Package.swift
+uses: jacobtomlinson/gha-find-replace@3eaedee5ed6204139f1edb18af1ee349763feac2
+with:
+  include: #@ "integration\/" + repo + "\/Package\.swift"
+  find: '\.package\(name: "RealmDatabase", url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
+  replace: '.package(name: "RealmDatabase", url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.head.sha }}"))'
 #@ end
 
 #@ def pushToExistingBranch(repo):
@@ -82,6 +88,8 @@ with:
   if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
   steps:
     - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
     - #@ checkoutSDK(repo)
     - #@ checkoutExistingBranch(repo)
     #@ for step in submoduleUpdateSteps:
@@ -99,3 +107,4 @@ name: Test SDKs
 jobs:
   _: #@ template.replace(sdkIntegrationPR("realm-dotnet", [ updateSubmodule("realm-dotnet", "wrappers/realm-core") ]))
   _: #@ template.replace(sdkIntegrationPR("realm-js", [ updateSubmodule("realm-js", "vendor/realm-core") ]))
+  _: #@ template.replace(sdkIntegrationPR("realm-cocoa", [ updatePackageSwift("realm-cocoa") ]))
