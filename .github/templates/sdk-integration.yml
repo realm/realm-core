@@ -28,12 +28,12 @@ run: |
   fi
 #@ end
 
-#@ def updateSubmodule(repo):
+#@ def updateSubmodule(repo, submodulePath):
 name: Update submodule
 id: update-core
 #@yaml/text-templated-strings
 run: |
-  cd integration/(@= repo @)/wrappers/realm-core
+  cd integration/(@= repo @)/(@= submodulePath @)
   git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
   git fetch origin ${{ github.event.pull_request.head.ref }}
   git checkout -t origin/${{ github.event.pull_request.head.ref }}
@@ -74,7 +74,7 @@ with:
   draft: true
 #@ end
 
-#@ def sdkIntegrationTest(repo):
+#@ def sdkIntegrationPR(repo, submoduleUpdateSteps):
 #@yaml/text-templated-strings
 "update-(@= repo @)":
   runs-on: ubuntu-latest
@@ -84,7 +84,9 @@ with:
     - uses: actions/checkout@v2
     - #@ checkoutSDK(repo)
     - #@ checkoutExistingBranch(repo)
-    - #@ updateSubmodule(repo)
+    #@ for step in submoduleUpdateSteps:
+    - #@ step
+    #@ end
     - #@ pushToExistingBranch(repo)
     - #@ preparePR(repo)
 #@ end
@@ -95,4 +97,5 @@ name: Test SDKs
   pull_request:
     types: [ opened, labeled, synchronize ]
 jobs:
-  _: #@ template.replace(sdkIntegrationTest("realm-dotnet"))
+  _: #@ template.replace(sdkIntegrationPR("realm-dotnet", [ updateSubmodule("realm-dotnet", "wrappers/realm-core") ]))
+  _: #@ template.replace(sdkIntegrationPR("realm-js", [ updateSubmodule("realm-js", "vendor/realm-core") ]))

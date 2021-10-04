@@ -65,3 +65,62 @@ jobs:
         labels: public-api
         commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
         draft: true
+  update-realm-js:
+    runs-on: ubuntu-latest
+    name: Update realm-js
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout realm-js
+      uses: actions/checkout@v2
+      with:
+        repository: realm/realm-js
+        path: integration/realm-js
+        submodules: recursive
+        token: ${{ secrets.REALM_CI_PAT }}
+    - name: Checkout existing branch
+      id: checkout-existing
+      run: |
+        cd integration/realm-js
+        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-js.git ${{ github.event.pull_request.head.ref }} | wc -l)
+        if [ $branch_exists -eq 1 ];then
+          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+          git fetch origin ${{ github.event.pull_request.head.ref }}
+          git checkout -t origin/${{ github.event.pull_request.head.ref }}
+          echo "::set-output name=pr-exists::true"
+        fi
+    - name: Update submodule
+      id: update-core
+      run: |
+        cd integration/realm-js/vendor/realm-core
+        git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
+        git fetch origin ${{ github.event.pull_request.head.ref }}
+        git checkout -t origin/${{ github.event.pull_request.head.ref }}
+        core_sha=$(git rev-parse HEAD)
+        echo "::set-output name=core-sha::$core_sha"
+    - name: Push to existing branch
+      if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
+      run: |
+        cd integration/realm-js
+        if [ -n "$(git status --porcelain)" ]; then
+          git config --global user.name 'Realm CI bot'
+          git config --global user.email 'realm-ci@users.noreply.github.com'
+          git commit -am "Update Core to ${{ steps.update-core.outputs.core-sha }}"
+          git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/realm-js.git
+        else
+          echo "SDK repo is already up to date with these changes. Nothing to commit/push."
+        fi
+    - name: Create PR
+      uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
+      if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
+      with:
+        token: ${{ secrets.REALM_CI_PAT }}
+        branch: ${{ github.event.pull_request.head.ref }}
+        title: ${{ github.event.pull_request.title }}
+        body: Pick up https://github.com/realm/realm-core/pull/${{ github.event.pull_request.number }}
+        delete-branch: true
+        path: integration/realm-js
+        base: master
+        labels: public-api
+        commit-message: Update Core to ${{ steps.update-core.outputs.core-sha }}
+        draft: true
