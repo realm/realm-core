@@ -23,8 +23,8 @@ jobs:
       id: checkout-existing
       run: |
         cd integration/realm-dotnet
-        if $(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l) != 0
-        then
+        branch_exists=$(git ls-remote --heads https://github.com/realm/realm-dotnet.git ${{ github.event.pull_request.head.ref }} | wc -l)
+        if [ $branch_exists -eq 1 ];then
           git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
           git fetch origin ${{ github.event.pull_request.head.ref }}
           git checkout -t origin/${{ github.event.pull_request.head.ref }}
