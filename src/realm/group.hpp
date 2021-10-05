@@ -342,12 +342,10 @@ public:
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
-        constexpr const char class_prefix[] = "class_";
-        constexpr size_t class_prefix_len = sizeof(class_prefix) - 1;
-        char* p = std::copy_n(class_prefix, class_prefix_len, buffer.data());
-        size_t len = std::min(class_name.size(), buffer.size() - class_prefix_len);
+        char* p = std::copy_n(g_class_name_prefix, g_class_name_prefix_len, buffer.data());
+        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix_len);
         std::copy_n(class_name.data(), len, p);
-        return StringData(buffer.data(), class_prefix_len + len);
+        return StringData(buffer.data(), g_class_name_prefix_len + len);
     }
 
 

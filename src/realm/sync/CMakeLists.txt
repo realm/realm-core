@@ -81,7 +81,6 @@ set(SYNC_INSTALL_HEADERS
     instruction_replication.hpp
     instructions.hpp
     object_id.hpp
-    object.hpp
     permissions.hpp
     protocol.hpp
     transform.hpp
