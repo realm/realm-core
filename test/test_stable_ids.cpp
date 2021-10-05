@@ -4,7 +4,6 @@
 #include <realm/sync/noinst/server_history.hpp>
 #include <realm/db.hpp>
 
-#include <realm/sync/object.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_applier.hpp>
@@ -75,7 +74,7 @@ TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, 
 
     {
         WriteTransaction wt{sg};
-        sync::create_table(wt, "class_foo");
+        wt.get_or_add_table("class_foo");
         wt.commit();
     }
 
@@ -107,7 +106,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables without primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
 
         auto obj0 = t0->create_object();
         auto obj1 = t0->create_object();
@@ -120,7 +119,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with integer primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = wt.get_group().add_table_with_primary_key("class_t1", type_Int, "pk");
         auto obj0 = t1->create_object_with_primary_key(123);
 
         GlobalKey expected_object_id(123);
@@ -130,7 +129,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with string primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_String, "pk");
+        TableRef t2 = wt.get_group().add_table_with_primary_key("class_t2", type_String, "pk");
         auto obj0 = t2->create_object_with_primary_key("foo");
 
         GlobalKey expected_object_id("foo");
@@ -141,20 +140,24 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // is used.
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
-        TableRef t11 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = wt.get_group().get_or_add_table_with_primary_key("class_t1", type_Int, "pk");
+        TableRef t11 = wt.get_group().get_or_add_table_with_primary_key("class_t1", type_Int, "pk");
         CHECK_EQUAL(t1, t11);
 
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
-        TableRef t21 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
+        TableRef t2 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t2", type_Int, "pk", /* nullable */ true);
+        TableRef t21 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t2", type_Int, "pk", /* nullable */ true);
         CHECK_EQUAL(t2, t21);
 
-        TableRef t3 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
-        TableRef t31 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
+        TableRef t3 = wt.get_group().get_or_add_table_with_primary_key("class_t3", type_String, "pk");
+        TableRef t31 = wt.get_group().get_or_add_table_with_primary_key("class_t3", type_String, "pk");
         CHECK_EQUAL(t3, t31);
 
-        TableRef t4 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
-        TableRef t41 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
+        TableRef t4 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t4", type_String, "pk", /* nullable */ true);
+        TableRef t41 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t4", type_String, "pk", /* nullable */ true);
         CHECK_EQUAL(t4, t41);
     }
 
@@ -172,8 +175,8 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
     ColKey link_col;
     {
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-        TableRef t1 = sync::create_table(wt, "class_t1");
+        TableRef t0 = wt.get_or_add_table("class_t0");
+        TableRef t1 = wt.get_or_add_table("class_t1");
         link_col = t0->add_column(*t1, "link");
 
         Obj t1_k1 = t1->create_object();
@@ -252,7 +255,7 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
         auto history = TEST_TYPE::make_history(test_dir);
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
         t0->create_object();
         CHECK_EQUAL(t0->size(), 2);
@@ -262,7 +265,7 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
         auto history = TEST_TYPE::make_history(test_dir);
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
         t0->create_object();
         CHECK_EQUAL(t0->size(), 4);
@@ -285,7 +288,7 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
         DBRef sg = DB::create(*history);
         {
             WriteTransaction wt{sg};
-            TableRef t0 = sync::create_table_with_primary_key(wt, "class_t0", type_String, "pk");
+            TableRef t0 = wt.get_group().add_table_with_primary_key("class_t0", type_String, "pk");
 
             char buffer[12];
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {

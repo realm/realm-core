@@ -22,7 +22,6 @@ set(SYNC_SOURCES
     instruction_replication.cpp
     instructions.cpp
     object_id.cpp
-    object.cpp
     protocol.cpp
     transform.cpp
     ../util/network_ssl.cpp
@@ -82,7 +81,6 @@ set(SYNC_INSTALL_HEADERS
     instruction_replication.hpp
     instructions.hpp
     object_id.hpp
-    object.hpp
     permissions.hpp
     protocol.hpp
     transform.hpp

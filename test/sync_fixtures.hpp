@@ -1061,9 +1061,7 @@ inline void RealmFixture::empty_transact()
 inline void RealmFixture::nonempty_transact()
 {
     auto func = [](Transaction& tr) {
-        TableRef table = tr.get_table("class_Table");
-        if (!table)
-            table = sync::create_table(tr, "class_Test");
+        TableRef table = tr.get_or_add_table("class_Table");
         table->create_object();
         return true;
     };
@@ -1137,7 +1135,7 @@ namespace accounting {
 // Set up schema
 inline bool init(Transaction& tr, int account_identifier, std::int_fast64_t initial_balance)
 {
-    TableRef account = sync::create_table(tr, "class_Account");
+    TableRef account = tr.add_table("class_Account");
     ColKey col_ndx_identifier = account->add_column(type_Int, "identifier");
     ColKey col_ndx_balance = account->add_column(type_Int, "balance");
     account->create_object().set(col_ndx_identifier, account_identifier).set(col_ndx_balance, initial_balance);
@@ -1168,7 +1166,7 @@ inline TableRef find_or_create_result_sets_table(Transaction& g)
 {
     TableRef result_sets = g.get_table(g_partial_sync_result_sets_table_name);
     if (!result_sets) {
-        result_sets = sync::create_table(g, g_partial_sync_result_sets_table_name);
+        result_sets = g.add_table(g_partial_sync_result_sets_table_name);
         result_sets->add_column(type_String, "query");
         result_sets->add_column(type_String, "matches_property");
         result_sets->add_column(type_Int, "status");
