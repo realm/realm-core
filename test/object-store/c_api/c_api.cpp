@@ -1125,6 +1125,15 @@ TEST_CASE("C API") {
             });
         }
 
+        SECTION("duplicate primary key") {
+            write([&]() {
+                cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123)));
+                auto p = realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123));
+                CHECK(!p);
+                CHECK_ERR(RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
+            });
+        }
+
         SECTION("not in a transaction") {
             CHECK(!realm_object_create(realm, class_foo.key));
             CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
@@ -1191,6 +1200,14 @@ TEST_CASE("C API") {
             realm_class_key_t invalid_class_key = 123123123;
             CHECK(!realm_get_object(realm, invalid_class_key, obj1_key));
             CHECK_ERR(RLM_ERR_NO_SUCH_TABLE);
+        }
+
+        SECTION("create object with primary key that already exists") {
+            bool did_create;
+            auto obj2a = cptr_checked(
+                realm_object_get_or_create_with_primary_key(realm, class_bar.key, rlm_int_val(1), &did_create));
+            CHECK(!did_create);
+            CHECK(realm_equals(obj2a.get(), obj2.get()));
         }
 
         SECTION("realm_get_value()") {
