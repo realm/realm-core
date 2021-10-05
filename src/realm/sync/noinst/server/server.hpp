@@ -11,6 +11,7 @@
 #include <realm/util/network.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/string_view.hpp>
 #include <realm/util/time.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/noinst/server/metrics.hpp>

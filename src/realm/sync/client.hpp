@@ -13,10 +13,9 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
-#include <realm/impl/cont_transact_hist.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
+#include <realm/sync/config.hpp>
+#include <realm/sync/protocol.hpp>
 
 namespace realm {
 namespace sync {

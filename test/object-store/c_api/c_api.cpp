@@ -7,6 +7,7 @@
 #include "util/test_file.hpp"
 
 #include <cstring>
+#include <numeric>
 #include <thread>
 
 extern "C" int realm_c_api_tests(const char* file);

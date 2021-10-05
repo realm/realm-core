@@ -19,8 +19,11 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 
-namespace realm {
-namespace app {
+#include <realm/object-store/sync/app_service_client.hpp>
+
+namespace realm::app {
+
+MongoClient::~MongoClient() = default;
 
 MongoDatabase MongoClient::operator[](const std::string& name)
 {
@@ -32,5 +35,4 @@ MongoDatabase MongoClient::db(const std::string& name)
     return MongoDatabase(name, m_user, m_service, m_service_name);
 }
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app

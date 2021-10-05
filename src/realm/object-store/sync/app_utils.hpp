@@ -16,23 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-
 #ifndef APP_UTILS_HPP
 #define APP_UTILS_HPP
 
-#include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/util/optional.hpp>
-#include <string>
 
-namespace realm {
-namespace app {
+namespace realm::app {
+struct AppError;
+struct Response;
 
 class AppUtils {
 public:
     static util::Optional<AppError> check_for_errors(const Response& response);
 };
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* APP_UTILS_HPP */

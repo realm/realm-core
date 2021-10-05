@@ -25,6 +25,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
 

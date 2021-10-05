@@ -18,6 +18,10 @@
 
 #include <realm/object-store/sync/app_utils.hpp>
 
+#include <realm/object-store/sync/generic_network_transport.hpp>
+
+#include <external/json/json.hpp>
+
 namespace realm {
 namespace app {
 
