@@ -29,5 +29,4 @@ jobs:
         token: ${{ secrets.REALM_CI_PAT }}
         repository: ${{ matrix.repo }}
         pull-request-number: ${{ steps.find-pr-number.outputs.number }}
-        comment: Closing this because the Core PR was closed.
         delete-branch: true
