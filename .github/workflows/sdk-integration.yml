@@ -51,7 +51,7 @@ jobs:
       with:
         include: integration\/${{ matrix.repo.name }}\/Package\.swift
         find: 'url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
-        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha }}"))'
+        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ (github.event.pull_request.merged && github.event.pull_request.merge_commit_sha) || github.event.pull_request.head.sha }}"))'
     - name: Push to existing branch
       if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
       run: |
