@@ -9,7 +9,7 @@ jobs:
   update-sdk-prs:
     runs-on: ubuntu-latest
     name: Update SDK PRs
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && github.event.pull_request.state === 'open' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && github.event.pull_request.state == 'open' }}
     strategy:
       matrix:
         repo:
