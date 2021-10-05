@@ -9,7 +9,7 @@ jobs:
   update-sdk-prs:
     runs-on: ubuntu-latest
     name: Update SDK PRs
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && github.event.pull_request.state === 'open' }}
     strategy:
       matrix:
         repo:
@@ -19,9 +19,6 @@ jobs:
             submodule-path: vendor/realm-core
           - name: realm-cocoa
     steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
     - name: Checkout ${{ matrix.repo.name }}
       uses: actions/checkout@v2
       with:
@@ -29,14 +26,13 @@ jobs:
         path: integration/${{ matrix.repo.name }}
         submodules: recursive
         token: ${{ secrets.REALM_CI_PAT }}
+        fetch-depth: 0
     - name: Checkout existing branch
       id: checkout-existing
       run: |
         cd integration/${{ matrix.repo.name }}
         branch_exists=$(git ls-remote --heads https://github.com/realm/${{ matrix.repo.name }}.git ${{ github.event.pull_request.head.ref }} | wc -l)
         if [ $branch_exists -eq 1 ];then
-          git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-          git fetch origin ${{ github.event.pull_request.head.ref }}
           git checkout -t origin/${{ github.event.pull_request.head.ref }}
           echo "::set-output name=pr-exists::true"
         fi
@@ -44,8 +40,6 @@ jobs:
       if: ${{ matrix.repo.submodule-path }}
       run: |
         cd integration/${{ matrix.repo.name }}/${{ matrix.repo.submodule-path }}
-        git remote set-branches --add 'origin' ${{ github.event.pull_request.head.ref }}
-        git fetch origin ${{ github.event.pull_request.head.ref }}
         git checkout -t origin/${{ github.event.pull_request.head.ref }}
     - name: Update Package.swift
       if: ${{ !matrix.repo.submodule-path }}
