@@ -27,6 +27,7 @@ jobs:
       uses: peter-evans/close-pull@cd1af3be40e42b1c6cb814502bee104471c8980b
       with:
         token: ${{ secrets.REALM_CI_PAT }}
-        repository: ${{ matrix.repo }}
+        repository: realm/${{ matrix.repo }}
         pull-request-number: ${{ steps.find-pr-number.outputs.number }}
+        comment: Closing this because the Core PR was closed.
         delete-branch: true
