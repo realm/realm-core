@@ -33,16 +33,17 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
-#include <realm/db.hpp>
-
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #endif
 
+#include <realm/db.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <external/json/json.hpp>
 
 namespace realm {
 class TestHelper {

@@ -15,14 +15,18 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+
 #ifndef AUTH_REQUEST_CLIENT_HPP
 #define AUTH_REQUEST_CLIENT_HPP
 
-#include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
+#include <functional>
+#include <string>
 
 namespace realm {
+class SyncUser;
 namespace app {
+struct Request;
+struct Response;
 
 class AuthRequestClient {
 public:

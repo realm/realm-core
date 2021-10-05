@@ -22,10 +22,12 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
@@ -36,8 +38,10 @@
 #include "util/test_file.hpp"
 
 #include <external/json/json.hpp>
+#include <external/mpark/variant.hpp>
 #include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
 

@@ -20,6 +20,8 @@
 #include "util.hpp"
 #include "conversion.hpp"
 
+#include <realm/object-store/sync/sync_user.hpp>
+
 namespace realm::c_api {
 using namespace realm::app;
 

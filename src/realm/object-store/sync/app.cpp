@@ -46,6 +46,15 @@ Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
 }
 
+template <typename T>
+T value_from_json(const nlohmann::json& data, const std::string& key)
+{
+    if (auto it = data.find(key); it != data.end()) {
+        return it->get<T>();
+    }
+    throw AppError(make_error_code(JSONErrorCode::missing_json_key), key);
+}
+
 enum class RequestTokenType { NoAuth, AccessToken, RefreshToken };
 
 // generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is

@@ -19,17 +19,14 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
-#include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>

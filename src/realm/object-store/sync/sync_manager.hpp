@@ -21,9 +21,6 @@
 
 #include <realm/object-store/shared_realm.hpp>
 
-#include <realm/object-store/sync/app.hpp>
-#include <realm/object-store/sync/sync_user.hpp>
-
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
@@ -47,6 +44,10 @@ class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
+}
+
+namespace app {
+class App;
 }
 
 struct SyncClientTimeouts {

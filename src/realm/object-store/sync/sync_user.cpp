@@ -18,6 +18,7 @@
 
 #include <realm/object-store/sync/sync_user.hpp>
 
+#include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
