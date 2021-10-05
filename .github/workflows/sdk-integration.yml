@@ -5,11 +5,12 @@ on:
     - opened
     - labeled
     - synchronize
+    - closed
 jobs:
   update-sdk-prs:
     runs-on: ubuntu-latest
     name: Update SDK PRs
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && github.event.pull_request.state == 'open' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && (github.event.pull_request.state == 'open' || (github.event.action == 'closed' && github.event.pull_request.merged)) }}
     strategy:
       matrix:
         repo:
@@ -35,19 +36,22 @@ jobs:
         if [ $branch_exists -eq 1 ];then
           git checkout -t origin/${{ github.event.pull_request.head.ref }}
           echo "::set-output name=pr-exists::true"
+        elif [ ${{ github.event.pull_request.merged }} ]; then
+          echo "Existing SDK branch not found for a merge PR. Bailing out"
+          exit 1
         fi
     - name: Update submodule
       if: ${{ matrix.repo.submodule-path }}
       run: |
         cd integration/${{ matrix.repo.name }}/${{ matrix.repo.submodule-path }}
-        git checkout -t origin/${{ github.event.pull_request.head.ref }}
+        git checkout ${{ github.event.pull_request.merged && 'master' || format('-t origin/{0}', github.event.pull_request.head.ref) }}
     - name: Update Package.swift
       if: ${{ !matrix.repo.submodule-path }}
       uses: jacobtomlinson/gha-find-replace@3eaedee5ed6204139f1edb18af1ee349763feac2
       with:
         include: integration\/${{ matrix.repo.name }}\/Package\.swift
         find: 'url: "https:\/\/github\.com\/realm\/realm-core", (.*)\)'
-        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.head.sha }}"))'
+        replace: 'url: "https://github.com/realm/realm-core", .revision("${{ github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha }}"))'
     - name: Push to existing branch
       if: ${{ steps.checkout-existing.outputs.pr-exists == 'true' }}
       run: |
@@ -55,7 +59,7 @@ jobs:
         if [ -n "$(git status --porcelain)" ]; then
           git config --global user.name 'Realm CI bot'
           git config --global user.email 'realm-ci@users.noreply.github.com'
-          git commit -am "Update Core to ${{ github.event.pull_request.head.sha }}"
+          git commit -am "Update Core to ${{ github.event.pull_request.merged && format('master@{0}, github.event.pull_request.merge_commit_sha) || github.event.pull_request.head.sha }}"
           git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/${{ matrix.repo.name }}.git
         else
           echo "SDK repo is already up to date with these changes. Nothing to commit/push."
