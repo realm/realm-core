@@ -21,7 +21,7 @@ jobs:
     - name: Find SDK PR
       id: find-pr-number
       run: |
-        pull_number=$(curl -s 'https://api.github.com/repos/realm/realm-dotnet/pulls?head=realm:ni/public-api-gha' -H 'Accept: application/vnd.github.v3+json' | jq '.[0].number')
+        pull_number=$(curl -s 'https://api.github.com/repos/realm/${{ matrix.repo }}/pulls?head=realm:${{ github.event.pull_request.head.ref }}' -H 'Accept: application/vnd.github.v3+json' | jq '.[0].number')
         echo "::set-output name=number::$pull_number"
     - name: Close Unmerged PR
       uses: peter-evans/close-pull@cd1af3be40e42b1c6cb814502bee104471c8980b
