@@ -44,7 +44,7 @@ jobs:
       if: ${{ matrix.repo.submodule-path }}
       run: |
         cd integration/${{ matrix.repo.name }}/${{ matrix.repo.submodule-path }}
-        git checkout ${{ github.event.pull_request.merged && 'master' || format('-t origin/{0}', github.event.pull_request.head.ref) }}
+        git checkout ${{ (github.event.pull_request.merged && 'master') || format('-t origin/{0}', github.event.pull_request.head.ref) }}
     - name: Update Package.swift
       if: ${{ !matrix.repo.submodule-path }}
       uses: jacobtomlinson/gha-find-replace@3eaedee5ed6204139f1edb18af1ee349763feac2
@@ -59,7 +59,7 @@ jobs:
         if [ -n "$(git status --porcelain)" ]; then
           git config --global user.name 'Realm CI bot'
           git config --global user.email 'realm-ci@users.noreply.github.com'
-          git commit -am "Update Core to ${{ github.event.pull_request.merged && format('master@{0}, github.event.pull_request.merge_commit_sha) || github.event.pull_request.head.sha }}"
+          git commit -am "Update Core to ${{ (github.event.pull_request.merged && format('master@{0}, github.event.pull_request.merge_commit_sha)) || github.event.pull_request.head.sha }}"
           git push https://realm-ci:${{ secrets.REALM_CI_PAT }}@github.com/realm/${{ matrix.repo.name }}.git
         else
           echo "SDK repo is already up to date with these changes. Nothing to commit/push."
