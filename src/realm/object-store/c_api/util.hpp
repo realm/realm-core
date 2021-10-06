@@ -141,7 +141,7 @@ public:
 
 private:
     std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
-    uint64_t m_next_token;
+    uint64_t m_next_token = 0;
 };
 } // namespace realm::c_api
 
