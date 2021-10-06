@@ -31,7 +31,6 @@
 #include <realm/util/http.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/network_ssl.hpp>
-#include <realm/sync/access_token.hpp>
 
 
 namespace realm {

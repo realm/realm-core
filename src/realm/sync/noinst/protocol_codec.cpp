@@ -1,7 +1,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server_impl_base.hpp>
 
 
 using namespace realm;

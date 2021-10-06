@@ -1208,7 +1208,7 @@ void deleter_thread(ConcurrentQueue<LnkLstPtr>& queue)
         // after the potentially synchronizing locking
         // operation inside queue.get()
         while (delay > 0)
-            delay--;
+            delay = delay - 1;
         // just let 'r' die
     }
 }
@@ -5833,11 +5833,11 @@ TEST(LangBindHelper_RemoveObject)
 TEST(LangBindHelper_callWithLock)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB::CallbackWithLock callback = [this, &path](const std::string& realm_path) {
+    DB::CallbackWithLock callback = [&](const std::string& realm_path) {
         CHECK(realm_path.compare(path) == 0);
     };
 
-    DB::CallbackWithLock callback_not_called = [=](const std::string&) {
+    DB::CallbackWithLock callback_not_called = [&](const std::string&) {
         CHECK(false);
     };
 

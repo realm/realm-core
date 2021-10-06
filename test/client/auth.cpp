@@ -4,10 +4,10 @@
 
 #include <realm/util/random.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/sync/auth.hpp>
+
+#include "auth.hpp"
 
 using namespace realm;
-using AccessToken = sync::AccessToken;
 using Client = sync::auth::Client;
 
 namespace {

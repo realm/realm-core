@@ -116,6 +116,7 @@ struct FreeUserdata {
 };
 
 using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
+using SharedUserdata = std::shared_ptr<void>;
 
 /**
  * Convenience class for managing callbacks.

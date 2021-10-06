@@ -676,7 +676,7 @@ public:
         size_t message_size =
             make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
-        auto handler = [=](std::error_code ec, size_t) {
+        auto handler = [this](std::error_code ec, size_t) {
             // If the operation is aborted, the socket object may have been destroyed.
             if (ec != util::error::operation_aborted) {
                 if (ec) {
@@ -987,7 +987,7 @@ private:
             return;
         }
 
-        auto handler = [=](std::error_code ec, size_t) {
+        auto handler = [this](std::error_code ec, size_t) {
             // If the operation is aborted, the socket object may have been destroyed.
             if (ec != util::error::operation_aborted) {
                 if (ec) {

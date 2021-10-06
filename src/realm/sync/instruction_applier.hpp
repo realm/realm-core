@@ -21,7 +21,6 @@
 
 #include <realm/sync/instructions.hpp>
 #include <realm/sync/changeset.hpp>
-#include <realm/sync/object.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/list.hpp>
 #include <realm/dictionary.hpp>
@@ -78,7 +77,7 @@ private:
     const Changeset* m_log = nullptr;
     util::Logger* m_logger = nullptr;
 
-    TableNameBuffer m_table_name_buffer;
+    Group::TableNameBuffer m_table_name_buffer;
     InternString m_last_table_name;
     InternString m_last_field_name;
     TableRef m_last_table;

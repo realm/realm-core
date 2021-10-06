@@ -276,15 +276,14 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         StringData table_name = table_src->get_name();
         if (!table_name.begins_with("class"))
             continue;
-        bool has_pk = sync::table_has_primary_key(*table_src);
+        auto pk_col_src = table_src->get_primary_key_column();
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
-            if (!has_pk) {
-                sync::create_table(group_dst, table_name);
+            if (!pk_col_src) {
+                group_dst.get_or_add_table(table_name);
             }
             else {
-                auto pk_col_src = table_src->get_primary_key_column();
                 DataType pk_type = DataType(pk_col_src.get_type());
                 StringData pk_col_name = table_src->get_column_name(pk_col_src);
                 group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
@@ -489,7 +488,8 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
         for (const Obj& src : *table_src) {
             auto oid = src.get_object_id();
-            auto dst = obj_for_object_id(*table_dst, oid);
+            auto key = table_dst->get_objkey(oid);
+            auto dst = table_dst->get_object(key);
             REALM_ASSERT(dst);
             bool updated = false;
 
@@ -514,7 +514,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     else {
                         ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
                         GlobalKey target_oid = table_target_src->get_object_id(target_obj_key_src);
-                        ObjKey target_obj_key_dst = sync::row_for_object_id(*table_target_dst, target_oid);
+                        ObjKey target_obj_key_dst = table_target_dst->get_objkey(target_oid);
                         if (dst.get<ObjKey>(col_key_dst) != target_obj_key_dst) {
                             dst.set(col_key_dst, target_obj_key_dst);
                             updated = true;
@@ -530,7 +530,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                     // object ids are the same.
                     auto convert_ndx = [&](ObjKey key_src) {
                         auto oid = table_target_src->get_object_id(key_src);
-                        ObjKey key_dst = sync::row_for_object_id(*table_target_dst, oid);
+                        ObjKey key_dst = table_target_dst->get_objkey(oid);
                         REALM_ASSERT(key_dst);
                         return key_dst;
                     };
@@ -585,7 +585,7 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
             group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col.is_nullable());
         }
         else {
-            sync::create_table(group_dst, table_name);
+            group_dst.get_or_add_table(table_name);
         }
     }
 

@@ -1,5 +1,4 @@
 #include <realm/sync/instruction_applier.hpp>
-#include <realm/sync/object.hpp>
 #include <realm/set.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -90,8 +89,8 @@ TableRef InstructionApplier::table_for_class_name(StringData class_name) const
 {
     if (class_name.size() >= Group::max_table_name_length - 6)
         bad_transaction_log("class name too long");
-    TableNameBuffer buffer;
-    return m_transaction.get_table(class_name_to_table_name(class_name, buffer));
+    Group::TableNameBuffer buffer;
+    return m_transaction.get_table(Group::class_name_to_table_name(class_name, buffer));
 }
 
 template <typename T>
@@ -123,7 +122,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
             if (spec.type == Instruction::Payload::Type::GlobalKey) {
                 log("sync::create_table(group, \"%1\");", table_name);
-                sync::create_table(m_transaction, table_name);
+                m_transaction.get_or_add_table(table_name);
             }
             else {
                 if (!is_valid_key_type(spec.type)) {
@@ -133,9 +132,10 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 DataType pk_type = get_data_type(spec.type);
                 StringData pk_field = get_string(spec.field);
                 bool nullable = spec.nullable;
-                log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
+
+                log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
                     pk_field, nullable);
-                sync::create_table_with_primary_key(m_transaction, table_name, pk_type, pk_field, nullable);
+                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable);
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
@@ -296,8 +296,8 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
             return visitor(data.decimal);
         case Type::Link: {
             StringData class_name = get_string(data.link.target_table);
-            TableNameBuffer buffer;
-            StringData target_table_name = class_name_to_table_name(class_name, buffer);
+            Group::TableNameBuffer buffer;
+            StringData target_table_name = Group::class_name_to_table_name(class_name, buffer);
             TableRef target_table = m_transaction.get_table(target_table_name);
             if (!target_table) {
                 bad_transaction_log("Link with invalid target table '%1'", target_table_name);
@@ -562,8 +562,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                                 existing_is_dict ? " not" : "");
         }
         if (new_type == type_Link) {
-            TableNameBuffer buffer;
-            auto target_table_name = class_name_to_table_name(get_string(instr.link_target_table), buffer);
+            Group::TableNameBuffer buffer;
+            auto target_table_name = Group::class_name_to_table_name(get_string(instr.link_target_table), buffer);
             if (target_table_name != table->get_link_target(existing_key)->get_name()) {
                 bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (link targets differ)",
                                     table->get_name(), col_name);
@@ -600,10 +600,10 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         }
     }
     else {
-        TableNameBuffer buffer;
+        Group::TableNameBuffer buffer;
         auto target_table_name = get_string(instr.link_target_table);
         if (target_table_name.size() != 0) {
-            TableRef target = m_transaction.get_table(class_name_to_table_name(target_table_name, buffer));
+            TableRef target = m_transaction.get_table(Group::class_name_to_table_name(target_table_name, buffer));
             if (!target) {
                 bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
                                     col_name, target_table_name);
@@ -1044,7 +1044,7 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
 {
     if (auto class_name = m_log->try_get_string(instr.table)) {
-        return class_name_to_table_name(*class_name, m_table_name_buffer);
+        return Group::class_name_to_table_name(*class_name, m_table_name_buffer);
     }
     else {
         bad_transaction_log("Corrupt table name in %1 instruction", name);

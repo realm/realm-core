@@ -476,7 +476,7 @@ TEST(Network_AsyncReadWriteLargeAmount)
     socket_2.connect(listening_endpoint);
     socket_2.set_option(network::SocketBase::no_delay(true));
     std::function<void(int)> write_chunk = [&](int i) {
-        auto handler = [=](std::error_code ec, size_t n) {
+        auto handler = [this, i, num_chunks, num_bytes_per_chunk, write_chunk](std::error_code ec, size_t n) {
             if (CHECK_NOT(ec)) {
                 CHECK_EQUAL(num_bytes_per_chunk, n);
                 if (i + 1 == num_chunks)
@@ -1396,7 +1396,7 @@ public:
 
     void run()
     {
-        auto handler = [=](std::error_code ec) {
+        auto handler = [this](std::error_code ec) {
             handle_accept(ec);
         };
         network::Endpoint endpoint;
@@ -1420,7 +1420,7 @@ private:
         if (ec)
             throw std::system_error(ec);
         m_socket.set_option(network::SocketBase::no_delay(true));
-        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+        auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
         m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
@@ -1448,7 +1448,7 @@ private:
         in >> sp >> m_body_size;
         if (!CHECK(in) || !CHECK(in.eof()) || !CHECK_EQUAL(sp, ' '))
             return;
-        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+        auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
@@ -1465,7 +1465,7 @@ private:
         MemoryOutputStream out;
         out.set_buffer(m_header_buffer, m_header_buffer + s_max_header_size);
         out << "was " << m_body_size << '\n';
-        auto handler = [=](std::error_code handler_ec, size_t) {
+        auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_header(handler_ec);
         };
         m_socket.async_write(m_header_buffer, out.size(), handler);
@@ -1475,7 +1475,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code handler_ec, size_t) {
+        auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_body(handler_ec);
         };
         m_socket.async_write(m_body_buffer.get(), m_body_size, handler);
@@ -1485,7 +1485,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code handler_ec, size_t) {
+        auto handler = [this](std::error_code handler_ec, size_t) {
             handle_read_header_2(handler_ec);
         };
         m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
@@ -1524,7 +1524,7 @@ public:
         MemoryOutputStream out;
         out.set_buffer(m_header_buffer, m_header_buffer + s_max_header_size);
         out << "echo " << sizeof echo_body << '\n';
-        auto handler = [=](std::error_code ec, size_t) {
+        auto handler = [this](std::error_code ec, size_t) {
             handle_write_header(ec);
         };
         m_socket.async_write(m_header_buffer, out.size(), handler);
@@ -1549,7 +1549,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code handler_ec, size_t) {
+        auto handler = [this](std::error_code handler_ec, size_t) {
             handle_write_body(handler_ec);
         };
         m_socket.async_write(echo_body, sizeof echo_body, handler);
@@ -1559,7 +1559,7 @@ private:
     {
         if (ec)
             throw std::system_error(ec);
-        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+        auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
         m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
@@ -1587,7 +1587,7 @@ private:
         in >> sp >> m_body_size;
         if (!CHECK(in) || !CHECK(in.eof()) || !CHECK_EQUAL(sp, ' '))
             return;
-        auto handler = [=](std::error_code handler_ec, size_t handler_n) {
+        auto handler = [this](std::error_code handler_ec, size_t handler_n) {
             handle_read_body(handler_ec, handler_n);
         };
         m_body_buffer.reset(new char[m_body_size]);
