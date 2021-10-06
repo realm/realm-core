@@ -19,6 +19,7 @@ set(REALM_FFI_SOURCES
 
 if(REALM_ENABLE_SYNC)
     list(APPEND REALM_FFI_SOURCES
+        http.cpp
         logging.cpp
     )
 endif()

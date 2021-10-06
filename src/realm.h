@@ -1888,4 +1888,65 @@ typedef enum realm_log_level {
 
 typedef void (*realm_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
 
+/* HTTP transport */
+typedef enum realm_http_request_method {
+    RLM_HTTP_REQUEST_METHOD_GET,
+    RLM_HTTP_REQUEST_METHOD_POST,
+    RLM_HTTP_REQUEST_METHOD_PATCH,
+    RLM_HTTP_REQUEST_METHOD_PUT,
+    RLM_HTTP_REQUEST_METHOD_DELETE,
+} realm_http_request_method_e;
+
+typedef struct realm_http_header {
+    const char* name;
+    const char* value;
+} realm_http_header_t;
+
+typedef struct realm_http_request {
+    realm_http_request_method_e method;
+    const char* url;
+    uint64_t timeout_ms;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+    bool uses_refresh_token;
+} realm_http_request_t;
+
+typedef struct realm_http_response {
+    int status_code;
+    int custom_status_code;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+} realm_http_response_t;
+
+/**
+ * Callback function provided by Core to complete a HTTP request with a given response.
+ *
+ * @param completion_data Internal state pointer passed by Core when invoking realm_http_request_func_t
+ *                        to start the request.
+ * @param response The server response to the HTTP request initiated by Core.
+ */
+typedef void (*realm_http_completion_func_t)(void* completion_data, const realm_http_response_t* response);
+/**
+ * Callback function used by Core to make a HTTP request.
+ *
+ * @param transport_userdata The userdata pointer passed to realm_http_transport_new().
+ * @param request The request to send.
+ * @param completion_data Internal state pointer of Core, needed by @a completion_callback.
+ * @param completion_callback Callback function provided by Core that completes the request with a response.
+ */
+typedef void (*realm_http_request_func_t)(void* transport_userdata, const realm_http_request_t request,
+                                          void* completion_data, realm_http_completion_func_t completion_callback);
+
+typedef struct realm_http_transport realm_http_transport_t;
+
+/**
+ * Create a new HTTP transport with these callbacks implementing its functionality.
+ */
+RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func_t, void* userdata,
+                                                         realm_free_userdata_func_t);
+
 #endif // REALM_H
