@@ -238,7 +238,7 @@ void ClientHistoryImpl::do_initiate_transact(Group& group, version_type version,
     SyncReplication::do_initiate_transact(group, version, history_updated);
 }
 
-// Overriding member function in realm::TrivialReplication
+// Overriding member function in realm::Replication
 auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version_type orig_version) -> version_type
 {
     ensure_updated(orig_version);
@@ -289,7 +289,7 @@ auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version
 }
 
 
-// Overriding member function in realm::TrivialReplication
+// Overriding member function in realm::Replication
 void ClientHistoryImpl::finalize_changeset() noexcept
 {
     // Since the history is in the Realm, the added changeset is
@@ -1227,7 +1227,7 @@ void ClientHistoryImpl::set_oldest_bound_version(version_type version)
 // Overriding member function in realm::_impl::History
 BinaryData ClientHistoryImpl::get_uncommitted_changes() const noexcept
 {
-    return TrivialReplication::get_uncommitted_changes();
+    return Replication::get_uncommitted_changes();
 }
 
 // Overriding member function in realm::_impl::History

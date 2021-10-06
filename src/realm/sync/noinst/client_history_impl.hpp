@@ -121,7 +121,7 @@ public:
     std::unique_ptr<History> _create_history_read() override;
     void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
 
-    // Overriding member functions in realm::TrivialReplication
+    // Overriding member functions in realm::Replication
     version_type prepare_changeset(const char*, size_t, version_type) override final;
     void finalize_changeset() noexcept override final;
 

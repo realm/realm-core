@@ -32,10 +32,10 @@ public:
     }
 };
 
-class MyTrivialReplication : public TrivialReplication {
+class MyTrivialReplication : public Replication {
 public:
     MyTrivialReplication(const std::string& path)
-        : TrivialReplication(path)
+        : Replication(path)
     {
     }
 
@@ -82,7 +82,7 @@ public:
 
     void do_initiate_transact(Group& group, version_type version, bool hist_updated) override
     {
-        TrivialReplication::do_initiate_transact(group, version, hist_updated);
+        Replication::do_initiate_transact(group, version, hist_updated);
         m_group = &group;
     }
 
@@ -121,7 +121,7 @@ public:
 
     void initialize(DB& sg) override
     {
-        TrivialReplication::initialize(sg);
+        Replication::initialize(sg);
     }
 
     version_type prepare_changeset(const char*, size_t, version_type version) override

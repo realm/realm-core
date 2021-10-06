@@ -1806,7 +1806,7 @@ std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 }
 
 
-// Overriding member in TrivialReplication
+// Overriding member in Replication
 auto ServerHistory::prepare_changeset(const char* data, std::size_t size, version_type realm_version) -> version_type
 {
     ensure_updated(realm_version);
@@ -1835,7 +1835,7 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size, versio
 }
 
 
-// Overriding member in TrivialReplication
+// Overriding member in Replication
 void ServerHistory::finalize_changeset() noexcept {}
 
 
@@ -2084,7 +2084,7 @@ void ServerHistory::set_oldest_bound_version(version_type realm_version)
 // Overriding member in Replication
 BinaryData ServerHistory::get_uncommitted_changes() const noexcept
 {
-    return TrivialReplication::get_uncommitted_changes();
+    return Replication::get_uncommitted_changes();
 }
 
 

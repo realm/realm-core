@@ -243,7 +243,7 @@ public:
 // LCOV_EXCL_STOP (NullInstructionObserver)
 
 
-/// See TransactLogConvenientEncoder for information about the meaning of the
+/// See Replication for information about the meaning of the
 /// arguments of each of the functions in this class.
 class TransactLogEncoder {
 public:
@@ -369,109 +369,6 @@ private:
     friend class TransactLogParser;
 };
 
-class TransactLogConvenientEncoder {
-public:
-    virtual ~TransactLogConvenientEncoder();
-    virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
-    virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
-                                            bool nullable);
-    virtual void prepare_erase_class(TableKey table_key);
-    virtual void erase_class(TableKey table_key, size_t num_tables);
-    virtual void rename_class(TableKey table_key, StringData new_name);
-    virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
-    virtual void erase_column(const Table*, ColKey col_key);
-    virtual void rename_column(const Table*, ColKey col_key, StringData name);
-
-    virtual void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value);
-    virtual void set(const Table*, ColKey col_key, ObjKey key, Mixed value, Instruction variant = instr_Set);
-
-    virtual void list_set(const CollectionBase& list, size_t list_ndx, Mixed value);
-    virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value);
-    virtual void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void list_erase(const CollectionBase&, size_t link_ndx);
-    virtual void list_clear(const CollectionBase&);
-
-    virtual void set_insert(const CollectionBase& set, size_t list_ndx, Mixed value);
-    virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
-    virtual void set_clear(const CollectionBase& set);
-
-    virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
-    virtual void dictionary_set(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
-    virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
-
-    virtual void create_object(const Table*, GlobalKey);
-    virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);
-    virtual void remove_object(const Table*, ObjKey);
-
-    virtual void typed_link_change(const Table*, ColKey, TableKey);
-
-    //@{
-
-    /// Implicit nullifications due to removal of target row. This is redundant
-    /// information from the point of view of replication, as the removal of the
-    /// target row will reproduce the implicit nullifications in the target
-    /// Realm anyway. The purpose of this instruction is to allow observers
-    /// (reactor pattern) to be explicitly notified about the implicit
-    /// nullifications.
-
-    virtual void nullify_link(const Table*, ColKey col_key, ObjKey key);
-    virtual void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx);
-
-    //@}
-
-protected:
-    TransactLogConvenientEncoder(TransactLogStream& encoder);
-
-    void reset_selection_caches() noexcept;
-    void set_buffer(char* new_free_begin, char* new_free_end)
-    {
-        m_encoder.set_buffer(new_free_begin, new_free_end);
-    }
-    char* write_position() const
-    {
-        return m_encoder.write_position();
-    }
-
-private:
-    struct CollectionId {
-        TableKey table_key;
-        ObjKey object_key;
-        ColKey col_id;
-
-        CollectionId() = default;
-        CollectionId(const CollectionBase& list)
-            : table_key(list.get_table()->get_key())
-            , object_key(list.get_owner_key())
-            , col_id(list.get_col_key())
-        {
-        }
-        CollectionId(TableKey t, ObjKey k, ColKey c)
-            : table_key(t)
-            , object_key(k)
-            , col_id(c)
-        {
-        }
-        bool operator!=(const CollectionId& other)
-        {
-            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
-        }
-    };
-    TransactLogEncoder m_encoder;
-    mutable const Table* m_selected_table = nullptr;
-    mutable CollectionId m_selected_list;
-
-    void unselect_all() noexcept;
-    void select_table(const Table*); // unselects link list
-    void select_collection(const CollectionBase&);
-
-    void do_select_table(const Table*);
-    void do_select_collection(const CollectionBase&);
-
-    void do_set(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
-
-    friend class TransactReverser;
-};
-
 
 class TransactLogParser {
 public:
@@ -581,11 +478,6 @@ inline void TransactLogEncoder::set_buffer(char* free_begin, char* free_end)
     REALM_ASSERT(free_begin <= free_end);
     m_transact_log_free_begin = free_begin;
     m_transact_log_free_end = free_end;
-}
-
-inline void TransactLogConvenientEncoder::reset_selection_caches() noexcept
-{
-    unselect_all();
 }
 
 inline char* TransactLogEncoder::reserve(size_t n)
@@ -745,26 +637,6 @@ void TransactLogEncoder::append_string_instr(Instruction instr, StringData strin
     advance(ptr);
 }
 
-inline void TransactLogConvenientEncoder::unselect_all() noexcept
-{
-    m_selected_table = nullptr;
-    m_selected_list = CollectionId();
-}
-
-inline void TransactLogConvenientEncoder::select_table(const Table* table)
-{
-    if (table != m_selected_table)
-        do_select_table(table); // Throws
-    m_selected_list = CollectionId();
-}
-
-inline void TransactLogConvenientEncoder::select_collection(const CollectionBase& list)
-{
-    if (CollectionId(list) != m_selected_list) {
-        do_select_collection(list); // Throws
-    }
-}
-
 inline bool TransactLogEncoder::insert_group_level_table(TableKey table_key)
 {
     append_simple_instr(instr_InsertGroupLevelTable, table_key); // Throws
@@ -777,24 +649,10 @@ inline bool TransactLogEncoder::erase_class(TableKey table_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::prepare_erase_class(TableKey) {}
-
-inline void TransactLogConvenientEncoder::erase_class(TableKey table_key, size_t)
-{
-    unselect_all();
-    m_encoder.erase_class(table_key); // Throws
-}
-
 inline bool TransactLogEncoder::rename_class(TableKey table_key)
 {
     append_simple_instr(instr_RenameGroupLevelTable, table_key); // Throws
     return true;
-}
-
-inline void TransactLogConvenientEncoder::rename_class(TableKey table_key, StringData)
-{
-    unselect_all();
-    m_encoder.rename_class(table_key); // Throws
 }
 
 inline bool TransactLogEncoder::insert_column(ColKey col_key)
@@ -803,22 +661,10 @@ inline bool TransactLogEncoder::insert_column(ColKey col_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::insert_column(const Table* t, ColKey col_key, DataType, StringData, Table*)
-{
-    select_table(t);                  // Throws
-    m_encoder.insert_column(col_key); // Throws
-}
-
 inline bool TransactLogEncoder::erase_column(ColKey col_key)
 {
     append_simple_instr(instr_EraseColumn, col_key); // Throws
     return true;
-}
-
-inline void TransactLogConvenientEncoder::erase_column(const Table* t, ColKey col_key)
-{
-    select_table(t);                 // Throws
-    m_encoder.erase_column(col_key); // Throws
 }
 
 inline bool TransactLogEncoder::rename_column(ColKey col_key)
@@ -827,45 +673,12 @@ inline bool TransactLogEncoder::rename_column(ColKey col_key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::rename_column(const Table* t, ColKey col_key, StringData)
-{
-    select_table(t);                  // Throws
-    m_encoder.rename_column(col_key); // Throws
-}
-
-
 inline bool TransactLogEncoder::modify_object(ColKey col_key, ObjKey key)
 {
     append_simple_instr(instr_Set, col_key, key); // Throws
     return true;
 }
 
-
-inline void TransactLogConvenientEncoder::do_set(const Table* t, ColKey col_key, ObjKey key, Instruction variant)
-{
-    if (variant != Instruction::instr_SetDefault) {
-        select_table(t);                       // Throws
-        m_encoder.modify_object(col_key, key); // Throws
-    }
-}
-
-
-inline void TransactLogConvenientEncoder::set(const Table* t, ColKey col_key, ObjKey key, Mixed, Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-
-inline void TransactLogConvenientEncoder::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64_t)
-{
-    do_set(t, col_key, key); // Throws
-}
-
-inline void TransactLogConvenientEncoder::nullify_link(const Table* t, ColKey col_key, ObjKey key)
-{
-    select_table(t);                       // Throws
-    m_encoder.modify_object(col_key, key); // Throws
-}
 
 
 /************************************ List ***********************************/
@@ -876,22 +689,10 @@ inline bool TransactLogEncoder::list_set(size_t list_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
-{
-    select_collection(list);      // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
 inline bool TransactLogEncoder::list_insert(size_t list_ndx)
 {
     append_simple_instr(instr_ListInsert, list_ndx); // Throws
     return true;
-}
-
-inline void TransactLogConvenientEncoder::list_insert(const CollectionBase& list, size_t list_ndx, Mixed)
-{
-    select_collection(list);         // Throws
-    m_encoder.list_insert(list_ndx); // Throws
 }
 
 
@@ -903,11 +704,6 @@ inline bool TransactLogEncoder::set_insert(size_t set_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
-{
-    select_collection(set);        // Throws
-    m_encoder.set_insert(set_ndx); // Throws
-}
 
 inline bool TransactLogEncoder::set_erase(size_t set_ndx)
 {
@@ -915,11 +711,6 @@ inline bool TransactLogEncoder::set_erase(size_t set_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
-{
-    select_collection(set);       // Throws
-    m_encoder.set_erase(set_ndx); // Throws
-}
 
 inline bool TransactLogEncoder::set_clear(size_t set_size)
 {
@@ -927,17 +718,6 @@ inline bool TransactLogEncoder::set_clear(size_t set_size)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_clear(const CollectionBase& set)
-{
-    select_collection(set);          // Throws
-    m_encoder.set_clear(set.size()); // Throws
-}
-
-inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
-{
-    select_table(t);              // Throws
-    m_encoder.remove_object(key); // Throws
-}
 
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
@@ -946,36 +726,17 @@ inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_n
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_move(const CollectionBase& list, size_t from_link_ndx,
-                                                    size_t to_link_ndx)
-{
-    select_collection(list);                         // Throws
-    m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
-}
-
 inline bool TransactLogEncoder::list_erase(size_t list_ndx)
 {
     append_simple_instr(instr_ListErase, list_ndx); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_erase(const CollectionBase& list, size_t link_ndx)
-{
-    select_collection(list);        // Throws
-    m_encoder.list_erase(link_ndx); // Throws
-}
 
 inline bool TransactLogEncoder::list_clear(size_t old_list_size)
 {
     append_simple_instr(instr_ListClear, old_list_size); // Throws
     return true;
-}
-
-inline void TransactLogConvenientEncoder::typed_link_change(const Table* source_table, ColKey col,
-                                                            TableKey dest_table)
-{
-    select_table(source_table);
-    m_encoder.typed_link_change(col, dest_table);
 }
 
 inline bool TransactLogEncoder::typed_link_change(ColKey col, TableKey dest)

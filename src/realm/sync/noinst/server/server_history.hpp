@@ -473,7 +473,7 @@ public:
     _impl::History* _get_history_write() override;
     std::unique_ptr<_impl::History> _create_history_read() override;
 
-    // Overriding member functions in TrivialReplication
+    // Overriding member functions in Replication
     version_type prepare_changeset(const char*, std::size_t, version_type) override;
     void finalize_changeset() noexcept override;
 

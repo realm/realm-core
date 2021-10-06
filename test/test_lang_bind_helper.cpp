@@ -363,12 +363,12 @@ public:
     }
 };
 
-class ShortCircuitHistory : public TrivialReplication {
+class ShortCircuitHistory : public Replication {
 public:
     using version_type = _impl::History::version_type;
 
     ShortCircuitHistory(const std::string& database_file)
-        : TrivialReplication(database_file)
+        : Replication(database_file)
     {
     }
 
