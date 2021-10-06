@@ -67,7 +67,8 @@ RealmJWT::RealmJWT(const std::string& token)
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
     this->expires_at =
-    std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() +
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count() +
         static_cast<int64_t>(json["exp"]) - static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
