@@ -120,50 +120,6 @@ install(FILES ../../external/json/json.hpp
         DESTINATION include/external/json
         COMPONENT devel)
 
-if(REALM_BUILD_COMMANDLINE_TOOLS)
-    add_executable(DumpCommand dump_command.cpp)
-    set_target_properties(DumpCommand PROPERTIES
-                          OUTPUT_NAME "realm-dump"
-                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-		  target_link_libraries(DumpCommand Sync Storage)
-
-    # FIXME: RCORE-331 stat command currently fails to build
-    # add_executable(StatCommand stat_command.cpp)
-    # set_target_properties(StatCommand PROPERTIES
-    #                       OUTPUT_NAME "realm-stat"
-    #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    # target_link_libraries(StatCommand Sync Storage)
-
-    add_executable(ApplyToStateCommand apply_to_state_command.cpp)
-    set_target_properties(ApplyToStateCommand PROPERTIES
-                          OUTPUT_NAME "realm-apply-to-state"
-                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    target_link_libraries(ApplyToStateCommand Sync Storage)
-
-    # FIXME: Port realm-hist to new instruction format
-    # add_executable(HistCommand sync/hist_command.cpp)
-    # set_target_properties(HistCommand PROPERTIES
-    #                       OUTPUT_NAME "realm-hist"
-    #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    # target_link_libraries(HistCommand Sync Storage)
-
-    add_executable(PrintChangesetCommand print_changeset_command.cpp)
-    set_target_properties(PrintChangesetCommand PROPERTIES
-                          OUTPUT_NAME "realm-print-changeset"
-                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    target_link_libraries(PrintChangesetCommand Sync Storage)
-
-    install(TARGETS
-        DumpCommand
-        # StatCommand
-        # HistCommand
-        ApplyToStateCommand
-        COMPONENT runtime
-    )
-endif()
-
-if (REALM_BUILD_INSPECTOR)
-    add_subdirectory(inspector)
-endif()
-
 add_subdirectory(noinst/server)
+add_subdirectory(tools)
+

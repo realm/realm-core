@@ -11,18 +11,18 @@
 #include <sstream>
 #include <iostream>
 
+#include <realm/array_integer.hpp>
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
 #include <realm/util/enum.hpp>
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/timestamp_formatter.hpp>
 #include <realm/util/load_file.hpp>
-#include <realm/noinst/server_history.hpp>
 #include <realm/group.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/sync/protocol.hpp>
-
 
 using namespace realm;
 using util::TimestampFormatter;
@@ -34,7 +34,6 @@ using sync::timestamp_type;
 using sync::UploadCursor;
 using sync::version_type;
 using ClientType = _impl::ServerHistory::ClientType;
-
 
 // FIXME: Ideas for additional forms of filtering:
 // - Filter to class (only changesets that refer to an object of this class or
@@ -67,25 +66,24 @@ util::EnumAssoc SummarySpec::map[] = {{int(Summary::auto_), "auto"},
                                       {0, nullptr}};
 using SummaryEnum = util::Enum<Summary, SummarySpec>;
 
-
 struct InstructionTypeSpec {
     static util::EnumAssoc map[];
 };
-util::EnumAssoc InstructionTypeSpec::map[] = {{int(sync::Instruction::Type::SelectTable), "SelectTable"},
-                                              {int(sync::Instruction::Type::SelectField), "SelectField"},
-                                              {int(sync::Instruction::Type::AddTable), "AddTable"},
+
+util::EnumAssoc InstructionTypeSpec::map[] = {{int(sync::Instruction::Type::AddTable), "AddTable"},
                                               {int(sync::Instruction::Type::EraseTable), "EraseTable"},
                                               {int(sync::Instruction::Type::CreateObject), "CreateObject"},
                                               {int(sync::Instruction::Type::EraseObject), "EraseObject"},
-                                              {int(sync::Instruction::Type::Set), "Set"},
+                                              {int(sync::Instruction::Type::Update), "Update"},
                                               {int(sync::Instruction::Type::AddInteger), "AddInteger"},
                                               {int(sync::Instruction::Type::AddColumn), "AddColumn"},
                                               {int(sync::Instruction::Type::EraseColumn), "EraseColumn"},
-                                              {int(sync::Instruction::Type::ArraySet), "ArraySet"},
                                               {int(sync::Instruction::Type::ArrayInsert), "ArrayInsert"},
                                               {int(sync::Instruction::Type::ArrayMove), "ArrayMove"},
                                               {int(sync::Instruction::Type::ArrayErase), "ArrayErase"},
                                               {int(sync::Instruction::Type::Clear), "Clear"},
+                                              {int(sync::Instruction::Type::SetInsert), "SetInsert"},
+                                              {int(sync::Instruction::Type::SetErase), "SetErase"},
                                               {0, nullptr}};
 using InstructionTypeEnum = util::Enum<sync::Instruction::Type, InstructionTypeSpec>;
 
@@ -151,7 +149,6 @@ enum class LogicalClientType {
     indirect,
     regular,
     subserver,
-    partial,
     legacy,
 };
 
@@ -160,7 +157,7 @@ void all_client_files(std::set<LogicalClientType>& types)
 {
     types = {LogicalClientType::special,  LogicalClientType::upstream, LogicalClientType::self,
              LogicalClientType::indirect, LogicalClientType::regular,  LogicalClientType::subserver,
-             LogicalClientType::partial,  LogicalClientType::legacy};
+             LogicalClientType::legacy};
 }
 
 
@@ -174,9 +171,6 @@ bool parse_client_types(util::StringView string, std::set<LogicalClientType>& ty
                 continue;
             case 's':
                 types_2.insert(LogicalClientType::subserver);
-                continue;
-            case 'p':
-                types_2.insert(LogicalClientType::partial);
                 continue;
             case 'l':
                 types_2.insert(LogicalClientType::legacy);
@@ -211,32 +205,13 @@ public:
     struct InstrInfo {
         Instruction::Type type;
         InternString class_name;
-        GlobalKey object_id;
+        sync::instr::PrimaryKey object_id;
         InternString property;
         const Payload* payload;
 
         bool is_modification() const noexcept
         {
-            switch (type) {
-                case Instruction::Type::SelectTable:
-                case Instruction::Type::SelectField:
-                    break;
-                case Instruction::Type::AddTable:
-                case Instruction::Type::EraseTable:
-                case Instruction::Type::CreateObject:
-                case Instruction::Type::EraseObject:
-                case Instruction::Type::Set:
-                case Instruction::Type::AddInteger:
-                case Instruction::Type::AddColumn:
-                case Instruction::Type::EraseColumn:
-                case Instruction::Type::ArraySet:
-                case Instruction::Type::ArrayInsert:
-                case Instruction::Type::ArrayMove:
-                case Instruction::Type::ArrayErase:
-                case Instruction::Type::ArrayClear:
-                    return true;
-            }
-            return false;
+            return true;
         }
     };
 
@@ -290,7 +265,7 @@ private:
 
 class ModifiesObjectExpr : public ModifiesClassExpr {
 public:
-    ModifiesObjectExpr(std::string class_name, GlobalKey object_id) noexcept
+    ModifiesObjectExpr(std::string class_name, sync::instr::PrimaryKey object_id) noexcept
         : ModifiesClassExpr{std::move(class_name)}
         , m_object_id{std::move(object_id)}
     {
@@ -298,17 +273,18 @@ public:
 
     bool eval(const InstrInfo& instr) const noexcept override
     {
-        return (ModifiesClassExpr::eval(instr) && instr.object_id && instr.object_id == m_object_id);
+        return (ModifiesClassExpr::eval(instr) && (instr.object_id != sync::instr::PrimaryKey{mpark::monostate{}}) &&
+                instr.object_id == m_object_id);
     }
 
 private:
-    const GlobalKey m_object_id;
+    const sync::instr::PrimaryKey m_object_id;
 };
 
 
 class ModifiesPropertyExpr : public ModifiesObjectExpr {
 public:
-    ModifiesPropertyExpr(std::string class_name, GlobalKey object_id, std::string property) noexcept
+    ModifiesPropertyExpr(std::string class_name, sync::instr::PrimaryKey object_id, std::string property) noexcept
         : ModifiesObjectExpr{std::move(class_name), std::move(object_id)}
         , m_property{std::move(property)}
     {
@@ -333,7 +309,7 @@ private:
 
 class LinksToObjectExpr : public Expr {
 public:
-    LinksToObjectExpr(std::string class_name, GlobalKey object_id) noexcept
+    LinksToObjectExpr(std::string class_name, sync::instr::PrimaryKey object_id) noexcept
         : m_class_name{std::move(class_name)}
         , m_object_id{std::move(object_id)}
     {
@@ -346,14 +322,14 @@ public:
 
     bool eval(const InstrInfo& instr) const noexcept override
     {
-        return (instr.payload && DataType(instr.payload->type) == type_Link &&
+        return (instr.payload && instr.payload->type == Payload::Type::Link &&
                 instr.payload->data.link.target_table == m_interned_class_name &&
                 instr.payload->data.link.target == m_object_id);
     }
 
 private:
     const std::string m_class_name;
-    const GlobalKey m_object_id;
+    const sync::instr::PrimaryKey m_object_id;
     InternString m_interned_class_name;
 };
 
@@ -405,16 +381,6 @@ public:
         return modify_class(Instruction::Type::EraseTable);
     }
 
-    bool operator()(Instruction::SelectTable& instr) noexcept
-    {
-        m_selected_class_name = instr.table;
-        GlobalKey object_id;
-        InternString property;
-        const Payload* payload = nullptr;
-        Expr::InstrInfo info = {Instruction::Type::SelectTable, m_selected_class_name, object_id, property, payload};
-        return m_expression.eval(info);
-    }
-
     bool operator()(Instruction::AddColumn&) noexcept
     {
         return modify_class(Instruction::Type::AddColumn);
@@ -427,7 +393,7 @@ public:
 
     bool operator()(Instruction::CreateObject& instr) noexcept
     {
-        return modify_object(Instruction::Type::CreateObject, instr.object, &instr.payload);
+        return modify_object(Instruction::Type::CreateObject, instr.object);
     }
 
     bool operator()(Instruction::EraseObject& instr) noexcept
@@ -437,33 +403,17 @@ public:
 
     bool operator()(Instruction::Update& instr) noexcept
     {
-        select_property(instr);
-        return modify_property(Instruction::Type::Set, &instr.payload);
+        return modify_object(Instruction::Type::Update, instr.object);
     }
 
-    bool operator()(Instruction::AddInteger& instr) noexcept
+    bool operator()(Instruction::AddInteger&) noexcept
     {
-        select_property(instr);
         return modify_property(Instruction::Type::AddInteger);
-    }
-
-    bool operator()(Instruction::SelectField& instr) noexcept
-    {
-        select_property(instr);
-        const Payload* payload = nullptr;
-        Expr::InstrInfo info = {Instruction::Type::SelectField, m_selected_class_name, m_selected_object_id,
-                                m_selected_property, payload};
-        return m_expression.eval(info);
-    }
-
-    bool operator()(Instruction::ArraySet& instr) noexcept
-    {
-        return modify_property(Instruction::Type::ArraySet, &instr.payload);
     }
 
     bool operator()(Instruction::ArrayInsert& instr) noexcept
     {
-        return modify_property(Instruction::Type::ArrayInsert, &instr.payload);
+        return modify_object(Instruction::Type::ArrayInsert, instr.object);
     }
 
     bool operator()(Instruction::ArrayMove&) noexcept
@@ -476,15 +426,25 @@ public:
         return modify_property(Instruction::Type::ArrayErase);
     }
 
-    bool operator()(Instruction::ArrayClear&) noexcept
+    bool operator()(Instruction::Clear&) noexcept
     {
-        return modify_property(Instruction::Type::ArrayClear);
+        return modify_property(Instruction::Type::Clear);
+    }
+
+    bool operator()(Instruction::SetInsert&) noexcept
+    {
+        return modify_property(Instruction::Type::SetInsert);
+    }
+
+    bool operator()(Instruction::SetErase&) noexcept
+    {
+        return modify_property(Instruction::Type::SetErase);
     }
 
 private:
     const Expr& m_expression;
     InternString m_selected_class_name;
-    GlobalKey m_selected_object_id;
+    sync::instr::PrimaryKey m_selected_object_id;
     InternString m_selected_property;
 
     bool modify_class(Instruction::Type instruction_type) const noexcept
@@ -493,18 +453,12 @@ private:
         return modify_object(instruction_type, object_id);
     }
 
-    bool modify_object(Instruction::Type instruction_type, GlobalKey object_id,
+    bool modify_object(Instruction::Type instruction_type, sync::instr::PrimaryKey object_id,
                        const Payload* payload = nullptr) const noexcept
     {
         InternString property;
         Expr::InstrInfo info = {instruction_type, m_selected_class_name, object_id, property, payload};
         return m_expression.eval(info);
-    }
-
-    void select_property(const Instruction::FieldInstructionBase& instr) noexcept
-    {
-        m_selected_object_id = instr.object;
-        m_selected_property = instr.field;
     }
 
     bool modify_property(Instruction::Type instruction_type, const Payload* payload = nullptr) const noexcept
@@ -880,19 +834,19 @@ public:
             m_reciprocal_transforms->init_from_ref(ref);
         }
         {
-            ref_type ref = root.get_as_ref(remote_versions_iip);
-            m_remote_versions.reset(new IntegerBpTree(alloc)); // Throws
-            m_remote_versions->init_from_ref(ref);             // Throws
+            m_remote_versions.reset(new IntegerBpTree(alloc));         // Throws
+            m_remote_versions->set_parent(&root, remote_versions_iip); // Throws
+            m_remote_versions->create();
         }
         {
-            m_origin_file_idents.reset(new IntegerBpTree(alloc)); // Throws
-            ref_type ref = root.get_as_ref(origin_file_idents_iip);
-            m_origin_file_idents->init_from_ref(ref); // Throws
+            m_origin_file_idents.reset(new IntegerBpTree(alloc));            // Throws
+            m_origin_file_idents->set_parent(&root, origin_file_idents_iip); // Throws
+            m_origin_file_idents->create();
         }
         {
-            m_origin_timestamps.reset(new IntegerBpTree(alloc)); // Throws
-            ref_type ref = root.get_as_ref(origin_timestamps_iip);
-            m_origin_timestamps->init_from_ref(ref); // Throws
+            m_origin_timestamps.reset(new IntegerBpTree(alloc));           // Throws
+            m_origin_timestamps->set_parent(&root, origin_timestamps_iip); // Throws
+            m_origin_timestamps->create();
         }
         std::size_t history_size = m_changesets->size();
         m_base_version = version_type(current_snapshot_version - history_size);
@@ -1429,8 +1383,6 @@ public:
                 return LogicalClientType::regular;
             case ClientType::subserver:
                 return LogicalClientType::subserver;
-            case ClientType::partial:
-                return LogicalClientType::partial;
         }
         REALM_ASSERT(false);
         return {};
@@ -1857,7 +1809,7 @@ int main(int argc, char* argv[])
     std::unique_ptr<Expr> expression;
     file_ident_type client_file = 0;
     std::set<LogicalClientType> client_file_types = {LogicalClientType::regular, LogicalClientType::subserver,
-                                                     LogicalClientType::partial, LogicalClientType::legacy};
+                                                     LogicalClientType::legacy};
     bool unexpired_client_files = true;
     bool expired_client_files = false;
     std::time_t min_last_seen_timestamp = std::numeric_limits<std::time_t>::min();
