@@ -942,7 +942,7 @@ RLM_API bool realm_rollback(realm_t*);
 
 /**
  * Add a callback that will be invoked every time the view of this file is updated.
- * 
+ *
  * This callback is guaranteed to be invoked before any object or collection change
  * notifications for this realm are delivered.
  *

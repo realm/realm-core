@@ -120,10 +120,10 @@ using SharedUserdata = std::shared_ptr<void>;
 
 /**
  * Convenience class for managing callbacks.
- * 
+ *
  * WARNING: This class doesn't provide any thread-safety guarantees
  * about which threads modifies or invokes callbacks.
- * 
+ *
  * @tparam Args The argument types of the callback.
  */
 template <typename... Args>
