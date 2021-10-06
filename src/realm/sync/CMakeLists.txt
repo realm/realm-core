@@ -122,7 +122,7 @@ install(FILES ../../external/json/json.hpp
 
 add_subdirectory(noinst/server)
 
-if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
+if(NOT REALM_BUILD_LIB_ONLY AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
 	add_subdirectory(tools)
 endif()
 
