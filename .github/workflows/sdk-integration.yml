@@ -40,7 +40,7 @@ jobs:
         if [ $branch_exists -eq 1 ];then
           git checkout -t origin/${{ github.event.pull_request.head.ref }}
           echo "::set-output name=pr-exists::true"
-        elif [ ${{ github.event.pull_request.merged }} ]; then
+        elif ${{ github.event.pull_request.merged }}; then
           echo "Existing SDK branch not found for a merge PR. Bailing out"
           exit 1
         fi
