@@ -21,7 +21,7 @@
 #include <realm/group.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/sync/protocol.hpp>
 
 using namespace realm;

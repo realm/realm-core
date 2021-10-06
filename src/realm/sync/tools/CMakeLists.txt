@@ -1,11 +1,14 @@
-cmake_minimum_required(VERSION 3.6)
 
 add_executable(InspectorInspectClientRealm "inspect_client_realm.cpp")
-set_target_properties(InspectorInspectClientRealm PROPERTIES OUTPUT_NAME "realm-inspect-client-realm")
+set_target_properties(InspectorInspectClientRealm PROPERTIES
+                      OUTPUT_NAME "realm-inspect-client-realm"
+                      DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 target_link_libraries(InspectorInspectClientRealm Sync Storage)
 
 add_executable(InspectorPrintChangeset "print_changeset.cpp")
-set_target_properties(InspectorPrintChangeset PROPERTIES OUTPUT_NAME "realm-print-changeset")
+set_target_properties(InspectorPrintChangeset PROPERTIES
+                      OUTPUT_NAME "realm-print-changeset"
+                      DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 target_link_libraries(InspectorPrintChangeset Sync Storage)
 
 add_executable(StatCommand stat_command.cpp)
@@ -33,5 +36,5 @@ install(TARGETS
     InspectorInspectClientRealm
     InspectorPrintChangeset
     COMPONENT runtime
+    DESTINATION bin
 )
-

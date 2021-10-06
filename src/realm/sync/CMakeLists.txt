@@ -121,5 +121,8 @@ install(FILES ../../external/json/json.hpp
         COMPONENT devel)
 
 add_subdirectory(noinst/server)
-add_subdirectory(tools)
+
+if(NOT REALM_BUILD_LIB_ONLY AND NOT WINDOWS_STORE)
+	add_subdirectory(tools)
+endif()
 
