@@ -1,0 +1,42 @@
+name: Close Unmerged SDK PRs
+on:
+  pull_request:
+    types:
+    - closed
+jobs:
+  update-sdk-prs:
+    runs-on: ubuntu-latest
+    name: Update SDK PRs
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'public-api') && !github.event.pull_request.merged }}
+    strategy:
+      matrix:
+        repo:
+          - realm-dotnet
+          - realm-js
+          - realm-cocoa
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Find SDK PR
+      uses: actions/github-script@v5
+      id: find-pr-number
+      with:
+        github-token: ${{ secrets.REALM_CI_PAT }}
+        script: |
+          const pulls = await github.rest.pulls.list({
+            owner: "realm",
+            repo: "${{ matrix.repo }}",
+            head: "realm:${{ github.event.pull_request.head.ref }}"
+          });
+
+          return pulls.data[0].number;
+        result-encoding: string
+    - name: Close Unmerged PR
+      uses: peter-evans/close-pull@cd1af3be40e42b1c6cb814502bee104471c8980b
+      with:
+        token: ${{ secrets.REALM_CI_PAT }}
+        repository: realm/${{ matrix.repo }}
+        pull-request-number: ${{ steps.find-pr-number.outputs.result }}
+        comment: Closing this because the Core PR was closed.
+        delete-branch: true
