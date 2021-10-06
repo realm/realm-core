@@ -314,6 +314,15 @@ typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
 typedef void (*realm_callback_error_func_t)(void* userdata, const realm_async_error_t*);
+typedef void (*realm_on_realm_change_func_t)(void* userdata);
+
+/**
+ * Callback for realm schema changed notifications.
+ *
+ * @param new_schema The new schema. This object is released after the callback returns.
+ *                   Preserve it with realm_clone() if you wish to keep it around for longer.
+ */
+typedef void (*realm_on_schema_change_func_t)(void* userdata, const realm_schema_t* new_schema);
 
 /* Scheduler types */
 typedef void (*realm_scheduler_notify_func_t)(void* userdata);
@@ -932,6 +941,19 @@ RLM_API bool realm_commit(realm_t*);
 RLM_API bool realm_rollback(realm_t*);
 
 /**
+ * Add a callback that will be invoked every time the view of this file is updated.
+ *
+ * @return a registration token used to remove the callback.
+ */
+RLM_API uint64_t realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t, void* userdata,
+                                                  realm_free_userdata_func_t);
+
+/**
+ * Remove a realm changed callback that was previously registered with the token.
+ */
+RLM_API void realm_remove_realm_changed_callback(realm_t*, uint64_t token);
+
+/**
  * Refresh the view of the realm file.
  *
  * If another process or thread has made changes to the realm file, this causes
@@ -1022,6 +1044,19 @@ RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* 
  * The returned value is owned by the `realm_t` instance, and must not be freed.
  */
 RLM_API const void* _realm_get_schema_native(const realm_t*);
+
+/**
+ * Add a callback that will be invoked every time the schema of this realm is changed.
+ *
+ * @return a registration token used to remove the callback.
+ */
+RLM_API uint64_t realm_add_schema_changed_callback(realm_t*, realm_on_schema_change_func_t, void* userdata,
+                                                   realm_free_userdata_func_t);
+
+/**
+ * Remove a schema changed callback that was previously registered with the token.
+ */
+RLM_API void realm_remove_schema_changed_callback(realm_t*, uint64_t token);
 
 /**
  * Validate the schema.
