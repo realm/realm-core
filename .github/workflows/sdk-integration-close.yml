@@ -29,7 +29,7 @@ jobs:
             head: "realm:${{ github.event.pull_request.head.ref }}"
           });
 
-          return pulls[0].number;
+          return pulls.data[0].number;
         result-encoding: string
     - name: Close Unmerged PR
       uses: peter-evans/close-pull@cd1af3be40e42b1c6cb814502bee104471c8980b
