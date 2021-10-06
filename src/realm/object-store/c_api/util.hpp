@@ -117,6 +117,14 @@ struct FreeUserdata {
 
 using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
 
+/**
+ * Convenience class for managing callbacks.
+ * 
+ * WARNING: This class doesn't provide any thread-safety guarantees
+ * about which threads modifies or invokes callbacks.
+ * 
+ * @tparam Args The argument types of the callback.
+ */
 template <typename... Args>
 class CallbackRegistry {
 public:
@@ -135,7 +143,7 @@ public:
     void invoke(Args... args)
     {
         for (auto& callback : m_callbacks) {
-            callback.second(std::forward<Args>(args)...);
+            callback.second(args...);
         }
     }
 
