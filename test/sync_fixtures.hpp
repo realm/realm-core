@@ -9,11 +9,11 @@
 #include <realm/string_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/server.hpp>
+#include <realm/sync/noinst/server/server.hpp>
 
 #include "test.hpp"
 

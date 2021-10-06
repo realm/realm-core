@@ -1,6 +1,6 @@
 #include <thread>
 
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "test.hpp"
 

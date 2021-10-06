@@ -17,13 +17,12 @@
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/replication.hpp>
 #include <realm/db.hpp>
-#include <realm/sync/clock.hpp>
+#include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/object_id.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/instruction_replication.hpp>
-#include <realm/sync/permissions.hpp>
-#include <realm/sync/noinst/object_id_history_state.hpp>
+#include <realm/sync/noinst/server/permissions.hpp>
 #include <realm/array_integer.hpp>
 #include <realm/array_ref.hpp>
 

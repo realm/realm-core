@@ -7,7 +7,7 @@
 #include <realm/table_view.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset_parser.hpp>
