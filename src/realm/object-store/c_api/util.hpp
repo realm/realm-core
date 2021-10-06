@@ -123,7 +123,7 @@ public:
     uint64_t add(util::UniqueFunction<void(Args...)>&& callback)
     {
         uint64_t token = m_next_token++;
-        m_callbacks.emplace(token, std::move(callback));
+        m_callbacks.emplace_hint(m_callbacks.end(), token, std::move(callback));
         return token;
     }
 
