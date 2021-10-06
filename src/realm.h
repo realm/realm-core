@@ -1910,7 +1910,6 @@ typedef struct realm_http_request {
     size_t num_headers;
     const char* body;
     size_t body_size;
-    bool uses_refresh_token;
 } realm_http_request_t;
 
 typedef struct realm_http_response {

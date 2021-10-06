@@ -54,8 +54,7 @@ protected:
                                        c_headers.data(),
                                        c_headers.size(),
                                        request.body.data(),
-                                       request.body.size(),
-                                       request.uses_refresh_token};
+                                       request.body.size()};
         m_request_executor(m_userdata.get(), std::move(c_request), completion_data, &on_response_completed);
     }
 
