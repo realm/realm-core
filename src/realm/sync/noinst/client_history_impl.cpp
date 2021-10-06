@@ -7,7 +7,6 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/version.hpp>
-#include <realm/sync/object.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_replication.hpp>
@@ -1017,8 +1016,8 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
         REALM_ASSERT(class_name.size() < Group::max_table_name_length - 6);
-        sync::TableNameBuffer buffer;
-        return group.get_table(sync::class_name_to_table_name(class_name, buffer));
+        Group::TableNameBuffer buffer;
+        return group.get_table(Group::class_name_to_table_name(class_name, buffer));
     };
 
     // Fix up changesets.

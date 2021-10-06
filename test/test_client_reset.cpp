@@ -43,7 +43,7 @@ TEST(ClientReset_NoLocalChanges)
         Session session = fixture.make_bound_session(sg, server_path);
 
         WriteTransaction wt{sg};
-        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int_pk");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int_pk");
         table->create_object_with_primary_key(int64_t(123));
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
@@ -193,7 +193,7 @@ TEST(ClientReset_InitialLocalChanges)
         DBRef sg = DB::create(make_client_replication(path_1));
 
         WriteTransaction wt{sg};
-        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
         table->create_object_with_primary_key(int64_t(123));
         session_1.nonsync_transact_notify(wt.commit());
     }
@@ -204,7 +204,7 @@ TEST(ClientReset_InitialLocalChanges)
         DBRef sg = DB::create(make_client_replication(path_2));
 
         WriteTransaction wt{sg};
-        TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "int");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
         table->create_object_with_primary_key(int64_t(456));
         wt.commit();
     }
@@ -309,7 +309,7 @@ TEST(ClientReset_LocalChangesWhenOffline)
         session_1.wait_for_download_complete_or_client_stopped();
 
         WriteTransaction wt{sg};
-        TableRef table = create_table(wt, "class_table");
+        TableRef table = wt.add_table("class_table");
         col_int = table->add_column(type_Int, "int");
         table->create_object().set(col_int, 123);
         session_1.nonsync_transact_notify(wt.commit());
@@ -383,17 +383,17 @@ TEST(ClientReset_ThreeClients)
     std::string real_path_1, real_path_2;
 
     auto create_schema = [&](Transaction& group) {
-        TableRef table_0 = create_table_with_primary_key(group, "class_table_0", type_Int, "pk_int");
+        TableRef table_0 = group.add_table_with_primary_key("class_table_0", type_Int, "pk_int");
         table_0->add_column(type_Int, "int");
         table_0->add_column(type_Bool, "bool");
         table_0->add_column(type_Float, "float");
         table_0->add_column(type_Double, "double");
         table_0->add_column(type_Timestamp, "timestamp");
 
-        TableRef table_1 = create_table_with_primary_key(group, "class_table_1", type_Int, "pk_int");
+        TableRef table_1 = group.add_table_with_primary_key("class_table_1", type_Int, "pk_int");
         table_1->add_column(type_String, "String");
 
-        TableRef table_2 = create_table_with_primary_key(group, "class_table_2", type_String, "pk_string");
+        TableRef table_2 = group.add_table_with_primary_key("class_table_2", type_String, "pk_string");
         table_2->add_column_list(type_String, "array_string");
     };
 
@@ -667,7 +667,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         DBRef sg = DB::create(make_client_replication(path_1));
         WriteTransaction wt{sg};
         std::string table_name = "class_table1";
-        TableRef table = create_table_with_primary_key(wt, table_name, type_Int, "int_pk");
+        TableRef table = wt.get_group().add_table_with_primary_key(table_name, type_Int, "int_pk");
         table->create_object_with_primary_key(int64_t(123));
         wt.commit();
         Session session = fixture.make_bound_session(sg, server_path_1);
@@ -678,7 +678,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         DBRef sg = DB::create(make_client_replication(path_2));
         WriteTransaction wt{sg};
         std::string table_name = "class_table2";
-        TableRef table = create_table_with_primary_key(wt, table_name, type_String, "string_pk");
+        TableRef table = wt.get_group().add_table_with_primary_key(table_name, type_String, "string_pk");
         table->create_object_with_primary_key("pk_0");
         wt.commit();
         Session session = fixture.make_bound_session(sg, server_path_2);
@@ -755,7 +755,7 @@ TEST(ClientReset_PinnedVersion)
     // Create and upload the initial version
     {
         WriteTransaction wt{sg};
-        TableRef table = create_table(wt, table_name);
+        TableRef table = wt.add_table(table_name);
         table->add_column(type_Float, "float");
         table->create_object();
         wt.commit();

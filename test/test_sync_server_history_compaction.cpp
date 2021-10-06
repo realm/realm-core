@@ -1,7 +1,6 @@
 #include <thread>
 
-#include <realm/sync/object.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "test.hpp"
 
@@ -65,7 +64,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     // history.
     {
         WriteTransaction wt{sg_1};
-        sync::create_table(wt, "class_Foo");
+        wt.add_table("class_Foo");
         wt.commit();
         Session session = fixture.make_bound_session(sg_1, "/test");
         session.wait_for_upload_complete_or_client_stopped();
@@ -77,7 +76,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     // and its last seen timestamp at 1s.
     {
         WriteTransaction wt{sg_2};
-        sync::create_table(wt, "class_Bar");
+        wt.add_table("class_Bar");
         wt.commit();
         Session session = fixture.make_bound_session(sg_2, "/test");
         session.wait_for_upload_complete_or_client_stopped();
@@ -179,7 +178,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtDownloadTime)
             auto history = make_client_replication(client_2_path);
             auto sg = DB::create(*history);
             WriteTransaction wt{sg};
-            sync::create_table(wt, "class_Foo");
+            wt.add_table("class_Foo");
             wt.commit();
         }
         clock.add_time(100s);
@@ -266,7 +265,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
     {
         auto sg = DB::create(make_client_replication(client_2_path));
         WriteTransaction wt{sg};
-        sync::create_table(wt, "class_Foo");
+        wt.add_table("class_Foo");
         wt.commit();
     }
     clock.add_time(100s);
@@ -283,7 +282,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
     {
         auto sg = DB::create(make_client_replication(client_1_path));
         WriteTransaction wt{sg};
-        sync::create_table(wt, "class_Bar");
+        wt.add_table("class_Bar");
         version_type version = wt.commit();
         session_1.nonsync_transact_notify(version);
     }
@@ -329,7 +328,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     Session client_1 = fixture.make_bound_session(sg_1, "/test");
     {
         WriteTransaction wt{sg_1};
-        sync::create_table(wt, "class_Foo");
+        wt.add_table("class_Foo");
         version_type version = wt.commit();
         client_1.nonsync_transact_notify(version);
     }
@@ -469,7 +468,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
                 Session session = fixture.make_bound_session(sg, "/test");
                 {
                     WriteTransaction wt{sg};
-                    TableRef foo = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
+                    TableRef foo = wt.get_group().add_table_with_primary_key("class_Foo", type_Int, "pk");
                     ColKey col = foo->add_column(type_String, "large");
                     for (int_fast64_t j = 0; j < 100; ++j) {
                         foo->create_object_with_primary_key(j).set(col, large_string);

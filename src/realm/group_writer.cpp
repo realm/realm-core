@@ -282,7 +282,7 @@ void GroupWriter::sync_all_mappings()
 // used policy. Entries in the cache are kept in MRU order.
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
-    auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [=](auto& window) {
+    auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [&](const auto& window) {
         return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
     });
     if (match != m_map_windows.end()) {

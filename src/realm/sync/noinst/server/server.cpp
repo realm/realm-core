@@ -19,7 +19,7 @@
 #include <atomic>
 #include <thread>
 
-#include <realm/sync/encrypt/fingerprint.hpp>
+#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
 #include <realm/util/value_reset_guard.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/string_view.hpp>
@@ -47,19 +47,19 @@
 #include <realm/binary_data.hpp>
 #include <realm/sync/noinst/file_descriptors.hpp>
 #include <realm/sync/noinst/compression.hpp>
-#include <realm/sync/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/server_file_access_cache.hpp>
+#include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server_impl_base.hpp>
-#include <realm/sync/noinst/vacuum.hpp>
+#include <realm/sync/noinst/server/server_impl_base.hpp>
+#include <realm/sync/noinst/server/vacuum.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/access_control.hpp>
-#include <realm/sync/server.hpp>
+#include <realm/sync/noinst/server/access_control.hpp>
+#include <realm/sync/noinst/server/server.hpp>
 #include <realm/sync/changeset.hpp>
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
@@ -5366,7 +5366,7 @@ void ServerImpl::listen()
 
 void ServerImpl::initiate_accept()
 {
-    auto handler = [=](std::error_code ec) {
+    auto handler = [this](std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_accept(ec);
     };
@@ -6067,7 +6067,7 @@ void SyncConnection::send_next_message()
 
 void SyncConnection::initiate_write_output_buffer()
 {
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_write_output_buffer();
     };
 
@@ -6080,7 +6080,7 @@ void SyncConnection::initiate_write_output_buffer()
 
 void SyncConnection::initiate_pong_output_buffer()
 {
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_pong_output_buffer();
     };
 
@@ -6142,7 +6142,7 @@ void SyncConnection::initiate_write_error(ProtocolError error_code, session_iden
     get_server_protocol().make_error_message(protocol_version, out, error_code, message, message_size, try_again,
                                              session_ident); // Throws
 
-    auto handler = [=]() {
+    auto handler = [this]() {
         handle_write_error(); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler));

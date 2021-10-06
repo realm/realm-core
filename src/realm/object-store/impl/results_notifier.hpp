@@ -70,8 +70,8 @@ private:
     // rerunning the query when there's no chance of it changing.
     TableVersions m_last_seen_version;
 
-    // The rows from the previous run of the query, for calculating diffs
-    std::vector<int64_t> m_previous_rows;
+    // The objects from the previous run of the query, for calculating diffs
+    ObjKeys m_previous_objs;
 
     TransactionChangeInfo* m_info = nullptr;
     bool m_results_were_used = true;

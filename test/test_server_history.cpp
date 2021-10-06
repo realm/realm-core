@@ -1,4 +1,4 @@
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "test.hpp"
 
@@ -70,7 +70,7 @@ TEST(ServerHistory_Verify)
     {
         WriteTransaction wt{sg};
         wt.get_group().verify();
-        TableRef table = sync::create_table(wt, "class_table");
+        TableRef table = wt.add_table("class_table");
         table->add_column(type_Int, "alpha");
         table->add_column(type_Int, "beta");
         table->create_object();

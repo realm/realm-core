@@ -49,11 +49,6 @@ namespace _impl {
 struct SyncClient;
 }
 
-class SyncLoggerFactory {
-public:
-    virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
-};
-
 struct SyncClientTimeouts {
     SyncClientTimeouts();
     // See sync::Client::Config for the meaning of these fields.
@@ -76,7 +71,8 @@ struct SyncClientConfig {
     util::Optional<std::vector<char>> custom_encryption_key;
     bool reset_metadata_on_error = false;
 
-    SyncLoggerFactory* logger_factory = nullptr;
+    using LoggerFactory = std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>;
+    LoggerFactory logger_factory;
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level log_level = util::Logger::Level::info;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
@@ -116,10 +112,7 @@ public:
     // The log level can only be set up until the point the Sync Client is created. This happens when the first
     // Session is created.
     void set_log_level(util::Logger::Level) noexcept;
-    void set_logger_factory(SyncLoggerFactory&) noexcept;
-
-    // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> make_logger() const;
+    void set_logger_factory(SyncClientConfig::LoggerFactory) noexcept;
 
     // Sets the application level user agent string.
     // This should have the format specified here:
@@ -258,6 +251,9 @@ private:
 
     bool run_file_action(const SyncFileActionMetadata&);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
+
+    // Create a new logger of the type which will be used by the sync client
+    std::unique_ptr<util::Logger> make_logger() const;
 
     // Protects m_users
     mutable std::mutex m_user_mutex;

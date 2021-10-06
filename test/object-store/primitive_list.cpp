@@ -117,6 +117,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
                    cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
                    cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
 {
+    using std::swap;
     auto values = TestType::values();
     using T = typename TestType::Type;
     using W = typename TestType::Wrapped;
@@ -257,12 +258,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             return;
 
         list.move(1, 2);
-        std::swap(values[1], values[2]);
+        swap(values[1], values[2]);
         REQUIRE(list == values);
         REQUIRE(results == values);
 
         list.move(2, 1);
-        std::swap(values[1], values[2]);
+        swap(values[1], values[2]);
         REQUIRE(list == values);
         REQUIRE(results == values);
 
@@ -300,7 +301,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             return;
 
         list.swap(0, 2);
-        std::swap(values[0], values[2]);
+        swap(values[0], values[2]);
         REQUIRE(list == values);
         REQUIRE(results == values);
 
@@ -308,7 +309,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             return;
 
         list.swap(1, 3);
-        std::swap(values[1], values[3]);
+        swap(values[1], values[3]);
         REQUIRE(list == values);
         REQUIRE(results == values);
     }

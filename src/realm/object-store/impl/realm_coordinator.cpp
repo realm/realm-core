@@ -932,7 +932,7 @@ public:
 
         // Copy the list change info if there are multiple LinkViews for the same LinkList
         auto id = [](auto const& list) {
-            return std::tie(list.table_key, list.col_key, list.row_key);
+            return std::tie(list.table_key, list.col_key, list.obj_key);
         };
         for (size_t i = 1; i < m_current->lists.size(); ++i) {
             for (size_t j = i; j > 0; --j) {

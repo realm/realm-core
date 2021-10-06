@@ -4,9 +4,8 @@
 
 #include <realm/db.hpp>
 #include <realm/util/file.hpp>
-#include <realm/sync/noinst/server_history.hpp>
-#include <realm/sync/noinst/server_legacy_migration.hpp>
-#include <realm/sync/object.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/server/server_legacy_migration.hpp>
 
 using namespace realm;
 
@@ -44,7 +43,7 @@ bool check_legacy_format_1(const Group& group)
     return good;
 }
 
-bool try_migrate_file(const std::string original_path, const std::string& new_path, util::Logger& logger)
+bool try_migrate_file(const std::string original_path, const std::string& new_path)
 {
     HistoryContext context; // Throws
     _impl::ServerHistory::DummyCompactionControl compaction_control;
@@ -52,9 +51,6 @@ bool try_migrate_file(const std::string original_path, const std::string& new_pa
     if (check_legacy_format_1(legacy_group)) {
         _impl::ServerHistory new_history{new_path, context, compaction_control}; // Throws
         DBRef new_shared_group = DB::create(new_history);                        // Throws
-        WriteTransaction wt{new_shared_group};
-        sync::import_from_legacy_format(legacy_group, wt, logger); // Throws
-        wt.commit();
         return true;
     }
     else {
@@ -68,15 +64,15 @@ bool try_migrate_file(const std::string original_path, const std::string& new_pa
 }
 
 void migrate_file_safely(const std::string& realm_file, const std::string& temp_file_1,
-                         const std::string& temp_file_2, const std::string& backup_file, util::Logger& logger)
+                         const std::string& temp_file_2, const std::string& backup_file)
 {
     std::string lock_file = DB::get_core_file(realm_file, DB::CoreFileType::Lock); // Throws
-    util::File lock{lock_file, util::File::mode_Write}; // Throws
-    lock.lock_exclusive();                              // Throws
+    util::File lock{lock_file, util::File::mode_Write};                            // Throws
+    lock.lock_exclusive();                                                         // Throws
     util::File::UnlockGuard ug{lock};
-    util::File::copy(realm_file, temp_file_1);                                      // Throws
-    util::File::try_remove(temp_file_2);                                            // Throws
-    bool migration_was_needed = try_migrate_file(temp_file_1, temp_file_2, logger); // Throws
+    util::File::copy(realm_file, temp_file_1);                              // Throws
+    util::File::try_remove(temp_file_2);                                    // Throws
+    bool migration_was_needed = try_migrate_file(temp_file_1, temp_file_2); // Throws
     if (migration_was_needed) {
         // Just-in-time backup of the original Realm file.
         util::File::copy(realm_file, backup_file); // Throws
@@ -134,10 +130,9 @@ void ensure_legacy_migration_1(const std::string& realms_dir, const std::string&
             std::size_t n = 1;
             for (const auto& file : realm_files) {
                 logger.info("Migrating %1 (%2/%3)", file, n, realm_files.size());
-                std::string realm_file = util::File::resolve(file, realms_dir);  // Throws
-                std::string backup_file = util::File::resolve(file, backup_dir); // Throws
-                migrate_file_safely(realm_file, temp_file_1, temp_file_2, backup_file,
-                                    logger); // Throws
+                std::string realm_file = util::File::resolve(file, realms_dir);         // Throws
+                std::string backup_file = util::File::resolve(file, backup_dir);        // Throws
+                migrate_file_safely(realm_file, temp_file_1, temp_file_2, backup_file); // Throws
                 ++n;
             }
 

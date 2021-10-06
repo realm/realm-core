@@ -37,8 +37,8 @@
 #include <realm/db.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/auth.hpp>
 
+#include "auth.hpp"
 #include "metrics.hpp"
 
 

@@ -366,11 +366,11 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        bool has_pk = sync::table_has_primary_key(*table_src);
+        auto pk_col_src = table_src->get_primary_key_column();
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
-            REALM_ASSERT(has_pk); // a sync table will have a pk
+            REALM_ASSERT(pk_col_src); // a sync table will have a pk
             auto pk_col_src = table_src->get_primary_key_column();
             DataType pk_type = DataType(pk_col_src.get_type());
             StringData pk_col_name = table_src->get_column_name(pk_col_src);

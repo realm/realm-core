@@ -1,6 +1,6 @@
 #include <realm/string_data.hpp>
 #include <realm/util/sha_crypto.hpp>
-#include <realm/sync/crypto_server.hpp>
+#include <realm/sync/noinst/server/crypto_server.hpp>
 
 #include "test.hpp"
 

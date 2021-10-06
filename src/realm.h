@@ -1872,4 +1872,20 @@ RLM_API realm_notification_token_t* realm_results_add_notification_callback(real
  */
 RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
 
+/* Logging */
+// equivalent to realm::util::Logger::Level in util/logger.hpp and must be kept in sync.
+typedef enum realm_log_level {
+    RLM_LOG_LEVEL_ALL = 0,
+    RLM_LOG_LEVEL_TRACE = 1,
+    RLM_LOG_LEVEL_DEBUG = 2,
+    RLM_LOG_LEVEL_DETAIL = 3,
+    RLM_LOG_LEVEL_INFO = 4,
+    RLM_LOG_LEVEL_WARNING = 5,
+    RLM_LOG_LEVEL_ERROR = 6,
+    RLM_LOG_LEVEL_FATAL = 7,
+    RLM_LOG_LEVEL_OFF = 8,
+} realm_log_level_e;
+
+typedef void (*realm_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+
 #endif // REALM_H

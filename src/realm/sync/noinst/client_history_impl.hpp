@@ -4,7 +4,6 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/noinst/object_id_history_state.hpp>
 #include <realm/array_integer.hpp>
 
 namespace realm {
