@@ -494,9 +494,12 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
 bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
-    constexpr size_t buffer_seconds = 5; // arbitrary
-    auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
-    return is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
+    static const int64_t five_minutes_in_seconds = 300;
+    auto now = duration_cast<seconds>(system_clock::now().time_since_epoch());
+    auto expires_at = m_access_token.expires_at;
+    auto refresh_at = std::max(now.count() + five_minutes_in_seconds,
+                               expires_at - five_minutes_in_seconds);
+    return is_logged_in() && now.count() > refresh_at;
 }
 
 } // namespace realm
