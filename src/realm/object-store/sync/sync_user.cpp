@@ -68,7 +68,6 @@ RealmJWT::RealmJWT(const std::string& token)
 
     this->expires_at = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() +
                        static_cast<int64_t>(json["exp"]) - static_cast<int64_t>(json["iat"]);
-    this->issued_at = static_cast<int64_t>(json["iat"]);
 
     if (json.find("user_data") != json.end()) {
         this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
@@ -495,7 +494,7 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
 bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
-    constexpr size_t buffer_seconds = 5; // arbitrary
+    constexpr size_t buffer_seconds = 60; // arbitrary
     auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
     return is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
 }

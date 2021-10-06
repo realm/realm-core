@@ -59,8 +59,6 @@ struct RealmJWT {
 
     // When the token expires.
     int64_t expires_at = 0;
-    // When the token was issued.
-    int64_t issued_at = 0;
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
