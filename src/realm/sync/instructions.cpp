@@ -1,10 +1,6 @@
 #include <realm/impl/transact_log.hpp>
 #include <realm/sync/instructions.hpp>
 
-#include <algorithm>
-#include <ostream>
-#include <set>
-
 using namespace realm;
 using namespace realm::_impl;
 

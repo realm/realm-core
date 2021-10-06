@@ -456,16 +456,11 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
     align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
-    if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_any(i1) < get_any(i2);
-        });
-    }
-    else {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_any(i1) > get_any(i2);
-        });
-    }
+    std::sort(b, e, [this](size_t i1, size_t i2) {
+        return get_any(i1) < get_any(i2);
+    });
+    if (!ascending)
+        std::reverse(b, e);
 }
 
 void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
@@ -491,16 +486,11 @@ void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
     align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
-    if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_key(i1) < get_key(i2);
-        });
-    }
-    else {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_key(i1) > get_key(i2);
-        });
-    }
+    std::sort(b, e, [this](size_t i1, size_t i2) {
+        return get_key(i1) < get_key(i2);
+    });
+    if (!ascending)
+        std::reverse(b, e);
 }
 
 void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
