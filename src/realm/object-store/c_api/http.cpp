@@ -37,7 +37,21 @@ public:
     {
     }
 
-protected:
+    static void on_response_completed(void* completion_data, const realm_http_response_t* response)
+    {
+        auto& completion = *reinterpret_cast<std::function<void(const Response)>*>(completion_data);
+
+        std::map<std::string, std::string> headers;
+        for (size_t i = 0; i < response->num_headers; i++) {
+            headers.emplace(std::string(response->headers[i].name), std::string(response->headers[i].value));
+        }
+
+        completion({response->status_code, response->custom_status_code, std::move(headers),
+                    std::string(response->body, response->body_size)});
+        delete &completion;
+    }
+
+private:
     void send_request_to_server(const Request request,
                                 std::function<void(const Response)> completion_block) override final
     {
@@ -55,22 +69,7 @@ protected:
                                        c_headers.size(),
                                        request.body.data(),
                                        request.body.size()};
-        m_request_executor(m_userdata.get(), std::move(c_request), completion_data, &on_response_completed);
-    }
-
-private:
-    static void on_response_completed(void* completion_data, const realm_http_response_t* response)
-    {
-        auto& completion = *reinterpret_cast<std::function<void(const Response)>*>(completion_data);
-
-        std::map<std::string, std::string> headers;
-        for (size_t i = 0; i < response->num_headers; i++) {
-            headers.emplace(std::string(response->headers[i].name), std::string(response->headers[i].value));
-        }
-
-        completion({response->status_code, response->custom_status_code, std::move(headers),
-                    std::string(response->body, response->body_size)});
-        delete &completion;
+        m_request_executor(m_userdata.get(), std::move(c_request), completion_data);
     }
 
     UserdataPtr m_userdata;
@@ -85,4 +84,9 @@ RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func
     auto transport = std::make_shared<realm::c_api::CNetworkTransport>(realm::c_api::UserdataPtr{userdata, free},
                                                                        request_executor);
     return new realm_http_transport_t(std::move(transport));
+}
+
+RLM_API void realm_http_transport_complete_request(void* completion_data, const realm_http_response_t* response)
+{
+    realm::c_api::CNetworkTransport::on_response_completed(completion_data, response);
 }
