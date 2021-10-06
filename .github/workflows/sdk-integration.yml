@@ -19,6 +19,10 @@ jobs:
           - name: realm-js
             submodule-path: vendor/realm-core
           - name: realm-cocoa
+    outputs:
+      pr-url-dotnet: ${{ steps.set-pr-url.outputs.realm-dotnet-url }}
+      pr-url-js: ${{ steps.set-pr-url.outputs.realm-js-url }}
+      pr-url-cocoa: ${{ steps.set-pr-url.outputs.realm-cocoa-url }}
     steps:
     - name: Checkout ${{ matrix.repo.name }}
       uses: actions/checkout@v2
@@ -67,6 +71,7 @@ jobs:
     - name: Create PR
       uses: peter-evans/create-pull-request@7380612b49221684fefa025244f2ef4008ae50ad
       if: ${{ steps.checkout-existing.outputs.pr-exists != 'true' }}
+      id: create-pr
       with:
         token: ${{ secrets.REALM_CI_PAT }}
         branch: ${{ github.event.pull_request.head.ref }}
@@ -78,3 +83,6 @@ jobs:
         labels: public-api
         commit-message: Update Core to ${{ github.event.pull_request.head.sha }}
         draft: true
+    - name: Set PR Url Output
+      id: set-pr-url
+      run: echo "set-output name=${{matrix.repo.name}}-url::${{ steps.create-pr.outputs.pull-request-url }}"
