@@ -34,117 +34,7 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 
 namespace {
 
-// (protocol, address, port, session_multiplex_ident)
-//
-// `protocol` is included for convenience, even though it is not strictly part
-// of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
-
-class ClientImpl final : public ClientImplBase {
-public:
-    ClientImpl(Client::Config);
-    ~ClientImpl();
-
-    void cancel_reconnect_delay();
-    bool wait_for_session_terminations_or_client_stopped();
-
-    void stop() noexcept final;
-    void run() final;
-
-private:
-    const bool m_one_connection_per_session;
-    util::network::Trigger m_actualize_and_finalize;
-    util::network::DeadlineTimer m_keep_running_timer;
-
-    // Note: There is one server slot per server endpoint (hostname, port,
-    // session_multiplex_ident), and it survives from one connection object to
-    // the next, which is important because it carries information about a
-    // possible reconnect delay applying to the new connection object (server
-    // hammering protection).
-    //
-    // Note: Due to a particular load balancing scheme that is currently in use,
-    // every session is forced to open a seperate connection (via abuse of
-    // `m_one_connection_per_session`, which is only intended for testing
-    // purposes). This disables part of the hammering protection scheme built in
-    // to the client.
-    struct ServerSlot {
-        ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
-        std::unique_ptr<ClientImplBase::Connection> connection;
-
-        // Used instead of `connection` when `m_one_connection_per_session` is
-        // true.
-        std::map<connection_ident_type, std::unique_ptr<ClientImplBase::Connection>> alt_connections;
-    };
-
-    // Must be accessed only by event loop thread
-    std::map<ServerEndpoint, ServerSlot> m_server_slots;
-
-    // Must be accessed only by event loop thread
-    connection_ident_type m_prev_connection_ident = 0;
-
-    util::Mutex m_mutex;
-
-    bool m_stopped = false;                       // Protected by `m_mutex`
-    bool m_sessions_terminated = false;           // Protected by `m_mutex`
-    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
-
-    std::atomic<bool> m_running{false}; // Debugging facility
-
-    // The set of session wrappers that are not yet wrapping a session object,
-    // and are not yet abandoned (still referenced by the application).
-    //
-    // Protected by `m_mutex`.
-    std::map<SessionWrapper*, ServerEndpoint> m_unactualized_session_wrappers;
-
-    // The set of session wrappers that were successfully actualized, but are
-    // now abandoned (no longer referenced by the application), and have not yet
-    // been finalized. Order in queue is immaterial.
-    //
-    // Protected by `m_mutex`.
-    SessionWrapperStack m_abandoned_session_wrappers;
-
-    // Protected by `m_mutex`.
-    util::CondVar m_wait_or_client_stopped_cond;
-
-    void start_keep_running_timer();
-    void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
-    void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
-    void actualize_and_finalize_session_wrappers();
-
-    // Get or create a connection. If a connection exists for the specified
-    // endpoint, it will be returned, otherwise a new connection will be
-    // created. If `m_one_connection_per_session` is true (testing only), a new
-    // connection will be created every time.
-    //
-    // Must only be accessed from event loop thread.
-    //
-    // FIXME: Passing these SSL parameters here is confusing at best, since they
-    // are ignored if a connection is already available for the specified
-    // endpoint. Also, there is no way to check that all the specified SSL
-    // parameters are in agreement with a preexisting connection. A better
-    // approach would be to allow for per-endpoint SSL parameters to be
-    // specifiable through public member functions of ClientImpl from where they
-    // could then be picked up as new connections are created on demand.
-    //
-    // FIXME: `session_multiplex_ident` should be eliminated from ServerEndpoint
-    // as it effectively disables part of the hammering protection scheme if it
-    // is used to ensure that each session gets a separate connection. With the
-    // alternative approach outlined in the previous FIXME (specify per endpoint
-    // SSL parameters at the client object level), there seems to be no more use
-    // for `session_multiplex_ident`.
-    ClientImplBase::Connection& get_connection(ServerEndpoint, const std::string& authorization_header_name,
-                                   const std::map<std::string, std::string>& custom_http_headers,
-                                   bool verify_servers_ssl_certificate,
-                                   Optional<std::string> ssl_trust_certificate_path,
-                                   std::function<SyncConfig::SSLVerifyCallback>, Optional<ProxyConfig>,
-                                   bool& was_created);
-
-    // Destroys the specified connection.
-    void remove_connection(ClientImplBase::Connection&) noexcept;
-
-    friend class ClientImplBase::Connection;
-    friend class sync::SessionWrapper;
-};
+using ClientImpl = ClientImplBase;
 
 
 class SessionImpl : public ClientImplBase::Session {
@@ -510,79 +400,8 @@ inline SessionWrapperStack::~SessionWrapperStack()
 
 // ################ ClientImpl ################
 
-inline ClientImpl::ClientImpl(Client::Config config)
-    : ClientImplBase{config} // Throws
-    , m_one_connection_per_session{config.one_connection_per_session}
-    , m_keep_running_timer{get_service()} // Throws
-{
-    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
-    logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
-                 get_current_protocol_version()); // Throws
-    logger.debug("Platform: %1", util::get_platform_info());
-    const char* build_mode;
-#if REALM_DEBUG
-    build_mode = "Debug";
-#else
-    build_mode = "Release";
-#endif
-    logger.debug("Build mode: %1", build_mode);
-    logger.debug("Config param: one_connection_per_session = %1",
-                 config.one_connection_per_session); // Throws
-    logger.debug("Config param: connect_timeout = %1 ms",
-                 config.connect_timeout); // Throws
-    logger.debug("Config param: connection_linger_time = %1 ms",
-                 config.connection_linger_time); // Throws
-    logger.debug("Config param: ping_keepalive_period = %1 ms",
-                 config.ping_keepalive_period); // Throws
-    logger.debug("Config param: pong_keepalive_timeout = %1 ms",
-                 config.pong_keepalive_timeout); // Throws
-    logger.debug("Config param: fast_reconnect_limit = %1 ms",
-                 config.fast_reconnect_limit); // Throws
-    logger.debug("Config param: disable_upload_compaction = %1",
-                 config.disable_upload_compaction); // Throws
-    logger.debug("Config param: tcp_no_delay = %1",
-                 config.tcp_no_delay); // Throws
-    logger.debug("Config param: disable_sync_to_disk = %1",
-                 config.disable_sync_to_disk); // Throws
-    logger.debug("User agent string: '%1'", get_user_agent_string());
 
-    if (config.reconnect_mode != ReconnectMode::normal) {
-        logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
-                    "never do this in production!");
-    }
-
-    if (config.dry_run) {
-        logger.warn("Testing/debugging feature 'dry run' enabled - "
-                    "never do this in production!");
-    }
-
-    if (m_one_connection_per_session) {
-        // FIXME: Re-enable this warning when the load balancer is able to handle
-        // multiplexing.
-        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
-        //            "never do this in production");
-    }
-
-    if (config.disable_upload_activation_delay) {
-        logger.warn("Testing/debugging feature 'disable_upload_activation_delay' enabled - "
-                    "never do this in production");
-    }
-
-    if (config.disable_sync_to_disk) {
-        logger.warn("Testing/debugging feature 'disable_sync_to_disk' enabled - "
-                    "never do this in production");
-    }
-
-    auto handler = [this] {
-        actualize_and_finalize_session_wrappers(); // Throws
-    };
-    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
-
-    start_keep_running_timer(); // Throws
-}
-
-
-ClientImpl::~ClientImpl()
+ClientImplBase::~ClientImplBase()
 {
     bool client_destroyed_while_still_running = m_running;
     REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
@@ -678,14 +497,14 @@ void ClientImpl::stop() noexcept
         return;
     m_stopped = true;
     m_wait_or_client_stopped_cond.notify_all();
-    ClientImplBase::stop();
+    m_service.stop();
 }
 
 
 void ClientImpl::run()
 {
     auto ta = util::make_temp_assign(m_running, true);
-    ClientImplBase::run(); // Throws
+    m_service.run(); // Throws
 }
 
 
@@ -851,7 +670,7 @@ inline ClientImpl& SessionImpl::get_client() noexcept
 
 inline ClientImplBase::Connection& SessionImpl::get_connection() noexcept
 {
-    return static_cast<ClientImplBase::Connection&>(Session::get_connection());
+    return Session::get_connection();
 }
 
 
@@ -1612,7 +1431,7 @@ void ClientImplBase::Connection::resume_active_sessions()
 void ClientImplBase::Connection::on_idle()
 {
     logger.debug("Destroying connection object");
-    ClientImpl& client = static_cast<ClientImpl&>(get_client());
+    ClientImpl& client = get_client();
     client.remove_connection(*this);
     // NOTE: This connection object is now destroyed!
 }
@@ -1702,13 +1521,13 @@ void Client::stop() noexcept
 
 void Client::cancel_reconnect_delay()
 {
-    static_cast<ClientImpl*>(m_impl.get())->cancel_reconnect_delay();
+    m_impl->cancel_reconnect_delay();
 }
 
 
 bool Client::wait_for_session_terminations_or_client_stopped()
 {
-    return static_cast<ClientImpl*>(m_impl.get())->wait_for_session_terminations_or_client_stopped();
+    return m_impl.get()->wait_for_session_terminations_or_client_stopped();
 }
 
 
@@ -1720,7 +1539,7 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 
 
 Session::Session(Client& client, DBRef db, Config&& config)
-    : m_impl{Impl::make_session(static_cast<ClientImpl&>(*client.m_impl), std::move(db), std::move(config))} // Throws
+    : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
 {
 }
 

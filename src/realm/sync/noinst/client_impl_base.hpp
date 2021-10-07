@@ -26,6 +26,13 @@ namespace realm {
 
 
 namespace sync {
+
+// (protocol, address, port, session_multiplex_ident)
+//
+// `protocol` is included for convenience, even though it is not strictly part
+// of an endpoint.
+using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type, std::string>;
+
 class SessionWrapper;
 
 class SessionWrapperStack {
@@ -376,9 +383,9 @@ namespace _impl {
 class ClientImplBase {
 public:
     enum class ConnectionTerminationReason;
-    class ReconnectInfo;
     class Connection;
     class Session;
+
 
     // clang-format off
     using RoundtripTimeHandler = sync::RoundtripTimeHandler;
@@ -394,6 +401,48 @@ public:
 
     using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
+    /// Per-server endpoint information used to determine reconnect delays.
+    class ReconnectInfo {
+    public:
+        void reset() noexcept;
+
+    private:
+        using milliseconds_lim = std::numeric_limits<milliseconds_type>;
+
+        // When `m_reason` is present, it indicates that a connection attempt was
+        // initiated, and that a new reconnect delay must be computed before
+        // initiating another connection attempt. In this case, `m_time_point` is
+        // the point in time from which the next delay should count. It will
+        // generally be the time at which the last connection attempt was initiated,
+        // but for certain connection termination reasons, it will instead be the
+        // time at which the connection was closed. `m_delay` will generally be the
+        // duration of the delay that preceded the last connection attempt, and can
+        // be used as a basis for computing the next delay.
+        //
+        // When `m_reason` is absent, it indicates that a new reconnect delay has
+        // been computed, and `m_time_point` will be the time at which the delay
+        // expires (if equal to `milliseconds_lim::max()`, the delay is
+        // indefinite). `m_delay` will generally be the duration of the computed
+        // delay.
+        //
+        // Since `m_reason` is absent, and `m_timepoint` is zero initially, the
+        // first reconnect delay will already have expired, so the effective delay
+        // will be zero.
+        util::Optional<ConnectionTerminationReason> m_reason;
+        milliseconds_type m_time_point = 0;
+        milliseconds_type m_delay = 0;
+
+        // Set this flag to true to schedule a postponed invocation of reset(). See
+        // Connection::cancel_reconnect_delay() for details and rationale.
+        //
+        // Will be set back to false when a PONG message arrives, and the
+        // corresponding PING message was sent while `m_scheduled_reset` was
+        // true. See receive_pong().
+        bool m_scheduled_reset = false;
+
+        friend class Connection;
+    };
+
     static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
     static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
     static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
@@ -403,15 +452,15 @@ public:
     util::Logger& logger;
 
     ClientImplBase(sync::ClientConfig);
-    virtual ~ClientImplBase();
+    ~ClientImplBase();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
     /// These call stop(), run(), and report_event_loop_metrics() on the service
     /// object (get_service()) respectively.
-    virtual void stop() noexcept;
-    virtual void run();
+    void stop() noexcept;
+    void run();
     void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
     // @}
 
@@ -426,8 +475,11 @@ public:
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
 
+    void cancel_reconnect_delay();
+    bool wait_for_session_terminations_or_client_stopped();
 
 private:
+    using connection_ident_type = std::int_fast64_t;
     using file_ident_type = sync::file_ident_type;
     using salt_type = sync::salt_type;
     using session_ident_type = sync::session_ident_type;
@@ -453,9 +505,102 @@ private:
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
+    const bool m_one_connection_per_session;
+    util::network::Trigger m_actualize_and_finalize;
+    util::network::DeadlineTimer m_keep_running_timer;
+
+    // Note: There is one server slot per server endpoint (hostname, port,
+    // session_multiplex_ident), and it survives from one connection object to
+    // the next, which is important because it carries information about a
+    // possible reconnect delay applying to the new connection object (server
+    // hammering protection).
+    //
+    // Note: Due to a particular load balancing scheme that is currently in use,
+    // every session is forced to open a seperate connection (via abuse of
+    // `m_one_connection_per_session`, which is only intended for testing
+    // purposes). This disables part of the hammering protection scheme built in
+    // to the client.
+    struct ServerSlot {
+        ReconnectInfo reconnect_info; // Applies exclusively to `connection`.
+        std::unique_ptr<ClientImplBase::Connection> connection;
+
+        // Used instead of `connection` when `m_one_connection_per_session` is
+        // true.
+        std::map<connection_ident_type, std::unique_ptr<ClientImplBase::Connection>> alt_connections;
+    };
+
+    // Must be accessed only by event loop thread
+    std::map<sync::ServerEndpoint, ServerSlot> m_server_slots;
+
+    // Must be accessed only by event loop thread
+    connection_ident_type m_prev_connection_ident = 0;
+
+    util::Mutex m_mutex;
+
+    bool m_stopped = false;                       // Protected by `m_mutex`
+    bool m_sessions_terminated = false;           // Protected by `m_mutex`
+    bool m_actualize_and_finalize_needed = false; // Protected by `m_mutex`
+
+    std::atomic<bool> m_running{false}; // Debugging facility
+
+    // The set of session wrappers that are not yet wrapping a session object,
+    // and are not yet abandoned (still referenced by the application).
+    //
+    // Protected by `m_mutex`.
+    std::map<sync::SessionWrapper*, sync::ServerEndpoint> m_unactualized_session_wrappers;
+
+    // The set of session wrappers that were successfully actualized, but are
+    // now abandoned (no longer referenced by the application), and have not yet
+    // been finalized. Order in queue is immaterial.
+    //
+    // Protected by `m_mutex`.
+    sync::SessionWrapperStack m_abandoned_session_wrappers;
+
+    // Protected by `m_mutex`.
+    util::CondVar m_wait_or_client_stopped_cond;
+
+    void start_keep_running_timer();
+    void register_unactualized_session_wrapper(sync::SessionWrapper*, sync::ServerEndpoint);
+    void register_abandoned_session_wrapper(util::bind_ptr<sync::SessionWrapper>) noexcept;
+    void actualize_and_finalize_session_wrappers();
+
+    // Get or create a connection. If a connection exists for the specified
+    // endpoint, it will be returned, otherwise a new connection will be
+    // created. If `m_one_connection_per_session` is true (testing only), a new
+    // connection will be created every time.
+    //
+    // Must only be accessed from event loop thread.
+    //
+    // FIXME: Passing these SSL parameters here is confusing at best, since they
+    // are ignored if a connection is already available for the specified
+    // endpoint. Also, there is no way to check that all the specified SSL
+    // parameters are in agreement with a preexisting connection. A better
+    // approach would be to allow for per-endpoint SSL parameters to be
+    // specifiable through public member functions of ClientImpl from where they
+    // could then be picked up as new connections are created on demand.
+    //
+    // FIXME: `session_multiplex_ident` should be eliminated from ServerEndpoint
+    // as it effectively disables part of the hammering protection scheme if it
+    // is used to ensure that each session gets a separate connection. With the
+    // alternative approach outlined in the previous FIXME (specify per endpoint
+    // SSL parameters at the client object level), there seems to be no more use
+    // for `session_multiplex_ident`.
+    ClientImplBase::Connection& get_connection(sync::ServerEndpoint, const std::string& authorization_header_name,
+                                               const std::map<std::string, std::string>& custom_http_headers,
+                                               bool verify_servers_ssl_certificate,
+                                               util::Optional<std::string> ssl_trust_certificate_path,
+                                               std::function<SyncConfig::SSLVerifyCallback>,
+                                               util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
+
+    // Destroys the specified connection.
+    void remove_connection(ClientImplBase::Connection&) noexcept;
+
     static std::string make_user_agent_string(sync::ClientConfig&);
 
     session_ident_type get_next_session_ident() noexcept;
+
+    friend class ClientImplBase::Connection;
+    friend class sync::SessionWrapper;
 };
 
 constexpr int ClientImplBase::get_oldest_supported_protocol_version() noexcept
@@ -496,49 +641,6 @@ enum class ClientImplBase::ConnectionTerminationReason {
     /// The application requested a feature that is unavailable in the
     /// negotiated protocol version.
     missing_protocol_feature,
-};
-
-
-/// Per-server endpoint information used to determine reconnect delays.
-class ClientImplBase::ReconnectInfo {
-public:
-    void reset() noexcept;
-
-private:
-    using milliseconds_lim = std::numeric_limits<milliseconds_type>;
-
-    // When `m_reason` is present, it indicates that a connection attempt was
-    // initiated, and that a new reconnect delay must be computed before
-    // initiating another connection attempt. In this case, `m_time_point` is
-    // the point in time from which the next delay should count. It will
-    // generally be the time at which the last connection attempt was initiated,
-    // but for certain connection termination reasons, it will instead be the
-    // time at which the connection was closed. `m_delay` will generally be the
-    // duration of the delay that preceded the last connection attempt, and can
-    // be used as a basis for computing the next delay.
-    //
-    // When `m_reason` is absent, it indicates that a new reconnect delay has
-    // been computed, and `m_time_point` will be the time at which the delay
-    // expires (if equal to `milliseconds_lim::max()`, the delay is
-    // indefinite). `m_delay` will generally be the duration of the computed
-    // delay.
-    //
-    // Since `m_reason` is absent, and `m_timepoint` is zero initially, the
-    // first reconnect delay will already have expired, so the effective delay
-    // will be zero.
-    util::Optional<ConnectionTerminationReason> m_reason;
-    milliseconds_type m_time_point = 0;
-    milliseconds_type m_delay = 0;
-
-    // Set this flag to true to schedule a postponed invocation of reset(). See
-    // Connection::cancel_reconnect_delay() for details and rationale.
-    //
-    // Will be set back to false when a PONG message arrives, and the
-    // corresponding PING message was sent while `m_scheduled_reset` was
-    // true. See receive_pong().
-    bool m_scheduled_reset = false;
-
-    friend class Connection;
 };
 
 
@@ -1437,16 +1539,6 @@ public:
 
 // Implementation
 
-inline void ClientImplBase::stop() noexcept
-{
-    m_service.stop();
-}
-
-inline void ClientImplBase::run()
-{
-    m_service.run(); // Throws
-}
-
 inline void ClientImplBase::report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
 {
     m_service.report_event_loop_metrics(std::move(handler)); // Throws
@@ -1481,8 +1573,6 @@ inline std::mt19937_64& ClientImplBase::get_random() noexcept
 {
     return m_random;
 }
-
-inline ClientImplBase::~ClientImplBase() {}
 
 inline auto ClientImplBase::get_next_session_ident() noexcept -> session_ident_type
 {

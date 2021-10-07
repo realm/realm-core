@@ -25,6 +25,7 @@
 using namespace realm;
 using namespace _impl;
 using namespace realm::util;
+using namespace realm::sync;
 
 // clang-format off
 using Connection      = ClientImplBase::Connection;
@@ -123,9 +124,76 @@ ClientImplBase::ClientImplBase(sync::ClientConfig config)
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
     , m_client_protocol{}                                 // Throws
+    , m_one_connection_per_session{config.one_connection_per_session}
+    , m_keep_running_timer{get_service()} // Throws
 {
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
+
+    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
+    logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
+                 get_current_protocol_version()); // Throws
+    logger.debug("Platform: %1", util::get_platform_info());
+    const char* build_mode;
+#if REALM_DEBUG
+    build_mode = "Debug";
+#else
+    build_mode = "Release";
+#endif
+    logger.debug("Build mode: %1", build_mode);
+    logger.debug("Config param: one_connection_per_session = %1",
+                 config.one_connection_per_session); // Throws
+    logger.debug("Config param: connect_timeout = %1 ms",
+                 config.connect_timeout); // Throws
+    logger.debug("Config param: connection_linger_time = %1 ms",
+                 config.connection_linger_time); // Throws
+    logger.debug("Config param: ping_keepalive_period = %1 ms",
+                 config.ping_keepalive_period); // Throws
+    logger.debug("Config param: pong_keepalive_timeout = %1 ms",
+                 config.pong_keepalive_timeout); // Throws
+    logger.debug("Config param: fast_reconnect_limit = %1 ms",
+                 config.fast_reconnect_limit); // Throws
+    logger.debug("Config param: disable_upload_compaction = %1",
+                 config.disable_upload_compaction); // Throws
+    logger.debug("Config param: tcp_no_delay = %1",
+                 config.tcp_no_delay); // Throws
+    logger.debug("Config param: disable_sync_to_disk = %1",
+                 config.disable_sync_to_disk); // Throws
+    logger.debug("User agent string: '%1'", get_user_agent_string());
+
+    if (config.reconnect_mode != ReconnectMode::normal) {
+        logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
+                    "never do this in production!");
+    }
+
+    if (config.dry_run) {
+        logger.warn("Testing/debugging feature 'dry run' enabled - "
+                    "never do this in production!");
+    }
+
+    if (m_one_connection_per_session) {
+        // FIXME: Re-enable this warning when the load balancer is able to handle
+        // multiplexing.
+        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+        //            "never do this in production");
+    }
+
+    if (config.disable_upload_activation_delay) {
+        logger.warn("Testing/debugging feature 'disable_upload_activation_delay' enabled - "
+                    "never do this in production");
+    }
+
+    if (config.disable_sync_to_disk) {
+        logger.warn("Testing/debugging feature 'disable_sync_to_disk' enabled - "
+                    "never do this in production");
+    }
+
+    auto handler = [this] {
+        actualize_and_finalize_session_wrappers(); // Throws
+    };
+    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
+
+    start_keep_running_timer(); // Throws
 }
 
 
