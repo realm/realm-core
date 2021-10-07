@@ -23,6 +23,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace realm {
 class Realm;
