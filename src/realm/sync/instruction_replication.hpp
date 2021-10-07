@@ -36,7 +36,7 @@ public:
     // reset() resets the encoder, the selected tables and the cache. It is
     // called by do_initiate_transact(), but can be called at the other times
     // as well.
-    virtual void reset();
+    void reset();
 
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;

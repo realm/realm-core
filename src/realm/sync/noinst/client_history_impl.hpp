@@ -47,7 +47,7 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
-class ClientReplication : public SyncReplication, private _impl::History, public TransformHistory {
+class ClientReplication final : public SyncReplication, private _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
     using RemoteChangeset = Transformer::RemoteChangeset;

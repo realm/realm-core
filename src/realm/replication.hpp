@@ -100,7 +100,7 @@ public:
     class Interrupted; // Exception
     class SimpleIndexTranslator;
 
-    virtual std::string get_database_path() const;
+    std::string get_database_path() const;
 
     /// Called during construction of the associated DB object.
     ///
@@ -416,16 +416,16 @@ protected:
     /// `current_version` indicates that the previous transaction failed.
 
     virtual void do_initiate_transact(Group& group, version_type current_version, bool history_updated);
-    virtual version_type do_prepare_commit(version_type orig_version);
-    virtual void do_finalize_commit() noexcept;
-    virtual void do_abort_transact() noexcept;
+    version_type do_prepare_commit(version_type orig_version);
+    void do_finalize_commit() noexcept;
+    void do_abort_transact() noexcept;
 
     //@}
 
 
-    virtual void do_interrupt() noexcept;
+    void do_interrupt() noexcept;
 
-    virtual void do_clear_interrupt() noexcept;
+    void do_clear_interrupt() noexcept;
 
     // Formerly part of TrivialReplication:
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
