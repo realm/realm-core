@@ -52,8 +52,7 @@ public:
     }
 
 private:
-    void send_request_to_server(const Request request,
-                                std::function<void(const Response)> completion_block) override final
+    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) final
     {
         auto* completion_data = new std::function<void(const Response)>(std::move(completion_block));
 
