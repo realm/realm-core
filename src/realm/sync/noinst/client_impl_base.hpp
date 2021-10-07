@@ -983,7 +983,7 @@ public:
 
     using SyncProgress = sync::SyncProgress;
     using VersionInfo = sync::VersionInfo;
-    using ClientHistoryBase = sync::ClientReplicationBase;
+    using ClientHistoryBase = sync::ClientReplication;
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using IntegrationError = ClientHistoryBase::IntegrationError;
 

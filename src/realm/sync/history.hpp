@@ -47,7 +47,7 @@ timestamp_type generate_changeset_timestamp() noexcept;
 // arguments.
 void map_changeset_timestamp(timestamp_type, std::time_t& seconds_since_epoch, long& nanoseconds) noexcept;
 
-class ClientReplicationBase : public SyncReplication {
+class ClientReplication : public SyncReplication {
 public:
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
 
@@ -208,13 +208,6 @@ public:
                                              VersionInfo& new_version, IntegrationError& integration_error,
                                              util::Logger&, SyncTransactReporter* transact_reporter = nullptr) = 0;
 
-protected:
-    ClientReplicationBase(const std::string& realm_path);
-};
-
-
-class ClientReplication : public ClientReplicationBase {
-public:
     /// Get the persisted upload/download progress in bytes.
     virtual void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes,
                                            std::uint_fast64_t& downloadable_bytes, std::uint_fast64_t& uploaded_bytes,
@@ -254,11 +247,6 @@ std::unique_ptr<ClientReplication> make_client_replication(const std::string& re
 
 // Implementation
 
-inline ClientReplicationBase::ClientReplicationBase(const std::string& realm_path)
-    : SyncReplication{realm_path} // Throws
-{
-}
-
 inline timestamp_type generate_changeset_timestamp() noexcept
 {
     namespace chrono = std::chrono;
@@ -295,7 +283,7 @@ inline void map_changeset_timestamp(timestamp_type timestamp, std::time_t& secon
 }
 
 inline ClientReplication::ClientReplication(const std::string& realm_path)
-    : ClientReplicationBase{realm_path} // Throws
+    : SyncReplication{realm_path} // Throws
 {
 }
 

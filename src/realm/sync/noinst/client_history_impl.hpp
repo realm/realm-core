@@ -125,7 +125,7 @@ public:
     version_type prepare_changeset(const char*, size_t, version_type) override final;
     void finalize_changeset() noexcept override final;
 
-    // Overriding member functions in realm::sync::ClientReplicationBase
+    // Overriding member functions in realm::sync::ClientReplication
     void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override final;
     void set_client_file_ident(SaltedFileIdent, bool) override final;
     void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, VersionInfo&) override final;

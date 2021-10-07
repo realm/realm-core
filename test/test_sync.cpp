@@ -7455,7 +7455,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     version_type last_version, last_version_observed = 0;
     auto dump_uploadable = [&] {
         UploadCursor upload_cursor{last_version_observed, 0};
-        std::vector<sync::ClientReplicationBase::UploadChangeset> changesets_to_upload;
+        std::vector<sync::ClientReplication::UploadChangeset> changesets_to_upload;
         version_type locked_server_version = 0;
         history.find_uploadable_changesets(upload_cursor, last_version, changesets_to_upload, locked_server_version);
         CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));

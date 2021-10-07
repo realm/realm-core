@@ -653,7 +653,7 @@ DB& SessionImpl::get_db() const noexcept
     return *m_wrapper.m_db;
 }
 
-ClientReplicationBase& SessionImpl::access_realm()
+ClientReplication& SessionImpl::access_realm()
 {
     return m_wrapper.get_history();
 }
