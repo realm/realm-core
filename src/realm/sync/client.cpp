@@ -130,8 +130,6 @@ private:
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
 
-    static ClientImplBase::Config make_client_impl_base_config(Client::Config&);
-
     void start_keep_running_timer();
     void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
     void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
@@ -444,7 +442,7 @@ inline SessionWrapperStack::~SessionWrapperStack()
 // ################ ClientImpl ################
 
 inline ClientImpl::ClientImpl(Client::Config config)
-    : ClientImplBase{make_client_impl_base_config(config)}                            // Throws
+    : ClientImplBase{config} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -619,33 +617,6 @@ void ClientImpl::run()
 {
     auto ta = util::make_temp_assign(m_running, true);
     ClientImplBase::run(); // Throws
-}
-
-
-ClientImplBase::Config ClientImpl::make_client_impl_base_config(Client::Config& config)
-{
-    ClientImplBase::Config config_2;
-
-    // clang-format off
-    config_2.user_agent_platform_info        = std::move(config.user_agent_platform_info);
-    config_2.user_agent_application_info     = std::move(config.user_agent_application_info);
-    config_2.logger                          = config.logger;
-    config_2.reconnect_mode                  = config.reconnect_mode;
-    config_2.connect_timeout                 = config.connect_timeout;
-    config_2.connection_linger_time          = (config.one_connection_per_session ? 0 :
-                                                config.connection_linger_time);
-    config_2.ping_keepalive_period           = config.ping_keepalive_period;
-    config_2.pong_keepalive_timeout          = config.pong_keepalive_timeout;
-    config_2.fast_reconnect_limit            = config.fast_reconnect_limit;
-    config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
-    config_2.dry_run                         = config.dry_run;
-    config_2.tcp_no_delay                    = config.tcp_no_delay;
-    config_2.enable_default_port_hack        = config.enable_default_port_hack;
-    config_2.disable_upload_compaction       = config.disable_upload_compaction;
-    config_2.roundtrip_time_handler          = std::move(config.roundtrip_time_handler);
-    // clang-format on
-
-    return config_2;
 }
 
 

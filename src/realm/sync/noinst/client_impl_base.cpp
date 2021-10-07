@@ -106,11 +106,11 @@ bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelo
 }
 
 
-ClientImplBase::ClientImplBase(Config config)
+ClientImplBase::ClientImplBase(sync::ClientConfig config)
     : logger{config.logger ? *config.logger : g_fallback_logger}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
-    , m_connection_linger_time{config.connection_linger_time}
+    , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
@@ -129,7 +129,7 @@ ClientImplBase::ClientImplBase(Config config)
 }
 
 
-std::string ClientImplBase::make_user_agent_string(Config& config)
+std::string ClientImplBase::make_user_agent_string(sync::ClientConfig& config)
 {
     std::string platform_info = std::move(config.user_agent_platform_info);
     if (platform_info.empty())

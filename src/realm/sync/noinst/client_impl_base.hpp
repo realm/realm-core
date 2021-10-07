@@ -148,6 +148,173 @@ static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1
 
 using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
+struct ClientConfig {
+    /// An optional custom platform description to be sent to server as part
+    /// of a user agent description (HTTP `User-Agent` header).
+    ///
+    /// If left empty, the platform description will be whatever is returned
+    /// by util::get_platform_info().
+    std::string user_agent_platform_info;
+
+    /// Optional information about the application to be added to the user
+    /// agent description as sent to the server. The intention is that the
+    /// application describes itself using the following (rough) syntax:
+    ///
+    ///     <application info>  ::=  (<space> <layer>)*
+    ///     <layer>             ::=  <name> "/" <version> [<space> <details>]
+    ///     <name>              ::=  (<alnum>)+
+    ///     <version>           ::=  <digit> (<alnum> | "." | "-" | "_")*
+    ///     <details>           ::=  <parentherized>
+    ///     <parentherized>     ::=  "(" (<nonpar> | <parentherized>)* ")"
+    ///
+    /// Where `<space>` is a single space character, `<digit>` is a decimal
+    /// digit, `<alnum>` is any alphanumeric character, and `<nonpar>` is
+    /// any character other than `(` and `)`.
+    ///
+    /// When multiple levels are present, the innermost layer (the one that
+    /// is closest to this API) should appear first.
+    ///
+    /// Example:
+    ///
+    ///     RealmJS/2.13.0 RealmStudio/2.9.0
+    ///
+    /// Note: The user agent description is not intended for machine
+    /// interpretation, but should still follow the specified syntax such
+    /// that it remains easily interpretable by human beings.
+    std::string user_agent_application_info;
+
+    /// An optional logger to be used by the client. If no logger is
+    /// specified, the client will use an instance of util::StderrLogger
+    /// with the log level threshold set to util::Logger::Level::info. The
+    /// client does not require a thread-safe logger, and it guarantees that
+    /// all logging happens either on behalf of the constructor or on behalf
+    /// of the invocation of run().
+    util::Logger* logger = nullptr;
+
+    /// Use ports 80 and 443 by default instead of 7800 and 7801
+    /// respectively. Ideally, these default ports should have been made
+    /// available via a different URI scheme instead (http/https or ws/wss).
+    bool enable_default_port_hack = true;
+
+    /// For testing purposes only.
+    ReconnectMode reconnect_mode = ReconnectMode::normal;
+
+    /// Create a separate connection for each session. For testing purposes
+    /// only.
+    ///
+    /// FIXME: This setting needs to be true for now, due to limitations in
+    /// the load balancer.
+    bool one_connection_per_session = true;
+
+    /// Do not access the local file system. Sessions will act as if
+    /// initiated on behalf of an empty (or nonexisting) local Realm
+    /// file. Received DOWNLOAD messages will be accepted, but otherwise
+    /// ignored. No UPLOAD messages will be generated. For testing purposes
+    /// only.
+    ///
+    /// Many operations, such as serialized transactions, are not suppored
+    /// in this mode.
+    bool dry_run = false;
+
+    /// The maximum number of milliseconds to allow for a connection to
+    /// become fully established. This includes the time to resolve the
+    /// network address, the TCP connect operation, the SSL handshake, and
+    /// the WebSocket handshake.
+    milliseconds_type connect_timeout = default_connect_timeout;
+
+    /// The number of milliseconds to keep a connection open after all
+    /// sessions have been abandoned (or suspended by errors).
+    ///
+    /// The purpose of this linger time is to avoid close/reopen cycles
+    /// during short periods of time where there are no sessions interested
+    /// in using the connection.
+    ///
+    /// If the connection gets closed due to an error before the linger time
+    /// expires, the connection will be kept closed until there are sessions
+    /// willing to use it again.
+    milliseconds_type connection_linger_time = default_connection_linger_time;
+
+    /// The client will send PING messages periodically to allow the server
+    /// to detect dead connections (heartbeat). This parameter specifies the
+    /// time, in milliseconds, between these PING messages. When scheduling
+    /// the next PING message, the client will deduct a small random amount
+    /// from the specified value to help spread the load on the server from
+    /// many clients.
+    milliseconds_type ping_keepalive_period = default_ping_keepalive_period;
+
+    /// Whenever the server receives a PING message, it is supposed to
+    /// respond with a PONG messsage to allow the client to detect dead
+    /// connections (heartbeat). This parameter specifies the time, in
+    /// milliseconds, that the client will wait for the PONG response
+    /// message before it assumes that the connection is dead, and
+    /// terminates it.
+    milliseconds_type pong_keepalive_timeout = default_pong_keepalive_timeout;
+
+    /// The maximum amount of time, in milliseconds, since the loss of a
+    /// prior connection, for a new connection to be considered a *fast
+    /// reconnect*.
+    ///
+    /// In general, when a client establishes a connection to the server,
+    /// the uploading process remains suspended until the initial
+    /// downloading process completes (as if by invocation of
+    /// Session::async_wait_for_download_completion()). However, to avoid
+    /// unnecessary latency in change propagation during ongoing
+    /// application-level activity, if the new connection is established
+    /// less than a certain amount of time (`fast_reconnect_limit`) since
+    /// the client was previously connected to the server, then the
+    /// uploading process will be activated immediately.
+    ///
+    /// For now, the purpose of the general delaying of the activation of
+    /// the uploading process, is to increase the chance of multiple initial
+    /// transactions on the client-side, to be uploaded to, and processed by
+    /// the server as a single unit. In the longer run, the intention is
+    /// that the client should upload transformed (from reciprocal history),
+    /// rather than original changesets when applicable to reduce the need
+    /// for changeset to be transformed on both sides. The delaying of the
+    /// upload process will increase the number of cases where this is
+    /// possible.
+    ///
+    /// FIXME: Currently, the time between connections is not tracked across
+    /// sessions, so if the application closes its session, and opens a new
+    /// one immediately afterwards, the activation of the upload process
+    /// will be delayed unconditionally.
+    milliseconds_type fast_reconnect_limit = default_fast_reconnect_limit;
+
+    /// Set to true to completely disable delaying of the upload process. In
+    /// this mode, the upload process will be activated immediately, and the
+    /// value of `fast_reconnect_limit` is ignored.
+    ///
+    /// For testing purposes only.
+    bool disable_upload_activation_delay = false;
+
+    /// If `disable_upload_compaction` is true, every changeset will be
+    /// compacted before it is uploaded to the server. Compaction will
+    /// reduce the size of a changeset if the same field is set multiple
+    /// times or if newly created objects are deleted within the same
+    /// transaction. Log compaction increeses CPU usage and memory
+    /// consumption.
+    bool disable_upload_compaction = false;
+
+    /// Set the `TCP_NODELAY` option on all TCP/IP sockets. This disables
+    /// the Nagle algorithm. Disabling it, can in some cases be used to
+    /// decrease latencies, but possibly at the expense of scalability. Be
+    /// sure to research the subject before you enable this option.
+    bool tcp_no_delay = false;
+
+    /// The specified function will be called whenever a PONG message is
+    /// received on any connection. The round-trip time in milliseconds will
+    /// be pased to the function. The specified function will always be
+    /// called by the client's event loop thread, i.e., the thread that
+    /// calls `Client::run()`. This feature is mainly for testing purposes.
+    std::function<RoundtripTimeHandler> roundtrip_time_handler;
+
+    /// Disable sync to disk (fsync(), msync()) for all realm files managed
+    /// by this client.
+    ///
+    /// Testing/debugging feature. Should never be enabled in production.
+    bool disable_sync_to_disk = false;
+};
+
 } // namespace sync
 
 /// \brief Information about an error causing a session to be temporarily
@@ -188,7 +355,6 @@ namespace _impl {
 
 class ClientImplBase {
 public:
-    class Config;
     enum class ConnectionTerminationReason;
     class ReconnectInfo;
     class Connection;
@@ -216,6 +382,7 @@ public:
 
     util::Logger& logger;
 
+    ClientImplBase(sync::ClientConfig);
     virtual ~ClientImplBase();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
@@ -239,8 +406,6 @@ public:
     bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
                               port_type& port, std::string& path) const;
 
-protected:
-    ClientImplBase(Config);
 
 private:
     using file_ident_type = sync::file_ident_type;
@@ -268,7 +433,7 @@ private:
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
-    static std::string make_user_agent_string(Config&);
+    static std::string make_user_agent_string(sync::ClientConfig&);
 
     session_ident_type get_next_session_ident() noexcept;
 };
@@ -282,27 +447,6 @@ constexpr int ClientImplBase::get_oldest_supported_protocol_version() noexcept
 
 static_assert(ClientImplBase::get_oldest_supported_protocol_version() >= 1, "");
 static_assert(ClientImplBase::get_oldest_supported_protocol_version() <= sync::get_current_protocol_version(), "");
-
-
-/// See sync::Client::Config for the meaning of the individual properties.
-class ClientImplBase::Config {
-public:
-    std::string user_agent_platform_info;
-    std::string user_agent_application_info;
-    util::Logger* logger = nullptr;
-    ReconnectMode reconnect_mode = ReconnectMode::normal;
-    milliseconds_type connect_timeout = sync::default_connect_timeout;
-    milliseconds_type connection_linger_time = sync::default_connection_linger_time;
-    milliseconds_type ping_keepalive_period = sync::default_ping_keepalive_period;
-    milliseconds_type pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
-    milliseconds_type fast_reconnect_limit = sync::default_fast_reconnect_limit;
-    bool disable_upload_activation_delay = false;
-    bool dry_run = false;
-    bool tcp_no_delay = false;
-    bool enable_default_port_hack = false;
-    bool disable_upload_compaction = false;
-    std::function<RoundtripTimeHandler> roundtrip_time_handler;
-};
 
 
 /// Information about why a connection (or connection initiation attempt) was
