@@ -20,10 +20,170 @@
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/client.hpp>
 
 
 namespace realm {
+
+
+namespace sync {
+/// The presence of the ClientReset config indicates an ongoing or requested client
+/// reset operation. If client_reset is util::none or if the local Realm does not
+/// exist, an ordinary sync session will take place.
+///
+/// A session will perform client reset by downloading a fresh copy of the Realm
+/// from the server at a different file path location. After download, the fresh
+/// Realm will be integrated into the local Realm in a write transaction. The
+/// application is free to read or write to the local realm during the entire client
+/// reset. Like a DOWNLOAD message, the application will not be able to perform a
+/// write transaction at the same time as the sync client performs its own write
+/// transaction. Client reset is not more disturbing for the application than any
+/// DOWNLOAD message. The application can listen to change notifications from the
+/// client reset exactly as in a DOWNLOAD message. If the application writes to the
+/// local realm during client reset but before the client reset operation has
+/// obtained a write lock, the changes made by the application may be lost or
+/// overwritten depending on the recovery mode selected.
+///
+/// Client reset downloads its fresh Realm copy for a Realm at path "xyx.realm" to
+/// "xyz.realm.fresh". It is assumed that this path is available for use and if
+/// there are any problems the client reset will fail with
+/// Client::Error::client_reset_failed.
+///
+/// The recommended usage of client reset is after a previous session encountered an
+/// error that implies the need for a client reset. It is not recommended to persist
+/// the need for a client reset. The application should just attempt to synchronize
+/// in the usual fashion and only after hitting an error, start a new session with a
+/// client reset. In other words, if the application crashes during a client reset,
+/// the application should attempt to perform ordinary synchronization after restart
+/// and switch to client reset if needed.
+///
+/// Error codes that imply the need for a client reset are the session level error
+/// codes described by SyncError::is_client_reset_requested()
+///
+/// However, other errors such as bad changeset (UPLOAD) could also be resolved with
+/// a client reset. Client reset can even be used without any prior error if so
+/// desired.
+///
+/// After completion of a client reset, the sync client will continue synchronizing
+/// with the server in the usual fashion.
+///
+/// The progress of client reset can be tracked with the standard progress handler.
+///
+/// Client reset is done when the progress handler arguments satisfy
+/// "progress_version > 0". However, if the application wants to ensure that it has
+/// all data present on the server, it should wait for download completion using
+/// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
+/// bool wait_for_download_complete_or_client_stopped().
+struct ClientReset {
+    bool seamless_loss = false;
+    DBRef fresh_copy;
+    util::UniqueFunction<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+    util::UniqueFunction<void(TransactionRef local)> notify_after_client_reset;
+};
+
+/// \brief Protocol errors discovered by the client.
+///
+/// These errors will terminate the network connection (disconnect all sessions
+/// associated with the affected connection), and the error will be reported to
+/// the application via the connection state change listeners of the affected
+/// sessions.
+enum class ClientError {
+    // clang-format off
+    connection_closed           = 100, ///< Connection closed (no error)
+    unknown_message             = 101, ///< Unknown type of input message
+    bad_syntax                  = 102, ///< Bad syntax in input message head
+    limits_exceeded             = 103, ///< Limits exceeded in input message
+    bad_session_ident           = 104, ///< Bad session identifier in input message
+    bad_message_order           = 105, ///< Bad input message order
+    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
+    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
+    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
+    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
+    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
+    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
+    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
+    bad_request_ident           = 113, ///< Bad request identifier (MARK)
+    bad_error_code              = 114, ///< Bad error code (ERROR),
+    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
+    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
+    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
+    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
+    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
+    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
+    connect_timeout             = 121, ///< Sync connection was not fully established in time
+    bad_timestamp               = 122, ///< Bad timestamp (PONG)
+    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
+    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
+    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
+    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
+    bad_state_message           = 127, ///< Bad values in state message (STATE)
+    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
+    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
+    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
+    // clang-format on
+};
+
+const std::error_category& client_error_category() noexcept;
+
+std::error_code make_error_code(ClientError) noexcept;
+} // namespace sync
+} // namespace realm
+
+namespace std {
+
+template <>
+struct is_error_code_enum<realm::sync::ClientError> {
+    static const bool value = true;
+};
+
+} // namespace std
+
+namespace realm {
+namespace sync {
+
+static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
+static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
+static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
+static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
+static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
+
+using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
+
+} // namespace sync
+
+/// \brief Information about an error causing a session to be temporarily
+/// disconnected from the server.
+///
+/// In general, the connection will be automatically reestablished
+/// later. Whether this happens quickly, generally depends on \ref
+/// is_fatal. If \ref is_fatal is true, it means that the error is deemed to
+/// be of a kind that is likely to persist, and cause all future reconnect
+/// attempts to fail. In that case, if another attempt is made at
+/// reconnecting, the delay will be substantial (at least an hour).
+///
+/// \ref error_code specifies the error that caused the connection to be
+/// closed. For the list of errors reported by the server, see \ref
+/// ProtocolError (or `protocol.md`). For the list of errors corresponding
+/// to protocol violations that are detected by the client, see
+/// Client::Error. The error may also be a system level error, or an error
+/// from one of the potential intermediate protocol layers (SSL or
+/// WebSocket).
+///
+/// \ref detailed_message is the most detailed message available to describe
+/// the error. It is generally equal to `error_code.message()`, but may also
+/// be a more specific message (one that provides extra context). The
+/// purpose of this message is mostly to aid in debugging. For non-debugging
+/// purposes, `error_code.message()` should generally be considered
+/// sufficient.
+///
+/// \sa set_connection_state_change_listener().
+struct SessionErrorInfo {
+    std::error_code error_code;
+    bool is_fatal;
+    const std::string& detailed_message;
+};
+
+enum class ConnectionState { disconnected, connecting, connected };
+
 namespace _impl {
 
 class ClientImplBase {
@@ -35,10 +195,10 @@ public:
     class Session;
 
     // clang-format off
-    using RoundtripTimeHandler = sync::Client::RoundtripTimeHandler;
+    using RoundtripTimeHandler = sync::RoundtripTimeHandler;
     using ProtocolEnvelope     = sync::ProtocolEnvelope;
     using ProtocolError        = sync::ProtocolError;
-    using port_type            = sync::Session::port_type;
+    using port_type            = util::network::Endpoint::port_type;
     using version_type         = sync::version_type;
     using timestamp_type       = sync::timestamp_type;
     using SaltedVersion        = sync::SaltedVersion;
@@ -47,6 +207,12 @@ public:
     // clang-format on
 
     using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
+
+    static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
+    static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
+    static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
+    static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
+    static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
 
     util::Logger& logger;
 
@@ -81,7 +247,7 @@ private:
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
     using SaltedFileIdent = sync::SaltedFileIdent;
-    using ClientError = sync::Client::Error;
+    using ClientError = sync::ClientError;
 
     const ReconnectMode m_reconnect_mode; // For testing purposes only
     const milliseconds_type m_connect_timeout;
@@ -124,11 +290,11 @@ public:
     std::string user_agent_application_info;
     util::Logger* logger = nullptr;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
-    milliseconds_type connect_timeout = sync::Client::default_connect_timeout;
-    milliseconds_type connection_linger_time = sync::Client::default_connection_linger_time;
-    milliseconds_type ping_keepalive_period = sync::Client::default_ping_keepalive_period;
-    milliseconds_type pong_keepalive_timeout = sync::Client::default_pong_keepalive_timeout;
-    milliseconds_type fast_reconnect_limit = sync::Client::default_fast_reconnect_limit;
+    milliseconds_type connect_timeout = sync::default_connect_timeout;
+    milliseconds_type connection_linger_time = sync::default_connection_linger_time;
+    milliseconds_type ping_keepalive_period = sync::default_ping_keepalive_period;
+    milliseconds_type pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
+    milliseconds_type fast_reconnect_limit = sync::default_fast_reconnect_limit;
     bool disable_upload_activation_delay = false;
     bool dry_run = false;
     bool tcp_no_delay = false;
@@ -213,12 +379,15 @@ private:
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImplBase::Connection : public util::websocket::Config {
+class ClientImplBase::Connection final : public util::websocket::Config {
 public:
-    using SSLVerifyCallback = sync::Session::SSLVerifyCallback;
+    using connection_ident_type           = std::int_fast64_t;
+    using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
+
+    using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
+                                   size_t pem_size, int preverify_ok, int depth);
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImplBase::ReconnectInfo;
-    using port_type = ClientImplBase::port_type;
     using ReadCompletionHandler = util::websocket::ReadCompletionHandler;
     using WriteCompletionHandler = util::websocket::WriteCompletionHandler;
 
@@ -303,38 +472,26 @@ public:
     bool websocket_binary_message_received(const char*, std::size_t) override;
     bool websocket_pong_message_received(const char*, std::size_t) override;
 
-protected:
-    /// The application must ensure that the specified client object is kept
-    /// alive at least until the connection object is destroyed.
-    Connection(ClientImplBase&, std::string logger_prefix, ProtocolEnvelope, std::string address, port_type port,
-               bool verify_servers_ssl_certificate, util::Optional<std::string> ssl_trust_certificate_path,
-               std::function<SSLVerifyCallback>, util::Optional<ProxyConfig>, ReconnectInfo);
-    virtual ~Connection();
+    connection_ident_type get_ident() const noexcept;
+    const ServerEndpoint& get_server_endpoint() const noexcept;
+    ConnectionState get_state() const noexcept;
+
+    void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
+                             const std::string& signed_access_token);
+
+    void resume_active_sessions();
+
+    Connection(ClientImplBase&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
+                   const std::map<std::string, std::string>& custom_http_headers, bool verify_servers_ssl_certificate,
+                   util::Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
+                   util::Optional<ProxyConfig>, ReconnectInfo);
+
+    ~Connection();
+private:
 
     template <class H>
     void for_each_active_session(H handler);
 
-    //@{
-    /// These are called as the state of the connection changes between
-    /// "disconnected", "connecting", and "connected". The initial state is
-    /// always "disconnected". The next state after "disconnected" is always
-    /// "connecting". The next state after "connecting" is either "connected" or
-    /// "disconnected". The next state after "connected" is always
-    /// "disconnected".
-    ///
-    /// A switch to the disconnected state only happens when an error occurs,
-    /// and information about that error is passed to on_disconnected(). If \a
-    /// custom_message is null, there is no custom message, and the message is
-    /// whatever is returned by `ec.message()`.
-    ///
-    /// The default implementations of these functions do nothing.
-    ///
-    /// These functions are always called by the event loop thread of the
-    /// associated client object.
-    virtual void on_connecting();
-    virtual void on_connected();
-    virtual void on_disconnected(std::error_code, bool is_fatal, const StringData* custom_message);
-    //@}
 
     /// \brief Called when the connection becomes idle.
     ///
@@ -354,13 +511,13 @@ protected:
     ///
     /// This function is always called by the event loop thread of the
     /// associated client object.
-    virtual void on_idle();
+    void on_idle();
 
-    virtual std::string get_http_request_path() const = 0;
+    std::string get_http_request_path() const;
 
     /// The application can override this function to set custom headers. The
     /// default implementation sets no headers.
-    virtual void set_http_request_headers(util::HTTPHeaders&);
+    void set_http_request_headers(util::HTTPHeaders&);
 
 private:
     using SyncProgress = sync::SyncProgress;
@@ -385,8 +542,7 @@ private:
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
 
-    enum class State { disconnected, connecting, connected };
-    State m_state = State::disconnected;
+    ConnectionState m_state = ConnectionState::disconnected;
 
     std::size_t m_num_active_unsuspended_sessions = 0;
     std::size_t m_num_active_sessions = 0;
@@ -533,6 +689,19 @@ private:
     ConnectionTerminationReason determine_connection_termination_reason(std::error_code) noexcept;
     Session* get_session(session_ident_type) const noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
+
+    const connection_ident_type m_ident;
+    const ServerEndpoint m_server_endpoint;
+    const std::string m_authorization_header_name;
+    const std::map<std::string, std::string> m_custom_http_headers;
+
+    std::string m_http_request_path_prefix;
+    std::string m_realm_virt_path;
+    std::string m_signed_access_token;
+
+    static std::string make_logger_prefix(connection_ident_type);
+
+    void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
 
     friend class ClientProtocol;
     friend class Session;
@@ -796,7 +965,7 @@ protected:
     // reset. If it returns none, ordinary sync is used. If it returns a
     // Config::ClientReset, the session will be initiated with a fresh
     // copy of the Realm transferred from the server.
-    virtual util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() noexcept;
+    virtual util::Optional<sync::ClientReset>& get_client_reset_config() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///
@@ -1033,7 +1202,7 @@ private:
 
     std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
 
-    util::Optional<sync::Session::Config::ClientReset> m_client_reset_config = util::none;
+    util::Optional<sync::ClientReset> m_client_reset_config = util::none;
 
     static std::string make_logger_prefix(session_ident_type);
 
@@ -1170,6 +1339,11 @@ inline ClientImplBase& ClientImplBase::Connection::get_client() noexcept
     return m_client;
 }
 
+inline ConnectionState ClientImplBase::Connection::get_state() const noexcept
+{
+    return m_state;
+}
+
 inline auto ClientImplBase::Connection::get_reconnect_info() const noexcept -> ReconnectInfo
 {
     return m_reconnect_info;
@@ -1200,7 +1374,7 @@ void ClientImplBase::Connection::for_each_active_session(H handler)
 inline void ClientImplBase::Connection::voluntary_disconnect()
 {
     REALM_ASSERT(m_reconnect_info.m_reason && was_voluntary(*m_reconnect_info.m_reason));
-    std::error_code ec = sync::Client::Error::connection_closed;
+    std::error_code ec = sync::ClientError::connection_closed;
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     disconnect(ec, is_fatal, custom_message); // Throws
@@ -1215,8 +1389,8 @@ inline void ClientImplBase::Connection::involuntary_disconnect(std::error_code e
 
 inline void ClientImplBase::Connection::change_state_to_disconnected() noexcept
 {
-    REALM_ASSERT(m_state != State::disconnected);
-    m_state = State::disconnected;
+    REALM_ASSERT(m_state != ConnectionState::disconnected);
+    m_state = ConnectionState::disconnected;
 
     if (m_num_active_sessions == 0)
         m_on_idle.trigger();
@@ -1233,7 +1407,7 @@ inline void ClientImplBase::Connection::one_more_active_unsuspended_session()
     if (m_num_active_unsuspended_sessions++ != 0)
         return;
     // Rose from zero to one
-    if (m_state == State::disconnected && !m_reconnect_delay_in_progress && m_activated)
+    if (m_state == ConnectionState::disconnected && !m_reconnect_delay_in_progress && m_activated)
         initiate_reconnect(); // Throws
 }
 
@@ -1242,7 +1416,7 @@ inline void ClientImplBase::Connection::one_less_active_unsuspended_session()
     if (--m_num_active_unsuspended_sessions != 0)
         return;
     // Dropped from one to zero
-    if (m_state != State::disconnected)
+    if (m_state != ConnectionState::disconnected)
         initiate_disconnect_wait(); // Throws
 }
 

@@ -580,7 +580,7 @@ void SyncSession::handle_error(SyncError error)
         }
     }
     else if (error_code.category() == realm::sync::client_error_category()) {
-        using ClientError = realm::sync::Client::Error;
+        using ClientError = realm::sync::ClientError;
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
             case ClientError::pong_timeout:

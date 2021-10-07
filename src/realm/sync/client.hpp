@@ -16,23 +16,22 @@
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_impl_base.hpp>
 
 namespace realm {
 namespace sync {
 
-
 class Client {
 public:
-    enum class Error;
-
     using port_type = util::network::Endpoint::port_type;
-    using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
-    static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
-    static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
-    static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
-    static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
-    static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
+    using Error = ClientError;
+
+    static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
+    static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
+    static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
+    static constexpr milliseconds_type default_pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
+    static constexpr milliseconds_type default_fast_reconnect_limit = sync::default_fast_reconnect_limit;
 
     struct Config {
         Config() {}
@@ -335,6 +334,8 @@ class BadServerUrl; // Exception
 /// guaranteed to not be executing after Client::run() has returned.
 class Session {
 public:
+    using ConnectionState = realm::ConnectionState;
+    using ErrorInfo = SessionErrorInfo;
     using port_type = util::network::Endpoint::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
@@ -485,59 +486,7 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// The presence of the ClientReset config indicates an ongoing or requested client
-        /// reset operation. If client_reset is util::none or if the local Realm does not
-        /// exist, an ordinary sync session will take place.
-        ///
-        /// A session will perform client reset by downloading a fresh copy of the Realm
-        /// from the server at a different file path location. After download, the fresh
-        /// Realm will be integrated into the local Realm in a write transaction. The
-        /// application is free to read or write to the local realm during the entire client
-        /// reset. Like a DOWNLOAD message, the application will not be able to perform a
-        /// write transaction at the same time as the sync client performs its own write
-        /// transaction. Client reset is not more disturbing for the application than any
-        /// DOWNLOAD message. The application can listen to change notifications from the
-        /// client reset exactly as in a DOWNLOAD message. If the application writes to the
-        /// local realm during client reset but before the client reset operation has
-        /// obtained a write lock, the changes made by the application may be lost or
-        /// overwritten depending on the recovery mode selected.
-        ///
-        /// Client reset downloads its fresh Realm copy for a Realm at path "xyx.realm" to
-        /// "xyz.realm.fresh". It is assumed that this path is available for use and if
-        /// there are any problems the client reset will fail with
-        /// Client::Error::client_reset_failed.
-        ///
-        /// The recommended usage of client reset is after a previous session encountered an
-        /// error that implies the need for a client reset. It is not recommended to persist
-        /// the need for a client reset. The application should just attempt to synchronize
-        /// in the usual fashion and only after hitting an error, start a new session with a
-        /// client reset. In other words, if the application crashes during a client reset,
-        /// the application should attempt to perform ordinary synchronization after restart
-        /// and switch to client reset if needed.
-        ///
-        /// Error codes that imply the need for a client reset are the session level error
-        /// codes described by SyncError::is_client_reset_requested()
-        ///
-        /// However, other errors such as bad changeset (UPLOAD) could also be resolved with
-        /// a client reset. Client reset can even be used without any prior error if so
-        /// desired.
-        ///
-        /// After completion of a client reset, the sync client will continue synchronizing
-        /// with the server in the usual fashion.
-        ///
-        /// The progress of client reset can be tracked with the standard progress handler.
-        ///
-        /// Client reset is done when the progress handler arguments satisfy
-        /// "progress_version > 0". However, if the application wants to ensure that it has
-        /// all data present on the server, it should wait for download completion using
-        /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
-        /// bool wait_for_download_complete_or_client_stopped().
-        struct ClientReset {
-            bool seamless_loss = false;
-            DBRef fresh_copy;
-            util::UniqueFunction<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
-            util::UniqueFunction<void(TransactionRef local)> notify_after_client_reset;
-        };
+        using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
@@ -705,41 +654,8 @@ public:
     /// under Session for more on this.
     void set_progress_handler(std::function<ProgressHandler>);
 
-    enum class ConnectionState { disconnected, connecting, connected };
 
-    /// \brief Information about an error causing a session to be temporarily
-    /// disconnected from the server.
-    ///
-    /// In general, the connection will be automatically reestablished
-    /// later. Whether this happens quickly, generally depends on \ref
-    /// is_fatal. If \ref is_fatal is true, it means that the error is deemed to
-    /// be of a kind that is likely to persist, and cause all future reconnect
-    /// attempts to fail. In that case, if another attempt is made at
-    /// reconnecting, the delay will be substantial (at least an hour).
-    ///
-    /// \ref error_code specifies the error that caused the connection to be
-    /// closed. For the list of errors reported by the server, see \ref
-    /// ProtocolError (or `protocol.md`). For the list of errors corresponding
-    /// to protocol violations that are detected by the client, see
-    /// Client::Error. The error may also be a system level error, or an error
-    /// from one of the potential intermediate protocol layers (SSL or
-    /// WebSocket).
-    ///
-    /// \ref detailed_message is the most detailed message available to describe
-    /// the error. It is generally equal to `error_code.message()`, but may also
-    /// be a more specific message (one that provides extra context). The
-    /// purpose of this message is mostly to aid in debugging. For non-debugging
-    /// purposes, `error_code.message()` should generally be considered
-    /// sufficient.
-    ///
-    /// \sa set_connection_state_change_listener().
-    struct ErrorInfo {
-        std::error_code error_code;
-        bool is_fatal;
-        const std::string& detailed_message;
-    };
-
-    using ConnectionStateChangeListener = void(ConnectionState, const ErrorInfo*);
+    using ConnectionStateChangeListener = void(ConnectionState, const SessionErrorInfo*);
 
     /// \brief Install a connection state change listener.
     ///
@@ -751,7 +667,7 @@ public:
     /// after "connected" is always "disconnected". A switch to the
     /// "disconnected" state only happens when an error occurs.
     ///
-    /// Whenever the installed function is called, an ErrorInfo object is passed
+    /// Whenever the installed function is called, an SessionErrorInfo object is passed
     /// when, and only when the passed state is ConnectionState::disconnected.
     ///
     /// When multiple sessions share a single connection, the state changes will
@@ -999,70 +915,7 @@ private:
     void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
 };
 
-
-/// \brief Protocol errors discovered by the client.
-///
-/// These errors will terminate the network connection (disconnect all sessions
-/// associated with the affected connection), and the error will be reported to
-/// the application via the connection state change listeners of the affected
-/// sessions.
-enum class Client::Error {
-    // clang-format off
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
-    // clang-format on
-};
-
-const std::error_category& client_error_category() noexcept;
-
-std::error_code make_error_code(Client::Error) noexcept;
-
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
-
-} // namespace sync
-} // namespace realm
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::Client::Error> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm {
-namespace sync {
-
 
 // Implementation
 
@@ -1106,7 +959,7 @@ inline void Session::detach() noexcept
 
 inline void Session::set_error_handler(std::function<ErrorHandler> handler)
 {
-    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
+    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const SessionErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);

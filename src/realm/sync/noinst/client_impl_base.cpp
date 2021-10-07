@@ -162,7 +162,7 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
     bool was_inserted = p.second;
     REALM_ASSERT(was_inserted);
     sess_2.activate(); // Throws
-    if (m_state == State::connected) {
+    if (m_state == ConnectionState::connected) {
         bool fast_reconnect = false;
         sess_2.connection_established(fast_reconnect); // Throws
     }
@@ -174,7 +174,7 @@ void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == State::disconnected)
+        if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle.trigger();
     }
     sess->initiate_deactivation(); // Throws
@@ -205,7 +205,7 @@ void Connection::cancel_reconnect_delay()
         initiate_reconnect_wait(); // Throws
         return;
     }
-    if (m_state != State::disconnected) {
+    if (m_state != ConnectionState::disconnected) {
         // A currently established connection, or an in-progress attempt to
         // establish the connection may be about to fail for a reason that
         // precedes the invocation of Session::cancel_reconnect_delay(). For
@@ -229,66 +229,6 @@ void Connection::cancel_reconnect_delay()
     }
     // Nothing to do in this case. The next reconnect attemp will be made as
     // soon as there are any sessions that are both active and unsuspended.
-}
-
-
-Connection::Connection(ClientImplBase& client, std::string logger_prefix, ProtocolEnvelope protocol,
-                       std::string address, port_type port, bool verify_servers_ssl_certificate,
-                       Optional<std::string> ssl_trust_certificate_path,
-                       std::function<SSLVerifyCallback> ssl_verify_callback,
-                       Optional<SyncConfig::ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
-    : logger{std::move(logger_prefix), client.logger} // Throws
-    , m_client{client}
-    , m_read_ahead_buffer{} // Throws
-    , m_websocket{*this}    // Throws
-    , m_protocol_envelope{protocol}
-    , m_address{std::move(address)}
-    , m_port{port}
-    , m_http_host{util::make_http_host(sync::is_ssl(protocol), m_address, m_port)} // Throws
-    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
-    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
-    , m_ssl_verify_callback{std::move(ssl_verify_callback)}
-    , m_proxy_config{std::move(proxy_config)}
-    , m_reconnect_info{reconnect_info}
-{
-    auto handler = [this] {
-        REALM_ASSERT(m_activated);
-        if (m_state == State::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
-}
-
-
-void Connection::on_connecting()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_connected()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_disconnected(std::error_code, bool, const StringData*)
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_idle()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::set_http_request_headers(HTTPHeaders&)
-{
-    // No-op unless overridden.
 }
 
 
@@ -662,9 +602,8 @@ void Connection::initiate_reconnect()
 {
     REALM_ASSERT(m_activated);
 
-    on_connecting(); // Throws
-
-    m_state = State::connecting;
+    m_state = ConnectionState::connecting;
+    report_connection_state_change(ConnectionState::connecting, nullptr); // Throws
     m_read_ahead_buffer.clear();
     m_ssl_stream = util::none;
     m_socket = util::none;
@@ -711,7 +650,7 @@ void Connection::handle_connect_wait(std::error_code ec)
         throw std::system_error(ec);
     }
 
-    REALM_ASSERT(m_state == State::connecting);
+    REALM_ASSERT(m_state == ConnectionState::connecting);
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_connect_timeout;
     logger.info("Connect timeout"); // Throws
     std::error_code ec_2 = ClientError::connect_timeout;
@@ -978,7 +917,7 @@ void Connection::handle_connection_established()
     // Cancel connect timeout watchdog
     m_connect_timer = util::none;
 
-    m_state = State::connected;
+    m_state = ConnectionState::connected;
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -996,13 +935,13 @@ void Connection::handle_connection_established()
         sess.connection_established(fast_reconnect); // Throws
     }
 
-    on_connected(); // Throws
+    report_connection_state_change(ConnectionState::connected, nullptr); // Throws
 }
 
 
 void Connection::schedule_urgent_ping()
 {
-    REALM_ASSERT(m_state != State::disconnected);
+    REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_ping_delay_in_progress) {
         m_heartbeat_timer = util::none;
         m_ping_delay_in_progress = false;
@@ -1011,7 +950,7 @@ void Connection::schedule_urgent_ping()
         initiate_ping_delay(now); // Throws
         return;
     }
-    REALM_ASSERT(m_state == State::connecting || m_waiting_for_pong);
+    REALM_ASSERT(m_state == ConnectionState::connecting || m_waiting_for_pong);
     if (!m_send_ping)
         m_minimize_next_ping_delay = true;
 }
@@ -1070,7 +1009,7 @@ void Connection::handle_ping_delay()
 
     initiate_pong_timeout(); // Throws
 
-    if (m_state == State::connected && !m_sending)
+    if (m_state == ConnectionState::connected && !m_sending)
         send_next_message(); // Throws
 }
 
@@ -1129,7 +1068,7 @@ void Connection::handle_write_message()
 
 void Connection::send_next_message()
 {
-    REALM_ASSERT(m_state == State::connected);
+    REALM_ASSERT(m_state == ConnectionState::connected);
     REALM_ASSERT(!m_sending_session);
     REALM_ASSERT(!m_sending);
     if (m_send_ping) {
@@ -1140,7 +1079,7 @@ void Connection::send_next_message()
         // The state of being connected is not supposed to be able to change
         // across this loop thanks to the "no callback reentrance" guarantee
         // provided by util::Websocket::async_write_text(), and friends.
-        REALM_ASSERT(m_state == State::connected);
+        REALM_ASSERT(m_state == ConnectionState::connected);
 
         Session& sess = *m_sessions_enlisted_to_send.front();
         m_sessions_enlisted_to_send.pop_front();
@@ -1251,7 +1190,7 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 
     m_disconnect_delay_in_progress = false;
 
-    REALM_ASSERT(m_state != State::disconnected);
+    REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_num_active_unsuspended_sessions == 0) {
         if (m_client.m_connection_linger_time > 0)
             logger.detail("Linger time expired"); // Throws
@@ -1389,7 +1328,7 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     // Cancel connect timeout watchdog
     m_connect_timer = util::none;
 
-    if (m_state == State::connected) {
+    if (m_state == ConnectionState::connected) {
         m_disconnect_time = monotonic_clock_now();
         m_disconnect_has_occurred = true;
 
@@ -1429,7 +1368,9 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
-    on_disconnected(ec, is_fatal, custom_message); // Throws
+    std::string detailed_message = (custom_message ? std::string(*custom_message) : ec.message()); // Throws
+    SessionErrorInfo error_info{ec, is_fatal, detailed_message};
+    report_connection_state_change(ConnectionState::disconnected, &error_info); // Throws
     initiate_reconnect_wait();                     // Throws
 }
 
@@ -1650,7 +1591,7 @@ void Connection::handle_protocol_error(ClientProtocol::Error error)
 // state.
 void Connection::enlist_to_send(Session* sess)
 {
-    REALM_ASSERT(m_state == State::connected);
+    REALM_ASSERT(m_state == ConnectionState::connected);
     m_sessions_enlisted_to_send.push_back(sess); // Throws
     if (!m_sending)
         send_next_message(); // Throws
@@ -1780,7 +1721,7 @@ void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_byte
 }
 
 
-util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() noexcept
+util::Optional<sync::ClientReset>& Session::get_client_reset_config() noexcept
 {
     return m_client_reset_config;
 }
@@ -1841,7 +1782,7 @@ void Session::activate()
         // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
         // If the client reset config were a `const &` then this std::move would create another strong
         // reference which we don't want to happen.
-        util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
+        util::Optional<sync::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
 
@@ -2338,7 +2279,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
     catch (const std::exception& e) {
         logger.error("A fatal error occured during client reset: '%1'", e.what());
-        return make_error_code(sync::Client::Error::auto_client_reset_failure);
+        return make_error_code(sync::ClientError::auto_client_reset_failure);
     }
     if (!did_client_reset) {
         constexpr bool fix_up_object_ids = true;
