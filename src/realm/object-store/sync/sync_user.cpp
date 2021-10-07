@@ -362,7 +362,13 @@ void SyncUser::log_out()
 
 bool SyncUser::is_logged_in() const
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
+    return do_is_logged_in(lock);
+}
+
+bool SyncUser::do_is_logged_in(std::unique_lock<std::mutex>& lock) const
+{
+    REALM_ASSERT(lock.owns_lock());
     return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
 }
 
@@ -495,8 +501,16 @@ bool SyncUser::access_token_refresh_required() const
 {
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
+    std::unique_lock<std::mutex> lock(m_mutex);
     auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
-    return is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
+    return do_is_logged_in(lock) && m_access_token.expires_at < static_cast<int64_t>(threshold);
+}
+
+bool SyncUser::refresh_token_is_expired() const
+{
+    using namespace std::chrono;
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_refresh_token.expires_at < duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 }
 
 } // namespace realm

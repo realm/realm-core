@@ -261,11 +261,6 @@ public:
 
     std::string refresh_token() const;
 
-    RealmJWT refresh_jwt() const
-    {
-        return m_refresh_token;
-    }
-
     std::string device_id() const;
 
     bool has_device_id() const;
@@ -297,6 +292,7 @@ public:
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.
     bool access_token_refresh_required() const;
+    bool refresh_token_is_expired() const;
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
@@ -314,6 +310,8 @@ protected:
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
+
+    bool do_is_logged_in(std::unique_lock<std::mutex>& lock) const;
 
     State m_state;
 
