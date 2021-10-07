@@ -740,8 +740,7 @@ public:
     void override_server(std::string address, port_type);
 
 private:
-    class Impl;
-    Impl* m_impl = nullptr;
+    SessionWrapper* m_impl = nullptr;
 
     void abandon() noexcept;
     void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);

@@ -1471,26 +1471,6 @@ void ClientImpl::Connection::report_connection_state_change(ConnectionState stat
 }
 
 
-class Session::Impl : public SessionWrapper {
-public:
-    Impl(ClientImpl& client, DBRef db, Config config)
-        : SessionWrapper{client, std::move(db), std::move(config)} // Throws
-    {
-    }
-
-    static Impl* make_session(ClientImpl& client, DBRef db, Config config)
-    {
-        util::bind_ptr<Impl> sess;
-        sess.reset(new Impl{client, std::move(db), std::move(config)}); // Throws
-        // The reference count passed back to the application is implicitly
-        // owned by a naked pointer. This is done to avoid exposing
-        // implementation details through the header file (that is, through the
-        // Session object).
-        return sess.release();
-    }
-};
-
-
 Client::Client(Config config)
     : m_impl{new ClientImpl{std::move(config)}} // Throws
 {
@@ -1538,8 +1518,14 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 
 
 Session::Session(Client& client, DBRef db, Config&& config)
-    : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
 {
+    util::bind_ptr<SessionWrapper> sess;
+    sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(config)}); // Throws
+    // The reference count passed back to the application is implicitly
+    // owned by a naked pointer. This is done to avoid exposing
+    // implementation details through the header file (that is, through the
+    // Session object).
+    m_impl = sess.release();
 }
 
 
@@ -1634,7 +1620,7 @@ void Session::abandon() noexcept
 {
     REALM_ASSERT(m_impl);
     // Reabsorb the ownership assigned to the applications naked pointer by
-    // Session::Impl::make_session().
+    // Session constructor
     util::bind_ptr<SessionWrapper> wrapper{m_impl, util::bind_ptr_base::adopt_tag{}};
     SessionWrapper::abandon(std::move(wrapper));
 }
