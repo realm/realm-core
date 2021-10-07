@@ -437,7 +437,7 @@ public:
 
     util::Logger& logger;
 
-    ClientImpl(sync::ClientConfig);
+    ClientImpl(ClientConfig);
     ~ClientImpl();
 
     static constexpr int get_oldest_supported_protocol_version() noexcept;
@@ -466,12 +466,6 @@ public:
 
 private:
     using connection_ident_type = std::int_fast64_t;
-    using file_ident_type = sync::file_ident_type;
-    using salt_type = sync::salt_type;
-    using session_ident_type = sync::session_ident_type;
-    using request_ident_type = sync::request_ident_type;
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using ClientError = sync::ClientError;
 
     const ReconnectMode m_reconnect_mode; // For testing purposes only
     const milliseconds_type m_connect_timeout;
@@ -516,7 +510,7 @@ private:
     };
 
     // Must be accessed only by event loop thread
-    std::map<sync::ServerEndpoint, ServerSlot> m_server_slots;
+    std::map<ServerEndpoint, ServerSlot> m_server_slots;
 
     // Must be accessed only by event loop thread
     connection_ident_type m_prev_connection_ident = 0;
@@ -533,21 +527,21 @@ private:
     // and are not yet abandoned (still referenced by the application).
     //
     // Protected by `m_mutex`.
-    std::map<sync::SessionWrapper*, sync::ServerEndpoint> m_unactualized_session_wrappers;
+    std::map<SessionWrapper*, ServerEndpoint> m_unactualized_session_wrappers;
 
     // The set of session wrappers that were successfully actualized, but are
     // now abandoned (no longer referenced by the application), and have not yet
     // been finalized. Order in queue is immaterial.
     //
     // Protected by `m_mutex`.
-    sync::SessionWrapperStack m_abandoned_session_wrappers;
+    SessionWrapperStack m_abandoned_session_wrappers;
 
     // Protected by `m_mutex`.
     util::CondVar m_wait_or_client_stopped_cond;
 
     void start_keep_running_timer();
-    void register_unactualized_session_wrapper(sync::SessionWrapper*, sync::ServerEndpoint);
-    void register_abandoned_session_wrapper(util::bind_ptr<sync::SessionWrapper>) noexcept;
+    void register_unactualized_session_wrapper(SessionWrapper*, ServerEndpoint);
+    void register_abandoned_session_wrapper(util::bind_ptr<SessionWrapper>) noexcept;
     void actualize_and_finalize_session_wrappers();
 
     // Get or create a connection. If a connection exists for the specified
@@ -571,7 +565,7 @@ private:
     // alternative approach outlined in the previous FIXME (specify per endpoint
     // SSL parameters at the client object level), there seems to be no more use
     // for `session_multiplex_ident`.
-    ClientImpl::Connection& get_connection(sync::ServerEndpoint, const std::string& authorization_header_name,
+    ClientImpl::Connection& get_connection(ServerEndpoint, const std::string& authorization_header_name,
                                            const std::map<std::string, std::string>& custom_http_headers,
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
@@ -581,23 +575,23 @@ private:
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
 
-    static std::string make_user_agent_string(sync::ClientConfig&);
+    static std::string make_user_agent_string(ClientConfig&);
 
     session_ident_type get_next_session_ident() noexcept;
 
     friend class ClientImpl::Connection;
-    friend class sync::SessionWrapper;
+    friend class SessionWrapper;
 };
 
 constexpr int ClientImpl::get_oldest_supported_protocol_version() noexcept
 {
-    // See sync::get_current_protocol_version() for information about the
+    // See get_current_protocol_version() for information about the
     // individual protocol versions.
     return 2;
 }
 
 static_assert(ClientImpl::get_oldest_supported_protocol_version() >= 1, "");
-static_assert(ClientImpl::get_oldest_supported_protocol_version() <= sync::get_current_protocol_version(), "");
+static_assert(ClientImpl::get_oldest_supported_protocol_version() <= get_current_protocol_version(), "");
 
 
 /// Information about why a connection (or connection initiation attempt) was
@@ -706,7 +700,7 @@ public:
     /// contents of the `Sec-WebSocket-Protocol` header in the HTTP
     /// response. The negotiated protocol version is guaranteed to be greater
     /// than or equal to get_oldest_supported_protocol_version(), and be less
-    /// than or equal to sync::get_current_protocol_version().
+    /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
     // Overriding methods in util::websocket::Config
@@ -742,7 +736,6 @@ public:
     ~Connection();
 
 private:
-    using SyncProgress = sync::SyncProgress;
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     template <class H>
@@ -967,8 +960,6 @@ class ClientImpl::Session {
 public:
     class Config;
 
-    using SyncProgress = sync::SyncProgress;
-    using VersionInfo = sync::VersionInfo;
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using IntegrationError = ClientReplication::IntegrationError;
 
@@ -1158,7 +1149,7 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(bool success, version_type client_version, sync::DownloadCursor download_progress,
+    void on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
                                   IntegrationError error);
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
@@ -1170,7 +1161,7 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(sync::SessionWrapper&, ClientImpl::Connection&, Config);
+    Session(SessionWrapper&, ClientImpl::Connection&, Config);
     ~Session();
 
 private:
@@ -1217,7 +1208,7 @@ private:
     // reset. If it returns none, ordinary sync is used. If it returns a
     // Config::ClientReset, the session will be initiated with a state Realm
     // transfer from the server.
-    util::Optional<sync::ClientReset>& get_client_reset_config() noexcept;
+    util::Optional<ClientReset>& get_client_reset_config() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///
@@ -1237,19 +1228,19 @@ private:
     ///
     /// The implementation is allowed, but not obliged to aggregate changesets
     /// from multiple invocations of initiate_integrate_changesets() and pass
-    /// them to sync::ClientReplication::integrate_server_changesets() at once.
+    /// them to ClientReplication::integrate_server_changesets() at once.
     ///
     /// The synchronization progress passed to
-    /// sync::ClientReplication::integrate_server_changesets() must be obtained
+    /// ClientReplication::integrate_server_changesets() must be obtained
     /// by calling get_sync_progress(), and that call must occur after the last
     /// invocation of initiate_integrate_changesets() whose changesets are
     /// included in what is passed to
-    /// sync::ClientReplication::integrate_server_changesets().
+    /// ClientReplication::integrate_server_changesets().
     ///
     /// The download cursor passed to on_changesets_integrated() must be
     /// SyncProgress::download of the synchronization progress passed to the
     /// last invocation of
-    /// sync::ClientReplication::integrate_server_changesets().
+    /// ClientReplication::integrate_server_changesets().
     ///
     /// The default implementation integrates the specified changesets and calls
     /// on_changesets_integrated() immediately (i.e., from the event loop thread
@@ -1305,9 +1296,6 @@ private:
     //@}
 
 private:
-    using UploadCursor = sync::UploadCursor;
-    using DownloadCursor = sync::DownloadCursor;
-
     Connection& m_conn;
     const session_ident_type m_ident;
     SyncTransactReporter* const m_sync_transact_reporter;
@@ -1454,11 +1442,11 @@ private:
 
     std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
 
-    sync::SessionWrapper& m_wrapper;
+    SessionWrapper& m_wrapper;
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(sync::SessionWrapper& wrapper, Connection&, session_ident_type, Config&&);
+    Session(SessionWrapper& wrapper, Connection&, session_ident_type, Config&&);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1513,7 +1501,7 @@ private:
 };
 
 
-/// See sync::Client::Session for the meaning of the individual properties
+/// See Client::Session for the meaning of the individual properties
 /// (other than `sync_transact_reporter`).
 class ClientImpl::Session::Config {
 public:
@@ -1614,7 +1602,7 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
     REALM_ASSERT(m_reconnect_info.m_reason && was_voluntary(*m_reconnect_info.m_reason));
-    std::error_code ec = sync::ClientError::connection_closed;
+    std::error_code ec = ClientError::connection_closed;
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     disconnect(ec, is_fatal, custom_message); // Throws
@@ -1798,12 +1786,12 @@ inline void ClientImpl::Session::new_access_token_available()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(sync::SessionWrapper& wrapper, Connection& conn, Config config)
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, Config config)
     : Session{wrapper, conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
 {
 }
 
-inline ClientImpl::Session::Session(sync::SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
                                     Config&& config)
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}

@@ -14,8 +14,10 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
 
-using namespace realm;
-using namespace realm::sync;
+namespace realm {
+namespace sync {
+
+namespace {
 using namespace realm::util;
 
 
@@ -31,10 +33,6 @@ using connection_ident_type           = std::int_fast64_t;
 using ProxyConfig                     = SyncConfig::ProxyConfig;
 // clang-format on
 
-
-namespace {
-
-// ################ miscellaneous ################
 
 const char* get_error_message(ClientError error_code)
 {
@@ -167,7 +165,7 @@ ErrorCategoryImpl g_error_category;
 // and initiation of deactivation happens no earlier than during
 // finalization. See also activate_session() and initiate_session_deactivation()
 // in ClientImpl::Connection.
-class sync::SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
+class SessionWrapper final : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
     SessionWrapper(ClientImpl&, DBRef db, Session::Config);
     ~SessionWrapper() noexcept;
@@ -312,7 +310,7 @@ private:
     void report_progress();
     void change_server_endpoint(ServerEndpoint);
 
-    friend class sync::SessionWrapperStack;
+    friend class SessionWrapperStack;
     friend class ClientImpl::Session;
 };
 
@@ -657,7 +655,7 @@ ClientReplication& SessionImpl::access_realm()
     return m_wrapper.get_history();
 }
 
-util::Optional<sync::ClientReset>& SessionImpl::get_client_reset_config() noexcept
+util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
 {
     return m_wrapper.m_client_reset_config;
 }
@@ -687,7 +685,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     else {
         bool success = false;
         version_type client_version = 0;                 // Dummy
-        sync::DownloadCursor download_progress = {0, 0}; // Dummy
+        DownloadCursor download_progress = {0, 0};       // Dummy
         IntegrationError error = IntegrationError::bad_changeset;
         on_changesets_integrated(success, client_version, download_progress, error); // Throws
     }
@@ -1344,7 +1342,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
-    , m_http_host{util::make_http_host(sync::is_ssl(m_protocol_envelope), m_address, m_port)} // Throws
+    , m_http_host{util::make_http_host(is_ssl(m_protocol_envelope), m_address, m_port)} // Throws
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}
@@ -1593,19 +1591,16 @@ void Session::abandon() noexcept
 }
 
 
-const std::error_category& sync::client_error_category() noexcept
+const std::error_category& client_error_category() noexcept
 {
     return g_error_category;
 }
 
 
-std::error_code sync::make_error_code(ClientError error_code) noexcept
+std::error_code make_error_code(ClientError error_code) noexcept
 {
     return std::error_code{int(error_code), g_error_category};
 }
-
-namespace realm {
-namespace sync {
 
 std::ostream& operator<<(std::ostream& os, ProxyConfig::Type proxyType)
 {

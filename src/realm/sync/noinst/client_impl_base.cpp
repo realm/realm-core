@@ -99,7 +99,7 @@ bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& 
 }
 
 
-ClientImpl::ClientImpl(sync::ClientConfig config)
+ClientImpl::ClientImpl(ClientConfig config)
     : logger{config.logger ? *config.logger : g_fallback_logger}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -189,7 +189,7 @@ ClientImpl::ClientImpl(sync::ClientConfig config)
 }
 
 
-std::string ClientImpl::make_user_agent_string(sync::ClientConfig& config)
+std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 {
     std::string platform_info = std::move(config.user_agent_platform_info);
     if (platform_info.empty())
@@ -345,7 +345,7 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
     auto i = headers.find("Sec-WebSocket-Protocol");
     if (i != headers.end()) {
         util::StringView value = i->second;
-        util::StringView prefix = sync::get_websocket_protocol_prefix();
+        util::StringView prefix = get_websocket_protocol_prefix();
         // FIXME: Use std::string_view::begins_with() in C++20.
         bool begins_with =
             (value.size() >= prefix.size() && std::equal(value.data(), value.data() + prefix.size(), prefix.data()));
@@ -357,8 +357,8 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
             int value_2 = 0;
             in >> value_2;
             if (in && in.eof() && value_2 >= 0) {
-                bool good_version = (value_2 >= get_oldest_supported_protocol_version() &&
-                                     value_2 <= sync::get_current_protocol_version());
+                bool good_version =
+                    (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
                     m_negotiated_protocol_version = value_2;
@@ -945,9 +945,9 @@ void Connection::initiate_websocket_handshake()
         std::ostringstream out;
         out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         out.imbue(std::locale::classic());
-        const char* protocol_prefix = sync::get_websocket_protocol_prefix();
+        const char* protocol_prefix = get_websocket_protocol_prefix();
         int min = get_oldest_supported_protocol_version();
-        int max = sync::get_current_protocol_version();
+        int max = get_current_protocol_version();
         REALM_ASSERT(min <= max);
         // List protocol version in descending order to ensure that the server
         // selects the highest possible version.
@@ -1507,7 +1507,7 @@ void Connection::receive_error_message(int error_code, StringData message, bool 
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", message, error_code,
                 try_again, session_ident); // Throws
 
-    bool known_error_code = bool(sync::get_protocol_error_message(error_code));
+    bool known_error_code = bool(get_protocol_error_message(error_code));
     if (REALM_LIKELY(known_error_code)) {
         ProtocolError error_code_2 = ProtocolError(error_code);
         if (REALM_LIKELY(!is_session_level_error(error_code_2))) {
@@ -1702,7 +1702,7 @@ bool Session::integrate_changesets(ClientReplication& history, const SyncProgres
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return true;
     }
-    const sync::Transformer::RemoteChangeset* changesets = received_changesets.data();
+    const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
                                                        version_info, error, logger,
@@ -1791,7 +1791,7 @@ void Session::activate()
         // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
         // If the client reset config were a `const &` then this std::move would create another strong
         // reference which we don't want to happen.
-        util::Optional<sync::ClientReset>& client_reset_config = get_client_reset_config();
+        util::Optional<ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
 
@@ -2053,8 +2053,8 @@ void Session::send_upload_message()
 
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
-            sync::Changeset log;
-            sync::parse_changeset(in, log);
+            Changeset log;
+            parse_changeset(in, log);
             std::stringstream ss;
             log.print(ss);
             logger.trace("Changeset (parsed):\n%1", ss.str());
@@ -2065,8 +2065,8 @@ void Session::send_upload_message()
             // Upload compaction only takes place within single changesets to
             // avoid another client seeing inconsistent snapshots.
             ChunkedBinaryInputStream stream{uc.changeset};
-            sync::Changeset changeset;
-            sync::parse_changeset(stream, changeset); // Throws
+            Changeset changeset;
+            parse_changeset(stream, changeset); // Throws
             // FIXME: What is the point of setting these? How can compaction care about them?
             changeset.version = uc.progress.client_version;
             changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
@@ -2335,7 +2335,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const sync::Transformer::RemoteChangeset& changeset : received_changesets) {
+    for (const Transformer::RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing.
         bool good_server_version = (changeset.remote_version > server_version &&
                                     changeset.remote_version <= progress.download.server_version);
@@ -2487,7 +2487,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
         return ClientError::bad_message_order;
     }
 
-    bool known_error_code = bool(sync::get_protocol_error_message(error_code));
+    bool known_error_code = bool(get_protocol_error_message(error_code));
     if (REALM_UNLIKELY(!known_error_code)) {
         logger.error("Unknown error code"); // Throws
         return ClientError::bad_error_code;
