@@ -24,8 +24,6 @@
 
 
 namespace realm {
-
-
 namespace sync {
 
 // (protocol, address, port, session_multiplex_ident)
@@ -343,8 +341,6 @@ struct ClientConfig {
     bool disable_sync_to_disk = false;
 };
 
-} // namespace sync
-
 /// \brief Information about an error causing a session to be temporarily
 /// disconnected from the server.
 ///
@@ -379,27 +375,16 @@ struct SessionErrorInfo {
 
 enum class ConnectionState { disconnected, connecting, connected };
 
-namespace _impl {
-
 class ClientImpl {
 public:
     enum class ConnectionTerminationReason;
     class Connection;
     class Session;
 
-
-    // clang-format off
-    using RoundtripTimeHandler = sync::RoundtripTimeHandler;
-    using ProtocolEnvelope     = sync::ProtocolEnvelope;
-    using ProtocolError        = sync::ProtocolError;
     using port_type            = util::network::Endpoint::port_type;
-    using version_type         = sync::version_type;
-    using timestamp_type       = sync::timestamp_type;
-    using SaltedVersion        = sync::SaltedVersion;
-    using milliseconds_type    = sync::milliseconds_type;
     using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
-    // clang-format on
-
+    using ClientProtocol = _impl::ClientProtocol;
+    using ClientResetOperation = _impl::ClientResetOperation;
     using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
     /// Per-server endpoint information used to determine reconnect delays.
@@ -860,7 +845,7 @@ private:
 
     void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
 
-    friend class ClientProtocol;
+    friend ClientProtocol;
     friend class Session;
 
     ClientImpl& m_client;
@@ -2008,7 +1993,7 @@ inline bool ClientImpl::Session::check_received_sync_progress(const SyncProgress
     return check_received_sync_progress(progress, error_code);
 }
 
-} // namespace _impl
+} // namespace sync
 } // namespace realm
 
 #endif // REALM_NOINST_CLIENT_IMPL_BASE_HPP

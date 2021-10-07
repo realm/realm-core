@@ -102,7 +102,7 @@ public:
                               port_type& port, std::string& path) const;
 
 private:
-    std::unique_ptr<_impl::ClientImpl> m_impl;
+    std::unique_ptr<ClientImpl> m_impl;
     friend class Session;
 };
 
@@ -166,7 +166,6 @@ class BadServerUrl; // Exception
 /// guaranteed to not be executing after Client::run() has returned.
 class Session {
 public:
-    using ConnectionState = realm::ConnectionState;
     using ErrorInfo = SessionErrorInfo;
     using port_type = util::network::Endpoint::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);

@@ -17,7 +17,6 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ConnectionState = Session::ConnectionState;
 using ErrorInfo = Session::ErrorInfo;
 
 TEST(ClientReset_NoLocalChanges)

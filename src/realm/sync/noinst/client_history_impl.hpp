@@ -7,7 +7,7 @@
 #include <realm/array_integer.hpp>
 
 namespace realm {
-namespace _impl {
+namespace sync {
 
 // As new schema versions come into existence, describe them here.
 //
@@ -47,24 +47,13 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
-class ClientReplication : public sync::SyncReplication, private History, public sync::TransformHistory {
+class ClientReplication : public SyncReplication, private _impl::History, public TransformHistory {
 public:
-    // clang-format off
-    using file_ident_type = sync::file_ident_type;
     using version_type    = sync::version_type;
-    using RemoteChangeset = sync::Transformer::RemoteChangeset;
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion   = sync::SaltedVersion;
-    using DownloadCursor  = sync::DownloadCursor;
-    using UploadCursor    = sync::UploadCursor;
-    using SyncProgress    = sync::SyncProgress;
-    using VersionInfo     = sync::VersionInfo;
-    using HistoryEntry    = sync::HistoryEntry;
-    using Transformer     = sync::Transformer;
-    // clang-format on
+    using RemoteChangeset = Transformer::RemoteChangeset;
 
     struct UploadChangeset {
-        sync::timestamp_type origin_timestamp;
+        timestamp_type origin_timestamp;
         file_ident_type origin_file_ident;
         UploadCursor progress;
         ChunkedBinaryData changeset;
@@ -102,7 +91,7 @@ public:
     ///
     /// The history object must be in a write transaction before this function
     /// is called.
-    void set_initial_state_realm_history_numbers(version_type local_version, sync::SaltedVersion server_version);
+    void set_initial_state_realm_history_numbers(version_type local_version, SaltedVersion server_version);
 
     // virtual void set_client_file_ident_in_wt() sets the client file ident.
     // The history must be in a write transaction with version 'current_version'.
@@ -122,12 +111,12 @@ public:
     /// this history object must be in a write transaction when this function
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                      sync::SaltedVersion server_version, BinaryData uploadable_changeset);
+                                      SaltedVersion server_version, BinaryData uploadable_changeset);
 
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
     /// of local origin. This should only be used for testing and defaults to calling
-    /// sync::generate_changeset_timestamp().
-    void set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn);
+    /// generate_changeset_timestamp().
+    void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
 
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they
@@ -309,7 +298,7 @@ public:
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
 
-    // Overriding member functions in realm::sync::TransformHistory
+    // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
     ChunkedBinaryData get_reciprocal_transform(version_type) const override final;
     void set_reciprocal_transform(version_type, BinaryData) override final;
@@ -424,7 +413,7 @@ private:
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
-    std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
+    std::function<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
 
     static version_type find_sync_history_entry(Arrays& arrays, version_type base_version, version_type begin_version,
                                                 version_type end_version, HistoryEntry& entry,
@@ -512,16 +501,10 @@ inline void ClientReplication::clamp_sync_version_range(version_type& begin, ver
 inline auto ClientReplication::get_transformer() -> Transformer&
 {
     if (!m_transformer)
-        m_transformer = sync::make_transformer(); // Throws
+        m_transformer = make_transformer(); // Throws
     return *m_transformer;
 }
 
-
-} // namespace _impl
-
-
-namespace sync {
-using ClientReplication = _impl::ClientReplication;
 
 /// \brief Create a "sync history" implementation of the realm::Replication
 /// interface.
@@ -529,8 +512,8 @@ using ClientReplication = _impl::ClientReplication;
 /// The intended role for such an object is as a plugin for new
 /// realm::DB objects.
 std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path);
-}
 
+} // namespace sync
 } // namespace realm
 
 #endif // REALM_NOINST_CLIENT_HISTORY_IMPL_HPP

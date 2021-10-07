@@ -101,7 +101,7 @@ public:
     void dump_result_sets();
 
 private:
-    using ConnectionState = sync::Session::ConnectionState;
+    using ConnectionState = sync::ConnectionState;
 
     Context& m_context;
     const std::string m_realm_path;

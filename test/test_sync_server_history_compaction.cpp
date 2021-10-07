@@ -153,7 +153,6 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtDownloadTime)
         ClientServerFixture fixture{dir, test_context, fixture_config};
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener_1 = [&](ConnectionState, const ErrorInfo* info) {
             if (info) {
@@ -238,7 +237,6 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
     std::atomic<bool> did_fail{false};
     std::atomic<bool> did_expire{false};
 
-    using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     auto listener_1 = [&](ConnectionState, const ErrorInfo* info) {
         if (info) {

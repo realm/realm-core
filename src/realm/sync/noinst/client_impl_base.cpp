@@ -34,16 +34,8 @@ using UploadChangeset = ClientReplication::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
 // mentioned in signature of out-of-line member function definitions.
-using file_ident_type = sync::file_ident_type;
-using version_type = sync::version_type;
-using salt_type = sync::salt_type;
-using session_ident_type = sync::session_ident_type;
-using request_ident_type = sync::request_ident_type;
-using SyncProgress = sync::SyncProgress;
 using ConnectionTerminationReason = ClientImpl::ConnectionTerminationReason;
-using ProtocolEnvelope            = ClientImpl::ProtocolEnvelope;
 using OutputBuffer                = ClientImpl::OutputBuffer;
-using ProtocolError               = ClientImpl::ProtocolError;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 

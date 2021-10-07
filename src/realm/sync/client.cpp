@@ -20,8 +20,7 @@ using namespace realm::util;
 
 
 // clang-format off
-using ClientImpl                      = _impl::ClientImpl;
-using SessionImpl                     = _impl::ClientImpl::Session;
+using SessionImpl                     = ClientImpl::Session;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -167,7 +166,7 @@ ErrorCategoryImpl g_error_category;
 // NOTE: Activation of the session happens no later than during actualization,
 // and initiation of deactivation happens no earlier than during
 // finalization. See also activate_session() and initiate_session_deactivation()
-// in _impl::ClientImpl::Connection.
+// in ClientImpl::Connection.
 class sync::SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
     SessionWrapper(ClientImpl&, DBRef db, Session::Config);

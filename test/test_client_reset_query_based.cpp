@@ -16,7 +16,6 @@ using namespace realm::fixtures;
 
 namespace {
 
-using ConnectionState = Session::ConnectionState;
 using ErrorInfo = Session::ErrorInfo;
 
 // FIXME: Rewrite this test without QBS

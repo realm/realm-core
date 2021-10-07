@@ -767,14 +767,14 @@ void SyncSession::do_create_sync_session()
 
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
-    m_session->set_connection_state_change_listener([weak_self](sync::Session::ConnectionState state,
+    m_session->set_connection_state_change_listener([weak_self](sync::ConnectionState state,
                                                                 const sync::Session::ErrorInfo* error) {
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
             std::unique_lock<std::mutex> lock(self->m_state_mutex);
             auto old_state = self->m_connection_state;
-            using cs = sync::Session::ConnectionState;
+            using cs = sync::ConnectionState;
             switch (state) {
                 case cs::disconnected:
                     self->m_connection_state = ConnectionState::Disconnected;
