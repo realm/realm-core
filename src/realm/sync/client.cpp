@@ -20,7 +20,7 @@ using namespace realm::util;
 
 
 // clang-format off
-using ClientImplBase                  = _impl::ClientImplBase;
+using ClientImpl                      = _impl::ClientImpl;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -34,19 +34,16 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 
 namespace {
 
-using ClientImpl = ClientImplBase;
-
-
-class SessionImpl : public ClientImplBase::Session {
+class SessionImpl : public ClientImpl::Session {
 public:
-    SessionImpl(SessionWrapper&, ClientImplBase::Connection&, Config);
+    SessionImpl(SessionWrapper&, ClientImpl::Connection&, Config);
 
     ClientImpl& get_client() noexcept;
-    ClientImplBase::Connection& get_connection() noexcept;
+    ClientImpl::Connection& get_connection() noexcept;
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
-    // Overriding member function in ClientImplBase::Session
+    // Overriding member function in ClientImpl::Session
     const std::string& get_virt_path() const noexcept override final;
     const std::string& get_signed_access_token() const noexcept override final;
     const std::string& get_realm_path() const noexcept override final;
@@ -198,7 +195,7 @@ ErrorCategoryImpl g_error_category;
 // NOTE: Activation of the session happens no later than during actualization,
 // and initiation of deactivation happens no earlier than during
 // finalization. See also activate_session() and initiate_session_deactivation()
-// in _impl::ClientImplBase::Connection.
+// in _impl::ClientImpl::Connection.
 class sync::SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
     SessionWrapper(ClientImpl&, DBRef db, Session::Config);
@@ -250,7 +247,7 @@ private:
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
-    const ClientImplBase::Session::Config m_session_impl_config;
+    const ClientImpl::Session::Config m_session_impl_config;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -329,7 +326,7 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    static ClientImplBase::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
+    static ClientImpl::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
 
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
                      std::string multiplex_ident);
@@ -401,7 +398,7 @@ inline SessionWrapperStack::~SessionWrapperStack()
 // ################ ClientImpl ################
 
 
-ClientImplBase::~ClientImplBase()
+ClientImpl::~ClientImpl()
 {
     bool client_destroyed_while_still_running = m_running;
     REALM_ASSERT_RELEASE(!client_destroyed_while_still_running);
@@ -424,7 +421,7 @@ void ClientImpl::cancel_reconnect_delay()
             if (m_one_connection_per_session) {
                 REALM_ASSERT(!slot.connection);
                 for (const auto& p : slot.alt_connections) {
-                    ClientImplBase::Connection& conn = *p.second;
+                    ClientImpl::Connection& conn = *p.second;
                     conn.resume_active_sessions(); // Throws
                     conn.cancel_reconnect_delay(); // Throws
                 }
@@ -432,7 +429,7 @@ void ClientImpl::cancel_reconnect_delay()
             else {
                 REALM_ASSERT(slot.alt_connections.empty());
                 if (slot.connection) {
-                    ClientImplBase::Connection& conn = *slot.connection;
+                    ClientImpl::Connection& conn = *slot.connection;
                     conn.resume_active_sessions(); // Throws
                     conn.cancel_reconnect_delay(); // Throws
                 }
@@ -592,12 +589,13 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
 }
 
 
-ClientImplBase::Connection& ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authorization_header_name,
-                                           const std::map<std::string, std::string>& custom_http_headers,
-                                           bool verify_servers_ssl_certificate,
-                                           Optional<std::string> ssl_trust_certificate_path,
-                                           std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
-                                           Optional<ProxyConfig> proxy_config, bool& was_created)
+ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
+                                                   const std::string& authorization_header_name,
+                                                   const std::map<std::string, std::string>& custom_http_headers,
+                                                   bool verify_servers_ssl_certificate,
+                                                   Optional<std::string> ssl_trust_certificate_path,
+                                                   std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
+                                                   Optional<ProxyConfig> proxy_config, bool& was_created)
 {
     ServerSlot& server_slot = m_server_slots[endpoint]; // Throws
 
@@ -611,12 +609,12 @@ ClientImplBase::Connection& ClientImpl::get_connection(ServerEndpoint endpoint, 
     // Create a new connection
     REALM_ASSERT(!server_slot.connection);
     connection_ident_type ident = m_prev_connection_ident + 1;
-    std::unique_ptr<ClientImplBase::Connection> conn_2 = std::make_unique<ClientImplBase::Connection>(
+    std::unique_ptr<ClientImpl::Connection> conn_2 = std::make_unique<ClientImpl::Connection>(
         *this, ident, std::move(endpoint), authorization_header_name, custom_http_headers,
         verify_servers_ssl_certificate, std::move(ssl_trust_certificate_path), std::move(ssl_verify_callback),
         std::move(proxy_config),
         server_slot.reconnect_info); // Throws
-    ClientImplBase::Connection& conn = *conn_2;
+    ClientImpl::Connection& conn = *conn_2;
     if (!m_one_connection_per_session) {
         server_slot.connection = std::move(conn_2);
     }
@@ -629,7 +627,7 @@ ClientImplBase::Connection& ClientImpl::get_connection(ServerEndpoint endpoint, 
 }
 
 
-void ClientImpl::remove_connection(ClientImplBase::Connection& conn) noexcept
+void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 {
     const ServerEndpoint& endpoint = conn.get_server_endpoint();
     auto i = m_server_slots.find(endpoint);
@@ -655,8 +653,8 @@ void ClientImpl::remove_connection(ClientImplBase::Connection& conn) noexcept
 
 // ################ SessionImpl ################
 
-inline SessionImpl::SessionImpl(SessionWrapper& wrapper, ClientImplBase::Connection& conn, Config config)
-    : ClientImplBase::Session{conn, std::move(config)} // Throws
+inline SessionImpl::SessionImpl(SessionWrapper& wrapper, ClientImpl::Connection& conn, Config config)
+    : ClientImpl::Session{conn, std::move(config)} // Throws
     , m_wrapper{wrapper}
 {
 }
@@ -668,7 +666,7 @@ inline ClientImpl& SessionImpl::get_client() noexcept
 }
 
 
-inline ClientImplBase::Connection& SessionImpl::get_connection() noexcept
+inline ClientImpl::Connection& SessionImpl::get_connection() noexcept
 {
     return Session::get_connection();
 }
@@ -716,8 +714,8 @@ inline void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downlo
 {
     bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
     if (REALM_LIKELY(!simulate_integration_error)) {
-        ClientImplBase::Session::initiate_integrate_changesets(downloadable_bytes,
-                                                               changesets); // Throws
+        ClientImpl::Session::initiate_integrate_changesets(downloadable_bytes,
+                                                           changesets); // Throws
     }
     else {
         bool success = false;
@@ -873,7 +871,7 @@ void SessionWrapper::cancel_reconnect_delay()
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
         sess.cancel_resumption_delay(); // Throws
-        ClientImplBase::Connection& conn = sess.get_connection();
+        ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
     };
     m_client.get_service().post(std::move(handler)); // Throws
@@ -1008,7 +1006,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
             return; // Already finalized
         self->m_signed_access_token = std::move(token);
         SessionImpl& sess = *self->m_sess;
-        ClientImplBase::Connection& conn = sess.get_connection();
+        ClientImpl::Connection& conn = sess.get_connection();
         // FIXME: This only makes sense when each session uses a separate connection.
         conn.update_connect_info(self->m_http_request_path_prefix, self->m_virt_path,
                                  self->m_signed_access_token); // Throws
@@ -1031,7 +1029,7 @@ void SessionWrapper::override_server(std::string address, port_type port)
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
         SessionImpl& sess = *self->m_sess;
-        ClientImplBase::Connection& conn = sess.get_connection();
+        ClientImpl::Connection& conn = sess.get_connection();
         ServerEndpoint endpoint = conn.get_server_endpoint(); // Throws (copy)
         std::get<1>(endpoint) = std::move(address);
         std::get<2>(endpoint) = port;
@@ -1058,7 +1056,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     m_db->claim_sync_agent();
 
     bool was_created = false;
-    ClientImplBase::Connection& conn = m_client.get_connection(
+    ClientImpl::Connection& conn = m_client.get_connection(
         std::move(endpoint), m_authorization_header_name, m_custom_http_headers, m_verify_servers_ssl_certificate,
         m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config,
         was_created); // Throws
@@ -1104,7 +1102,7 @@ void SessionWrapper::finalize()
     REALM_ASSERT(m_actualized);
     REALM_ASSERT(m_sess);
 
-    ClientImplBase::Connection& conn = m_sess->get_connection();
+    ClientImpl::Connection& conn = m_sess->get_connection();
     conn.initiate_session_deactivation(m_sess); // Throws
 
     m_sess = nullptr;
@@ -1153,9 +1151,9 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
 }
 
 auto SessionWrapper::make_session_impl_config(SyncTransactReporter& transact_reporter, Session::Config& config)
-    -> ClientImplBase::Session::Config
+    -> ClientImpl::Session::Config
 {
-    ClientImplBase::Session::Config config_2;
+    ClientImpl::Session::Config config_2;
     config_2.sync_transact_reporter = &transact_reporter;
     config_2.disable_upload = config.disable_upload;
     config_2.disable_empty_upload = config.disable_empty_upload;
@@ -1225,7 +1223,7 @@ void SessionWrapper::on_suspended(std::error_code ec, StringData message, bool i
 {
     m_suspended = true;
     if (m_connection_state_change_listener) {
-        ClientImplBase::Connection& conn = m_sess->get_connection();
+        ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {
             std::string message_2{message}; // Throws (copy)
             ConnectionState state = ConnectionState::disconnected;
@@ -1240,7 +1238,7 @@ void SessionWrapper::on_resumed()
 {
     m_suspended = false;
     if (m_connection_state_change_listener) {
-        ClientImplBase::Connection& conn = m_sess->get_connection();
+        ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {
             m_connection_state_change_listener(ConnectionState::connecting, nullptr); // Throws
             if (conn.get_state() == ConnectionState::connected)
@@ -1305,10 +1303,10 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
     REALM_ASSERT(m_sess);
 
     SessionImpl& old_sess = *m_sess;
-    ClientImplBase::Connection& old_conn = old_sess.get_connection();
+    ClientImpl::Connection& old_conn = old_sess.get_connection();
 
     bool was_created = false;
-    ClientImplBase::Connection& new_conn = m_client.get_connection(
+    ClientImpl::Connection& new_conn = m_client.get_connection(
         std::move(endpoint), m_authorization_header_name, m_custom_http_headers, m_verify_servers_ssl_certificate,
         m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config,
         was_created); // Throws
@@ -1363,14 +1361,15 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
     }
 }
 
-// ################ ClientImplBase::Connection ################
+// ################ ClientImpl::Connection ################
 
-ClientImplBase::Connection::Connection(ClientImplBase& client, connection_ident_type ident, ServerEndpoint endpoint,
-                               const std::string& authorization_header_name,
-                               const std::map<std::string, std::string>& custom_http_headers,
-                               bool verify_servers_ssl_certificate, Optional<std::string> ssl_trust_certificate_path,
-                               std::function<SSLVerifyCallback> ssl_verify_callback,
-                               Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
+ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ident, ServerEndpoint endpoint,
+                                   const std::string& authorization_header_name,
+                                   const std::map<std::string, std::string>& custom_http_headers,
+                                   bool verify_servers_ssl_certificate,
+                                   Optional<std::string> ssl_trust_certificate_path,
+                                   std::function<SSLVerifyCallback> ssl_verify_callback,
+                                   Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
     : logger{make_logger_prefix(ident), client.logger} // Throws
     , m_client{client}
     , m_read_ahead_buffer{} // Throws
@@ -1399,20 +1398,20 @@ ClientImplBase::Connection::Connection(ClientImplBase& client, connection_ident_
     m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
 }
 
-inline connection_ident_type ClientImplBase::Connection::get_ident() const noexcept
+inline connection_ident_type ClientImpl::Connection::get_ident() const noexcept
 {
     return m_ident;
 }
 
 
-inline const ServerEndpoint& ClientImplBase::Connection::get_server_endpoint() const noexcept
+inline const ServerEndpoint& ClientImpl::Connection::get_server_endpoint() const noexcept
 {
     return m_server_endpoint;
 }
 
-inline void ClientImplBase::Connection::update_connect_info(const std::string& http_request_path_prefix,
-                                                const std::string& realm_virt_path,
-                                                const std::string& signed_access_token)
+inline void ClientImpl::Connection::update_connect_info(const std::string& http_request_path_prefix,
+                                                        const std::string& realm_virt_path,
+                                                        const std::string& signed_access_token)
 {
     m_http_request_path_prefix = http_request_path_prefix; // Throws (copy)
     m_realm_virt_path = realm_virt_path;                   // Throws (copy)
@@ -1420,15 +1419,15 @@ inline void ClientImplBase::Connection::update_connect_info(const std::string& h
 }
 
 
-void ClientImplBase::Connection::resume_active_sessions()
+void ClientImpl::Connection::resume_active_sessions()
 {
-    auto handler = [=](ClientImplBase::Session& sess) {
+    auto handler = [=](ClientImpl::Session& sess) {
         sess.cancel_resumption_delay(); // Throws
     };
     for_each_active_session(std::move(handler)); // Throws
 }
 
-void ClientImplBase::Connection::on_idle()
+void ClientImpl::Connection::on_idle()
 {
     logger.debug("Destroying connection object");
     ClientImpl& client = get_client();
@@ -1437,14 +1436,14 @@ void ClientImplBase::Connection::on_idle()
 }
 
 
-std::string ClientImplBase::Connection::get_http_request_path() const
+std::string ClientImpl::Connection::get_http_request_path() const
 {
     std::string path = m_http_request_path_prefix; // Throws (copy)
     return path;
 }
 
 
-void ClientImplBase::Connection::set_http_request_headers(HTTPHeaders& headers)
+void ClientImpl::Connection::set_http_request_headers(HTTPHeaders& headers)
 {
     headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
 
@@ -1453,7 +1452,7 @@ void ClientImplBase::Connection::set_http_request_headers(HTTPHeaders& headers)
 }
 
 
-std::string ClientImplBase::Connection::make_logger_prefix(connection_ident_type ident)
+std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ident)
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
@@ -1462,9 +1461,9 @@ std::string ClientImplBase::Connection::make_logger_prefix(connection_ident_type
 }
 
 
-void ClientImplBase::Connection::report_connection_state_change(ConnectionState state, const SessionErrorInfo* error_info)
+void ClientImpl::Connection::report_connection_state_change(ConnectionState state, const SessionErrorInfo* error_info)
 {
-    auto handler = [=](ClientImplBase::Session& sess) {
+    auto handler = [=](ClientImpl::Session& sess) {
         SessionImpl& sess_2 = static_cast<SessionImpl&>(sess);
         sess_2.on_connection_state_changed(state, error_info); // Throws
     };

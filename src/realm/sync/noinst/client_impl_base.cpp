@@ -28,8 +28,8 @@ using namespace realm::util;
 using namespace realm::sync;
 
 // clang-format off
-using Connection      = ClientImplBase::Connection;
-using Session         = ClientImplBase::Session;
+using Connection      = ClientImpl::Connection;
+using Session         = ClientImpl::Session;
 using UploadChangeset = sync::ClientReplicationBase::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
@@ -40,10 +40,10 @@ using salt_type = sync::salt_type;
 using session_ident_type = sync::session_ident_type;
 using request_ident_type = sync::request_ident_type;
 using SyncProgress = sync::SyncProgress;
-using ConnectionTerminationReason = ClientImplBase::ConnectionTerminationReason;
-using ProtocolEnvelope            = ClientImplBase::ProtocolEnvelope;
-using OutputBuffer                = ClientImplBase::OutputBuffer;
-using ProtocolError               = ClientImplBase::ProtocolError;
+using ConnectionTerminationReason = ClientImpl::ConnectionTerminationReason;
+using ProtocolEnvelope            = ClientImpl::ProtocolEnvelope;
+using OutputBuffer                = ClientImpl::OutputBuffer;
+using ProtocolError               = ClientImpl::ProtocolError;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
@@ -55,8 +55,8 @@ util::StderrLogger g_fallback_logger;
 } // unnamed namespace
 
 
-bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
-                                          port_type& port, std::string& path) const
+bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
+                                      port_type& port, std::string& path) const
 {
     util::Uri uri(url); // Throws
     uri.canonicalize(); // Throws
@@ -107,7 +107,7 @@ bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelo
 }
 
 
-ClientImplBase::ClientImplBase(sync::ClientConfig config)
+ClientImpl::ClientImpl(sync::ClientConfig config)
     : logger{config.logger ? *config.logger : g_fallback_logger}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
@@ -197,7 +197,7 @@ ClientImplBase::ClientImplBase(sync::ClientConfig config)
 }
 
 
-std::string ClientImplBase::make_user_agent_string(sync::ClientConfig& config)
+std::string ClientImpl::make_user_agent_string(sync::ClientConfig& config)
 {
     std::string platform_info = std::move(config.user_agent_platform_info);
     if (platform_info.empty())
@@ -971,7 +971,7 @@ void Connection::initiate_websocket_handshake()
     }
 
     HTTPHeaders headers;
-    ClientImplBase& client = get_client();
+    ClientImpl& client = get_client();
     headers["User-Agent"] = client.get_user_agent_string(); // Throws
     set_http_request_headers(headers);                      // Throws
 
@@ -2620,7 +2620,7 @@ void Session::update_progress(const SyncProgress& progress)
 }
 
 
-bool ClientImplBase::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
+bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;

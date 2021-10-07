@@ -102,7 +102,7 @@ public:
                               port_type& port, std::string& path) const;
 
 private:
-    std::unique_ptr<_impl::ClientImplBase> m_impl;
+    std::unique_ptr<_impl::ClientImpl> m_impl;
     friend class Session;
 };
 
