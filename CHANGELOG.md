@@ -3,6 +3,7 @@
 ### Enhancements
 * Added methods to freeze and thaw realms, objects, results and lists.
 * Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
+* Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
 
 ### Fixed
