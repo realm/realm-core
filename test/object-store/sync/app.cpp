@@ -1997,7 +1997,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(token.timestamp < token.expires);
             std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
             using namespace std::chrono_literals;
-            token.expires = std::chrono::system_clock::to_time_t(now - 30s);
+            token.expires = std::chrono::system_clock::to_time_t(now - 61s);
             REQUIRE(token.expired(now));
         }
 
