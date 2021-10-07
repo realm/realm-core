@@ -308,8 +308,7 @@ void ClientReplication::get_status(version_type& current_client_version, SaltedF
     if (ref_type ref = gf::get_history_ref(*rt)) {
         Array root(m_db->get_alloc());
         root.init_from_ref(ref);
-        client_file_ident_2.salt =
-            salt_type(root.get_as_ref_or_tagged(s_client_file_ident_salt_iip).get_as_int());
+        client_file_ident_2.salt = salt_type(root.get_as_ref_or_tagged(s_client_file_ident_salt_iip).get_as_int());
         progress_2.latest_server_version.version =
             version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int());
         progress_2.latest_server_version.salt =

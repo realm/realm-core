@@ -1236,8 +1236,8 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    ClientReplication::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes,
-                                                        uploaded_bytes, uploadable_bytes, snapshot_version);
+    ClientReplication::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
+                                                 uploadable_bytes, snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total
     // size of the history. From protocol version 26, downloadable_bytes

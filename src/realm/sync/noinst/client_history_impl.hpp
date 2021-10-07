@@ -49,7 +49,7 @@ constexpr int get_client_history_schema_version() noexcept
 
 class ClientReplication : public SyncReplication, private _impl::History, public TransformHistory {
 public:
-    using version_type    = sync::version_type;
+    using version_type = sync::version_type;
     using RemoteChangeset = Transformer::RemoteChangeset;
 
     struct UploadChangeset {
@@ -136,7 +136,7 @@ public:
     /// set_sync_progress(), or `SyncProgress{}` if set_sync_progress() has
     /// never been called.
     void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
-                            SyncProgress& progress) const;
+                    SyncProgress& progress) const;
 
     /// Stores the server assigned client file identifier in the associated
     /// Realm file, such that it is available via get_status() during future
@@ -172,8 +172,7 @@ public:
     /// \param downloadable_bytes If specified, and if the implementation cares
     /// about byte-level progress, this function updates the persistent record
     /// of the estimate of the number of remaining bytes to be downloaded.
-    void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
-                                   VersionInfo&);
+    void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes, VersionInfo&);
 
     /// \brief Scan through the history for changesets to be uploaded.
     ///
@@ -210,8 +209,8 @@ public:
     /// For changesets of local origin, UploadChangeset::origin_file_ident will
     /// be zero.
     void find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
-                                            std::vector<UploadChangeset>& uploadable_changesets,
-                                            version_type& locked_server_version) const;
+                                    std::vector<UploadChangeset>& uploadable_changesets,
+                                    version_type& locked_server_version) const;
 
 
     /// \brief Integrate a sequence of changesets received from the server using
@@ -248,17 +247,15 @@ public:
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
-    bool integrate_server_changesets(const SyncProgress& progress,
-                                             const std::uint_fast64_t* downloadable_bytes,
-                                             const RemoteChangeset* changesets, std::size_t num_changesets,
-                                             VersionInfo& new_version, IntegrationError& integration_error,
-                                             util::Logger&, SyncTransactReporter* transact_reporter = nullptr);
+    bool integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+                                     const RemoteChangeset* changesets, std::size_t num_changesets,
+                                     VersionInfo& new_version, IntegrationError& integration_error, util::Logger&,
+                                     SyncTransactReporter* transact_reporter = nullptr);
 
     /// Get the persisted upload/download progress in bytes.
-    void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes,
-                                           std::uint_fast64_t& downloadable_bytes, std::uint_fast64_t& uploaded_bytes,
-                                           std::uint_fast64_t& uploadable_bytes,
-                                           std::uint_fast64_t& snapshot_version);
+    void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes, std::uint_fast64_t& downloadable_bytes,
+                                   std::uint_fast64_t& uploaded_bytes, std::uint_fast64_t& uploadable_bytes,
+                                   std::uint_fast64_t& snapshot_version);
 
     /// Return an upload cursor as it would be when the uploading process
     /// reaches the snapshot to which the current transaction is bound.
