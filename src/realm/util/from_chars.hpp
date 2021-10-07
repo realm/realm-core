@@ -45,7 +45,7 @@ FromCharsResult from_chars(const char* const first, const char* const last, T& v
     }
 
     T res_value = 0;
-    for (; ptr <= last; ++ptr) {
+    for (; ptr != last; ++ptr) {
         auto digit = digit_value(*ptr);
         if (digit >= base) {
             break;

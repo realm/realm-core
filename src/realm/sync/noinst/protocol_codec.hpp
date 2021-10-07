@@ -89,7 +89,7 @@ private:
         // We currently only support numeric, string, and boolean values in header lines.
         static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string>);
         if (at_end()) {
-            throw ProtocolCodecException("header line is empty");
+            throw ProtocolCodecException("reached end of header line prematurely");
         }
         if constexpr (is_any_v<T, std::string_view, std::string>) {
             // Currently all string fields in wire protocol header lines appear at the beginning of the line and
