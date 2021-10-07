@@ -86,10 +86,12 @@ private:
     template <typename T>
     std::pair<T, std::string_view> peek_token_impl() const
     {
+        // We currently only support numeric, string, and boolean values in header lines.
+        static_assert(std::is_integral_v<T> || is_any_v<T, std::string_view, std::string>);
         if (at_end()) {
             throw ProtocolCodecException("header line is empty");
         }
-        if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
+        if constexpr (is_any_v<T, std::string_view, std::string>) {
             // Currently all string fields in wire protocol header lines appear at the beginning of the line and
             // should be delimited by a space.
             auto delim_at = m_sv.find(' ');
@@ -97,7 +99,7 @@ private:
                 throw ProtocolCodecException("reached end of header line prematurely");
             }
 
-            return std::make_pair(m_sv.substr(0, delim_at), m_sv.substr(delim_at));
+            return {m_sv.substr(0, delim_at), m_sv.substr(delim_at)};
         }
         else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
             T cur_arg = {};
@@ -107,7 +109,7 @@ private:
                                                           std::make_error_code(parse_res.ec).message()));
             }
 
-            return std::make_pair(cur_arg, m_sv.substr(parse_res.ptr - m_sv.data()));
+            return {cur_arg, m_sv.substr(parse_res.ptr - m_sv.data())};
         }
         else if constexpr (std::is_same_v<T, bool>) {
             int cur_arg;
@@ -117,10 +119,8 @@ private:
                                                           std::make_error_code(parse_res.ec).message()));
             }
 
-            return std::make_pair((cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data()));
+            return {(cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data())};
         }
-        // We currently only support numeric, string, and boolean values in header lines.
-        REALM_UNREACHABLE();
     }
 
     std::string_view m_sv;
