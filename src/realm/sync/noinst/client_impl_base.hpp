@@ -1176,10 +1176,7 @@ public:
     void on_changesets_integrated(bool success, version_type client_version, sync::DownloadCursor download_progress,
                                   IntegrationError error);
 
-    virtual ~Session();
-
-protected:
-    using SyncTransactReporter = ClientHistoryBase::SyncTransactReporter;
+    void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
     /// The application must ensure that the new session object is either
     /// activated (Connection::activate_session()) or destroyed before the
@@ -1188,7 +1185,12 @@ protected:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(Connection&, Config);
+    Session(sync::SessionWrapper&, ClientImpl::Connection&, Config);
+    ~Session();
+
+private:
+    using SyncTransactReporter = ClientHistoryBase::SyncTransactReporter;
+
 
     /// Fetch a reference to the remote virtual path of the Realm associated
     /// with this session.
@@ -1198,7 +1200,7 @@ protected:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual const std::string& get_virt_path() const noexcept = 0;
+    const std::string& get_virt_path() const noexcept;
 
     /// Fetch a reference to the signed access token.
     ///
@@ -1210,10 +1212,10 @@ protected:
     ///
     /// FIXME: For the upstream client of a 2nd tier server it is not ideal that
     /// the admin token needs to be uploaded for every session.
-    virtual const std::string& get_signed_access_token() const noexcept = 0;
+    const std::string& get_signed_access_token() const noexcept;
 
-    virtual const std::string& get_realm_path() const noexcept = 0;
-    virtual DB& get_db() const noexcept = 0;
+    const std::string& get_realm_path() const noexcept;
+    DB& get_db() const noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid
     /// until the next invocation of access_realm() on one of the session
@@ -1224,13 +1226,13 @@ protected:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual ClientHistoryBase& access_realm() = 0;
+    ClientHistoryBase& access_realm();
 
     // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
-    // Config::ClientReset, the session will be initiated with a fresh
-    // copy of the Realm transferred from the server.
-    virtual util::Optional<sync::ClientReset>& get_client_reset_config() noexcept;
+    // Config::ClientReset, the session will be initiated with a state Realm
+    // transfer from the server.
+    util::Optional<sync::ClientReset>& get_client_reset_config() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///
@@ -1276,17 +1278,17 @@ protected:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&);
+    void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
     ///
     /// The default implementation does nothing.
-    virtual void on_upload_completion();
+    void on_upload_completion();
 
     /// See request_download_completion_notification().
     ///
     /// The default implementation does nothing.
-    virtual void on_download_completion();
+    void on_download_completion();
 
     /// By returning true, this function indicates to the session that the
     /// received file identifier is valid. If the identfier is invald, this
@@ -1296,7 +1298,7 @@ protected:
     ///
     /// The default implementation returns false, so it must be overridden if
     /// request_subtier_file_ident() is ever called.
-    virtual bool on_subtier_file_ident(file_ident_type);
+    bool on_subtier_file_ident(file_ident_type);
 
     //@{
     /// These are called as the state of the session changes between
@@ -1313,8 +1315,8 @@ protected:
     ///
     /// These functions are guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual void on_suspended(std::error_code ec, StringData message, bool is_fatal);
-    virtual void on_resumed();
+    void on_suspended(std::error_code ec, StringData message, bool is_fatal);
+    void on_resumed();
     //@}
 
 private:
@@ -1467,11 +1469,11 @@ private:
 
     std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
 
-    util::Optional<sync::ClientReset> m_client_reset_config = util::none;
+    sync::SessionWrapper& m_wrapper;
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(Connection&, session_ident_type, Config);
+    Session(sync::SessionWrapper& wrapper, Connection&, session_ident_type, Config&&);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1811,12 +1813,13 @@ inline void ClientImpl::Session::new_access_token_available()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(Connection& conn, Config config)
-    : Session{conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
+inline ClientImpl::Session::Session(sync::SessionWrapper& wrapper, Connection& conn, Config config)
+    : Session{wrapper, conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
 {
 }
 
-inline ClientImpl::Session::Session(Connection& conn, session_ident_type ident, Config config)
+inline ClientImpl::Session::Session(sync::SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
+                                    Config&& config)
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
@@ -1824,6 +1827,7 @@ inline ClientImpl::Session::Session(Connection& conn, session_ident_type ident, 
     , m_disable_upload{config.disable_upload}
     , m_disable_empty_upload{config.disable_empty_upload}
     , m_is_subserver{config.is_subserver}
+    , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
         m_allow_upload = true;

@@ -1767,60 +1767,9 @@ Session::~Session()
 }
 
 
-void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
-                                            const ReceivedChangesets& received_changesets)
-{
-    bool success;
-    version_type client_version;
-    IntegrationError error = {};
-    if (REALM_LIKELY(!get_client().is_dry_run())) {
-        VersionInfo version_info;
-        ClientHistoryBase& history = access_realm(); // Throws
-        success = integrate_changesets(history, m_progress, downloadable_bytes, received_changesets, version_info,
-                                       error); // Throws
-        client_version = version_info.realm_version;
-    }
-    else {
-        // Fake it for "dry run" mode
-        success = true;
-        client_version = m_last_version_available + 1;
-    }
-    on_changesets_integrated(success, client_version, m_progress.download, error); // Throws
-}
-
-
-util::Optional<sync::ClientReset>& Session::get_client_reset_config() noexcept
-{
-    return m_client_reset_config;
-}
-
-void Session::on_upload_completion()
-{
-    // No-op unless overridden.
-}
-
-
-void Session::on_download_completion()
-{
-    // No-op unless overridden.
-}
-
-
 bool Session::on_subtier_file_ident(file_ident_type)
 {
     return false; // By default, do not accept the received file identifier.
-}
-
-
-void Session::on_suspended(std::error_code, StringData, bool)
-{
-    // No-op unless overridden.
-}
-
-
-void Session::on_resumed()
-{
-    // No-op unless overridden.
 }
 
 

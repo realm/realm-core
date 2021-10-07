@@ -21,6 +21,7 @@ using namespace realm::util;
 
 // clang-format off
 using ClientImpl                      = _impl::ClientImpl;
+using SessionImpl                     = _impl::ClientImpl::Session;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
@@ -33,35 +34,6 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 
 
 namespace {
-
-class SessionImpl : public ClientImpl::Session {
-public:
-    SessionImpl(SessionWrapper&, ClientImpl::Connection&, Config);
-
-    ClientImpl& get_client() noexcept;
-    ClientImpl::Connection& get_connection() noexcept;
-
-    void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
-
-    // Overriding member function in ClientImpl::Session
-    const std::string& get_virt_path() const noexcept override final;
-    const std::string& get_signed_access_token() const noexcept override final;
-    const std::string& get_realm_path() const noexcept override final;
-    DB& get_db() const noexcept override final;
-    ClientHistoryBase& access_realm() override final;
-    util::Optional<sync::ClientReset>& get_client_reset_config() noexcept override final;
-    void initiate_integrate_changesets(std::uint_fast64_t, const ReceivedChangesets&) override final;
-    void on_upload_completion() override final;
-    void on_download_completion() override final;
-    void on_suspended(std::error_code, StringData, bool) override final;
-    void on_resumed() override final;
-
-private:
-    // Becomes dangling after initiation of deactivation. Note that this is not
-    // a problem as callbacks are guaranteed to not occur after initiation of
-    // deactivation.
-    SessionWrapper& m_wrapper;
-};
 
 // ################ miscellaneous ################
 
@@ -342,7 +314,7 @@ private:
     void change_server_endpoint(ServerEndpoint);
 
     friend class sync::SessionWrapperStack;
-    friend class ::SessionImpl;
+    friend class ClientImpl::Session;
 };
 
 
@@ -653,24 +625,6 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 
 // ################ SessionImpl ################
 
-inline SessionImpl::SessionImpl(SessionWrapper& wrapper, ClientImpl::Connection& conn, Config config)
-    : ClientImpl::Session{conn, std::move(config)} // Throws
-    , m_wrapper{wrapper}
-{
-}
-
-
-inline ClientImpl& SessionImpl::get_client() noexcept
-{
-    return m_wrapper.m_client;
-}
-
-
-inline ClientImpl::Connection& SessionImpl::get_connection() noexcept
-{
-    return Session::get_connection();
-}
-
 
 inline void SessionImpl::on_connection_state_changed(ConnectionState state, const SessionErrorInfo* error_info)
 {
@@ -709,13 +663,27 @@ util::Optional<sync::ClientReset>& SessionImpl::get_client_reset_config() noexce
     return m_wrapper.m_client_reset_config;
 }
 
-inline void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
-                                                       const ReceivedChangesets& changesets)
+void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
+                                                const ReceivedChangesets& changesets)
 {
     bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
     if (REALM_LIKELY(!simulate_integration_error)) {
-        ClientImpl::Session::initiate_integrate_changesets(downloadable_bytes,
-                                                           changesets); // Throws
+        bool success;
+        version_type client_version;
+        IntegrationError error = {};
+        if (REALM_LIKELY(!get_client().is_dry_run())) {
+            VersionInfo version_info;
+            ClientHistoryBase& history = access_realm(); // Throws
+            success = integrate_changesets(history, m_progress, downloadable_bytes, changesets, version_info,
+                                           error); // Throws
+            client_version = version_info.realm_version;
+        }
+        else {
+            // Fake it for "dry run" mode
+            success = true;
+            client_version = m_last_version_available + 1;
+        }
+        on_changesets_integrated(success, client_version, m_progress.download, error); // Throws
     }
     else {
         bool success = false;
