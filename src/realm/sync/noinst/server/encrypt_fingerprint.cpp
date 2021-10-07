@@ -2,7 +2,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include <realm/sync/encrypt/fingerprint.hpp>
+#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
 #include <realm/util/sha_crypto.hpp>
 
 using namespace realm;

@@ -5,7 +5,6 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/object.hpp>
 
 namespace realm {
 namespace _impl {

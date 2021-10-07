@@ -11,9 +11,9 @@
 #include <realm/util/logger.hpp>
 #include <realm/db.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
-#include <realm/sync/metrics.hpp>
+#include <realm/sync/noinst/server/metrics.hpp>
 
 namespace realm {
 namespace _impl {

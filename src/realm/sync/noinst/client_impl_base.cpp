@@ -1103,7 +1103,7 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    auto handler = [=] {
+    auto handler = [this] {
         handle_write_message(); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler)); // Throws

@@ -280,7 +280,7 @@ public:
     // Get object based on primary key
     Obj get_object_with_primary_key(Mixed pk) const;
     // Get primary key based on ObjKey
-    Mixed get_primary_key(ObjKey key);
+    Mixed get_primary_key(ObjKey key) const;
     // Get logical index for object. This function is not very efficient
     size_t get_object_ndx(ObjKey key) const noexcept
     {

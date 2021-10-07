@@ -311,7 +311,7 @@ std::string make_temp_dir()
                 throw;
         }
     }
-    return path.u8string();
+    return path.string();
 
 #else // POSIX.1-2008 version
 
@@ -1612,7 +1612,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     if (path_.is_absolute())
         return path;
 
-    return (std::filesystem::path(base_dir) / path_).u8string();
+    return (std::filesystem::path(base_dir) / path_).string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1836,7 +1836,7 @@ bool DirScanner::next(std::string& name)
 {
     const std::filesystem::directory_iterator end;
     if (m_iterator != end) {
-        name = m_iterator->path().filename().u8string();
+        name = m_iterator->path().filename().string();
         m_iterator++;
         return true;
     }

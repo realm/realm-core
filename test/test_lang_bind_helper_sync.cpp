@@ -49,7 +49,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
         DBRef sg = DB::create(*hist);
         {
             WriteTransaction wt(sg);
-            sync::create_table(wt, "class_table");
+            wt.add_table("class_table");
             wt.commit();
         }
     }
@@ -69,7 +69,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
         DBRef sg = DB::create(*hist);
         {
             WriteTransaction wt(sg);
-            sync::create_table(wt, "class_table");
+            wt.add_table("class_table");
             wt.commit();
         }
     }

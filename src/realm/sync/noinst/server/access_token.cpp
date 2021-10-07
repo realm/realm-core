@@ -5,8 +5,8 @@
 
 #include <realm/util/base64.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/sync/permissions.hpp>
-#include <realm/sync/access_token.hpp>
+#include <realm/sync/noinst/server/permissions.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
 
 using namespace realm;
 using namespace realm::util;

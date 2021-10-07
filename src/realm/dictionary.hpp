@@ -29,9 +29,9 @@ namespace realm {
 
 class DictionaryClusterTree;
 
-class Dictionary final : public CollectionBaseImpl<CollectionBase> {
+class Dictionary final : public CollectionBaseImpl<CollectionBase, Dictionary> {
 public:
-    using Base = CollectionBaseImpl<CollectionBase>;
+    using Base = CollectionBaseImpl<CollectionBase, Dictionary>;
     class Iterator;
 
     Dictionary() {}
@@ -46,10 +46,7 @@ public:
     }
     Dictionary& operator=(const Dictionary& other);
 
-    bool operator==(const Dictionary& other) const noexcept
-    {
-        return CollectionBaseImpl<CollectionBase>::operator==(other);
-    }
+    using Base::operator==;
 
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;

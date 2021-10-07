@@ -1,4 +1,4 @@
-#include <realm/sync/crypto_server.hpp>
+#include <realm/sync/noinst/server/crypto_server.hpp>
 
 #include <openssl/bio.h>
 #include <openssl/pem.h>

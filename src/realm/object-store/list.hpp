@@ -61,6 +61,7 @@ public:
 
     template <typename T = Obj>
     T get(size_t row_ndx) const;
+
     template <typename T>
     size_t find(T const& value) const;
 
@@ -134,6 +135,9 @@ private:
 
     friend struct std::hash<List>;
 };
+
+template <>
+Obj List::get(size_t row_ndx) const;
 
 template <typename T>
 auto& List::as() const
