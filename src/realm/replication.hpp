@@ -58,7 +58,8 @@ public:
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
 
     virtual void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value);
-    virtual void set(const Table*, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant = _impl::instr_Set);
+    virtual void set(const Table*, ColKey col_key, ObjKey key, Mixed value,
+                     _impl::Instruction variant = _impl::instr_Set);
 
     virtual void list_set(const CollectionBase& list, size_t list_ndx, Mixed value);
     virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value);
@@ -488,7 +489,6 @@ public:
 };
 
 
-
 // Implementation:
 
 inline Replication::Replication(const std::string& database_file)
@@ -661,8 +661,7 @@ inline void Replication::remove_object(const Table* t, ObjKey key)
     m_encoder.remove_object(key); // Throws
 }
 
-inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx,
-                                                    size_t to_link_ndx)
+inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
 {
     select_collection(list);                         // Throws
     m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
@@ -674,8 +673,7 @@ inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
     m_encoder.list_erase(link_ndx); // Throws
 }
 
-inline void Replication::typed_link_change(const Table* source_table, ColKey col,
-                                                            TableKey dest_table)
+inline void Replication::typed_link_change(const Table* source_table, ColKey col, TableKey dest_table)
 {
     select_table(source_table);
     m_encoder.typed_link_change(col, dest_table);

@@ -381,7 +381,7 @@ public:
     class Connection;
     class Session;
 
-    using port_type            = util::network::Endpoint::port_type;
+    using port_type = util::network::Endpoint::port_type;
     using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
@@ -628,7 +628,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 /// occur on behalf of the event loop thread of the associated client object.
 class ClientImpl::Connection final : public util::websocket::Config {
 public:
-    using connection_ident_type           = std::int_fast64_t;
+    using connection_ident_type = std::int_fast64_t;
     using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
 
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,

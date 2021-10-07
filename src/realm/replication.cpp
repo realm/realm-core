@@ -120,8 +120,8 @@ void Replication::create_object(const Table* t, GlobalKey id)
 
 void Replication::create_object_with_primary_key(const Table* t, ObjKey key, Mixed)
 {
-    select_table(t);                                                                       // Throws
-    m_encoder.create_object(key);                                                          // Throws
+    select_table(t);              // Throws
+    m_encoder.create_object(key); // Throws
 }
 
 void Replication::do_select_table(const Table* table)
