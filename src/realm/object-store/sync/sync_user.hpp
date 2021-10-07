@@ -52,6 +52,10 @@ public:
 
 using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
 
+struct InvalidSyncUser : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 // A struct that decodes a given JWT.
 struct RealmJWT {
     // The token being decoded from.

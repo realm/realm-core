@@ -2172,6 +2172,80 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 Results dogs = get_dogs(r);
             }
         }
+
+        SECTION("Revoked refresh token on an anonymous user results in a sync error") {
+            TestSyncManager sync_manager(app_config, {});
+            auto app = sync_manager.app();
+            auto anon_user = log_in(app);
+            REQUIRE(app->current_user() == anon_user);
+            SyncTestFile config(app, partition, schema);
+            REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
+            app_session.admin_api.revoke_user_sessions(anon_user->identity(), app_session.server_app_id);
+            // revoking a user session only affects the refresh token, so the access token should still continue to
+            // work.
+            REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
+
+            verify_error_on_sync_with_invalid_refresh_token(anon_user, config);
+
+            // the user has been logged out, and current user is reset
+            REQUIRE(!app->current_user());
+            REQUIRE(!anon_user->is_logged_in());
+            REQUIRE(anon_user->state() == SyncUser::State::Removed);
+
+            // new requests for an access token do not work for anon users
+            anon_user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(error);
+                REQUIRE(error->message ==
+                        util::format("Cannot initiate a refresh on user '%1' because the user has been removed",
+                                     anon_user->identity()));
+            });
+
+            REQUIRE_THROWS_MATCHES(
+                Realm::get_shared_realm(config), InvalidSyncUser,
+                Catch::Message(
+                    util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                                 anon_user->identity())));
+        }
+
+        SECTION("Opening a Realm with a removed email user results produces an exception") {
+            TestSyncManager sync_manager(app_config, {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_log_in(app);
+            auto email_user = app->current_user();
+            const std::string user_ident = email_user->identity();
+            REQUIRE(email_user);
+            SyncTestFile config(app, partition, schema);
+            REQUIRE(email_user->is_logged_in());
+            {
+                // sync works on a valid user
+                auto r = Realm::get_shared_realm(config);
+                Results dogs = get_dogs(r);
+            }
+            app->sync_manager()->remove_user(user_ident);
+            REQUIRE_FALSE(email_user->is_logged_in());
+            REQUIRE(email_user->state() == SyncUser::State::Removed);
+
+            // should not be able to open a sync'd Realm with an invalid user
+            REQUIRE_THROWS_MATCHES(
+                Realm::get_shared_realm(config), InvalidSyncUser,
+                Catch::Message(util::format(
+                    "Cannot start a sync session for user '%1' because this user has been removed.", user_ident)));
+
+            std::shared_ptr<SyncUser> new_user_instance = log_in(app, creds);
+            // the previous instance is still invalid
+            REQUIRE_FALSE(email_user->is_logged_in());
+            REQUIRE(email_user->state() == SyncUser::State::Removed);
+            // but the new instance will work and has the same server issued ident
+            REQUIRE(new_user_instance);
+            REQUIRE(new_user_instance->is_logged_in());
+            REQUIRE(new_user_instance->identity() == user_ident);
+            {
+                // sync works again if the same user is logged back in
+                config.sync_config->user = new_user_instance;
+                auto r = Realm::get_shared_realm(config);
+                Results dogs = get_dogs(r);
+            }
+        }
     }
 
     SECTION("too large sync message error handling") {
