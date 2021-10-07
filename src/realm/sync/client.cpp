@@ -34,35 +34,11 @@ using ProxyConfig                     = SyncConfig::ProxyConfig;
 
 namespace {
 
-class SessionImpl;
-class SessionWrapper;
-
-
 // (protocol, address, port, session_multiplex_ident)
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
 using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
-
-
-class SessionWrapperStack {
-public:
-    bool empty() const noexcept;
-    void push(util::bind_ptr<SessionWrapper>) noexcept;
-    util::bind_ptr<SessionWrapper> pop() noexcept;
-    void clear() noexcept;
-    SessionWrapperStack() noexcept = default;
-    SessionWrapperStack(SessionWrapperStack&&) noexcept;
-    ~SessionWrapperStack();
-    friend void swap(SessionWrapperStack& q_1, SessionWrapperStack& q_2) noexcept
-    {
-        std::swap(q_1.m_back, q_2.m_back);
-    }
-
-private:
-    SessionWrapper* m_back = nullptr;
-};
-
 
 class ClientImpl final : public ClientImplBase {
 public:
@@ -167,7 +143,7 @@ private:
     void remove_connection(ClientImplBase::Connection&) noexcept;
 
     friend class ClientImplBase::Connection;
-    friend class SessionWrapper;
+    friend class sync::SessionWrapper;
 };
 
 
@@ -199,6 +175,99 @@ private:
     // deactivation.
     SessionWrapper& m_wrapper;
 };
+
+// ################ miscellaneous ################
+
+const char* get_error_message(ClientError error_code)
+{
+    switch (error_code) {
+        case ClientError::connection_closed:
+            return "Connection closed (no error)";
+        case ClientError::unknown_message:
+            return "Unknown type of input message";
+        case ClientError::bad_syntax:
+            return "Bad syntax in input message head";
+        case ClientError::limits_exceeded:
+            return "Limits exceeded in input message";
+        case ClientError::bad_session_ident:
+            return "Bad session identifier in input message";
+        case ClientError::bad_message_order:
+            return "Bad input message order";
+        case ClientError::bad_client_file_ident:
+            return "Bad client file identifier (IDENT)";
+        case ClientError::bad_progress:
+            return "Bad progress information (DOWNLOAD)";
+        case ClientError::bad_changeset_header_syntax:
+            return "Bad progress information (DOWNLOAD)";
+        case ClientError::bad_changeset_size:
+            return "Bad changeset size in changeset header (DOWNLOAD)";
+        case ClientError::bad_origin_file_ident:
+            return "Bad origin file identifier in changeset header (DOWNLOAD)";
+        case ClientError::bad_server_version:
+            return "Bad server version in changeset header (DOWNLOAD)";
+        case ClientError::bad_changeset:
+            return "Bad changeset (DOWNLOAD)";
+        case ClientError::bad_request_ident:
+            return "Bad request identifier (MARK)";
+        case ClientError::bad_error_code:
+            return "Bad error code (ERROR)";
+        case ClientError::bad_compression:
+            return "Bad compression (DOWNLOAD)";
+        case ClientError::bad_client_version:
+            return "Bad last integrated client version in changeset header (DOWNLOAD)";
+        case ClientError::ssl_server_cert_rejected:
+            return "SSL server certificate rejected";
+        case ClientError::pong_timeout:
+            return "Timeout on reception of PONG respone message";
+        case ClientError::bad_client_file_ident_salt:
+            return "Bad client file identifier salt (IDENT)";
+        case ClientError::bad_file_ident:
+            return "Bad file identifier (ALLOC)";
+        case ClientError::connect_timeout:
+            return "Sync connection was not fully established in time";
+        case ClientError::bad_timestamp:
+            return "Bad timestamp (PONG)";
+        case ClientError::bad_protocol_from_server:
+            return "Bad or missing protocol version information from server";
+        case ClientError::client_too_old_for_server:
+            return "Protocol version negotiation failed: Client is too old for server";
+        case ClientError::client_too_new_for_server:
+            return "Protocol version negotiation failed: Client is too new for server";
+        case ClientError::protocol_mismatch:
+            return ("Protocol version negotiation failed: No version supported by both "
+                    "client and server");
+        case ClientError::bad_state_message:
+            return "Bad state message (STATE)";
+        case ClientError::missing_protocol_feature:
+            return "Requested feature missing in negotiated protocol version";
+        case ClientError::http_tunnel_failed:
+            return "Failure to establish HTTP tunnel with configured proxy";
+        case ClientError::auto_client_reset_failure:
+            return "Automatic recovery from client reset failed";
+    }
+    return nullptr;
+}
+
+
+class ErrorCategoryImpl : public std::error_category {
+public:
+    const char* name() const noexcept override final
+    {
+        return "realm::sync::ClientError";
+    }
+    std::string message(int error_code) const override final
+    {
+        const char* msg = get_error_message(ClientError(error_code));
+        if (!msg)
+            msg = "Unknown error";
+        std::string msg_2{msg}; // Throws (copy)
+        return msg_2;
+    }
+};
+
+ErrorCategoryImpl g_error_category;
+
+} // unnamed namespace
 
 
 // Life cycle states of a session wrapper:
@@ -240,7 +309,7 @@ private:
 // and initiation of deactivation happens no earlier than during
 // finalization. See also activate_session() and initiate_session_deactivation()
 // in _impl::ClientImplBase::Connection.
-class SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
+class sync::SessionWrapper : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
     SessionWrapper(ClientImpl&, DBRef db, Session::Config);
     ~SessionWrapper() noexcept;
@@ -385,8 +454,8 @@ private:
     void report_progress();
     void change_server_endpoint(ServerEndpoint);
 
-    friend class SessionWrapperStack;
-    friend class SessionImpl;
+    friend class sync::SessionWrapperStack;
+    friend class ::SessionImpl;
 };
 
 
@@ -1474,100 +1543,6 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
         }
     }
 }
-
-
-// ################ miscellaneous ################
-
-const char* get_error_message(ClientError error_code)
-{
-    switch (error_code) {
-        case ClientError::connection_closed:
-            return "Connection closed (no error)";
-        case ClientError::unknown_message:
-            return "Unknown type of input message";
-        case ClientError::bad_syntax:
-            return "Bad syntax in input message head";
-        case ClientError::limits_exceeded:
-            return "Limits exceeded in input message";
-        case ClientError::bad_session_ident:
-            return "Bad session identifier in input message";
-        case ClientError::bad_message_order:
-            return "Bad input message order";
-        case ClientError::bad_client_file_ident:
-            return "Bad client file identifier (IDENT)";
-        case ClientError::bad_progress:
-            return "Bad progress information (DOWNLOAD)";
-        case ClientError::bad_changeset_header_syntax:
-            return "Bad progress information (DOWNLOAD)";
-        case ClientError::bad_changeset_size:
-            return "Bad changeset size in changeset header (DOWNLOAD)";
-        case ClientError::bad_origin_file_ident:
-            return "Bad origin file identifier in changeset header (DOWNLOAD)";
-        case ClientError::bad_server_version:
-            return "Bad server version in changeset header (DOWNLOAD)";
-        case ClientError::bad_changeset:
-            return "Bad changeset (DOWNLOAD)";
-        case ClientError::bad_request_ident:
-            return "Bad request identifier (MARK)";
-        case ClientError::bad_error_code:
-            return "Bad error code (ERROR)";
-        case ClientError::bad_compression:
-            return "Bad compression (DOWNLOAD)";
-        case ClientError::bad_client_version:
-            return "Bad last integrated client version in changeset header (DOWNLOAD)";
-        case ClientError::ssl_server_cert_rejected:
-            return "SSL server certificate rejected";
-        case ClientError::pong_timeout:
-            return "Timeout on reception of PONG respone message";
-        case ClientError::bad_client_file_ident_salt:
-            return "Bad client file identifier salt (IDENT)";
-        case ClientError::bad_file_ident:
-            return "Bad file identifier (ALLOC)";
-        case ClientError::connect_timeout:
-            return "Sync connection was not fully established in time";
-        case ClientError::bad_timestamp:
-            return "Bad timestamp (PONG)";
-        case ClientError::bad_protocol_from_server:
-            return "Bad or missing protocol version information from server";
-        case ClientError::client_too_old_for_server:
-            return "Protocol version negotiation failed: Client is too old for server";
-        case ClientError::client_too_new_for_server:
-            return "Protocol version negotiation failed: Client is too new for server";
-        case ClientError::protocol_mismatch:
-            return ("Protocol version negotiation failed: No version supported by both "
-                    "client and server");
-        case ClientError::bad_state_message:
-            return "Bad state message (STATE)";
-        case ClientError::missing_protocol_feature:
-            return "Requested feature missing in negotiated protocol version";
-        case ClientError::http_tunnel_failed:
-            return "Failure to establish HTTP tunnel with configured proxy";
-        case ClientError::auto_client_reset_failure:
-            return "Automatic recovery from client reset failed";
-    }
-    return nullptr;
-}
-
-
-class ErrorCategoryImpl : public std::error_category {
-public:
-    const char* name() const noexcept override final
-    {
-        return "realm::sync::ClientError";
-    }
-    std::string message(int error_code) const override final
-    {
-        const char* msg = get_error_message(ClientError(error_code));
-        if (!msg)
-            msg = "Unknown error";
-        std::string msg_2{msg}; // Throws (copy)
-        return msg_2;
-    }
-};
-
-ErrorCategoryImpl g_error_category;
-
-} // unnamed namespace
 
 // ################ ClientImplBase::Connection ################
 

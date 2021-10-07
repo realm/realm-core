@@ -26,6 +26,26 @@ namespace realm {
 
 
 namespace sync {
+class SessionWrapper;
+
+class SessionWrapperStack {
+public:
+    bool empty() const noexcept;
+    void push(util::bind_ptr<SessionWrapper>) noexcept;
+    util::bind_ptr<SessionWrapper> pop() noexcept;
+    void clear() noexcept;
+    SessionWrapperStack() noexcept = default;
+    SessionWrapperStack(SessionWrapperStack&&) noexcept;
+    ~SessionWrapperStack();
+    friend void swap(SessionWrapperStack& q_1, SessionWrapperStack& q_2) noexcept
+    {
+        std::swap(q_1.m_back, q_2.m_back);
+    }
+
+private:
+    SessionWrapper* m_back = nullptr;
+};
+
 /// The presence of the ClientReset config indicates an ongoing or requested client
 /// reset operation. If client_reset is util::none or if the local Realm does not
 /// exist, an ordinary sync session will take place.
