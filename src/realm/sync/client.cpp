@@ -358,7 +358,7 @@ inline SessionWrapperStack::SessionWrapperStack(SessionWrapperStack&& q) noexcep
 }
 
 
-inline SessionWrapperStack::~SessionWrapperStack()
+SessionWrapperStack::~SessionWrapperStack()
 {
     clear();
 }
