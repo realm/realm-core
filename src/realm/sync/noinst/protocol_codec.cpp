@@ -5,24 +5,6 @@
 
 namespace realm::_impl {
 
-HeaderLineParser::HeaderLineParser(std::string_view line)
-    : m_sv(line)
-{
-}
-
-HeaderLineParser::HeaderLineParser(HeaderLineParser&& other)
-    : HeaderLineParser(other.m_sv)
-{
-    other.m_sv = std::string_view{};
-}
-
-HeaderLineParser& HeaderLineParser::operator=(HeaderLineParser&& other)
-{
-    m_sv = other.m_sv;
-    other.m_sv = std::string_view{};
-    return *this;
-}
-
 using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
 // Client protocol

@@ -24,29 +24,30 @@
 #include <realm/sync/history.hpp>
 
 namespace realm::_impl {
-
+struct ProtocolCodecException : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 class HeaderLineParser {
 public:
-    struct HeaderLineParserException : public std::runtime_error {
-        using std::runtime_error::runtime_error;
-    };
-
     HeaderLineParser() = default;
-    explicit HeaderLineParser(std::string_view line);
-    HeaderLineParser(HeaderLineParser&& other);
-    HeaderLineParser& operator=(HeaderLineParser&& other);
+    explicit HeaderLineParser(std::string_view line)
+        : m_sv(line)
+    {
+    }
 
     template <typename T>
     T read_next(char expected_terminator = ' ')
     {
-        const auto ret = peek_token_impl<T>();
-        if (ret.second.front() != expected_terminator) {
-            throw HeaderLineParserException(
-                util::format("expected to find delimeter '%1' in header line, but found '%2'", expected_terminator,
-                             ret.second.front()));
+        const auto [tok, rest] = peek_token_impl<T>();
+        if (rest.empty()) {
+            throw ProtocolCodecException("header line ended prematurely without terminator");
         }
-        m_sv = ret.second.substr(1);
-        return ret.first;
+        if (rest.front() != expected_terminator) {
+            throw ProtocolCodecException(util::format(
+                "expected to find delimeter '%1' in header line, but found '%2'", expected_terminator, rest.front()));
+        }
+        m_sv = rest.substr(1);
+        return tok;
     }
 
     template <typename T>
@@ -57,7 +58,7 @@ public:
         return T(ret.data(), size);
     }
 
-    size_t size() const noexcept
+    size_t bytes_remaining() const noexcept
     {
         return m_sv.size();
     }
@@ -67,7 +68,7 @@ public:
         return m_sv;
     }
 
-    bool empty() const noexcept
+    bool at_end() const noexcept
     {
         return m_sv.empty();
     }
@@ -75,7 +76,7 @@ public:
     void advance(size_t size)
     {
         if (size > m_sv.size()) {
-            throw HeaderLineParserException(
+            throw ProtocolCodecException(
                 util::format("cannot advance header by %1 characters, only %2 characters left", size, m_sv.size()));
         }
         m_sv.remove_prefix(size);
@@ -85,38 +86,38 @@ private:
     template <typename T>
     std::pair<T, std::string_view> peek_token_impl() const
     {
-        if (empty()) {
-            throw HeaderLineParserException("header line is empty");
+        if (at_end()) {
+            throw ProtocolCodecException("header line is empty");
         }
         if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
             // Currently all string fields in wire protocol header lines appear at the beginning of the line and
             // should be delimited by a space.
             auto delim_at = m_sv.find(' ');
             if (delim_at == std::string_view::npos) {
-                throw HeaderLineParserException("reached end of header line prematurely");
+                throw ProtocolCodecException("reached end of header line prematurely");
             }
 
             return std::make_pair(m_sv.substr(0, delim_at), m_sv.substr(delim_at));
         }
         else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
             T cur_arg = {};
-            auto parse_res = util::from_chars(m_sv.data(), m_sv.data() + m_sv.size() + 1, cur_arg, 10);
+            auto parse_res = util::from_chars(m_sv.data(), m_sv.data() + m_sv.size(), cur_arg, 10);
             if (parse_res.ec != std::errc{}) {
-                throw HeaderLineParserException(util::format("error parsing integer in header line: %1",
-                                                             std::make_error_code(parse_res.ec).message()));
+                throw ProtocolCodecException(util::format("error parsing integer in header line: %1",
+                                                          std::make_error_code(parse_res.ec).message()));
             }
 
             return std::make_pair(cur_arg, m_sv.substr(parse_res.ptr - m_sv.data()));
         }
         else if constexpr (std::is_same_v<T, bool>) {
             int cur_arg;
-            auto parse_res = util::from_chars(m_sv.data(), m_sv.data() + m_sv.size() + 1, cur_arg, 10);
+            auto parse_res = util::from_chars(m_sv.data(), m_sv.data() + m_sv.size(), cur_arg, 10);
             if (parse_res.ec != std::errc{}) {
-                throw HeaderLineParserException(util::format("error parsing boolean in header line: %1",
-                                                             std::make_error_code(parse_res.ec).message()));
+                throw ProtocolCodecException(util::format("error parsing boolean in header line: %1",
+                                                          std::make_error_code(parse_res.ec).message()));
             }
 
-            return std::make_pair(static_cast<bool>(cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data()));
+            return std::make_pair((cur_arg != 0), m_sv.substr(parse_res.ptr - m_sv.data()));
         }
         // We currently only support numeric, string, and boolean values in header lines.
         REALM_UNREACHABLE();
@@ -220,7 +221,7 @@ public:
             auto timestamp = msg.read_next<milliseconds_type>('\n');
             connection.receive_pong(timestamp);
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             logger.error("Bad syntax in input message '%1': %2", msg_data, e.what());
             connection.handle_protocol_error(Error::bad_syntax); // throws
         }
@@ -243,7 +244,7 @@ public:
         try {
             message_type = msg.read_next<std::string_view>();
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             return report_error(Error::bad_syntax, "Could not find message type in message: %1", e.what());
         }
 
@@ -298,10 +299,10 @@ public:
                 return report_error(Error::unknown_message, "Unknown input message type '%1'", msg_data);
             }
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             return report_error(Error::bad_syntax, "Bad syntax in %1 message: %2", message_type, e.what());
         }
-        if (!msg.empty()) {
+        if (!msg.at_end()) {
             return report_error(Error::bad_syntax, "wire protocol message had leftover data after being parsed");
         }
     }
@@ -356,7 +357,7 @@ private:
         ReceivedChangesets received_changesets;
 
         // Loop through the body and find the changesets.
-        while (!msg.empty()) {
+        while (!msg.at_end()) {
             realm::sync::Transformer::RemoteChangeset cur_changeset;
             cur_changeset.remote_version = msg.read_next<version_type>();
             cur_changeset.last_integrated_local_version = msg.read_next<version_type>();
@@ -365,9 +366,9 @@ private:
             cur_changeset.original_changeset_size = msg.read_next<size_t>();
             auto changeset_size = msg.read_next<size_t>();
 
-            if (changeset_size > msg.size()) {
+            if (changeset_size > msg.bytes_remaining()) {
                 return report_error(Error::bad_changeset_size, "Bad changeset size %1 > %2", changeset_size,
-                                    msg.size());
+                                    msg.bytes_remaining());
             }
 
             if (cur_changeset.remote_version == 0) {
@@ -403,7 +404,7 @@ private:
             }
 
             cur_changeset.data = changeset_data;
-            received_changesets.push_back(cur_changeset); // Throws
+            received_changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
         connection.receive_download_message(session_ident, progress, downloadable_bytes,
@@ -498,7 +499,7 @@ public:
 
             connection.receive_ping(timestamp, rtt);
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             connection.logger.error("Bad syntax in ping message: %1", e.what());
             connection.handle_protocol_error(Error::bad_syntax);
         }
@@ -531,7 +532,7 @@ public:
         try {
             message_type = msg.read_next<std::string_view>();
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             return report_error(Error::bad_syntax, "Could not find message type in message: %1", e.what());
         }
 
@@ -548,7 +549,7 @@ public:
 
                 std::size_t body_size = (is_body_compressed ? compressed_body_size : uncompressed_body_size);
                 if (body_size > s_max_body_size) {
-                    auto header = msg_with_header.substr(0, msg_with_header.size() - msg.size());
+                    auto header = msg_with_header.substr(0, msg_with_header.size() - msg.bytes_remaining());
                     return report_error(Error::limits_exceeded,
                                         "Body size of upload message is too large. Raw header: %1", header);
                 }
@@ -582,7 +583,7 @@ public:
                 std::vector<UploadChangeset> upload_changesets;
 
                 // Loop through the body and find the changesets.
-                while (!msg.empty()) {
+                while (!msg.at_end()) {
                     UploadChangeset upload_changeset;
                     size_t changeset_size;
                     try {
@@ -592,12 +593,12 @@ public:
                         upload_changeset.origin_file_ident = msg.read_next<file_ident_type>();
                         changeset_size = msg.read_next<size_t>();
                     }
-                    catch (const HeaderLineParser::HeaderLineParserException& e) {
+                    catch (const ProtocolCodecException& e) {
                         return report_error(Error::bad_changeset_header_syntax, "Bad changeset header syntax: %1",
                                             e.what());
                     }
 
-                    if (changeset_size > msg.size()) {
+                    if (changeset_size > msg.bytes_remaining()) {
                         return report_error(Error::bad_changeset_size, "Bad changeset size");
                     }
 
@@ -613,7 +614,7 @@ public:
                         logger.trace("Changeset: %1",
                                      clamped_hex_dump(upload_changeset.changeset)); // Throws
                     }
-                    upload_changesets.push_back(upload_changeset); // Throws
+                    upload_changesets.push_back(std::move(upload_changeset)); // Throws
                 }
 
                 connection.receive_upload_message(session_ident, progress_client_version, progress_server_version,
@@ -693,7 +694,7 @@ public:
                 return report_error(Error::unknown_message, "unknown message type %1", message_type);
             }
         }
-        catch (const HeaderLineParser::HeaderLineParserException& e) {
+        catch (const ProtocolCodecException& e) {
             return report_error(Error::bad_syntax, "bad syntax in %1 message: %2", message_type, e.what());
         }
     }

@@ -9,7 +9,6 @@
 #include "realm/sync/changeset_parser.hpp"
 #include "realm/sync/noinst/compression.hpp"
 #include "realm/util/cli_args.hpp"
-#include "realm/util/from_chars.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 #include "realm/util/string_view.hpp"
@@ -58,10 +57,6 @@ struct UploadMessage {
 
 using Message = mpark::variant<ServerIdentMessage, DownloadMessage, UploadMessage>;
 
-struct MessageParseException : public std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
 Message parse_message(HeaderLineParser& msg, Logger& logger)
 {
     auto message_type = msg.read_next<std::string_view>();
@@ -74,7 +69,7 @@ Message parse_message(HeaderLineParser& msg, Logger& logger)
     else if (message_type == "ident") {
         return ServerIdentMessage::parse(msg);
     }
-    throw MessageParseException("could not find valid message in input");
+    throw ProtocolCodecException("could not find valid message in input");
 }
 
 ServerIdentMessage ServerIdentMessage::parse(HeaderLineParser& msg)
@@ -118,7 +113,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger)
                                                             uncompressed_body_buffer.get(), uncompressed_body_size);
 
         if (ec) {
-            throw MessageParseException("error decompressing download message");
+            throw ProtocolCodecException("error decompressing download message");
         }
 
         body = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
@@ -127,7 +122,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger)
         body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
     }
 
-    while (!body.empty()) {
+    while (!body.at_end()) {
         realm::sync::Transformer::RemoteChangeset cur_changeset;
         cur_changeset.remote_version = body.read_next<sync::version_type>();
         cur_changeset.last_integrated_local_version = body.read_next<sync::version_type>();
@@ -173,7 +168,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
                                                             uncompressed_body_buffer.get(), uncompressed_body_size);
 
         if (ec) {
-            throw MessageParseException("error decompressing upload message");
+            throw ProtocolCodecException("error decompressing upload message");
         }
 
         body = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
@@ -182,7 +177,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
     }
 
-    while (!body.empty()) {
+    while (!body.at_end()) {
         realm::sync::Changeset cur_changeset;
         cur_changeset.version = body.read_next<sync::version_type>();
         cur_changeset.last_integrated_remote_version = body.read_next<sync::version_type>();
@@ -278,12 +273,12 @@ int main(int argc, const char** argv)
 
     auto input_contents = load_file(input_arg.as<std::string>());
     HeaderLineParser msg(input_contents);
-    while (!msg.empty()) {
+    while (!msg.at_end()) {
         Message message;
         try {
             message = parse_message(msg, *logger);
         }
-        catch (const MessageParseException& e) {
+        catch (const ProtocolCodecException& e) {
             logger->error("Error parsing input message file: %1", e.what());
             return EXIT_FAILURE;
         }
