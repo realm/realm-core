@@ -115,7 +115,8 @@ RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* rea
         auto tblkey = TableKey(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
         auto pkval = from_capi(pk);
-        *did_create = false;
+        if (did_create)
+            *did_create = false;
 
         ColKey pkcol = table->get_primary_key_column();
         if (!pkcol) {
