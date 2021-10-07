@@ -487,11 +487,13 @@ public:
                    util::Optional<ProxyConfig>, ReconnectInfo);
 
     ~Connection();
+
 private:
+    using SyncProgress = sync::SyncProgress;
+    using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     template <class H>
     void for_each_active_session(H handler);
-
 
     /// \brief Called when the connection becomes idle.
     ///
@@ -519,9 +521,79 @@ private:
     /// default implementation sets no headers.
     void set_http_request_headers(util::HTTPHeaders&);
 
-private:
-    using SyncProgress = sync::SyncProgress;
-    using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+    void initiate_reconnect_wait();
+    void handle_reconnect_wait(std::error_code);
+    void initiate_reconnect();
+    void initiate_connect_wait();
+    void handle_connect_wait(std::error_code);
+    void initiate_resolve();
+    void handle_resolve(std::error_code, util::network::Endpoint::List);
+    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t);
+    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t);
+    void initiate_http_tunnel();
+    void handle_http_tunnel(std::error_code);
+    void initiate_websocket_or_ssl_handshake();
+    void initiate_ssl_handshake();
+    void handle_ssl_handshake(std::error_code);
+    void initiate_websocket_handshake();
+    void handle_connection_established();
+    void schedule_urgent_ping();
+    void initiate_ping_delay(milliseconds_type now);
+    void handle_ping_delay();
+    void initiate_pong_timeout();
+    void handle_pong_timeout();
+    void initiate_write_message(const OutputBuffer&, Session*);
+    void handle_write_message();
+    void send_next_message();
+    void send_ping();
+    void initiate_write_ping(const OutputBuffer&);
+    void handle_write_ping();
+    void handle_message_received(const char* data, std::size_t size);
+    void handle_pong_received(const char* data, std::size_t size);
+    void initiate_disconnect_wait();
+    void handle_disconnect_wait(std::error_code);
+    void resolve_error(std::error_code);
+    void tcp_connect_error(std::error_code);
+    void http_tunnel_error(std::error_code);
+    void ssl_handshake_error(std::error_code);
+    void read_error(std::error_code);
+    void write_error(std::error_code);
+    void close_due_to_protocol_error(std::error_code);
+    void close_due_to_missing_protocol_feature();
+    void close_due_to_client_side_error(std::error_code, bool is_fatal);
+    void close_due_to_server_side_error(ProtocolError, StringData message, bool try_again);
+    void voluntary_disconnect();
+    void involuntary_disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
+    void disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
+    void change_state_to_disconnected() noexcept;
+
+    // These are only called from ClientProtocol class.
+    void receive_pong(milliseconds_type timestamp);
+    void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
+    void receive_ident_message(session_ident_type, SaltedFileIdent);
+    void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                                  const ReceivedChangesets&);
+    void receive_mark_message(session_ident_type, request_ident_type);
+    void receive_alloc_message(session_ident_type, file_ident_type file_ident);
+    void receive_unbound_message(session_ident_type);
+    void handle_protocol_error(ClientProtocol::Error);
+
+    // These are only called from Session class.
+    void enlist_to_send(Session*);
+    void one_more_active_unsuspended_session();
+    void one_less_active_unsuspended_session();
+
+    OutputBuffer& get_output_buffer() noexcept;
+    ConnectionTerminationReason determine_connection_termination_reason(std::error_code) noexcept;
+    Session* get_session(session_ident_type) const noexcept;
+    static bool was_voluntary(ConnectionTerminationReason) noexcept;
+
+    static std::string make_logger_prefix(connection_ident_type);
+
+    void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
+
+    friend class ClientProtocol;
+    friend class Session;
 
     ClientImplBase& m_client;
     util::Optional<util::network::Resolver> m_resolver;
@@ -623,73 +695,6 @@ private:
     std::unique_ptr<char[]> m_input_body_buffer;
     OutputBuffer m_output_buffer;
 
-    void initiate_reconnect_wait();
-    void handle_reconnect_wait(std::error_code);
-    void initiate_reconnect();
-    void initiate_connect_wait();
-    void handle_connect_wait(std::error_code);
-    void initiate_resolve();
-    void handle_resolve(std::error_code, util::network::Endpoint::List);
-    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t);
-    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t);
-    void initiate_http_tunnel();
-    void handle_http_tunnel(std::error_code);
-    void initiate_websocket_or_ssl_handshake();
-    void initiate_ssl_handshake();
-    void handle_ssl_handshake(std::error_code);
-    void initiate_websocket_handshake();
-    void handle_connection_established();
-    void schedule_urgent_ping();
-    void initiate_ping_delay(milliseconds_type now);
-    void handle_ping_delay();
-    void initiate_pong_timeout();
-    void handle_pong_timeout();
-    void initiate_write_message(const OutputBuffer&, Session*);
-    void handle_write_message();
-    void send_next_message();
-    void send_ping();
-    void initiate_write_ping(const OutputBuffer&);
-    void handle_write_ping();
-    void handle_message_received(const char* data, std::size_t size);
-    void handle_pong_received(const char* data, std::size_t size);
-    void initiate_disconnect_wait();
-    void handle_disconnect_wait(std::error_code);
-    void resolve_error(std::error_code);
-    void tcp_connect_error(std::error_code);
-    void http_tunnel_error(std::error_code);
-    void ssl_handshake_error(std::error_code);
-    void read_error(std::error_code);
-    void write_error(std::error_code);
-    void close_due_to_protocol_error(std::error_code);
-    void close_due_to_missing_protocol_feature();
-    void close_due_to_client_side_error(std::error_code, bool is_fatal);
-    void close_due_to_server_side_error(ProtocolError, StringData message, bool try_again);
-    void voluntary_disconnect();
-    void involuntary_disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
-    void disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
-    void change_state_to_disconnected() noexcept;
-
-    // These are only called from ClientProtocol class.
-    void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
-    void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                  const ReceivedChangesets&);
-    void receive_mark_message(session_ident_type, request_ident_type);
-    void receive_alloc_message(session_ident_type, file_ident_type file_ident);
-    void receive_unbound_message(session_ident_type);
-    void handle_protocol_error(ClientProtocol::Error);
-
-    // These are only called from Session class.
-    void enlist_to_send(Session*);
-    void one_more_active_unsuspended_session();
-    void one_less_active_unsuspended_session();
-
-    OutputBuffer& get_output_buffer() noexcept;
-    ConnectionTerminationReason determine_connection_termination_reason(std::error_code) noexcept;
-    Session* get_session(session_ident_type) const noexcept;
-    static bool was_voluntary(ConnectionTerminationReason) noexcept;
-
     const connection_ident_type m_ident;
     const ServerEndpoint m_server_endpoint;
     const std::string m_authorization_header_name;
@@ -698,13 +703,6 @@ private:
     std::string m_http_request_path_prefix;
     std::string m_realm_virt_path;
     std::string m_signed_access_token;
-
-    static std::string make_logger_prefix(connection_ident_type);
-
-    void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
-
-    friend class ClientProtocol;
-    friend class Session;
 };
 
 
