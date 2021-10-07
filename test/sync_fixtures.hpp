@@ -1108,7 +1108,7 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
     version_type current_client_version = 0;    // Dummy
     SaltedFileIdent client_file_ident = {0, 0}; // Dummy
     SyncProgress progress;
-    auto& history = static_cast<_impl::ClientHistoryImpl&>(*m_db->get_replication());
+    auto& history = static_cast<_impl::ClientReplication&>(*m_db->get_replication());
     history.get_status(current_client_version, client_file_ident, progress);
     return progress.download.server_version;
 }

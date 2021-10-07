@@ -3,6 +3,7 @@
 #include <realm/group.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include <realm/version.hpp>
 
@@ -77,7 +78,6 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
         : VacuumFile(logger, options, path)
     {
         auto client_history = sync::make_client_replication(path);
-        m_client_history = client_history.get();
         DBOptions sg_options;
         sg_options.allow_file_format_upgrade = !options.no_file_upgrade;
         if (options.encryption_key)
@@ -109,8 +109,6 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
         File f{m_path, File::mode_Read};
         results.after_size = size_t(f.get_size());
     }
-
-    ClientReplication* m_client_history = nullptr;
 };
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {

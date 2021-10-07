@@ -673,7 +673,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         IntegrationError error = {};
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
-            ClientHistoryBase& history = access_realm(); // Throws
+            ClientReplication& history = access_realm(); // Throws
             success = integrate_changesets(history, m_progress, downloadable_bytes, changesets, version_info,
                                            error); // Throws
             client_version = version_info.realm_version;
@@ -1237,7 +1237,7 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    _impl::ClientHistoryImpl::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes,
+    ClientReplication::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes,
                                                         uploaded_bytes, uploadable_bytes, snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total

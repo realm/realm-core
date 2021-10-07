@@ -16,6 +16,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/websocket.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
@@ -983,9 +984,8 @@ public:
 
     using SyncProgress = sync::SyncProgress;
     using VersionInfo = sync::VersionInfo;
-    using ClientHistoryBase = sync::ClientReplication;
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using IntegrationError = ClientHistoryBase::IntegrationError;
+    using IntegrationError = ClientReplication::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -1160,7 +1160,7 @@ public:
     /// This function is thread-safe, but if called from a thread other than the
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
-    bool integrate_changesets(ClientHistoryBase&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+    bool integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                               const ReceivedChangesets&, VersionInfo&, IntegrationError&);
 
     /// To be used in connection with implementations of
@@ -1189,7 +1189,7 @@ public:
     ~Session();
 
 private:
-    using SyncTransactReporter = ClientHistoryBase::SyncTransactReporter;
+    using SyncTransactReporter = ClientReplication::SyncTransactReporter;
 
 
     /// Fetch a reference to the remote virtual path of the Realm associated
@@ -1226,7 +1226,7 @@ private:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    ClientHistoryBase& access_realm();
+    ClientReplication& access_realm();
 
     // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
@@ -1252,19 +1252,19 @@ private:
     ///
     /// The implementation is allowed, but not obliged to aggregate changesets
     /// from multiple invocations of initiate_integrate_changesets() and pass
-    /// them to sync::ClientHistoryBase::integrate_server_changesets() at once.
+    /// them to sync::ClientReplication::integrate_server_changesets() at once.
     ///
     /// The synchronization progress passed to
-    /// sync::ClientHistoryBase::integrate_server_changesets() must be obtained
+    /// sync::ClientReplication::integrate_server_changesets() must be obtained
     /// by calling get_sync_progress(), and that call must occur after the last
     /// invocation of initiate_integrate_changesets() whose changesets are
     /// included in what is passed to
-    /// sync::ClientHistoryBase::integrate_server_changesets().
+    /// sync::ClientReplication::integrate_server_changesets().
     ///
     /// The download cursor passed to on_changesets_integrated() must be
     /// SyncProgress::download of the synchronization progress passed to the
     /// last invocation of
-    /// sync::ClientHistoryBase::integrate_server_changesets().
+    /// sync::ClientReplication::integrate_server_changesets().
     ///
     /// The default implementation integrates the specified changesets and calls
     /// on_changesets_integrated() immediately (i.e., from the event loop thread
@@ -1379,7 +1379,7 @@ private:
     // message. See struct SyncProgress for a description. The values stored in
     // `m_progress` either are persisted, or are about to be.
     //
-    // Initialized by way of ClientHistoryBase::get_status() at session
+    // Initialized by way of ClientReplication::get_status() at session
     // activation time.
     //
     // `m_progress.upload.client_version` is the client-side sync version

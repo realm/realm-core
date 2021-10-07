@@ -327,7 +327,7 @@ TEST(ClientResetDiff_2)
 
     // The remote.
     {
-        _impl::ClientHistoryImpl history{path_1};
+        _impl::ClientReplication history{path_1};
         DBRef sg = DB::create(history);
         WriteTransaction wt{sg};
 
@@ -341,7 +341,7 @@ TEST(ClientResetDiff_2)
 
     // The local.
     {
-        _impl::ClientHistoryImpl history{path_2};
+        _impl::ClientReplication history{path_2};
         DBRef sg = DB::create(history);
         WriteTransaction wt{sg};
 
@@ -364,7 +364,7 @@ TEST(ClientResetDiff_2)
 
     // Check the content.
     {
-        _impl::ClientHistoryImpl history{path_2};
+        _impl::ClientReplication history{path_2};
         DBRef sg = DB::create(history);
         {
             ReadTransaction rt{sg};
@@ -446,7 +446,7 @@ TEST(ClientResetDiff_2)
 
             {
                 version_type begin_version = 1;
-                Optional<_impl::ClientHistoryImpl::LocalChangeset> lc =
+                Optional<_impl::ClientReplication::LocalChangeset> lc =
                     history.get_next_local_changeset(current_version, begin_version);
                 CHECK(lc);
                 CHECK_EQUAL(lc->version, 2);
@@ -455,7 +455,7 @@ TEST(ClientResetDiff_2)
 
             {
                 version_type begin_version = 2;
-                Optional<_impl::ClientHistoryImpl::LocalChangeset> lc =
+                Optional<_impl::ClientReplication::LocalChangeset> lc =
                     history.get_next_local_changeset(current_version, begin_version);
                 CHECK(lc);
                 CHECK_EQUAL(lc->version, 2);
@@ -464,7 +464,7 @@ TEST(ClientResetDiff_2)
 
             {
                 version_type begin_version = 3;
-                Optional<_impl::ClientHistoryImpl::LocalChangeset> lc =
+                Optional<_impl::ClientReplication::LocalChangeset> lc =
                     history.get_next_local_changeset(current_version, begin_version);
                 CHECK(!lc);
             }
@@ -1044,7 +1044,7 @@ TEST(ClientResetDiff_Links)
 
     // The remote.
     {
-        _impl::ClientHistoryImpl history{path_1};
+        _impl::ClientReplication history{path_1};
         DBRef sg = DB::create(history);
         WriteTransaction wt{sg};
 
@@ -1116,7 +1116,7 @@ TEST(ClientResetDiff_Links)
 
     // The local.
     {
-        _impl::ClientHistoryImpl history{path_2};
+        _impl::ClientReplication history{path_2};
         DBRef sg = DB::create(history);
         WriteTransaction wt{sg};
 
@@ -1187,7 +1187,7 @@ TEST(ClientResetDiff_Links)
 
     // Check the content.
     {
-        _impl::ClientHistoryImpl history{path_2};
+        _impl::ClientReplication history{path_2};
         DBRef sg = DB::create(history);
         {
             ReadTransaction rt{sg};

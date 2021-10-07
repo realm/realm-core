@@ -30,7 +30,7 @@ using namespace realm::sync;
 // clang-format off
 using Connection      = ClientImpl::Connection;
 using Session         = ClientImpl::Session;
-using UploadChangeset = sync::ClientReplication::UploadChangeset;
+using UploadChangeset = ClientReplication::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
 // mentioned in signature of out-of-line member function definitions.
@@ -1701,7 +1701,7 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientHistoryBase& history, const SyncProgress& progress,
+bool Session::integrate_changesets(ClientReplication& history, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
                                    IntegrationError& error)
@@ -1815,7 +1815,7 @@ void Session::activate()
         }
 
         if (!m_client_reset_operation) {
-            const ClientHistoryBase& history = access_realm();                             // Throws
+            const ClientReplication& history = access_realm();                             // Throws
             history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
     }
@@ -2013,7 +2013,7 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    const ClientHistoryBase& history = access_realm(); // Throws
+    const ClientReplication& history = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
@@ -2244,7 +2244,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     // access before the client reset (if applicable) because
     // the reset can take a while and the sync session might have died
     // by the time the reset finishes.
-    ClientHistoryBase& history = access_realm(); // Throws
+    ClientReplication& history = access_realm(); // Throws
 
     auto client_reset_if_needed = [&]() -> bool {
         if (!m_client_reset_operation) {

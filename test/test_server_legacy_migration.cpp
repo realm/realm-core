@@ -3,6 +3,7 @@
 #include <realm/group.hpp>
 #include <realm/sync/noinst/server/server_legacy_migration.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/history.hpp>
 
 #include "test.hpp"

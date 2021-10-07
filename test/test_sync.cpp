@@ -7446,7 +7446,7 @@ TEST(Sync_Set)
 TEST(Sync_DanglingLinksCountInPriorSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    realm::_impl::ClientHistoryImpl history{path};
+    realm::_impl::ClientReplication history{path};
     auto local_db = realm::DB::create(history);
     auto& logger = test_context.logger;
 

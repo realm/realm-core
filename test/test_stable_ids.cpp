@@ -2,6 +2,7 @@
 
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/db.hpp>
 
 #include <realm/util/base64.hpp>

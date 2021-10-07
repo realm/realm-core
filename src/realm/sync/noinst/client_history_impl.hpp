@@ -47,12 +47,12 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
-class ClientHistoryImpl : public sync::ClientReplication, private History, public sync::TransformHistory {
+class ClientReplication : public sync::SyncReplication, private History, public sync::TransformHistory {
 public:
-    using file_ident_type = sync::file_ident_type;
-    using version_type = sync::version_type;
-
     // clang-format off
+    using file_ident_type = sync::file_ident_type;
+    using version_type    = sync::version_type;
+    using RemoteChangeset = sync::Transformer::RemoteChangeset;
     using SaltedFileIdent = sync::SaltedFileIdent;
     using SaltedVersion   = sync::SaltedVersion;
     using DownloadCursor  = sync::DownloadCursor;
@@ -63,12 +63,32 @@ public:
     using Transformer     = sync::Transformer;
     // clang-format on
 
+    struct UploadChangeset {
+        sync::timestamp_type origin_timestamp;
+        file_ident_type origin_file_ident;
+        UploadCursor progress;
+        ChunkedBinaryData changeset;
+        std::unique_ptr<char[]> buffer;
+    };
+
+    // FIXME: Apparently, this feature is expected by object store, but why?
+    // What is it ultimately used for? (@tgoyne)
+    class SyncTransactReporter {
+    public:
+        virtual void report_sync_transact(VersionID old_version, VersionID new_version) = 0;
+
+    protected:
+        ~SyncTransactReporter() {}
+    };
+
+    enum class IntegrationError { bad_origin_file_ident, bad_changeset };
+
     struct LocalChangeset {
         version_type version;
         ChunkedBinaryData changeset;
     };
 
-    ClientHistoryImpl(const std::string& realm_path);
+    ClientReplication(const std::string& realm_path);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -109,6 +129,166 @@ public:
     /// sync::generate_changeset_timestamp().
     void set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn);
 
+    /// Get the version of the latest snapshot of the associated Realm, as well
+    /// as the client file identifier and the synchronization progress as they
+    /// are stored in that snapshot.
+    ///
+    /// The returned current client version is the version produced by the last
+    /// changeset in the history. The type of version returned here, is the one
+    /// that identifies an entry in the sync history. Whether this is the same
+    /// as the snapshot number of the Realm file depends on the history
+    /// implementation.
+    ///
+    /// The returned client file identifier is the one that was last stored by
+    /// set_client_file_ident(), or `SaltedFileIdent{0, 0}` if
+    /// set_client_file_ident() has never been called.
+    ///
+    /// The returned SyncProgress is the one that was last stored by
+    /// set_sync_progress(), or `SyncProgress{}` if set_sync_progress() has
+    /// never been called.
+    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
+                            SyncProgress& progress) const;
+
+    /// Stores the server assigned client file identifier in the associated
+    /// Realm file, such that it is available via get_status() during future
+    /// synchronization sessions. It is an error to set this identifier more
+    /// than once per Realm file.
+    ///
+    /// \param client_file_ident The server assigned client-side file
+    /// identifier. A client-side file identifier is a non-zero positive integer
+    /// strictly less than 2**64. The server guarantees that all client-side
+    /// file identifiers generated on behalf of a particular server Realm are
+    /// unique with respect to each other. The server is free to generate
+    /// identical identifiers for two client files if they are associated with
+    /// different server Realms.
+    ///
+    /// \param fix_up_object_ids The object ids that depend on client file ident
+    /// will be fixed in both state and history if this parameter is true. If
+    /// it is known that there are no objects to fix, it can be set to false to
+    /// achieve higher performance.
+    ///
+    /// The client is required to obtain the file identifier before engaging in
+    /// synchronization proper, and it must store the identifier and use it to
+    /// reestablish the connection between the client file and the server file
+    /// when engaging in future synchronization sessions.
+    void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
+
+    /// Stores the synchronization progress in the associated Realm file in a
+    /// way that makes it available via get_status() during future
+    /// synchronization sessions. Progress is reported by the server in the
+    /// DOWNLOAD message.
+    ///
+    /// See struct SyncProgress for a description of \a progress.
+    ///
+    /// \param downloadable_bytes If specified, and if the implementation cares
+    /// about byte-level progress, this function updates the persistent record
+    /// of the estimate of the number of remaining bytes to be downloaded.
+    void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+                                   VersionInfo&);
+
+    /// \brief Scan through the history for changesets to be uploaded.
+    ///
+    /// This function scans the history for changesets to be uploaded, i.e., for
+    /// changesets that are not empty, and were not produced by integration of
+    /// changesets recieved from the server. The scan begins at the position
+    /// specified by the initial value of \a upload_progress.client_version, and
+    /// ends no later than at the position specified by \a end_version.
+    ///
+    /// The implementation is allowed to end the scan before \a end_version,
+    /// such as to limit the combined size of returned changesets. However, if
+    /// the specified range contains any changesets that are supposed to be
+    /// uploaded, this function must return at least one.
+    ///
+    /// Upon return, \a upload_progress will have been updated to point to the
+    /// position from which the next scan should resume. This must be a position
+    /// after the last returned changeset, and before any remaining changesets
+    /// that are supposed to be uploaded, although never a position that
+    /// succeeds \a end_version.
+    ///
+    /// The value passed as \a upload_progress by the caller, must either be one
+    /// that was produced by an earlier invocation of
+    /// find_uploadable_changesets(), one that was returned by get_status(), or
+    /// one that was received by the client in a DOWNLOAD message from the
+    /// server. When the value comes from a DOWNLOAD message, it is supposed to
+    /// reflect a value of UploadChangeset::progress produced by an earlier
+    /// invocation of find_uploadable_changesets().
+    ///
+    /// Found changesets are added to \a uploadable_changesets.
+    ///
+    /// \param locked_server_version will be set to the value that should be
+    /// used as `<locked server version>` in a DOWNLOAD message.
+    ///
+    /// For changesets of local origin, UploadChangeset::origin_file_ident will
+    /// be zero.
+    void find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
+                                            std::vector<UploadChangeset>& uploadable_changesets,
+                                            version_type& locked_server_version) const;
+
+
+    /// \brief Integrate a sequence of changesets received from the server using
+    /// a single Realm transaction.
+    ///
+    /// Each changeset will be transformed as if by a call to
+    /// Transformer::transform_remote_changeset(), and then applied to the
+    /// associated Realm.
+    ///
+    /// As a final step, each changeset will be added to the local history (list
+    /// of applied changesets).
+    ///
+    /// This function checks whether the specified changesets specify valid
+    /// remote origin file identifiers and whether the changesets contain valid
+    /// sequences of instructions. The caller must already have ensured that the
+    /// origin file identifiers are strictly positive and not equal to the file
+    /// identifier assigned to this client by the server.
+    ///
+    /// If any of the changesets are invalid, this function returns false and
+    /// sets `integration_error` to the appropriate value. If they are all
+    /// deemed valid, this function updates \a version_info to reflect the new
+    /// version produced by the transaction.
+    ///
+    /// \param progress The synchronization progress is what was received in the
+    /// DOWNLOAD message along with the specified changesets. The progress will
+    /// be persisted along with the changesets.
+    ///
+    /// \param downloadable_bytes If specified, and if the implementation cares
+    /// about byte-level progress, this function updates the persistent record
+    /// of the estimate of the number of remaining bytes to be downloaded.
+    ///
+    /// \param num_changesets The number of passed changesets. Must be non-zero.
+    ///
+    /// \param transact_reporter An optional callback which will be called with the
+    /// version immediately processing the sync transaction and that of the sync
+    /// transaction.
+    bool integrate_server_changesets(const SyncProgress& progress,
+                                             const std::uint_fast64_t* downloadable_bytes,
+                                             const RemoteChangeset* changesets, std::size_t num_changesets,
+                                             VersionInfo& new_version, IntegrationError& integration_error,
+                                             util::Logger&, SyncTransactReporter* transact_reporter = nullptr);
+
+    /// Get the persisted upload/download progress in bytes.
+    void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes,
+                                           std::uint_fast64_t& downloadable_bytes, std::uint_fast64_t& uploaded_bytes,
+                                           std::uint_fast64_t& uploadable_bytes,
+                                           std::uint_fast64_t& snapshot_version);
+
+    /// Return an upload cursor as it would be when the uploading process
+    /// reaches the snapshot to which the current transaction is bound.
+    ///
+    /// **CAUTION:** Must be called only while a transaction (read or write) is
+    /// in progress via the SharedGroup object associated with this history
+    /// object.
+    UploadCursor get_upload_anchor_of_current_transact(const Transaction&) const;
+
+    /// Return the synchronization changeset of the current transaction as it
+    /// would be if that transaction was committed at this time.
+    ///
+    /// The returned memory reference may be invalidated by subsequent
+    /// operations on the Realm state.
+    ///
+    /// **CAUTION:** Must be called only while a write transaction is in
+    /// progress via the SharedGroup object associated with this history object.
+    util::StringView get_sync_changeset_of_current_transact(const Transaction&) const noexcept;
+
     // Overriding member functions in realm::Replication
     void initialize(DB& sg) override final;
     void initiate_session(version_type) override final;
@@ -125,23 +305,9 @@ public:
     version_type prepare_changeset(const char*, size_t, version_type) override final;
     void finalize_changeset() noexcept override final;
 
-    // Overriding member functions in realm::sync::ClientReplication
-    void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override final;
-    void set_client_file_ident(SaltedFileIdent, bool) override final;
-    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, VersionInfo&) override final;
-    void find_uploadable_changesets(UploadCursor&, version_type, std::vector<UploadChangeset>&,
-                                    version_type&) const override final;
-    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*, const RemoteChangeset*,
-                                     std::size_t, VersionInfo&, IntegrationError&, util::Logger&,
-                                     SyncTransactReporter*) override final;
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
-    // Overriding member functions in realm::sync::ClientHistory
-    void get_upload_download_bytes(std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
-                                   std::uint_fast64_t&) override final;
-    UploadCursor get_upload_anchor_of_current_transact(const Transaction&) const override final;
-    util::StringView get_sync_changeset_of_current_transact(const Transaction&) const noexcept override final;
 
     // Overriding member functions in realm::sync::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
@@ -305,8 +471,8 @@ private:
 
 // Implementation
 
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
-    : ClientReplication{realm_path}
+inline ClientReplication::ClientReplication(const std::string& realm_path)
+    : SyncReplication{realm_path}
 {
 }
 
@@ -332,7 +498,7 @@ inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
 //
 // See trim_sync_history() for further details, and in particular, for a
 // definition of *upload skippable*.
-inline void ClientHistoryImpl::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
+inline void ClientReplication::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
 {
     REALM_ASSERT(begin <= end);
     REALM_ASSERT(m_progress_download.last_integrated_client_version <= begin);
@@ -343,7 +509,7 @@ inline void ClientHistoryImpl::clamp_sync_version_range(version_type& begin, ver
     }
 }
 
-inline auto ClientHistoryImpl::get_transformer() -> Transformer&
+inline auto ClientReplication::get_transformer() -> Transformer&
 {
     if (!m_transformer)
         m_transformer = sync::make_transformer(); // Throws
@@ -352,6 +518,19 @@ inline auto ClientHistoryImpl::get_transformer() -> Transformer&
 
 
 } // namespace _impl
+
+
+namespace sync {
+using ClientReplication = _impl::ClientReplication;
+
+/// \brief Create a "sync history" implementation of the realm::Replication
+/// interface.
+///
+/// The intended role for such an object is as a plugin for new
+/// realm::DB objects.
+std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path);
+}
+
 } // namespace realm
 
 #endif // REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
