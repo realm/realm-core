@@ -259,13 +259,14 @@ public:
                                  server_version, client_version, origin_timestamp, origin_file_ident,
                                  original_changeset_size,
                                  changeset_size); // Throws
-                    if (changeset_data.size() < 1056) {
+                    if (changeset_data.size() < 1024) {
                         logger.trace("Changeset: %1",
                                      clamped_hex_dump(changeset_data)); // Throws
                     }
                     else {
-                        logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
-                                     compressed_hex_dump(changeset_data)); // Throws
+                        auto compressed_data = compressed_hex_dump(changeset_data);
+                        logger.trace("Changeset: (compressed_size=%1) <%2>", compressed_data.size(),
+                                     compressed_data); // Throws
                     }
 #if REALM_DEBUG
                     ChunkedBinaryInputStream in{changeset_data};

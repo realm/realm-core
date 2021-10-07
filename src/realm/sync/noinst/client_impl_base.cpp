@@ -2094,8 +2094,8 @@ void Session::send_upload_message()
                              _impl::clamped_hex_dump(changeset_data)); // Throws
             }
             else {
-                logger.trace("Changeset(comp): %1 %2", changeset_data.size(),
-                             protocol.compressed_hex_dump(changeset_data));
+                auto compressed_data = protocol.compressed_hex_dump(changeset_data);
+                logger.trace("Changeset: (compressed_size=%1) <%2>", compressed_data.size(), compressed_data);
             }
 
 #if REALM_DEBUG
