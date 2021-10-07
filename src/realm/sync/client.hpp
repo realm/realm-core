@@ -269,8 +269,7 @@ public:
                               port_type& port, std::string& path) const;
 
 private:
-    class Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<_impl::ClientImplBase> m_impl;
     friend class Session;
 };
 

@@ -64,7 +64,7 @@ private:
 };
 
 
-class ClientImpl : public ClientImplBase {
+class ClientImpl final : public ClientImplBase {
 public:
     ClientImpl(Client::Config);
     ~ClientImpl();
@@ -72,8 +72,8 @@ public:
     void cancel_reconnect_delay();
     bool wait_for_session_terminations_or_client_stopped();
 
-    void stop() noexcept;
-    void run();
+    void stop() noexcept final;
+    void run() final;
 
 private:
     const bool m_one_connection_per_session;
@@ -1707,15 +1707,6 @@ void ClientImplBase::Connection::report_connection_state_change(ConnectionState 
 }
 
 
-class Client::Impl : public ClientImpl {
-public:
-    Impl(Client::Config config)
-        : ClientImpl{std::move(config)} // Throws
-    {
-    }
-};
-
-
 class Session::Impl : public SessionWrapper {
 public:
     Impl(ClientImpl& client, DBRef db, Config config)
@@ -1737,7 +1728,7 @@ public:
 
 
 Client::Client(Config config)
-    : m_impl{new Impl{std::move(config)}} // Throws
+    : m_impl{new ClientImpl{std::move(config)}} // Throws
 {
 }
 
@@ -1765,13 +1756,13 @@ void Client::stop() noexcept
 
 void Client::cancel_reconnect_delay()
 {
-    m_impl->cancel_reconnect_delay();
+    static_cast<ClientImpl*>(m_impl.get())->cancel_reconnect_delay();
 }
 
 
 bool Client::wait_for_session_terminations_or_client_stopped()
 {
-    return m_impl->wait_for_session_terminations_or_client_stopped();
+    return static_cast<ClientImpl*>(m_impl.get())->wait_for_session_terminations_or_client_stopped();
 }
 
 
@@ -1783,7 +1774,7 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 
 
 Session::Session(Client& client, DBRef db, Config&& config)
-    : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
+    : m_impl{Impl::make_session(static_cast<ClientImpl&>(*client.m_impl), std::move(db), std::move(config))} // Throws
 {
 }
 

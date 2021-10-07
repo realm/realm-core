@@ -216,13 +216,15 @@ public:
 
     util::Logger& logger;
 
+    virtual ~ClientImplBase();
+
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
     /// These call stop(), run(), and report_event_loop_metrics() on the service
     /// object (get_service()) respectively.
-    void stop() noexcept;
-    void run();
+    virtual void stop() noexcept;
+    virtual void run();
     void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
     // @}
 
@@ -239,7 +241,6 @@ public:
 
 protected:
     ClientImplBase(Config);
-    ~ClientImplBase();
 
 private:
     using file_ident_type = sync::file_ident_type;
