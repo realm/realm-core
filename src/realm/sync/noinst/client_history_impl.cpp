@@ -172,12 +172,6 @@ std::unique_ptr<_impl::History> ClientReplication::_create_history_read()
 }
 
 // Overriding member function in realm::Replication
-void ClientReplication::do_initiate_transact(Group& group, version_type version, bool history_updated)
-{
-    SyncReplication::do_initiate_transact(group, version, history_updated);
-}
-
-// Overriding member function in realm::Replication
 auto ClientReplication::prepare_changeset(const char* data, size_t size, version_type orig_version) -> version_type
 {
     ensure_updated(orig_version);
