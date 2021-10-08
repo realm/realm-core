@@ -168,42 +168,6 @@ TEST_CASE("sync_user: logout", "[sync]") {
     }
 }
 
-TEST_CASE("sync_user: token thread safety", "[sync]") {
-    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoMetadata));
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-    const std::string identity = "sync_test_identity";
-    const std::string refresh_token = realm::encode_fake_jwt("1234567890-fake-refresh-token");
-    const std::string access_token = realm::encode_fake_jwt("1234567890-fake-access-token");
-    const std::string server_url = "https://realm.example.org";
-    auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
-
-    using namespace std::chrono_literals;
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    int64_t valid_time = std::chrono::system_clock::to_time_t(now + 30min);
-    int64_t expired_time = std::chrono::system_clock::to_time_t(now - 30min);
-
-    SECTION("stress test") {
-        constexpr size_t num_iterations = 1000;
-        auto shared_code = [&]() {
-            for (size_t i = 0; i < num_iterations; ++i) {
-                bool should_refresh = user->access_token_refresh_required();
-                int64_t flipped = should_refresh ? valid_time : expired_time;
-                std::string access_token = realm::encode_fake_jwt("1234567890-fake-access-token", flipped, flipped);
-                user->update_access_token(std::move(access_token));
-                should_refresh = user->refresh_token_is_expired();
-                flipped = should_refresh ? valid_time : expired_time;
-                std::string refresh_token = realm::encode_fake_jwt("1234567890-fake-refresh-token", flipped, flipped);
-                user->update_refresh_token(std::move(refresh_token));
-            }
-        };
-        JoiningThread worker([&] {
-            shared_code();
-        });
-        shared_code();
-        worker.join();
-    }
-}
-
 TEST_CASE("sync_user: user persistence", "[sync]") {
     TestSyncManager init_sync_manager(
         TestSyncManager::Config("baz_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
