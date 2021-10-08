@@ -29,7 +29,6 @@
 #include <realm/util/assert.hpp>
 
 #if REALM_ENABLE_SYNC
-#include <realm/sync/object.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 

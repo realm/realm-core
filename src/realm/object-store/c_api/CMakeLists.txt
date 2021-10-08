@@ -17,6 +17,12 @@ set(REALM_FFI_SOURCES
     # realm/object-store/c_api/realm.c
 )
 
+if(REALM_ENABLE_SYNC)
+    list(APPEND REALM_FFI_SOURCES
+        logging.cpp
+    )
+endif()
+
 add_library(RealmFFI SHARED ${REALM_FFI_SOURCES})
 add_library(RealmFFIStatic STATIC ${REALM_FFI_SOURCES})
 

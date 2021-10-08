@@ -6,8 +6,8 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/file.hpp>
-#include <realm/sync/metrics.hpp>
-#include <realm/sync/server.hpp>
+#include <realm/sync/noinst/server/metrics.hpp>
+#include <realm/sync/noinst/server/server.hpp>
 
 namespace realm {
 namespace config {

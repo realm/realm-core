@@ -1,7 +1,6 @@
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/transform.hpp> // TransformError
-#include <realm/sync/object.hpp>
 #include <realm/list.hpp>
 
 namespace realm {
@@ -144,7 +143,7 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
 
 InternString SyncReplication::emit_class_name(StringData table_name)
 {
-    return m_encoder.intern_string(table_name_to_class_name(table_name));
+    return m_encoder.intern_string(Group::table_name_to_class_name(table_name));
 }
 
 InternString SyncReplication::emit_class_name(const Table& table)

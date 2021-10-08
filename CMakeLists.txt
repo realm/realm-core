@@ -69,6 +69,13 @@ endfunction()
 # Set global warnings settings
 if(MSVC)
     add_compile_options(/W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS)
+
+    # Don't complain about unary minus on unsigned resulting in positive number.
+    add_compile_options(/wd4146)
+
+    # We use these in our AtomicSharedPtr implementation and it can't move
+    # to atomic<shared_ptr<T>> because NotificationToken relies on movability.
+    add_compile_options(/D_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
 else()
     add_compile_options(-Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers)
     # TODO: Remove this when fixed
@@ -77,6 +84,12 @@ else()
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative)
+    endif()
+
+    if(CMAKE_CXX_STANDARD EQUAL 20)
+        # std::is_pod was deprecated in c++20, but is still used by 3rd party json parser.
+        # TODO remove this once we upgrade it.
+        add_cxx_flag_if_supported(-Wno-deprecated-declarations)
     endif()
 
     add_cxx_flag_if_supported(-Wpartial-availability)

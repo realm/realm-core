@@ -44,7 +44,7 @@ static inline std::string remove_whitespace(const char* c)
 // FIXME(BUILD-12151) the argument to the corpus check function is an r-value reference to work around
 // a bug in the version of gcc in the v3 mongodb toolchain.
 template <typename T>
-using CorpusCheck = void (*)(T&&);
+using CorpusCheck = util::FunctionRef<void(T&&)>;
 
 template <typename T>
 struct CorpusEntry {

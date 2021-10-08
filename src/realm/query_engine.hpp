@@ -1437,11 +1437,11 @@ protected:
 template <>
 class MixedNode<Equal> : public MixedNodeBase {
 public:
-    MixedNode<Equal>(Mixed v, ColKey column)
+    MixedNode(Mixed v, ColKey column)
         : MixedNodeBase(v, column)
     {
     }
-    MixedNode<Equal>(const MixedNode<Equal>& other)
+    MixedNode(const MixedNode<Equal>& other)
         : MixedNodeBase(other)
         , m_has_search_index(other.m_has_search_index)
     {
@@ -1863,7 +1863,7 @@ public:
 
     std::string describe(util::serializer::SerialisationState& state) const override;
 
-    StringNode<Equal>(const StringNode& from)
+    StringNode(const StringNode& from)
         : StringNodeEqualBase(from)
     {
         for (auto& needle : from.m_needles) {

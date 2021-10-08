@@ -771,6 +771,20 @@ TEST_CASE("C API") {
         CHECK(realm_equals(realm2.get(), realm));
     }
 
+    SECTION("realm changed notification") {
+        bool realm_changed_callback_called = false;
+        realm_add_realm_changed_callback(
+            realm,
+            [](void* userdata) {
+                *reinterpret_cast<bool*>(userdata) = true;
+            },
+            &realm_changed_callback_called, [](void*) {});
+
+        realm_begin_write(realm);
+        realm_commit(realm);
+        CHECK(realm_changed_callback_called);
+    }
+
     SECTION("schema is set after opening") {
         const realm_class_info_t baz = {
             "baz",
@@ -811,7 +825,22 @@ TEST_CASE("C API") {
 
         // create a new schema and update the realm
         auto new_schema = realm_schema_new(classes, num_classes + 1, properties);
+
+        // check that the schema changed callback fires with the new schema
+        struct Context {
+            realm_schema_t* expected_schema;
+            bool result;
+        } context = {new_schema, false};
+        realm_add_schema_changed_callback(
+            realm,
+            [](void* userdata, auto* new_schema) {
+                auto& ctx = *reinterpret_cast<Context*>(userdata);
+                ctx.result = realm_equals(new_schema, ctx.expected_schema);
+            },
+            &context, [](void*) {});
+
         CHECK(checked(realm_update_schema(realm, new_schema)));
+        CHECK(context.result);
         auto new_num_classes = realm_get_num_classes(realm);
         CHECK(new_num_classes == (num_classes + 1));
 

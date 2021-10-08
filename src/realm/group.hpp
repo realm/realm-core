@@ -334,6 +334,20 @@ public:
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    static StringData table_name_to_class_name(StringData table_name)
+    {
+        REALM_ASSERT(table_name.begins_with(g_class_name_prefix));
+        return table_name.substr(g_class_name_prefix_len);
+    }
+    using TableNameBuffer = std::array<char, max_table_name_length>;
+    static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
+    {
+        char* p = std::copy_n(g_class_name_prefix, g_class_name_prefix_len, buffer.data());
+        size_t len = std::min(class_name.size(), buffer.size() - g_class_name_prefix_len);
+        std::copy_n(class_name.data(), len, p);
+        return StringData(buffer.data(), g_class_name_prefix_len + len);
+    }
+
 
     TableRef get_table(TableKey key);
     ConstTableRef get_table(TableKey key) const;
@@ -349,6 +363,8 @@ public:
     TableRef add_embedded_table(StringData name);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
+    TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
+                                               bool nullable = false);
 
     void remove_table(TableKey key);
     void remove_table(StringData name);
@@ -1049,6 +1065,22 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     }
     return TableRef(table, table->m_alloc.get_instance_version());
 }
+
+inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
+                                                         bool nullable)
+{
+    if (TableRef table = get_table(name)) {
+        if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
+            table->is_nullable(table->get_primary_key_column()) != nullable) {
+            throw std::runtime_error("Inconsistent schema");
+        }
+        return table;
+    }
+    else {
+        return add_table_with_primary_key(name, pk_type, pk_name, nullable);
+    }
+}
+
 
 inline void Group::init_array_parents() noexcept
 {
