@@ -28,7 +28,7 @@
 -----------
 
 ### Internals
-* None.
+* Cleaned out some old server tools and add the remaining ones to the default build.
 
 ----------------------------------------------
 
