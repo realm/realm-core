@@ -34,15 +34,22 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 
 void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
-    auto session = m_session.load();
-    if (!session)
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_session)
         return;
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion([callback, self, this](std::error_code ec) {
-        auto session = m_session.exchange(nullptr);
-        if (!session)
-            return; // Swallow all events if the task as been canceled.
+    m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (!m_session)
+                return; // Swallow all events if the task has been cancelled.
+
+            for (auto token : m_registered_callbacks) {
+                m_session->unregister_progress_notifier(token);
+            }
+            m_session = nullptr;
+        }
 
         // Release our references to the coordinator after calling the callback
         auto coordinator = std::move(m_coordinator);
@@ -64,9 +71,14 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
 void AsyncOpenTask::cancel()
 {
-    if (auto session = m_session.exchange(nullptr)) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session) {
+        for (auto token : m_registered_callbacks) {
+            m_session->unregister_progress_notifier(token);
+        }
         // Does a better way exists for canceling the download?
-        session->log_out();
+        m_session->log_out();
+        m_session = nullptr;
         m_coordinator = nullptr;
     }
 }
@@ -74,8 +86,11 @@ void AsyncOpenTask::cancel()
 uint64_t
 AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback> callback)
 {
-    if (auto session = m_session.load()) {
-        return session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session) {
+        auto token = m_session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+        m_registered_callbacks.emplace_back(token);
+        return token;
     }
     else {
         return 0;
@@ -84,8 +99,9 @@ AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::Pr
 
 void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 {
-    if (auto session = m_session.load())
-        session->unregister_progress_notifier(token);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session)
+        m_session->unregister_progress_notifier(token);
 }
 
 } // namespace realm
