@@ -1926,4 +1926,67 @@ typedef enum realm_log_level {
 
 typedef void (*realm_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
 
+/* HTTP transport */
+typedef enum realm_http_request_method {
+    RLM_HTTP_REQUEST_METHOD_GET,
+    RLM_HTTP_REQUEST_METHOD_POST,
+    RLM_HTTP_REQUEST_METHOD_PATCH,
+    RLM_HTTP_REQUEST_METHOD_PUT,
+    RLM_HTTP_REQUEST_METHOD_DELETE,
+} realm_http_request_method_e;
+
+typedef struct realm_http_header {
+    const char* name;
+    const char* value;
+} realm_http_header_t;
+
+typedef struct realm_http_request {
+    realm_http_request_method_e method;
+    const char* url;
+    uint64_t timeout_ms;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+} realm_http_request_t;
+
+typedef struct realm_http_response {
+    int status_code;
+    int custom_status_code;
+    const realm_http_header_t* headers;
+    size_t num_headers;
+    const char* body;
+    size_t body_size;
+} realm_http_response_t;
+
+/**
+ * Callback function used by Core to make a HTTP request.
+ *
+ * Complete the request by calling realm_http_transport_complete_request(),
+ * passing in the request_context pointer here and the received response.
+ * Network request are expected to be asynchronous and can be completed on any thread.
+ *
+ * @param userdata The userdata pointer passed to realm_http_transport_new().
+ * @param request The request to send.
+ * @param request_context Internal state pointer of Core, needed by realm_http_transport_complete_request().
+ */
+typedef void (*realm_http_request_func_t)(void* userdata, const realm_http_request_t request, void* request_context);
+
+typedef struct realm_http_transport realm_http_transport_t;
+
+/**
+ * Create a new HTTP transport with these callbacks implementing its functionality.
+ */
+RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func_t, void* userdata,
+                                                         realm_free_userdata_func_t);
+
+/**
+ * Complete a HTTP request with the given response.
+ *
+ * @param request_context Internal state pointer passed by Core when invoking realm_http_request_func_t
+ *                        to start the request.
+ * @param response The server response to the HTTP request initiated by Core.
+ */
+RLM_API void realm_http_transport_complete_request(void* request_context, const realm_http_response_t* response);
+
 #endif // REALM_H
