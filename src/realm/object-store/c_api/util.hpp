@@ -2,6 +2,7 @@
 #define REALM_OBJECT_STORE_C_API_UTIL_HPP
 
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/util/functional.hpp>
 
 namespace realm::c_api {
 
@@ -116,6 +117,41 @@ struct FreeUserdata {
 
 using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
 using SharedUserdata = std::shared_ptr<void>;
+
+/**
+ * Convenience class for managing callbacks.
+ *
+ * WARNING: This class doesn't provide any thread-safety guarantees
+ * about which threads modifies or invokes callbacks.
+ *
+ * @tparam Args The argument types of the callback.
+ */
+template <typename... Args>
+class CallbackRegistry {
+public:
+    uint64_t add(util::UniqueFunction<void(Args...)>&& callback)
+    {
+        uint64_t token = m_next_token++;
+        m_callbacks.emplace_hint(m_callbacks.end(), token, std::move(callback));
+        return token;
+    }
+
+    void remove(uint64_t token)
+    {
+        m_callbacks.erase(token);
+    }
+
+    void invoke(Args... args)
+    {
+        for (auto& callback : m_callbacks) {
+            callback.second(args...);
+        }
+    }
+
+private:
+    std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
+    uint64_t m_next_token = 0;
+};
 } // namespace realm::c_api
 
 #endif // REALM_OBJECT_STORE_C_API_UTIL_HPP

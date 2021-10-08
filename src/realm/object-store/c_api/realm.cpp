@@ -1,5 +1,5 @@
 #include <realm/object-store/c_api/types.hpp>
-#include <realm/object-store/c_api/util.hpp>
+#include "realm.hpp"
 
 namespace realm::c_api {
 
@@ -121,6 +121,20 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
+RLM_API uint64_t realm_add_realm_changed_callback(realm_t* realm, realm_on_realm_change_func_t callback,
+                                                  void* userdata, realm_free_userdata_func_t free_userdata)
+{
+    util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, free_userdata}]() {
+        callback(userdata.get());
+    };
+    return CBindingContext::get(*realm).realm_changed_callbacks().add(std::move(func));
+}
+
+RLM_API void realm_remove_realm_changed_callback(realm_t* realm, uint64_t token)
+{
+    CBindingContext::get(*realm).realm_changed_callbacks().remove(token);
+}
+
 RLM_API bool realm_refresh(realm_t* realm)
 {
     return wrap_err([&]() {
@@ -163,6 +177,17 @@ RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t*
         auto realm = Realm::get_shared_realm(static_cast<ThreadSafeReference&&>(*rtsr), sch);
         return new shared_realm{std::move(realm)};
     });
+}
+
+CBindingContext& CBindingContext::get(SharedRealm realm)
+{
+    if (!realm->m_binding_context) {
+        realm->m_binding_context.reset(new CBindingContext());
+    }
+
+    CBindingContext* ctx = dynamic_cast<CBindingContext*>(realm->m_binding_context.get());
+    REALM_ASSERT(ctx != nullptr);
+    return *ctx;
 }
 
 } // namespace realm::c_api

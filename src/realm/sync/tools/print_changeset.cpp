@@ -83,7 +83,11 @@ void print_changeset(const std::string& path, bool hex, bool compressed)
         changeset_binary = file_contents;
     }
     sync::Changeset changeset = changeset_binary_to_sync_changeset(changeset_binary);
+#if REALM_DEBUG
     changeset.print(std::cout);
+#else
+    std::cout << "changeset printing is disabled in Release mode, build in Debug mode to use this tool" << std::endl;
+#endif
 }
 
 int main(int argc, char* argv[])
