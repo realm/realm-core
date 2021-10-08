@@ -81,16 +81,6 @@ public:
                                              const Transformer::RemoteChangeset* incoming_changesets,
                                              std::size_t num_changesets, util::Logger* replay_logger);
 
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {
         REALM_ASSERT(orig_version == s_initial_version + m_core_entries.size());

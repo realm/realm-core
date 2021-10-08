@@ -277,8 +277,6 @@ public:
 
     // Overriding member functions in realm::Replication
     void initialize(DB& sg) override final;
-    void initiate_session(version_type) override final;
-    void terminate_session() noexcept override final;
     HistoryType get_history_type() const noexcept override final;
     int get_history_schema_version() const noexcept override final;
     bool is_upgradable_history_schema(int) const noexcept override final;

@@ -221,16 +221,6 @@ public:
         m_history.initialize(&alloc); // Throws
     }
 
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_history.ensure_updated(orig_version);

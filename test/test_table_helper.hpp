@@ -39,16 +39,6 @@ public:
     {
     }
 
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
     HistoryType get_history_type() const noexcept override
     {
         return hist_None;

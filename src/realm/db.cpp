@@ -1152,9 +1152,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                                                     path);
                 }
 
-                if (Replication* repl = get_replication())
-                    repl->initiate_session(version); // Throws
-
                 if (m_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
@@ -1580,8 +1577,6 @@ void DB::close(bool allow_open_read_transactions)
         }
         if (m_alloc.is_attached())
             m_alloc.detach();
-        if (m_replication)
-            m_replication->terminate_session();
         m_fake_read_lock_if_immutable.reset();
     }
     else {
@@ -1629,8 +1624,6 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
                 catch (...) {
                 } // ignored on purpose.
             }
-            if (m_replication)
-                m_replication->terminate_session();
         }
         lock.unlock();
     }

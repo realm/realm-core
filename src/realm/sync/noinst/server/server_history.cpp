@@ -1732,20 +1732,6 @@ void ServerHistory::initialize(DB& sg)
 
 
 // Overriding member in Replication
-void ServerHistory::initiate_session(version_type)
-{
-    // No-op
-}
-
-
-// Overriding member in Replication
-void ServerHistory::terminate_session() noexcept
-{
-    // No-op
-}
-
-
-// Overriding member in Replication
 auto ServerHistory::get_history_type() const noexcept -> HistoryType
 {
     return hist_SyncServer;

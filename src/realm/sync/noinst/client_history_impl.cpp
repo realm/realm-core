@@ -156,20 +156,6 @@ void ClientReplication::initialize(DB& sg)
 
 
 // Overriding member function in realm::Replication
-void ClientReplication::initiate_session(version_type)
-{
-    // No-op
-}
-
-
-// Overriding member function in realm::Replication
-void ClientReplication::terminate_session() noexcept
-{
-    // No-op
-}
-
-
-// Overriding member function in realm::Replication
 auto ClientReplication::get_history_type() const noexcept -> HistoryType
 {
     return hist_SyncClient;

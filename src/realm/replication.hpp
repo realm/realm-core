@@ -109,28 +109,6 @@ public:
     virtual void initialize(DB& db);
 
 
-    /// Called by the associated DB object when a session is
-    /// initiated. A *session* is a sequence of temporally overlapping
-    /// accesses to a specific Realm file, where each access consists of a
-    /// DB object through which the Realm file is open. Session
-    /// initiation occurs during the first opening of the Realm file within such
-    /// a session.
-    ///
-    /// Session initiation fails if this function throws.
-    ///
-    /// \param version The current version of the associated Realm.
-    ///
-    /// The default implementation does nothing.
-    virtual void initiate_session(version_type version) = 0;
-
-    /// Called by the associated DB object when a session is
-    /// terminated. See initiate_session() for the definition of a
-    /// session. Session termination occurs upon closing the Realm through the
-    /// last DB object within the session.
-    ///
-    /// The default implementation does nothing.
-    virtual void terminate_session() noexcept = 0;
-
     /// \defgroup replication_transactions
     //@{
 

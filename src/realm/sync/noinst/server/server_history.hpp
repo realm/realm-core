@@ -464,8 +464,6 @@ public:
 
     // Overriding member functions in Replication
     void initialize(DB&) override;
-    void initiate_session(version_type) override;
-    void terminate_session() noexcept override;
     HistoryType get_history_type() const noexcept override;
     int get_history_schema_version() const noexcept override;
     bool is_upgradable_history_schema(int) const noexcept override;
