@@ -140,7 +140,8 @@ struct SyncConfig {
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
     std::function<void(TransactionRef local)> notify_after_client_reset;
-    std::function<void(const std::string&, std::function<void(DBRef, std::exception_ptr)>)> get_fresh_realm_for_path;
+    std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
+        get_fresh_realm_for_path;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

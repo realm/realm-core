@@ -47,7 +47,7 @@ public:
     realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
-    void clean_up_state();
+    void clean_up_state() noexcept;
 
     util::Logger& m_logger;
     DB& m_db;

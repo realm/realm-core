@@ -464,7 +464,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     });
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err)
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     if (m_state != &State::active) {
@@ -473,18 +473,12 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err
     // The download can fail for many reasons. For example:
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
-    if (err) {
+    if (error_message) {
         lock.unlock();
-        std::string err_msg = "unknown";
-        try {
-            std::rethrow_exception(err);
-        }
-        catch (const std::exception& materialized_err) {
-            err_msg = materialized_err.what();
-        }
         const bool is_fatal = true;
         SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
-                            util::format("A fatal error occured during client reset: '%1'", err_msg), is_fatal);
+                            util::format("A fatal error occured during client reset: '%1'", *error_message),
+                            is_fatal);
         handle_error(synthetic);
         return;
     }
@@ -545,13 +539,14 @@ void SyncSession::handle_error(SyncError error)
                     REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                     std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
                     auto weak_self_ref = weak_from_this();
-                    m_config.get_fresh_realm_for_path(fresh_path, [weak_self_ref](DBRef db, std::exception_ptr err) {
-                        // the original session may have been closed during download of the reset realm
-                        // and in that case do nothing
-                        if (auto strong = weak_self_ref.lock()) {
-                            strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
-                        }
-                    });
+                    m_config.get_fresh_realm_for_path(
+                        fresh_path, [weak_self_ref](DBRef db, util::Optional<std::string> err) {
+                            // the original session may have been closed during download of the reset realm
+                            // and in that case do nothing
+                            if (auto strong = weak_self_ref.lock()) {
+                                strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                            }
+                        });
                     return;
                 }
             }

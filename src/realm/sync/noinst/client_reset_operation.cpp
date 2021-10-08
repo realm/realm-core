@@ -21,6 +21,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/util/scope_exit.hpp>
 
 namespace realm::_impl {
 
@@ -62,39 +63,35 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
                        local_realm_exists);
 
         client_reset::LocalVersionIDs local_version_ids;
-        try {
-            if (m_notify_before) {
-                TransactionRef local_frozen, remote_frozen;
-                local_frozen = m_db.start_frozen();
-                if (m_db_fresh) {
-                    remote_frozen = m_db_fresh->start_frozen();
-                }
-                m_notify_before(local_frozen, remote_frozen);
-            }
-
-            local_version_ids =
-                client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger);
-
-            if (m_notify_after) {
-                m_notify_after(m_db.start_frozen());
-            }
-        }
-        catch (const std::exception& e) {
+        auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
             clean_up_state();
-            throw e;
+        });
+
+        if (m_notify_before) {
+            TransactionRef local_frozen, remote_frozen;
+            local_frozen = m_db.start_frozen();
+            if (m_db_fresh) {
+                remote_frozen = m_db_fresh->start_frozen();
+            }
+            m_notify_before(local_frozen, remote_frozen);
+        }
+
+        local_version_ids =
+            client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger); // throws
+
+        if (m_notify_after) {
+            m_notify_after(m_db.start_frozen());
         }
 
         m_client_reset_old_version = local_version_ids.old_version;
         m_client_reset_new_version = local_version_ids.new_version;
-
-        clean_up_state();
 
         return true;
     }
     return false;
 }
 
-void ClientResetOperation::clean_up_state()
+void ClientResetOperation::clean_up_state() noexcept
 {
     if (m_db_fresh) {
         std::string path_to_clean = m_db_fresh->get_path();

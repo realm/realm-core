@@ -328,7 +328,7 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
-    void handle_fresh_realm_downloaded(DBRef db, std::exception_ptr err);
+    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message);
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };

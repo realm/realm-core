@@ -97,42 +97,44 @@ void RealmCoordinator::create_sync_session()
     open_db();
     if (m_sync_session)
         return;
-    m_config.sync_config->get_fresh_realm_for_path = [&](const std::string& path,
-                                                         std::function<void(DBRef, std::exception_ptr)> callback) {
-        try {
-            // Get a fully downloaded Realm using the current configuration but changing the
-            // on disk path to the one provided. The current sync session is not affected.
-            REALM_ASSERT(!path.empty());
-            REALM_ASSERT(path != m_config.path);
-            REALM_ASSERT(m_config.sync_config);
-            auto copy_config = m_config;
-            copy_config.path = path;
-            // Do not use seamless loss mode on the fresh Realm. Use manual mode so that
-            // any error during the download is propagated back to the original session.
-            // This prevents a cycle if the fresh copy itself experiences a client reset.
-            copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-            std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
-            REALM_ASSERT(rc);
-            auto task = rc->get_synchronized_realm(copy_config);
-            task->start([callback, path](ThreadSafeReference realm_ref, std::exception_ptr err) {
-                if (err) {
-                    callback(nullptr, std::move(err));
-                }
-                else {
-                    SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
-                    REALM_ASSERT(realm);
-                    DBRef db = Realm::Internal::get_db(*realm);
-                    std::shared_ptr<RealmCoordinator> rc = RealmCoordinator::get_coordinator(path);
-                    rc->m_sync_session->log_out();
-                    rc->m_sync_session->close();
-                    callback(std::move(db), nullptr);
-                }
-            });
-        }
-        catch (...) {
-            callback(nullptr, std::current_exception());
-        }
-    };
+    m_config.sync_config->get_fresh_realm_for_path =
+        [&](const std::string& path, std::function<void(DBRef, util::Optional<std::string>)> callback) {
+            try {
+                // Get a fully downloaded Realm using the current configuration but changing the
+                // on disk path to the one provided. The current sync session is not affected.
+                REALM_ASSERT(!path.empty());
+                REALM_ASSERT(path != m_config.path);
+                REALM_ASSERT(m_config.sync_config);
+                auto copy_config = m_config;
+                copy_config.path = path;
+                // Do not use seamless loss mode on the fresh Realm. Use manual mode so that
+                // any error during the download is propagated back to the original session.
+                // This prevents a cycle if the fresh copy itself experiences a client reset.
+                copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+                std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
+                REALM_ASSERT(rc);
+                auto task = rc->get_synchronized_realm(copy_config);
+                task->start([callback, path](ThreadSafeReference, std::exception_ptr err) {
+                    try {
+                        if (err) {
+                            std::rethrow_exception(err);
+                        }
+                        else {
+                            std::shared_ptr<RealmCoordinator> rc = RealmCoordinator::get_coordinator(path);
+                            rc->m_sync_session->log_out();
+                            rc->m_sync_session->close();
+                            callback(rc->m_db, util::none);
+                        }
+                    }
+                    catch (const std::exception& e) {
+                        callback(nullptr, util::make_optional<std::string>(e.what()));
+                    }
+                });
+            }
+            catch (const std::exception& e) {
+                callback(nullptr, util::make_optional<std::string>(e.what()));
+            }
+        };
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();

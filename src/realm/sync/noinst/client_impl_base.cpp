@@ -1850,10 +1850,10 @@ void Session::activate()
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
         if (client_reset_config && !m_client_reset_operation) {
-            m_client_reset_operation.reset(new _impl::ClientResetOperation(
+            m_client_reset_operation = std::make_unique<_impl::ClientResetOperation>(
                 logger, get_db(), std::move(client_reset_config->fresh_copy), client_reset_config->seamless_loss,
                 std::move(client_reset_config->notify_before_client_reset),
-                std::move(client_reset_config->notify_after_client_reset))); // Throws
+                std::move(client_reset_config->notify_after_client_reset)); // Throws
         }
 
         if (!m_client_reset_operation) {
