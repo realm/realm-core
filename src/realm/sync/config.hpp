@@ -40,6 +40,21 @@ namespace bson {
 class Bson;
 }
 
+enum class SimplifiedProtocolError {
+    ConnectionIssue,
+    UnexpectedInternalIssue,
+    SessionIssue,
+    BadAuthentication,
+    PermissionDenied,
+    ClientResetRequested,
+};
+
+namespace sync {
+enum class ProtocolError;
+}
+
+SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
+
 struct SyncError {
 
     std::error_code error_code;

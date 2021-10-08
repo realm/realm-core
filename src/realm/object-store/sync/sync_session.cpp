@@ -520,79 +520,30 @@ void SyncSession::handle_error(SyncError error)
         m_state->handle_error(lock, *this, error);
     }
 
-    if (error.is_client_reset_requested()) {
-        auto user_handles_reset = [&]() {
-            next_state = NextStateAfterError::inactive;
-            update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
-        };
-        if (error.error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
-            // At this point, automatic recovery has been attempted but it failed.
-            // Fallback to a manual reset and let the user try to handle it.
-            user_handles_reset();
-        }
-        else {
-            switch (m_config.client_resync_mode) {
-                case ClientResyncMode::Manual:
-                    user_handles_reset();
-                    break;
-                case ClientResyncMode::SeamlessLoss: {
-                    REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
-                    std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
-                    auto weak_self_ref = weak_from_this();
-                    m_config.get_fresh_realm_for_path(
-                        fresh_path, [weak_self_ref](DBRef db, util::Optional<std::string> err) {
-                            // the original session may have been closed during download of the reset realm
-                            // and in that case do nothing
-                            if (auto strong = weak_self_ref.lock()) {
-                                strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
-                            }
-                        });
-                    return;
-                }
-            }
-        }
+    auto user_handles_client_reset = [&]() {
+        next_state = NextStateAfterError::inactive;
+        update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
+    };
+
+    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+        // At this point, automatic recovery has been attempted but it failed.
+        // Fallback to a manual reset and let the user try to handle it.
+        user_handles_client_reset();
     }
     else if (error_code.category() == realm::sync::protocol_error_category()) {
-        using ProtocolError = realm::sync::ProtocolError;
-        switch (static_cast<ProtocolError>(error_code.value())) {
-            // Connection level errors
-            case ProtocolError::connection_closed:
-            case ProtocolError::other_error:
+        SimplifiedProtocolError simplified =
+            get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
+        switch (simplified) {
+            case SimplifiedProtocolError::ConnectionIssue:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case ProtocolError::unknown_message:
-            case ProtocolError::bad_syntax:
-            case ProtocolError::limits_exceeded:
-            case ProtocolError::wrong_protocol_version:
-            case ProtocolError::bad_session_ident:
-            case ProtocolError::reuse_of_session_ident:
-            case ProtocolError::bound_in_other_session:
-            case ProtocolError::bad_message_order:
-            case ProtocolError::bad_client_version:
-            case ProtocolError::illegal_realm_path:
-            case ProtocolError::no_such_realm:
-            case ProtocolError::bad_changeset:
-            case ProtocolError::bad_changeset_header_syntax:
-            case ProtocolError::bad_changeset_size:
-            case ProtocolError::bad_changesets:
-            case ProtocolError::bad_decompression:
-            case ProtocolError::unsupported_session_feature:
-            case ProtocolError::transact_before_upload:
-            case ProtocolError::partial_sync_disabled:
-            case ProtocolError::user_mismatch:
-            case ProtocolError::too_many_sessions:
-                break;
-            // Session errors
-            case ProtocolError::session_closed:
-            case ProtocolError::other_session_error:
-            case ProtocolError::disabled_session:
-                // The binding doesn't need to be aware of these because they are strictly informational, and do not
+            case SimplifiedProtocolError::UnexpectedInternalIssue:
+                break; // fatal: bubble these up to the user below
+            case SimplifiedProtocolError::SessionIssue:
+                // The SDK doesn't need to be aware of these because they are strictly informational, and do not
                 // represent actual errors.
                 return;
-            case ProtocolError::token_expired: {
-                REALM_ASSERT_RELEASE(false);
-            }
-            case ProtocolError::bad_authentication: {
+            case SimplifiedProtocolError::BadAuthentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
                 next_state = NextStateAfterError::none;
                 {
@@ -604,28 +555,32 @@ void SyncSession::handle_error(SyncError error)
                     user_to_invalidate->invalidate();
                 break;
             }
-            case ProtocolError::permission_denied: {
+            case SimplifiedProtocolError::PermissionDenied: {
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
-            case ProtocolError::bad_client_file:
-            case ProtocolError::bad_client_file_ident:
-            case ProtocolError::bad_origin_file_ident:
-            case ProtocolError::bad_server_file_ident:
-            case ProtocolError::bad_server_version:
-            case ProtocolError::client_file_blacklisted:
-            case ProtocolError::client_file_expired:
-            case ProtocolError::diverging_histories:
-            case ProtocolError::invalid_schema_change:
-            case ProtocolError::server_file_deleted:
-            case ProtocolError::user_blacklisted: {
-                // All these should be kept in sync with the list found in
-                // SyncError::is_client_reset_requested()
-                // If this code is reached, then the list is out of sync
-                // because the reset should have been handled above.
-                std::string msg = util::format("client reset code mismatch for '%1'", error_code.value());
-                REALM_TERMINATE(msg.c_str());
+            case SimplifiedProtocolError::ClientResetRequested: {
+                switch (m_config.client_resync_mode) {
+                    case ClientResyncMode::Manual:
+                        user_handles_client_reset();
+                        break;
+                    case ClientResyncMode::SeamlessLoss: {
+                        REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
+                        std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
+                        auto weak_self_ref = weak_from_this();
+                        m_config.get_fresh_realm_for_path(
+                            fresh_path, [weak_self_ref](DBRef db, util::Optional<std::string> err) {
+                                // the original session may have been closed during download of the reset realm
+                                // and in that case do nothing
+                                if (auto strong = weak_self_ref.lock()) {
+                                    strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                                }
+                            });
+                        return; // do not propgate the error to the user at this point
+                    }
+                }
+                break;
             }
         }
     }
