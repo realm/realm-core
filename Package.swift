@@ -23,7 +23,7 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
 
-    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])),
 ]
 
 let syncServerSources: [String] =  [
