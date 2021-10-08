@@ -134,6 +134,7 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::user_blacklisted:
             return SimplifiedProtocolError::ClientResetRequested;
     }
+    return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
 }
 
 } // namespace realm
