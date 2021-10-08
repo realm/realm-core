@@ -11,12 +11,6 @@ SyncReplication::SyncReplication(const std::string& realm_path)
 {
 }
 
-void SyncReplication::initialize(DB& sg)
-{
-    REALM_ASSERT(!m_db);
-    m_db = &sg;
-}
-
 void SyncReplication::reset()
 {
     m_encoder.reset();

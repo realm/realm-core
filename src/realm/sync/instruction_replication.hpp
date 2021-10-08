@@ -41,8 +41,6 @@ public:
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    void initialize(DB&) override;
-
     void add_class(TableKey tk, StringData table_name, bool is_embedded) final;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
                                     bool nullable) final;
@@ -102,7 +100,6 @@ private:
     bool m_short_circuit = false;
 
     ChangesetEncoder m_encoder;
-    DB* m_db = nullptr;
     Transaction* m_transaction;
 
     TableKey m_table_being_erased;

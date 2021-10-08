@@ -360,7 +360,6 @@ public:
     virtual std::unique_ptr<_impl::History> _create_history_read() = 0;
 
 protected:
-    DB* m_db = nullptr;
     Replication(const std::string& database_file);
 
 
@@ -437,6 +436,9 @@ private:
             return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
         }
     };
+
+    DB* m_db = nullptr;
+
     _impl::TransactLogEncoder m_encoder;
     mutable const Table* m_selected_table = nullptr;
     mutable CollectionId m_selected_list;
