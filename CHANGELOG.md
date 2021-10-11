@@ -3,6 +3,7 @@
 ### Enhancements
 * Added methods to freeze and thaw realms, objects, results and lists.
 * Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
+* Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
 * Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
 
@@ -23,6 +24,7 @@
   * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
   * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
 * `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed.
+* C-API function `realm_object_create_with_primary_key` will now fail if an object already exists with given primary key.
 
 -----------
 
