@@ -62,7 +62,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
     throw std::runtime_error("unknown provider type in provider_type_from_enum");
 }
 
-AuthProvider enum_from_provider_type(IdentityProvider provider)
+AuthProvider enum_from_provider_type(const IdentityProvider& provider)
 {
     if (provider == IdentityProviderAnonymous) {
         return AuthProvider::ANONYMOUS;
