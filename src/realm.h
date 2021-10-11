@@ -2017,6 +2017,12 @@ typedef struct realm_app realm_app_t;
 typedef struct realm_app_credentials realm_app_credentials_t;
 typedef struct realm_user realm_user_t;
 
+typedef enum realm_user_state {
+    RLM_USER_STATE_LOGGED_OUT,
+    RLM_USER_STATE_LOGGED_IN,
+    RLM_USER_STATE_REMOVED
+} realm_user_state_e;
+
 /**
  * Possible error categories the realm_app_error_t error code can fall in.
  */
@@ -2390,6 +2396,8 @@ RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, co
 
 RLM_API const char* realm_user_get_identity(const realm_user_t*);
 
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*);
+
 typedef struct {
     const char* id;
     realm_auth_provider_e provider_type;
@@ -2431,6 +2439,15 @@ RLM_API bool realm_user_log_out(realm_user_t*);
  * @return true if the user is in the logged in state.
  */
 RLM_API bool realm_user_is_logged_in(const realm_user_t*);
+
+/**
+ * Get the custom user data from the user's access token.
+ *
+ * Returned value must be manually released with realm_free().
+ *
+ * @return A serialized BSON document, or null if token doesn't have any custom data.
+ */
+RLM_API char* realm_user_get_custom_data(const realm_user_t*);
 
 /**
  * Get the user profile associated with this user.

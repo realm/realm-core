@@ -23,6 +23,10 @@
 namespace realm::c_api {
 using namespace realm::app;
 
+static_assert(realm_user_state_e(SyncUser::State::LoggedOut) == RLM_USER_STATE_LOGGED_OUT);
+static_assert(realm_user_state_e(SyncUser::State::LoggedIn) == RLM_USER_STATE_LOGGED_IN);
+static_assert(realm_user_state_e(SyncUser::State::Removed) == RLM_USER_STATE_REMOVED);
+
 static_assert(realm_auth_provider_e(AuthProvider::ANONYMOUS) == RLM_AUTH_PROVIDER_ANONYMOUS);
 static_assert(realm_auth_provider_e(AuthProvider::FACEBOOK) == RLM_AUTH_PROVIDER_FACEBOOK);
 static_assert(realm_auth_provider_e(AuthProvider::GOOGLE) == RLM_AUTH_PROVIDER_GOOGLE);
@@ -681,6 +685,11 @@ RLM_API const char* realm_user_get_identity(const realm_user_t* user)
     return (*user)->identity().c_str();
 }
 
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user)
+{
+    return realm_user_state_e((*user)->state());
+}
+
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
                                            size_t max, size_t* out_n)
 {
@@ -744,6 +753,18 @@ RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
         std::string data = bson::Bson((*user)->user_profile().data()).to_string();
 
         return duplicate_string(data);
+    });
+}
+
+RLM_API char* realm_user_get_custom_data(const realm_user_t* user)
+{
+    return wrap_err([&]() -> char* {
+        if (const auto& data = (*user)->custom_data()) {
+            std::string json = bson::Bson(*data).to_string();
+            return duplicate_string(json);
+        }
+
+        return nullptr;
     });
 }
 
