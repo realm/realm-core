@@ -92,6 +92,9 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         catch (const UnexpectedPrimaryKeyException& ex) {
             populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
         }
+        catch (const DuplicatePrimaryKeyException& ex) {
+            populate_error(ex, RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
+        }
         catch (const InvalidPropertyKeyException& ex) {
             populate_error(ex, RLM_ERR_INVALID_PROPERTY);
         }
