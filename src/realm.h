@@ -2014,7 +2014,6 @@ RLM_API void realm_http_transport_complete_request(void* request_context, const 
 
 /* App */
 typedef struct realm_app realm_app_t;
-typedef struct realm_app_username_password_provider_client realm_app_username_password_provider_client_t;
 typedef struct realm_app_credentials realm_app_credentials_t;
 typedef struct realm_user realm_user_t;
 
@@ -2125,6 +2124,13 @@ typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_USER_API_KEY,
     RLM_AUTH_PROVIDER_SERVER_API_KEY,
 } realm_auth_provider_e;
+
+typedef struct realm_app_user_apikey {
+    realm_object_id_t id;
+    const char* key;
+    const char* name;
+    bool disabled;
+} realm_app_user_apikey_t;
 
 typedef struct realm_app_error {
     struct {
@@ -2279,58 +2285,108 @@ RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                realm_app_user_completion_func_t, void* userdata,
-                                               realm_free_userdata_func_t userdata_free);
+                                               realm_free_userdata_func_t);
 
 RLM_API bool realm_app_log_out_current_user(realm_app_t*, realm_app_void_completion_func_t, void* userdata,
-                                            realm_free_userdata_func_t userdata_free);
+                                            realm_free_userdata_func_t);
 
 RLM_API bool realm_app_refresh_custom_data(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t,
-                                           void* userdata, realm_free_userdata_func_t userdata_free);
+                                           void* userdata, realm_free_userdata_func_t);
 
 RLM_API bool realm_app_log_out(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
-                               realm_free_userdata_func_t userdata_free);
+                               realm_free_userdata_func_t);
 
 RLM_API bool realm_app_link_user(realm_app_t*, realm_user_t*, realm_app_credentials_t*,
-                                 realm_app_user_completion_func_t, void* userdata,
-                                 realm_free_userdata_func_t userdata_free);
+                                 realm_app_user_completion_func_t, void* userdata, realm_free_userdata_func_t);
 
 RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** new_user);
 
 RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
-                                   realm_free_userdata_func_t userdata_free);
+                                   realm_free_userdata_func_t);
 
-RLM_API realm_app_username_password_provider_client_t* realm_app_get_username_password_provider_client(realm_app_t*);
+RLM_API bool realm_app_username_password_provider_client_register_email(realm_app_t*, const char* email,
+                                                                        const char* password,
+                                                                        realm_app_void_completion_func_t,
+                                                                        void* userdata, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_username_password_provider_client_register_email(
-    realm_app_username_password_provider_client_t*, const char* email, const char* password,
-    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t userdata_free);
-
-RLM_API bool realm_app_username_password_provider_client_confirm_user(realm_app_username_password_provider_client_t*,
-                                                                      const char* token, const char* token_id,
+RLM_API bool realm_app_username_password_provider_client_confirm_user(realm_app_t*, const char* token,
+                                                                      const char* token_id,
                                                                       realm_app_void_completion_func_t,
-                                                                      void* userdata,
-                                                                      realm_free_userdata_func_t userdata_free);
+                                                                      void* userdata, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_username_password_provider_client_resend_confirmation_email(
-    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
-    void* userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_username_password_provider_client_resend_confirmation_email(realm_app_t*, const char* email,
+                                                                                   realm_app_void_completion_func_t,
+                                                                                   void* userdata,
+                                                                                   realm_free_userdata_func_t);
 
-RLM_API bool realm_app_username_password_provider_client_send_reset_password_email(
-    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
-    void* userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_username_password_provider_client_send_reset_password_email(realm_app_t*, const char* email,
+                                                                                   realm_app_void_completion_func_t,
+                                                                                   void* userdata,
+                                                                                   realm_free_userdata_func_t);
 
-RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmation(
-    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
-    void* userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmation(realm_app_t*, const char* email,
+                                                                                   realm_app_void_completion_func_t,
+                                                                                   void* userdata,
+                                                                                   realm_free_userdata_func_t);
 
-RLM_API bool realm_app_username_password_provider_client_reset_password(
-    realm_app_username_password_provider_client_t*, const char* password, const char* token, const char* token_id,
-    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_username_password_provider_client_reset_password(realm_app_t*, const char* password,
+                                                                        const char* token, const char* token_id,
+                                                                        realm_app_void_completion_func_t,
+                                                                        void* userdata, realm_free_userdata_func_t);
 
 RLM_API bool realm_app_username_password_provider_client_call_reset_password_function(
-    realm_app_username_password_provider_client_t*, const char* email, const char* password,
-    const char* serialized_bson_payload, realm_app_void_completion_func_t, void* userdata,
-    realm_free_userdata_func_t userdata_free);
+    realm_app_t*, const char* email, const char* password, const char* serialized_bson_payload,
+    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t);
+
+
+RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t*, const realm_user_t*,
+                                                                 const char* name,
+                                                                 void (*)(void* userdata, realm_app_user_apikey_t*,
+                                                                          realm_app_error_t*),
+                                                                 void* userdata, realm_free_userdata_func_t);
+
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t*, const realm_user_t*,
+                                                                realm_object_id_t id,
+                                                                void (*)(void* userdata, realm_app_user_apikey_t*,
+                                                                         realm_app_error_t*),
+                                                                void* userdata, realm_free_userdata_func_t);
+
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t*, const realm_user_t*,
+                                                                 void (*)(void* userdata, realm_app_user_apikey_t[],
+                                                                          size_t count, realm_app_error_t*),
+                                                                 void* userdata, realm_free_userdata_func_t);
+
+RLM_API bool realm_app_user_apikey_provider_client_delete_apikey(const realm_app_t*, const realm_user_t*,
+                                                                 realm_object_id_t id,
+                                                                 realm_app_void_completion_func_t, void* userdata,
+                                                                 realm_free_userdata_func_t);
+
+RLM_API bool realm_app_user_apikey_provider_client_enable_apikey(const realm_app_t*, const realm_user_t*,
+                                                                 realm_object_id_t id,
+                                                                 realm_app_void_completion_func_t, void* userdata,
+                                                                 realm_free_userdata_func_t);
+
+RLM_API bool realm_app_user_apikey_provider_client_disable_apikey(const realm_app_t*, const realm_user_t*,
+                                                                  realm_object_id_t id,
+                                                                  realm_app_void_completion_func_t, void* userdata,
+                                                                  realm_free_userdata_func_t);
+
+RLM_API bool realm_app_push_notification_client_register_device(const realm_app_t*, const realm_user_t*,
+                                                                const char* service_name,
+                                                                const char* registration_token,
+                                                                realm_app_void_completion_func_t, void* userdata,
+                                                                realm_free_userdata_func_t);
+
+RLM_API bool realm_app_push_notification_client_deregister_device(const realm_app_t*, const realm_user_t*,
+                                                                  const char* service_name,
+                                                                  realm_app_void_completion_func_t, void* userdata,
+                                                                  realm_free_userdata_func_t);
+
+RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
+                                     const char* serialized_bson_args,
+                                     void (*)(void* userdata, const char* serialized_bson_response,
+                                              const realm_app_error_t*),
+                                     void* userdata, realm_free_userdata_func_t);
 
 RLM_API const char* realm_user_get_identity(const realm_user_t*);
 

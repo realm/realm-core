@@ -459,14 +459,6 @@ struct realm_app_credentials : realm::c_api::WrapC, realm::app::AppCredentials {
     }
 };
 
-struct realm_app_username_password_provider_client : realm::c_api::WrapC,
-                                                     realm::app::App::UsernamePasswordProviderClient {
-    realm_app_username_password_provider_client(realm::app::App::UsernamePasswordProviderClient client)
-        : realm::app::App::UsernamePasswordProviderClient(std::move(client))
-    {
-    }
-};
-
 struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     realm_user(std::shared_ptr<realm::SyncUser> user)
         : std::shared_ptr<realm::SyncUser>{std::move(user)}
