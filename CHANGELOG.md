@@ -5,6 +5,7 @@
 * Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
 * Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
+* Added the `App`, credentials, users, and username/password provider functionality to the C API.
 
 ### Fixed
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)

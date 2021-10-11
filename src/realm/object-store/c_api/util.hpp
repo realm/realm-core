@@ -20,6 +20,18 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
     };
 }
 
+template <class F>
+inline auto wrap_err(F&& f, const decltype(std::declval<F>()())& e)
+{
+    try {
+        return f();
+    }
+    catch (...) {
+        set_last_exception(std::current_exception());
+        return e;
+    }
+}
+
 inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, TableKey table_key)
 {
     // Validate the table key.
@@ -99,6 +111,14 @@ inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
         return ObjLink{target_table->get_key(), val.get<ObjKey>()};
     }
     return val;
+}
+
+inline char* duplicate_string(const std::string& string)
+{
+    char* ret = reinterpret_cast<char*>(malloc(string.size() + 1));
+    string.copy(ret, string.size());
+    ret[string.size()] = '\0';
+    return ret;
 }
 
 struct FreeUserdata {

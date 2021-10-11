@@ -64,6 +64,8 @@ typedef struct realm_results realm_results_t;
 
 /* Config types */
 typedef struct realm_config realm_config_t;
+typedef struct realm_app_config realm_app_config_t;
+typedef struct realm_sync_client_config realm_sync_client_config_t;
 typedef struct realm_sync_config realm_sync_config_t;
 typedef bool (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
@@ -446,6 +448,17 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*)()) noexcept;
  * @return True if an error was cleared.
  */
 RLM_API bool realm_clear_last_error(void);
+
+/**
+ * Free memory allocated by the module this library was linked into.
+ *
+ * This is needed for raw memory buffers such as string copies or arrays
+ * returned from a library function. Realm C Wrapper objects on the other hand
+ * should always be freed with realm_release() only.
+ *
+ * @param buffer A pointer to a memory buffer owned by the caller.
+ */
+RLM_API void realm_free(void* buffer);
 
 /**
  * Free any Realm C Wrapper object.
@@ -1988,5 +2001,382 @@ RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func
  * @param response The server response to the HTTP request initiated by Core.
  */
 RLM_API void realm_http_transport_complete_request(void* request_context, const realm_http_response_t* response);
+
+/* App */
+typedef struct realm_app realm_app_t;
+typedef struct realm_app_username_password_provider_client realm_app_username_password_provider_client_t;
+typedef struct realm_app_credentials realm_app_credentials_t;
+typedef struct realm_user realm_user_t;
+
+/**
+ * Possible error categories the realm_app_error_t error code can fall in.
+ */
+typedef enum realm_app_error_category {
+    /**
+     * Error category for HTTP-related errors. The error code value can be interpreted as a HTTP status code.
+     */
+    RLM_APP_ERROR_CATEGORY_HTTP,
+    /**
+     * JSON response parsing related errors. The error code is a member of realm_app_errno_json_e.
+     */
+    RLM_APP_ERROR_CATEGORY_JSON,
+    /**
+     * Client-side related errors. The error code is a member of realm_app_errno_client_e.
+     */
+    RLM_APP_ERROR_CATEGORY_CLIENT,
+    /**
+     * Errors reported by the backend. The error code is a member of realm_app_errno_service_e.
+     */
+    RLM_APP_ERROR_CATEGORY_SERVICE,
+    /**
+     * Custom error code was set in realm_http_response_t.custom_status_code.
+     * The error code is the custom_status_code value.
+     */
+    RLM_APP_ERROR_CATEGORY_CUSTOM
+} realm_app_error_category_e;
+
+typedef enum realm_app_errno_json {
+    RLM_APP_ERR_JSON_BAD_TOKEN = 1,
+    RLM_APP_ERR_JSON_MALFORMED_JSON = 2,
+    RLM_APP_ERR_JSON_MISSING_JSON_KEY = 3,
+    RLM_APP_ERR_JSON_BAD_BSON_PARSE = 4
+} realm_app_errno_json_e;
+
+typedef enum realm_app_errno_client {
+    RLM_APP_ERR_CLIENT_USER_NOT_FOUND = 1,
+    RLM_APP_ERR_CLIENT_USER_NOT_LOGGED_IN = 2,
+    RLM_APP_ERR_CLIENT_APP_DEALLOCATED = 3
+} realm_app_errno_client_e;
+
+typedef enum realm_app_errno_service {
+    RLM_APP_ERR_SERVICE_MISSING_AUTH_REQ = 1,
+    RLM_APP_ERR_SERVICE_INVALID_SESSION = 2,
+    RLM_APP_ERR_SERVICE_USER_APP_DOMAIN_MISMATCH = 3,
+    RLM_APP_ERR_SERVICE_DOMAIN_NOT_ALLOWED = 4,
+    RLM_APP_ERR_SERVICE_READ_SIZE_LIMIT_EXCEEDED = 5,
+    RLM_APP_ERR_SERVICE_INVALID_PARAMETER = 6,
+    RLM_APP_ERR_SERVICE_MISSING_PARAMETER = 7,
+    RLM_APP_ERR_SERVICE_TWILIO_ERROR = 8,
+    RLM_APP_ERR_SERVICE_GCM_ERROR = 9,
+    RLM_APP_ERR_SERVICE_HTTP_ERROR = 10,
+    RLM_APP_ERR_SERVICE_AWS_ERROR = 11,
+    RLM_APP_ERR_SERVICE_MONGODB_ERROR = 12,
+    RLM_APP_ERR_SERVICE_ARGUMENTS_NOT_ALLOWED = 13,
+    RLM_APP_ERR_SERVICE_FUNCTION_EXECUTION_ERROR = 14,
+    RLM_APP_ERR_SERVICE_NO_MATCHING_RULE_FOUND = 15,
+    RLM_APP_ERR_SERVICE_INTERNAL_SERVER_ERROR = 16,
+    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_NOT_FOUND = 17,
+    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_ALREADY_EXISTS = 18,
+    RLM_APP_ERR_SERVICE_SERVICE_NOT_FOUND = 19,
+    RLM_APP_ERR_SERVICE_SERVICE_TYPE_NOT_FOUND = 20,
+    RLM_APP_ERR_SERVICE_SERVICE_ALREADY_EXISTS = 21,
+    RLM_APP_ERR_SERVICE_SERVICE_COMMAND_NOT_FOUND = 22,
+    RLM_APP_ERR_SERVICE_VALUE_NOT_FOUND = 23,
+    RLM_APP_ERR_SERVICE_VALUE_ALREADY_EXISTS = 24,
+    RLM_APP_ERR_SERVICE_VALUE_DUPLICATE_NAME = 25,
+    RLM_APP_ERR_SERVICE_FUNCTION_NOT_FOUND = 26,
+    RLM_APP_ERR_SERVICE_FUNCTION_ALREADY_EXISTS = 27,
+    RLM_APP_ERR_SERVICE_FUNCTION_DUPLICATE_NAME = 28,
+    RLM_APP_ERR_SERVICE_FUNCTION_SYNTAX_ERROR = 29,
+    RLM_APP_ERR_SERVICE_FUNCTION_INVALID = 30,
+    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_NOT_FOUND = 31,
+    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_ALREADY_EXISTS = 32,
+    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_DUPLICATE_NAME = 33,
+    RLM_APP_ERR_SERVICE_RULE_NOT_FOUND = 34,
+    RLM_APP_ERR_SERVICE_API_KEY_NOT_FOUND = 35,
+    RLM_APP_ERR_SERVICE_RULE_ALREADY_EXISTS = 36,
+    RLM_APP_ERR_SERVICE_RULE_DUPLICATE_NAME = 37,
+    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_DUPLICATE_NAME = 38,
+    RLM_APP_ERR_SERVICE_RESTRICTED_HOST = 39,
+    RLM_APP_ERR_SERVICE_API_KEY_ALREADY_EXISTS = 40,
+    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_AUTH_FAILED = 41,
+    RLM_APP_ERR_SERVICE_EXECUTION_TIME_LIMIT_EXCEEDED = 42,
+    RLM_APP_ERR_SERVICE_NOT_CALLABLE = 43,
+    RLM_APP_ERR_SERVICE_USER_ALREADY_CONFIRMED = 44,
+    RLM_APP_ERR_SERVICE_USER_NOT_FOUND = 45,
+    RLM_APP_ERR_SERVICE_USER_DISABLED = 46,
+    RLM_APP_ERR_SERVICE_AUTH_ERROR = 47,
+    RLM_APP_ERR_SERVICE_BAD_REQUEST = 48,
+    RLM_APP_ERR_SERVICE_ACCOUNT_NAME_IN_USE = 49,
+    RLM_APP_ERR_SERVICE_INVALID_EMAIL_PASSWORD = 50,
+
+    RLM_APP_ERR_SERVICE_UNKNOWN = -1,
+    RLM_APP_ERR_SERVICE_NONE = 0
+} realm_app_errno_service_e;
+
+typedef enum realm_auth_provider {
+    RLM_AUTH_PROVIDER_ANONYMOUS,
+    RLM_AUTH_PROVIDER_FACEBOOK,
+    RLM_AUTH_PROVIDER_GOOGLE,
+    RLM_AUTH_PROVIDER_APPLE,
+    RLM_AUTH_PROVIDER_CUSTOM,
+    RLM_AUTH_PROVIDER_USERNAME_PASSWORD,
+    RLM_AUTH_PROVIDER_FUNCTION,
+    RLM_AUTH_PROVIDER_USER_API_KEY,
+    RLM_AUTH_PROVIDER_SERVER_API_KEY,
+} realm_auth_provider_e;
+
+typedef struct realm_app_error {
+    struct {
+        realm_app_error_category_e category;
+        int value;
+    } error_code;
+
+    int http_status_code;
+
+    const char* message;
+
+    const char* link_to_server_logs;
+} realm_app_error_t;
+
+/**
+ * Generic completion callback for asynchronous Realm App operations.
+ *
+ * @param userdata The userdata pointer the asynchronous operation was started with.
+ * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
+ */
+typedef void (*realm_app_void_completion_func_t)(void* userdata, realm_app_error_t* error);
+
+/**
+ * Completion callback for asynchronous Realm App operations that yield a user object.
+ *
+ * @param userdata The userdata pointer the asynchronous operation was started with.
+ * @param user User object produced by the operation. The pointer is alive only for the duration of the callback,
+ *             if you wish to use it further make a copy with realm_clone().
+ * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
+ */
+typedef void (*realm_app_user_completion_func_t)(void* userdata, realm_user_t* user, realm_app_error_t* error);
+
+/**
+ * Create anonymous app credentials.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void);
+
+/**
+ * Create Facebook app credentials.
+ *
+ * @param access_token Facebook access token.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token);
+
+/**
+ * Create Google app credentials.
+ *
+ * @param id_token Google id token.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token);
+
+/**
+ * Create Apple app credentials.
+ *
+ * @param id_token Apple id token
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token);
+
+/**
+ * Create custom app credentials.
+ *
+ * @param token Custom token.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_custom(const char* token);
+
+/**
+ * Create username and password app credentials.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_username_password(const char* username,
+                                                                             const char* password);
+
+/**
+ * Create Realm Function app credentials.
+ *
+ * @param serialized_bson_payload The serialized BSON payload to invoke the function with.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_bson_payload);
+
+/**
+ * Create User API Key app credentials.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key);
+
+/**
+ * Create Server API Key app credentials.
+ */
+RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key);
+
+/**
+ * Get the provider type of a credentials object.
+ */
+RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*);
+
+/**
+ * Create a new app configuration.
+ *
+ * @param app_id The MongoDB Realm app id.
+ * @param http_transport The HTTP transport used to make network calls.
+ * needed.
+ */
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport);
+
+RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms);
+RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*);
+
+/**
+ * Get an existing @a realm_app_t* instance with the same app id, or create it with the
+ * configuration if it doesn't exist.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
+
+/**
+ * Get an existing @a realm_app_t* instance from the cache.
+ *
+ * @param app_id The app id to look for.
+ * @param out_app A pointer to a @a realm_app_t* variable that will be populated
+ *                with the app instance, or NULL if an app wasn't found.
+ * @return true if no error occurred.
+ */
+RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app);
+
+/**
+ * Clear all the cached @a realm_app_t* instances in the process.
+ *
+ * @a realm_app_t* instances will need to be disposed with realm_release()
+ * for them to be fully destroyed after the cache is cleared.
+ */
+RLM_API void realm_clear_cached_apps(void);
+
+RLM_API const char* realm_app_get_app_id(const realm_app_t*);
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*);
+
+/**
+ * Get the list of active users in this @a app.
+ *
+ * @param out_users A pointer to an array of `realm_user_t*`, which
+ *                  will be populated with the list of active users in the app.
+ *                  May be NULL, in which case this function can be used to
+ *                  discover the number of active users in the app.
+ * @param max The maximum number of entries to write to `out_users`.
+ * @param out_n The actual number of properties written to `out_users`.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n);
+
+RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
+                                               realm_app_user_completion_func_t, void* userdata,
+                                               realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_log_out_current_user(realm_app_t*, realm_app_void_completion_func_t, void* userdata,
+                                            realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_refresh_custom_data(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t,
+                                           void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_log_out(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
+                               realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_link_user(realm_app_t*, realm_user_t*, realm_app_credentials_t*,
+                                 realm_app_user_completion_func_t, void* userdata,
+                                 realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** new_user);
+
+RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
+                                   realm_free_userdata_func_t userdata_free);
+
+RLM_API realm_app_username_password_provider_client_t* realm_app_get_username_password_provider_client(realm_app_t*);
+
+RLM_API bool realm_app_username_password_provider_client_register_email(
+    realm_app_username_password_provider_client_t*, const char* email, const char* password,
+    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_confirm_user(realm_app_username_password_provider_client_t*,
+                                                                      const char* token, const char* token_id,
+                                                                      realm_app_void_completion_func_t,
+                                                                      void* userdata,
+                                                                      realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_resend_confirmation_email(
+    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
+    void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_send_reset_password_email(
+    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
+    void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmation(
+    realm_app_username_password_provider_client_t*, const char* email, realm_app_void_completion_func_t,
+    void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_reset_password(
+    realm_app_username_password_provider_client_t*, const char* password, const char* token, const char* token_id,
+    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t userdata_free);
+
+RLM_API bool realm_app_username_password_provider_client_call_reset_password_function(
+    realm_app_username_password_provider_client_t*, const char* email, const char* password,
+    const char* serialized_bson_payload, realm_app_void_completion_func_t, void* userdata,
+    realm_free_userdata_func_t userdata_free);
+
+RLM_API const char* realm_user_get_identity(const realm_user_t*);
+
+typedef struct {
+    const char* id;
+    realm_auth_provider_e provider_type;
+} realm_user_identity_t;
+
+/**
+ * Get the list of identities of this @a user.
+ *
+ * @param out_identities A pointer to an array of `realm_user_identity_t`, which
+ *                       will be populated with the list of identities of this user.
+ *                       May be NULL, in which case this function can be used to
+ *                       discover the number of identities of this user.
+ * @param max The maximum number of entries to write to `out_identities`.
+ * @param out_n The actual number of properties written to `out_identities`.
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+                                           size_t max, size_t* out_n);
+
+RLM_API const char* realm_user_get_local_identity(const realm_user_t*);
+
+// returned pointer must be manually released with realm_free()
+RLM_API char* realm_user_get_device_id(const realm_user_t*);
+
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*);
+
+/**
+ * Log out the user and mark it as logged out.
+ *
+ * Any active sync sessions associated with this user will be stopped.
+ *
+ * @return true, if no errors occurred.
+ */
+RLM_API bool realm_user_log_out(realm_user_t*);
+
+/**
+ * Check if the user is logged in.
+ *
+ * @return true if the user is in the logged in state.
+ */
+RLM_API bool realm_user_is_logged_in(const realm_user_t*);
+
+/**
+ * Get the user profile associated with this user.
+ *
+ * Returned value must be manually released with realm_free().
+ *
+ * @return A serialized BSON document, or null if an error occurred.
+ */
+RLM_API char* realm_user_get_profile_data(const realm_user_t*);
+
+/* Sync */
+
+RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void);
 
 #endif // REALM_H

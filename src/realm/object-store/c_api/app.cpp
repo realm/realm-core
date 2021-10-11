@@ -1,0 +1,582 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2021 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or utilied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/c_api/util.hpp>
+
+namespace realm::c_api {
+namespace {
+using namespace realm::app;
+
+static_assert(realm_auth_provider_e(AuthProvider::ANONYMOUS) == RLM_AUTH_PROVIDER_ANONYMOUS);
+static_assert(realm_auth_provider_e(AuthProvider::FACEBOOK) == RLM_AUTH_PROVIDER_FACEBOOK);
+static_assert(realm_auth_provider_e(AuthProvider::GOOGLE) == RLM_AUTH_PROVIDER_GOOGLE);
+static_assert(realm_auth_provider_e(AuthProvider::APPLE) == RLM_AUTH_PROVIDER_APPLE);
+static_assert(realm_auth_provider_e(AuthProvider::CUSTOM) == RLM_AUTH_PROVIDER_CUSTOM);
+static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH_PROVIDER_USERNAME_PASSWORD);
+static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER_FUNCTION);
+static_assert(realm_auth_provider_e(AuthProvider::USER_API_KEY) == RLM_AUTH_PROVIDER_USER_API_KEY);
+static_assert(realm_auth_provider_e(AuthProvider::SERVER_API_KEY) == RLM_AUTH_PROVIDER_SERVER_API_KEY);
+
+static_assert(realm_app_errno_json_e(JSONErrorCode::bad_token) == RLM_APP_ERR_JSON_BAD_TOKEN);
+static_assert(realm_app_errno_json_e(JSONErrorCode::malformed_json) == RLM_APP_ERR_JSON_MALFORMED_JSON);
+static_assert(realm_app_errno_json_e(JSONErrorCode::missing_json_key) == RLM_APP_ERR_JSON_MISSING_JSON_KEY);
+static_assert(realm_app_errno_json_e(JSONErrorCode::bad_bson_parse) == RLM_APP_ERR_JSON_BAD_BSON_PARSE);
+
+static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_found) == RLM_APP_ERR_CLIENT_USER_NOT_FOUND);
+static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_logged_in) == RLM_APP_ERR_CLIENT_USER_NOT_LOGGED_IN);
+static_assert(realm_app_errno_client_e(ClientErrorCode::app_deallocated) == RLM_APP_ERR_CLIENT_APP_DEALLOCATED);
+
+static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_auth_req) == RLM_APP_ERR_SERVICE_MISSING_AUTH_REQ);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_session) == RLM_APP_ERR_SERVICE_INVALID_SESSION);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::user_app_domain_mismatch) ==
+              RLM_APP_ERR_SERVICE_USER_APP_DOMAIN_MISMATCH);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::domain_not_allowed) ==
+              RLM_APP_ERR_SERVICE_DOMAIN_NOT_ALLOWED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::read_size_limit_exceeded) ==
+              RLM_APP_ERR_SERVICE_READ_SIZE_LIMIT_EXCEEDED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_parameter) ==
+              RLM_APP_ERR_SERVICE_INVALID_PARAMETER);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_parameter) ==
+              RLM_APP_ERR_SERVICE_MISSING_PARAMETER);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::twilio_error) == RLM_APP_ERR_SERVICE_TWILIO_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::gcm_error) == RLM_APP_ERR_SERVICE_GCM_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::http_error) == RLM_APP_ERR_SERVICE_HTTP_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::aws_error) == RLM_APP_ERR_SERVICE_AWS_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::mongodb_error) == RLM_APP_ERR_SERVICE_MONGODB_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::arguments_not_allowed) ==
+              RLM_APP_ERR_SERVICE_ARGUMENTS_NOT_ALLOWED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_execution_error) ==
+              RLM_APP_ERR_SERVICE_FUNCTION_EXECUTION_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::no_matching_rule_found) ==
+              RLM_APP_ERR_SERVICE_NO_MATCHING_RULE_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::internal_server_error) ==
+              RLM_APP_ERR_SERVICE_INTERNAL_SERVER_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_not_found) ==
+              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_already_exists) ==
+              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::service_not_found) ==
+              RLM_APP_ERR_SERVICE_SERVICE_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::service_type_not_found) ==
+              RLM_APP_ERR_SERVICE_SERVICE_TYPE_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::service_already_exists) ==
+              RLM_APP_ERR_SERVICE_SERVICE_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::service_command_not_found) ==
+              RLM_APP_ERR_SERVICE_SERVICE_COMMAND_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::value_not_found) == RLM_APP_ERR_SERVICE_VALUE_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::value_already_exists) ==
+              RLM_APP_ERR_SERVICE_VALUE_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::value_duplicate_name) ==
+              RLM_APP_ERR_SERVICE_VALUE_DUPLICATE_NAME);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_not_found) ==
+              RLM_APP_ERR_SERVICE_FUNCTION_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_already_exists) ==
+              RLM_APP_ERR_SERVICE_FUNCTION_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_duplicate_name) ==
+              RLM_APP_ERR_SERVICE_FUNCTION_DUPLICATE_NAME);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_syntax_error) ==
+              RLM_APP_ERR_SERVICE_FUNCTION_SYNTAX_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::function_invalid) == RLM_APP_ERR_SERVICE_FUNCTION_INVALID);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_not_found) ==
+              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_already_exists) ==
+              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_duplicate_name) ==
+              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_DUPLICATE_NAME);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_not_found) == RLM_APP_ERR_SERVICE_RULE_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_not_found) ==
+              RLM_APP_ERR_SERVICE_API_KEY_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_already_exists) ==
+              RLM_APP_ERR_SERVICE_RULE_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_duplicate_name) ==
+              RLM_APP_ERR_SERVICE_RULE_DUPLICATE_NAME);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_duplicate_name) ==
+              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_DUPLICATE_NAME);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::restricted_host) == RLM_APP_ERR_SERVICE_RESTRICTED_HOST);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_already_exists) ==
+              RLM_APP_ERR_SERVICE_API_KEY_ALREADY_EXISTS);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_auth_failed) ==
+              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_AUTH_FAILED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::execution_time_limit_exceeded) ==
+              RLM_APP_ERR_SERVICE_EXECUTION_TIME_LIMIT_EXCEEDED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::not_callable) == RLM_APP_ERR_SERVICE_NOT_CALLABLE);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::user_already_confirmed) ==
+              RLM_APP_ERR_SERVICE_USER_ALREADY_CONFIRMED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::user_not_found) == RLM_APP_ERR_SERVICE_USER_NOT_FOUND);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::user_disabled) == RLM_APP_ERR_SERVICE_USER_DISABLED);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_error) == RLM_APP_ERR_SERVICE_AUTH_ERROR);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::bad_request) == RLM_APP_ERR_SERVICE_BAD_REQUEST);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::account_name_in_use) ==
+              RLM_APP_ERR_SERVICE_ACCOUNT_NAME_IN_USE);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_email_password) ==
+              RLM_APP_ERR_SERVICE_INVALID_EMAIL_PASSWORD);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::unknown) == RLM_APP_ERR_SERVICE_UNKNOWN);
+static_assert(realm_app_errno_service_e(ServiceErrorCode::none) == RLM_APP_ERR_SERVICE_NONE);
+
+static realm_app_error_t to_capi(const AppError& error)
+{
+    realm_app_error_t ret;
+
+    const std::error_category& category = error.error_code.category();
+    if (category == http_error_category()) {
+        ret.error_code.category = RLM_APP_ERROR_CATEGORY_HTTP;
+    }
+    else if (category == json_error_category()) {
+        ret.error_code.category = RLM_APP_ERROR_CATEGORY_JSON;
+    }
+    else if (category == client_error_category()) {
+        ret.error_code.category = RLM_APP_ERROR_CATEGORY_CLIENT;
+    }
+    else if (category == service_error_category()) {
+        ret.error_code.category = RLM_APP_ERROR_CATEGORY_SERVICE;
+    }
+    else if (category == custom_error_category()) {
+        ret.error_code.category = RLM_APP_ERROR_CATEGORY_CUSTOM;
+    }
+    else {
+        REALM_TERMINATE("Unexpected error category");
+    }
+
+    ret.error_code.value = error.error_code.value();
+
+    if (error.http_status_code) {
+        ret.http_status_code = *error.http_status_code;
+    }
+
+    ret.message = error.message.c_str();
+
+    if (error.link_to_server_logs.size() > 0) {
+        ret.link_to_server_logs = error.link_to_server_logs.c_str();
+    }
+
+    return ret;
+}
+
+static inline auto make_callback(realm_app_void_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free)
+{
+    return
+        [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](util::Optional<AppError> error) {
+            if (error) {
+                realm_app_error_t c_err{to_capi(*error)};
+                callback(userdata.get(), &c_err);
+            }
+            else {
+                callback(userdata.get(), nullptr);
+            }
+        };
+}
+
+static inline auto make_callback(realm_app_user_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free)
+{
+    return [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+               std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
+        if (error) {
+            realm_app_error_t c_err{to_capi(*error)};
+            callback(userdata.get(), nullptr, &c_err);
+        }
+        else {
+            auto* c_user = new realm_user_t(std::move(user));
+            callback(userdata.get(), c_user, nullptr);
+            realm_release(c_user);
+        }
+    };
+}
+
+} // namespace
+} // namespace realm::c_api
+
+using namespace realm;
+using namespace realm::app;
+using namespace realm::c_api;
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void)
+{
+    return new realm_app_credentials_t(AppCredentials::anonymous());
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token)
+{
+    return new realm_app_credentials_t(AppCredentials::facebook(access_token));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token)
+{
+    return new realm_app_credentials_t(AppCredentials::google(AuthCode(id_token)));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token)
+{
+    return new realm_app_credentials_t(AppCredentials::apple(id_token));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_custom(const char* token)
+{
+    return new realm_app_credentials_t(AppCredentials::custom(token));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_username_password(const char* username,
+                                                                             const char* password)
+{
+    return new realm_app_credentials_t(AppCredentials::username_password(username, password));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_bson_payload)
+{
+    return new realm_app_credentials_t(AppCredentials::function(std::string(serialized_bson_payload)));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key)
+{
+    return new realm_app_credentials_t(AppCredentials::user_api_key(api_key));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key)
+{
+    return new realm_app_credentials_t(AppCredentials::server_api_key(api_key));
+}
+
+RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t* credentials)
+{
+    return realm_auth_provider_e(credentials->provider());
+}
+
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport)
+{
+    auto* config = new realm_app_config_t;
+    config->app_id = app_id;
+    config->transport = *http_transport;
+    return config;
+}
+
+RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const char* base_url)
+{
+    config->base_url = std::string(base_url);
+}
+
+RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name)
+{
+    config->local_app_name = std::string(local_app_name);
+}
+
+RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config, const char* local_app_version)
+{
+    config->local_app_version = std::string(local_app_version);
+}
+
+RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms)
+{
+    config->default_request_timeout_ms = ms;
+}
+
+RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform)
+{
+    config->platform = std::string(platform);
+}
+
+RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version)
+{
+    config->platform_version = std::string(platform_version);
+}
+
+RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const char* sdk_version)
+{
+    config->sdk_version = std::string(sdk_version);
+}
+
+RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
+                                   const realm_sync_client_config_t* sync_client_config)
+{
+    return wrap_err([&]() {
+        return new realm_app_t(App::get_shared_app(*app_config, *sync_client_config));
+    });
+}
+
+RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app)
+{
+    return wrap_err([&]() {
+        if (auto app = App::get_cached_app(app_id)) {
+            if (out_app) {
+                *out_app = new realm_app_t(app);
+            }
+        };
+
+        return true;
+    });
+}
+
+RLM_API void realm_clear_cached_apps(void)
+{
+    App::clear_cached_apps();
+}
+
+RLM_API const char* realm_app_get_app_id(const realm_app_t* app)
+{
+    return (*app)->config().app_id.c_str();
+}
+
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app)
+{
+    if (auto user = (*app)->current_user()) {
+        return new realm_user_t(user);
+    }
+
+    return nullptr;
+}
+
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        if (out_users) {
+            std::vector<std::shared_ptr<SyncUser>> users = (*app)->all_users();
+            size_t i = 0;
+            for (; i < max; i++) {
+                out_users[i] = new realm_user_t(users[i]);
+            }
+            if (out_n) {
+                *out_n = i;
+            }
+        }
+        else {
+            if (out_n) {
+                *out_n = (*app)->all_users().size();
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_credentials_t* credentials,
+                                               realm_app_user_completion_func_t callback, void* userdata,
+                                               realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->log_in_with_credentials(*credentials, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_completion_func_t callback,
+                                            void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->log_out(make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
+                                           realm_app_void_completion_func_t callback, void* userdata,
+                                           realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->refresh_custom_data(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                               void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->log_out(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app_credentials_t* credentials,
+                                 realm_app_user_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->link_user(*user, *credentials, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user, realm_user_t** new_user)
+{
+    return wrap_err([&]() {
+        auto new_user_local = (*app)->switch_user(*user);
+        if (new_user) {
+            *new_user = new realm_user_t(std::move(new_user_local));
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        (*app)->remove_user(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API realm_app_username_password_provider_client_t*
+realm_app_get_username_password_provider_client(realm_app_t* app)
+{
+    return new realm_app_username_password_provider_client_t(
+        (*app)->provider_client<App::UsernamePasswordProviderClient>());
+}
+
+RLM_API bool realm_app_username_password_provider_client_register_email(
+    realm_app_username_password_provider_client_t* client, const char* email, const char* password,
+    realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->register_email(email, password, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_confirm_user(
+    realm_app_username_password_provider_client_t* client, const char* token, const char* token_id,
+    realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->confirm_user(token, token_id, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_resend_confirmation_email(
+    realm_app_username_password_provider_client_t* client, const char* email,
+    realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->resend_confirmation_email(email, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_send_reset_password_email(
+    realm_app_username_password_provider_client_t* client, const char* email,
+    realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->send_reset_password_email(email, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmation(
+    realm_app_username_password_provider_client_t* client, const char* email,
+    realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->retry_custom_confirmation(email, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_reset_password(
+    realm_app_username_password_provider_client_t* client, const char* password, const char* token,
+    const char* token_id, realm_app_void_completion_func_t callback, void* userdata,
+    realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        client->reset_password(password, token, token_id, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API bool realm_app_username_password_provider_client_call_reset_password_function(
+    realm_app_username_password_provider_client_t* client, const char* email, const char* password,
+    const char* serialized_bson_payload, realm_app_void_completion_func_t callback, void* userdata,
+    realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&]() {
+        auto args = bson::BsonArray(bson::parse(serialized_bson_payload));
+        client->call_reset_password_function(email, password, args, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
+RLM_API const char* realm_user_get_identity(const realm_user_t* user)
+{
+    return (*user)->identity().c_str();
+}
+
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+                                           size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        if (out_identities) {
+            const auto& identities = (*user)->identities();
+            size_t i = 0;
+            for (; i < max; i++) {
+                out_identities[i] = {identities[i].id.c_str(),
+                                     realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
+            }
+            if (out_n) {
+                *out_n = i;
+            }
+        }
+        else {
+            if (out_n) {
+                *out_n = (*user)->identities().size();
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API const char* realm_user_get_local_identity(const realm_user_t* user)
+{
+    return (*user)->local_identity().c_str();
+}
+
+RLM_API char* realm_user_get_device_id(const realm_user_t* user)
+{
+    if ((*user)->has_device_id()) {
+        return duplicate_string((*user)->device_id());
+    }
+
+    return nullptr;
+}
+
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user)
+{
+    return realm_auth_provider_e(enum_from_provider_type((*user)->provider_type()));
+}
+
+RLM_API bool realm_user_log_out(realm_user_t* user)
+{
+    return wrap_err([&]() {
+        (*user)->log_out();
+        return true;
+    });
+}
+
+RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
+{
+    return (*user)->is_logged_in();
+}
+
+RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
+{
+    return wrap_err([&]() {
+        std::string data = bson::Bson((*user)->user_profile().data()).to_string();
+
+        return duplicate_string(data);
+    });
+}
