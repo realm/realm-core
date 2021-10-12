@@ -28,6 +28,7 @@
 
 ### Internals
 * Cleaned out some old server tools and add the remaining ones to the default build.
+* App can now use bundled realm without getting "progress error" from server.
 
 ----------------------------------------------
 
