@@ -1,5 +1,20 @@
-#include <unordered_set>
-#include <vector>
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2021 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
 
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
@@ -11,6 +26,8 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 
+#include <vector>
+
 using namespace realm;
 using namespace _impl;
 using namespace sync;
@@ -21,7 +38,10 @@ struct EmbeddedObjectConverter {
     // If an embedded object is encountered, add it to a list of embedded objects to process.
     // This relies on the property that embedded objects only have one incoming link
     // otherwise there could be an infinite loop while discovering embedded objects.
-    void track(Obj e_src, Obj e_dst);
+    void track(Obj e_src, Obj e_dst)
+    {
+        embedded_pending.push_back({e_src, e_dst});
+    }
     void process_pending();
 
 private:
@@ -72,7 +92,7 @@ struct InterRealmValueConverter {
     int cmp_src_to_dst(Mixed src, Mixed dst, ConversionResult* converted_src_out = nullptr,
                        bool* did_update_out = nullptr)
     {
-        bool cmp = 0;
+        int cmp = 0;
         Mixed converted_src;
         if (m_primitive_types_only || !src.is_type(type_Link, type_TypedLink)) {
             converted_src = src;
@@ -83,13 +103,13 @@ struct InterRealmValueConverter {
                 ObjKey src_link_key = src.get<ObjKey>();
                 if (m_is_embedded_link) {
                     Obj src_embedded = m_opposite_of_src->get_object(src_link_key);
-                    REALM_ASSERT_DEBUG(src_embedded);
+                    REALM_ASSERT_DEBUG(src_embedded.is_valid());
                     if (dst.is_type(type_Link, type_TypedLink)) {
                         cmp = 0; // no need to set this link, there is already an embedded object here
                         Obj dst_embedded = m_opposite_of_dst->get_object(dst.get<ObjKey>());
-                        REALM_ASSERT_DEBUG(dst_embedded);
+                        REALM_ASSERT_DEBUG(dst_embedded.is_valid());
                         converted_src = dst_embedded.get_key();
-                        m_embedded_converter.track(src_embedded, dst_embedded);
+                        track_new_embedded(src_embedded, dst_embedded);
                     }
                     else {
                         cmp = src.compare(dst);
@@ -448,11 +468,6 @@ private:
     std::vector<InterRealmValueConverter> m_columns_cache;
 };
 
-void EmbeddedObjectConverter::track(Obj e_src, Obj e_dst)
-{
-    embedded_pending.push_back({e_src, e_dst});
-}
-
 void EmbeddedObjectConverter::process_pending()
 {
     // Conceptually this is a map, but doing a linear search through a vector is known
@@ -469,8 +484,8 @@ void EmbeddedObjectConverter::process_pending()
             return val.first == dst_table_key;
         });
         if (it == converters.end()) {
-            converters.push_back({dst_table_key, InterRealmObjectConverter{src_table, dst_table, *this}});
-            it = converters.end() - 1;
+            return converters.emplace_back(dst_table_key, InterRealmObjectConverter{src_table, dst_table, *this})
+                .second;
         }
         return it->second;
     };
