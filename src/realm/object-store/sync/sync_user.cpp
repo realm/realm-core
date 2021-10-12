@@ -118,8 +118,11 @@ SyncUser::~SyncUser() {}
 std::shared_ptr<SyncManager> SyncUser::sync_manager() const
 {
     util::CheckedLockGuard lk(m_mutex);
+    if (m_state == State::Removed) {
+        throw std::logic_error(util::format(
+            "Cannot start a sync session for user '%1' because this user has been removed.", identity()));
+    }
     REALM_ASSERT(m_sync_manager);
-    REALM_ASSERT(m_state != SyncUser::State::Removed);
     return m_sync_manager->shared_from_this();
 }
 
@@ -329,10 +332,22 @@ void SyncUser::log_out()
         m_access_token = RealmJWT{};
         m_refresh_token = RealmJWT{};
 
-        m_sync_manager->perform_metadata_update([&](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_state_and_tokens(State::LoggedOut, "", "");
-        });
+        if (this->m_provider_type == app::IdentityProviderAnonymous) {
+            // An Anonymous user can not log back in.
+            // Mark the user as 'dead' in the persisted metadata Realm.
+            m_state = State::Removed;
+            m_sync_manager->perform_metadata_update([&](const auto& manager) {
+                auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
+                if (metadata)
+                    metadata->remove();
+            });
+        }
+        else {
+            m_sync_manager->perform_metadata_update([&](const auto& manager) {
+                auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+                metadata->set_state_and_tokens(State::LoggedOut, "", "");
+            });
+        }
         sync_manager_shared = m_sync_manager->shared_from_this();
         // Move all active sessions into the waiting sessions pool. If the user is
         // logged back in, they will automatically be reactivated.
@@ -346,18 +361,6 @@ void SyncUser::log_out()
     }
 
     sync_manager_shared->log_out_user(m_identity);
-
-    // Mark the user as 'dead' in the persisted metadata Realm
-    // if they were an anonymous user
-    if (this->m_provider_type == app::IdentityProviderAnonymous) {
-        invalidate();
-        sync_manager_shared->perform_metadata_update([&](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
-            if (metadata)
-                metadata->remove();
-        });
-    }
-
     emit_change_to_subscribers(*this);
 }
 
@@ -478,22 +481,35 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
-    auto app = [&]() -> std::shared_ptr<app::App> {
+    std::shared_ptr<app::App> app;
+    std::shared_ptr<SyncUser> user;
+    {
         util::CheckedLockGuard lk(m_mutex);
-        if (!m_sync_manager || m_state == SyncUser::State::Removed) {
-            return nullptr;
+        if (m_state != SyncUser::State::Removed) {
+            user = shared_from_this();
         }
-        return m_sync_manager->app().lock();
-    }();
-    if (app) {
-        app->refresh_custom_data(shared_from_this(), [completion_block, this](auto error) {
-            emit_change_to_subscribers(*this);
-            completion_block(error);
-        });
+        if (m_sync_manager) {
+            app = m_sync_manager->app().lock();
+        }
+    }
+    if (!user) {
+        completion_block(app::AppError(
+            app::make_client_error_code(app::ClientErrorCode::user_not_found),
+            util::format("Cannot initiate a refresh on user '%1' because the user has been removed", m_identity)));
+    }
+    else if (!app) {
+        completion_block(app::AppError(
+            app::make_client_error_code(app::ClientErrorCode::app_deallocated),
+            util::format("Cannot initiate a refresh on user '%1' because the app has been deallocated", m_identity)));
     }
     else {
-        completion_block(app::AppError(app::make_client_error_code(app::ClientErrorCode::app_deallocated),
-                                       "App has been deallocated"));
+        std::weak_ptr<SyncUser> weak_user = user->weak_from_this();
+        app->refresh_custom_data(user, [completion_block, weak_user](auto error) {
+            if (auto strong = weak_user.lock()) {
+                strong->emit_change_to_subscribers(*strong);
+            }
+            completion_block(error);
+        });
     }
 }
 
