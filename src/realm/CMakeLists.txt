@@ -247,6 +247,7 @@ set(REALM_INSTALL_HEADERS
     util/to_string.hpp
     util/type_list.hpp
     util/type_traits.hpp
+    util/uri.hpp
     util/utf8.hpp
 
     util/metered/unordered_map.hpp
