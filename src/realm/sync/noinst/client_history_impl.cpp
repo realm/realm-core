@@ -351,6 +351,8 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
     wt->set_sync_file_id(client_file_ident.ident);
     root.set(s_client_file_ident_salt_iip,
              RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
+    root.set(s_progress_download_client_version_iip, RefOrTagged::make_tagged(0));
+    root.set(s_progress_upload_client_version_iip, RefOrTagged::make_tagged(0));
 
     if (fix_up_object_ids) {
         // Replication must be temporarily disabled because the database must be

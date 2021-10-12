@@ -95,12 +95,28 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
 RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
                                                              realm_value_t pk)
 {
+    bool did_create;
+    realm_object_t* object = realm_object_get_or_create_with_primary_key(realm, table_key, pk, &did_create);
+    if (object && !did_create) {
+        delete object;
+        object = wrap_err([&]() {
+            throw DuplicatePrimaryKeyException("Object with this primary key already exists");
+            return nullptr;
+        });
+    }
+    return object;
+}
+
+RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
+                                                                    realm_value_t pk, bool* did_create)
+{
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto tblkey = TableKey(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
-        // FIXME: Provide did_create?
         auto pkval = from_capi(pk);
+        if (did_create)
+            *did_create = false;
 
         ColKey pkcol = table->get_primary_key_column();
         if (!pkcol) {
@@ -117,7 +133,7 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
             throw WrongPrimaryKeyTypeException{schema.name};
         }
 
-        auto obj = table->create_object_with_primary_key(pkval);
+        auto obj = table->create_object_with_primary_key(pkval, did_create);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
     });

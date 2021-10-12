@@ -13,6 +13,10 @@
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/app.hpp>
+#endif
+
 #include <stdexcept>
 #include <string>
 
@@ -34,6 +38,10 @@ struct ImmutableException : std::exception {
 
 
 struct UnexpectedPrimaryKeyException : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
+struct DuplicatePrimaryKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 
@@ -394,5 +402,26 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
     }
 };
 
+#if REALM_ENABLE_SYNC
+struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
+    realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
+        : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))
+    {
+    }
+
+    realm_http_transport* clone() const override
+    {
+        return new realm_http_transport{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_http_transport*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+#endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP

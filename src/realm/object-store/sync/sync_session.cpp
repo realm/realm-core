@@ -362,18 +362,13 @@ const SyncSession::State& SyncSession::State::waiting_for_access_token = Waiting
 std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
 {
     return [session](util::Optional<app::AppError> error) {
-        using namespace std::chrono;
-
         auto session_user = session->user();
-        auto is_user_expired =
-            session_user && session_user->refresh_jwt().expires_at <
-                                duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 
         if (!session_user) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
         }
-        else if (is_user_expired) {
+        else if (session_user->refresh_token_is_expired()) { // user is expired
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
             if (session->m_config.error_handler) {
@@ -403,7 +398,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             }
             else {
                 // 10 seconds is arbitrary, but it is to not swamp the server
-                std::this_thread::sleep_for(milliseconds(10000));
+                std::this_thread::sleep_for(std::chrono::seconds(10));
                 if (session_user) {
                     session_user->refresh_custom_data(handle_refresh(session));
                 }
