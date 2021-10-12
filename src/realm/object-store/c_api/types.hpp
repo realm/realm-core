@@ -41,6 +41,10 @@ struct UnexpectedPrimaryKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 
+struct DuplicatePrimaryKeyException : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
 struct InvalidPropertyKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };

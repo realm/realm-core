@@ -3,6 +3,7 @@
 ### Enhancements
 * Added methods to freeze and thaw realms, objects, results and lists.
 * Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
+* Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
 * Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
 
@@ -14,7 +15,7 @@
 * Fixed a rare assertion failure or deadlock when a sync session is racing to close at the same time that external reference to the Realm is being released. ([#4931](https://github.com/realm/realm-core/issues/4931))
 * Fixed an assertion failure when opening a sync Realm with a user who had been removed. Instead an exception will be thrown. ([#4937](https://github.com/realm/realm-core/issues/4937), since v10)
 * Fixed a bug where progress notifiers continue to be called after the download of a synced realm is complete. ([#4919](https://github.com/realm/realm-core/issues/4919))
-* Fixed an issue where the Mac Catalyst target was excluded from the `REALM_HAVE_SECURE_TRANSPORT` macro in the Swift Package. This caused `'SSL/TLS protocol not supported'` to be thrown as an exception if Realm Sync is used. ([#7474](https://github.com/realm/realm-cocoa/issues/7474))
+* Fixed an issue where the release process was only publishing armeabi-v7a Android binaries. ([#4952](https://github.com/realm/realm-core/pull/4952), since v10.6.0)
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
@@ -25,11 +26,13 @@
   * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
   * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
 * `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed.
+* C-API function `realm_object_create_with_primary_key` will now fail if an object already exists with given primary key.
 
 -----------
 
 ### Internals
 * Cleaned out some old server tools and add the remaining ones to the default build.
+* App can now use bundled realm without getting "progress error" from server.
 
 ----------------------------------------------
 

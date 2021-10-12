@@ -2322,6 +2322,8 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         ClientHistoryBase& history = access_realm(); // Throws
         bool fix_up_object_ids = true;
         history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        this->m_progress.download.last_integrated_client_version = 0;
+        this->m_progress.upload.client_version = 0;
     }
 
     // Ready to send the IDENT (or REFRESH) message
