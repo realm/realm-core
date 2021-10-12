@@ -2201,7 +2201,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
 
             REQUIRE_THROWS_MATCHES(
-                Realm::get_shared_realm(config), InvalidSyncUser,
+                Realm::get_shared_realm(config), std::logic_error,
                 Catch::Message(
                     util::format("Cannot start a sync session for user '%1' because this user has been removed.",
                                  anon_user->identity())));
@@ -2227,7 +2227,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             // should not be able to open a sync'd Realm with an invalid user
             REQUIRE_THROWS_MATCHES(
-                Realm::get_shared_realm(config), InvalidSyncUser,
+                Realm::get_shared_realm(config), std::logic_error,
                 Catch::Message(util::format(
                     "Cannot start a sync session for user '%1' because this user has been removed.", user_ident)));
 

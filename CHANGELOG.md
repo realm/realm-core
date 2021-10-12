@@ -14,6 +14,7 @@
 * Change Apple/Linux temp dir created with `util::make_temp_dir()` to default to the environment's TMPDIR if available. Make `TestFile` clean up the directories it creates when finished. ([#4921](https://github.com/realm/realm-core/issues/4921))
 * Fixed a rare assertion failure or deadlock when a sync session is racing to close at the same time that external reference to the Realm is being released. ([#4931](https://github.com/realm/realm-core/issues/4931))
 * Fixed an assertion failure when opening a sync Realm with a user who had been removed. Instead an exception will be thrown. ([#4937](https://github.com/realm/realm-core/issues/4937), since v10)
+* Fixed a rare segfault which could trigger if a user was being logged out while the access token refresh response comes in. ([#4944](https://github.com/realm/realm-core/issues/4944), since v10)
 * Fixed a bug where progress notifiers continue to be called after the download of a synced realm is complete. ([#4919](https://github.com/realm/realm-core/issues/4919))
 * Fixed an issue where the release process was only publishing armeabi-v7a Android binaries. ([#4952](https://github.com/realm/realm-core/pull/4952), since v10.6.0)
 
