@@ -68,7 +68,7 @@ if [ "${OS}" == "android" ]; then
           -D CMAKE_ANDROID_NDK="${ANDROID_NDK}" \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_ABI="${ARCH}" \
+          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
