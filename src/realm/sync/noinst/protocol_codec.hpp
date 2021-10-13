@@ -250,7 +250,7 @@ public:
 
         try {
             if (message_type == "download") {
-                parse_download_message(connection, std::move(msg));
+                parse_download_message(connection, msg);
             }
             else if (message_type == "pong") {
                 auto timestamp = msg.read_next<milliseconds_type>('\n');
@@ -309,7 +309,7 @@ public:
 
 private:
     template <typename Connection>
-    void parse_download_message(Connection& connection, HeaderLineParser msg)
+    void parse_download_message(Connection& connection, HeaderLineParser& msg)
     {
         util::Logger& logger = connection.logger;
         auto report_error = [&](Error err, const auto fmt, auto&&... args) {
