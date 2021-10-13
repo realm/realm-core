@@ -32,7 +32,7 @@ static_assert(realm_auth_provider_e(AuthProvider::FACEBOOK) == RLM_AUTH_PROVIDER
 static_assert(realm_auth_provider_e(AuthProvider::GOOGLE) == RLM_AUTH_PROVIDER_GOOGLE);
 static_assert(realm_auth_provider_e(AuthProvider::APPLE) == RLM_AUTH_PROVIDER_APPLE);
 static_assert(realm_auth_provider_e(AuthProvider::CUSTOM) == RLM_AUTH_PROVIDER_CUSTOM);
-static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH_PROVIDER_USERNAME_PASSWORD);
+static_assert(realm_auth_provider_e(AuthProvider::USERNAME_PASSWORD) == RLM_AUTH_PROVIDER_EMAIL_PASSWORD);
 static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER_FUNCTION);
 static_assert(realm_auth_provider_e(AuthProvider::USER_API_KEY) == RLM_AUTH_PROVIDER_USER_API_KEY);
 static_assert(realm_auth_provider_e(AuthProvider::SERVER_API_KEY) == RLM_AUTH_PROVIDER_SERVER_API_KEY);
@@ -139,25 +139,25 @@ static realm_app_error_t to_capi(const AppError& error)
 
     const std::error_category& category = error.error_code.category();
     if (category == http_error_category()) {
-        ret.error_code.category = RLM_APP_ERROR_CATEGORY_HTTP;
+        ret.error_category = RLM_APP_ERROR_CATEGORY_HTTP;
     }
     else if (category == json_error_category()) {
-        ret.error_code.category = RLM_APP_ERROR_CATEGORY_JSON;
+        ret.error_category = RLM_APP_ERROR_CATEGORY_JSON;
     }
     else if (category == client_error_category()) {
-        ret.error_code.category = RLM_APP_ERROR_CATEGORY_CLIENT;
+        ret.error_category = RLM_APP_ERROR_CATEGORY_CLIENT;
     }
     else if (category == service_error_category()) {
-        ret.error_code.category = RLM_APP_ERROR_CATEGORY_SERVICE;
+        ret.error_category = RLM_APP_ERROR_CATEGORY_SERVICE;
     }
     else if (category == custom_error_category()) {
-        ret.error_code.category = RLM_APP_ERROR_CATEGORY_CUSTOM;
+        ret.error_category = RLM_APP_ERROR_CATEGORY_CUSTOM;
     }
     else {
         REALM_TERMINATE("Unexpected error category");
     }
 
-    ret.error_code.value = error.error_code.value();
+    ret.error_code = error.error_code.value();
 
     if (error.http_status_code) {
         ret.http_status_code = *error.http_status_code;
@@ -225,13 +225,14 @@ static inline auto make_callback(void (*callback)(void* userdata, realm_app_user
     };
 }
 
-static inline bson::BsonArray parse_bson_array(const char* serialized_bson_payload)
+static inline bson::BsonArray parse_ejson_array(const realm_string_t& serialized)
 {
-    if (!serialized_bson_payload) {
+    if (!serialized.data) {
         return {};
     }
     else {
-        return bson::BsonArray(bson::parse(serialized_bson_payload));
+        std::string_view view(serialized.data, serialized.size);
+        return bson::BsonArray(bson::parse(view));
     }
 }
 
@@ -255,20 +256,19 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_
     return new realm_app_credentials_t(AppCredentials::apple(id_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_custom(const char* token)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token)
 {
-    return new realm_app_credentials_t(AppCredentials::custom(token));
+    return new realm_app_credentials_t(AppCredentials::custom(jwt_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_username_password(const char* username,
-                                                                             const char* password)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email, realm_string_t password)
 {
-    return new realm_app_credentials_t(AppCredentials::username_password(username, password));
+    return new realm_app_credentials_t(AppCredentials::username_password(email, from_capi(password)));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_bson_payload)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(realm_string_t serialized_ejson_payload)
 {
-    return new realm_app_credentials_t(AppCredentials::function(std::string(serialized_bson_payload)));
+    return new realm_app_credentials_t(AppCredentials::function(from_capi(serialized_ejson_payload)));
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key)
@@ -337,17 +337,13 @@ RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
     });
 }
 
-RLM_API bool realm_app_get_cached(const char* app_id, realm_app_t** out_app)
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id)
 {
-    return wrap_err([&]() {
-        if (auto app = App::get_cached_app(app_id)) {
-            if (out_app) {
-                *out_app = new realm_app_t(app);
-            }
-        };
+    if (auto app = App::get_cached_app(app_id)) {
+        return new realm_app_t(app);
+    };
 
-        return true;
-    });
+    return nullptr;
 }
 
 RLM_API void realm_clear_cached_apps(void)
@@ -373,8 +369,9 @@ RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_
 {
     return wrap_err([&]() {
         if (out_users) {
-            std::vector<std::shared_ptr<SyncUser>> users = (*app)->all_users();
+            const auto& users = (*app)->all_users();
             size_t i = 0;
+            max = std::min(users.size(), max);
             for (; i < max; i++) {
                 out_users[i] = new realm_user_t(users[i]);
             }
@@ -459,24 +456,24 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_a
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_register_email(realm_app_t* app, const char* email,
-                                                                        const char* password,
-                                                                        realm_app_void_completion_func_t callback,
-                                                                        void* userdata,
-                                                                        realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
+                                                                     realm_string_t password,
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     void* userdata,
+                                                                     realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&]() {
         (*app)->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, make_callback(callback, userdata, userdata_free));
+            email, from_capi(password), make_callback(callback, userdata, userdata_free));
         return true;
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_confirm_user(realm_app_t* app, const char* token,
-                                                                      const char* token_id,
-                                                                      realm_app_void_completion_func_t callback,
-                                                                      void* userdata,
-                                                                      realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t* app, const char* token,
+                                                                   const char* token_id,
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   void* userdata,
+                                                                   realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&]() {
         (*app)->provider_client<App::UsernamePasswordProviderClient>().confirm_user(
@@ -485,7 +482,7 @@ RLM_API bool realm_app_username_password_provider_client_confirm_user(realm_app_
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_resend_confirmation_email(
+RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(
     realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
     realm_free_userdata_func_t userdata_free)
 {
@@ -496,7 +493,7 @@ RLM_API bool realm_app_username_password_provider_client_resend_confirmation_ema
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_send_reset_password_email(
+RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
     realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
     realm_free_userdata_func_t userdata_free)
 {
@@ -507,7 +504,7 @@ RLM_API bool realm_app_username_password_provider_client_send_reset_password_ema
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmation(
+RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(
     realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
     realm_free_userdata_func_t userdata_free)
 {
@@ -518,27 +515,27 @@ RLM_API bool realm_app_username_password_provider_client_retry_custom_confirmati
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_reset_password(realm_app_t* app, const char* password,
-                                                                        const char* token, const char* token_id,
-                                                                        realm_app_void_completion_func_t callback,
-                                                                        void* userdata,
-                                                                        realm_free_userdata_func_t userdata_free)
+RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t* app, realm_string_t password,
+                                                                     const char* token, const char* token_id,
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     void* userdata,
+                                                                     realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&]() {
         (*app)->provider_client<App::UsernamePasswordProviderClient>().reset_password(
-            password, token, token_id, make_callback(callback, userdata, userdata_free));
+            from_capi(password), token, token_id, make_callback(callback, userdata, userdata_free));
         return true;
     });
 }
 
-RLM_API bool realm_app_username_password_provider_client_call_reset_password_function(
-    realm_app_t* app, const char* email, const char* password, const char* serialized_bson_payload,
+RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
+    realm_app_t* app, const char* email, realm_string_t password, realm_string_t serialized_ejson_payload,
     realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&]() {
-        bson::BsonArray args = parse_bson_array(serialized_bson_payload);
+        bson::BsonArray args = parse_ejson_array(serialized_ejson_payload);
         (*app)->provider_client<App::UsernamePasswordProviderClient>().call_reset_password_function(
-            email, password, args, make_callback(callback, userdata, userdata_free));
+            email, from_capi(password), args, make_callback(callback, userdata, userdata_free));
         return true;
     });
 }
@@ -659,7 +656,7 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
 }
 
 RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
-                                     const char* serialized_bson_payload,
+                                     realm_string_t serialized_ejson_payload,
                                      void (*callback)(void* userdata, const char* serialized_bson_response,
                                                       const realm_app_error_t*),
                                      void* userdata, realm_free_userdata_func_t userdata_free)
@@ -675,7 +672,7 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
                 callback(userdata.get(), bson->toJson().c_str(), nullptr);
             }
         };
-        (*app)->call_function(*user, function_name, parse_bson_array(serialized_bson_payload), std::move(cb));
+        (*app)->call_function(*user, function_name, parse_ejson_array(serialized_ejson_payload), std::move(cb));
         return true;
     });
 }
@@ -747,24 +744,24 @@ RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
     return (*user)->is_logged_in();
 }
 
-RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
+RLM_API realm_string_t realm_user_get_profile_data(const realm_user_t* user)
 {
-    return wrap_err([&]() {
+    return wrap_err([&]() -> realm_string_t {
         std::string data = bson::Bson((*user)->user_profile().data()).to_string();
 
-        return duplicate_string(data);
+        return {duplicate_string(data), data.size()};
     });
 }
 
-RLM_API char* realm_user_get_custom_data(const realm_user_t* user)
+RLM_API realm_string_t realm_user_get_custom_data(const realm_user_t* user)
 {
-    return wrap_err([&]() -> char* {
+    return wrap_err([&]() -> realm_string_t {
         if (const auto& data = (*user)->custom_data()) {
             std::string json = bson::Bson(*data).to_string();
-            return duplicate_string(json);
+            return {duplicate_string(json), json.size()};
         }
 
-        return nullptr;
+        return {};
     });
 }
 
