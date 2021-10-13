@@ -3637,7 +3637,7 @@ private:
             bool body_is_compressed = false;
             version_type end_version = last_server_version.version;
             DownloadCursor download_progress;
-            UploadCursor upload_progress = m_upload_threshold;
+            UploadCursor upload_progress = {0, 0};
             std::uint_fast64_t downloadable_bytes = 0;
             std::size_t num_changesets;
             std::size_t accum_original_size;

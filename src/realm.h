@@ -1266,11 +1266,21 @@ RLM_API realm_results_t* realm_object_find_all(const realm_t*, realm_class_key_t
 RLM_API realm_object_t* realm_object_create(realm_t*, realm_class_key_t);
 
 /**
- * Create an object in a class with a primary key.
+ * Create an object in a class with a primary key. Will not succeed if an
+ * object with the given primary key value already exists.
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
 RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_class_key_t, realm_value_t pk);
+
+/**
+ * Create an object in a class with a primary key. If an object with the given
+ * primary key value already exists, that object will be returned.
+ *
+ * @return A non-NULL pointer if the object was found/created successfully.
+ */
+RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t*, realm_class_key_t, realm_value_t pk,
+                                                                    bool* did_create);
 
 /**
  * Delete a realm object.

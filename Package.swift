@@ -35,12 +35,7 @@ let syncExcludes: [String] = [
     "realm/sync/noinst/server/crypto_server_openssl.cpp",
 
     // CLI Tools
-    "realm/sync/apply_to_state_command.cpp",
-    "realm/sync/dump_command.cpp",
-    "realm/sync/hist_command.cpp",
-    "realm/sync/inspector",
-    "realm/sync/print_changeset_command.cpp",
-    "realm/sync/stat_command.cpp",
+    "realm/sync/tools",
 ]
 
 let notSyncServerSources: [String] = [
@@ -775,9 +770,7 @@ let package = Package(
                 "util.hpp",
             ],
             publicHeadersPath: ".",
-            cxxSettings: ([
-                .headerSearchPath("external/pegtl/include/tao")
-            ] + cxxSettings) as [CXXSetting]),
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],

@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iostream>
 
+#include <realm/array_integer.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/quote.hpp>
 #include <realm/util/timestamp_formatter.hpp>
@@ -52,11 +53,6 @@ std::string format_num_entries(std::size_t num)
 std::string format_num_history_entries(std::size_t num)
 {
     return format_num_something(num, "history entry", "history entries");
-}
-
-std::string format_num_client_files(std::size_t num)
-{
-    return format_num_something(num, "client file", "client files");
 }
 
 std::string format_num_unconsumed_changesets(std::size_t num)
@@ -341,7 +337,8 @@ void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref, 
         // FIXME: Avoid use of optional type `std::int64_t`
         using IntegerBpTree = BPlusTree<std::int64_t>;
         IntegerBpTree sh_remote_versions{alloc};
-        sh_remote_versions.init_from_ref(ref_3);
+        sh_remote_versions.set_parent(&root, remote_versions_iip);
+        sh_remote_versions.create(); // Throws
         std::size_t sync_history_size = sh_remote_versions.size();
         sh.base_version = version_type(snapshot_version - sync_history_size);
         sh.curr_version = snapshot_version;
@@ -440,248 +437,6 @@ void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref, 
     }
 }
 
-
-struct ServerHistoryInfo {
-    struct ContinuousTransactionsHistory {
-        version_type base_version = 0;
-        version_type curr_version = 0;
-        std::size_t size = 0;
-        std::uint_fast64_t aggr_size = 0;
-    };
-    struct SynchronizationHistory {
-        SaltedVersion base_version = {0, 0};
-        version_type curr_version = 0;
-        std::size_t size = 0;
-        std::uint_fast64_t aggr_size = 0;
-        version_type compacted_until = 0;
-        std::time_t last_compaction_at = 0;
-    };
-    struct ClientFiles {
-        std::size_t size = 0;
-        std::uint_fast64_t aggr_size = 0; // Not including reciprocal histories
-        std::uint_fast64_t recip_hist_aggr_size = 0;
-    };
-    struct PartialSync {
-        SaltedFileIdent partial_file_ident = {0, 0};
-        version_type partial_version = 0;
-        SaltedVersion reference_version = {0, 0};
-    };
-    struct SchemaVersion {
-        int schema_version = 0;
-        bool details_are_unknown = false;
-        std::string library_version;
-        version_type snapshot_version = 0;
-        std::time_t timestamp = 0;
-    };
-    ContinuousTransactionsHistory ct_history;
-    SynchronizationHistory sync_history;
-    ClientFiles client_files;
-    util::Optional<PartialSync> partial_sync;
-    util::Optional<std::vector<SchemaVersion>> schema_versions;
-};
-
-
-void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root_ref, int schema_version,
-                                         version_type snapshot_version, ServerHistoryInfo& info)
-{
-    // clang-format off
-
-    // Sizes of fixed-size arrays
-    std::size_t root_size = 11;
-    std::size_t sync_history_size = 6;
-    std::size_t client_files_size = 8;
-    std::size_t upstream_status_size = 8;
-    std::size_t partial_sync_size = 5;
-    std::size_t schema_versions_size = 4;
-    if (schema_version < 8) {
-        root_size = 10;
-        client_files_size = 6;
-    }
-    else if (schema_version < 10) {
-        client_files_size = 7;
-    }
-
-    // Slots in root array of history compartment
-    std::size_t client_files_iip = 0;
-    std::size_t history_base_version_iip = 1;
-    std::size_t base_version_salt_iip = 2;
-    std::size_t sync_history_iip = 3;
-    std::size_t ct_history_iip = 4;
-    std::size_t upstream_status_iip = 6;
-    std::size_t partial_sync_iip = 7;
-    std::size_t compacted_until_version_iip = 8;
-    std::size_t last_compaction_at_iip = 9;
-    std::size_t schema_versions_iip = 10;
-
-    // Slots in root array of `sync_history`
-    std::size_t sh_version_salts_iip = 0;
-
-    // Slots in root array of `client_files`
-    std::size_t cf_ident_salts_iip = 0;
-    std::size_t cf_client_versions_iip = 1;
-    std::size_t cf_rh_base_versions_iip = 2;
-    std::size_t cf_recip_hist_refs_iip = 3;
-    std::size_t cf_proxy_files_iip = 4;
-    std::size_t cf_client_types_iip = 5;
-    std::size_t cf_last_seen_timestamps_iip = 6;
-    std::size_t cf_locked_server_versions_iip = 7;
-    if (schema_version < 10) {
-        cf_client_types_iip = std::size_t(-1);
-        cf_last_seen_timestamps_iip = 5;
-        cf_locked_server_versions_iip = 6;
-    }
-
-    // Slots in root array of `upstream_status`
-    std::size_t us_client_file_ident_iip = 0;
-    std::size_t us_client_file_ident_salt_iip = 1;
-    std::size_t us_progress_latest_server_version_iip = 2;
-    std::size_t us_progress_latest_server_version_salt_iip = 3;
-    std::size_t us_progress_download_server_version_iip = 4;
-    std::size_t us_progress_download_client_version_iip = 5;
-    std::size_t us_progress_upload_client_version_iip = 6;
-    std::size_t us_progress_upload_server_version_iip = 7;
-
-    // Slots in root array of `partial_sync`
-    std::size_t ps_partial_file_ident_iip = 0;
-    std::size_t ps_partial_file_ident_salt_iip = 1;
-    std::size_t ps_progress_partial_version_iip = 2;
-    std::size_t ps_progress_reference_version_iip = 3;
-    std::size_t ps_progress_reference_version_salt_iip = 4;
-
-    // Slots in root array of `schema_versions` table
-    std::size_t sv_schema_versions_iip = 0;
-    std::size_t sv_library_versions_iip = 1;
-    std::size_t sv_snapshot_versions_iip = 2;
-    std::size_t sv_timestamps_iip = 3;
-
-    // clang-format on
-
-    Array root{alloc};
-    root.init_from_ref(history_root_ref);
-    if (root.size() != root_size)
-        throw std::runtime_error{"Unexpected size of history root array"};
-    {
-        ServerHistoryInfo::ContinuousTransactionsHistory cth;
-        ref_type ref = root.get_as_ref(ct_history_iip);
-        BinaryColumn ct_history{alloc};
-        ct_history.init_from_ref(ref);
-        std::size_t ct_history_size = ct_history.size();
-        cth.base_version = version_type(snapshot_version - ct_history_size);
-        cth.curr_version = snapshot_version;
-        cth.size = ct_history_size;
-        cth.aggr_size = get_aggregate_size({ref}, alloc);
-        info.ct_history = std::move(cth);
-    }
-    {
-        ServerHistoryInfo::SynchronizationHistory sh;
-        ref_type ref_1 = root.get_as_ref(sync_history_iip);
-        Array sync_history{alloc};
-        sync_history.init_from_ref(ref_1);
-        if (sync_history.size() != sync_history_size)
-            throw std::runtime_error{"Unexpected size of `sync_history` root array"};
-        ref_type ref_2 = sync_history.get_as_ref(sh_version_salts_iip);
-        // FIXME: Avoid use of optional type `std::int64_t`
-        using IntegerBpTree = BPlusTree<std::int64_t>;
-        IntegerBpTree sh_version_salts{alloc};
-        sh_version_salts.init_from_ref(ref_2);
-        std::size_t sync_history_size = sh_version_salts.size();
-        sh.base_version.version = version_type(root.get_as_ref_or_tagged(history_base_version_iip).get_as_int());
-        sh.base_version.salt = salt_type(root.get_as_ref_or_tagged(base_version_salt_iip).get_as_int());
-        sh.curr_version = version_type(sh.base_version.version + sync_history_size);
-        sh.size = sync_history_size;
-        sh.aggr_size = get_aggregate_size({ref_1}, alloc);
-        sh.compacted_until = version_type(root.get_as_ref_or_tagged(compacted_until_version_iip).get_as_int());
-        sh.last_compaction_at = std::time_t(root.get_as_ref_or_tagged(last_compaction_at_iip).get_as_int());
-        info.sync_history = std::move(sh);
-    }
-    {
-        ServerHistoryInfo::ClientFiles cf;
-        Array client_files{alloc};
-        client_files.init_from_ref(root.get_as_ref(client_files_iip));
-        if (client_files.size() != client_files_size)
-            throw std::runtime_error{"Unexpected size of `client_files` root array"};
-        ref_type ref_1 = client_files.get_as_ref(cf_ident_salts_iip);
-        ref_type ref_2 = client_files.get_as_ref(cf_client_versions_iip);
-        ref_type ref_3 = client_files.get_as_ref(cf_rh_base_versions_iip);
-        ref_type ref_4 = client_files.get_as_ref(cf_recip_hist_refs_iip);
-        ref_type ref_5 = client_files.get_as_ref(cf_proxy_files_iip);
-        ref_type ref_6 = 0;
-        ref_type ref_7 = client_files.get_as_ref(cf_last_seen_timestamps_iip);
-        ref_type ref_8 = 0;
-        if (schema_version >= 10)
-            ref_6 = client_files.get_as_ref(cf_client_types_iip);
-        if (schema_version >= 8)
-            ref_8 = client_files.get_as_ref(cf_locked_server_versions_iip);
-        // FIXME: Avoid use of optional type `std::int64_t`
-        using IntegerBpTree = BPlusTree<std::int64_t>;
-        IntegerBpTree cf_ident_salts{alloc};
-        cf_ident_salts.init_from_ref(ref_1);
-        std::size_t num_client_files = cf_ident_salts.size();
-        cf.size = num_client_files;
-        cf.aggr_size = get_aggregate_size({ref_1, ref_2, ref_3, ref_5, ref_6, ref_7, ref_8}, alloc);
-        cf.recip_hist_aggr_size = get_aggregate_size({ref_4}, alloc);
-        info.client_files = std::move(cf);
-    }
-    if (ref_type ref = root.get_as_ref(partial_sync_iip)) {
-        ServerHistoryInfo::PartialSync ps;
-        Array partial_sync{alloc};
-        partial_sync.init_from_ref(ref);
-        if (partial_sync.size() != partial_sync_size)
-            throw std::runtime_error{"Unexpected size of `partial_sync` root array"};
-        ps.partial_file_ident.ident = file_ident_type(partial_sync.get(ps_partial_file_ident_iip));
-        ps.partial_file_ident.salt = salt_type(partial_sync.get(ps_partial_file_ident_salt_iip));
-        ps.partial_version = version_type(partial_sync.get(ps_progress_partial_version_iip));
-        ps.reference_version.version = version_type(partial_sync.get(ps_progress_reference_version_iip));
-        ps.reference_version.salt = salt_type(partial_sync.get(ps_progress_reference_version_salt_iip));
-        info.partial_sync = std::move(ps);
-    }
-    if (schema_version >= 8) {
-        Array schema_versions{alloc};
-        schema_versions.set_parent(&root, schema_versions_iip);
-        schema_versions.init_from_parent();
-        REALM_ASSERT(schema_versions.size() == schema_versions_size);
-        Array sv_schema_versions{alloc};
-        sv_schema_versions.set_parent(&schema_versions, sv_schema_versions_iip);
-        sv_schema_versions.init_from_parent();
-        Array sv_library_versions{alloc};
-        sv_library_versions.set_parent(&schema_versions, sv_library_versions_iip);
-        sv_library_versions.init_from_parent();
-        Array sv_snapshot_versions{alloc};
-        sv_snapshot_versions.set_parent(&schema_versions, sv_snapshot_versions_iip);
-        sv_snapshot_versions.init_from_parent();
-        Array sv_timestamps{alloc};
-        sv_timestamps.set_parent(&schema_versions, sv_timestamps_iip);
-        sv_timestamps.init_from_parent();
-        Array array{alloc};
-        std::string string;
-        std::vector<ServerHistoryInfo::SchemaVersion> sv;
-        std::size_t n = sv_schema_versions.size();
-        REALM_ASSERT(n == sv_library_versions.size());
-        for (std::size_t i = 0; i < n; ++i) {
-            ServerHistoryInfo::SchemaVersion entry;
-            entry.schema_version = int(sv_schema_versions.get(i));
-            array.set_parent(&sv_library_versions, i);
-            if (ref_type ref = array.get_ref_from_parent()) {
-                array.init_from_ref(ref);
-                std::size_t size = array.size();
-                string = {};
-                string.resize(size);
-                using uchar = unsigned char;
-                for (std::size_t j = 0; j < size; ++j)
-                    string[j] = char(uchar(array.get(j)));
-                entry.library_version = std::move(string);
-                entry.snapshot_version = version_type(sv_snapshot_versions.get(i));
-                entry.timestamp = std::time_t(sv_timestamps.get(i));
-            }
-            else {
-                entry.details_are_unknown = true;
-            }
-            sv.push_back(std::move(entry));
-        }
-        info.schema_versions = std::move(sv);
-    }
-}
-
 } // unnamed namespace
 
 
@@ -691,7 +446,6 @@ int main(int argc, char* argv[])
     std::string encryption_key;
     bool show_history = false;
     bool show_columns = false;
-    bool show_queries = false;
     bool verify = false;
 
     // Process command line
@@ -734,10 +488,6 @@ int main(int argc, char* argv[])
                 show_columns = true;
                 continue;
             }
-            else if (std::strcmp(arg, "-q") == 0 || std::strcmp(arg, "--show-queries") == 0) {
-                show_queries = true;
-                continue;
-            }
             else if (std::strcmp(arg, "-V") == 0 || std::strcmp(arg, "--verify") == 0) {
                 verify = true;
                 continue;
@@ -772,7 +522,6 @@ int main(int argc, char* argv[])
                          "  -H, --show-history   Show detailed breakdown of contents of history\n"
                          "                       compartment.\n"
                          "  -c, --show-columns   Show column-level schema information for each table.\n"
-                         "  -q, --show-queries   List the queries in the `___ResultSets` table.\n"
                          "  -V, --verify         Perform group-level verification (no-op unless built in\n"
                          "                       debug mode).\n"
                          "  -v, --version        Show the version of the Realm Sync release that this\n"
@@ -963,92 +712,7 @@ int main(int argc, char* argv[])
                 }
             }
             else if (history_type == Replication::hist_SyncServer) {
-                ServerHistoryInfo info;
-                if (history_schema_version >= 6 && history_schema_version <= 10) {
-                    extract_server_history_info_6_to_10(alloc, history_ref, history_schema_version, version, info);
-                }
-                else {
-                    std::cerr << "ERROR: Detailed breakdown of server-side history compartment is "
-                                 "unavailable for history schema version "
-                              << history_schema_version << "\n";
-                    return EXIT_FAILURE;
-                }
-                std::cout << "    - Continuous transactions history:\n";
-                {
-                    const ServerHistoryInfo::ContinuousTransactionsHistory& cth = info.ct_history;
-                    std::cout << "      - Base version: " << cth.base_version << "\n";
-                    std::cout << "      - Current version: " << cth.curr_version
-                              << " (hard-linked to snapshot number)\n";
-                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size)) << " ("
-                              << format_num_entries(cth.size) << ")\n";
-                }
-                std::cout << "    - Synchronization history:\n";
-                {
-                    const ServerHistoryInfo::SynchronizationHistory& sh = info.sync_history;
-                    std::cout << "      - Base version: " << sh.base_version.version
-                              << " "
-                                 "(salt="
-                              << sh.base_version.salt << ")\n";
-                    std::cout << "      - Current version: " << sh.curr_version << "\n";
-                    std::cout << "      - Size: " << format_byte_size(double(sh.aggr_size)) << " ("
-                              << format_num_history_entries(sh.size) << ")\n";
-                    std::cout << "      - Compacted until: " << sh.compacted_until << "\n";
-                    std::cout << "      - Last compaction at: ";
-                    if (sh.compacted_until > 0) {
-                        std::cout << format_timestamp(sh.last_compaction_at);
-                    }
-                    else {
-                        std::cout << "Never";
-                    }
-                    std::cout << "\n";
-                }
-                std::cout << "    - Client files registry:\n";
-                {
-                    const ServerHistoryInfo::ClientFiles& cf = info.client_files;
-                    std::cout << "      - Size: " << format_byte_size(double(cf.aggr_size)) << " ("
-                              << format_num_client_files(cf.size) << ")\n";
-                    std::cout << "      - Reciprocal history size: "
-                                 ""
-                              << format_byte_size(double(cf.recip_hist_aggr_size)) << " ("
-                              << format_byte_size(double(cf.recip_hist_aggr_size) / cf.size)
-                              << " "
-                                 "per client file)\n";
-                }
-                std::cout << "    - Binding to reference file (partial sync):";
-                if (info.partial_sync) {
-                    const ServerHistoryInfo::PartialSync& ps = *info.partial_sync;
-                    std::cout << "\n"
-                                 "      - Partial file identifier: "
-                              << ps.partial_file_ident.ident << " (salt=" << ps.partial_file_ident.salt
-                              << ")\n"
-                                 "      - Partial version: "
-                              << ps.partial_version
-                              << "\n"
-                                 "      - Reference version: "
-                              << ps.reference_version.version << " (salt=" << ps.reference_version.salt << ")\n";
-                }
-                else {
-                    std::cout << " None\n";
-                }
-                std::cout << "    - History compartment schema versions:";
-                if (info.schema_versions) {
-                    std::cout << "\n";
-                    for (const ServerHistoryInfo::SchemaVersion& entry : *info.schema_versions) {
-                        std::cout << "      - Version: " << entry.schema_version;
-                        if (!entry.details_are_unknown) {
-                            std::cout << " (sync_library_version=" << entry.library_version
-                                      << ", snapshot_number=" << entry.snapshot_version
-                                      << ", timestamp=" << format_timestamp(entry.timestamp) << ")";
-                        }
-                        else {
-                            std::cout << " (details are unknown)";
-                        }
-                        std::cout << "\n";
-                    }
-                }
-                else {
-                    std::cout << " None\n";
-                }
+                std::cerr << "Server history detected, but this is unsupported" << std::endl;
             }
             else {
                 std::cerr << "ERROR: Detailed breakdown of history compartment is unavailable "
@@ -1122,44 +786,6 @@ int main(int argc, char* argv[])
                 if (table->has_search_index(col))
                     std::cout << " (indexed)";
                 std::cout << "\n";
-            }
-        }
-        if (show_queries && table_name == "class___ResultSets") {
-            ColKey matches_property_col_key = table->get_column_key("matches_property");
-            if (!matches_property_col_key) {
-                std::cerr << "ERROR: Column 'matches_property' missing in 'class___ResultSets'\n";
-                return EXIT_FAILURE;
-            }
-            ColKey query_col_key = table->get_column_key("query");
-            if (!query_col_key) {
-                std::cerr << "ERROR: Column 'query' missing in 'class___ResultSets'\n";
-                return EXIT_FAILURE;
-            }
-            ColKey status_col_key = table->get_column_key("status");
-            if (!status_col_key) {
-                std::cerr << "ERROR: Column 'status' missing in 'class___ResultSets'\n";
-                return EXIT_FAILURE;
-            }
-            ColKey matches_count_col_key = table->get_column_key("matches_count");
-            for (auto& obj : *table) {
-                StringData matches_property = obj.get<String>(matches_property_col_key);
-                ColKey matches_col_key = table->get_column_key(matches_property);
-                if (!matches_col_key) {
-                    std::cerr << "ERROR: Matches column '" << matches_property
-                              << "' missing in "
-                                 "'class___ResultSets'\n";
-                    return EXIT_FAILURE;
-                }
-                ConstTableRef target_table = table->get_link_target(matches_col_key);
-                StringData query = obj.get<String>(query_col_key);
-                std::int_fast64_t status = obj.get<Int>(status_col_key);
-                std::cout << "      - Query: " << quoted(target_table->get_name()) << ": " << query
-                          << " (status=" << status;
-                if (matches_count_col_key) {
-                    std::int_fast64_t matches_count = obj.get<Int>(matches_count_col_key);
-                    std::cout << ", matches_count=" << matches_count;
-                }
-                std::cout << ")\n";
             }
         }
     }
