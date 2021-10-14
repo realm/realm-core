@@ -2247,7 +2247,8 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*);
  *              May be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n);
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity,
+                                     size_t* out_n);
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                realm_app_user_completion_func_t, void* userdata,
