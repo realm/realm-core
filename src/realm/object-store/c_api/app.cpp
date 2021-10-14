@@ -370,12 +370,9 @@ RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_
         if (out_users) {
             OutBuffer<realm_user_t> buf(out_users);
             for (const auto& user : (*app)->all_users()) {
-                if (buf.size() < capacity) {
-                    buf.emplace(user);
-                }
-                else {
+                buf.emplace(user);
+                if (buf.size() == capacity)
                     break;
-                }
             }
             buf.release(out_n);
         }
