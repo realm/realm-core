@@ -72,7 +72,7 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 void AsyncOpenTask::cancel()
 {
     std::shared_ptr<SyncSession> session = nullptr;
-    
+
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (!m_session)
