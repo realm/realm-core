@@ -172,6 +172,63 @@ private:
     std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
     uint64_t m_next_token = 0;
 };
+
+/**
+ * Convenience struct for safely filling external arrays with new-allocated pointers.
+ *
+ * Calling new T() might throw, which requires that extra care needs to be put in
+ * freeing any elements allocated into the buffer up to that point.
+ */
+template <typename T>
+struct OutBuffer {
+public:
+    OutBuffer(T** buffer)
+        : m_buffer(buffer)
+    {
+    }
+
+    template <typename... Args>
+    void emplace(Args&&... args)
+    {
+        m_buffer[m_size++] = new T(std::forward<Args>(args)...);
+    }
+
+    size_t size()
+    {
+        return m_size;
+    }
+
+    /**
+     * Release ownership of the elements in the buffer so that they won't be
+     * freed when this goes out of scope.
+     *
+     * @param out_n Total number of items added to the buffer. Can be null.
+     */
+    void release(size_t* out_n)
+    {
+        m_released = true;
+        if (out_n) {
+            *out_n = m_size;
+        }
+    }
+
+    ~OutBuffer()
+    {
+        if (m_released) {
+            return;
+        }
+
+        while (m_size--) {
+            delete m_buffer[m_size];
+            m_buffer[m_size] = nullptr;
+        }
+    }
+
+private:
+    T** m_buffer;
+    size_t m_size = 0;
+    bool m_released = false;
+};
 } // namespace realm::c_api
 
 #endif // REALM_OBJECT_STORE_C_API_UTIL_HPP

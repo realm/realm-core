@@ -2241,14 +2241,13 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*);
  * @param out_users A pointer to an array of `realm_user_t*`, which
  *                  will be populated with the list of active users in the app.
  *                  May be NULL, in which case this function can be used to
- *                  discover the number of active users in the app.
- * @param max The maximum number of entries to write to `out_users`.
- *            If greater than the total number of entries then the value is disregarded.
+ *                  discover the number of active users by passing in just `out_n`.
+ * @param capacity The maximum number of elements `out_users` can hold.
  * @param out_n The actual number of entries written to `out_users`.
  *              May be NULL.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n);
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n);
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                realm_app_user_completion_func_t, void* userdata,
@@ -2384,14 +2383,13 @@ typedef struct {
  * @param out_identities A pointer to an array of `realm_user_identity_t`, which
  *                       will be populated with the list of identities of this user.
  *                       May be NULL, in which case this function can be used to
- *                       discover the number of identities of this user.
- * @param max The maximum number of entries to write to `out_identities`.
- *            If greater than the total number of entries then the value is disregarded.
+ *                       discover the number of identities of this user by passing in just `out_n`.
+ * @param capacity The maximum number of elements `out_identities` can hold.
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
  * @return true, if no errors occurred.
  */
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
-                                           size_t max, size_t* out_n);
+                                           size_t capacity, size_t* out_n);
 
 RLM_API const char* realm_user_get_local_identity(const realm_user_t*);
 

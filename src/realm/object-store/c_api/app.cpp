@@ -365,19 +365,20 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app)
     return nullptr;
 }
 
-RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t max, size_t* out_n)
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n)
 {
     return wrap_err([&]() {
         if (out_users) {
-            const auto& users = (*app)->all_users();
-            size_t i = 0;
-            max = std::min(users.size(), max);
-            for (; i < max; i++) {
-                out_users[i] = new realm_user_t(users[i]);
+            OutBuffer<realm_user_t> buf(out_users);
+            for (const auto& user : (*app)->all_users()) {
+                if (buf.size() < capacity) {
+                    buf.emplace(user);
+                }
+                else {
+                    break;
+                }
             }
-            if (out_n) {
-                *out_n = i;
-            }
+            buf.release(out_n);
         }
         else {
             if (out_n) {
