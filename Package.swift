@@ -765,6 +765,7 @@ let package = Package(
             exclude: [
                 "CMakeLists.txt",
                 "conversion.hpp",
+                "logging.hpp",
                 "realm.c",
                 "types.hpp",
                 "util.hpp",

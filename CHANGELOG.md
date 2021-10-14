@@ -7,6 +7,7 @@
 * Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
 * Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
+* Added the `App` functionality (except access to Atlas collections) to the C API. ([#4951](https://github.com/realm/realm-core/pull/4951))
 
 ### Fixed
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
