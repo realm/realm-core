@@ -208,7 +208,7 @@ static inline auto make_callback(realm_app_user_completion_func_t callback, void
     };
 }
 
-static inline auto make_callback(void (*callback)(void* userdata, realm_app_user_apikey_t*, realm_app_error_t*),
+static inline auto make_callback(void (*callback)(void* userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
                                  void* userdata, realm_free_userdata_func_t userdata_free)
 {
     return [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
@@ -543,7 +543,7 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
 
 RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
     const realm_app_t* app, const realm_user_t* user, const char* name,
-    void (*callback)(void* userdata, realm_app_user_apikey_t*, realm_app_error_t*), void* userdata,
+    void (*callback)(void* userdata, realm_app_user_apikey_t*, const realm_app_error_t*), void* userdata,
     realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {
@@ -555,7 +555,7 @@ RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
 
 RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
     const realm_app_t* app, const realm_user_t* user, realm_object_id_t id,
-    void (*callback)(void* userdata, realm_app_user_apikey_t*, realm_app_error_t*), void* userdata,
+    void (*callback)(void* userdata, realm_app_user_apikey_t*, const realm_app_error_t*), void* userdata,
     realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&] {

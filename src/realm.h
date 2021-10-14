@@ -2167,7 +2167,7 @@ typedef struct realm_app_error {
  * @param userdata The userdata pointer the asynchronous operation was started with.
  * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
  */
-typedef void (*realm_app_void_completion_func_t)(void* userdata, realm_app_error_t* error);
+typedef void (*realm_app_void_completion_func_t)(void* userdata, const realm_app_error_t* error);
 
 /**
  * Completion callback for asynchronous Realm App operations that yield a user object.
@@ -2178,7 +2178,7 @@ typedef void (*realm_app_void_completion_func_t)(void* userdata, realm_app_error
  *             if you wish to use it further make a copy with realm_clone().
  * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
  */
-typedef void (*realm_app_user_completion_func_t)(void* userdata, realm_user_t* user, realm_app_error_t* error);
+typedef void (*realm_app_user_completion_func_t)(void* userdata, realm_user_t* user, const realm_app_error_t* error);
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) RLM_API_NOEXCEPT;
@@ -2325,13 +2325,13 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
 RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t*, const realm_user_t*,
                                                                  const char* name,
                                                                  void (*)(void* userdata, realm_app_user_apikey_t*,
-                                                                          realm_app_error_t*),
+                                                                          const realm_app_error_t*),
                                                                  void* userdata, realm_free_userdata_func_t);
 
 RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t*, const realm_user_t*,
                                                                 realm_object_id_t id,
                                                                 void (*)(void* userdata, realm_app_user_apikey_t*,
-                                                                         realm_app_error_t*),
+                                                                         const realm_app_error_t*),
                                                                 void* userdata, realm_free_userdata_func_t);
 
 RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t*, const realm_user_t*,
