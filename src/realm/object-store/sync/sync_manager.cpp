@@ -18,6 +18,7 @@
 
 #include <realm/object-store/sync/sync_manager.hpp>
 
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
@@ -595,6 +596,9 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
 
 std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, const SyncConfig& sync_config)
 {
+    if (!db->can_claim_sync_agent()) {
+        return nullptr;
+    }
     auto& client = get_sync_client(); // Throws
     auto path = db->get_path();
 
@@ -675,6 +679,32 @@ void SyncManager::enable_session_multiplexing()
         throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
 
     m_config.multiplex_sessions = true;
+}
+
+void SyncManager::resume()
+{
+    for (auto& [k,v] : m_suspended_sessions) {
+        auto coordinator = RealmCoordinator::get_coordinator(k);
+        coordinator->resume(std::move(v));
+    }
+
+    m_suspended_sessions.clear();
+}
+
+void SyncManager::suspend()
+{
+    if (!has_existing_sessions()) {
+        return;
+    }
+
+    m_sessions.begin()->second->m_db->release_sync_agent();
+    for (auto& [k,v] : m_sessions) {
+        auto coordinator = RealmCoordinator::get_coordinator(v->m_db->get_path());
+        m_suspended_sessions.insert({v->m_db->get_path(), std::move(coordinator->get_config())});
+        v->close();
+        coordinator->suspend();
+    }
+    m_sessions.clear();
 }
 
 SyncClient& SyncManager::get_sync_client() const

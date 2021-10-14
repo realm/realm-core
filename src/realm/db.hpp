@@ -393,14 +393,15 @@ public:
                              bool delete_lockfile = false);
 
     /// Mark this DB as the sync agent for the file.
-    /// \throw MultipleSyncAgents if another DB is already the sync agent.
     void claim_sync_agent();
-    void release_sync_agent();
+    void release_sync_agent(bool with_lock = true);
 
+    bool can_claim_sync_agent();
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
 private:
+    util::File m_sync_agent_lock;
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;

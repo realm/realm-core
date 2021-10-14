@@ -49,7 +49,6 @@
 
 using namespace realm;
 using namespace realm::_impl;
-
 static auto& s_coordinator_mutex = *new std::mutex;
 static auto& s_coordinators_per_path = *new std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>>;
 
@@ -91,11 +90,13 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
 void RealmCoordinator::create_sync_session()
 {
 #if REALM_ENABLE_SYNC
-    if (m_sync_session)
+    if (m_sync_session || m_is_suspended)
         return;
 
     open_db();
     if (m_sync_session)
+        return;
+    if (!m_db->can_claim_sync_agent())
         return;
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 

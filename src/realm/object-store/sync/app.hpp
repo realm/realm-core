@@ -64,6 +64,10 @@ public:
         std::string platform;
         std::string platform_version;
         std::string sdk_version;
+        // The path for a Synced Realm that will be shared
+        // by multiple processes.
+        // TODO: Probably could use a better name.
+        util::Optional<std::string> shared_path;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
