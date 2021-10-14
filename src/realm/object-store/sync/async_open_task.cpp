@@ -53,7 +53,6 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
         // Release our references to the coordinator after calling the callback
         auto coordinator = std::move(m_coordinator);
-        m_coordinator = nullptr;
 
         if (ec)
             return callback({}, std::make_exception_ptr(std::system_error(ec)));
@@ -71,7 +70,7 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
 void AsyncOpenTask::cancel()
 {
-    std::shared_ptr<SyncSession> session = nullptr;
+    std::shared_ptr<SyncSession> session;
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -83,7 +82,6 @@ void AsyncOpenTask::cancel()
         }
 
         session = std::move(m_session);
-        m_session = nullptr;
         m_coordinator = nullptr;
     }
 
