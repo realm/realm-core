@@ -34,6 +34,7 @@ class Schema;
 class StringData;
 class SyncSession;
 class Transaction;
+class SyncManager;
 
 namespace _impl {
 class CollectionNotifier;
@@ -207,7 +208,20 @@ public:
         return m_audit_context.get();
     }
 
+    void suspend() noexcept
+    {
+        m_is_suspended = true;
+#if REALM_ENABLE_SYNC
+        m_sync_session = nullptr;
+#endif
+    }
+    void resume(const Realm::Config& config) noexcept
+    {
+        m_is_suspended = false;
+        create_session(config);
+    }
 private:
+    friend class realm::SyncManager;
     friend Realm::Internal;
     Realm::Config m_config;
     std::shared_ptr<DB> m_db;
@@ -255,6 +269,7 @@ private:
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);
 
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&) REQUIRES(m_notifier_mutex);
+    bool m_is_suspended;
 };
 
 void translate_file_exception(StringData path, bool immutable = false);

@@ -144,6 +144,13 @@ public:
     // the state of that session.
     bool has_existing_sessions();
 
+    // Resume sync. This will recreate all sync sessions that were suspended.
+    // It will also attempt to claim ownership of the sync agent.
+    void resume();
+    // Suspend sync. This will terminate all sync sessions and store their metadata to
+    // be reconstructed on resumption. It will also release ownership of the sync agent.
+    void suspend();
+
     // Blocking call that only return once all sessions have been terminated.
     // Due to the async nature of the SyncClient, even with `SyncSessionStopPolicy::Immediate`, a
     // session is not guaranteed to stop immediately when a Realm is closed. Using this method
@@ -278,6 +285,10 @@ private:
     // Sessions remove themselves from this map by calling `unregister_session` once they're
     // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
+    // Map of suspended sessions by path name.
+    // The path and config are used to create new `SyncSessions`
+    // upon resumption via the `RealmCoordinator`.
+    std::unordered_map<std::string, Realm::Config> m_suspended_sessions;
 
     // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
     // Callers of this method should hold the `m_session_mutex` themselves.

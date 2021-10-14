@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
+#include <filesystem>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -42,6 +43,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -748,7 +750,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     if (options.durability == Durability::Async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
-
     m_db_path = path;
     SlabAlloc& alloc = m_alloc;
     if (options.is_immutable) {
@@ -767,7 +768,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     m_coordination_dir = get_core_file(path, CoreFileType::Management);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
-
 #if REALM_METRICS
     if (options.enable_metrics) {
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
@@ -1325,6 +1325,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
     }
 
     m_alloc.set_read_only(true);
+    auto fs_path = path.substr(0, path.find_last_of("/"));
+    auto process_lock_path = util::file_path_by_appending_component(fs_path,
+                                                                    "process.lock");
+    m_sync_agent_lock = util::File(process_lock_path, util::File::Mode::mode_Write);
 }
 
 void DB::open(BinaryData buffer, bool take_ownership)
@@ -2872,27 +2876,43 @@ DBRef DB::create(BinaryData buffer, bool take_ownership)
     return retval;
 }
 
+bool DB::can_claim_sync_agent()
+{
+    return m_sync_agent_lock.try_lock_exclusive();
+}
+
 void DB::claim_sync_agent()
 {
     REALM_ASSERT(is_attached());
     std::unique_lock<InterprocessMutex> lock(m_controlmutex);
     SharedInfo* info = m_file_map.get_addr();
-    if (info->sync_agent_present)
-        throw MultipleSyncAgents{};
+    // if there is a sync agent present but the lock is not held,
+    // then another process was suspended and we can reclaim sync
+    // agent status for this process
+    if (info->sync_agent_present && can_claim_sync_agent())
+        release_sync_agent(false);
+    m_sync_agent_lock.lock_exclusive();
     info->sync_agent_present = 1; // Set to true
     m_is_sync_agent = true;
 }
 
-void DB::release_sync_agent()
+void DB::release_sync_agent(bool with_lock)
 {
     REALM_ASSERT(is_attached());
-    std::unique_lock<InterprocessMutex> lock(m_controlmutex);
+    // TODO: This is smelly due to claiming the sync agent needing
+    // TODO: to release the previous sync agent if taking over from
+    // TODO: a different suspended process.
+    if (with_lock)
+        std::unique_lock<InterprocessMutex> lock(m_controlmutex);
     if (!m_is_sync_agent)
         return;
     SharedInfo* info = m_file_map.get_addr();
     REALM_ASSERT(info->sync_agent_present);
     info->sync_agent_present = 0;
     m_is_sync_agent = false;
+    if (with_lock) {
+        m_sync_agent_lock.unlock();
+    }
 }
 
 // HACK: Somewhat misplaced, but we have no replication.cpp
