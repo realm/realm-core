@@ -339,7 +339,7 @@ RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
 RLM_API realm_app_t* realm_app_get_cached(const char* app_id)
 {
     if (auto app = App::get_cached_app(app_id)) {
-        return new realm_app_t(app);
+        return new realm_app_t(std::move(app));
     };
 
     return nullptr;
