@@ -575,6 +575,7 @@ RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
             }
             else {
                 std::vector<realm_app_user_apikey_t> c_apikeys;
+                c_apikeys.reserve(apikeys.size());
                 for (const auto& apikey : apikeys) {
                     c_apikeys.push_back(to_capi(apikey));
                 }
