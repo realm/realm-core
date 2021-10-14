@@ -215,10 +215,10 @@ public:
         m_sync_session = nullptr;
 #endif
     }
-    void resume(const Realm::Config& config) noexcept
+    void resume() noexcept
     {
         m_is_suspended = false;
-        create_session(config);
+        create_session(m_config);
     }
 private:
     friend class realm::SyncManager;

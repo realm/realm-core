@@ -285,10 +285,10 @@ private:
     // Sessions remove themselves from this map by calling `unregister_session` once they're
     // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
-    // Map of suspended sessions by path name.
-    // The path and config are used to create new `SyncSessions`
+    // Vector of suspended session realm paths.
+    // The paths used to create new `SyncSessions`
     // upon resumption via the `RealmCoordinator`.
-    std::unordered_map<std::string, Realm::Config> m_suspended_sessions;
+    std::vector<std::string> m_suspended_paths;
 
     // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
     // Callers of this method should hold the `m_session_mutex` themselves.

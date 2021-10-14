@@ -683,12 +683,11 @@ void SyncManager::enable_session_multiplexing()
 
 void SyncManager::resume()
 {
-    for (auto& [k,v] : m_suspended_sessions) {
-        auto coordinator = RealmCoordinator::get_coordinator(k);
-        coordinator->resume(std::move(v));
+    for (auto& v : m_suspended_paths) {
+        RealmCoordinator::get_coordinator(v)->resume();
     }
 
-    m_suspended_sessions.clear();
+    m_suspended_paths.clear();
 }
 
 void SyncManager::suspend()
@@ -700,7 +699,7 @@ void SyncManager::suspend()
     m_sessions.begin()->second->m_db->release_sync_agent();
     for (auto& [k,v] : m_sessions) {
         auto coordinator = RealmCoordinator::get_coordinator(v->m_db->get_path());
-        m_suspended_sessions.insert({v->m_db->get_path(), std::move(coordinator->get_config())});
+        m_suspended_paths.push_back(v->m_db->get_path());
         v->close();
         coordinator->suspend();
     }
