@@ -10,6 +10,7 @@
 #include <string>
 
 #include <realm/util/buffer.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
@@ -484,79 +485,58 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// ClientReset is used for both async open and client reset. If
-        /// client_reset is not util::none, the sync client will perform
-        /// async open for this session if the local Realm does not exist, and
-        /// client reset if the local Realm exists. If client_reset is
-        /// util::none, an ordinary sync session will take place.
+        /// The presence of the ClientReset config indicates an ongoing or requested client
+        /// reset operation. If client_reset is util::none or if the local Realm does not
+        /// exist, an ordinary sync session will take place.
         ///
-        /// A session will perform async open by downloading a state Realm, and
-        /// some metadata, from the server, patching up the metadata part of
-        /// the Realm and finally move the downloaded Realm into the path of
-        /// the local Realm. After completion of async open, the application
-        /// can open and use the Realm.
+        /// A session will perform client reset by downloading a fresh copy of the Realm
+        /// from the server at a different file path location. After download, the fresh
+        /// Realm will be integrated into the local Realm in a write transaction. The
+        /// application is free to read or write to the local realm during the entire client
+        /// reset. Like a DOWNLOAD message, the application will not be able to perform a
+        /// write transaction at the same time as the sync client performs its own write
+        /// transaction. Client reset is not more disturbing for the application than any
+        /// DOWNLOAD message. The application can listen to change notifications from the
+        /// client reset exactly as in a DOWNLOAD message. If the application writes to the
+        /// local realm during client reset but before the client reset operation has
+        /// obtained a write lock, the changes made by the application may be lost or
+        /// overwritten depending on the recovery mode selected.
         ///
-        /// A session will perform client reset by downloading a state Realm, and
-        /// some metadata, from the server. After download, the state Realm will
-        /// be integrated into the local Realm in a write transaction. The
-        /// application is free to use the local realm during the entire client
-        /// reset. Like a DOWNLOAD message, the application will not be able
-        /// to perform a write transaction at the same time as the sync client
-        /// performs its own write transaction. Client reset is not more
-        /// disturbing for the application than any DOWNLOAD message. The
-        /// application can listen to change notifications from the client
-        /// reset exactly as in a DOWNLOAD message.
+        /// Client reset downloads its fresh Realm copy for a Realm at path "xyx.realm" to
+        /// "xyz.realm.fresh". It is assumed that this path is available for use and if
+        /// there are any problems the client reset will fail with
+        /// Client::Error::client_reset_failed.
         ///
-        /// Async open and client reset require a private directory for
-        /// metadata. This directory must be specified in the option
-        /// 'metadata_dir'. The metadata_dir must not be touched during async
-        /// open or client reset. The metadata_dir can safely be removed at
-        /// times where async open or client reset do not take place. The sync
-        /// client attempts to clean up metadata_dir. The metadata_dir can be
-        /// reused across app restarts to resume an interrupted download. It is
-        /// recommended to leave the metadata_dir unchanged except when it is
-        /// known that async open or client reset is done.
+        /// The recommended usage of client reset is after a previous session encountered an
+        /// error that implies the need for a client reset. It is not recommended to persist
+        /// the need for a client reset. The application should just attempt to synchronize
+        /// in the usual fashion and only after hitting an error, start a new session with a
+        /// client reset. In other words, if the application crashes during a client reset,
+        /// the application should attempt to perform ordinary synchronization after restart
+        /// and switch to client reset if needed.
         ///
-        /// The recommended usage of async open is to use it for the initial
-        /// bootstrap if Realm usage is not needed until after the server state
-        /// has been downloaded.
+        /// Error codes that imply the need for a client reset are the session level error
+        /// codes described by SyncError::is_client_reset_requested()
         ///
-        /// The recommended usage of client reset is after a previous session
-        /// encountered an error that implies the need for a client reset. It
-        /// is not recommended to persist the need for a client reset. The
-        /// application should just attempt to synchronize in the usual fashion
-        /// and only after hitting an error, start a new session with a client
-        /// reset. In other words, if the application crashes during a client reset,
-        /// the application should attempt to perform ordinary synchronization
-        /// after restart and switch to client reset if needed.
+        /// However, other errors such as bad changeset (UPLOAD) could also be resolved with
+        /// a client reset. Client reset can even be used without any prior error if so
+        /// desired.
         ///
-        /// Error codes that imply the need for a client reset are the session
-        /// level error codes:
+        /// After completion of a client reset, the sync client will continue synchronizing
+        /// with the server in the usual fashion.
         ///
-        /// bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
-        /// bad_server_version           = 209, // Bad server version (IDENT, UPLOAD)
-        /// bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
-        /// diverging_histories          = 211, // Diverging histories (IDENT)
+        /// The progress of client reset can be tracked with the standard progress handler.
         ///
-        /// However, other errors such as bad changeset (UPLOAD) could also be resolved
-        /// with a client reset. Client reset can even be used without any prior error
-        /// if so desired.
-        ///
-        /// After completion of async open and client reset, the sync client
-        /// will continue synchronizing with the server in the usual fashion.
-        ///
-        /// The progress of async open and client reset can be tracked with the
-        /// standard progress handler.
-        ///
-        /// Async open and client reset are done when the progress handler
-        /// arguments satisfy "progress_version > 0". However, if the
-        /// application wants to ensure that it has all data present on the
-        /// server, it should wait for download completion using either
-        /// void async_wait_for_download_completion(WaitOperCompletionHandler)
-        /// or
+        /// Client reset is done when the progress handler arguments satisfy
+        /// "progress_version > 0". However, if the application wants to ensure that it has
+        /// all data present on the server, it should wait for download completion using
+        /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
         /// bool wait_for_download_complete_or_client_stopped().
         struct ClientReset {
-            std::string metadata_dir;
+            bool seamless_loss = false;
+            DBRef fresh_copy;
+            util::UniqueFunction<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+            util::UniqueFunction<void(TransactionRef local)> notify_after_client_reset;
         };
         util::Optional<ClientReset> client_reset_config;
 
@@ -586,7 +566,7 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, Config = {});
+    Session(Client&, std::shared_ptr<DB>, Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
@@ -1058,6 +1038,7 @@ enum class Client::Error {
     bad_state_message           = 127, ///< Bad values in state message (STATE)
     missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
     http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
+    auto_client_reset_failure   = 132, ///< A fatal error was encountered which prevents completion of a client reset
     // clang-format on
 };
 

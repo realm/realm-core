@@ -792,11 +792,11 @@ protected:
     /// not after initiation of deactivation.
     virtual ClientHistoryBase& access_realm() = 0;
 
-    // client_reset_config() returns the config for async open and client
+    // client_reset_config() returns the config for client
     // reset. If it returns none, ordinary sync is used. If it returns a
-    // Config::ClientReset, the session will be initiated with a state Realm
-    // transfer from the server.
-    virtual const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept;
+    // Config::ClientReset, the session will be initiated with a fresh
+    // copy of the Realm transferred from the server.
+    virtual util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() noexcept;
 
     /// \brief Initiate the integration of downloaded changesets.
     ///

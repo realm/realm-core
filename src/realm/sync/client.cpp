@@ -234,7 +234,7 @@ public:
     const std::string& get_realm_path() const noexcept override final;
     DB& get_db() const noexcept override final;
     ClientHistoryBase& access_realm() override final;
-    const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept override final;
+    util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() noexcept override final;
     void initiate_integrate_changesets(std::uint_fast64_t, const ReceivedChangesets&) override final;
     void on_upload_completion() override final;
     void on_download_completion() override final;
@@ -1028,7 +1028,7 @@ ClientReplicationBase& SessionImpl::access_realm()
     return m_wrapper.get_history();
 }
 
-const util::Optional<sync::Session::Config::ClientReset>& SessionImpl::get_client_reset_config() const noexcept
+util::Optional<sync::Session::Config::ClientReset>& SessionImpl::get_client_reset_config() noexcept
 {
     return m_wrapper.m_client_reset_config;
 }
@@ -1096,7 +1096,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
-    , m_client_reset_config{config.client_reset_config}
+    , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
 {
     REALM_ASSERT(m_db);
@@ -1752,6 +1752,8 @@ const char* get_error_message(Client::Error error_code)
             return "Requested feature missing in negotiated protocol version";
         case Client::Error::http_tunnel_failed:
             return "Failure to establish HTTP tunnel with configured proxy";
+        case Client::Error::auto_client_reset_failure:
+            return "Automatic recovery from client reset failed";
     }
     return nullptr;
 }
@@ -1853,7 +1855,7 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, DBRef db, Config config)
+Session::Session(Client& client, DBRef db, Config&& config)
     : m_impl{Impl::make_session(*client.m_impl, std::move(db), std::move(config))} // Throws
 {
 }

@@ -23,9 +23,11 @@
 #include "realm/object-store/schema.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 
+#include "sync/sync_test_utils.hpp"
+
 #include "external/json/json.hpp"
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 namespace realm {
 app::Response do_http_request(const app::Request& request);
 
@@ -35,6 +37,7 @@ public:
     app::Response patch(std::string body) const;
     app::Response post(std::string body) const;
     app::Response put(std::string body) const;
+    app::Response del() const;
     nlohmann::json get_json() const;
     nlohmann::json patch_json(nlohmann::json body) const;
     nlohmann::json post_json(nlohmann::json body) const;
@@ -63,10 +66,32 @@ public:
                                  const std::string& password);
 
     AdminAPIEndpoint apps() const;
-    void revoke_user_sessions(const std::string& user_id, const std::string app_id);
-    void disable_user_sessions(const std::string& user_id, const std::string app_id);
-    void enable_user_sessions(const std::string& user_id, const std::string app_id);
-    bool verify_access_token(const std::string& access_token, const std::string app_id);
+    void revoke_user_sessions(const std::string& user_id, const std::string& app_id);
+    void disable_user_sessions(const std::string& user_id, const std::string& app_id);
+    void enable_user_sessions(const std::string& user_id, const std::string& app_id);
+    bool verify_access_token(const std::string& access_token, const std::string& app_id);
+    void set_development_mode_to(const std::string& app_id, bool enable);
+    void delete_app(const std::string& app_id);
+
+    struct Service {
+        std::string id;
+        std::string name;
+        std::string type;
+        int64_t version;
+        int64_t last_modified;
+    };
+    struct ServiceConfig {
+        std::string database_name;
+        nlohmann::json partition;
+        std::string state;
+    };
+    std::vector<Service> get_services(const std::string& app_id);
+    Service get_sync_service(const std::string& app_id);
+    ServiceConfig get_config(const std::string& app_id, const Service& service);
+    ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
+    ServiceConfig pause_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
+    ServiceConfig enable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
+    bool is_sync_enabled(const std::string& app_id);
 
     const std::string& base_url() const noexcept
     {
@@ -80,6 +105,8 @@ private:
         , m_group_id(std::move(group_id))
     {
     }
+
+    AdminAPIEndpoint service_config_endpoint(const std::string& app_id, const std::string& service_id);
 
     std::string m_base_url;
     std::string m_access_token;
@@ -135,6 +162,36 @@ struct AppSession {
     AppCreateConfig config;
 };
 AppSession create_app(const AppCreateConfig& config);
+
+class SynchronousTestTransport : public app::GenericNetworkTransport {
+public:
+    void send_request_to_server(const app::Request request,
+                                std::function<void(const app::Response)> completion_block) override
+    {
+        completion_block(do_http_request(request));
+    }
+};
+
+// This will create a new test app in the baas server at base_url
+// to be used in tests.
+AppSession get_runtime_app_session(std::string base_url);
+
+template <typename Factory>
+inline app::App::Config get_config(Factory factory, const AppSession& app_session)
+{
+    return {app_session.client_app_id,
+            factory,
+            app_session.admin_api.base_url(),
+            util::none,
+            util::Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"};
+}
+
+// Get an App config suitable for integration testing against BaaS
+app::App::Config get_integration_config();
 
 } // namespace realm
 

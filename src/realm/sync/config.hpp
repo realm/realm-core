@@ -19,6 +19,7 @@
 #ifndef REALM_SYNC_CONFIG_HPP
 #define REALM_SYNC_CONFIG_HPP
 
+#include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/network.hpp>
@@ -27,19 +28,32 @@
 #include <memory>
 #include <string>
 #include <map>
-#include <array>
 #include <system_error>
 #include <unordered_map>
 
 namespace realm {
 
-class Group;
 class SyncUser;
 class SyncSession;
 
 namespace bson {
 class Bson;
 }
+
+enum class SimplifiedProtocolError {
+    ConnectionIssue,
+    UnexpectedInternalIssue,
+    SessionIssue,
+    BadAuthentication,
+    PermissionDenied,
+    ClientResetRequested,
+};
+
+namespace sync {
+enum class ProtocolError;
+}
+
+SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
 
@@ -78,10 +92,10 @@ struct SyncError {
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
 enum class ClientResyncMode : unsigned char {
-    // Enable automatic client resync without local transaction recovery
-    DiscardLocal = 1,
     // Fire a client reset error
-    Manual = 2,
+    Manual,
+    // Discard local changes, without disrupting accessors or closing the Realm
+    SeamlessLoss,
 };
 
 enum class ReconnectMode {
@@ -136,9 +150,13 @@ struct SyncConfig {
     std::map<std::string, std::string> custom_http_headers;
 
     // The name of the directory which Realms should be backed up to following
-    // a client reset
+    // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
-    ClientResyncMode client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
+    std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
+    std::function<void(TransactionRef local)> notify_after_client_reset;
+    std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
+        get_fresh_realm_for_path;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

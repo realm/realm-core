@@ -160,7 +160,7 @@ public:
         m_replication = repl;
     }
 
-    const std::string& get_path() const
+    const std::string& get_path() const noexcept
     {
         return m_db_path;
     }

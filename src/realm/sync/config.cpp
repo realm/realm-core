@@ -51,14 +51,14 @@ bool SyncError::is_session_level_protocol_error() const
 /// The error indicates a client reset situation.
 bool SyncError::is_client_reset_requested() const
 {
+    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+        return true;
+    }
     if (error_code.category() != realm::sync::protocol_error_category()) {
         return false;
     }
-    // Documented here: https://realm.io/docs/realm-object-server/#client-recovery-from-a-backup
-    return (error_code == ProtocolError::bad_server_file_ident ||
-            error_code == ProtocolError::bad_client_file_ident || error_code == ProtocolError::bad_server_version ||
-            error_code == ProtocolError::diverging_histories || error_code == ProtocolError::client_file_expired ||
-            error_code == ProtocolError::invalid_schema_change);
+    return get_simplified_error(static_cast<sync::ProtocolError>(error_code.value())) ==
+           SimplifiedProtocolError::ClientResetRequested;
 }
 
 SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
@@ -75,6 +75,66 @@ SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
     : user(std::move(user))
     , partition_value(partition)
 {
+}
+
+SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
+{
+    switch (err) {
+        // Connection level errors
+        case ProtocolError::connection_closed:
+        case ProtocolError::other_error:
+            // Not real errors, don't need to be reported to the binding.
+            return SimplifiedProtocolError::ConnectionIssue;
+        case ProtocolError::unknown_message:
+        case ProtocolError::bad_syntax:
+        case ProtocolError::limits_exceeded:
+        case ProtocolError::wrong_protocol_version:
+        case ProtocolError::bad_session_ident:
+        case ProtocolError::reuse_of_session_ident:
+        case ProtocolError::bound_in_other_session:
+        case ProtocolError::bad_message_order:
+        case ProtocolError::bad_client_version:
+        case ProtocolError::illegal_realm_path:
+        case ProtocolError::no_such_realm:
+        case ProtocolError::bad_changeset:
+        case ProtocolError::bad_changeset_header_syntax:
+        case ProtocolError::bad_changeset_size:
+        case ProtocolError::bad_changesets:
+        case ProtocolError::bad_decompression:
+        case ProtocolError::unsupported_session_feature:
+        case ProtocolError::transact_before_upload:
+        case ProtocolError::partial_sync_disabled:
+        case ProtocolError::user_mismatch:
+        case ProtocolError::too_many_sessions:
+            return SimplifiedProtocolError::UnexpectedInternalIssue;
+        // Session errors
+        case ProtocolError::session_closed:
+        case ProtocolError::other_session_error:
+        case ProtocolError::disabled_session:
+            // The binding doesn't need to be aware of these because they are strictly informational, and do not
+            // represent actual errors.
+            return SimplifiedProtocolError::SessionIssue;
+        case ProtocolError::token_expired: {
+            REALM_UNREACHABLE(); // This is not sent by the MongoDB server
+        }
+        case ProtocolError::bad_authentication:
+            return SimplifiedProtocolError::BadAuthentication;
+        case ProtocolError::permission_denied:
+            return SimplifiedProtocolError::PermissionDenied;
+        case ProtocolError::bad_client_file:
+        case ProtocolError::bad_client_file_ident:
+        case ProtocolError::bad_origin_file_ident:
+        case ProtocolError::bad_server_file_ident:
+        case ProtocolError::bad_server_version:
+        case ProtocolError::client_file_blacklisted:
+        case ProtocolError::client_file_expired:
+        case ProtocolError::diverging_histories:
+        case ProtocolError::invalid_schema_change:
+        case ProtocolError::server_file_deleted:
+        case ProtocolError::user_blacklisted:
+            return SimplifiedProtocolError::ClientResetRequested;
+    }
+    return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
 }
 
 } // namespace realm

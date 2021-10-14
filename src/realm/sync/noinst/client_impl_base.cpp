@@ -6,6 +6,7 @@
 #include <realm/util/random.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/http.hpp>
@@ -1779,7 +1780,7 @@ void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_byte
 }
 
 
-const util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() const noexcept
+util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() noexcept
 {
     return m_client_reset_config;
 }
@@ -1831,10 +1832,16 @@ void Session::activate()
 
     logger.debug("Activating"); // Throws
 
-    REALM_ASSERT(!m_client_reset_operation);
-
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
+        // The reason we need a mutable reference from get_client_reset_config() is because we
+        // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
+        // DB. If it did, then the fresh DB would stay alive for the duration of this sync session
+        // and we want to clean it up once the reset is finished. Additionally, the fresh copy will
+        // be set to a new copy on every reset so there is no reason to keep a reference to it.
+        // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
+        // If the client reset config were a `const &` then this std::move would create another strong
+        // reference which we don't want to happen.
+        util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
 
@@ -1842,15 +1849,11 @@ void Session::activate()
                     "client reset = %3",
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
-        if (client_reset_config) {
-            if (!util::File::is_dir(client_reset_config->metadata_dir)) {
-                logger.error("Client reset config requires an existing metadata directory"); // Throws
-                REALM_TERMINATE("No metadata directory");
-            }
-            logger.info("Client reset config, metadata_dir = '%1', ",
-                        client_reset_config->metadata_dir); // Throws
-            m_client_reset_operation.reset(
-                new _impl::ClientResetOperation(logger, get_db(), client_reset_config->metadata_dir)); // Throws
+        if (client_reset_config && !m_client_reset_operation) {
+            m_client_reset_operation = std::make_unique<_impl::ClientResetOperation>(
+                logger, get_db(), std::move(client_reset_config->fresh_copy), client_reset_config->seamless_loss,
+                std::move(client_reset_config->notify_before_client_reset),
+                std::move(client_reset_config->notify_after_client_reset)); // Throws
         }
 
         if (!m_client_reset_operation) {
@@ -2280,47 +2283,65 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return std::error_code{};  // Success
     }
 
+    // access before the client reset (if applicable) because
+    // the reset can take a while and the sync session might have died
+    // by the time the reset finishes.
+    ClientHistoryBase& history = access_realm(); // Throws
+
     auto client_reset_if_needed = [&]() -> bool {
+        if (!m_client_reset_operation) {
+            return false;
+        }
+
         // ClientResetOperation::finalize() will return true only if the operation actually did
         // a client reset. It may choose not to do a reset if the local Realm does not exist
         // at this point (in that case there is nothing to reset). But in any case, we must
         // clean up m_client_reset_operation at this point as sync should be able to continue from
         // this point forward.
-        auto client_reset_operation = std::move(m_client_reset_operation); // accept ownership to clean up
-
-        if (!client_reset_operation || !client_reset_operation->finalize(client_file_ident)) {
+        auto client_reset_operation = std::move(m_client_reset_operation);
+        if (!client_reset_operation->finalize(client_file_ident)) {
             return false;
         }
-        realm::VersionID client_reset_old_version;
-        realm::VersionID client_reset_new_version;
+        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
+        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
+        // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        const ClientHistoryBase& history = access_realm();                           // Throws
         history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
-        REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
-        REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
-        REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
-        REALM_ASSERT(m_progress.upload.client_version == 0);
-        REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
+        REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
+                        client_file_ident.ident);
+        REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
+                        client_file_ident.salt);
+        REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
+                        m_progress.download.last_integrated_client_version);
+        REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
+        REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
+                        m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
-        REALM_ASSERT(m_last_version_selected_for_upload == 0);
-
-        client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        client_reset_new_version = client_reset_operation->get_client_reset_new_version();
+        REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         if (m_sync_transact_reporter) {
             m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
         }
         return true;
     };
-    if (!client_reset_if_needed()) {
-        ClientHistoryBase& history = access_realm(); // Throws
-        bool fix_up_object_ids = true;
+    // if a client reset happens, it will take care of setting the file ident
+    // and if not, we do it here
+    bool did_client_reset = false;
+    try {
+        did_client_reset = client_reset_if_needed();
+    }
+    catch (const std::exception& e) {
+        logger.error("A fatal error occured during client reset: '%1'", e.what());
+        return make_error_code(sync::Client::Error::auto_client_reset_failure);
+    }
+    if (!did_client_reset) {
+        constexpr bool fix_up_object_ids = true;
         history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
@@ -2645,6 +2666,7 @@ void Session::check_for_upload_completion()
     REALM_ASSERT(!m_deactivation_initiated);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
+    // during an ongoing client reset operation, we never upload anything
     if (m_client_reset_operation)
         return;
 

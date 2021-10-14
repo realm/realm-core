@@ -29,6 +29,7 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
+#include "sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
@@ -112,111 +113,10 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
     return *err;
 }
 
-template <typename Transport>
-const std::shared_ptr<GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 } // namespace
 
-
-// temporarily disable these tests for now,
-// but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
-#ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
-#endif
 
 #if REALM_ENABLE_AUTH_TESTS
-namespace {
-// This will create a new test app in the baas server at base_url to be used in tests throughout
-// tis file.
-AppSession get_runtime_app_session(std::string base_url)
-{
-    static const AppSession cached_app_session = [&] {
-        auto cached_app_session = create_app(default_app_config(base_url));
-        std::cout << "found app_id: " << cached_app_session.client_app_id << " in stitch config" << std::endl;
-        return cached_app_session;
-    }();
-    return cached_app_session;
-}
-
-class SynchronousTestTransport : public GenericNetworkTransport {
-public:
-    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
-    {
-        completion_block(do_http_request(request));
-    }
-};
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
-    // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
-}
-#endif
-
-struct AutoVerifiedEmailCredentials : AppCredentials {
-    AutoVerifiedEmailCredentials()
-    {
-        // emails with this prefix will pass through the baas app due to the register function
-        email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        password = random_string(10);
-        static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
-    }
-    std::string email;
-    std::string password;
-};
-
-void timed_wait_for(std::function<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(2000))
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    util::EventLoop::main().run_until([&] {
-        REQUIRE(std::chrono::steady_clock::now() - wait_start < max_ms);
-        return condition();
-    });
-}
-
-app::AppCredentials create_user_and_log_in(SharedApp app)
-{
-    REQUIRE(app);
-    AutoVerifiedEmailCredentials creds;
-    auto client = app->provider_client<App::UsernamePasswordProviderClient>();
-    client.register_email(creds.email, creds.password, [&](Optional<app::AppError> error) {
-        REQUIRE_FALSE(error);
-    });
-    log_in(app, creds);
-    return std::move(creds);
-}
-
-template <typename Factory>
-App::Config get_config(Factory factory, const AppSession& app_session)
-{
-    return {app_session.client_app_id,
-            factory,
-            app_session.admin_api.base_url(),
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
-// Get an App config suitable for integration testing against BaaS
-App::Config get_integration_config()
-{
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto app_session = get_runtime_app_session(base_url);
-    return get_config(instance_of<SynchronousTestTransport>, app_session);
-}
-} // namespace
 
 // MARK: - Login with Credentials Tests
 
@@ -2377,18 +2277,6 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
         CHECK(processed);
         auto data = *user->custom_data();
         CHECK(data["favorite_color"] == "green");
-    }
-}
-
-void timed_sleeping_wait_for(std::function<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30))
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        millisleep(1);
     }
 }
 
