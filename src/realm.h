@@ -32,8 +32,10 @@
 
 #ifdef __cplusplus
 #define RLM_API extern "C" RLM_EXPORT
+#define RLM_API_NOEXCEPT noexcept
 #else
 #define RLM_API RLM_EXPORT
+#define RLM_API_NOEXCEPT
 #endif // __cplusplus
 
 // Some platforms don't support anonymous unions in structs.
@@ -2178,24 +2180,26 @@ typedef void (*realm_app_void_completion_func_t)(void* userdata, realm_app_error
  */
 typedef void (*realm_app_user_completion_func_t)(void* userdata, realm_user_t* user, realm_app_error_t* error);
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email, realm_string_t password);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key);
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email,
+                                                                          realm_string_t password) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) RLM_API_NOEXCEPT;
 
 /**
  * Create Custom Function authentication app credentials.
  *
  * @param serialized_ejson_payload The arguments array to invoke the function with,
  *                                 serialized as an Extended JSON string.
+ * @return null, if an error occurred.
  */
 RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_ejson_payload);
 
-RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*);
+RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*) RLM_API_NOEXCEPT;
 
 /**
  * Create a new app configuration.
@@ -2203,15 +2207,16 @@ RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_cred
  * @param app_id The MongoDB Realm app id.
  * @param http_transport The HTTP transport used to make network calls.
  */
-RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport);
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
+                                                 const realm_http_transport_t* http_transport) RLM_API_NOEXCEPT;
 
-RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*);
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*);
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*);
-RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms);
-RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*);
-RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*);
-RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*);
+RLM_API void realm_app_config_set_base_url(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_local_app_name(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_local_app_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, uint64_t ms) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_t* instance with the same app id, or create it with the
@@ -2226,7 +2231,7 @@ RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_c
  *
  * @return Cached app instance, or null if no cached app exists for this @a app_id.
  */
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id);
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id) RLM_API_NOEXCEPT;
 
 /**
  * Clear all the cached @a realm_app_t* instances in the process.
@@ -2234,10 +2239,10 @@ RLM_API realm_app_t* realm_app_get_cached(const char* app_id);
  * @a realm_app_t* instances will need to be disposed with realm_release()
  * for them to be fully destroyed after the cache is cleared.
  */
-RLM_API void realm_clear_cached_apps(void);
+RLM_API void realm_clear_cached_apps(void) RLM_API_NOEXCEPT;
 
-RLM_API const char* realm_app_get_app_id(const realm_app_t*);
-RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*);
+RLM_API const char* realm_app_get_app_id(const realm_app_t*) RLM_API_NOEXCEPT;
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of active users in this @a app.
@@ -2373,9 +2378,9 @@ RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, co
                                               const realm_app_error_t*),
                                      void* userdata, realm_free_userdata_func_t);
 
-RLM_API const char* realm_user_get_identity(const realm_user_t*);
+RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*);
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
 
 typedef struct {
     const char* id;
@@ -2397,12 +2402,12 @@ typedef struct {
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
                                            size_t capacity, size_t* out_n);
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t*);
+RLM_API const char* realm_user_get_local_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
 // returned pointer must be manually released with realm_free()
-RLM_API char* realm_user_get_device_id(const realm_user_t*);
+RLM_API char* realm_user_get_device_id(const realm_user_t*) RLM_API_NOEXCEPT;
 
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*);
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*) RLM_API_NOEXCEPT;
 
 /**
  * Log out the user and mark it as logged out.
@@ -2413,7 +2418,7 @@ RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t*);
  */
 RLM_API bool realm_user_log_out(realm_user_t*);
 
-RLM_API bool realm_user_is_logged_in(const realm_user_t*);
+RLM_API bool realm_user_is_logged_in(const realm_user_t*) RLM_API_NOEXCEPT;
 
 /**
  * Get the custom user data from the user's access token.
@@ -2423,7 +2428,7 @@ RLM_API bool realm_user_is_logged_in(const realm_user_t*);
  * @return An Extended JSON document serialized as string,
  *         or null if token doesn't have any custom data.
  */
-RLM_API char* realm_user_get_custom_data(const realm_user_t*);
+RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
 
 /**
  * Get the user profile associated with this user.

@@ -9,7 +9,7 @@ namespace realm::c_api {
 void set_last_exception(std::exception_ptr eptr);
 
 template <class F>
-inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
+inline auto wrap_err(F&& f) noexcept -> decltype(f())
 {
     try {
         return f();
@@ -21,7 +21,7 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
 }
 
 template <class F>
-inline auto wrap_err(F&& f, const decltype(f())& e)
+inline auto wrap_err(F&& f, const decltype(f())& e) noexcept
 {
     try {
         return f();

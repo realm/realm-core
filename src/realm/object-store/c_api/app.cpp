@@ -234,57 +234,61 @@ static inline bson::BsonArray parse_ejson_array(const char* serialized)
     }
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::anonymous());
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::facebook(access_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::google(AuthCode(id_token)));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::apple(id_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_jwt(const char* jwt_token) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::custom(jwt_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email, realm_string_t password)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const char* email,
+                                                                          realm_string_t password) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::username_password(email, from_capi(password)));
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_ejson_payload)
 {
-    return new realm_app_credentials_t(AppCredentials::function(serialized_ejson_payload));
+    return wrap_err([&] {
+        return new realm_app_credentials_t(AppCredentials::function(serialized_ejson_payload));
+    });
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::user_api_key(api_key));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const char* api_key) noexcept
 {
     return new realm_app_credentials_t(AppCredentials::server_api_key(api_key));
 }
 
-RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t* credentials)
+RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t* credentials) noexcept
 {
     return realm_auth_provider_e(credentials->provider());
 }
 
-RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm_http_transport_t* http_transport)
+RLM_API realm_app_config_t* realm_app_config_new(const char* app_id,
+                                                 const realm_http_transport_t* http_transport) noexcept
 {
     auto* config = new realm_app_config_t;
     config->app_id = app_id;
@@ -292,37 +296,38 @@ RLM_API realm_app_config_t* realm_app_config_new(const char* app_id, const realm
     return config;
 }
 
-RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const char* base_url)
+RLM_API void realm_app_config_set_base_url(realm_app_config_t* config, const char* base_url) noexcept
 {
     config->base_url = std::string(base_url);
 }
 
-RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name)
+RLM_API void realm_app_config_set_local_app_name(realm_app_config_t* config, const char* local_app_name) noexcept
 {
     config->local_app_name = std::string(local_app_name);
 }
 
-RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config, const char* local_app_version)
+RLM_API void realm_app_config_set_local_app_version(realm_app_config_t* config,
+                                                    const char* local_app_version) noexcept
 {
     config->local_app_version = std::string(local_app_version);
 }
 
-RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms)
+RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t* config, uint64_t ms) noexcept
 {
     config->default_request_timeout_ms = ms;
 }
 
-RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform)
+RLM_API void realm_app_config_set_platform(realm_app_config_t* config, const char* platform) noexcept
 {
     config->platform = std::string(platform);
 }
 
-RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version)
+RLM_API void realm_app_config_set_platform_version(realm_app_config_t* config, const char* platform_version) noexcept
 {
     config->platform_version = std::string(platform_version);
 }
 
-RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const char* sdk_version)
+RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const char* sdk_version) noexcept
 {
     config->sdk_version = std::string(sdk_version);
 }
@@ -335,7 +340,7 @@ RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
     });
 }
 
-RLM_API realm_app_t* realm_app_get_cached(const char* app_id)
+RLM_API realm_app_t* realm_app_get_cached(const char* app_id) noexcept
 {
     if (auto app = App::get_cached_app(app_id)) {
         return new realm_app_t(std::move(app));
@@ -344,17 +349,17 @@ RLM_API realm_app_t* realm_app_get_cached(const char* app_id)
     return nullptr;
 }
 
-RLM_API void realm_clear_cached_apps(void)
+RLM_API void realm_clear_cached_apps(void) noexcept
 {
     App::clear_cached_apps();
 }
 
-RLM_API const char* realm_app_get_app_id(const realm_app_t* app)
+RLM_API const char* realm_app_get_app_id(const realm_app_t* app) noexcept
 {
     return (*app)->config().app_id.c_str();
 }
 
-RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app)
+RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcept
 {
     if (auto user = (*app)->current_user()) {
         return new realm_user_t(user);
@@ -674,12 +679,12 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
     });
 }
 
-RLM_API const char* realm_user_get_identity(const realm_user_t* user)
+RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
 {
     return (*user)->identity().c_str();
 }
 
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user)
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexcept
 {
     return realm_user_state_e((*user)->state());
 }
@@ -708,12 +713,12 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     });
 }
 
-RLM_API const char* realm_user_get_local_identity(const realm_user_t* user)
+RLM_API const char* realm_user_get_local_identity(const realm_user_t* user) noexcept
 {
     return (*user)->local_identity().c_str();
 }
 
-RLM_API char* realm_user_get_device_id(const realm_user_t* user)
+RLM_API char* realm_user_get_device_id(const realm_user_t* user) noexcept
 {
     if ((*user)->has_device_id()) {
         return duplicate_string((*user)->device_id());
@@ -722,7 +727,7 @@ RLM_API char* realm_user_get_device_id(const realm_user_t* user)
     return nullptr;
 }
 
-RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user)
+RLM_API realm_auth_provider_e realm_user_get_auth_provider(const realm_user_t* user) noexcept
 {
     return realm_auth_provider_e(enum_from_provider_type((*user)->provider_type()));
 }
@@ -735,7 +740,7 @@ RLM_API bool realm_user_log_out(realm_user_t* user)
     });
 }
 
-RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
+RLM_API bool realm_user_is_logged_in(const realm_user_t* user) noexcept
 {
     return (*user)->is_logged_in();
 }
@@ -744,21 +749,18 @@ RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
 {
     return wrap_err([&] {
         std::string data = bson::Bson((*user)->user_profile().data()).to_string();
-
         return duplicate_string(data);
     });
 }
 
-RLM_API char* realm_user_get_custom_data(const realm_user_t* user)
+RLM_API char* realm_user_get_custom_data(const realm_user_t* user) noexcept
 {
-    return wrap_err([&]() -> char* {
-        if (const auto& data = (*user)->custom_data()) {
-            std::string json = bson::Bson(*data).to_string();
-            return duplicate_string(json);
-        }
+    if (const auto& data = (*user)->custom_data()) {
+        std::string json = bson::Bson(*data).to_string();
+        return duplicate_string(json);
+    }
 
-        return nullptr;
-    });
+    return nullptr;
 }
 
 } // namespace realm::c_api
