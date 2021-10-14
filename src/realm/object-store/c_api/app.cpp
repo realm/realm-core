@@ -135,7 +135,7 @@ static_assert(realm_app_errno_service_e(ServiceErrorCode::none) == RLM_APP_ERR_S
 
 static realm_app_error_t to_capi(const AppError& error)
 {
-    realm_app_error_t ret;
+    auto ret = realm_app_error_t();
 
     const std::error_category& category = error.error_code.category();
     if (category == http_error_category()) {
