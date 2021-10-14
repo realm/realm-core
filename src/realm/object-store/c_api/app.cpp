@@ -690,14 +690,13 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     return wrap_err([&]() {
         if (out_identities) {
             const auto& identities = (*user)->identities();
-            size_t i = 0;
             max = std::min(identities.size(), max);
-            for (; i < max; i++) {
+            for (size_t i = 0; i < max; i++) {
                 out_identities[i] = {identities[i].id.c_str(),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
             }
             if (out_n) {
-                *out_n = i;
+                *out_n = max;
             }
         }
         else {
