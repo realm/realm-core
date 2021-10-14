@@ -19,8 +19,8 @@
 #include <catch2/catch.hpp>
 
 #include "collection_fixtures.hpp"
-#include "util/baas_admin_api.hpp"
 #include "sync/sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -1653,6 +1653,304 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless
         SECTION("reversed order") {
             reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
         }
+    }
+}
+
+TEST_CASE("client reset with embedded object", "[client reset][embedded objects]") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    TestSyncManager init_sync_manager;
+    SyncTestFile config(init_sync_manager.app(), "default");
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.schema = Schema{
+        {"object",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+         }},
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"array_of_objs", PropertyType::Object | PropertyType::Array, "EmbeddedObject"},
+             {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"},
+             {"embedded_dict", PropertyType::Object | PropertyType::Dictionary | PropertyType::Nullable,
+              "EmbeddedObject"},
+         }},
+        {"EmbeddedObject",
+         ObjectSchema::IsEmbedded{true},
+         {
+             {"array", PropertyType::Int | PropertyType::Array},
+             {"name", PropertyType::String | PropertyType::Nullable},
+             {"link_to_embedded_object2", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject2"},
+         }},
+        {"EmbeddedObject2",
+         ObjectSchema::IsEmbedded{true},
+         {
+             {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
+             {"date", PropertyType::Date},
+             {"top_level_link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
+         }},
+    };
+    struct SecondLevelEmbeddedContent {
+        std::vector<std::pair<std::string, std::string>> dict_values = {{"key A", random_string(10)},
+                                                                        {"key B", random_string(10)}};
+        Timestamp datetime = Timestamp{random_int(), 0};
+        util::Optional<Mixed> pk_of_linked_object;
+    };
+    struct EmbeddedContent {
+        std::string name = random_string(10);
+        std::vector<Int> array_vals = {random_int(), random_int(), random_int()};
+        util::Optional<SecondLevelEmbeddedContent> second_level = SecondLevelEmbeddedContent();
+    };
+    struct TopLevelContent {
+        util::Optional<EmbeddedContent> link_value = EmbeddedContent();
+        std::vector<EmbeddedContent> array_values{3};
+        std::vector<std::pair<std::string, util::Optional<EmbeddedContent>>> dict_values = {
+            {"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+    };
+
+    SyncTestFile config2(init_sync_manager.app(), "default");
+
+    std::unique_ptr<reset_utils::TestClientReset> test_reset =
+        reset_utils::make_fake_local_client_reset(config, config2);
+
+    auto set_embedded = [](Obj embedded, const EmbeddedContent& value) {
+        embedded.set<StringData>("name", value.name);
+        ColKey list_col = embedded.get_table()->get_column_key("array");
+        embedded.set_list_values<Int>(list_col, value.array_vals);
+        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+        if (value.second_level) {
+            Obj second = embedded.get_linked_object(link2_col);
+            if (!second) {
+                second = embedded.create_and_set_linked_object(link2_col);
+            }
+            second.set("date", value.second_level->datetime);
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            if (value.second_level->pk_of_linked_object) {
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                ObjKey top_link = top_table->find_primary_key(*(value.second_level->pk_of_linked_object));
+                second.set(top_link_col, top_link);
+            }
+            else {
+                second.set_null(top_link_col);
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            for (auto it = dict.begin(); it != dict.end(); ++it) {
+                if (std::find_if(value.second_level->dict_values.begin(), value.second_level->dict_values.end(),
+                                 [&](auto& pair) {
+                                     return pair.first == (*it).first.get_string();
+                                 }) == value.second_level->dict_values.end()) {
+                    dict.erase(it);
+                }
+            }
+            for (auto& it : value.second_level->dict_values) {
+                dict.insert(it.first, it.second);
+            }
+        }
+        else {
+            embedded.set_null(link2_col);
+        }
+    };
+
+    auto check_embedded = [](Obj embedded, const EmbeddedContent& value) {
+        REQUIRE(embedded.get_any("name").get<StringData>() == value.name);
+        ColKey list_col = embedded.get_table()->get_column_key("array");
+        REQUIRE(embedded.get_list_values<Int>(list_col) == value.array_vals);
+
+        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+        Obj second = embedded.get_linked_object(link2_col);
+        if (value.second_level) {
+            REQUIRE(second);
+            REQUIRE(second.get<Timestamp>("date") == value.second_level->datetime);
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            ObjKey actual_link = second.get<ObjKey>(top_link_col);
+            if (!value.second_level->pk_of_linked_object) {
+                REQUIRE(!actual_link);
+            }
+            else {
+                REQUIRE(actual_link);
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                Obj actual_top_obj = top_table->get_object(actual_link);
+                REQUIRE(actual_top_obj.get_primary_key() == *(value.second_level->pk_of_linked_object));
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            REQUIRE(dict.size() == value.second_level->dict_values.size());
+            for (auto& pair : value.second_level->dict_values) {
+                util::Optional<Mixed> actual = dict.try_get(pair.first);
+                REQUIRE(actual);
+                REQUIRE(actual->get_string() == pair.second);
+            }
+        }
+        else {
+            REQUIRE(!second);
+        }
+    };
+
+    auto set_content = [&](Obj obj, const TopLevelContent& content) {
+        ColKey link_col = obj.get_table()->get_column_key("embedded_obj");
+        if (!content.link_value) {
+            obj.set_null(link_col);
+        }
+        else {
+            Obj embedded_link = obj.get_linked_object(link_col);
+            if (!embedded_link) {
+                embedded_link = obj.create_and_set_linked_object(link_col);
+            }
+            set_embedded(embedded_link, *content.link_value);
+        }
+        auto list = obj.get_linklist("array_of_objs");
+        for (size_t i = 0; i < content.array_values.size(); ++i) {
+            Obj link;
+            if (i >= list.size()) {
+                link = list.create_and_insert_linked_object(list.size());
+            }
+            else {
+                link = list.get_object(i);
+            }
+            set_embedded(link, content.array_values[i]);
+        }
+        auto dict = obj.get_dictionary("embedded_dict");
+        for (auto it = dict.begin(); it != dict.end(); ++it) {
+            if (std::find_if(content.dict_values.begin(), content.dict_values.end(), [&](auto& dict_val) {
+                    return (*it).first == dict_val.first;
+                }) != content.dict_values.end()) {
+                dict.erase(it);
+            }
+        }
+        for (size_t i = 0; i < content.dict_values.size(); ++i) {
+            if (content.dict_values[i].second) {
+                Obj embedded = dict.create_and_insert_linked_object(content.dict_values[i].first);
+                set_embedded(embedded, *(content.dict_values[i].second));
+            }
+            else {
+                dict.insert(content.dict_values[i].first, Mixed{});
+            }
+        }
+    };
+    auto check_content = [&](Obj obj, const TopLevelContent& content) {
+        Obj embedded_link = obj.get_linked_object("embedded_obj");
+        if (content.link_value) {
+            REQUIRE(embedded_link);
+            check_embedded(embedded_link, *content.link_value);
+        }
+        else {
+            REQUIRE(!embedded_link);
+        }
+        auto list = obj.get_linklist("array_of_objs");
+        REQUIRE(list.size() == content.array_values.size());
+        for (size_t i = 0; i < content.array_values.size(); ++i) {
+            Obj link = list.get_object(i);
+            check_embedded(link, content.array_values[i]);
+        }
+        auto dict = obj.get_dictionary("embedded_dict");
+        REQUIRE(dict.size() == content.dict_values.size());
+        for (auto& val : content.dict_values) {
+            Obj embedded = dict.get_object(val.first);
+            if (val.second) {
+                check_embedded(embedded, *val.second);
+            }
+            else {
+                REQUIRE(!embedded);
+            }
+        }
+    };
+
+    auto reset_embedded_object = [&](TopLevelContent local_content, TopLevelContent remote_content) {
+        test_reset
+            ->make_local_changes([&](SharedRealm local) {
+                TableRef table = get_table(*local, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                set_content(obj, local_content);
+            })
+            ->make_remote_changes([&](SharedRealm remote) {
+                TableRef table = get_table(*remote, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                set_content(obj, remote_content);
+            })
+            ->on_post_reset([&](SharedRealm local) {
+                TableRef table = get_table(*local, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                check_content(obj, remote_content);
+            })
+            ->run();
+    };
+
+    ObjectId pk_val = ObjectId::gen();
+    test_reset->setup([&pk_val](SharedRealm realm) {
+        auto table = get_table(*realm, "TopLevel");
+        REQUIRE(table);
+        auto obj = table->create_object_with_primary_key(pk_val);
+        Obj embedded_link = obj.create_and_set_linked_object(table->get_column_key("embedded_obj"));
+        embedded_link.set<String>("name", "initial name");
+    });
+
+    SECTION("no change") {
+        TopLevelContent state;
+        reset_embedded_object(state, state);
+    }
+    SECTION("modify every embedded property") {
+        TopLevelContent local, remote;
+        reset_embedded_object(local, remote);
+    }
+    SECTION("nullify embedded links") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        remote.link_value.reset();
+        for (auto& val : remote.dict_values) {
+            val.second.reset();
+        }
+        remote.array_values.clear();
+        reset_embedded_object(local, remote);
+    }
+    SECTION("populate embedded links") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.link_value.reset();
+        for (auto& val : local.dict_values) {
+            val.second.reset();
+        }
+        local.array_values.clear();
+        reset_embedded_object(local, remote);
+    }
+    SECTION("add additional embedded objects") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        remote.dict_values.push_back({"new key1", {EmbeddedContent{}}});
+        remote.dict_values.push_back({"new key2", {EmbeddedContent{}}});
+        remote.dict_values.push_back({"new key3", {}});
+        remote.array_values.push_back({EmbeddedContent{}});
+        remote.array_values.push_back({});
+        remote.array_values.push_back({EmbeddedContent{}});
+        reset_embedded_object(local, remote);
+    }
+    SECTION("remove some embedded objects") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.dict_values.push_back({"new key1", {EmbeddedContent{}}});
+        local.dict_values.push_back({"new key2", {EmbeddedContent{}}});
+        local.dict_values.push_back({"new key3", {}});
+        local.array_values.push_back({EmbeddedContent{}});
+        local.array_values.push_back({});
+        local.array_values.push_back({EmbeddedContent{}});
+        reset_embedded_object(local, remote);
+    }
+    SECTION("add a top level link cycle") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        remote.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
+        reset_embedded_object(local, remote);
+    }
+    SECTION("remove a top level link cycle") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
+        reset_embedded_object(local, remote);
     }
 }
 
