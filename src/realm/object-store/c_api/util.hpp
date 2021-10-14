@@ -21,7 +21,7 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
 }
 
 template <class F>
-inline auto wrap_err(F&& f, const decltype(std::declval<F>()())& e)
+inline auto wrap_err(F&& f, const decltype(f())& e)
 {
     try {
         return f();
