@@ -2186,10 +2186,10 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_server_api_key(const 
 /**
  * Create Custom Function authentication app credentials.
  *
- * @param serialized_ejson_payload The arguments array to invoke the function with, serialized as an Extended JSON
- * string.
+ * @param serialized_ejson_payload The arguments array to invoke the function with,
+ *                                 serialized as an Extended JSON string.
  */
-RLM_API realm_app_credentials_t* realm_app_credentials_new_function(realm_string_t serialized_ejson_payload);
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_ejson_payload);
 
 RLM_API realm_auth_provider_e realm_auth_credentials_get_provider(realm_app_credentials_t*);
 
@@ -2309,7 +2309,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
-    realm_app_t*, const char* email, realm_string_t password, realm_string_t serialized_ejson_payload,
+    realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
     realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t);
 
 
@@ -2364,8 +2364,8 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  * @return true, if no error occurred.
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
-                                     realm_string_t serialized_ejson_args,
-                                     void (*)(void* userdata, const char* serialized_bson_response,
+                                     const char* serialized_ejson_args,
+                                     void (*)(void* userdata, const char* serialized_ejson_response,
                                               const realm_app_error_t*),
                                      void* userdata, realm_free_userdata_func_t);
 
@@ -2414,22 +2414,22 @@ RLM_API bool realm_user_is_logged_in(const realm_user_t*);
 /**
  * Get the custom user data from the user's access token.
  *
- * Returned value's data buffer must be manually released with realm_free().
+ * Returned value must be manually released with realm_free().
  *
  * @return An Extended JSON document serialized as string,
  *         or null if token doesn't have any custom data.
  */
-RLM_API realm_string_t realm_user_get_custom_data(const realm_user_t*);
+RLM_API char* realm_user_get_custom_data(const realm_user_t*);
 
 /**
  * Get the user profile associated with this user.
  *
- * Returned value's data buffer must be manually released with realm_free().
+ * Returned value must be manually released with realm_free().
  *
  * @return An Extended JSON document serialized as string,
  *         or null if an error occurred.
  */
-RLM_API realm_string_t realm_user_get_profile_data(const realm_user_t*);
+RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
 /* Sync */
 

@@ -224,14 +224,13 @@ static inline auto make_callback(void (*callback)(void* userdata, realm_app_user
     };
 }
 
-static inline bson::BsonArray parse_ejson_array(const realm_string_t& serialized)
+static inline bson::BsonArray parse_ejson_array(const char* serialized)
 {
-    if (!serialized.data) {
+    if (!serialized) {
         return {};
     }
     else {
-        std::string_view view(serialized.data, serialized.size);
-        return bson::BsonArray(bson::parse(view));
+        return bson::BsonArray(bson::parse(serialized));
     }
 }
 
@@ -265,9 +264,9 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_email_password(const 
     return new realm_app_credentials_t(AppCredentials::username_password(email, from_capi(password)));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_function(realm_string_t serialized_ejson_payload)
+RLM_API realm_app_credentials_t* realm_app_credentials_new_function(const char* serialized_ejson_payload)
 {
-    return new realm_app_credentials_t(AppCredentials::function(from_capi(serialized_ejson_payload)));
+    return new realm_app_credentials_t(AppCredentials::function(serialized_ejson_payload));
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_user_api_key(const char* api_key)
@@ -526,7 +525,7 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
 }
 
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
-    realm_app_t* app, const char* email, realm_string_t password, realm_string_t serialized_ejson_payload,
+    realm_app_t* app, const char* email, realm_string_t password, const char* serialized_ejson_payload,
     realm_app_void_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
 {
     return wrap_err([&]() {
@@ -654,8 +653,8 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
 }
 
 RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t* user, const char* function_name,
-                                     realm_string_t serialized_ejson_payload,
-                                     void (*callback)(void* userdata, const char* serialized_bson_response,
+                                     const char* serialized_ejson_payload,
+                                     void (*callback)(void* userdata, const char* serialized_ejson_response,
                                                       const realm_app_error_t*),
                                      void* userdata, realm_free_userdata_func_t userdata_free)
 {
@@ -742,24 +741,24 @@ RLM_API bool realm_user_is_logged_in(const realm_user_t* user)
     return (*user)->is_logged_in();
 }
 
-RLM_API realm_string_t realm_user_get_profile_data(const realm_user_t* user)
+RLM_API char* realm_user_get_profile_data(const realm_user_t* user)
 {
-    return wrap_err([&]() -> realm_string_t {
+    return wrap_err([&] {
         std::string data = bson::Bson((*user)->user_profile().data()).to_string();
 
-        return {duplicate_string(data), data.size()};
+        return duplicate_string(data);
     });
 }
 
-RLM_API realm_string_t realm_user_get_custom_data(const realm_user_t* user)
+RLM_API char* realm_user_get_custom_data(const realm_user_t* user)
 {
-    return wrap_err([&]() -> realm_string_t {
+    return wrap_err([&]() -> char* {
         if (const auto& data = (*user)->custom_data()) {
             std::string json = bson::Bson(*data).to_string();
-            return {duplicate_string(json), json.size()};
+            return duplicate_string(json);
         }
 
-        return {};
+        return nullptr;
     });
 }
 
