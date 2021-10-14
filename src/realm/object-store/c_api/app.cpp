@@ -202,9 +202,8 @@ static inline auto make_callback(realm_app_user_completion_func_t callback, void
             callback(userdata.get(), nullptr, &c_err);
         }
         else {
-            auto* c_user = new realm_user_t(std::move(user));
-            callback(userdata.get(), c_user, nullptr);
-            realm_release(c_user);
+            auto c_user = realm_user_t(std::move(user));
+            callback(userdata.get(), &c_user, nullptr);
         }
     };
 }
