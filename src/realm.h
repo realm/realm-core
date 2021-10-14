@@ -2136,6 +2136,10 @@ typedef struct realm_app_user_apikey {
     bool disabled;
 } realm_app_user_apikey_t;
 
+// This type should never be returned from a function.
+// It's only meant as an asynchronous callback argument.
+// Pointers to this struct are only valid inside the scope
+// of the callback they were passed to.
 typedef struct realm_app_error {
     realm_app_error_category_e error_category;
     int error_code;
