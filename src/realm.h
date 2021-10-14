@@ -2384,7 +2384,8 @@ typedef struct {
  * @param out_identities A pointer to an array of `realm_user_identity_t`, which
  *                       will be populated with the list of identities of this user.
  *                       May be NULL, in which case this function can be used to
- *                       discover the number of identities of this user by passing in just `out_n`.
+ *                       discover the number of identities of this user by passing in NULL here
+ *                       and examining `*out_n`.
  * @param capacity The maximum number of elements `out_identities` can hold.
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
  * @return true, if no errors occurred.
