@@ -71,15 +71,28 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
 void AsyncOpenTask::cancel()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_session) {
+    std::shared_ptr<SyncSession> session = nullptr;
+    
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_session)
+            return;
+
         for (auto token : m_registered_callbacks) {
             m_session->unregister_progress_notifier(token);
         }
-        // Does a better way exists for canceling the download?
-        m_session->log_out();
+
+        session = std::move(m_session);
         m_session = nullptr;
         m_coordinator = nullptr;
+    }
+
+    // We need to release the mutex before we log the session out as that will invoke the
+    // wait_for_download_completion callback which will also attempt to acquire the mutex
+    // thus deadlocking.
+    if (session) {
+        // Does a better way exists for canceling the download?
+        session->log_out();
     }
 }
 
