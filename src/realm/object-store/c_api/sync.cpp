@@ -442,8 +442,8 @@ RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
     realm_async_open_task_t* task, realm_sync_progress_func_t notifier, void* userdata,
     realm_free_userdata_func_t userdata_free) noexcept
 {
-    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](size_t transferred,
-                                                                                           size_t transferrable) {
+    auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
+                                                                                           uint64_t transferrable) {
         notifier(userdata.get(), transferred, transferrable);
     };
     return (*task)->register_download_progress_notifier(std::move(cb));
@@ -525,8 +525,8 @@ RLM_API uint64_t realm_sync_session_register_progress_notifier(realm_sync_sessio
                                                                realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
-        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](auto transferred,
-                                                                                     auto transferrable) {
+        [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
+                                                                                     uint64_t transferrable) {
             notifier(userdata.get(), transferred, transferrable);
         };
     return (*session)->register_progress_notifier(std::move(cb), SyncSession::ProgressDirection(direction),

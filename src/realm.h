@@ -2643,7 +2643,7 @@ typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, realm
                                                            realm_sync_connection_state_e new_state);
 typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, realm_sync_session_state_e old_state,
                                                         realm_sync_session_state_e new_state);
-typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred_bytes, size_t total_bytes);
+typedef void (*realm_sync_progress_func_t)(void* userdata, uint64_t transferred_bytes, uint64_t total_bytes);
 typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_session_t*, const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
