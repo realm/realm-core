@@ -2400,7 +2400,7 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  *
  * Return value must be manually released with realm_free().
  */
-RLM_API char* realm_аpp_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
                                                                     const char* custom_filename) RLM_API_NOEXCEPT;
 
 RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
