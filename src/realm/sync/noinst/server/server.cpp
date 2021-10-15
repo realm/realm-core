@@ -6016,7 +6016,7 @@ void SyncConnection::handle_message_received(const char* data, size_t size)
 {
     // parse_message_received() parses the message and calls the
     // proper handler on the SyncConnection object (this).
-    get_server_protocol().parse_message_received<SyncConnection>(*this, data, size);
+    get_server_protocol().parse_message_received<SyncConnection>(*this, std::string_view(data, size));
     metrics().increment("protocol.bytes.received", int(size)); // Throws
     return;
 }
@@ -6026,7 +6026,7 @@ void SyncConnection::handle_ping_received(const char* data, size_t size)
 {
     // parse_message_received() parses the message and calls the
     // proper handler on the SyncConnection object (this).
-    get_server_protocol().parse_ping_received<SyncConnection>(*this, data, size);
+    get_server_protocol().parse_ping_received<SyncConnection>(*this, std::string_view(data, size));
     metrics().increment("protocol.bytes.received", int(size)); // Throws
     return;
 }

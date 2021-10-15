@@ -1,11 +1,13 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Add a "seamless loss" mode to client reset where local changes are overwritten by the server's state without having to handle the reset manually. ([#4809](https://github.com/realm/realm-core/pull/4809))
 * Added methods to freeze and thaw realms, objects, results and lists.
 * Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
 * Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
 * Added notification callbacks for realm changed and schema changed events to the C API.
 * Added the `GenericNetworkTransport` API to C API.
+* Added the `App` functionality (except access to Atlas collections) to the C API. ([#4951](https://github.com/realm/realm-core/pull/4951))
 
 ### Fixed
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
@@ -18,6 +20,7 @@
 * Fixed a bug where progress notifiers continue to be called after the download of a synced realm is complete. ([#4919](https://github.com/realm/realm-core/issues/4919))
 * Fixed an issue where the release process was only publishing armeabi-v7a Android binaries. ([#4952](https://github.com/realm/realm-core/pull/4952), since v10.6.0)
 * Allow for EPERM to be returned from fallocate(). Thanks to [@ztane](https://github.com/ztane) for reporting and suggesting a fix. ([#4957](https://github.com/realm/realm-core/issues/4957))
+* Fixed an issue where the Mac Catalyst target was excluded from the `REALM_HAVE_SECURE_TRANSPORT` macro in the Swift Package. This caused `'SSL/TLS protocol not supported'` to be thrown as an exception if Realm Sync is used. ([#7474](https://github.com/realm/realm-cocoa/issues/7474))
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
@@ -35,6 +38,7 @@
 ### Internals
 * Cleaned out some old server tools and add the remaining ones to the default build.
 * App can now use bundled realm without getting "progress error" from server.
+* Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
 
 ----------------------------------------------
 

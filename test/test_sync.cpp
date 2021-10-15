@@ -3569,7 +3569,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a1.signed_user_token = g_signed_test_user_token;
 
-    Session session_a1{client, db_a1, session_config_a1};
+    Session session_a1{client, db_a1, std::move(session_config_a1)};
     session_a1.bind();
 
     Session::Config session_config_a2;
@@ -3590,7 +3590,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_a2.signed_user_token = g_signed_test_user_token;
 
-    Session session_a2{client, db_a2, session_config_a2};
+    Session session_a2{client, db_a2, std::move(session_config_a2)};
     session_a2.bind();
 
     Session::Config session_config_b1;
@@ -3611,7 +3611,7 @@ TEST(Sync_MultiplexIdent)
     };
     session_config_b1.signed_user_token = g_signed_test_user_token;
 
-    Session session_b1{client, db_b1, session_config_b1};
+    Session session_b1{client, db_b1, std::move(session_config_b1)};
     session_b1.bind();
 
     session_a1.wait_for_download_complete_or_client_stopped();
@@ -3650,7 +3650,7 @@ TEST(Sync_SSL_Certificate_1)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "/root-ca/crt.pem";
 
-    Session session = fixture.make_session(db, session_config);
+    Session session = fixture.make_session(db, std::move(session_config));
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
 
     fixture.start();
@@ -3687,7 +3687,7 @@ TEST(Sync_SSL_Certificate_2)
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
 
-    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
@@ -3718,7 +3718,7 @@ TEST(Sync_SSL_Certificate_3)
     session_config.verify_servers_ssl_certificate = false;
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
 
-    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 }
@@ -3745,7 +3745,7 @@ TEST(Sync_SSL_Certificate_DER)
     session_config.verify_servers_ssl_certificate = true;
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/localhost-chain.crt.cer";
 
-    Session session = fixture.make_session(db, session_config);
+    Session session = fixture.make_session(db, std::move(session_config));
     fixture.bind_session(session, "/test", g_signed_test_user_token, ProtocolEnvelope::realms);
 
     fixture.start();
@@ -3786,7 +3786,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3843,7 +3843,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
@@ -3895,7 +3895,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, session_config);
+    Session session = fixture.make_bound_session(db, "/test", g_signed_test_user_token, std::move(session_config));
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     Session::port_type server_port_actual = fixture.get_server().listen_endpoint().port();
@@ -3945,7 +3945,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, session_config);
+    Session session(client, db, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -4364,7 +4364,7 @@ TEST(Sync_UploadDownloadProgress_3)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    Session session(client, db, config);
+    Session session(client, db, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -4672,7 +4672,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, db, session_config}};
+    std::unique_ptr<Session> session{new Session{client, db, std::move(session_config)}};
 
     util::Mutex mutex;
 
@@ -5605,7 +5605,7 @@ TEST(Sync_ServerHasMoved)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    sync::Session session(client, db, config);
+    sync::Session session(client, db, std::move(config));
 
     auto wait = [&] {
         BowlOfStonesSemaphore bowl;
@@ -6087,7 +6087,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, session_config};
+        Session session{client, db, std::move(session_config)};
 
         auto listener = [&](Session::ConnectionState state, const Session::ErrorInfo* error_info) {
             if (state == Session::ConnectionState::disconnected) {
@@ -6132,7 +6132,7 @@ TEST(Sync_AuthorizationHeaderName)
     custom_http_headers["Header-Name-1"] = "Header-Value-1";
     custom_http_headers["Header-Name-2"] = "Header-Value-2";
     session_config.custom_http_headers = std::move(custom_http_headers);
-    Session session = fixture.make_session(db, session_config);
+    Session session = fixture.make_session(db, std::move(session_config));
     fixture.bind_session(session, "/test");
 
     session.wait_for_download_complete_or_client_stopped();
@@ -6564,7 +6564,6 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     }
 }
 
-
 // This test calls row_for_object_id() for various object ids and tests that
 // the right value is returned including that no assertions are hit.
 TEST(Sync_RowForGlobalKey)
@@ -6852,7 +6851,7 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     };
     Session::Config config;
     config.simulate_integration_error = true;
-    Session session = fixture.make_session(db_2, config);
+    Session session = fixture.make_session(db_2, std::move(config));
     session.set_connection_state_change_listener(listener);
     fixture.bind_session(session, "/test");
     session.wait_for_download_complete_or_client_stopped();

@@ -26,6 +26,7 @@
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/sync/client.hpp>
+#include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/websocket.hpp>
@@ -458,6 +459,48 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     });
 }
 
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    if (m_state != &State::active) {
+        return;
+    }
+    // The download can fail for many reasons. For example:
+    // - unable to write the fresh copy to the file system
+    // - during download of the fresh copy, the fresh copy itself is reset
+    if (error_message) {
+        lock.unlock();
+        const bool is_fatal = true;
+        SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
+                            util::format("A fatal error occured during client reset: '%1'", *error_message),
+                            is_fatal);
+        handle_error(synthetic);
+        return;
+    }
+
+    // Performing a client reset requires tearing down our current
+    // sync session and creating a new one with the relevant client reset config. This
+    // will result in session completion handlers firing
+    // when the old session is torn down, which we don't want as this
+    // is supposed to be transparent to the user.
+    //
+    // To avoid this, we need to move the completion handlers aside temporarily so
+    // that moving to the inactive state doesn't clear them - they will be
+    // re-registered when the session becomes active again.
+    {
+        m_force_client_reset = true;
+        m_client_reset_fresh_copy = std::move(db);
+        CompletionCallbacks callbacks;
+        std::swap(m_completion_callbacks, callbacks);
+        // always swap back, even if advance_state throws
+        auto guard = util::make_scope_exit([&]() noexcept {
+            std::swap(callbacks, m_completion_callbacks);
+        });
+        advance_state(lock, State::inactive); // unlocks the lock
+    }
+    revive_if_needed();
+}
+
 // This method should only be called from within the error handler callback registered upon the underlying
 // `m_session`.
 void SyncSession::handle_error(SyncError error)
@@ -472,78 +515,30 @@ void SyncSession::handle_error(SyncError error)
         m_state->handle_error(lock, *this, error);
     }
 
-    if (error.is_client_reset_requested()) {
-        switch (m_config.client_resync_mode) {
-            case ClientResyncMode::Manual:
-                break;
-            case ClientResyncMode::DiscardLocal: {
-                // Performing a client resync requires tearing down our current
-                // sync session and creating a new one with a forced client
-                // reset. This will result in session completion handlers firing
-                // when the old session is torn down, which we don't want as this
-                // is supposed to be transparent to the user.
-                //
-                // To avoid this, we need to move the completion handlers aside temporarily so
-                // that moving to the inactive state doesn't clear them - they will be re-registered
-                // when the session becomes active again.
-                {
-                    std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_reset = true;
-                    CompletionCallbacks callbacks;
-                    std::swap(m_completion_callbacks, callbacks);
-                    advance_state(lock, State::inactive);
+    auto user_handles_client_reset = [&]() {
+        next_state = NextStateAfterError::inactive;
+        update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
+    };
 
-                    // FIXME This should be done in a scope guard so that we always do this, even if advance_state
-                    // throws.
-                    std::swap(callbacks, m_completion_callbacks);
-                }
-                revive_if_needed();
-                return;
-            }
-        }
+    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+        // At this point, automatic recovery has been attempted but it failed.
+        // Fallback to a manual reset and let the user try to handle it.
+        user_handles_client_reset();
     }
-
-    if (error_code.category() == realm::sync::protocol_error_category()) {
-        using ProtocolError = realm::sync::ProtocolError;
-        switch (static_cast<ProtocolError>(error_code.value())) {
-            // Connection level errors
-            case ProtocolError::connection_closed:
-            case ProtocolError::other_error:
+    else if (error_code.category() == realm::sync::protocol_error_category()) {
+        SimplifiedProtocolError simplified =
+            get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
+        switch (simplified) {
+            case SimplifiedProtocolError::ConnectionIssue:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case ProtocolError::unknown_message:
-            case ProtocolError::bad_syntax:
-            case ProtocolError::limits_exceeded:
-            case ProtocolError::wrong_protocol_version:
-            case ProtocolError::bad_session_ident:
-            case ProtocolError::reuse_of_session_ident:
-            case ProtocolError::bound_in_other_session:
-            case ProtocolError::bad_message_order:
-            case ProtocolError::bad_client_version:
-            case ProtocolError::illegal_realm_path:
-            case ProtocolError::no_such_realm:
-            case ProtocolError::bad_changeset:
-            case ProtocolError::bad_changeset_header_syntax:
-            case ProtocolError::bad_changeset_size:
-            case ProtocolError::bad_changesets:
-            case ProtocolError::bad_decompression:
-            case ProtocolError::unsupported_session_feature:
-            case ProtocolError::transact_before_upload:
-            case ProtocolError::partial_sync_disabled:
-            case ProtocolError::user_mismatch:
-            case ProtocolError::too_many_sessions:
-                break;
-            // Session errors
-            case ProtocolError::session_closed:
-            case ProtocolError::other_session_error:
-            case ProtocolError::disabled_session:
-                // The binding doesn't need to be aware of these because they are strictly informational, and do not
+            case SimplifiedProtocolError::UnexpectedInternalIssue:
+                break; // fatal: bubble these up to the user below
+            case SimplifiedProtocolError::SessionIssue:
+                // The SDK doesn't need to be aware of these because they are strictly informational, and do not
                 // represent actual errors.
                 return;
-            case ProtocolError::token_expired: {
-                REALM_ASSERT_RELEASE(false);
-            }
-            case ProtocolError::bad_authentication: {
+            case SimplifiedProtocolError::BadAuthentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
                 next_state = NextStateAfterError::none;
                 {
@@ -555,25 +550,33 @@ void SyncSession::handle_error(SyncError error)
                     user_to_invalidate->invalidate();
                 break;
             }
-            case ProtocolError::permission_denied: {
+            case SimplifiedProtocolError::PermissionDenied: {
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
             }
-            case ProtocolError::bad_client_file:
-            case ProtocolError::bad_client_file_ident:
-            case ProtocolError::bad_origin_file_ident:
-            case ProtocolError::bad_server_file_ident:
-            case ProtocolError::bad_server_version:
-            case ProtocolError::client_file_blacklisted:
-            case ProtocolError::diverging_histories:
-            case ProtocolError::server_file_deleted:
-            case ProtocolError::user_blacklisted:
-            case ProtocolError::client_file_expired:
-            case ProtocolError::invalid_schema_change:
-                next_state = NextStateAfterError::inactive;
-                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
+            case SimplifiedProtocolError::ClientResetRequested: {
+                switch (m_config.client_resync_mode) {
+                    case ClientResyncMode::Manual:
+                        user_handles_client_reset();
+                        break;
+                    case ClientResyncMode::SeamlessLoss: {
+                        REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
+                        std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
+                        auto weak_self_ref = weak_from_this();
+                        m_config.get_fresh_realm_for_path(
+                            fresh_path, [weak_self_ref](DBRef db, util::Optional<std::string> err) {
+                                // the original session may have been closed during download of the reset realm
+                                // and in that case do nothing
+                                if (auto strong = weak_self_ref.lock()) {
+                                    strong->handle_fresh_realm_downloaded(std::move(db), std::move(err));
+                                }
+                            });
+                        return; // do not propgate the error to the user at this point
+                    }
+                }
                 break;
+            }
         }
     }
     else if (error_code.category() == realm::sync::client_error_category()) {
@@ -611,6 +614,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
             case ClientError::http_tunnel_failed:
+            case ClientError::auto_client_reset_failure:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -632,35 +636,37 @@ void SyncSession::handle_error(SyncError error)
         error.is_unrecognized_by_client = true;
     }
 
-    // Dont't bother invoking m_config.error_handler if the sync is inactive.
-    // It does not make sense to call the handler when the session is closed.
-    if (m_state == &State::inactive) {
-        return;
-    }
-
-    switch (next_state) {
-        case NextStateAfterError::none:
-            if (m_config.cancel_waits_on_nonfatal_error) {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                cancel_pending_waits(lock, error.error_code);
-            }
-            break;
-        case NextStateAfterError::inactive: {
-            if (error.is_client_reset_requested()) {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                cancel_pending_waits(lock, error.error_code);
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                advance_state(lock, State::inactive);
-            }
-            break;
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        // Dont't bother invoking m_config.error_handler if the sync is inactive.
+        // It does not make sense to call the handler when the session is closed.
+        if (m_state == &State::inactive) {
+            return;
         }
-        case NextStateAfterError::error: {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            cancel_pending_waits(lock, error.error_code);
-            break;
+
+        switch (next_state) {
+            case NextStateAfterError::none:
+                if (m_config.cancel_waits_on_nonfatal_error) {
+                    cancel_pending_waits(lock, error.error_code); // unlocks the mutex
+                }
+                break;
+            case NextStateAfterError::inactive: {
+                if (error.is_client_reset_requested()) {
+                    cancel_pending_waits(lock, error.error_code); // unlocks the mutex
+                }
+                // reacquire the lock if the above cancel_pending_waits released it
+                if (!lock.owns_lock()) {
+                    lock.lock();
+                }
+                if (m_state != &State::inactive) { // check this again now that we have the lock
+                    advance_state(lock, State::inactive);
+                }
+                break;
+            }
+            case NextStateAfterError::error: {
+                cancel_pending_waits(lock, error.error_code);
+                break;
+            }
         }
     }
     if (m_config.error_handler) {
@@ -726,9 +732,12 @@ void SyncSession::do_create_sync_session()
 
     if (m_force_client_reset) {
         sync::Session::Config::ClientReset config;
-        config.metadata_dir = m_db->get_path() + ".resync";
-        util::try_make_dir(config.metadata_dir);
+        config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
+        config.notify_after_client_reset = m_config.notify_after_client_reset;
+        config.notify_before_client_reset = m_config.notify_before_client_reset;
+        config.fresh_copy = std::move(m_client_reset_fresh_copy);
         session_config.client_reset_config = std::move(config);
+        m_force_client_reset = false;
     }
 
     m_session = m_client.make_session(m_db, std::move(session_config));

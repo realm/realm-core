@@ -902,11 +902,11 @@ public:
         return MultiClientServerFixture::get_server(0);
     }
 
-    Session make_session(DBRef db, Session::Config config = {})
+    Session make_session(DBRef db, Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
     }
-    Session make_session(std::string const& path, Session::Config config = {})
+    Session make_session(std::string const& path, Session::Config&& config = {})
     {
         auto db = DB::create(make_client_replication(path));
         return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
@@ -920,14 +920,14 @@ public:
                                                protocol);
     }
 
-    Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config config = {})
+    Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(config));
     }
 
     Session make_bound_session(DBRef db, std::string server_path, std::string signed_user_token,
-                               Session::Config config = {})
+                               Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(signed_user_token), std::move(config));

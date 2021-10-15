@@ -21,7 +21,6 @@ TEST(AsyncOpen_NonExistingRealm)
 {
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path);
-    TEST_DIR(metadata_dir);
 
     const std::string server_path = "/data";
 
@@ -40,12 +39,8 @@ TEST(AsyncOpen_NonExistingRealm)
 
     // Download the empty state Realm.
     Session::Config session_config;
-    {
-        Session::Config::ClientReset client_reset_config;
-        client_reset_config.metadata_dir = std::string(metadata_dir);
-        session_config.client_reset_config = client_reset_config;
-    }
-    Session session = fixture.make_session(path, session_config);
+    session_config.client_reset_config = Session::Config::ClientReset{};
+    Session session = fixture.make_session(path, std::move(session_config));
     session.set_progress_handler(progress_handler);
     fixture.bind_session(session, server_path);
     session.wait_for_download_complete_or_client_stopped();
@@ -65,14 +60,13 @@ TEST(AsyncOpen_DisableStateRealms)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    TEST_DIR(metadata_dir_2);
 
     const int number_of_rows = 100;
 
     util::Logger& logger = test_context.logger;
 
     ClientServerFixture::Config config;
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
     std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
@@ -103,12 +97,8 @@ TEST(AsyncOpen_DisableStateRealms)
             state_downloadable = downloadable;
     };
     Session::Config session_config;
-    {
-        Session::Config::ClientReset client_reset_config;
-        client_reset_config.metadata_dir = std::string(metadata_dir_2);
-        session_config.client_reset_config = client_reset_config;
-    }
-    Session session = fixture.make_session(path_2, session_config);
+    session_config.client_reset_config = Session::Config::ClientReset{};
+    Session session = fixture.make_session(path_2, std::move(session_config));
     session.set_progress_handler(progress_handler);
     fixture.bind_session(session, "/data");
     session.wait_for_download_complete_or_client_stopped();
@@ -129,11 +119,6 @@ TEST(AsyncOpen_StateRealmManagement)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    SHARED_GROUP_TEST_PATH(path_3);
-    SHARED_GROUP_TEST_PATH(path_4);
-    TEST_DIR(metadata_dir_2);
-    TEST_DIR(metadata_dir_3);
-    TEST_DIR(metadata_dir_4);
 
     const std::string server_path = "/data";
 
@@ -162,11 +147,9 @@ TEST(AsyncOpen_StateRealmManagement)
 
     // Async open with a client.
     {
-        Session::Config::ClientReset client_reset_config;
-        client_reset_config.metadata_dir = std::string(metadata_dir_2);
         Session::Config session_config;
-        session_config.client_reset_config = client_reset_config;
-        Session session = fixture.make_session(path_2, session_config);
+        session_config.client_reset_config = Session::Config::ClientReset{};
+        Session session = fixture.make_session(path_2, std::move(session_config));
         fixture.bind_session(session, server_path);
         session.wait_for_download_complete_or_client_stopped();
     }

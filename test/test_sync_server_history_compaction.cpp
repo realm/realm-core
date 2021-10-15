@@ -168,7 +168,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtDownloadTime)
         // Set up client 1 for continuous download
         Session::Config session_config;
         session_config.disable_upload = true;
-        Session session_1 = fixture.make_session(client_1_path, session_config);
+        Session session_1 = fixture.make_session(client_1_path, std::move(session_config));
         session_1.set_connection_state_change_listener(listener_1);
         fixture.bind_session(session_1, "/test");
         session_1.wait_for_download_complete_or_client_stopped();
@@ -251,7 +251,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
 
     Session::Config session_config;
     session_config.disable_empty_upload = true;
-    Session session_1 = fixture.make_session(client_1_path, session_config);
+    Session session_1 = fixture.make_session(client_1_path, std::move(session_config));
     session_1.set_connection_state_change_listener(listener_1);
     fixture.bind_session(session_1, "/test");
 

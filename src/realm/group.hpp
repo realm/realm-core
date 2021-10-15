@@ -334,6 +334,7 @@ public:
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
         REALM_ASSERT(table_name.begins_with(g_class_name_prefix));
@@ -347,7 +348,6 @@ public:
         std::copy_n(class_name.data(), len, p);
         return StringData(buffer.data(), g_class_name_prefix_len + len);
     }
-
 
     TableRef get_table(TableKey key);
     ConstTableRef get_table(TableKey key) const;
@@ -978,6 +978,11 @@ inline StringData Group::get_table_name(TableKey key) const
 {
     size_t table_ndx = key2ndx_checked(key);
     return m_table_names.get(table_ndx);
+}
+
+inline bool Group::table_is_public(TableKey key) const
+{
+    return get_table_name(key).begins_with(g_class_name_prefix);
 }
 
 inline bool Group::has_table(StringData name) const noexcept

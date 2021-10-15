@@ -23,6 +23,7 @@ if(REALM_ENABLE_SYNC)
     )
     list(APPEND SOURCES
         ../sync/sync_test_utils.cpp
+        client_reset.cpp
     )
 endif()
 
