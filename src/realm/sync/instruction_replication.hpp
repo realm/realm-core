@@ -27,7 +27,7 @@ namespace realm {
 namespace sync {
 
 
-class SyncReplication : public TrivialReplication {
+class SyncReplication : public Replication {
 public:
     explicit SyncReplication(const std::string& realm_path);
     void set_short_circuit(bool) noexcept;
@@ -36,15 +36,13 @@ public:
     // reset() resets the encoder, the selected tables and the cache. It is
     // called by do_initiate_transact(), but can be called at the other times
     // as well.
-    virtual void reset();
+    void reset();
 
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    // TrivialReplication interface:
     void initialize(DB&) override;
 
-    // TransactLogConvenientEncoder interface:
     void add_class(TableKey tk, StringData table_name, bool is_embedded) override;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
                                     bool nullable) override;

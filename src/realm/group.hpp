@@ -42,7 +42,6 @@ class TableKeys;
 
 namespace _impl {
 class GroupFriend;
-class TransactLogConvenientEncoder;
 class TransactLogParser;
 } // namespace _impl
 
@@ -887,9 +886,7 @@ private:
     friend class GroupWriter;
     friend class DB;
     friend class _impl::GroupFriend;
-    friend class _impl::TransactLogConvenientEncoder;
     friend class _impl::TransactLogParser;
-    friend class TrivialReplication;
     friend class metrics::QueryInfo;
     friend class metrics::Metrics;
     friend class Transaction;

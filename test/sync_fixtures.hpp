@@ -586,7 +586,6 @@ public:
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -653,7 +652,6 @@ public:
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
         else {
-            using ConnectionState = Session::ConnectionState;
             using ErrorInfo = Session::ErrorInfo;
             auto fallback_listener = [this](ConnectionState state, const ErrorInfo* error) {
                 if (state != ConnectionState::disconnected)
@@ -1108,14 +1106,13 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
     version_type current_client_version = 0;    // Dummy
     SaltedFileIdent client_file_ident = {0, 0}; // Dummy
     SyncProgress progress;
-    auto& history = static_cast<_impl::ClientHistoryImpl&>(*m_db->get_replication());
+    auto& history = static_cast<ClientReplication&>(*m_db->get_replication());
     history.get_status(current_client_version, client_file_ident, progress);
     return progress.download.server_version;
 }
 
 inline void RealmFixture::setup_error_handler(std::function<ErrorHandler> handler)
 {
-    using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     auto listener = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)

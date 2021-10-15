@@ -13,7 +13,6 @@ using namespace realm::test_util;
 
 using port_type = util::network::Endpoint::port_type;
 using ConnectionStateChangeListener = Session::ConnectionStateChangeListener;
-using ConnectionState = Session::ConnectionState;
 using ErrorInfo = Session::ErrorInfo;
 
 namespace {

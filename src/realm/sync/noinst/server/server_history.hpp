@@ -106,7 +106,7 @@ constexpr int get_server_history_schema_version() noexcept
 }
 
 
-class ServerHistory : public sync::ClientReplicationBase,
+class ServerHistory : public sync::SyncReplication,
                       public _impl::History,
                       public std::enable_shared_from_this<ServerHistory> {
 public:
@@ -121,7 +121,7 @@ public:
     using UploadCursor           = sync::UploadCursor;
     using SyncProgress           = sync::SyncProgress;
     using HistoryEntry           = sync::HistoryEntry;
-    using IntegrationError       = sync::ClientReplicationBase::IntegrationError;
+    using RemoteChangeset        = sync::Transformer::RemoteChangeset;
     // clang-format on
 
     enum class BootstrapError {
@@ -473,19 +473,9 @@ public:
     _impl::History* _get_history_write() override;
     std::unique_ptr<_impl::History> _create_history_read() override;
 
-    // Overriding member functions in TrivialReplication
+    // Overriding member functions in Replication
     version_type prepare_changeset(const char*, std::size_t, version_type) override;
     void finalize_changeset() noexcept override;
-
-    // Overriding member functions in sync::ClientHistoryBase
-    void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override;
-    void set_client_file_ident(SaltedFileIdent, bool) override;
-    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, sync::VersionInfo&) override;
-    void find_uploadable_changesets(UploadCursor&, version_type, std::vector<UploadChangeset>&,
-                                    version_type&) const override;
-    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*, const RemoteChangeset*,
-                                     std::size_t, sync::VersionInfo&, IntegrationError&, util::Logger&,
-                                     SyncTransactReporter*) override;
 
     // Overriding member functions in _impl::History
     void update_from_ref_and_version(ref_type ref, version_type) override;
@@ -889,7 +879,7 @@ inline ServerHistory::IntegratableChangeset::IntegratableChangeset(file_ident_ty
 
 inline ServerHistory::ServerHistory(const std::string& realm_path, Context& context,
                                     CompactionControl& compaction_control)
-    : sync::ClientReplicationBase{realm_path} // Throws
+    : sync::SyncReplication{realm_path} // Throws
     , m_context{context}
     , m_compaction_control{compaction_control}
 {

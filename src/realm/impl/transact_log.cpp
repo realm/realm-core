@@ -23,36 +23,6 @@
 namespace realm {
 namespace _impl {
 
-TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& stream)
-    : m_encoder(stream)
-{
-}
-
-TransactLogConvenientEncoder::~TransactLogConvenientEncoder() {}
-
-void TransactLogConvenientEncoder::add_class(TableKey table_key, StringData, bool)
-{
-    unselect_all();
-    m_encoder.insert_group_level_table(table_key); // Throws
-}
-
-void TransactLogConvenientEncoder::add_class_with_primary_key(TableKey tk, StringData, DataType, StringData, bool)
-{
-    unselect_all();
-    m_encoder.insert_group_level_table(tk); // Throws
-}
-
-void TransactLogConvenientEncoder::create_object(const Table* t, GlobalKey id)
-{
-    select_table(t);                              // Throws
-    m_encoder.create_object(id.get_local_key(0)); // Throws
-}
-
-void TransactLogConvenientEncoder::create_object_with_primary_key(const Table* t, ObjKey key, Mixed)
-{
-    select_table(t);                                                                       // Throws
-    m_encoder.create_object(key);                                                          // Throws
-}
 
 bool TransactLogEncoder::select_table(TableKey key)
 {
@@ -61,39 +31,10 @@ bool TransactLogEncoder::select_table(TableKey key)
     return true;
 }
 
-void TransactLogConvenientEncoder::do_select_table(const Table* table)
-{
-    m_encoder.select_table(table->get_key()); // Throws
-    m_selected_table = table;
-}
-
 bool TransactLogEncoder::select_collection(ColKey col_key, ObjKey key)
 {
     append_simple_instr(instr_SelectList, col_key, key.value); // Throws
     return true;
-}
-
-
-void TransactLogConvenientEncoder::do_select_collection(const CollectionBase& list)
-{
-    select_table(list.get_table().unchecked_ptr());
-    ColKey col_key = list.get_col_key();
-    ObjKey key = list.get_owner_key();
-
-    m_encoder.select_collection(col_key, key); // Throws
-    m_selected_list = CollectionId(list.get_table()->get_key(), key, col_key);
-}
-
-void TransactLogConvenientEncoder::list_clear(const CollectionBase& list)
-{
-    select_collection(list);           // Throws
-    m_encoder.list_clear(list.size()); // Throws
-}
-
-void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
-{
-    select_collection(list);
-    m_encoder.list_erase(link_ndx);
 }
 
 /******************************** Dictionary *********************************/
@@ -106,12 +47,6 @@ bool TransactLogEncoder::dictionary_insert(size_t dict_ndx, Mixed key)
     return true;
 }
 
-void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed)
-{
-    select_collection(dict);
-    m_encoder.dictionary_insert(ndx, key);
-}
-
 bool TransactLogEncoder::dictionary_set(size_t dict_ndx, Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);
@@ -120,24 +55,12 @@ bool TransactLogEncoder::dictionary_set(size_t dict_ndx, Mixed key)
     return true;
 }
 
-void TransactLogConvenientEncoder::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed)
-{
-    select_collection(dict);
-    m_encoder.dictionary_set(ndx, key);
-}
-
 bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);
     append_string_instr(instr_DictionaryErase, key.get_string()); // Throws
     append_simple_instr(ndx);
     return true;
-}
-
-void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
-{
-    select_collection(dict);
-    m_encoder.dictionary_erase(ndx, key);
 }
 
 REALM_NORETURN

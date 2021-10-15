@@ -1806,7 +1806,7 @@ std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 }
 
 
-// Overriding member in TrivialReplication
+// Overriding member in Replication
 auto ServerHistory::prepare_changeset(const char* data, std::size_t size, version_type realm_version) -> version_type
 {
     ensure_updated(realm_version);
@@ -1835,215 +1835,9 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size, versio
 }
 
 
-// Overriding member in TrivialReplication
+// Overriding member in Replication
 void ServerHistory::finalize_changeset() noexcept {}
 
-
-// Overriding member in ClientHistoryBase
-void ServerHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
-                               SyncProgress& progress) const
-{
-    TransactionRef tr = m_db->start_read(); // Throws
-    version_type realm_version = tr->get_version();
-    const_cast<ServerHistory*>(this)->set_group(tr.get());
-    ensure_updated(realm_version); // Throws
-
-    REALM_ASSERT(m_acc);
-    REALM_ASSERT(m_acc->upstream_status.is_attached());
-
-    // server version is client version from the point of view of the upstream
-    // server
-    current_client_version = get_server_version();
-
-    client_file_ident.ident = (m_local_file_ident == g_root_node_file_ident ? 0 : m_local_file_ident);
-    const Array& us = m_acc->upstream_status;
-    client_file_ident.salt = salt_type(us.get(s_us_client_file_ident_salt_iip));
-    progress.latest_server_version.version = version_type(us.get(s_us_progress_latest_server_version_iip));
-    progress.latest_server_version.salt = salt_type(us.get(s_us_progress_latest_server_version_salt_iip));
-    progress.download.server_version = version_type(us.get(s_us_progress_download_server_version_iip));
-    progress.download.last_integrated_client_version =
-        version_type(us.get(s_us_progress_download_client_version_iip));
-    progress.upload.client_version = version_type(us.get(s_us_progress_upload_client_version_iip));
-    progress.upload.last_integrated_server_version = version_type(us.get(s_us_progress_upload_server_version_iip));
-
-    // FIXME: What about progress.downloadable_bytes?
-}
-
-
-// Overriding member in ClientHistoryBase
-void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
-{
-    REALM_ASSERT(client_file_ident.ident != g_root_node_file_ident);
-
-    TransactionRef tr = m_db->start_write(); // Throws
-    version_type realm_version = tr->get_version();
-    ensure_updated(realm_version); // Throws
-    prepare_for_write();           // Throws
-
-    REALM_ASSERT(m_acc->upstream_status.is_attached());
-    REALM_ASSERT(m_local_file_ident == g_root_node_file_ident);
-
-    Array& us = m_acc->upstream_status;
-    tr->set_sync_file_id(client_file_ident.ident);
-    us.set(s_us_client_file_ident_iip,
-           std::int_fast64_t(client_file_ident.salt)); // Throws
-
-    // Ensure that there is a `client_files` row corresponding to
-    // `client_file_ident`.
-    register_assigned_file_ident(client_file_ident.ident); // Throws
-
-    if (fix_up_object_ids) {
-        // Replication must be temporarily disabled because the database must be
-        // modified to fix up object IDs.
-        //
-        // FIXME: This is dangerous, because accessors will not be updated with
-        // modifications made here.  Luckily, only set_int() modifications are
-        // made, which never have an impact on accessors. However, notifications
-        // will not be triggered for those updates either.
-        TempShortCircuitReplication tss{*this};
-        fixup_state_and_changesets_for_assigned_file_ident(*tr, client_file_ident.ident); // Throws
-    }
-
-    tr->commit(); // Throws
-}
-
-
-// Overriding member in ClientHistoryBase
-void ServerHistory::set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t*,
-                                      VersionInfo& version_info)
-{
-    TransactionRef tr = m_db->start_write(); // Throws
-    version_type realm_version = tr->get_version();
-    ensure_updated(realm_version); // Throws
-    prepare_for_write();           // Throws
-
-    REALM_ASSERT(m_acc->upstream_status.is_attached());
-    REALM_ASSERT(m_local_file_ident != g_root_node_file_ident);
-
-    save_upstream_sync_progress(progress); // Throws
-
-    version_type new_realm_version = tr->commit(); // Throws
-    version_info.realm_version = new_realm_version;
-    version_info.sync_version = get_salted_server_version();
-}
-
-
-// Overriding member in ClientHistoryBase
-void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
-                                               std::vector<UploadChangeset>& uploadable_changesets,
-                                               version_type& locked_server_version) const
-{
-    TransactionRef tr = m_db->start_read(); // Throws
-    version_type realm_version = tr->get_version();
-    const_cast<ServerHistory*>(this)->set_group(tr.get());
-    ensure_updated(realm_version); // Throws
-
-    REALM_ASSERT(m_acc);
-    REALM_ASSERT(m_acc->upstream_status.is_attached());
-    REALM_ASSERT(m_local_file_ident != g_root_node_file_ident);
-
-    std::vector<UploadChangeset> changesets;
-
-    std::size_t accum_byte_size_soft_limit = 0x20000; // 128 KB
-    std::size_t accum_byte_size = 0;
-
-    version_type version = upload_progress.client_version;
-    version_type last_integrated_upstream_version = upload_progress.last_integrated_server_version;
-    while (accum_byte_size < accum_byte_size_soft_limit) {
-        file_ident_type remote_file_ident = 0; // Remote file is on upstream server
-        HistoryEntry entry;
-        version_type version_2 =
-            find_history_entry(remote_file_ident, version, end_version, entry, last_integrated_upstream_version);
-
-        if (version_2 == 0) {
-            version = end_version;
-            break;
-        }
-        version = version_2;
-
-        UploadChangeset uc;
-        std::size_t size = entry.changeset.copy_to(uc.buffer);
-        uc.origin_timestamp = entry.origin_timestamp;
-        uc.origin_file_ident = entry.origin_file_ident;
-        uc.progress = UploadCursor{version, last_integrated_upstream_version};
-        uc.changeset = BinaryData{uc.buffer.get(), size};
-        uploadable_changesets.push_back(std::move(uc)); // Throws
-
-        accum_byte_size += size;
-    }
-
-    upload_progress = {version, last_integrated_upstream_version};
-
-    const Array& us = m_acc->upstream_status;
-    locked_server_version = version_type(us.get(s_us_progress_download_server_version_iip));
-}
-
-
-// Overriding member in ClientHistoryBase
-bool ServerHistory::integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t*,
-                                                const RemoteChangeset* changesets, std::size_t num_changesets,
-                                                VersionInfo& version_info, IntegrationError& integration_error,
-                                                util::Logger& logger, SyncTransactReporter* transact_reporter)
-{
-    REALM_ASSERT(!transact_reporter);
-
-    TransactionRef tr = m_db->start_write(); // Throws
-    version_type realm_version = tr->get_version();
-    ensure_updated(realm_version); // Throws
-    prepare_for_write();           // Throws
-
-    REALM_ASSERT(m_acc->upstream_status.is_attached());
-    REALM_ASSERT(m_local_file_ident != g_root_node_file_ident);
-
-    IntegrationReporter& reporter = m_context.get_integration_reporter(); // Throws
-    reporter.on_integration_session_begin();                              // Throws
-
-    try {
-        version_type server_version = get_server_version();
-        for (std::size_t i = 0; i < num_changesets; ++i) {
-            const RemoteChangeset& changeset = changesets[i];
-            REALM_ASSERT(changeset.last_integrated_local_version <= server_version);
-            REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != m_local_file_ident);
-
-            if (!ensure_upstream_file_ident(changeset.origin_file_ident)) {
-                logger.error("Bad origin file identifier in changeset received from "
-                             "upstream server");
-                integration_error = IntegrationError::bad_origin_file_ident;
-                return false;
-            }
-        }
-
-        file_ident_type remote_file_ident = 0; // From upstream server
-        UploadCursor upload_progress = {progress.download.server_version,
-                                        progress.download.last_integrated_client_version};
-        version_type locked_server_version = upload_progress.last_integrated_server_version;
-        integrate_remote_changesets(remote_file_ident, upload_progress, locked_server_version, changesets,
-                                    num_changesets, &reporter, &reporter, logger); // Throws
-    }
-    catch (BadChangesetError& e) {
-        logger.error("Failed to parse, or apply changeset received from server: %1",
-                     e.what()); // Throws
-        integration_error = IntegrationError::bad_changeset;
-        return false;
-    }
-    catch (TransformError& e) {
-        logger.error("Failed to transform changeset received from server: %1",
-                     e.what()); // Throws
-        integration_error = IntegrationError::bad_changeset;
-        return false;
-    }
-
-    save_upstream_sync_progress(progress); // Throws
-
-    bool force = false;
-    do_compact_history(logger, force); // Throws
-
-    auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
-    version_type new_realm_version = tr->commit(); // Throws
-    version_info.realm_version = new_realm_version;
-    version_info.sync_version = get_salted_server_version();
-    return true;
-}
 
 // Overriding member in _impl::History
 void ServerHistory::update_from_parent(version_type realm_version)
@@ -2084,7 +1878,7 @@ void ServerHistory::set_oldest_bound_version(version_type realm_version)
 // Overriding member in Replication
 BinaryData ServerHistory::get_uncommitted_changes() const noexcept
 {
-    return TrivialReplication::get_uncommitted_changes();
+    return Replication::get_uncommitted_changes();
 }
 
 

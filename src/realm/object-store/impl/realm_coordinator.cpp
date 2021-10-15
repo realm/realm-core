@@ -36,6 +36,7 @@
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #endif
 
 #include <realm/db.hpp>

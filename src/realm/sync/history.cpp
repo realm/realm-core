@@ -6,7 +6,7 @@ namespace sync {
 
 std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path)
 {
-    return std::make_unique<_impl::ClientHistoryImpl>(realm_path); // Throws
+    return std::make_unique<ClientReplication>(realm_path); // Throws
 }
 
 } // namespace sync

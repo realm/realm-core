@@ -86,7 +86,6 @@ using IntegratableChangesetList = ServerHistory::IntegratableChangesetList;
 using IntegratableChangesets = ServerHistory::IntegratableChangesets;
 using IntegrationResult = ServerHistory::IntegrationResult;
 using BootstrapError = ServerHistory::BootstrapError;
-using IntegrationError = ServerHistory::IntegrationError;
 using ExtendedIntegrationError = ServerHistory::ExtendedIntegrationError;
 using ClientType = ServerHistory::ClientType;
 using FileIdentAllocSlot = ServerHistory::FileIdentAllocSlot;

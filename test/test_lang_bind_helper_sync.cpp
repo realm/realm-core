@@ -1,6 +1,7 @@
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include "test.hpp"
 

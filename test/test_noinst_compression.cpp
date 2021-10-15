@@ -5,6 +5,7 @@
 
 #include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include <algorithm>
 #include <cstring>

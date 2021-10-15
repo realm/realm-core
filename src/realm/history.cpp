@@ -205,18 +205,18 @@ void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type vers
 }
 
 
-class InRealmHistoryImpl : public TrivialReplication {
+class InRealmHistoryImpl : public Replication {
 public:
-    using version_type = TrivialReplication::version_type;
+    using version_type = Replication::version_type;
 
     InRealmHistoryImpl(std::string realm_path)
-        : TrivialReplication(realm_path)
+        : Replication(realm_path)
     {
     }
 
     void initialize(DB& db) override
     {
-        TrivialReplication::initialize(db); // Throws
+        Replication::initialize(db); // Throws
         Allocator& alloc = db.get_alloc();
         m_history.initialize(&alloc); // Throws
     }

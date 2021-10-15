@@ -126,7 +126,6 @@ TEST(Sync_BadVirtualPath)
 
     int nerrors = 0;
 
-    using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
@@ -568,7 +567,6 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -957,7 +955,6 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
         fixture.allow_server_errors(0, 1);
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -1010,7 +1007,6 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
         fixture.allow_server_errors(0, 1);
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -1065,7 +1061,6 @@ TEST(Sync_DetectSchemaMismatch_Links)
         fixture.allow_server_errors(0, 1);
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -1118,7 +1113,6 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         fixture.allow_server_errors(0, 1);
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -1167,7 +1161,6 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         fixture.allow_server_errors(0, 1);
         fixture.start();
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -1218,7 +1211,6 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
 
         bool error_did_occur = false;
 
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -5857,7 +5849,6 @@ TEST(Sync_ConnectionStateChange)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db_1);
     TEST_CLIENT_DB(db_2);
-    using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     std::vector<ConnectionState> states_1, states_2;
     {
@@ -6089,8 +6080,8 @@ TEST_IF(Sync_SSL_Certificates, false)
 
         Session session{client, db, std::move(session_config)};
 
-        auto listener = [&](Session::ConnectionState state, const Session::ErrorInfo* error_info) {
-            if (state == Session::ConnectionState::disconnected) {
+        auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
+            if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger.debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
@@ -6167,8 +6158,8 @@ TEST(Sync_BadChangeset)
             wt.commit();
         }
 
-        auto listener = [&](Session::ConnectionState state, const Session::ErrorInfo* error_info) {
-            if (state != Session::ConnectionState::disconnected)
+        auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
+            if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
@@ -6732,7 +6723,7 @@ TEST(Sync_ClientFileBlacklisting)
         config.client_file_blacklists["/test"].push_back(client_file_ident);
         ClientServerFixture fixture(server_dir, test_context, config);
         fixture.start();
-        using ConnectionState = Session::ConnectionState;
+        using ConnectionState = ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -6830,7 +6821,7 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     // it download that changeset. Then check that it fails at least two times.
     bool failed_once = false;
     bool failed_twice = false;
-    using ConnectionState = Session::ConnectionState;
+    using ConnectionState = ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
@@ -7446,7 +7437,7 @@ TEST(Sync_Set)
 TEST(Sync_DanglingLinksCountInPriorSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    realm::_impl::ClientHistoryImpl history{path};
+    ClientReplication history{path};
     auto local_db = realm::DB::create(history);
     auto& logger = test_context.logger;
 
@@ -7455,7 +7446,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
     version_type last_version, last_version_observed = 0;
     auto dump_uploadable = [&] {
         UploadCursor upload_cursor{last_version_observed, 0};
-        std::vector<sync::ClientReplicationBase::UploadChangeset> changesets_to_upload;
+        std::vector<sync::ClientReplication::UploadChangeset> changesets_to_upload;
         version_type locked_server_version = 0;
         history.find_uploadable_changesets(upload_cursor, last_version, changesets_to_upload, locked_server_version);
         CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));

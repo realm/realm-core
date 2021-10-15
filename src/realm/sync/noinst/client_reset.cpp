@@ -803,7 +803,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
                 (db_remote ? db_remote->get_path() : "<none>"));
 
-    auto& history_local = static_cast<ClientHistoryImpl&>(*db_local.get_replication());
+    auto& history_local = static_cast<ClientReplication&>(*db_local.get_replication());
 
     auto wt_local = db_local.start_write();
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
@@ -813,7 +813,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     sync::SaltedVersion fresh_server_version = {0, 0};
 
     if (db_remote) { // seamless_loss mode
-        auto& history_remote = static_cast<ClientHistoryImpl&>(*db_remote->get_replication());
+        auto& history_remote = static_cast<ClientReplication&>(*db_remote->get_replication());
         auto wt_remote = db_remote->start_write();
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);

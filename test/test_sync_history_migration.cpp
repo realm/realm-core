@@ -82,7 +82,7 @@ TEST_IF(Sync_HistoryMigration, false)
     if (bootstrapped) {
         auto i = std::max_element(client_schema_versions.begin(), client_schema_versions.end());
         latest_client_schema_version = *i;
-        REALM_ASSERT(latest_client_schema_version <= _impl::get_client_history_schema_version());
+        REALM_ASSERT(latest_client_schema_version <= sync::get_client_history_schema_version());
     }
 
     int latest_server_schema_version = -1;
@@ -97,7 +97,7 @@ TEST_IF(Sync_HistoryMigration, false)
     // for an easy way to produce the missing files).
     if (CHECK(bootstrapped)) {
         // FIXME: produce new files
-        // CHECK_EQUAL(_impl::get_client_history_schema_version(), latest_client_schema_version);
+        // CHECK_EQUAL(sync::get_client_history_schema_version(), latest_client_schema_version);
         // CHECK_EQUAL(_impl::get_server_history_schema_version(), latest_server_schema_version);
     }
 
@@ -300,7 +300,7 @@ TEST_IF(Sync_HistoryMigration, false)
         get_history_info(client_path, history_type, history_schema_version);
         REALM_ASSERT(history_type == Replication::hist_SyncClient);
         if (bootstrapped) {
-            if (latest_client_schema_version == _impl::get_client_history_schema_version())
+            if (latest_client_schema_version == sync::get_client_history_schema_version())
                 return; // Latest file is current
         }
         stash_file(client_path, "client", history_schema_version);
