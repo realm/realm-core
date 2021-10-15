@@ -124,6 +124,7 @@ jobWrapper {
         ]
 
         parallelExecutors = [
+            buildLinuxRelease       : doBuildLinux('Release'),
             checkLinuxDebug         : doCheckInDocker(buildOptions),
             checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
