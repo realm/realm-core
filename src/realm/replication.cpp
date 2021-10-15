@@ -77,28 +77,16 @@ void Replication::do_initiate_transact(Group&, version_type, bool)
 {
     char* data = m_stream.get_data();
     size_t size = m_stream.get_size();
-    set_buffer(data, data + size);
+    m_encoder.set_buffer(data, data + size);
 }
 
-Replication::version_type Replication::do_prepare_commit(version_type orig_version)
+Replication::version_type Replication::prepare_commit(version_type orig_version)
 {
     char* data = m_stream.get_data();
-    size_t size = write_position() - data;
+    size_t size = m_encoder.write_position() - data;
     version_type new_version = prepare_changeset(data, size, orig_version); // Throws
     return new_version;
 }
-
-void Replication::do_finalize_commit() noexcept
-{
-    finalize_changeset();
-}
-
-void Replication::do_abort_transact() noexcept {}
-
-void Replication::do_interrupt() noexcept {}
-
-void Replication::do_clear_interrupt() noexcept {}
-
 
 void Replication::add_class(TableKey table_key, StringData, bool)
 {

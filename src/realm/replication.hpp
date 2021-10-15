@@ -195,7 +195,6 @@ public:
     /// produced by the transaction.
     version_type prepare_commit(version_type current_version);
     void finalize_commit() noexcept;
-    void abort_transact() noexcept;
 
     //@}
 
@@ -209,29 +208,7 @@ public:
     /// initiation of commit operation). In that case, the caller may assume that the
     /// returned memory reference stays valid for the remainder of the transaction (up
     /// until initiation of the commit operation).
-    virtual BinaryData get_uncommitted_changes() const noexcept;
-
-    /// Interrupt any blocking call to a function in this class. This function
-    /// may be called asyncronously from any thread, but it may not be called
-    /// from a system signal handler.
-    ///
-    /// Some of the public function members of this class may block, but only
-    /// when it it is explicitely stated in the documention for those functions.
-    ///
-    /// FIXME: Currently we do not state blocking behaviour for all the
-    /// functions that can block.
-    ///
-    /// After any function has returned with an interruption indication, the
-    /// only functions that may safely be called are abort_transact() and the
-    /// destructor. If a client, after having received an interruption
-    /// indication, calls abort_transact() and then clear_interrupt(), it may
-    /// resume normal operation through this Replication object.
-    void interrupt() noexcept;
-
-    /// May be called by a client to reset this Replication object after an
-    /// interrupted transaction. It is not an error to call this function in a
-    /// situation where no interruption has occured.
-    void clear_interrupt() noexcept;
+    virtual BinaryData get_uncommitted_changes() const noexcept final;
 
     /// CAUTION: These values are stored in Realm files, so value reassignment
     /// is not allowed.
@@ -359,34 +336,25 @@ public:
     /// returns \ref hist_None.
     virtual std::unique_ptr<_impl::History> _create_history_read() = 0;
 
-protected:
-    Replication(const std::string& database_file);
-
-
-    // Formerly Replication:
-    void reset_selection_caches() noexcept;
-    void set_buffer(char* new_free_begin, char* new_free_end)
-    {
-        m_encoder.set_buffer(new_free_begin, new_free_end);
-    }
-    char* write_position() const
-    {
-        return m_encoder.write_position();
-    }
+    // This may only be called be the DB class to register itself.
     void register_db(DB* owner)
     {
         m_db = owner;
     }
 
+protected:
+    Replication(const std::string& database_file);
+
+
     //@{
 
     /// do_initiate_transact() is called by initiate_transact(), and likewise
-    /// for do_prepare_commit), do_finalize_commit(), and do_abort_transact().
+    /// for do_prepare_commit()
     ///
     /// With respect to exception safety, the Replication implementation has two
     /// options: It can prepare to accept the accumulated changeset in
     /// do_prepapre_commit() by allocating all required resources, and delay the
-    /// actual acceptance to do_finalize_commit(), which requires that the final
+    /// actual acceptance to finalize_commit(), which requires that the final
     /// acceptance can be done without any risk of failure. Alternatively, the
     /// Replication implementation can fully accept the changeset in
     /// do_prepapre_commit() (allowing for failure), and then discard that
@@ -394,23 +362,13 @@ protected:
     /// `current_version` indicates that the previous transaction failed.
 
     virtual void do_initiate_transact(Group& group, version_type current_version, bool history_updated);
-    version_type do_prepare_commit(version_type orig_version);
-    void do_finalize_commit() noexcept;
-    void do_abort_transact() noexcept;
 
     //@}
 
 
-    void do_interrupt() noexcept;
-
-    void do_clear_interrupt() noexcept;
-
     // Formerly part of TrivialReplication:
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
-    virtual void finalize_changeset() noexcept = 0;
-
-    friend class _impl::TransactReverser;
-    friend class DB;
+    virtual void finalize_changeset() noexcept {}
 
 private:
     struct CollectionId {
@@ -452,8 +410,6 @@ private:
 
     void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
 
-    friend class TransactReverser;
-
     const std::string m_database_file;
     _impl::TransactLogBufferStream m_stream;
 
@@ -483,50 +439,26 @@ inline void Replication::initiate_transact(Group& group, version_type current_ve
         hist->set_group(&group, history_updated);
     }
     do_initiate_transact(group, current_version, history_updated);
-    reset_selection_caches();
-}
-
-inline Replication::version_type Replication::prepare_commit(version_type orig_version)
-{
-    return do_prepare_commit(orig_version);
+    unselect_all();
 }
 
 inline void Replication::finalize_commit() noexcept
 {
-    do_finalize_commit();
-}
-
-inline void Replication::abort_transact() noexcept
-{
-    do_abort_transact();
-}
-
-inline void Replication::interrupt() noexcept
-{
-    do_interrupt();
-}
-
-inline void Replication::clear_interrupt() noexcept
-{
-    do_clear_interrupt();
+    finalize_changeset();
 }
 
 inline BinaryData Replication::get_uncommitted_changes() const noexcept
 {
     const char* data = m_stream.get_data();
-    size_t size = write_position() - data;
+    size_t size = m_encoder.write_position() - data;
     return BinaryData(data, size);
 }
 
 inline size_t Replication::transact_log_size()
 {
-    return write_position() - m_stream.get_data();
+    return m_encoder.write_position() - m_stream.get_data();
 }
 
-inline void Replication::reset_selection_caches() noexcept
-{
-    unselect_all();
-}
 
 inline void Replication::unselect_all() noexcept
 {

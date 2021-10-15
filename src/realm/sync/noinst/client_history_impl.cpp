@@ -1124,12 +1124,6 @@ void ClientReplication::set_oldest_bound_version(version_type version)
 }
 
 // Overriding member function in realm::_impl::History
-BinaryData ClientReplication::get_uncommitted_changes() const noexcept
-{
-    return Replication::get_uncommitted_changes();
-}
-
-// Overriding member function in realm::_impl::History
 void ClientReplication::verify() const
 {
 #ifdef REALM_DEBUG

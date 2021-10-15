@@ -982,8 +982,6 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     db->do_end_write();
 
-    repl->abort_transact();
-
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);
 }

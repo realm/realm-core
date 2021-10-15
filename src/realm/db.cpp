@@ -2141,13 +2141,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
-        try {
-            low_level_commit(new_version, transaction); // Throws
-        }
-        catch (...) {
-            repl->abort_transact();
-            throw;
-        }
+        low_level_commit(new_version, transaction); // Throws
         repl->finalize_commit();
     }
     else {
@@ -2571,9 +2565,6 @@ void Transaction::rollback()
         throw LogicError(LogicError::wrong_transact_state);
     db->reset_free_space_tracking();
     db->do_end_write();
-
-    if (Replication* repl = db->get_replication())
-        repl->abort_transact();
 
     do_end_read();
 }

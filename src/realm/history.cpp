@@ -229,12 +229,6 @@ public:
         return new_version;
     }
 
-    void finalize_changeset() noexcept override
-    {
-        // Since the history is in the Realm, the added changeset is
-        // automatically finalized as part of the commit operation.
-    }
-
     HistoryType get_history_type() const noexcept override
     {
         return hist_InRealm;

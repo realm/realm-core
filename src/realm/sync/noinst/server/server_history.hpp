@@ -473,7 +473,6 @@ public:
 
     // Overriding member functions in Replication
     version_type prepare_changeset(const char*, std::size_t, version_type) override;
-    void finalize_changeset() noexcept override;
 
     // Overriding member functions in _impl::History
     void update_from_ref_and_version(ref_type ref, version_type) override;
@@ -492,7 +491,6 @@ public:
     // Overriding member functions in _impl::History
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
-    BinaryData get_uncommitted_changes() const noexcept override;
     void verify() const override;
 
 private:
