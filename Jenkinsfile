@@ -394,12 +394,12 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
+            docker.build('realm-core-generic:gcc-10', '-f generic.Dockerfile .').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-8 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   scl enable devtoolset-10 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
