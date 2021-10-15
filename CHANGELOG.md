@@ -19,7 +19,7 @@
 * Fixed a rare segfault which could trigger if a user was being logged out while the access token refresh response comes in. ([#4944](https://github.com/realm/realm-core/issues/4944), since v10)
 * Fixed a bug where progress notifiers continue to be called after the download of a synced realm is complete. ([#4919](https://github.com/realm/realm-core/issues/4919))
 * Fixed an issue where the release process was only publishing armeabi-v7a Android binaries. ([#4952](https://github.com/realm/realm-core/pull/4952), since v10.6.0)
-* Allow for EPERM to be returned from fallocate(). Thanks to [@ztane](https://github.com/ztane) for reporting and suggesting a fix. ([#4957](https://github.com/realm/realm-core/issues/4957))
+* Allow for EPERM to be returned from fallocate(). This improves support for running on Linux environments with interesting filesystems, like AWS Lambda. Thanks to [@ztane](https://github.com/ztane) for reporting and suggesting a fix. ([#4957](https://github.com/realm/realm-core/issues/4957))
 * Fixed an issue where the Mac Catalyst target was excluded from the `REALM_HAVE_SECURE_TRANSPORT` macro in the Swift Package. This caused `'SSL/TLS protocol not supported'` to be thrown as an exception if Realm Sync is used. ([#7474](https://github.com/realm/realm-cocoa/issues/7474))
 
 ### Breaking changes
