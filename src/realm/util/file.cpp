@@ -920,7 +920,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
         std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
         throw OutOfDiskSpace(msg);
     }
-    if (status == EINVAL) {
+    if (status == EINVAL || status == EPERM) {
         return false; // Retry with non-atomic version
     }
     throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
