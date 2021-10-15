@@ -31,6 +31,7 @@
 ### Internals
 * Cleaned out some old server tools and add the remaining ones to the default build.
 * App can now use bundled realm without getting "progress error" from server.
+* Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
 
 ----------------------------------------------
 
