@@ -8,7 +8,7 @@ let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
 
-let cxxSettings: [CXXSetting] = [
+var cxxSettings: [CXXSetting] = [
     .headerSearchPath("."),
     .define("REALM_DEBUG", .when(configuration: .debug)),
     .define("REALM_NO_CONFIG"),
@@ -21,10 +21,14 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
     .define("REALM_VERSION_PATCH", to: String(versionCompontents[2])),
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
-    .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
-
-    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+    .define("REALM_VERSION_STRING", to: "\"\(versionStr)\"")
 ]
+
+#if swift(>=5.4)
+cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])))
+#else
+cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])))
+#endif
 
 let syncServerSources: [String] =  [
     "realm/sync/noinst/server",
