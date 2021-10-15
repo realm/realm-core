@@ -37,6 +37,7 @@
 
 #include "util/test_path.hpp"
 #include "util/compare_groups.hpp"
+#include "util/unit_test.hpp"
 
 #include <fstream>
 #include <numeric>
