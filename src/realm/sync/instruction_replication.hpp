@@ -85,13 +85,6 @@ public:
     void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx) final;
     //@}
 
-    template <class T>
-    void emit(T instruction);
-
-    // Returns true and populates m_last_table_name if instructions for the
-    // table should be emitted.
-    bool select_table(const Table&);
-
 protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
@@ -103,6 +96,13 @@ private:
     Transaction* m_transaction;
 
     TableKey m_table_being_erased;
+
+    template <class T>
+    void emit(T instruction);
+
+    // Returns true and populates m_last_table_name if instructions for the
+    // table should be emitted.
+    bool select_table(const Table&);
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 
