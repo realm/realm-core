@@ -1205,7 +1205,7 @@ void Connection::handle_message_received(const char* data, std::size_t size)
 {
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
-    get_client_protocol().parse_message_received<Connection>(*this, data, size);
+    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
 }
 
 
@@ -1213,7 +1213,7 @@ void Connection::handle_pong_received(const char* data, std::size_t size)
 {
     // parse_pong_received() parses the pong and calls the proper handler on the
     // Connection object (this).
-    get_client_protocol().parse_pong_received<Connection>(*this, data, size);
+    get_client_protocol().parse_pong_received<Connection>(*this, std::string_view(data, size));
 }
 
 

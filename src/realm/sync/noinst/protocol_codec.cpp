@@ -1,15 +1,11 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/from_chars.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 
-
-using namespace realm;
-
-using _impl::ClientProtocol;
-using _impl::ServerProtocol;
+namespace realm::_impl {
 
 using OutputBuffer = util::ResettableExpandableBufferOutputStream;
-
 
 // Client protocol
 
@@ -258,13 +254,13 @@ void ServerProtocol::make_pong(OutputBuffer& out, milliseconds_type timestamp)
 }
 
 
-std::string _impl::make_authorization_header(const std::string& signed_user_token)
+std::string make_authorization_header(const std::string& signed_user_token)
 {
     return "Bearer " + signed_user_token;
 }
 
 
-util::Optional<StringData> _impl::parse_authorization_header(const std::string& authorization_header)
+util::Optional<StringData> parse_authorization_header(const std::string& authorization_header)
 {
     StringData prefix = "Bearer ";
     // Token contains at least three characters. Stricter checks are possible, but do
@@ -278,3 +274,5 @@ util::Optional<StringData> _impl::parse_authorization_header(const std::string& 
     std::size_t token_size = authorization_header.size() - prefix.size();
     return StringData{authorization_header.data() + prefix.size(), token_size};
 }
+
+} // namespace realm::_impl
